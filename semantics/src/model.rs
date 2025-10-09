@@ -1,0 +1,1 @@
+// Semantic data model placeholder
