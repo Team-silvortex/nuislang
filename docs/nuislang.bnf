@@ -1,0 +1,181 @@
+<program> ::= { <attribute_list>? (<use_stmt> | <module_decl> | <trait_decl> | <impl_block> | <event_decl> | <delegate_decl>) }
+
+<use_stmt> ::= "use" <import_path> ";"
+<import_path> ::= <identifier> { "::" <identifier> }
+
+<attribute_list> ::= { <attribute> }
+<attribute> ::= "#[" <attribute_body> "]"
+<attribute_body> ::= <identifier> [ "(" <attribute_args> ")" ]
+<attribute_args> ::= <attribute_arg> { "," <attribute_arg> }
+<attribute_arg> ::= <literal> | <identifier> | <key_value_pair>
+<key_value_pair> ::= <identifier> "=" (<literal> | <identifier>)
+
+;; ------------------------------------------------------------
+;; Modules (domains are extensible; built-ins listed first)
+;; ------------------------------------------------------------
+<module_decl> ::= "mod" <domain_name> <identifier> [ "<" <generic_params> ">" ] "{" { <attribute_list>? <module_item> } "}"
+
+<domain_name> ::= "cpu" | "shader" | "kernel" | "npu" | "quantum" | <identifier>   ;; <identifier> 由 Nustar 注册
+
+<module_item> ::= <const_decl>
+                | <type_decl>
+                | <fn_decl>
+                | <event_decl>
+                | <delegate_decl>
+                | <event_handler>
+                | <impl_block>
+                | <comptime_block>
+                | <shader_block>      ;; 仅在 shader 域或允许内联 shader 的域中合法
+                | <kernel_block>      ;; 仅在 kernel 域或允许 kernel 的域中合法
+
+<const_decl> ::= "const" <identifier> ":" <type_expr> "=" <expression> ";"
+
+<type_decl> ::= <struct_decl> | <enum_decl>
+
+<struct_decl> ::= "struct" <identifier> [ "<" <generic_params> ">" ] "{" { <attribute_list>? <field_decl> } "}"
+<field_decl> ::= <identifier> ":" <type_expr> ";"
+
+<enum_decl> ::= "enum" <identifier> [ "<" <generic_params> ">" ] "{" { <attribute_list>? <enum_variant> } "}"
+<enum_variant> ::= <identifier> [ "(" <type_expr> { "," <type_expr> } ")" ] ";"
+
+;; ------------------------------------------------------------
+;; Traits / impl
+;; ------------------------------------------------------------
+<trait_decl> ::= "trait" <identifier> [ "<" <generic_params> ">" ] "{" { <attribute_list>? <trait_item> } "}"
+<trait_item> ::= <fn_signature> ";"
+
+<impl_block> ::= "impl" [ "<" <generic_params> ">" ] <type_ref> [ "for" <type_ref> ] "{" { <attribute_list>? <fn_decl> } "}"
+
+;; ------------------------------------------------------------
+;; Functions
+;; ------------------------------------------------------------
+<fn_decl> ::= [ "comptime" ] [ "async" ] "fn" <identifier> [ "<" <generic_params> ">" ]
+               "(" [ <param_list> ] ")" [ "->" <type_expr> ] <block>
+
+<fn_signature> ::= [ "comptime" ] [ "async" ] "fn" <identifier> "(" [ <param_list> ] ")" [ "->" <type_expr> ]
+
+<param_list> ::= <param> { "," <param> }
+<param> ::= <identifier> ":" <type_expr>
+
+<comptime_block> ::= "comptime" <block>
+
+;; ------------------------------------------------------------
+;; Events / Delegates / Handlers (signals)
+;; ------------------------------------------------------------
+<event_decl> ::= "event" <identifier> [ "<" <generic_params> ">" ] "(" [ <param_list> ] ")" ";"
+
+<delegate_decl> ::= "delegate" "fn" <identifier> [ "<" <generic_params> ">" ] "(" [ <param_list> ] ")" [ "->" <type_expr> ] ";"
+
+<event_handler> ::= "on" <identifier> "(" [ <param_list> ] ")" [ "async" ] <block>
+
+<emit_stmt> ::= "emit" <identifier> "(" [ <expression_list> ] ")" ";"
+
+;; ------------------------------------------------------------
+;; Shader / Kernel domain blocks
+;;   - shader_block 的内容由 WGSL 兼容子语法解析（本 BNF 仅占位）
+;;   - kernel_block 的并行参数签名由后端/插件解释
+;; ------------------------------------------------------------
+<shader_block> ::= "shader" "{" <shader_source> "}"        ;; <shader_source> 由 shader 子语法定义（WGSL 兼容）
+<shader_source> ::= <shader_token_stream>                  ;; 词法占位符
+
+<kernel_block> ::= "kernel" "(" [ <kernel_param_list> ] ")" <block>
+<kernel_param_list> ::= <kernel_param> { "," <kernel_param> }
+<kernel_param> ::= <identifier> ":" <type_expr>            ;; 例如 thread_id: u32, group_id: u32 等
+
+;; ------------------------------------------------------------
+;; Generics / Traits bounds
+;; ------------------------------------------------------------
+<generic_params> ::= <generic_param> { "," <generic_param> }
+<generic_param> ::= <identifier> [ ":" <trait_bound_list> ]
+<trait_bound_list> ::= <trait_bound> { "+" <trait_bound> }
+<trait_bound> ::= <type_ref>
+
+;; ------------------------------------------------------------
+;; Types (ownership qualifiers kept minimal)
+;; ------------------------------------------------------------
+<type_expr> ::= [ "ref" ] <type_atom> | <generic_type> | <optional_type>
+
+<type_atom> ::= <type_ref>
+<type_ref> ::= <identifier> [ "<" <type_expr_list> ">" ]
+<type_expr_list> ::= <type_expr> { "," <type_expr> }
+
+<generic_type> ::= <type_ref> "<" <type_expr_list> ">"
+<optional_type> ::= <type_ref> "?"
+
+;; ------------------------------------------------------------
+;; Blocks / Statements
+;; ------------------------------------------------------------
+<block> ::= "{" { <statement> } "}"
+
+<statement> ::= <var_decl>
+              | <const_decl>
+              | <expr_stmt>
+              | <return_stmt>
+              | <if_stmt>
+              | <match_stmt>
+              | <await_stmt>
+              | <emit_stmt>
+              | <block>
+              | <comptime_block>
+
+<var_decl> ::= "let" <identifier> ":" <type_expr> "=" <expression> ";"
+             | "let" <identifier> "=" <expression> ";"
+
+<expr_stmt> ::= <expression> ";"
+<return_stmt> ::= "return" [ <expression> ] ";"
+<await_stmt> ::= "await" <expression> ";"
+
+<if_stmt> ::= "if" <expression> <block> [ "else" <block> ]
+
+<match_stmt> ::= "match" <expression> "{" { <match_arm> } "}"
+<match_arm> ::= <pattern> "=>" <block> ";"
+
+;; ------------------------------------------------------------
+;; Expressions (move by default; 'copy' as explicit unary op)
+;; ------------------------------------------------------------
+<expression> ::= <literal>
+               | <identifier>
+               | <function_call>
+               | <method_call>
+               | <field_access>
+               | <binary_op_expr>
+               | <unary_op_expr>
+               | <parenthesized_expr>
+
+<parenthesized_expr> ::= "(" <expression> ")"
+
+<function_call> ::= <identifier> "(" [ <expression_list> ] ")"
+<method_call> ::= <expression> "." <identifier> "(" [ <expression_list> ] ")"
+<field_access> ::= <expression> "." <identifier>
+<expression_list> ::= <expression> { "," <expression> }
+
+<binary_op_expr> ::= <expression> <binary_op> <expression>
+<unary_op_expr> ::= <unary_op> <expression>
+
+<binary_op> ::= "||" | "&&" | "|" | "^" | "&"
+              | "==" | "!=" | "<" | ">" | "<=" | ">="
+              | "+" | "-" | "*" | "/" | "%"
+
+<unary_op> ::= "-" | "!" | "copy"            ;; copy 显式复制；无 'move'（默认移动语义）
+
+<pattern> ::= <identifier> | "_" | "some" "(" <identifier> ")" | "none"
+
+;; ------------------------------------------------------------
+;; Literals / Identifiers / Lexical
+;; ------------------------------------------------------------
+<literal> ::= <integer_literal> | <float_literal> | <string_literal> | <bool_literal> | "none" | "some" "(" <expression> ")"
+
+<integer_literal> ::= <digit> { <digit> }
+<float_literal> ::= <digit> { <digit> } "." <digit> { <digit> }
+<string_literal> ::= "\"" { <any_char_except_quote> } "\""
+<bool_literal> ::= "true" | "false"
+
+<identifier> ::= <ident_start> { <ident_continue> }
+<ident_start> ::= <letter> | "_"
+<ident_continue> ::= <letter> | <digit> | "_"
+
+<digit> ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+<letter> ::= "a" | ... | "z" | "A" | ... | "Z"
+
+<comment> ::= "//" { <any_char_except_newline> }
+            | "/*" { <any_char> } "*/"
