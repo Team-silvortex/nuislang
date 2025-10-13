@@ -1,3 +1,26 @@
 [workspace]
-members = ["compiler", "runtime", "semantics", "strategy-ai", "tools"]
+members = [
+    "compiler",
+    "runtime",
+    "semantics",
+    "strategy-ai",
+    "tools"          # ✅ 未来CLI或辅助工具可以放这里
+]
 resolver = "2"
+
+# 可选，方便 workspace 一键构建文档/测试
+[workspace.package]
+edition = "2021"
+license = "MIT"
+authors = ["Team Silvortex <team@silvortex.dev>"]
+repository = "https://github.com/Team-silvortex/nuislang"
+readme = "README.md"
+description = "NuisLang — A semantics-centric language designed to outlive hardware."
+
+# 可选全局依赖版本锁，防止 crate 不同版本冲突
+[workspace.dependencies]
+pest = "2.7"
+pest_derive = "2.7"
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0"
+log = "0.4"
