@@ -1,0 +1,16 @@
+fn @name(arg1: type, arg2: type) -> rettype {
+    ; body
+}
+%ret = call @func_name(arg1, arg2, ...)
+tailcall @func(...)
+awaitcall @async_func(...)
+%tex = call @load_texture("res/bg.png")
+%cb = closure @func(arg1, arg2)
+invoke %cb(extra_arg)
+%cb = closure @on_click(%button)
+invoke %cb()
+yield
+resume %co
+dispatch.render @func(args...)
+dispatch.audio  @func(args...)
+dispatch.ui     @func(args...)

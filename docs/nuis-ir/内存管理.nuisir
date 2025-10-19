@@ -1,0 +1,16 @@
+%obj = new %type [count] (init_args...) 
+del %obj
+%pool = mempool.new %type [count] 
+mempool.free %pool
+retain %obj
+release %obj
+%buf = gpu.alloc size, usage
+gpu.free %buf
+%ptr = gpu.map %buf
+gpu.unmap %buf
+%audio = audio.alloc channels, samples
+audio.free %audio
+barrier.gpu
+barrier.audio
+lifetime.start %obj
+lifetime.end %obj
