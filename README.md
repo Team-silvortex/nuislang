@@ -1,289 +1,403 @@
-🪶 NuisLang Whitepaper v0.2
+🪶 NuisLang Whitepaper v0.4
 
-A Language Designed to Outlive Hardware
-语言的使命不是追随硬件，而是超越它。
-
-⸻
-
-序 · 语义文明的宣言
-
-当计算诞生于指令之时，它注定服务于机器；
-当语言诞生于语义之上，它才开始服务于文明。
-
-过去几十年，我们将语言视作指令的模板，将编译器视作翻译器，将性能视作终极衡量。于是语言不断追赶架构，程序不断迎合硬件，抽象层在速度的恐惧中被碾碎。
-
-Nuis 并不认为这是必然。
-
-第五代语言不是更快的语言，而是更清醒的语言。它不为设备编程，而为意义编程；不再追逐执行模型，而是构建执行语义；不再围绕指令，而围绕意图。
-
-Nuis 的目标不是适配未来硬件，而是让未来硬件适配它。
+A Language Designed to Outlive Hardware.
+MIT License
 
 ⸻
 
-Ⅰ. 世界观 · Nuis 的语言哲学
+0. 序 · 语义文明的宣言
 
-Nuis 构建于三条稳定轴线上：
+当计算以指令为中心，语言便服务于机器；
+当计算以语义为中心，语言才服务于文明。
+
+过去的语言以指令、结构、架构为核心，
+为了追逐性能，不断向硬件妥协、向底层让渡抽象。
+
+Nuis 拒绝这一历史惯性。
+
+Nuis 是第五代语言：
+意图优先、语义优先、调度优先。
+
+它不为设备编程，而为意义编程；
+它不是被硬件决定的语言，而是未来硬件将适配的语言。
+
+⸻
+
+1. Nuis 的世界观（Philosophy）
+
+Nuis 的设计以三条稳定轴为基础：
 
 维度	定义	属性
-语义稳定性	描述“做什么”的层永久不应被硬件侵蚀	永久稳定
-执行可演化性	执行路径允许随时代替换	可替换
-策略可学习性	编译决策具备智能进化能力	可演化
+语义稳定性	描述“做什么”的语义层不受硬件侵蚀	永久稳定
+执行可演化性	执行路径可替换，不影响语义结构	可替换
+策略可学习性	编译器具备进化的策略智能	可演化
 
-Nuis 认为语言并非“指令的便利书写方式”，而是“意义的承载系统”。
-
-因此我们拒绝以下假设：
-	•	指令是语言的核心
-	•	性能凌驾于语义
-	•	编译器只是规则机器
-
-并确立以下信条：
-	1.	用户只描述意图，执行由系统决定。
-	2.	抽象必须建立在语义结构之上，而非语法糖。
-	3.	时间兼容性高于平台兼容性。
-	4.	编译器是策略智能体，而非静态规则机。
-	5.	安全是语义一致性的必然结果。
+信条：
+	1.	用户描述意图，执行由系统决定。
+	2.	抽象建立于语义结构，而非语法糖。
+	3.	时间兼容性优于平台兼容性。
+	4.	编译器是策略智能体，而非规则机器。
+	5.	安全来自语义一致性，而非附加规则。
 
 ⸻
 
-Ⅱ. 核心抽象：语义组件
+2. NIR：语义意图 IR（Semantic Intent IR）
 
-mod —— 类型化计算上下文
+NIR 是 Nuis 的最高层语言语义。
 
-mod 是 Nuis 的根语义单位，其本质不是模块，而是一个“计算宇宙”。
+NIR 的目标：
+	•	捕获意图（Intent）
+	•	捕获逻辑关系
+	•	捕获资源抽象
+	•	完全独立于平台、架构、执行域
 
-mod cpu Host { ... }
-mod kernel Compute { ... }
-mod shader Lighting { ... }
-mod quantum QKernel { ... }
+在 NIR 中，程序是一组语义节点的关系图，而非指令流。
 
-属性：
-	•	独立语义空间
-	•	独立类型实现
-	•	明确执行域
-	•	非结构嵌套，而是语义边界
+示例（概念化）：
 
-mod 构成执行图中的节点，而非简单命名空间。
+let buf = Buffer<f32>(1024)
+buf.fill(1.0)
+buf.normalize()
 
-⸻
+在 NIR 中被解释为：
+	•	Allocate(1024)
+	•	Fill(1.0)
+	•	Normalize()
 
-channel —— 跨域数据语义桥
-
-let ch = channel<Buffer<f32>, cpu::Host, kernel::Compute>::new();
-ch.send(data);
-kernel::Compute.dispatch(ch);
-
-channel 是计算域之间的语义连接，其职责是表达：
-	•	数据流向
-	•	生命周期边界
-	•	所有权迁移
-	•	同步策略
-
-它是调度图中的边，而非通信工具。
+NIR 不包含执行域、调度、生命周期、物理资源。
 
 ⸻
 
-Ⅲ. 三层 IR 架构：语义 → 调度 → 执行
+3. YIR：跨域调度 IR（Cross-Domain Scheduling IR）
 
-Nuis 引入明确的三层 IR 模型：
+YIR 是 Nuis 的核心，也是执行真理。
 
-Semantic IR (NIR) —— 描述意图与结构
-        ↓
-Schedule IR (YIR) —— 描述任务图与执行规划
-        ↓
-Target IR (LLVM / SPIR-V / QIR) —— 描述指令实现
+它承担：
+	•	CPU / GPU / Shader / WASM 的跨域调度
+	•	资源流（Resource Flow Graph）
+	•	生命周期图（Graph Lifetime Model）
+	•	域选择（Domain Selection）
+	•	数据流与控制流的统一表示
+	•	对接所有后端（Rust / GPU / WASM / Yalivia）
 
-NIR：语义中间表示
-	•	表达“要做什么”而非“如何做”
-	•	捕捉意图、上下文、生命周期、逻辑结构
-	•	不关心设备、线程或并行策略
+每个 YIR 程序都是一个 DAG（有向无环图）：
 
-YIR：调度中间表示
+Node  —— 计算单元
+Edge  —— 数据或控制依赖
+Res   —— 资源实体（跨节点生存）
 
-YIR 是 Nuis 的执行心脏：
-	•	构建任务图（DAG）
-	•	描述依赖关系
-	•	映射执行域
-	•	编排同步结构
-	•	供 Strategy Engine 操作
-
-这是新一代编译模型的核心，而非语法糖附属。
-
-Target IR
-
-执行层 IR 面向具体平台，完全可替换，仅服从 YIR 规划。
+YIR 是 Nuis 的真正核心层。
 
 ⸻
 
-Ⅳ. Strategy Engine · 可学习的编译智能体
+4. YIR 内存模型 v0.4（Memory Model for GLM）
 
-Strategy Engine 位于 NIR 与 YIR 之间，负责将语义抽象转化为执行结构。
+4.1 值分类（Value Classes）
 
-支持三种模式：
+YIR 将值分为两级：
 
-strategy:
-  mode: auto
-  model: ai_policy
+(1) val: 短命 SSA 值
+	•	算术结果、中间变量
+	•	不跨节点
+	•	不进入 GLM
 
-	•	Rule-driven：规则模板
-	•	AI-driven：机器学习策略
-	•	Profile-driven：性能反馈优化
-
-编译不再是固定过程，而是可学习决策链。
-
-⸻
-
-Ⅴ. Semantic Data Model (SDM)
-
-三层语义数据结构：
-
-层级	职责
-Mod Context Layer	语义作用域与内存边界
-Entity Layer	对象状态与语义属性
-Lifetime Graph Layer	生命周期演化路径
-
-Nuis Debug 的核心原则：
-
-Watch the Flow, not the Bytes.
+(2) res: 资源级 Value
+	•	Buffer / Image / Handle / 大对象
+	•	可能跨域（CPU→GPU→CPU）
+	•	需要生命周期追踪
+	•	进入 GLM 分析
 
 ⸻
 
-Ⅵ. 类型与上下文系统
+4.2 资源使用模式（UseMode）
 
-类型在 Nuis 中服从语义而非物理表示：
-	•	同名类型跨域独立实现
-	•	泛型是语义模板
-	•	多态是意图分化
+每个 res 在每个 YIR Node 上有：
+	•	Own
+节点拥有资源，可 drop/move
+	•	Read
+只读，不改变所有权
+	•	Write
+可变借用，不改变所有权
 
-mod physics(cpu) {
-    struct Vec3 { x: f32, y: f32, z: f32 }
-}
+使用模式规则：
+	•	同一资源同时只能存在一个 Own（在偏序意义上）
+	•	Write 与任意 Read/Write 不可并发
+	•	Read 之间可以并发（前提：无 Write）
 
-mod shader(shader) {
-    struct Vec3 { x: f32, y: f32, z: f32 }
-}
+⸻
+
+4.3 生命周期区（Region）
+
+GLM 定义资源生命周期：
+
+Region(R) = 所有合法使用 R 的节点集合。
+
+构建方式：
+	1.	找到资源的定义节点 N_def
+	2.	收集所有 Use(res=R) 的节点
+	3.	包含所有路径依赖
+	4.	被 Drop/Release 节点终止
+
+非法情况：
+	•	定义前使用
+	•	Drop 后使用
+	•	双重所有权（Copy Own）
+	•	并发 Write 冲突
+	•	跨域悬挂（domain mismatch）
+
+⸻
+
+4.4 跨域行为
+
+YIR 支持以下执行域：
+	•	CPU
+	•	GPU
+	•	Shader
+	•	WASM
+	•	Future Domain（可扩展）
+
+跨域移动：
+
+send %buf -> GPU
+
+语义：
+	•	Own 迁移到 GPU
+	•	Region 延伸
+	•	CPU 之后不能使用 buf（除非再迁回）
+
+跨域移动是 GLM 的核心检查点。
+
+⸻
+
+4.5 最小合法示例
+
+N1: alloc  %buf (CPU)      ; Own
+N2: write  %buf (CPU)
+N3: send   %buf -> GPU     ; Own moves
+N4: read   %buf (GPU)
+N5: read   %buf (GPU)
+N6: send   %buf -> CPU     ; Own moves back
+N7: read   %buf (CPU)
+N8: drop   %buf (CPU)
+
+Region(%buf) = {N1..N8}
+
+任何 N8 之后访问 buf → 编译错误。
+
+⸻
+
+5. Domain IR（CPU / GPU / Shader）
+
+Domain IR 是 YIR 的物理特化层：
+
+CPU Domain IR（CIR）
+	•	类 MIR（Rust 中层 IR）
+	•	显式控制流
+	•	显式资源 Drop
+	•	交由 Rust / LLVM 实现
+
+GPU Domain IR（GIR）
+	•	结构化 SPIR-V / compute-shader 模型
+	•	显式访存、线程网格语义
+	•	映射 Vulkan/Metal
+
+Shader Domain IR（SDFG/SSA）
+	•	图形着色器执行模型
+	•	并行通信与材质语义
+
+每个 Domain IR 都是 YIR 的特化。
+
+⸻
+
+6. Nurs：YIR-CPU ↔ Rust MIR 的双向桥接层
+
+Nurs 的核心设计：
+
+Nurs is a bidirectional semantic bridge between YIR-CPU and Rust MIR.
+
+原因：
+	•	YIR-CPU 特化后与 MIR 高度同构
+	•	控制流可相互转换
+	•	类型结构兼容
+	•	生命周期在 GLM 层已保证
+	•	可实现双向 lowering/lifting
+
+6.1 Nuis → Rust
+
+YIR-CPU
+  ↓
+Nurs Lowering
+  ↓
+Rust MIR
+  ↓
+LLVM
+  ↓
+Native Code
+
+6.2 Rust → Nuis
+
+Rust 模块可通过 MIR → YIR-CPU 导入：
+
+Rust AST
+  ↓
+MIR
+  ↓
+Nurs Lifting
+  ↓
+YIR-CPU NodeGraph
+  ↓
+Nuis 程序可直接使用
+
+无需 C ABI，不需 bindgen。
+
+Nuis 与 Rust 在 CPU 域属于IR 兄弟关系。
+
+6.3 稳定性模型
+	•	MIR 不稳定
+	•	YIR 为主轴
+	•	Nurs 感知 MIR 演化
+	•	Nuis 保持自身语义稳定
+	•	将来 YIR 可能反向影响 MIR
+
+⸻
+
+7. Go 的角色：Yalivia 的一级扩展语言
+	•	Go 在 Nuis 中不进入 CPU Domain
+	•	Go 经由：
+
+Go → Yalivia → YIR
+
+参与调度
+	•	动态特性（GC、JIT、反射、脚本化）完全托管 Yalivia
+	•	Nuis Native 完全不受影响
+
+Nuis Native = Rust 级高性能、零 GC
+Yalivia = 动态 & 多语言世界的执行层
+
+⸻
+
+8. 安全模型（Semantic Safety Model）
+
+安全由三层保障：
+	1.	GLM（语义级生命周期）
+	2.	Nurs（语义到 CPU 物理层的一致性）
+	3.	Rust Borrow Checker（CPU 地址级安全）
+
+三层互补，构成长久、跨域的可靠性体系。
+
+⸻
+
+9. Yalivia Runtime 的定位
+
+Yalivia 是可选的运行时：
+	•	动态调度（JIT / 解释）
+	•	脚本绑定（Go、Python、Lua…）
+	•	多语言桥接
+	•	策略智能体的运行空间
+	•	调度图执行引擎参考实现
+
+原则：
+
+Nuis Native 不依赖 Yalivia。
+
+Yalivia 是能力扩展，不是必需品。
+
+⸻
+
+10. 工具链体系（Tools）
+
+10.1 nuis-cli
+	•	源码 → NIR
+	•	NIR → YIR
+	•	GLM 验证
+	•	IR 导出（.nir, .yir, .dot, .json）
+	•	调度图可视化
+	•	与 nuis-rc 通信执行
+
+示例：
+
+nuis run main.ns
+nuis ir --yir main.ns -o graph.dot
+nuis schedule graph
 
 
 ⸻
 
-Ⅶ. 安全模型：语义一致性安全
+10.2 nuis-build
 
-Nuis 的安全不是内存限定，而是语义一致性：
-	•	异构 Borrow Checker
-	•	生命周期图验证
-	•	循环引用拒绝
-	•	跨域一致性检查
-
-⸻
-
-Ⅷ. Runtime · 最小职责执行层
+构建系统：
+	•	多模块工程
+	•	多域构建（native/wasm/yalivia）
+	•	与 Cargo/CMake 集成
+	•	YIR pass pipeline 配置
 
 ⸻
 
-Ⅷ-A. Nuis Toolchain & LanguageOS 架构
-
-Nuis 并非单一编译器，而是一个面向语义计算的 LanguageOS 级工具链系统，其职责是构建、维护并调度整个语义世界。
-
-核心组件如下：
-
-🧠 nuis-rc — Semantic Core Controller
-
-语义运行控制中枢，负责：
-	•	语义实体注册与追踪
-	•	生命周期一致性维护
-	•	跨域资源调度协调
-	•	Strategy Engine 与 Runtime 的通信桥梁
-
-它并非传统 runtime，而是“语义守护中枢”。
+10.3 nuis-rc（runtime controller）
+	•	本地或远程执行 YIR
+	•	CPU / GPU / WASM domain runner
+	•	支持 Yalivia runtime
+	•	性能分析与调度 Trace
 
 ⸻
 
-🌌 Nustar — Domain & Capability Registry
-
-领域注册系统，用于声明与管理：
-	•	新硬件域（CPU / GPU / Quantum / NPU）
-	•	执行能力模型
-	•	资源约束与特性描述
-	•	Plugin 领域扩展
-
-它使 Nuis 拥有可扩展的”语义宇宙”。
+10.4 IDE / LSP 支持
+	•	基于 NIR 的语义高亮
+	•	调度图可视化
+	•	生命周期 Region 预览
+	•	GLM 诊断
+	•	nuis-rc 会话控制
 
 ⸻
 
-🧵 Nurs — Physical Bridge Layer
+11. 执行模型总览
 
-物理桥层，负责：
-	•	与底层驱动接口交互
-	•	设备初始化与生命周期控制
-	•	DMA / UVM / Shared Memory 管理
-	•	安全执行通道维护
-
-它是语义世界与物理世界之间的接口层。
-
-⸻
-
-🛠️ nuis-cli & nuis-build
-
-开发者工具：
-	•	模块编译与调度预览
-	•	语义冲突检测
-	•	生命周期图可视化
-	•	执行策略模拟
-
-这些工具构成开发者与 LanguageOS 的交互窗口。
-
-⸻
-
-工具链协作模型
-
-Source (.ns)
- ↓
-Nuis Frontend
- ↓
-Semantic IR (NIR)
- ↓
-Strategy Engine
- ↓
-Schedule IR (YIR)
- ↓
-LanguageOS Core (nuis-rc)
- ↓
-Nurs → Hardware
-
-Nuis 工具链不是从代码到机器，而是从意图到执行文明。
-
-运行时承担：
-	•	执行设备调度
-	•	Channel 同步
-	•	策略模型加载
-	•	性能反馈采集
-
-其角色是执行服从者而非规则主宰者。
-
-⸻
-
-Ⅸ. AI 与语义共治
-
-AI 在 Nuis 中非加速器，而是决策参与者：
-	•	Semantic Advisor 提供结构分析
-	•	Strategy Engine 调节执行策略
-	•	反馈闭环训练
-
-⸻
-
-Ⅹ. Evolution Roadmap
-
-阶段	目标	状态
-v0.3	NIR 完善	✅
-v0.4	MLIR Dialect	🚧
-v0.5	Strategy 原型	🚧
-v0.6	多设备 runtime	⏳
-v0.7	Quantum backend	⏳
-v1.0	语义规范冻结	🏁
+User Code
+  ↓
+NIR (Semantic Intent)
+  ↓
+YIR (Scheduling Graph)
+  ↓
+GLM (Graph Lifetime Model)
+  ↓
+Domain IR (CPU/GPU/WASM)
+  ↓
+Nurs / Yalivia / WASM Backend
+  ↓
+Rust / GPU Driver / WASM Engine
+  ↓
+Hardware
 
 
 ⸻
 
-终章 · 语言的未来不是更快，而是更清晰
+12. v0.4 完成情况
+
+组件	状态
+NIR	稳定
+YIR	核心结构完备
+YIR 内存模型	v0.4 新增，正式落地
+GLM	编译期图生命周期模型完成
+Nurs	双向语义桥机制明确
+工具链	完整保留并扩展
+Rust 关系	定型
+Go / Yalivia	定型
+
+
+⸻
+
+13. 路线图（Roadmap）
+
+版本	内容
+v0.4	GLM + YIR 内存模型 + Nurs 双向机制
+v0.5	YIR Execution Prototype（可执行 DAG）
+v0.6	Nurs 低保真原型（YIR-CPU → MIR）
+v0.7	Yalivia Runtime 原型
+v1.0	NuisLanguageOS 发布
+
+
+⸻
+终章 · 语言若明，文明可久
 
 语言若只追逐性能，终将被硬件抛弃；
 语言若能守住语义，便可跨越时代。
@@ -296,5 +410,5 @@ Nuis 不为平台而生，而为意义而生。
 
 ⸻
 
-License: MIT
-Repository: github.com/Team-silvortex/nuislang
+License：MIT
+Repository：github.com/Team-silvortex/nuislang
