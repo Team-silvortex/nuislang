@@ -1,5 +1,3 @@
----
-
 # 🪶 **NuisLang Whitepaper v0.41**
 
 ### A Language Designed to Outlive Hardware.
