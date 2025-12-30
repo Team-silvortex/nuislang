@@ -1,5 +1,3 @@
----
-
 # 🪶 **NuisLang Whitepaper v0.42**
 
 ### A Semantics-First Execution Model for Heterogeneous Systems
