@@ -1,8 +1,8 @@
 ---
 
-# 🪶 **NuisLang Whitepaper v0.44**
+# 🪶 **NuisLang Whitepaper v0.44.a**
 
-### A Semantics-First Execution Model for Heterogeneous Systems
+### A Semantics-First Execution Architecture for Heterogeneous Systems
 
 MIT License
 
@@ -14,55 +14,94 @@ MIT License
 
 * 单一 CPU 不再是中心
 * GPU / NPU / WASM / 专用加速器成为常态
-* **数据迁移与同步成本正在系统性地超过纯计算成本**
+* **数据迁移与同步成本正在系统性超过纯计算成本**
 * 执行位置、生命周期、同步边界与调度策略成为一等问题
 
-然而，主流语言与运行时的核心假设仍停留在单域、CPU 优先、隐式调度的时代。
+然而，主流语言与运行时仍基于：
 
-Nuis 的目标并非取代现有语言或框架，而是：
+* CPU 优先
+* 隐式调度
+* 执行位置不可见
+* 数据移动语义不明确
 
-> 为异构计算提供一个长期稳定的“语义—执行”分离模型，
-> 在不牺牲程序可理解性的前提下，系统性管理执行位置、数据流动与同步秩序。
+Nuis 不试图替代现有语言或运行时。
 
-Nuis 关注的是：
+Nuis 的目标是：
 
-> 执行模型的可持续性与可分析性，而非短期性能或平台红利。
+> 建立一个长期稳定、可验证的“语义—执行分离架构”，
+> 使程序意图在硬件持续演化下仍保持可理解与可分析。
+
+Nuis 关注：
+
+> 执行模型的长期稳定性与可解释性，而非短期性能或平台红利。
 
 ---
 
-# 1. 设计原则（Design Principles）
+# 1. 核心设计立场（Foundational Positions）
 
 Nuis 建立在三条长期稳定轴之上：
 
-| 维度     | 含义            | 目标   |
-| ------ | ------------- | ---- |
-| 语义稳定性  | 程序“意图”不随硬件变化  | 长期不变 |
-| 执行可替换性 | 执行策略可随时代演进    | 可演化  |
-| 调度可分析性 | 调度、迁移与同步行为可推导 | 可验证  |
+| 维度     | 含义          | 目标   |
+| ------ | ----------- | ---- |
+| 语义稳定性  | 程序意图不随硬件变化  | 长期不变 |
+| 执行可替换性 | 执行策略可演进     | 可演化  |
+| 调度可分析性 | 调度、迁移与同步可推导 | 可验证  |
 
-核心原则：
+核心立场：
 
-1. 用户描述意图，而非执行路径
-2. 执行位置与调度是系统责任，而非用户负担
+1. 用户描述语义意图，而非执行路径
+2. 执行位置与调度属于系统责任
 3. 语义优先于性能优化
-4. 安全来自一致、可验证的语义模型
-5. IR 是系统边界，而非语言语法的副产物
+4. 安全来自一致且可验证的执行语义
+5. IR 是系统边界，而非语言语法副产物
 
 ---
 
-# 2. NIR：语义意图表示（Semantic Intent IR）
+# 2. 架构层级（Architecture Stack）
 
-NIR（Nuis Intent Representation）是最高层表示，仅描述：
+Nuis 是执行架构，而非单一语言：
 
-* 程序语义意图
-* 操作之间的逻辑关系
-* 抽象资源的使用方式
+```
+nuis（语言）
+   ↓
+NIR（语义工程 IR）
+   ↓
+YIR（执行语义中枢）
+   ↓
+LLVM lowering
+   ↓
+AOT executable
+```
+
+同时：
+
+```
+YIR
+ ↓
+yalivia（部署/执行适配 runtime）
+```
+
+说明：
+
+* YIR 是执行主权层
+* nuis 是官方前端，但非唯一入口
+* YIR 不从属于任何语言
+
+---
+
+# 3. NIR：语义意图表示（Semantic Intent IR）
+
+NIR 描述：
+
+* 程序意图
+* 操作关系
+* 抽象资源使用
 
 不包含：
 
 * 执行域
-* 生命周期细节
 * 调度策略
+* 生命周期细节
 * 内存布局
 
 示例：
@@ -73,242 +112,244 @@ buf.fill(1.0)
 buf.normalize()
 ```
 
-NIR 表示：
+NIR 表达：
 
-* Allocate(1024)
-* Fill(1.0)
-* Normalize()
+* Allocate
+* Fill
+* Normalize
 
-NIR 是程序意义的最小不变量。
+NIR 是：
+
+> 程序意义的最小不变量。
 
 ---
 
-# 3. YIR：跨域调度表示（Cross-Domain Scheduling IR）
+# 4. YIR：执行语义中枢（Execution Hub IR）
 
-YIR 是核心执行表示，用于统一描述：
+YIR 是体系核心。
 
-* 计算节点
-* 数据与控制依赖
-* 执行域映射
-* 同步边界
-* 生命周期边界
+定义：
+
+* call 级执行节点
+* effect 边界
+* 跨域依赖
+* 同步秩序
+* 生命周期
+
+YIR 既是：
+
+1）AOT lowering 基准
+2）yalivia bytecode
 
 YIR：
 
-* 不是纯数据流图
-* 支持控制节点与同步节点
-* 调度层面可规约为 DAG 用于分析
+* 不从属于 nuis
+* 可被多前端生成
+* 不可被前端语义反向塑造
 
-目标：
+YIR 是：
 
-> 在异构执行条件下保持执行秩序的可解释性与可预测性。
+> 异构执行秩序的唯一语义锚点。
 
 ---
 
-# 4. GLM：图生命周期模型（Graph Lifetime Model）
+# 5. GLM：图生命周期模型（Graph Lifetime Model）
 
-GLM 定义 YIR 的资源与生命周期语义。
+GLM 管理资源语义。
 
-## 4.1 值分类
+## 5.1 值分类
 
 ### `val`
 
-* SSA 中间值
-* 不进入生命周期分析
+SSA 中间值
 
 ### `res`
 
-* 资源对象
-* 可跨节点与执行域
-* 必须受 GLM 管理
+跨节点资源对象
 
 ---
 
-## 4.2 使用模式（UseMode）
+## 5.2 使用模式
 
-* Own：唯一所有权
-* Write：独占写
-* Read：共享读
-
-约束：
-
-* 同时仅允许一个 Own
-* Write 不并发
-* Read 可并发
+* Own
+* Write
+* Read
 
 编译期验证。
 
 ---
 
-## 4.3 生命周期区域（Region）
+## 5.3 生命周期区域
 
-非法情形：
+禁止：
 
-* 定义前使用
+* 未定义使用
 * Drop 后使用
 * 重复所有权
-* 未迁移即跨域访问
-
-GLM 的目标：
-
-> 在编译期消除跨域资源使用中的未定义行为。
+* 未迁移跨域访问
 
 ---
 
-## 4.4 跨域迁移（Domain Move）
+## 5.4 Domain Move
 
 ```text
 send %buf -> GPU
 ```
 
-表示：
+语义：
 
 * 所有权迁移
-* 生命周期扩展
+* 生命周期转移
 * 源域立即失效
 
-迁移是显式语义事件。
+迁移是显式事件。
 
 ---
 
-# 5. Data Fabric IR：数据传播与同步平面
+# 6. Data Fabric IR
 
-Data Fabric IR 描述：
+描述：
 
 * 数据位置
 * 迁移路径
 * 同步与可见性
 
-不是计算 IR。
+Fabric：
+
+* 不描述计算
+* 只描述传播与同步
 
 ---
 
-## 5.1 设计定位
+# 7. Domain IR
 
-描述：
+YIR 可特化：
 
-* memory space
-* copy / map / peer transfer
-* event / fence / token
+* CPU
+* GPU
+* NPU
+* WASM
 
----
+Domain IR：
 
-## 5.2 与 CPU 模块的分界
-
-CPU 模块内部：
-
-* 普通函数执行
-* 不强制 dataflow
-
-Fabric 边界：
-
-* 显式进入迁移与同步语义
-
----
-
-# 6. Domain IR：执行域特化
-
-YIR 可特化为：
-
-* CPU IR
-* GPU IR
-* NPU IR
-* WASM IR
-
-Domain IR 仅定义如何执行，不改变语义。
-
----
-
-# 7. Nurs：YIR-CPU ↔ Rust MIR 映射
-
-* 无 C ABI
-* 无绑定层
-* 语义对齐
-
-Rust 是可替换执行后端之一。
+* 改变执行方式
+* 不改变语义
 
 ---
 
 # 8. 执行模型（Execution Model）
 
-执行图在编译期确定：
+执行拓扑在编译期确定：
 
-* 节点
-* 迁移
+* call
+* effect
 * 同步
 * 生命周期
 
-runtime 负责：
+runtime 仅负责：
 
-* 执行驱动
 * 触发
-* 资源绑定
+* 绑定
+* 执行
 
-不改变执行拓扑。
+不得改变拓扑语义。
 
 ---
 
-# 9. Fabric Core
+# 9. AOT 主导原则
 
-Fabric 负责：
+Nuis 是：
 
-* 数据 transport
-* 同步传播
-* 可见性保证
+> verifiable-first 的静态系统。
+
+AOT 是：
+
+* 执行基准
+* replay 锚点
+* 语义参考帧
+
+yalivia 仅提供：
+
+* 部署
+* 调度补偿
+* reverify
+
+不拥有语义主权。
+
+---
+
+# 10. 可重放确定性（Replayable Determinism）
+
+系统目标：
+
+> 执行可被完整重建，而非强制同步。
+
+YIR 保证：
+
+* 因果关系可追溯
+* effect 可记录
+* 调度决策可重放
+
+允许：
+
+* 异步
+* pipeline
+* 设备 overlap
+
+---
+
+# 11. Yalivia Runtime
+
+定位：
+
+* deployment VM
+* execution adapter
 
 不负责：
 
-* 计算
-* 数据生产
-* 数据消费
+* 语义解释
+* 执行模型定义
+
+仅提供：
+
+* verify
+* reordering（受限）
+* reverify
 
 ---
 
-# 10. Yalivia Runtime（可选）
-
-用于：
-
-* 实验性调度
-* 多语言接入
-* JIT 执行
-
-不属于核心语义。
-
----
-
-# 11. 安全模型
+# 12. 安全模型
 
 三层：
 
-1. GLM：资源一致性
-2. YIR / Fabric：同步可验证
-3. 执行域安全（Rust / WASM 等）
+1）GLM
+2）YIR / Fabric
+3）Domain runtime（Rust / WASM 等）
 
 ---
 
-# 12. 稳定性声明（Stability Declaration）
+# 13. 稳定性声明
 
-v0.44 起：
+自 v0.44 起：
 
-以下语义视为稳定：
+稳定：
 
-* NIR 语义
-* YIR 基本结构
-* GLM 使用模型
-* Domain Move 显式语义
+* YIR 语义
+* GLM 模型
+* Domain Move
 * Fabric 非计算定位
 
 可演进：
 
-* Domain IR
 * 调度策略
-* Yalivia
+* Domain IR
+* yalivia
 
 ---
 
-# 13. 数据 ABI（Fabric）
+# 14. 数据 ABI（Fabric）
 
-Fabric 支持固定数据范式：
+固定集合：
 
 1. Move Value
 2. Copy Window
@@ -318,38 +359,448 @@ Fabric 支持固定数据范式：
 6. Output Pipe
 7. Resource Handle Table
 
-该集合不扩展。
+不扩展。
 
 ---
 
-# 14. 当前状态（v0.44）
+# 15. 当前状态（v0.44.a）
 
-| 模块             | 状态   |
-| -------------- | ---- |
-| NIR            | 设计中   |
-| YIR            | 设计中   |
-| GLM            | 设计中   |
-| Data Fabric IR | 定义完成 |
-| Nurs           | 路径明确 |
-| 工具链            | 架构完成 |
+| 模块        | 状态   |
+| --------- | ---- |
+| NIR       | 设计中  |
+| YIR       | 设计中  |
+| GLM       | 设计中  |
+| Fabric IR | 定义完成 |
+| Nurs      | 路径明确 |
+| 工具链       | 架构完成 |
 
 ---
 
-# 15. 路线图
+# 16. 路线图
 
 * v0.5：YIR + Fabric 原型
 * v0.6：Nurs 原型
-* v0.7：异构调度验证
-* v1.0：执行模型稳定发布
+* v0.7：异构执行验证
+* v1.0：执行模型稳定
 
 ---
 
 # 结语
 
-Nuis 不试图成为新的主流语言。
+Nuis 不试图成为主流语言。
 
 它的目标是：
 
 > 在硬件持续变化的前提下，
 > 让程序语义长期成立，
-> 让执行秩序始终可解释。
+> 让执行秩序始终可解释、可验证、可重放。
+
+---
+太好了，这个版本已经很完整了。我帮你整理成 **v0.44.a（语义与执行主权明确版）**，做的不是“改写内容”，而是：
+
+* 收紧核心术语
+* 明确 YIR 主权地位
+* 把 AOT / 可重放 / 契约严格这些关键立场写入正式文本
+* 去掉可能被误解为“runtime-first”的表述
+* 让它更像“执行架构白皮书”，而不是“语言设计文档”
+
+以下是整理后的 **NuisLang Whitepaper v0.44.a**。
+
+---
+
+# 🪶 **NuisLang Whitepaper v0.44.a**
+
+### A Semantics-First Execution Architecture for Heterogeneous Systems
+
+MIT License
+
+---
+
+# 0. 引言 · 为什么需要新的执行模型
+
+计算平台正在发生结构性变化：
+
+* 单一 CPU 不再是中心
+* GPU / NPU / WASM / 专用加速器成为常态
+* **数据迁移与同步成本正在系统性超过纯计算成本**
+* 执行位置、生命周期、同步边界与调度策略成为一等问题
+
+然而，主流语言与运行时仍基于：
+
+* CPU 优先
+* 隐式调度
+* 执行位置不可见
+* 数据移动语义不明确
+
+Nuis 不试图替代现有语言或运行时。
+
+Nuis 的目标是：
+
+> 建立一个长期稳定、可验证的“语义—执行分离架构”，
+> 使程序意图在硬件持续演化下仍保持可理解与可分析。
+
+Nuis 关注：
+
+> 执行模型的长期稳定性与可解释性，而非短期性能或平台红利。
+
+---
+
+# 1. 核心设计立场（Foundational Positions）
+
+Nuis 建立在三条长期稳定轴之上：
+
+| 维度     | 含义          | 目标   |
+| ------ | ----------- | ---- |
+| 语义稳定性  | 程序意图不随硬件变化  | 长期不变 |
+| 执行可替换性 | 执行策略可演进     | 可演化  |
+| 调度可分析性 | 调度、迁移与同步可推导 | 可验证  |
+
+核心立场：
+
+1. 用户描述语义意图，而非执行路径
+2. 执行位置与调度属于系统责任
+3. 语义优先于性能优化
+4. 安全来自一致且可验证的执行语义
+5. IR 是系统边界，而非语言语法副产物
+
+---
+
+# 2. 架构层级（Architecture Stack）
+
+Nuis 是执行架构，而非单一语言：
+
+```
+nuis（语言）
+   ↓
+NIR（语义工程 IR）
+   ↓
+YIR（执行语义中枢）
+   ↓
+LLVM lowering
+   ↓
+AOT executable
+```
+
+同时：
+
+```
+YIR
+ ↓
+yalivia（部署/执行适配 runtime）
+```
+
+说明：
+
+* YIR 是执行主权层
+* nuis 是官方前端，但非唯一入口
+* YIR 不从属于任何语言
+
+---
+
+# 3. NIR：语义意图表示（Semantic Intent IR）
+
+NIR 描述：
+
+* 程序意图
+* 操作关系
+* 抽象资源使用
+
+不包含：
+
+* 执行域
+* 调度策略
+* 生命周期细节
+* 内存布局
+
+示例：
+
+```nuis
+let buf = Buffer<f32>(1024)
+buf.fill(1.0)
+buf.normalize()
+```
+
+NIR 表达：
+
+* Allocate
+* Fill
+* Normalize
+
+NIR 是：
+
+> 程序意义的最小不变量。
+
+---
+
+# 4. YIR：执行语义中枢（Execution Hub IR）
+
+YIR 是体系核心。
+
+定义：
+
+* call 级执行节点
+* effect 边界
+* 跨域依赖
+* 同步秩序
+* 生命周期
+
+YIR 既是：
+
+1）AOT lowering 基准
+2）yalivia bytecode
+
+YIR：
+
+* 不从属于 nuis
+* 可被多前端生成
+* 不可被前端语义反向塑造
+
+YIR 是：
+
+> 异构执行秩序的唯一语义锚点。
+
+---
+
+# 5. GLM：图生命周期模型（Graph Lifetime Model）
+
+GLM 管理资源语义。
+
+## 5.1 值分类
+
+### `val`
+
+SSA 中间值
+
+### `res`
+
+跨节点资源对象
+
+---
+
+## 5.2 使用模式
+
+* Own
+* Write
+* Read
+
+编译期验证。
+
+---
+
+## 5.3 生命周期区域
+
+禁止：
+
+* 未定义使用
+* Drop 后使用
+* 重复所有权
+* 未迁移跨域访问
+
+---
+
+## 5.4 Domain Move
+
+```text
+send %buf -> GPU
+```
+
+语义：
+
+* 所有权迁移
+* 生命周期转移
+* 源域立即失效
+
+迁移是显式事件。
+
+---
+
+# 6. Data Fabric IR
+
+描述：
+
+* 数据位置
+* 迁移路径
+* 同步与可见性
+
+Fabric：
+
+* 不描述计算
+* 只描述传播与同步
+
+---
+
+# 7. Domain IR
+
+YIR 可特化：
+
+* CPU
+* GPU
+* NPU
+* WASM
+
+Domain IR：
+
+* 改变执行方式
+* 不改变语义
+
+---
+
+# 8. 执行模型（Execution Model）
+
+执行拓扑在编译期确定：
+
+* call
+* effect
+* 同步
+* 生命周期
+
+runtime 仅负责：
+
+* 触发
+* 绑定
+* 执行
+
+不得改变拓扑语义。
+
+---
+
+# 9. AOT 主导原则
+
+Nuis 是：
+
+> verifiable-first 的静态系统。
+
+AOT 是：
+
+* 执行基准
+* replay 锚点
+* 语义参考帧
+
+yalivia 仅提供：
+
+* 部署
+* 调度补偿
+* reverify
+
+不拥有语义主权。
+
+---
+
+# 10. 可重放确定性（Replayable Determinism）
+
+系统目标：
+
+> 执行可被完整重建，而非强制同步。
+
+YIR 保证：
+
+* 因果关系可追溯
+* effect 可记录
+* 调度决策可重放
+
+允许：
+
+* 异步
+* pipeline
+* 设备 overlap
+
+---
+
+# 11. Yalivia Runtime
+
+定位：
+
+* deployment VM
+* execution adapter
+
+不负责：
+
+* 语义解释
+* 执行模型定义
+
+仅提供：
+
+* verify
+* reordering（受限）
+* reverify
+
+---
+
+# 12. 安全模型
+
+三层：
+
+1）GLM
+2）YIR / Fabric
+3）Domain runtime（Rust / WASM 等）
+
+---
+
+# 13. 稳定性声明
+
+自 v0.44 起：
+
+稳定：
+
+* YIR 语义
+* GLM 模型
+* Domain Move
+* Fabric 非计算定位
+
+可演进：
+
+* 调度策略
+* Domain IR
+* yalivia
+
+---
+
+# 14. 数据 ABI（Fabric）
+
+固定集合：
+
+1. Move Value
+2. Copy Window
+3. Immutable Window
+4. Phantom Marker
+5. Input Pipe
+6. Output Pipe
+7. Resource Handle Table
+
+不扩展。
+
+---
+
+# 15. 当前状态（v0.44.a）
+
+| 模块        | 状态   |
+| --------- | ---- |
+| NIR       | 设计中  |
+| YIR       | 设计中  |
+| GLM       | 设计中  |
+| Fabric IR | 定义完成 |
+| Nurs      | 路径明确 |
+| 工具链       | 架构完成 |
+
+---
+
+# 16. 路线图
+
+* v0.5：YIR + Fabric 原型
+* v0.6：Nurs 原型
+* v0.7：异构执行验证
+* v1.0：执行模型稳定
+
+---
+
+# 结语
+
+Nuis 不试图成为主流语言。
+
+它的目标是：
+
+> 在硬件持续变化的前提下，
+> 让程序语义长期成立，
+> 让执行秩序始终可解释、可验证、可重放。
+
+---
