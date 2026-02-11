@@ -50,15 +50,14 @@ Nuis 建立在三条长期稳定轴之上：
 核心立场：
 
 1. 用户描述语义意图，而非执行路径
-2. 执行位置与调度属于系统责任（编译器与工具链层）
+2. 执行位置与调度属于系统责任
 3. 语义优先于性能优化
 4. 安全来自一致且可验证的执行语义
 5. IR 是系统边界，而非语言语法副产物
 
-说明：
-
-“系统责任”指 **nuisc + lowering toolchain** 的编译期职责，而非 runtime 的自主行为。
-runtime 不拥有执行拓扑主权。
+**补充说明（v0.44.b）**
+这里的“系统责任”指 **编译器与工具链层（nuisc + lowering toolchain）** 的职责，而非 runtime 在运行时临场做“自主智能调度”。
+runtime 可以执行、绑定、触发，但 **不得拥有执行拓扑主权**、不得反向塑造 YIR 语义。
 
 ---
 
@@ -94,38 +93,60 @@ yalivia（部署/执行适配 runtime）
 
 ---
 
-## 2.1 Toolchain Roles（工具链分权）
+## 2.1 Toolchain Roles（工具链分权，v0.44.b）
+
+Nuis 的“执行架构”不仅是 IR 分层，也是 **编译职责分层**：
 
 ```
 nuis source
    ↓
-nuisc
-   - 执行拓扑构造
-   - 调度约束编译
-   - 契约检查
-   - YIR 生成
+nuisc（核心编译器：执行调度编译）
    ↓
-nustar (per-mod)
-   - mod语法
-   - 解析
-   - lowering
-   - mod AST
+nustar（per-mod：语法/解析/lowering）
    ↓
-YIR
+mod AST
+   ↓
+NIR / YIR
+   ↓
+AOT / yalivia（JIT）
 ```
 
-nuisc：
+### nuisc（Execution Scheduler Compiler）
 
-* 不负责硬件语法解析
-* 不直接做 target lowering
-* 负责 execution topology 与 contract
+nuisc 的职责是 **调度与执行拓扑编译**：
 
-nustar：
+* 构造执行拓扑（call / effect / dep / lifetime）
+* 进行契约检查（Execution Contract）
+* 生成并验证 YIR（作为语义锚点）
+* 选择 AOT/JIT profile 的编译模式与产物形态
 
-* 提供 mod 语法/语义/能力
-* 生成 mod AST
-* 必须服从统一规范与接口
-* 不得改变 YIR 核心语义
+nuisc **不负责**：
+
+* 各硬件/Domain 的专属语法解析
+* 具体 target 的 lowering 细节实现
+
+### nustar（Per-Mod Frontend + Lowering）
+
+nustar 是硬件/Domain 的“能力注入点”：
+
+* 提供 mod 专属语法与解析器
+* 产出 mod AST
+* 完成 lowering（将 mod AST 降到 NIR / YIR 可接受的形态）
+* 必须服从统一定义规范与接口规范
+
+**关键约束**：
+nustar 可以扩展语法、扩展语义、扩展能力，但它的所有产物必须 **可被 nuisc 静态验证**，且不得破坏 YIR 的核心语义锚点地位。
+
+---
+
+## 2.2 Profiles（AOT / yalivia Profile，v0.44.b）
+
+可以将 “nuis” 在工程上看作 **同一语言的两个 profile**（同一 nuisc 通过编译选项选择）：
+
+* **nuis(AOT profile)**：严格静态、可复现、无运行时调度标记
+* **nuis(yalivia profile)**：语义子集 + 允许部分运行时行为标记（scheduling markers / hints），用于 JIT domain module
+
+两者共享同一语义血统与 IR 边界，差异仅来自 profile 能力集与契约要求；profile 标记不得反向塑造 YIR 核心语义。
 
 ---
 
@@ -195,28 +216,99 @@ YIR 是：
 
 # 5. GLM：图生命周期模型（Graph Lifetime Model）
 
-（保持原文）
+GLM 管理资源语义。
+
+## 5.1 值分类
+
+### `val`
+
+SSA 中间值
+
+### `res`
+
+跨节点资源对象
+
+---
+
+## 5.2 使用模式
+
+* Own
+* Write
+* Read
+
+编译期验证。
+
+---
+
+## 5.3 生命周期区域
+
+禁止：
+
+* 未定义使用
+* Drop 后使用
+* 重复所有权
+* 未迁移跨域访问
+
+---
+
+## 5.4 Domain Move
+
+```text
+send %buf -> GPU
+```
+
+语义：
+
+* 所有权迁移
+* 生命周期转移
+* 源域立即失效
+
+迁移是显式事件。
 
 ---
 
 # 6. Data Fabric IR
 
+描述：
+
+* 数据位置
+* 迁移路径
+* 同步与可见性
+
 Fabric：
 
-* 只描述数据迁移与同步
-* 不包含计算语义
-* 不允许引入 execution op
+* 不描述计算
+* 只描述传播与同步
+
+**补充约束（v0.44.b）**
+Fabric IR 是数据传播语义层，必须保持“非计算定位”：
+
+* 禁止携带 compute op
+* 禁止引入执行语义捷径（例如把 compute 包进搬运事件）
+* 仅允许表达：位置、路径、同步、可见性、句柄表映射
 
 ---
 
 # 7. Domain IR
 
+YIR 可特化：
+
+* CPU
+* GPU
+* NPU
+* WASM
+
 Domain IR：
 
 * 改变执行方式
 * 不改变语义
-* 不引入新的 effect 类型
-* 不改变 GLM 规则
+
+**补充约束（v0.44.b）**
+Domain IR 的可演进性不意味着可越界：
+
+* 不得引入新的 effect 类型
+* 不得改变 GLM 的所有权/生命周期规则
+* 只能在既定语义下改变执行方式（lowering / codegen strategy）
 
 ---
 
@@ -239,19 +331,20 @@ runtime 仅负责：
 
 ---
 
-## 8.1 Topology-First Principle
+## 8.1 Topology-First Principle（v0.44.b）
 
-程序首先定义 **计算拓扑**：
+Nuis 的执行模型以 **计算拓扑** 为第一性对象。
+编译期首先确定：
 
-* 执行关系图
-* effect 结构
-* 生命周期流
+* 执行关系图（call graph / dep graph）
+* effect 边界与因果关系
+* 生命周期流（GLM + Domain Move）
 
-调度与数据行为存在 runtime 维度，但必须：
+调度与数据行为可能存在 runtime 维度，但必须满足：
 
-* 服从拓扑
-* 可重放
-* 不改变语义
+* 在拓扑约束内发生
+* 可记录、可重放
+* 不改变拓扑语义本身
 
 ---
 
@@ -277,27 +370,25 @@ yalivia 仅提供：
 
 ---
 
-## 9.1 Execution Contract & Fail-Fast
+## 9.1 Execution Contract & Fail-Fast（v0.44.b）
 
-AOT executable 建立 **执行契约**：
+AOT executable 建立 **执行契约（Execution Contract）**。契约至少包含：
 
-包含：
+* 允许的 Domain 集合与版本约束
+* YIR 版本与语义兼容要求
+* Fabric ABI 版本
+* 资源模型假设（例如：可用内存域、显存域、句柄表策略等）
+* 关键能力约束（例如：某些 Domain Move 的可用性）
 
-* 可用 domain
-* 资源假设
-* YIR 版本
-* Fabric ABI
-* GLM 约束
-
-契约不成立：
-
-> 程序必须拒绝执行。
-
+**契约不成立 → 程序必须拒绝执行**。
 禁止：
 
-* fallback
-* 模拟
 * 自动降级
+* 隐式 fallback
+* 模拟执行替代真实 Domain
+* “尽量跑起来”的容错路径
+
+Fail-Fast 是 AOT-first 的必需条件：AOT 作为 replay 锚点时，必须保证执行准入严格一致。
 
 ---
 
@@ -321,15 +412,17 @@ YIR 保证：
 
 ---
 
-## 10.1 Trace Requirements
+## 10.1 Trace Requirements（v0.44.b）
 
-重放最小记录：
+为保证“可被完整重建”，系统需要定义最小重放记录面（minimum trace surface）：
 
-* effect 序
-* Domain Move
-* Fabric 事件
-* 资源句柄映射
-* 调度决策（若存在）
+* effect 序与边界
+* Domain Move 事件序列
+* Fabric 事件序列（Move/Window/Pipe/HandleTable 等）
+* 资源句柄映射（Resource Handle Table 的稳定映射与版本）
+* 调度决策（若存在可变调度层，则记录其决策以重放）
+
+目标是重建因果与秩序，而非强制同步执行。
 
 ---
 
@@ -353,75 +446,108 @@ YIR 保证：
 
 ---
 
-## 11.1 Optional JIT Domain
+## 11.1 Optional JIT Domain（v0.44.b）
 
-JIT：
+JIT 完全可选。默认系统为 **纯 AOT**，不允许共享内存的多进程动态行为污染 AOT 域。
 
-* 完全可选
-* 默认纯 AOT
+若需要动态性，应当：
 
-动态逻辑：
+* 将相关逻辑拆为 **JIT domain module**
+* 由 yalivia（作为 YIR 的 JIT runtime）执行
+* 与 AOT 域通过 **标准通用协议** 交互（而非内部私有协议）
 
-* 必须拆为独立 JIT module
-* 由 yalivia 执行
-* 与 AOT 通过标准协议通信
+原则：
 
-禁止：
-
-* 共享内存直接交互
-* runtime 修改拓扑
+* AOT 域保持可复现与契约执行
+* JIT 域提供灵活性与精度调优
+* 两者之间 **不直接互操作内存/运行时状态**，仅通过通信与句柄/窗口/管道等 ABI 机制交互（类比 Kotlin Native/JVM 的分域互通）
 
 ---
 
 # 12. 安全模型
 
-（保持）
+三层：
+
+1）GLM
+2）YIR / Fabric
+3）Domain runtime（Rust / WASM 等）
 
 ---
 
 # 13. 稳定性声明
 
-（保持）
+自 v0.44 起：
+
+稳定：
+
+* YIR 语义
+* GLM 模型
+* Domain Move
+* Fabric 非计算定位
+
+可演进：
+
+* 调度策略
+* Domain IR
+* yalivia
 
 ---
 
-## 13.1 Mod Registry & Conformance
+## 13.1 Mod Registry & Conformance（v0.44.b）
 
-mod 接入：
+Nuis 采用 **注册式 mod 接入**：
 
-* 通过 nustar 注册
-* 必须通过 conformance 验证
+* 每个主流硬件/Domain 对应一组 mod（含其 nustar、mod AST、lowering）
+* mod 必须通过 conformance 验证，保证其语义与接口满足统一规范
 
-nuisc 有权：
+nuisc 具有最终否决权：
 
-> 拒绝语义不一致的 mod。
+> 任何语义不一致、契约冲突、无法静态验证的 mod —— 必须拒绝注册。
 
-官方维护主流硬件 mod。
+治理原则：
+
+* AOT-first 的语义纯度优先于生态广度
+* 主流硬件的 mod 由官方实现并维护一致性
+* 第三方扩展必须以 contract 与 conformance 为准入条件，而非“能跑即可”
 
 ---
 
 # 14. 数据 ABI（Fabric）
 
-（保持）
+固定集合：
+
+1. Move Value
+2. Copy Window
+3. Immutable Window
+4. Phantom Marker
+5. Input Pipe
+6. Output Pipe
+7. Resource Handle Table
+
+不扩展。
 
 ---
 
 # 15. 当前状态（v0.44.b）
 
-| 模块        | 状态   |
-| --------- | ---- |
-| NIR       | 设计中  |
-| YIR       | 设计中  |
-| GLM       | 设计中  |
-| Fabric IR | 定义完成 |
-| nuisc     | 架构完成 |
-| nustar    | 路径明确 |
+| 模块                | 状态   |
+| ----------------- | ---- |
+| NIR               | 设计中  |
+| YIR               | 设计中  |
+| GLM               | 设计中  |
+| Fabric IR         | 定义完成 |
+| Nurs              | 路径明确 |
+| 工具链               | 架构完成 |
+| nuisc / nustar 分权 | 路径明确 |
 
 ---
 
 # 16. 路线图
 
-（保持）
+* v0.5：YIR + Fabric 原型
+* v0.6：Nurs 原型
+* v0.7：异构执行验证
+* v1.0：执行模型稳定
 
 ---
 
@@ -434,3 +560,17 @@ Nuis 不试图成为主流语言。
 > 在硬件持续变化的前提下，
 > 让程序语义长期成立，
 > 让执行秩序始终可解释、可验证、可重放。
+
+---
+
+## v0.44.a → v0.44.b 变更摘要（可删）
+
+* 增补：Toolchain 分权（nuisc vs nustar vs mod AST）
+* 增补：Profiles（AOT / yalivia）概念
+* 增补：Topology-First 原则
+* 增补：Execution Contract & Fail-Fast（契约不符拒绝运行）
+* 增补：Replay Trace 最小记录面要求
+* 增补：Optional JIT Domain（隔离域、标准协议通信、无共享内存互操作）
+* 增补：Mod Registry & Conformance（从严、拒绝不一致 mod、官方覆盖主流硬件）
+
+---
