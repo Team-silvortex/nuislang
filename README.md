@@ -562,15 +562,3 @@ Nuis 不试图成为主流语言。
 > 让执行秩序始终可解释、可验证、可重放。
 
 ---
-
-## v0.44.a → v0.44.b 变更摘要（可删）
-
-* 增补：Toolchain 分权（nuisc vs nustar vs mod AST）
-* 增补：Profiles（AOT / yalivia）概念
-* 增补：Topology-First 原则
-* 增补：Execution Contract & Fail-Fast（契约不符拒绝运行）
-* 增补：Replay Trace 最小记录面要求
-* 增补：Optional JIT Domain（隔离域、标准协议通信、无共享内存互操作）
-* 增补：Mod Registry & Conformance（从严、拒绝不一致 mod、官方覆盖主流硬件）
-
----
