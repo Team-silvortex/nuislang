@@ -1,0 +1,14 @@
+[package]
+name = "yir-run"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+readme.workspace = true
+description = "Run handwritten YIR modules."
+
+[dependencies]
+yir-exec = { path = "../../crates/yir-exec" }
+yir-syntax = { path = "../../crates/yir-syntax" }
+yir-verify = { path = "../../crates/yir-verify" }

@@ -1,8 +1,14 @@
-DFIR Algebra (v0.01)
+Fabric IR Algebra (legacy filename: `DFIR.md`, v0.44.b-aligned draft)
+
+> This file keeps its historical filename for now, but the project terminology
+> has moved from `DFIR` to `Fabric IR`.
+>
+> Scope note: this document describes the `nuis`-side Fabric semantics / ABI
+> surface. It does not define the external `yalivia` project.
 
 1 Primitive Set
 
-DFIR 由固定原语集合构成：
+Fabric IR 由固定原语集合构成：
 
 MoveValue
 CopyWindow
@@ -24,7 +30,7 @@ primitive composition
 
 2 Type Domain
 
-DFIR 类型空间定义为：
+Fabric IR 类型空间定义为：
 
 Value<T>
 Window<T>
@@ -165,7 +171,7 @@ Pipe	✓	✓	✓	✓
 
 这张矩阵是：
 
-DFIR verifier core rule
+Fabric verifier core rule
 
 
 ⸻
@@ -230,9 +236,9 @@ no disconnected data edges
 
 ⸻
 
-10 DFIR Composition Principle
+10 Fabric Composition Principle
 
-DFIR 的表达能力来自：
+Fabric IR 的表达能力来自：
 
 primitive composition
 
@@ -252,7 +258,7 @@ resource fencing
 
 11 Canonical Execution Model
 
-DFIR 表达为：
+Fabric IR 表达为：
 
 typed pipe network
 
@@ -276,9 +282,9 @@ fabric worker pipeline
 
 12 Algebra Summary
 
-DFIR 可以抽象为：
+Fabric IR 可以抽象为：
 
-DFIR =
+Fabric IR =
 Primitive
 ×
 Type
@@ -301,7 +307,7 @@ PipeGraph = static topology
 Program =
 ExecutionGraph (YIR)
 ×
-DataFabricGraph (DFIR)
+DataFabricGraph (Fabric IR)
 
 YIR 描述：
 
@@ -309,7 +315,7 @@ compute
 sync
 resource usage
 
-DFIR 描述：
+Fabric IR 描述：
 
 data movement
 views

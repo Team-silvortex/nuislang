@@ -1,0 +1,12 @@
+[package]
+name = "nuis-runtime"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+readme.workspace = true
+description = "AOT-side execution and contract scaffolding for the Nuis toolchain."
+
+[lib]
+path = "src/lib.rs"

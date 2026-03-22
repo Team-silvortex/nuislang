@@ -1,0 +1,15 @@
+[package]
+name = "yir-domain-cpu"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+readme.workspace = true
+description = "CPU domain mod for handwritten YIR."
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+yir-core = { path = "../yir-core" }

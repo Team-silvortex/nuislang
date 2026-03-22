@@ -1,1 +1,3 @@
-// AI Strategy Engine placeholder
+pub fn planner_name() -> &'static str {
+    "strategy-ai"
+}

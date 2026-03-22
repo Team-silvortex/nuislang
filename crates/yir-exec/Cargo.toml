@@ -1,0 +1,13 @@
+[package]
+name = "yir-exec"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+readme.workspace = true
+description = "Reference executor for handwritten YIR modules."
+
+[dependencies]
+yir-core = { path = "../yir-core" }
+yir-verify = { path = "../yir-verify" }

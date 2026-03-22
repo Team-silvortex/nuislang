@@ -1,0 +1,11 @@
+yir 0.1
+
+resource cpu0 cpu
+resource gpu0 shader.metal
+
+cpu.const seed cpu0 4
+cpu.const inc cpu0 3
+cpu.add sum cpu0 seed inc
+fabric.move sum_on_gpu gpu0 sum gpu0
+shader.dispatch shaded gpu0 sum_on_gpu
+shader.print done gpu0 shaded

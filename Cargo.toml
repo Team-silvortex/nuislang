@@ -1,10 +1,16 @@
 [workspace]
 members = [
-    "compiler",
-    "runtime",
-    "semantics",
-    "strategy-ai",
-    "tools"          # ✅ 未来CLI或辅助工具可以放这里
+    "crates/nuis-runtime",
+    "crates/nuis-semantics",
+    "crates/strategy-ai",
+    "crates/yir-core",
+    "crates/yir-domain-cpu",
+    "crates/yir-domain-shader",
+    "crates/yir-syntax",
+    "crates/yir-verify",
+    "crates/yir-exec",
+    "tools/nuisc",
+    "tools/yir-run"
 ]
 resolver = "2"
 

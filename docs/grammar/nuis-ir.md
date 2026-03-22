@@ -8,25 +8,34 @@
 
 # 1. Overview
 
-Nuis is an ahead-of-time (AOT) compiled language designed for heterogeneous computing systems.
+Nuis is a semantics-first execution architecture for heterogeneous computing systems.
 
-The Nuis compilation pipeline separates program semantics into two orthogonal intermediate representations:
+This document describes the IR boundary of the `nuis` toolchain itself, with
+`AOT-first` as the default and governing profile. Optional runtime-facing
+integration is out of scope here unless it preserves the same IR boundary.
+
+The current architecture separates program semantics into three layers:
 
 ```
-YIR   — Execution topology
-DFIR  — Data fabric topology
+NIR        — Semantic intent
+YIR        — Execution topology
+Fabric IR  — Data propagation semantics
 ```
 
-These two graphs remain independent and interact through typed channels.
+NIR captures stable program intent.
+
+YIR captures execution topology and semantic ordering.
+
+Fabric IR captures data movement, visibility, and synchronization surfaces.
 
 ```
 Program =
-ExecutionGraph (YIR)
-×
-DataFabricGraph (DFIR)
+SemanticIntent (NIR)
+-> ExecutionGraph (YIR)
++ DataFabricGraph (Fabric IR)
 ```
 
-This separation enables independent optimization of computation and data movement.
+This separation keeps semantic intent, execution order, and data propagation independently analyzable.
 
 ---
 
@@ -40,9 +49,11 @@ Execution and data movement are modeled independently.
 compute ≠ data movement
 ```
 
-YIR describes **how computation executes**.
+NIR describes **what the program means**.
 
-DFIR describes **how data moves between units**.
+YIR describes **how execution is ordered**.
+
+Fabric IR describes **how data moves and becomes visible across domains**.
 
 ---
 
@@ -61,7 +72,7 @@ The entire execution and data fabric topology must be known at compile time.
 
 ### 2.3 Minimal Primitive Set
 
-DFIR primitives are fixed.
+Fabric primitives are fixed.
 
 Extensions must **compose primitives** rather than introduce new ones.
 
@@ -81,7 +92,7 @@ Mutability is only allowed within explicitly bounded transient stages.
 
 The IR is not specialized for any specific hardware.
 
-Current implementations may lower to CPU cores, but the model is designed to support future dedicated fabric hardware.
+Current implementations may lower to CPU cores, but the model is designed to support future dedicated fabric hardware while keeping the AOT semantic frame stable.
 
 ---
 
@@ -90,6 +101,14 @@ Current implementations may lower to CPU cores, but the model is designed to sup
 YIR represents execution topology.
 
 It describes computation, synchronization, and resource usage.
+
+Current implementation priority in this repository:
+
+* hand-authored YIR source
+* static verification
+* reference execution
+* mod-registered instruction sets (`nustar`-style expansion point)
+* Fabric behavior represented first as explicit YIR-side data actions
 
 ### Core Operations
 
@@ -100,6 +119,33 @@ sync
 effect
 resource
 ```
+
+Minimal handwritten prototype directives:
+
+```text
+yir <version>
+resource <name> <kind>
+<mod>.<instr> <name> <resource> [args...]
+```
+
+Current built-in / registered examples:
+
+```text
+cpu.const <name> <resource> <value>
+cpu.add <name> <resource> <lhs> <rhs>
+cpu.mul <name> <resource> <lhs> <rhs>
+cpu.print <name> <resource> <input>
+fabric.move <name> <resource> <input> <to>
+shader.const <name> <resource> <value>
+shader.add <name> <resource> <lhs> <rhs>
+shader.mul <name> <resource> <lhs> <rhs>
+shader.dispatch <name> <resource> <input>
+shader.print <name> <resource> <input>
+```
+
+Resource kinds are intentionally open-ended. For example, the current macOS
+shader path uses `shader.metal`, but the grammar does not hard-code the backend
+set.
 
 ### Semantics
 
@@ -129,21 +175,21 @@ YIR controls execution scheduling over these resources.
 
 ---
 
-# 4. Data Fabric IR (DFIR)
+# 4. Data Fabric IR (Fabric IR)
 
-DFIR represents data exchange between execution units.
+Fabric IR represents data exchange between execution units.
 
-DFIR is a **typed static dataflow fabric graph**.
+Fabric IR is a **typed static dataflow fabric graph**.
 
 ```
-DFIR = typed pipe network
+Fabric IR = typed pipe network
 ```
 
 ---
 
-## 4.1 DFIR Primitives
+## 4.1 Fabric Primitives
 
-DFIR consists of seven primitives.
+Fabric IR consists of seven primitives.
 
 | Primitive             | Meaning              |
 | --------------------- | -------------------- |
@@ -224,7 +270,7 @@ Tuple<T...>
 
 Types must ultimately be composed from primitives.
 
-User-defined arbitrary structures are not allowed in DFIR.
+User-defined arbitrary structures are not allowed in Fabric IR.
 
 This ensures verifier tractability.
 
@@ -276,18 +322,18 @@ Verifier must guarantee that the IR graph is semantically valid before lowering.
 
 # 9. Lowering Model
 
-Current implementation lowers the system as follows:
+The current in-repo implementation target is intentionally conservative:
 
 ```
-YIR → compute cores
-DFIR → fabric worker cores
+YIR → AOT compute lowering
+Fabric IR → AOT data-plane lowering
 ```
 
-Fabric workers execute compiled data movement pipelines.
+Data-plane workers execute compiled data movement pipelines.
 
 This model follows a philosophy similar to data-plane systems such as DPDK-style pipelines.
 
-Future hardware may provide dedicated fabric execution units.
+Future hardware may provide dedicated fabric execution units, but that does not change the AOT-first semantic contract defined here.
 
 ---
 

@@ -1,0 +1,12 @@
+[package]
+name = "nuis-semantics"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+readme.workspace = true
+description = "Semantic model scaffolding for NIR, YIR, GLM, and Fabric contracts."
+
+[lib]
+path = "src/lib.rs"
