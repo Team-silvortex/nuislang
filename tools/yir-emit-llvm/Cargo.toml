@@ -1,0 +1,13 @@
+[package]
+name = "yir-emit-llvm"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+readme.workspace = true
+description = "Emit LLVM IR text from the CPU slice of a handwritten YIR graph."
+
+[dependencies]
+yir-lower-llvm = { path = "../../crates/yir-lower-llvm" }
+yir-syntax = { path = "../../crates/yir-syntax" }

@@ -20,9 +20,24 @@ fn run() -> Result<(), String> {
     println!("yir version: {}", module.version);
     println!("resources: {}", module.resources.len());
     println!("nodes: {}", module.nodes.len());
+    println!("edges: {}", module.edges.len());
     println!("trace:");
     for event in &trace.events {
         println!("  {event}");
+    }
+    println!("steps:");
+    for (lane, steps) in &trace.lane_steps {
+        println!("  {lane}:");
+        for step in steps {
+            println!("    {step}");
+        }
+    }
+    println!("lanes:");
+    for (lane, events) in &trace.lane_events {
+        println!("  {lane}:");
+        for event in events {
+            println!("    {event}");
+        }
     }
     println!("values:");
     for (name, value) in &trace.values {

@@ -565,7 +565,10 @@ nuisc 具有最终否决权：
 
 * 当前仓库**尚未实现完整 NIR / GLM / Fabric verifier**
 * 已具备最小 `YIR` 手写原型：`parse -> verify -> execute`
-* 当前 `YIR` 原型采用 **注册式 mod 指令集**，已接入 `cpu` 与 `shader`（macOS 路径下以 `shader.metal` 为资源后端） 
+* 当前 `YIR` 原型采用 **注册式 mod 指令集** 与**显式图边模型**
+* 当前已接入 `cpu` 与 backend-agnostic 的 `shader` mod；跨域交换以单独边类型表示
+* 当前 demo 直接由 `shader mod` 驱动；`ns-nova` 未来应作为独立项目在其上封装
+* GPU lane 产出的 `FrameSurface` 已可导出为实际图像文件（PPM）以验证异构执行结果
 * 现有 Rust crate 主要用于固定术语、边界与后续实现入口
 * 后续整改优先级应为：`YIR expand -> semantics model -> verifier hardening -> AOT executable path`
 

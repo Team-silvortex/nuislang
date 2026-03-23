@@ -73,7 +73,7 @@ impl RegisteredMod for CpuMod {
             )),
             "print" => {
                 let value = state.expect_value(&node.op.args[0])?.clone();
-                state.push_event(format!(
+                state.push_resource_event(resource, format!(
                     "effect cpu.print @{} [{}]: {}",
                     node.resource, resource.kind.raw, value
                 ));

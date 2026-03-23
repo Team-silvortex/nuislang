@@ -1,11 +1,18 @@
 yir 0.1
 
 resource cpu0 cpu
-resource gpu0 shader.metal
+resource shader0 shader
 
 cpu.const seed cpu0 4
 cpu.const inc cpu0 3
 cpu.add sum cpu0 seed inc
-fabric.move sum_on_gpu gpu0 sum gpu0
-shader.dispatch shaded gpu0 sum_on_gpu
-shader.print done gpu0 shaded
+fabric.move sum_on_shader shader0 sum shader0
+shader.dispatch shaded shader0 sum_on_shader
+shader.print done shader0 shaded
+
+edge dep seed sum
+edge dep inc sum
+edge xfer sum sum_on_shader
+edge dep sum_on_shader shaded
+edge dep shaded done
+edge effect shaded done

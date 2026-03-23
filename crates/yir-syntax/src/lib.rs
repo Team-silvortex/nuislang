@@ -1,4 +1,4 @@
-use yir_core::{Node, Operation, Resource, ResourceKind, YirModule};
+use yir_core::{Edge, EdgeKind, Node, Operation, Resource, ResourceKind, YirModule};
 
 pub fn parse_module(input: &str) -> Result<YirModule, String> {
     let mut module = YirModule::new("0.1");
@@ -15,6 +15,7 @@ pub fn parse_module(input: &str) -> Result<YirModule, String> {
         match tokens.first().copied() {
             Some("yir") => parse_header(&mut module, &tokens, line_no)?,
             Some("resource") => parse_resource(&mut module, &tokens, line_no)?,
+            Some("edge") => parse_edge(&mut module, &tokens, line_no)?,
             Some(opcode) => parse_node(&mut module, opcode, &tokens, line_no)?,
             None => {}
         }
@@ -68,6 +69,21 @@ fn parse_node(
         name: tokens[1].to_owned(),
         resource: tokens[2].to_owned(),
         op,
+    });
+    Ok(())
+}
+
+fn parse_edge(module: &mut YirModule, tokens: &[&str], line_no: usize) -> Result<(), String> {
+    if tokens.len() != 4 {
+        return Err(format!(
+            "line {line_no}: expected `edge <kind> <from> <to>`"
+        ));
+    }
+
+    module.edges.push(Edge {
+        kind: EdgeKind::parse(tokens[1]).map_err(|error| format!("line {line_no}: {error}"))?,
+        from: tokens[2].to_owned(),
+        to: tokens[3].to_owned(),
     });
     Ok(())
 }

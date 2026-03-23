@@ -6,11 +6,15 @@ members = [
     "crates/yir-core",
     "crates/yir-domain-cpu",
     "crates/yir-domain-shader",
+    "crates/yir-host-render",
+    "crates/yir-lower-llvm",
     "crates/yir-syntax",
     "crates/yir-verify",
     "crates/yir-exec",
     "tools/nuisc",
-    "tools/yir-run"
+    "tools/yir-export-frame",
+    "tools/yir-run",
+    "tools/yir-emit-llvm"
 ]
 resolver = "2"
 

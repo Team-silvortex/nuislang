@@ -37,7 +37,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "yir-emit-llvm"
+version = "0.1.0"
+dependencies = [
+ "yir-lower-llvm",
+ "yir-syntax",
+]
+
+[[package]]
 name = "yir-exec"
+version = "0.1.0"
+dependencies = [
+ "yir-core",
+ "yir-verify",
+]
+
+[[package]]
+name = "yir-export-frame"
+version = "0.1.0"
+dependencies = [
+ "yir-core",
+ "yir-exec",
+ "yir-host-render",
+ "yir-syntax",
+ "yir-verify",
+]
+
+[[package]]
+name = "yir-host-render"
+version = "0.1.0"
+dependencies = [
+ "yir-core",
+]
+
+[[package]]
+name = "yir-lower-llvm"
 version = "0.1.0"
 dependencies = [
  "yir-core",

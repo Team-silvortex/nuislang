@@ -107,6 +107,7 @@ Current implementation priority in this repository:
 * hand-authored YIR source
 * static verification
 * reference execution
+* explicit graph edges instead of text-order scheduling
 * mod-registered instruction sets (`nustar`-style expansion point)
 * Fabric behavior represented first as explicit YIR-side data actions
 
@@ -126,6 +127,7 @@ Minimal handwritten prototype directives:
 yir <version>
 resource <name> <kind>
 <mod>.<instr> <name> <resource> [args...]
+edge <dep|effect|lifetime|xfer> <from> <to>
 ```
 
 Current built-in / registered examples:
@@ -139,13 +141,34 @@ fabric.move <name> <resource> <input> <to>
 shader.const <name> <resource> <value>
 shader.add <name> <resource> <lhs> <rhs>
 shader.mul <name> <resource> <lhs> <rhs>
+shader.pack_ball_state <name> <resource> <color> <speed>
 shader.dispatch <name> <resource> <input>
+shader.draw_ball <name> <resource> <packet>
 shader.print <name> <resource> <input>
 ```
 
 Resource kinds are intentionally open-ended. For example, the current macOS
-shader path uses `shader.metal`, but the grammar does not hard-code the backend
-set.
+window/backend path may eventually lower to Metal, but the YIR grammar does not
+hard-code backend selection.
+
+Cross-domain exchange is represented as a dedicated edge kind:
+
+```text
+edge xfer <from> <to>
+```
+
+That keeps domain crossing explicit in the graph instead of burying it in
+instruction order.
+
+For the current direct shader-driven demo direction, the graph expresses:
+
+```text
+cpu-side state build
+    ->
+cross-domain exchange
+    ->
+shader-side render packet + draw
+```
 
 ### Semantics
 
