@@ -1,5 +1,41 @@
 ---
 
+# nuislang
+
+> AOT system programming language for heterogeneous execution, built on a custom IR (YIR) with a JIT runtime (yalivia) and integrated verification (vulpoya).
+
+---
+
+## Model
+
+```id="c9qk3b"
+source → nuislang → YIR → execution (via yalivia)
+                     ↓
+                 vulpoya (analysis / verification)
+```
+
+---
+
+## Properties
+
+* AOT-oriented compilation
+* Heterogeneous execution targets
+* Custom IR (YIR) as primary semantic layer
+* Integrated analysis and verification
+
+---
+
+## Notes
+
+* LLVM is used as a backend
+* Designed as a general-purpose system language
+* Forms its own toolchain and execution model (language, IR, runtime, verifier)
+
+---
+
+
+---
+
 # 🪶 **NuisLang Whitepaper v0.44.b**
 
 ### A Semantics-First Execution Architecture for Heterogeneous Systems
