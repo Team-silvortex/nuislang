@@ -136,6 +136,9 @@ Current built-in / registered examples:
 cpu.const <name> <resource> <value>
 cpu.add <name> <resource> <lhs> <rhs>
 cpu.mul <name> <resource> <lhs> <rhs>
+cpu.window <name> <resource> <width> <height> <title>
+cpu.input_i64 <name> <resource> <channel> <default>
+cpu.present_frame <name> <resource> <frame>
 cpu.print <name> <resource> <input>
 fabric.move <name> <resource> <input> <to>
 shader.const <name> <resource> <value>
@@ -144,6 +147,7 @@ shader.mul <name> <resource> <lhs> <rhs>
 shader.pack_ball_state <name> <resource> <color> <speed>
 shader.dispatch <name> <resource> <input>
 shader.draw_ball <name> <resource> <packet>
+shader.draw_sphere <name> <resource> <packet>
 shader.print <name> <resource> <input>
 ```
 
@@ -160,14 +164,18 @@ edge xfer <from> <to>
 That keeps domain crossing explicit in the graph instead of burying it in
 instruction order.
 
-For the current direct shader-driven demo direction, the graph expresses:
+For the current direct shader-driven and CPU-hosted UI event demo direction, the graph expresses:
 
 ```text
+cpu-hosted window + input sample
+    ->
 cpu-side state build
     ->
 cross-domain exchange
     ->
 shader-side render packet + draw
+    ->
+host-side frame presentation
 ```
 
 ### Semantics

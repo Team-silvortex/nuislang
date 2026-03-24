@@ -1,3 +1,5 @@
+use std::env;
+
 use yir_core::{ExecutionState, InstructionSemantics, Node, RegisteredMod, Resource, Value};
 
 pub struct CpuMod;
@@ -38,6 +40,50 @@ impl RegisteredMod for CpuMod {
 
                 Ok(InstructionSemantics::pure(node.op.args.clone()))
             }
+            "window" => {
+                if node.op.args.len() != 3 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.window <name> <resource> <width> <height> <title>`",
+                        node.name
+                    ));
+                }
+
+                node.op.args[0].parse::<i64>().map_err(|_| {
+                    format!("node `{}` has invalid width `{}`", node.name, node.op.args[0])
+                })?;
+                node.op.args[1].parse::<i64>().map_err(|_| {
+                    format!("node `{}` has invalid height `{}`", node.name, node.op.args[1])
+                })?;
+
+                Ok(InstructionSemantics::effect(Vec::new()))
+            }
+            "input_i64" => {
+                if node.op.args.len() != 2 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.input_i64 <name> <resource> <channel> <default>`",
+                        node.name
+                    ));
+                }
+
+                node.op.args[1].parse::<i64>().map_err(|_| {
+                    format!(
+                        "node `{}` has invalid default integer literal `{}`",
+                        node.name, node.op.args[1]
+                    )
+                })?;
+
+                Ok(InstructionSemantics::effect(Vec::new()))
+            }
+            "present_frame" => {
+                if node.op.args.len() != 1 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.present_frame <name> <resource> <frame>`",
+                        node.name
+                    ));
+                }
+
+                Ok(InstructionSemantics::effect(node.op.args.clone()))
+            }
             "print" => {
                 if node.op.args.len() != 1 {
                     return Err(format!(
@@ -71,6 +117,60 @@ impl RegisteredMod for CpuMod {
             "mul" => Ok(Value::Int(
                 state.expect_int(&node.op.args[0])? * state.expect_int(&node.op.args[1])?,
             )),
+            "window" => {
+                let width = node.op.args[0].parse::<i64>().map_err(|_| {
+                    format!("node `{}` has invalid width `{}`", node.name, node.op.args[0])
+                })?;
+                let height = node.op.args[1].parse::<i64>().map_err(|_| {
+                    format!("node `{}` has invalid height `{}`", node.name, node.op.args[1])
+                })?;
+                let title = &node.op.args[2];
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.window @{} [{}] {}x{} title={}",
+                        node.resource, resource.kind.raw, width, height, title
+                    ),
+                );
+                Ok(Value::Tuple(vec![Value::Int(width), Value::Int(height)]))
+            }
+            "input_i64" => {
+                let channel = &node.op.args[0];
+                let default_value = node.op.args[1].parse::<i64>().map_err(|_| {
+                    format!(
+                        "node `{}` has invalid default integer literal `{}`",
+                        node.name, node.op.args[1]
+                    )
+                })?;
+                let env_name = format!("NUIS_UI_{}", normalize_channel(channel));
+                let sampled = env::var(&env_name)
+                    .ok()
+                    .and_then(|value| value.parse::<i64>().ok())
+                    .unwrap_or(default_value);
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.input_i64 @{} [{}] channel={} value={} source={}",
+                        node.resource,
+                        resource.kind.raw,
+                        channel,
+                        sampled,
+                        if sampled == default_value { "default" } else { "env" }
+                    ),
+                );
+                Ok(Value::Int(sampled))
+            }
+            "present_frame" => {
+                let frame = state.expect_value(&node.op.args[0])?.clone();
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.present_frame @{} [{}]: {}",
+                        node.resource, resource.kind.raw, frame
+                    ),
+                );
+                Ok(Value::Unit)
+            }
             "print" => {
                 let value = state.expect_value(&node.op.args[0])?.clone();
                 state.push_resource_event(resource, format!(
@@ -93,4 +193,17 @@ fn require_cpu_resource(node: &Node, resource: &Resource) -> Result<(), String> 
             node.name, resource.name, resource.kind.raw
         ))
     }
+}
+
+fn normalize_channel(channel: &str) -> String {
+    channel
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() {
+                ch.to_ascii_uppercase()
+            } else {
+                '_'
+            }
+        })
+        .collect()
 }

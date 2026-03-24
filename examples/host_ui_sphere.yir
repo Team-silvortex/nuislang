@@ -1,22 +1,24 @@
-# Legacy filename note:
-# this example now stays inside the core repo as a direct shader-driven ball demo.
-
 yir 0.1
 
 resource cpu0 cpu
 resource shader0 shader
 
+cpu.window main_window cpu0 640 480 sphere_demo
+cpu.input_i64 color_delta cpu0 color_knob 20
+cpu.input_i64 speed_delta cpu0 speed_knob 4
 cpu.const base_color cpu0 128
-cpu.const color_delta cpu0 20
 cpu.const base_speed cpu0 12
-cpu.const speed_delta cpu0 4
 cpu.add ball_color cpu0 base_color color_delta
 cpu.add ball_speed cpu0 base_speed speed_delta
 fabric.move gpu_color shader0 ball_color shader0
 fabric.move gpu_speed shader0 ball_speed shader0
 shader.pack_ball_state render_packet shader0 gpu_color gpu_speed
 shader.draw_sphere frame shader0 render_packet
+fabric.move host_frame cpu0 frame cpu0
+cpu.present_frame present cpu0 host_frame
 
+edge effect main_window color_delta
+edge effect main_window speed_delta
 edge dep base_color ball_color
 edge dep color_delta ball_color
 edge dep base_speed ball_speed
@@ -26,3 +28,7 @@ edge xfer ball_speed gpu_speed
 edge dep gpu_color render_packet
 edge dep gpu_speed render_packet
 edge dep render_packet frame
+edge xfer frame host_frame
+edge dep host_frame present
+edge effect frame host_frame
+edge effect host_frame present

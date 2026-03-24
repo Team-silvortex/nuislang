@@ -68,6 +68,16 @@ impl RegisteredMod for ShaderMod {
 
                 Ok(InstructionSemantics::effect(node.op.args.clone()))
             }
+            "draw_sphere" => {
+                if node.op.args.len() != 1 {
+                    return Err(format!(
+                        "node `{}` expects `shader.draw_sphere <name> <resource> <packet>`",
+                        node.name
+                    ));
+                }
+
+                Ok(InstructionSemantics::effect(node.op.args.clone()))
+            }
             "print" => {
                 if node.op.args.len() != 1 {
                     return Err(format!(
@@ -121,6 +131,18 @@ impl RegisteredMod for ShaderMod {
                     resource,
                     format!(
                         "effect shader.draw_ball @{} [{}]: {}",
+                        node.resource, resource.kind.raw, frame
+                    ),
+                );
+                Ok(Value::Frame(frame))
+            }
+            "draw_sphere" => {
+                let value = state.expect_value(&node.op.args[0])?.clone();
+                let frame = draw_sphere_surface(&value)?;
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect shader.draw_sphere @{} [{}]: {}",
                         node.resource, resource.kind.raw, frame
                     ),
                 );
@@ -185,4 +207,59 @@ fn draw_ball_surface(value: &Value) -> Result<FrameSurface, String> {
     }
 
     Ok(FrameSurface { width, height, rows })
+}
+
+fn draw_sphere_surface(value: &Value) -> Result<FrameSurface, String> {
+    let (color, speed) = match value {
+        Value::Tuple(items) if items.len() == 2 => match (&items[0], &items[1]) {
+            (Value::Int(color), Value::Int(speed)) => (*color, *speed),
+            _ => return Err("shader.draw_sphere expects (int, int)".to_owned()),
+        },
+        _ => return Err("shader.draw_sphere expects a 2-tuple packet".to_owned()),
+    };
+
+    let width = 48usize;
+    let height = 32usize;
+    let radius = 0.72f32;
+    let offset_x = ((speed as f32) * 0.03).sin() * 0.22;
+    let offset_y = ((speed as f32) * 0.02).cos() * 0.16;
+    let palette = sphere_palette(color);
+
+    let mut rows = Vec::with_capacity(height);
+    for y in 0..height {
+        let mut row = String::with_capacity(width);
+        let ny = ((y as f32 / (height - 1) as f32) * 2.0 - 1.0) - offset_y;
+        for x in 0..width {
+            let nx = ((x as f32 / (width - 1) as f32) * 2.0 - 1.0) - offset_x;
+            let r2 = nx * nx + ny * ny;
+            if r2 > radius * radius {
+                row.push('.');
+                continue;
+            }
+
+            let nz = (radius * radius - r2).sqrt();
+            let len = (nx * nx + ny * ny + nz * nz).sqrt().max(0.0001);
+            let lx = -0.45f32;
+            let ly = -0.35f32;
+            let lz = 0.82f32;
+            let ll = (lx * lx + ly * ly + lz * lz).sqrt();
+            let light = ((nx / len) * (lx / ll) + (ny / len) * (ly / ll) + (nz / len) * (lz / ll))
+                .max(0.0);
+            let rim = (1.0 - (nz / radius)).powf(1.6) * 0.35;
+            let shade = (light * 0.85 + rim).clamp(0.0, 1.0);
+            let index = ((shade * (palette.len() - 1) as f32).round() as usize).min(palette.len() - 1);
+            row.push(palette[index]);
+        }
+        rows.push(row);
+    }
+
+    Ok(FrameSurface { width, height, rows })
+}
+
+fn sphere_palette(color: i64) -> &'static [char] {
+    match color.rem_euclid(3) {
+        0 => &[':', '-', '=', '+', '*', 'o'],
+        1 => &[':', '-', '=', '+', '*', 'O'],
+        _ => &[':', '-', '=', '+', '*', '@'],
+    }
 }
