@@ -1,0 +1,28 @@
+yir 0.1
+
+resource cpu0 cpu.arm64
+resource npu0 npu.apple
+
+cpu.target_config cpu_profile cpu0 arm64 apple_aapcs64 128
+npu.target_config npu_profile npu0 apple_ane coreml 128
+
+npu.tensor input npu0 1 3 2,4,6
+npu.tensor weights npu0 3 2 1,-2,3,0,2,1
+npu.tensor bias npu0 1 2 -4,3
+npu.matmul projected npu0 input weights
+npu.add_bias biased npu0 projected bias
+npu.relu activated npu0 biased
+npu.print npu_trace npu0 activated
+data.move host_tensor cpu0 activated cpu0
+cpu.print host_trace cpu0 host_tensor
+
+edge dep input projected
+edge dep weights projected
+edge dep projected biased
+edge dep bias biased
+edge dep biased activated
+edge dep activated npu_trace
+edge xfer activated host_tensor
+edge dep host_tensor host_trace
+edge effect activated npu_trace
+edge effect host_tensor host_trace

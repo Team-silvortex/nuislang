@@ -597,10 +597,29 @@ nuisc 具有最终否决权：
 * 当前仓库**尚未实现完整 NIR / GLM / Fabric verifier**
 * 已具备最小 `YIR` 手写原型：`parse -> verify -> execute`
 * 当前 `YIR` 原型采用 **注册式 mod 指令集** 与**显式图边模型**
+* 当前已新增工作中的 `YIR Reference`：`docs/reference/yir-reference.md`，用于像早期 `LLVM LangRef` 那样同步整理现有 reference surface
 * 当前已接入 `cpu` 与 backend-agnostic 的 `shader` mod；窗口/UI/present 作为 `cpu` 域特化能力存在
+* 上述窗口/UI/present 仅是当前 reference preview adapter 消费的 `cpu`-mod 能力，**不是 `YIR` core 对 UI 框架的内建依赖**
+* 当前 `cpu` mod 已开始覆盖 `arm64-family` 的抽象能力面（如 `target_config` / `bind_core` / `madd`）
+* 当前 `cpu` mod 也已有最小可寻址对象/指针原型（`null / borrow / move_ptr / alloc_node / load_* / store_* / free`），用于验证链表这类动态结构
+* 当前 `cpu` verifier 已开始按 Rust 风格收紧所有权边界：借用指针可读不可写，所有权移动后原名不可再用，释放后借用再读会被拒绝
+* 当前 `kernel` mod 已补最小张量计算原型（如 `tensor` / `matmul` / `add_bias` / `relu`），用于 macOS 上先行验证 `cpu <-> kernel/npu` 的异构图
+* 当前 `shader` mod 已开始覆盖 `Metal/Vulkan` 共有的渲染抽象面（如 `target` / `viewport` / `pipeline` / `begin_pass` / `draw_instanced`）
+* 当前已补 `shader lowering contract` 分析：`draw_instanced + begin_pass + target + pipeline` 会被标注为未来 backend lowering 子集；其余 shader reference op 目前明确走 prerender fallback
+* 当前 `shader package` 也已有最小清单骨架：同一 stage 会预留 `metal / vulkan / directx / opengl` 变体槽位，以便未来按 backend cooked/package 模式加载
+* 当前标准能力面已开始收敛为 `cpu / shader / kernel / data`，并以 `nustar` 注册包形态存在，manifest 位于 `nustar-packages/*.toml`
 * 当前 demo 直接由 `shader mod` 驱动；`ns-nova` 未来应作为独立项目在其上封装
 * GPU lane 产出的 `FrameSurface` 已可导出为实际图像文件（PPM）以验证异构执行结果
-* macOS 下已补最小系统窗口预览器骨架：CPU 侧创建窗口并展示 GPU framebuffer 导出的图像
+* macOS 下已补最小系统窗口预览器骨架：CPU 侧创建窗口并展示 GPU framebuffer 导出的图像；它属于工具层 adapter，不代表 `nuis` 对 Swift/AppKit 的语义依赖
+* 当前已补最小 `AOT bundle` 入口：`tools/yir-pack-aot` 会优先把 CPU slice 走 `YIR -> LLVM IR -> clang` 编成本地二进制；若模块包含异构渲染结果，则会输出 `shader_contract.txt`、`shader_package.toml`，并按当前能力额外打包预渲染 frame 资产
+* 当前 `nuisc` 已具备最小注册发现入口：`cargo run -p nuisc -- registry`
+* CPU-hosted UI event demo: `examples/host_ui_sphere.yir`
+* CPU linked-list demo: `examples/cpu_linked_list.yir`
+* Rust-ish CPU ownership demo: `examples/cpu_linked_list_rustish.yir`
+* Invalid borrowed-write demo: `examples/cpu_borrow_write_invalid.yir`
+* Invalid use-after-free demo: `examples/cpu_use_after_free_invalid.yir`
+* CPU/kernel tensor demo: `examples/kernel_tensor_demo.yir`
+* Legacy CPU/NPU tensor demo: `examples/npu_tensor_demo.yir`
 * 一次性窗口入口：`bash tools/yir-preview-macos/run-ball-once.sh`
 * 现有 Rust crate 主要用于固定术语、边界与后续实现入口
 * 后续整改优先级应为：`YIR expand -> semantics model -> verifier hardening -> AOT executable path`

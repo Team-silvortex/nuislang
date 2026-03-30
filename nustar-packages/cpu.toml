@@ -1,0 +1,8 @@
+package_id = "official.cpu"
+domain_family = "cpu"
+frontend = "nustar-cpu"
+entry_crate = "crates/yir-domain-cpu"
+profiles = ["aot"]
+resource_families = ["cpu", "cpu.arm64"]
+lowering_targets = ["llvm", "arm64"]
+ops = ["cpu.const", "cpu.add", "cpu.sub", "cpu.mul", "cpu.madd", "cpu.target_config", "cpu.bind_core", "cpu.window", "cpu.input_i64", "cpu.present_frame", "cpu.print"]

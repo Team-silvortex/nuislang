@@ -1,11 +1,15 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use yir_core::{EdgeKind, FabricMod, ModRegistry, Node, Resource, ResourceKind, YirModule};
+use yir_core::{DataMod, EdgeKind, LegacyFabricMod, ModRegistry, Node, Resource, ResourceKind, YirModule};
 
 pub fn default_registry() -> ModRegistry {
     let mut registry = ModRegistry::new();
-    registry.register(FabricMod);
+    registry.register(DataMod);
+    registry.register(LegacyFabricMod);
     registry.register(yir_domain_cpu::CpuMod);
+    registry.register(yir_domain_kernel::KernelMod);
+    registry.register(yir_domain_kernel::LegacyNpuMod);
+    registry.register(yir_domain_npu::NpuMod);
     registry.register(yir_domain_shader::ShaderMod);
     registry
 }
@@ -116,6 +120,7 @@ pub fn verify_module_with_registry(
     }
 
     ensure_acyclic(module)?;
+    verify_cpu_heap_protocol(module)?;
     Ok(())
 }
 
@@ -169,4 +174,261 @@ fn ensure_acyclic(module: &YirModule) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+#[derive(Clone, Copy)]
+enum PointerState {
+    Null,
+    Owned(usize),
+    Borrowed(usize),
+    Unknown,
+}
+
+#[derive(Clone, Copy)]
+struct HeapBinding {
+    live: bool,
+    next: PointerState,
+}
+
+fn verify_cpu_heap_protocol(module: &YirModule) -> Result<(), String> {
+    let order = topological_order(module)?;
+    let nodes = module
+        .nodes
+        .iter()
+        .map(|node| (node.name.as_str(), node))
+        .collect::<BTreeMap<_, _>>();
+
+    let mut values = BTreeMap::<String, PointerState>::new();
+    let mut heap = BTreeMap::<usize, HeapBinding>::new();
+    let mut next_id = 1usize;
+    let mut moved_names = BTreeSet::<String>::new();
+
+    for node_name in order {
+        let node = nodes
+            .get(node_name.as_str())
+            .copied()
+            .ok_or_else(|| format!("verification order references unknown node `{node_name}`"))?;
+
+        if node.op.module != "cpu" {
+            continue;
+        }
+
+        for arg in &node.op.args {
+            if moved_names.contains(arg) {
+                return Err(format!(
+                    "node `{}` uses moved pointer value `{}`",
+                    node.name, arg
+                ));
+            }
+        }
+
+        match node.op.instruction.as_str() {
+            "null" => {
+                values.insert(node.name.clone(), PointerState::Null);
+            }
+            "alloc_node" => {
+                let next = values.get(&node.op.args[1]).copied().unwrap_or(PointerState::Unknown);
+                let id = next_id;
+                next_id += 1;
+                heap.insert(
+                    id,
+                    HeapBinding {
+                        live: true,
+                        next,
+                    },
+                );
+                values.insert(node.name.clone(), PointerState::Owned(id));
+            }
+            "borrow" => {
+                let source = pointer_arg(&values, &node.op.args[0]);
+                match source {
+                    PointerState::Owned(id) | PointerState::Borrowed(id) => {
+                        ensure_live_heap(&heap, id, node)?;
+                        values.insert(node.name.clone(), PointerState::Borrowed(id));
+                    }
+                    PointerState::Null => {
+                        values.insert(node.name.clone(), PointerState::Null);
+                    }
+                    PointerState::Unknown => {
+                        values.insert(node.name.clone(), PointerState::Unknown);
+                    }
+                }
+            }
+            "move_ptr" => {
+                let source_name = &node.op.args[0];
+                let source = pointer_arg(&values, source_name);
+                match source {
+                    PointerState::Owned(id) => {
+                        ensure_live_heap(&heap, id, node)?;
+                        values.insert(node.name.clone(), PointerState::Owned(id));
+                        moved_names.insert(source_name.clone());
+                    }
+                    PointerState::Borrowed(_) => {
+                        return Err(format!(
+                            "node `{}` cannot move borrowed pointer `{}`",
+                            node.name, source_name
+                        ));
+                    }
+                    PointerState::Null => {
+                        values.insert(node.name.clone(), PointerState::Null);
+                    }
+                    PointerState::Unknown => {
+                        values.insert(node.name.clone(), PointerState::Unknown);
+                    }
+                }
+            }
+            "load_value" => {
+                ensure_pointer_readable(pointer_arg(&values, &node.op.args[0]), &heap, node)?;
+            }
+            "load_next" => {
+                let pointer = pointer_arg(&values, &node.op.args[0]);
+                let next = match pointer {
+                    PointerState::Owned(id) | PointerState::Borrowed(id) => {
+                        ensure_live_heap(&heap, id, node)?;
+                        heap.get(&id).map(|binding| binding.next).unwrap_or(PointerState::Unknown)
+                    }
+                    PointerState::Null => {
+                        return Err(format!("node `{}` dereferences null pointer", node.name));
+                    }
+                    PointerState::Unknown => PointerState::Unknown,
+                };
+                values.insert(node.name.clone(), next);
+            }
+            "store_value" => {
+                ensure_pointer_writable(pointer_arg(&values, &node.op.args[0]), &heap, node)?;
+            }
+            "store_next" => {
+                let dest = pointer_arg(&values, &node.op.args[0]);
+                ensure_pointer_writable(dest, &heap, node)?;
+                let next = pointer_arg(&values, &node.op.args[1]);
+                if let PointerState::Owned(id) = dest {
+                    if let Some(binding) = heap.get_mut(&id) {
+                        binding.next = next;
+                    }
+                }
+            }
+            "free" => {
+                let source_name = &node.op.args[0];
+                match pointer_arg(&values, source_name) {
+                    PointerState::Owned(id) => {
+                        ensure_live_heap(&heap, id, node)?;
+                        if let Some(binding) = heap.get_mut(&id) {
+                            binding.live = false;
+                        }
+                        moved_names.insert(source_name.clone());
+                    }
+                    PointerState::Borrowed(_) => {
+                        return Err(format!(
+                            "node `{}` cannot free borrowed pointer `{}`",
+                            node.name, source_name
+                        ));
+                    }
+                    PointerState::Null => {
+                        return Err(format!("node `{}` cannot free null pointer", node.name));
+                    }
+                    PointerState::Unknown => {}
+                }
+            }
+            _ => {}
+        }
+    }
+
+    Ok(())
+}
+
+fn pointer_arg(values: &BTreeMap<String, PointerState>, name: &str) -> PointerState {
+    values.get(name).copied().unwrap_or(PointerState::Unknown)
+}
+
+fn ensure_live_heap(
+    heap: &BTreeMap<usize, HeapBinding>,
+    id: usize,
+    node: &Node,
+) -> Result<(), String> {
+    let binding = heap
+        .get(&id)
+        .ok_or_else(|| format!("node `{}` references unknown heap object `&{id}`", node.name))?;
+    if binding.live {
+        Ok(())
+    } else {
+        Err(format!(
+            "node `{}` dereferences freed heap object `&{id}`",
+            node.name
+        ))
+    }
+}
+
+fn ensure_pointer_readable(
+    pointer: PointerState,
+    heap: &BTreeMap<usize, HeapBinding>,
+    node: &Node,
+) -> Result<(), String> {
+    match pointer {
+        PointerState::Owned(id) | PointerState::Borrowed(id) => ensure_live_heap(heap, id, node),
+        PointerState::Null => Err(format!("node `{}` dereferences null pointer", node.name)),
+        PointerState::Unknown => Ok(()),
+    }
+}
+
+fn ensure_pointer_writable(
+    pointer: PointerState,
+    heap: &BTreeMap<usize, HeapBinding>,
+    node: &Node,
+) -> Result<(), String> {
+    match pointer {
+        PointerState::Owned(id) => ensure_live_heap(heap, id, node),
+        PointerState::Borrowed(_) => Err(format!(
+            "node `{}` writes through borrowed pointer",
+            node.name
+        )),
+        PointerState::Null => Err(format!("node `{}` writes through null pointer", node.name)),
+        PointerState::Unknown => Ok(()),
+    }
+}
+
+fn topological_order(module: &YirModule) -> Result<Vec<String>, String> {
+    let mut adjacency = BTreeMap::<String, Vec<String>>::new();
+    let mut indegree = BTreeMap::<String, usize>::new();
+
+    for node in &module.nodes {
+        adjacency.entry(node.name.clone()).or_default();
+        indegree.entry(node.name.clone()).or_insert(0);
+    }
+
+    for edge in &module.edges {
+        adjacency
+            .entry(edge.from.clone())
+            .or_default()
+            .push(edge.to.clone());
+        *indegree.entry(edge.to.clone()).or_insert(0) += 1;
+    }
+
+    let mut ready = indegree
+        .iter()
+        .filter_map(|(name, degree)| (*degree == 0).then_some(name.clone()))
+        .collect::<Vec<_>>();
+    ready.sort();
+
+    let mut order = Vec::with_capacity(module.nodes.len());
+
+    while let Some(node) = ready.pop() {
+        order.push(node.clone());
+        if let Some(targets) = adjacency.get(&node) {
+            for target in targets {
+                if let Some(degree) = indegree.get_mut(target) {
+                    *degree -= 1;
+                    if *degree == 0 {
+                        ready.push(target.clone());
+                        ready.sort();
+                    }
+                }
+            }
+        }
+    }
+
+    if order.len() != module.nodes.len() {
+        return Err("graph contains a cycle across YIR edges".to_owned());
+    }
+
+    Ok(order)
 }

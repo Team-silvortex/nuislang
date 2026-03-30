@@ -12,8 +12,8 @@ cpu.const base_speed cpu0 12
 cpu.const speed_delta cpu0 4
 cpu.add ball_color cpu0 base_color color_delta
 cpu.add ball_speed cpu0 base_speed speed_delta
-fabric.move gpu_color shader0 ball_color shader0
-fabric.move gpu_speed shader0 ball_speed shader0
+data.move gpu_color shader0 ball_color shader0
+data.move gpu_speed shader0 ball_speed shader0
 shader.pack_ball_state render_packet shader0 gpu_color gpu_speed
 shader.draw_sphere frame shader0 render_packet
 

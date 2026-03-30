@@ -6,7 +6,7 @@ resource shader0 shader
 cpu.const seed cpu0 4
 cpu.const inc cpu0 3
 cpu.add sum cpu0 seed inc
-fabric.move sum_on_shader shader0 sum shader0
+data.move sum_on_shader shader0 sum shader0
 shader.dispatch shaded shader0 sum_on_shader
 shader.print done shader0 shaded
 

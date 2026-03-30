@@ -1,32 +1,46 @@
 yir 0.1
 
-resource cpu0 cpu
-resource shader0 shader
+resource cpu0 cpu.arm64
+resource shader0 shader.render
 
+cpu.target_config cpu_profile cpu0 arm64 apple_aapcs64 128
+cpu.bind_core main_thread cpu0 0
 cpu.window main_window cpu0 640 480 sphere_demo
 cpu.input_i64 color_delta cpu0 color_knob 20
 cpu.input_i64 speed_delta cpu0 speed_knob 4
 cpu.const base_color cpu0 128
 cpu.const base_speed cpu0 12
+cpu.const speed_scale cpu0 3
 cpu.add ball_color cpu0 base_color color_delta
-cpu.add ball_speed cpu0 base_speed speed_delta
-fabric.move gpu_color shader0 ball_color shader0
-fabric.move gpu_speed shader0 ball_speed shader0
+cpu.madd ball_speed cpu0 speed_delta speed_scale base_speed
+
+shader.target swapchain shader0 rgba8_unorm 128 96
+shader.viewport main_view shader0 128 96
+shader.pipeline lit_pipe shader0 lit_sphere triangle_strip
+data.move gpu_color shader0 ball_color shader0
+data.move gpu_speed shader0 ball_speed shader0
 shader.pack_ball_state render_packet shader0 gpu_color gpu_speed
-shader.draw_sphere frame shader0 render_packet
-fabric.move host_frame cpu0 frame cpu0
+shader.begin_pass main_pass shader0 swapchain lit_pipe main_view
+shader.draw_instanced frame shader0 main_pass render_packet 4 1
+data.move host_frame cpu0 frame cpu0
 cpu.present_frame present cpu0 host_frame
 
+edge effect main_thread main_window
 edge effect main_window color_delta
 edge effect main_window speed_delta
 edge dep base_color ball_color
 edge dep color_delta ball_color
-edge dep base_speed ball_speed
 edge dep speed_delta ball_speed
+edge dep speed_scale ball_speed
+edge dep base_speed ball_speed
+edge dep swapchain main_pass
+edge dep lit_pipe main_pass
+edge dep main_view main_pass
 edge xfer ball_color gpu_color
 edge xfer ball_speed gpu_speed
 edge dep gpu_color render_packet
 edge dep gpu_speed render_packet
+edge dep main_pass frame
 edge dep render_packet frame
 edge xfer frame host_frame
 edge dep host_frame present

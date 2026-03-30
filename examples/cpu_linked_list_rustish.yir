@@ -1,0 +1,39 @@
+yir 0.1
+
+resource cpu0 cpu.arm64
+
+cpu.target_config cpu_profile cpu0 arm64 apple_aapcs64 128
+cpu.null nil cpu0
+
+cpu.const tail_value cpu0 30
+cpu.alloc_node tail_raw cpu0 tail_value nil
+cpu.move_ptr tail cpu0 tail_raw
+
+cpu.const head_value_init cpu0 10
+cpu.alloc_node head cpu0 head_value_init tail
+
+cpu.borrow head_ref cpu0 head
+cpu.load_value head_value cpu0 head_ref
+cpu.load_next next_ptr cpu0 head_ref
+cpu.borrow tail_ref cpu0 next_ptr
+cpu.load_value tail_value_read cpu0 tail_ref
+cpu.add list_sum cpu0 head_value tail_value_read
+cpu.print out cpu0 list_sum
+
+edge dep tail_value tail_raw
+edge dep nil tail_raw
+edge dep tail_raw tail
+edge dep head_value_init head
+edge dep tail head
+edge dep head head_ref
+edge dep head_ref head_value
+edge effect head_ref head_value
+edge dep head_ref next_ptr
+edge effect head_ref next_ptr
+edge dep next_ptr tail_ref
+edge dep tail_ref tail_value_read
+edge effect tail_ref tail_value_read
+edge dep head_value list_sum
+edge dep tail_value_read list_sum
+edge dep list_sum out
+edge effect list_sum out

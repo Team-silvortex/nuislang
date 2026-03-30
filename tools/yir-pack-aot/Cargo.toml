@@ -1,0 +1,18 @@
+[package]
+name = "yir-pack-aot"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+readme.workspace = true
+description = "Build a small AOT bundle from a YIR module using LLVM/clang when possible and prerendered assets otherwise."
+
+[dependencies]
+yir-core = { path = "../../crates/yir-core" }
+yir-exec = { path = "../../crates/yir-exec" }
+yir-host-render = { path = "../../crates/yir-host-render" }
+yir-lower-contract = { path = "../../crates/yir-lower-contract" }
+yir-lower-llvm = { path = "../../crates/yir-lower-llvm" }
+yir-syntax = { path = "../../crates/yir-syntax" }
+yir-verify = { path = "../../crates/yir-verify" }

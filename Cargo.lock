@@ -30,6 +30,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "yir-domain-kernel"
+version = "0.1.0"
+dependencies = [
+ "yir-core",
+]
+
+[[package]]
+name = "yir-domain-npu"
+version = "0.1.0"
+dependencies = [
+ "yir-core",
+]
+
+[[package]]
 name = "yir-domain-shader"
 version = "0.1.0"
 dependencies = [
@@ -64,7 +78,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "yir-export-ui-plan"
+version = "0.1.0"
+dependencies = [
+ "yir-syntax",
+]
+
+[[package]]
 name = "yir-host-render"
+version = "0.1.0"
+dependencies = [
+ "yir-core",
+]
+
+[[package]]
+name = "yir-lower-contract"
 version = "0.1.0"
 dependencies = [
  "yir-core",
@@ -75,6 +103,19 @@ name = "yir-lower-llvm"
 version = "0.1.0"
 dependencies = [
  "yir-core",
+ "yir-verify",
+]
+
+[[package]]
+name = "yir-pack-aot"
+version = "0.1.0"
+dependencies = [
+ "yir-core",
+ "yir-exec",
+ "yir-host-render",
+ "yir-lower-contract",
+ "yir-lower-llvm",
+ "yir-syntax",
  "yir-verify",
 ]
 
@@ -100,5 +141,7 @@ version = "0.1.0"
 dependencies = [
  "yir-core",
  "yir-domain-cpu",
+ "yir-domain-kernel",
+ "yir-domain-npu",
  "yir-domain-shader",
 ]

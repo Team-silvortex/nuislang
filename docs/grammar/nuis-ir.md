@@ -134,26 +134,70 @@ Current built-in / registered examples:
 
 ```text
 cpu.const <name> <resource> <value>
+cpu.null <name> <resource>
+cpu.borrow <name> <resource> <ptr>
+cpu.move_ptr <name> <resource> <ptr>
 cpu.add <name> <resource> <lhs> <rhs>
+cpu.sub <name> <resource> <lhs> <rhs>
 cpu.mul <name> <resource> <lhs> <rhs>
+cpu.madd <name> <resource> <lhs> <rhs> <acc>
+cpu.alloc_node <name> <resource> <value> <next_ptr>
+cpu.load_value <name> <resource> <ptr>
+cpu.load_next <name> <resource> <ptr>
+cpu.store_value <name> <resource> <ptr> <value>
+cpu.store_next <name> <resource> <ptr> <next_ptr>
+cpu.is_null <name> <resource> <ptr>
+cpu.free <name> <resource> <ptr>
+cpu.target_config <name> <resource> <arch> <abi> <vector_bits>
+cpu.bind_core <name> <resource> <core_index>
 cpu.window <name> <resource> <width> <height> <title>
 cpu.input_i64 <name> <resource> <channel> <default>
 cpu.present_frame <name> <resource> <frame>
 cpu.print <name> <resource> <input>
-fabric.move <name> <resource> <input> <to>
+kernel.target_config <name> <resource> <arch> <runtime> <lane_width>
+kernel.tensor <name> <resource> <rows> <cols> <csv-elements>
+kernel.fill <name> <resource> <rows> <cols> <value>
+kernel.matmul <name> <resource> <lhs> <rhs>
+kernel.add_bias <name> <resource> <input> <bias>
+kernel.relu <name> <resource> <input>
+kernel.print <name> <resource> <input>
+data.move <name> <resource> <input> <to>
 shader.const <name> <resource> <value>
 shader.add <name> <resource> <lhs> <rhs>
 shader.mul <name> <resource> <lhs> <rhs>
+shader.target <name> <resource> <format> <width> <height>
+shader.viewport <name> <resource> <width> <height>
+shader.pipeline <name> <resource> <shading_model> <topology>
 shader.pack_ball_state <name> <resource> <color> <speed>
+shader.begin_pass <name> <resource> <target> <pipeline> <viewport>
 shader.dispatch <name> <resource> <input>
+shader.draw_instanced <name> <resource> <pass> <packet> <vertex_count> <instance_count>
 shader.draw_ball <name> <resource> <packet>
 shader.draw_sphere <name> <resource> <packet>
 shader.print <name> <resource> <input>
 ```
 
+Important boundary note:
+
+* `cpu.window`, `cpu.input_i64`, and `cpu.present_frame` are not YIR-core UI semantics.
+* They are current `cpu`-mod extension ops used by the reference preview/runtime path.
+* A different frontend, runtime adapter, or future framework can consume the same YIR graph without depending on these specific ops.
+* `cpu.borrow` and `cpu.move_ptr` are the first Rust-like ownership surface for the pure CPU domain: reads may flow through borrowed pointers, while writes and frees remain ownership-sensitive.
+* `cpu.alloc_node / load_* / store_* / free` are an early reference prototype for addressable objects and pointer-like semantics. They are intentionally narrow and currently model a controlled heap-node surface rather than a full general memory model.
+* `kernel.*` ops are the standard tensor/kernel execution surface. They may lower to `npu`, `gpu-kernel`, or future accelerators without changing the core graph semantics.
+* `data.*` ops are the instruction-level surface for Fabric-style exchange. The architecture term `Fabric` remains valid, but the standard op family name is `data`.
+* These domain surfaces are expected to graduate into `nustar` registration packages; `nuisc` should discover and bind them as registered capability bundles rather than hard-coding them as part of core YIR.
+
 Resource kinds are intentionally open-ended. For example, the current macOS
 window/backend path may eventually lower to Metal, but the YIR grammar does not
 hard-code backend selection.
+
+Current shader lowering contract direction:
+
+* `shader.target + shader.pipeline + shader.begin_pass + shader.draw_instanced` form the current backend-lowerable render subset.
+* This subset is intended to map to common `Metal/Vulkan` concepts, not to either backend's source language directly.
+* Legacy reference ops such as `shader.draw_ball`, `shader.draw_sphere`, and generic `shader.dispatch` remain valid YIR, but currently fall back to prerender/reference execution rather than entering the portable backend subset.
+* Package-level deployment should treat backend outputs as per-stage variants under one semantic stage id, so the same YIR stage can later carry `Metal`, `Vulkan`, `DirectX`, or `OpenGL` artifacts without changing the core graph.
 
 Cross-domain exchange is represented as a dedicated edge kind:
 
@@ -164,7 +208,7 @@ edge xfer <from> <to>
 That keeps domain crossing explicit in the graph instead of burying it in
 instruction order.
 
-For the current direct shader-driven and CPU-hosted UI event demo direction, the graph expresses:
+For the current direct shader-driven and CPU-hosted preview demo direction, one optional adapter path expresses:
 
 ```text
 cpu-hosted window + input sample

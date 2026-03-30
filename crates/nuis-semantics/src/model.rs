@@ -1,14 +1,22 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NirIntent {
-    pub op: &'static str,
+    pub op: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct YirNode {
-    pub kind: &'static str,
+    pub kind: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FabricPrimitive {
-    pub name: &'static str,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NustarPackage {
+    pub package_id: String,
+    pub domain_family: String,
+    pub entry_crate: String,
+    pub ops: Vec<String>,
 }

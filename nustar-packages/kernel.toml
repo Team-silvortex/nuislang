@@ -1,0 +1,8 @@
+package_id = "official.kernel"
+domain_family = "kernel"
+frontend = "nustar-kernel"
+entry_crate = "crates/yir-domain-kernel"
+profiles = ["aot"]
+resource_families = ["kernel", "kernel.apple", "npu", "npu.apple"]
+lowering_targets = ["coreml", "mps-graph", "ane"]
+ops = ["kernel.target_config", "kernel.tensor", "kernel.fill", "kernel.matmul", "kernel.add_bias", "kernel.relu", "kernel.print"]

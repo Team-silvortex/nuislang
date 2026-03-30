@@ -1,0 +1,8 @@
+package_id = "official.shader"
+domain_family = "shader"
+frontend = "nustar-shader"
+entry_crate = "crates/yir-domain-shader"
+profiles = ["aot"]
+resource_families = ["shader", "shader.render"]
+lowering_targets = ["metal", "vulkan", "directx", "opengl"]
+ops = ["shader.const", "shader.add", "shader.mul", "shader.target", "shader.viewport", "shader.pipeline", "shader.pack_ball_state", "shader.begin_pass", "shader.dispatch", "shader.draw_instanced", "shader.draw_ball", "shader.draw_sphere", "shader.print"]

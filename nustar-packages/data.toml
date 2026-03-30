@@ -1,0 +1,8 @@
+package_id = "official.data"
+domain_family = "data"
+frontend = "nustar-data"
+entry_crate = "crates/yir-core"
+profiles = ["aot"]
+resource_families = ["cpu", "shader", "kernel", "npu", "data"]
+lowering_targets = ["fabric-abi"]
+ops = ["data.move"]
