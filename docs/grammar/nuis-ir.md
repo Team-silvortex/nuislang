@@ -168,12 +168,32 @@ cpu.store_next <name> <resource> <ptr> <next_ptr>
 cpu.store_at <name> <resource> <buffer_ptr> <index> <value>
 cpu.is_null <name> <resource> <ptr>
 cpu.free <name> <resource> <ptr>
+cpu.const_bool <name> <resource> <true|false>
+cpu.const_i32 <name> <resource> <value>
+cpu.const_i64 <name> <resource> <value>
+cpu.const_f32 <name> <resource> <value>
+cpu.const_f64 <name> <resource> <value>
+cpu.struct <name> <resource> <type_name> <field=value>...
+cpu.field <name> <resource> <struct> <field_name>
 cpu.target_config <name> <resource> <arch> <abi> <vector_bits>
 cpu.bind_core <name> <resource> <core_index>
 cpu.window <name> <resource> <width> <height> <title>
 cpu.input_i64 <name> <resource> <channel> <default>
 cpu.present_frame <name> <resource> <frame>
 cpu.print <name> <resource> <input>
+
+Current handwritten `YIR` now includes a first typed value surface:
+
+* `bool`
+* `i32`
+* `i64`
+* `f32`
+* `f64`
+* named `struct`
+
+`cpu.struct` and `cpu.field` currently focus on value expression and field
+extraction. The LLVM path already supports typed constants and struct field
+access; a full stable struct aggregate ABI is still provisional.
 kernel.target_config <name> <resource> <arch> <runtime> <lane_width>
 kernel.tensor <name> <resource> <rows> <cols> <csv-elements>
 kernel.fill <name> <resource> <rows> <cols> <value>

@@ -139,8 +139,11 @@ Current behavior:
 * current macOS AppKit host stubs read `fabric_worker_core`, start a dedicated
   Fabric worker thread, and apply it as that thread's startup affinity hint;
 * current Fabric host booting stays AOT-first: generated host stubs embed a
-  static action table derived from `data.*` nodes instead of constructing a
-  heavyweight dynamic metadata graph at runtime
+  static typed action table derived from `data.*` nodes instead of constructing
+  a heavyweight dynamic metadata graph at runtime
+* the current typed action table also carries a minimal class/slot ABI tag for
+  each Fabric action, so host-side dispatch can remain static without falling
+  back to string-only pattern matching
 * this is still weaker than a strict reserved-core runtime model
 
 This is the beginning of a `YIR`-native toolchain, not the final shape.

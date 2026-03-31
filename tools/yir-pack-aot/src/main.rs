@@ -178,7 +178,7 @@ fn run() -> Result<(), String> {
         manifest.push("frame_runtime_mode=embedded_prerendered".to_owned());
         manifest.push("single_binary=true".to_owned());
         manifest.push(format!("fabric_boot_plan_events={}", fabric_boot_plan.len()));
-        manifest.push("fabric_boot_plan_mode=static_action_table".to_owned());
+        manifest.push("fabric_boot_plan_mode=static_typed_action_table".to_owned());
         if let Some(spec) = &window_spec {
             manifest.push(format!("window_title={}", spec.title));
             manifest.push(format!("window_width={}", spec.width));
@@ -216,6 +216,9 @@ struct PrimaryFabricBinding {
 
 #[derive(Debug, Clone)]
 struct FabricBootEvent {
+    action_kind: String,
+    action_class: String,
+    action_slot: String,
     event_name: String,
     table_id: String,
     source: String,
@@ -289,6 +292,49 @@ fn extract_fabric_boot_plan(
         .iter()
         .filter(|node| node.op.module == "data")
         .map(|node| {
+            let (action_kind, action_class, action_slot) = match node.op.instruction.as_str() {
+                "bind_core" => (
+                    "NUIS_FABRIC_ACTION_BIND_CORE",
+                    "worker",
+                    "bind_core",
+                ),
+                "handle_table" => (
+                    "NUIS_FABRIC_ACTION_HANDLE_TABLE",
+                    "binding",
+                    "handle_table",
+                ),
+                "output_pipe" => (
+                    "NUIS_FABRIC_ACTION_OUTPUT_PIPE",
+                    "pipe",
+                    "output",
+                ),
+                "input_pipe" => (
+                    "NUIS_FABRIC_ACTION_INPUT_PIPE",
+                    "pipe",
+                    "input",
+                ),
+                "marker" => (
+                    "NUIS_FABRIC_ACTION_MARKER",
+                    "sync",
+                    "marker",
+                ),
+                "copy_window" => (
+                    "NUIS_FABRIC_ACTION_COPY_WINDOW",
+                    "window",
+                    "copy",
+                ),
+                "immutable_window" => (
+                    "NUIS_FABRIC_ACTION_IMMUTABLE_WINDOW",
+                    "window",
+                    "immutable",
+                ),
+                "move" => (
+                    "NUIS_FABRIC_ACTION_MOVE_VALUE",
+                    "move",
+                    "value",
+                ),
+                _ => ("NUIS_FABRIC_ACTION_UNKNOWN", "unknown", "unknown"),
+            };
             let (source, target) = match node.op.instruction.as_str() {
                 "bind_core" => (worker_resource.to_owned(), worker_resource.to_owned()),
                 "handle_table" => (host_resource.to_owned(), render_resource.to_owned()),
@@ -303,6 +349,9 @@ fn extract_fabric_boot_plan(
             };
 
             FabricBootEvent {
+                action_kind: action_kind.to_owned(),
+                action_class: action_class.to_owned(),
+                action_slot: action_slot.to_owned(),
                 event_name: format!("data.{}:{}", node.op.instruction, node.name),
                 table_id: table_id.to_owned(),
                 source,
@@ -320,6 +369,15 @@ fn render_fabric_boot_plan(events: &[FabricBootEvent]) -> String {
     let mut out = String::new();
     for event in events {
         out.push_str("    {\n");
+        out.push_str(&format!("        {},\n", event.action_kind));
+        out.push_str(&format!(
+            "        \"{}\",\n",
+            c_string_literal(&event.action_class)
+        ));
+        out.push_str(&format!(
+            "        \"{}\",\n",
+            c_string_literal(&event.action_slot)
+        ));
         out.push_str(&format!(
             "        \"{}\",\n",
             c_string_literal(&event.event_name)
@@ -458,6 +516,22 @@ void nuis_debug_print_i64(int64_t value) {
     printf("%lld\n", (long long)value);
 }
 
+void nuis_debug_print_bool(int32_t value) {
+    printf("%s\n", value ? "true" : "false");
+}
+
+void nuis_debug_print_i32(int32_t value) {
+    printf("%d\n", value);
+}
+
+void nuis_debug_print_f32(float value) {
+    printf("%g\n", value);
+}
+
+void nuis_debug_print_f64(double value) {
+    printf("%g\n", value);
+}
+
 int main(void) {
     return (int)nuis_yir_entry();
 }
@@ -513,6 +587,22 @@ void nuis_debug_print_i64(int64_t value) {{
     printf("%lld\n", (long long)value);
 }}
 
+void nuis_debug_print_bool(int32_t value) {{
+    printf("%s\n", value ? "true" : "false");
+}}
+
+void nuis_debug_print_i32(int32_t value) {{
+    printf("%d\n", value);
+}}
+
+void nuis_debug_print_f32(float value) {{
+    printf("%g\n", value);
+}}
+
+void nuis_debug_print_f64(double value) {{
+    printf("%g\n", value);
+}}
+
 static void nuis_apply_fabric_affinity_hint(integer_t tag) {{
     if (tag <= 0) {{
         return;
@@ -535,11 +625,26 @@ static atomic_bool gNuisFabricWorkerRunning = false;
 static pthread_t gNuisFabricWorker;
 
 typedef struct {{
+    int kind;
+    char action_class[16];
+    char action_slot[16];
     char event_name[32];
     char table_id[32];
     char source[32];
     char target[32];
 }} NuisFabricEvent;
+
+enum {{
+    NUIS_FABRIC_ACTION_UNKNOWN = 0,
+    NUIS_FABRIC_ACTION_BIND_CORE = 1,
+    NUIS_FABRIC_ACTION_HANDLE_TABLE = 2,
+    NUIS_FABRIC_ACTION_OUTPUT_PIPE = 3,
+    NUIS_FABRIC_ACTION_INPUT_PIPE = 4,
+    NUIS_FABRIC_ACTION_MARKER = 5,
+    NUIS_FABRIC_ACTION_COPY_WINDOW = 6,
+    NUIS_FABRIC_ACTION_IMMUTABLE_WINDOW = 7,
+    NUIS_FABRIC_ACTION_MOVE_VALUE = 8,
+}};
 
 typedef struct {{
     int handle_table_count;
@@ -556,15 +661,13 @@ static const NuisFabricEvent kNuisFabricBootPlan[] = {{
 {fabric_boot_plan}}};
 static const size_t kNuisFabricBootPlanLen = {fabric_boot_plan_len};
 
-static bool nuis_fabric_event_is(const NuisFabricEvent *event, const char *prefix) {{
-    return strncmp(event->event_name, prefix, strlen(prefix)) == 0;
-}}
-
 static void nuis_dispatch_handle_table(const NuisFabricEvent *event) {{
     gNuisFabricDispatchState.handle_table_count += 1;
     fprintf(
         stderr,
-        "nuis: fabric dispatch handle_table table=%s host=%s render=%s\n",
+        "nuis: fabric dispatch handle_table class=%s slot=%s table=%s host=%s render=%s\n",
+        event->action_class,
+        event->action_slot,
         event->table_id,
         event->source,
         event->target
@@ -575,7 +678,9 @@ static void nuis_dispatch_output_pipe(const NuisFabricEvent *event) {{
     gNuisFabricDispatchState.output_pipe_count += 1;
     fprintf(
         stderr,
-        "nuis: fabric dispatch output_pipe egress=%s via=%s\n",
+        "nuis: fabric dispatch output_pipe class=%s slot=%s egress=%s via=%s\n",
+        event->action_class,
+        event->action_slot,
         event->source,
         event->target
     );
@@ -585,7 +690,9 @@ static void nuis_dispatch_input_pipe(const NuisFabricEvent *event) {{
     gNuisFabricDispatchState.input_pipe_count += 1;
     fprintf(
         stderr,
-        "nuis: fabric dispatch input_pipe ingress=%s into=%s\n",
+        "nuis: fabric dispatch input_pipe class=%s slot=%s ingress=%s into=%s\n",
+        event->action_class,
+        event->action_slot,
         event->source,
         event->target
     );
@@ -595,7 +702,9 @@ static void nuis_dispatch_marker(const NuisFabricEvent *event) {{
     gNuisFabricDispatchState.marker_count += 1;
     fprintf(
         stderr,
-        "nuis: fabric dispatch marker event=%s on=%s\n",
+        "nuis: fabric dispatch marker class=%s slot=%s event=%s on=%s\n",
+        event->action_class,
+        event->action_slot,
         event->event_name,
         event->source
     );
@@ -605,7 +714,9 @@ static void nuis_dispatch_window(const NuisFabricEvent *event) {{
     gNuisFabricDispatchState.window_count += 1;
     fprintf(
         stderr,
-        "nuis: fabric dispatch window transfer=%s -> %s\n",
+        "nuis: fabric dispatch window class=%s slot=%s transfer=%s -> %s\n",
+        event->action_class,
+        event->action_slot,
         event->source,
         event->target
     );
@@ -615,7 +726,9 @@ static void nuis_dispatch_move(const NuisFabricEvent *event) {{
     gNuisFabricDispatchState.move_count += 1;
     fprintf(
         stderr,
-        "nuis: fabric dispatch move value=%s -> %s\n",
+        "nuis: fabric dispatch move class=%s slot=%s value=%s -> %s\n",
+        event->action_class,
+        event->action_slot,
         event->source,
         event->target
     );
@@ -625,7 +738,9 @@ static void nuis_dispatch_bind_core(const NuisFabricEvent *event) {{
     gNuisFabricDispatchState.bind_core_count += 1;
     fprintf(
         stderr,
-        "nuis: fabric dispatch bind_core worker=%s\n",
+        "nuis: fabric dispatch bind_core class=%s slot=%s worker=%s\n",
+        event->action_class,
+        event->action_slot,
         event->source
     );
 }}
@@ -647,32 +762,40 @@ static void nuis_dispatch_host_signal(
 }}
 
 static void nuis_dispatch_fabric_event(const NuisFabricEvent *event) {{
-    if (nuis_fabric_event_is(event, "data.handle_table:")) {{
-        nuis_dispatch_handle_table(event);
-    }} else if (nuis_fabric_event_is(event, "data.output_pipe:")) {{
-        nuis_dispatch_output_pipe(event);
-    }} else if (nuis_fabric_event_is(event, "data.input_pipe:")) {{
-        nuis_dispatch_input_pipe(event);
-    }} else if (nuis_fabric_event_is(event, "data.marker:")) {{
-        nuis_dispatch_marker(event);
-    }} else if (
-        nuis_fabric_event_is(event, "data.copy_window:")
-        || nuis_fabric_event_is(event, "data.immutable_window:")
-    ) {{
-        nuis_dispatch_window(event);
-    }} else if (nuis_fabric_event_is(event, "data.move:")) {{
-        nuis_dispatch_move(event);
-    }} else if (nuis_fabric_event_is(event, "data.bind_core:")) {{
-        nuis_dispatch_bind_core(event);
-    }} else {{
-        fprintf(
-            stderr,
-            "nuis: fabric dispatch host event `%s` table=%s source=%s target=%s\n",
-            event->event_name,
-            event->table_id,
-            event->source,
-            event->target
-        );
+    switch (event->kind) {{
+        case NUIS_FABRIC_ACTION_HANDLE_TABLE:
+            nuis_dispatch_handle_table(event);
+            break;
+        case NUIS_FABRIC_ACTION_OUTPUT_PIPE:
+            nuis_dispatch_output_pipe(event);
+            break;
+        case NUIS_FABRIC_ACTION_INPUT_PIPE:
+            nuis_dispatch_input_pipe(event);
+            break;
+        case NUIS_FABRIC_ACTION_MARKER:
+            nuis_dispatch_marker(event);
+            break;
+        case NUIS_FABRIC_ACTION_COPY_WINDOW:
+        case NUIS_FABRIC_ACTION_IMMUTABLE_WINDOW:
+            nuis_dispatch_window(event);
+            break;
+        case NUIS_FABRIC_ACTION_MOVE_VALUE:
+            nuis_dispatch_move(event);
+            break;
+        case NUIS_FABRIC_ACTION_BIND_CORE:
+            nuis_dispatch_bind_core(event);
+            break;
+        default:
+            fprintf(
+                stderr,
+                "nuis: fabric dispatch unknown action kind=%d event=%s table=%s source=%s target=%s\n",
+                event->kind,
+                event->event_name,
+                event->table_id,
+                event->source,
+                event->target
+            );
+            break;
     }}
 }}
 

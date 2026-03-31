@@ -129,6 +129,13 @@ The `cpu` family is the current pure host/system and general compute surface.
 
 ```text
 cpu.const
+cpu.const_bool
+cpu.const_i32
+cpu.const_i64
+cpu.const_f32
+cpu.const_f64
+cpu.struct
+cpu.field
 cpu.neg
 cpu.not
 cpu.add
@@ -163,6 +170,10 @@ Important boundary:
   extension ops
 * they are not `YIR` core semantics
 * they are reference adapter surfaces used by the current preview/runtime path
+* the current handwritten reference model now also has a minimal typed-value
+  surface: `bool`, `i32`, `i64`, `f32`, `f64`, plus named `struct` values
+* current LLVM lowering already supports typed constants and struct field access;
+  full stable struct aggregate ABI lowering is still provisional
 
 ## Addressable-object prototype
 
@@ -442,8 +453,10 @@ Current reference direction:
   Fabric worker thread and applying the core as its affinity hint, not as a
   hard CPU-core reservation
 * current host-side Fabric booting is intentionally thin and AOT-first: `data.*`
-  nodes are lowered into a static boot/action table instead of a heavyweight
-  dynamic metadata runtime
+  nodes are lowered into a static typed boot/action table instead of a
+  heavyweight dynamic metadata runtime
+* the current boot/action table also carries minimal class/slot tags for
+  `handle_table`, `pipe`, `marker`, `window`, `move`, and worker-binding actions
 
 ---
 

@@ -118,13 +118,18 @@ impl EdgeKind {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Value {
+    Bool(bool),
+    I32(i32),
     Int(i64),
+    F32(f32),
+    F64(f64),
     Symbol(String),
     Tensor(TensorValue),
     Pointer(Option<usize>),
     Tuple(Vec<Value>),
+    Struct(StructValue),
     DataWindow(DataWindow),
     DataPipe(DataPipe),
     DataMarker(DataMarker),
@@ -155,6 +160,16 @@ pub struct TensorValue {
     pub cols: usize,
     pub elements: Vec<i64>,
 }
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct StructValue {
+    pub type_name: String,
+    pub fields: Vec<(String, Value)>,
+}
+
+impl Eq for Value {}
+
+impl Eq for StructValue {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DataWindow {
@@ -309,7 +324,11 @@ pub struct HeapBuffer {
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Bool(value) => write!(f, "{value}"),
+            Self::I32(value) => write!(f, "{value}i32"),
             Self::Int(value) => write!(f, "{value}"),
+            Self::F32(value) => write!(f, "{}f32", trim_float(*value as f64)),
+            Self::F64(value) => write!(f, "{}f64", trim_float(*value)),
             Self::Symbol(value) => write!(f, "{value}"),
             Self::Tensor(tensor) => write!(f, "{tensor}"),
             Self::Pointer(pointer) => match pointer {
@@ -326,6 +345,7 @@ impl fmt::Display for Value {
                 }
                 write!(f, ")")
             }
+            Self::Struct(value) => write!(f, "{value}"),
             Self::DataWindow(window) => write!(f, "{window}"),
             Self::DataPipe(pipe) => write!(f, "{pipe}"),
             Self::DataMarker(marker) => write!(f, "{marker}"),
@@ -352,6 +372,19 @@ impl fmt::Display for Value {
     }
 }
 
+fn trim_float(value: f64) -> String {
+    let mut rendered = value.to_string();
+    if rendered.contains('.') {
+        while rendered.ends_with('0') {
+            rendered.pop();
+        }
+        if rendered.ends_with('.') {
+            rendered.push('0');
+        }
+    }
+    rendered
+}
+
 impl fmt::Display for TensorValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "tensor[{}x{} ", self.rows, self.cols)?;
@@ -367,6 +400,19 @@ impl fmt::Display for TensorValue {
             }
         }
         write!(f, "]")
+    }
+}
+
+impl fmt::Display for StructValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}{{", self.type_name)?;
+        for (index, (name, value)) in self.fields.iter().enumerate() {
+            if index > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{name}: {value}")?;
+        }
+        write!(f, "}}")
     }
 }
 
@@ -621,11 +667,16 @@ pub struct ExecutionState {
 impl ExecutionState {
     pub fn expect_int(&self, name: &str) -> Result<i64, String> {
         match self.values.get(name) {
+            Some(Value::Bool(_)) => Err(format!("`{name}` is bool, expected int")),
+            Some(Value::I32(value)) => Ok(*value as i64),
             Some(Value::Int(value)) => Ok(*value),
+            Some(Value::F32(_)) => Err(format!("`{name}` is f32, expected int")),
+            Some(Value::F64(_)) => Err(format!("`{name}` is f64, expected int")),
             Some(Value::Symbol(_)) => Err(format!("`{name}` is symbol, expected int")),
             Some(Value::Tensor(_)) => Err(format!("`{name}` is tensor, expected int")),
             Some(Value::Pointer(_)) => Err(format!("`{name}` is pointer, expected int")),
             Some(Value::Tuple(_)) => Err(format!("`{name}` is tuple, expected int")),
+            Some(Value::Struct(_)) => Err(format!("`{name}` is struct, expected int")),
             Some(Value::DataWindow(_)) => Err(format!("`{name}` is window, expected int")),
             Some(Value::DataPipe(_)) => Err(format!("`{name}` is pipe, expected int")),
             Some(Value::DataMarker(_)) => Err(format!("`{name}` is marker, expected int")),
@@ -648,6 +699,14 @@ impl ExecutionState {
             Some(Value::RenderPass(_)) => Err(format!("`{name}` is render-pass, expected int")),
             Some(Value::Frame(_)) => Err(format!("`{name}` is frame, expected int")),
             Some(Value::Unit) => Err(format!("`{name}` is unit, expected int")),
+            None => Err(format!("missing value for `{name}`")),
+        }
+    }
+
+    pub fn expect_struct(&self, name: &str) -> Result<&StructValue, String> {
+        match self.values.get(name) {
+            Some(Value::Struct(value)) => Ok(value),
+            Some(other) => Err(format!("`{name}` is {other}, expected struct")),
             None => Err(format!("missing value for `{name}`")),
         }
     }
@@ -1067,6 +1126,7 @@ fn is_move_value_legal(value: &Value) -> bool {
         | Value::DataMarker(_)
         | Value::DataHandleTable(_) => false,
         Value::Tuple(items) => items.iter().all(is_move_value_legal),
+        Value::Struct(value) => value.fields.iter().all(|(_, value)| is_move_value_legal(value)),
         _ => true,
     }
 }
@@ -1075,6 +1135,7 @@ fn is_window_base_legal(value: &Value) -> bool {
     match value {
         Value::DataHandleTable(_) | Value::DataMarker(_) | Value::DataPipe(_) => false,
         Value::Tuple(items) => items.iter().all(is_move_value_legal),
+        Value::Struct(value) => value.fields.iter().all(|(_, value)| is_move_value_legal(value)),
         _ => true,
     }
 }
@@ -1083,6 +1144,7 @@ fn is_pipe_payload_legal(value: &Value) -> bool {
     match value {
         Value::DataPipe(_) => false,
         Value::Tuple(items) => items.iter().all(is_move_value_legal),
+        Value::Struct(value) => value.fields.iter().all(|(_, value)| is_move_value_legal(value)),
         _ => true,
     }
 }

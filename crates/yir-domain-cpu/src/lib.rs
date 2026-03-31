@@ -1,6 +1,6 @@
 use std::env;
 
-use yir_core::{ExecutionState, InstructionSemantics, Node, RegisteredMod, Resource, Value};
+use yir_core::{ExecutionState, InstructionSemantics, Node, RegisteredMod, Resource, StructValue, Value};
 
 pub struct CpuMod;
 
@@ -39,6 +39,118 @@ impl RegisteredMod for CpuMod {
                 })?;
 
                 Ok(InstructionSemantics::pure(Vec::new()))
+            }
+            "const_bool" => {
+                if node.op.args.len() != 1 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.const_bool <name> <resource> <true|false>`",
+                        node.name
+                    ));
+                }
+                match node.op.args[0].as_str() {
+                    "true" | "false" => Ok(InstructionSemantics::pure(Vec::new())),
+                    _ => Err(format!(
+                        "node `{}` has invalid bool literal `{}`",
+                        node.name, node.op.args[0]
+                    )),
+                }
+            }
+            "const_i32" => {
+                if node.op.args.len() != 1 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.const_i32 <name> <resource> <value>`",
+                        node.name
+                    ));
+                }
+                node.op.args[0].parse::<i32>().map_err(|_| {
+                    format!(
+                        "node `{}` has invalid i32 literal `{}`",
+                        node.name, node.op.args[0]
+                    )
+                })?;
+                Ok(InstructionSemantics::pure(Vec::new()))
+            }
+            "const_i64" => {
+                if node.op.args.len() != 1 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.const_i64 <name> <resource> <value>`",
+                        node.name
+                    ));
+                }
+                node.op.args[0].parse::<i64>().map_err(|_| {
+                    format!(
+                        "node `{}` has invalid i64 literal `{}`",
+                        node.name, node.op.args[0]
+                    )
+                })?;
+                Ok(InstructionSemantics::pure(Vec::new()))
+            }
+            "const_f32" => {
+                if node.op.args.len() != 1 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.const_f32 <name> <resource> <value>`",
+                        node.name
+                    ));
+                }
+                node.op.args[0].parse::<f32>().map_err(|_| {
+                    format!(
+                        "node `{}` has invalid f32 literal `{}`",
+                        node.name, node.op.args[0]
+                    )
+                })?;
+                Ok(InstructionSemantics::pure(Vec::new()))
+            }
+            "const_f64" => {
+                if node.op.args.len() != 1 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.const_f64 <name> <resource> <value>`",
+                        node.name
+                    ));
+                }
+                node.op.args[0].parse::<f64>().map_err(|_| {
+                    format!(
+                        "node `{}` has invalid f64 literal `{}`",
+                        node.name, node.op.args[0]
+                    )
+                })?;
+                Ok(InstructionSemantics::pure(Vec::new()))
+            }
+            "struct" => {
+                if node.op.args.len() < 2 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.struct <name> <resource> <type_name> <field=value>...`",
+                        node.name
+                    ));
+                }
+                for entry in &node.op.args[1..] {
+                    let Some((field, value_name)) = entry.split_once('=') else {
+                        return Err(format!(
+                            "node `{}` has invalid struct field binding `{}`",
+                            node.name, entry
+                        ));
+                    };
+                    if field.trim().is_empty() || value_name.trim().is_empty() {
+                        return Err(format!(
+                            "node `{}` has empty struct field binding `{}`",
+                            node.name, entry
+                        ));
+                    }
+                }
+                Ok(InstructionSemantics::pure(
+                    node.op.args[1..]
+                        .iter()
+                        .filter_map(|entry| entry.split_once('=').map(|(_, value)| value.trim().to_owned()))
+                        .collect(),
+                ))
+            }
+            "field" => {
+                if node.op.args.len() != 2 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.field <name> <resource> <struct> <field_name>`",
+                        node.name
+                    ));
+                }
+                Ok(InstructionSemantics::pure(vec![node.op.args[0].clone()]))
             }
             "null" => {
                 if !node.op.args.is_empty() {
@@ -276,6 +388,70 @@ impl RegisteredMod for CpuMod {
                     node.name, node.op.args[0]
                 )
             })?)),
+            "const_bool" => Ok(Value::Bool(match node.op.args[0].as_str() {
+                "true" => true,
+                "false" => false,
+                _ => {
+                    return Err(format!(
+                        "node `{}` has invalid bool literal `{}`",
+                        node.name, node.op.args[0]
+                    ))
+                }
+            })),
+            "const_i32" => Ok(Value::I32(node.op.args[0].parse::<i32>().map_err(|_| {
+                format!(
+                    "node `{}` has invalid i32 literal `{}`",
+                    node.name, node.op.args[0]
+                )
+            })?)),
+            "const_i64" => Ok(Value::Int(node.op.args[0].parse::<i64>().map_err(|_| {
+                format!(
+                    "node `{}` has invalid i64 literal `{}`",
+                    node.name, node.op.args[0]
+                )
+            })?)),
+            "const_f32" => Ok(Value::F32(node.op.args[0].parse::<f32>().map_err(|_| {
+                format!(
+                    "node `{}` has invalid f32 literal `{}`",
+                    node.name, node.op.args[0]
+                )
+            })?)),
+            "const_f64" => Ok(Value::F64(node.op.args[0].parse::<f64>().map_err(|_| {
+                format!(
+                    "node `{}` has invalid f64 literal `{}`",
+                    node.name, node.op.args[0]
+                )
+            })?)),
+            "struct" => {
+                let type_name = node.op.args[0].clone();
+                let mut fields = Vec::with_capacity(node.op.args.len().saturating_sub(1));
+                for entry in &node.op.args[1..] {
+                    let Some((field, value_name)) = entry.split_once('=') else {
+                        return Err(format!(
+                            "node `{}` has invalid struct field binding `{}`",
+                            node.name, entry
+                        ));
+                    };
+                    let value = state.expect_value(value_name.trim())?.clone();
+                    fields.push((field.trim().to_owned(), value));
+                }
+                Ok(Value::Struct(StructValue { type_name, fields }))
+            }
+            "field" => {
+                let struct_value = state.expect_struct(&node.op.args[0])?;
+                let field_name = &node.op.args[1];
+                struct_value
+                    .fields
+                    .iter()
+                    .find(|(name, _)| name == field_name)
+                    .map(|(_, value)| value.clone())
+                    .ok_or_else(|| {
+                        format!(
+                            "node `{}` reads missing field `{}` from `{}`",
+                            node.name, field_name, node.op.args[0]
+                        )
+                    })
+            }
             "null" => Ok(Value::Pointer(None)),
             "borrow" | "move_ptr" => Ok(Value::Pointer(state.expect_pointer(&node.op.args[0])?)),
             "neg" => Ok(Value::Int(-state.expect_int(&node.op.args[0])?)),
