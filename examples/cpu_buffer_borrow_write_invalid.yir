@@ -1,0 +1,19 @@
+yir 0.1
+
+resource cpu0 cpu.arm64
+
+cpu.const len cpu0 2
+cpu.const fill cpu0 0
+cpu.alloc_buffer buf cpu0 len fill
+cpu.borrow buf_ref cpu0 buf
+cpu.const idx0 cpu0 0
+cpu.const v1 cpu0 1
+cpu.store_at bad_write cpu0 buf_ref idx0 v1
+
+edge dep len buf
+edge dep fill buf
+edge dep buf buf_ref
+edge dep buf_ref bad_write
+edge dep idx0 bad_write
+edge dep v1 bad_write
+edge effect buf_ref bad_write

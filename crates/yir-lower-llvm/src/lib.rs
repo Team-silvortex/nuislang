@@ -7,6 +7,7 @@ use yir_verify::verify_module;
 enum LlvmValueRef {
     I64(String),
     Ptr(String),
+    CStr(String),
     Void,
 }
 
@@ -20,8 +21,11 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
         .collect::<BTreeMap<String, &Resource>>();
 
     let mut body = Vec::new();
+    let mut globals = Vec::new();
     let mut registers = BTreeMap::<String, LlvmValueRef>::new();
+    let mut buffer_lengths = BTreeMap::<String, String>::new();
     let mut next_reg = 0usize;
+    let mut next_global = 0usize;
     let mut last_cpu_value = None::<String>;
 
     for node_name in topological_order(module)? {
@@ -46,6 +50,18 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
         }
 
         match (node.op.module.as_str(), node.op.instruction.as_str()) {
+            ("cpu", "text") => {
+                let label = fresh_global(&mut next_global);
+                let (bytes, len) = llvm_c_string_bytes(&node.op.args[0]);
+                globals.push(format!(
+                    "{label} = private unnamed_addr constant [{len} x i8] c\"{bytes}\""
+                ));
+                let ptr = fresh_reg(&mut next_reg);
+                body.push(format!(
+                    "  {ptr} = getelementptr inbounds [{len} x i8], ptr {label}, i64 0, i64 0"
+                ));
+                registers.insert(node.name.clone(), LlvmValueRef::CStr(ptr));
+            }
             ("cpu", "const") => {
                 let reg = fresh_reg(&mut next_reg);
                 body.push(format!("  {reg} = add i64 0, {}", node.op.args[0]));
@@ -65,6 +81,9 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                     continue;
                 };
                 registers.insert(node.name.clone(), LlvmValueRef::Ptr(ptr.to_owned()));
+                if let Some(len) = buffer_lengths.get(&node.op.args[0]).cloned() {
+                    buffer_lengths.insert(node.name.clone(), len);
+                }
             }
             ("cpu", "add") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -158,6 +177,27 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 body.push(format!("  store ptr {next_ptr}, ptr {next_slot}"));
                 registers.insert(node.name.clone(), LlvmValueRef::Ptr(raw));
             }
+            ("cpu", "alloc_buffer") => {
+                let (Some(len), Some(fill)) = (
+                    get_i64(&registers, &node.op.args[0]),
+                    get_i64(&registers, &node.op.args[1]),
+                ) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.alloc_buffer `{}` because its inputs are outside the current CPU LLVM slice",
+                        node.name
+                    ));
+                    continue;
+                };
+                let len = len.to_owned();
+                let fill = fill.to_owned();
+                let bytes = fresh_reg(&mut next_reg);
+                body.push(format!("  {bytes} = mul i64 {len}, 8"));
+                let raw = fresh_reg(&mut next_reg);
+                body.push(format!("  {raw} = call ptr @malloc(i64 {bytes})"));
+                lower_buffer_fill(&mut body, &mut next_reg, raw.as_str(), len.as_str(), fill.as_str())?;
+                registers.insert(node.name.clone(), LlvmValueRef::Ptr(raw.clone()));
+                buffer_lengths.insert(node.name.clone(), len);
+            }
             ("cpu", "load_value") => {
                 let Some(ptr) = get_ptr(&registers, &node.op.args[0]) else {
                     body.push(format!(
@@ -190,6 +230,40 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 let reg = fresh_reg(&mut next_reg);
                 body.push(format!("  {reg} = load ptr, ptr {slot}"));
                 registers.insert(node.name.clone(), LlvmValueRef::Ptr(reg));
+                if let Some(len) = buffer_lengths.get(&node.op.args[0]).cloned() {
+                    buffer_lengths.insert(node.name.clone(), len);
+                }
+            }
+            ("cpu", "buffer_len") => {
+                let Some(len) = buffer_lengths.get(&node.op.args[0]).cloned() else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.buffer_len `{}` because its input buffer length is outside the current CPU LLVM slice",
+                        node.name
+                    ));
+                    continue;
+                };
+                registers.insert(node.name.clone(), LlvmValueRef::I64(len.clone()));
+                last_cpu_value = Some(len);
+            }
+            ("cpu", "load_at") => {
+                let (Some(ptr), Some(index)) = (
+                    get_ptr(&registers, &node.op.args[0]),
+                    get_i64(&registers, &node.op.args[1]),
+                ) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.load_at `{}` because its inputs are outside the current CPU LLVM slice",
+                        node.name
+                    ));
+                    continue;
+                };
+                let slot = fresh_reg(&mut next_reg);
+                body.push(format!(
+                    "  {slot} = getelementptr inbounds i64, ptr {ptr}, i64 {index}"
+                ));
+                let reg = fresh_reg(&mut next_reg);
+                body.push(format!("  {reg} = load i64, ptr {slot}"));
+                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                last_cpu_value = Some(reg);
             }
             ("cpu", "store_value") => {
                 let (Some(ptr), Some(value)) = (
@@ -225,6 +299,25 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                     "  {slot} = getelementptr inbounds %cpu.node, ptr {ptr}, i32 0, i32 1"
                 ));
                 body.push(format!("  store ptr {next_ptr}, ptr {slot}"));
+                registers.insert(node.name.clone(), LlvmValueRef::Void);
+            }
+            ("cpu", "store_at") => {
+                let (Some(ptr), Some(index), Some(value)) = (
+                    get_ptr(&registers, &node.op.args[0]),
+                    get_i64(&registers, &node.op.args[1]),
+                    get_i64(&registers, &node.op.args[2]),
+                ) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.store_at `{}` because its inputs are outside the current CPU LLVM slice",
+                        node.name
+                    ));
+                    continue;
+                };
+                let slot = fresh_reg(&mut next_reg);
+                body.push(format!(
+                    "  {slot} = getelementptr inbounds i64, ptr {ptr}, i64 {index}"
+                ));
+                body.push(format!("  store i64 {value}, ptr {slot}"));
                 registers.insert(node.name.clone(), LlvmValueRef::Void);
             }
             ("cpu", "is_null") => {
@@ -267,6 +360,9 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 if let Some(input) = get_i64(&registers, &node.op.args[0]) {
                     body.push(format!("  call void @nuis_debug_print_i64(i64 {input})"));
                     last_cpu_value = Some(input.to_owned());
+                } else if let Some(input) = get_cstr(&registers, &node.op.args[0]) {
+                    body.push(format!("  %print_str_{next_reg} = call i32 @puts(ptr {input})"));
+                    last_cpu_value = Some("0".to_owned());
                 } else {
                     body.push(format!(
                         "  ; deferred lowering for cpu.print `{}` because its input is produced outside the current CPU LLVM slice",
@@ -289,12 +385,15 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
 
     Ok(format!(
         "; yir version: {}\n\
+{}\n\
 %cpu.node = type {{ i64, ptr }}\n\
 declare ptr @malloc(i64)\n\
 declare void @free(ptr)\n\
+declare i32 @puts(ptr)\n\
 declare void @nuis_debug_print_i64(i64)\n\n\
 define i64 @nuis_yir_entry() {{\n{}\n  ret i64 {}\n}}\n",
         module.version,
+        globals.join("\n"),
         body.join("\n"),
         ret
     ))
@@ -320,10 +419,82 @@ fn get_ptr<'a>(
     }
 }
 
+fn get_cstr<'a>(
+    registers: &'a BTreeMap<String, LlvmValueRef>,
+    name: &str,
+) -> Option<&'a str> {
+    match registers.get(name) {
+        Some(LlvmValueRef::CStr(value)) => Some(value.as_str()),
+        _ => None,
+    }
+}
+
 fn fresh_reg(next: &mut usize) -> String {
     *next += 1;
     let reg = format!("%{}", *next);
     reg
+}
+
+fn fresh_global(next: &mut usize) -> String {
+    let label = format!("@.str.{}", *next);
+    *next += 1;
+    label
+}
+
+fn llvm_c_string_bytes(value: &str) -> (String, usize) {
+    let mut out = String::new();
+    let mut len = 0usize;
+    for byte in value.as_bytes() {
+        len += 1;
+        match *byte {
+            b'\\' => out.push_str("\\5C"),
+            b'"' => out.push_str("\\22"),
+            b'\n' => out.push_str("\\0A"),
+            b'\r' => out.push_str("\\0D"),
+            b'\t' => out.push_str("\\09"),
+            0x20..=0x7E => out.push(*byte as char),
+            other => out.push_str(&format!("\\{:02X}", other)),
+        }
+    }
+    out.push_str("\\00");
+    (out, len + 1)
+}
+
+fn lower_buffer_fill(
+    body: &mut Vec<String>,
+    next_reg: &mut usize,
+    ptr: &str,
+    len: &str,
+    fill: &str,
+) -> Result<(), String> {
+    let loop_cond = fresh_label(next_reg, "buf_fill_cond");
+    let loop_body = fresh_label(next_reg, "buf_fill_body");
+    let loop_exit = fresh_label(next_reg, "buf_fill_exit");
+    let index_ptr = fresh_reg(next_reg);
+    body.push(format!("  {index_ptr} = alloca i64"));
+    body.push(format!("  store i64 0, ptr {index_ptr}"));
+    body.push(format!("  br label %{loop_cond}"));
+    body.push(format!("{loop_cond}:"));
+    let index = fresh_reg(next_reg);
+    body.push(format!("  {index} = load i64, ptr {index_ptr}"));
+    let cmp = fresh_reg(next_reg);
+    body.push(format!("  {cmp} = icmp slt i64 {index}, {len}"));
+    body.push(format!("  br i1 {cmp}, label %{loop_body}, label %{loop_exit}"));
+    body.push(format!("{loop_body}:"));
+    let slot = fresh_reg(next_reg);
+    body.push(format!("  {slot} = getelementptr inbounds i64, ptr {ptr}, i64 {index}"));
+    body.push(format!("  store i64 {fill}, ptr {slot}"));
+    let next_index = fresh_reg(next_reg);
+    body.push(format!("  {next_index} = add i64 {index}, 1"));
+    body.push(format!("  store i64 {next_index}, ptr {index_ptr}"));
+    body.push(format!("  br label %{loop_cond}"));
+    body.push(format!("{loop_exit}:"));
+    Ok(())
+}
+
+fn fresh_label(next: &mut usize, prefix: &str) -> String {
+    *next += 1;
+    format!("{prefix}_{}", *next)
 }
 
 fn topological_order(module: &YirModule) -> Result<Vec<String>, String> {

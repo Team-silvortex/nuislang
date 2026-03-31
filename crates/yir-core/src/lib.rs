@@ -179,6 +179,11 @@ pub struct HeapNode {
     pub next: Option<usize>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HeapBuffer {
+    pub elements: Vec<i64>,
+}
+
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -332,6 +337,7 @@ pub struct ExecutionState {
     pub lane_events: BTreeMap<String, Vec<String>>,
     pub values: BTreeMap<String, Value>,
     pub heap: BTreeMap<usize, HeapNode>,
+    pub buffers: BTreeMap<usize, HeapBuffer>,
     pub next_heap_address: usize,
 }
 
@@ -399,6 +405,9 @@ impl ExecutionState {
         let Some(address) = pointer else {
             return Err("null pointer dereference".to_owned());
         };
+        if self.buffers.contains_key(&address) {
+            return Err(format!("buffer pointer `&{address}` used as node pointer"));
+        }
         self.heap
             .get(&address)
             .ok_or_else(|| format!("dangling pointer dereference `&{address}`"))
@@ -408,6 +417,9 @@ impl ExecutionState {
         let Some(address) = pointer else {
             return Err("null pointer store".to_owned());
         };
+        if self.buffers.contains_key(&address) {
+            return Err(format!("buffer pointer `&{address}` used as node pointer"));
+        }
         let node = self
             .heap
             .get_mut(&address)
@@ -424,6 +436,9 @@ impl ExecutionState {
         let Some(address) = pointer else {
             return Err("null pointer next-store".to_owned());
         };
+        if self.buffers.contains_key(&address) {
+            return Err(format!("buffer pointer `&{address}` used as node pointer"));
+        }
         let node = self
             .heap
             .get_mut(&address)
@@ -432,11 +447,76 @@ impl ExecutionState {
         Ok(())
     }
 
+    pub fn alloc_heap_buffer(&mut self, len: usize, fill: i64) -> usize {
+        let address = self.next_heap_address.max(1);
+        self.next_heap_address = address + 1;
+        self.buffers.insert(
+            address,
+            HeapBuffer {
+                elements: vec![fill; len],
+            },
+        );
+        address
+    }
+
+    pub fn read_heap_buffer(&self, pointer: Option<usize>) -> Result<&HeapBuffer, String> {
+        let Some(address) = pointer else {
+            return Err("null buffer dereference".to_owned());
+        };
+        if self.heap.contains_key(&address) {
+            return Err(format!("node pointer `&{address}` used as buffer pointer"));
+        }
+        self.buffers
+            .get(&address)
+            .ok_or_else(|| format!("dangling buffer dereference `&{address}`"))
+    }
+
+    pub fn read_heap_buffer_at(
+        &self,
+        pointer: Option<usize>,
+        index: usize,
+    ) -> Result<i64, String> {
+        let buffer = self.read_heap_buffer(pointer)?;
+        buffer
+            .elements
+            .get(index)
+            .copied()
+            .ok_or_else(|| format!("buffer index `{index}` out of bounds"))
+    }
+
+    pub fn write_heap_buffer_at(
+        &mut self,
+        pointer: Option<usize>,
+        index: usize,
+        value: i64,
+    ) -> Result<(), String> {
+        let Some(address) = pointer else {
+            return Err("null buffer store".to_owned());
+        };
+        if self.heap.contains_key(&address) {
+            return Err(format!("node pointer `&{address}` used as buffer pointer"));
+        }
+        let buffer = self
+            .buffers
+            .get_mut(&address)
+            .ok_or_else(|| format!("dangling buffer store `&{address}`"))?;
+        let slot = buffer
+            .elements
+            .get_mut(index)
+            .ok_or_else(|| format!("buffer index `{index}` out of bounds"))?;
+        *slot = value;
+        Ok(())
+    }
+
+    pub fn heap_buffer_len(&self, pointer: Option<usize>) -> Result<usize, String> {
+        Ok(self.read_heap_buffer(pointer)?.elements.len())
+    }
+
     pub fn free_heap_node(&mut self, pointer: Option<usize>) -> Result<(), String> {
         let Some(address) = pointer else {
             return Err("null pointer free".to_owned());
         };
-        if self.heap.remove(&address).is_some() {
+        if self.heap.remove(&address).is_some() || self.buffers.remove(&address).is_some() {
             Ok(())
         } else {
             Err(format!("double free or dangling pointer `&{address}`"))

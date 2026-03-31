@@ -4,6 +4,35 @@ pub struct NirIntent {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NirModule {
+    pub domain: String,
+    pub name: String,
+    pub functions: Vec<NirFunction>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NirFunction {
+    pub name: String,
+    pub body: Vec<NirStmt>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NirStmt {
+    Let {
+        name: String,
+        value: NirValue,
+    },
+    Print(NirValue),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NirValue {
+    Text(String),
+    Int(i64),
+    Var(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct YirNode {
     pub kind: String,
 }

@@ -185,9 +185,15 @@ enum PointerState {
 }
 
 #[derive(Clone, Copy)]
+enum HeapObjectKind {
+    Node { next: PointerState },
+    Buffer { len: Option<usize> },
+}
+
+#[derive(Clone, Copy)]
 struct HeapBinding {
     live: bool,
-    next: PointerState,
+    kind: HeapObjectKind,
 }
 
 fn verify_cpu_heap_protocol(module: &YirModule) -> Result<(), String> {
@@ -234,7 +240,20 @@ fn verify_cpu_heap_protocol(module: &YirModule) -> Result<(), String> {
                     id,
                     HeapBinding {
                         live: true,
-                        next,
+                        kind: HeapObjectKind::Node { next },
+                    },
+                );
+                values.insert(node.name.clone(), PointerState::Owned(id));
+            }
+            "alloc_buffer" => {
+                let id = next_id;
+                next_id += 1;
+                let len = known_non_negative_int(&nodes, &node.op.args[0])?;
+                heap.insert(
+                    id,
+                    HeapBinding {
+                        live: true,
+                        kind: HeapObjectKind::Buffer { len },
                     },
                 );
                 values.insert(node.name.clone(), PointerState::Owned(id));
@@ -278,14 +297,23 @@ fn verify_cpu_heap_protocol(module: &YirModule) -> Result<(), String> {
                 }
             }
             "load_value" => {
-                ensure_pointer_readable(pointer_arg(&values, &node.op.args[0]), &heap, node)?;
+                ensure_node_readable(pointer_arg(&values, &node.op.args[0]), &heap, node)?;
             }
             "load_next" => {
                 let pointer = pointer_arg(&values, &node.op.args[0]);
                 let next = match pointer {
                     PointerState::Owned(id) | PointerState::Borrowed(id) => {
                         ensure_live_heap(&heap, id, node)?;
-                        heap.get(&id).map(|binding| binding.next).unwrap_or(PointerState::Unknown)
+                        match heap.get(&id).map(|binding| binding.kind) {
+                            Some(HeapObjectKind::Node { next }) => next,
+                            Some(HeapObjectKind::Buffer { .. }) => {
+                                return Err(format!(
+                                    "node `{}` uses buffer object `&{id}` as linked-list node",
+                                    node.name
+                                ));
+                            }
+                            None => PointerState::Unknown,
+                        }
                     }
                     PointerState::Null => {
                         return Err(format!("node `{}` dereferences null pointer", node.name));
@@ -294,18 +322,47 @@ fn verify_cpu_heap_protocol(module: &YirModule) -> Result<(), String> {
                 };
                 values.insert(node.name.clone(), next);
             }
+            "buffer_len" => {
+                let pointer = pointer_arg(&values, &node.op.args[0]);
+                ensure_buffer_readable(pointer, &heap, node)?;
+            }
+            "load_at" => {
+                let pointer = pointer_arg(&values, &node.op.args[0]);
+                ensure_buffer_readable(pointer, &heap, node)?;
+                ensure_buffer_index_in_bounds(pointer, &heap, &nodes, &node.op.args[1], node)?;
+            }
             "store_value" => {
-                ensure_pointer_writable(pointer_arg(&values, &node.op.args[0]), &heap, node)?;
+                ensure_node_writable(pointer_arg(&values, &node.op.args[0]), &heap, node)?;
             }
             "store_next" => {
                 let dest = pointer_arg(&values, &node.op.args[0]);
-                ensure_pointer_writable(dest, &heap, node)?;
+                ensure_node_writable(dest, &heap, node)?;
                 let next = pointer_arg(&values, &node.op.args[1]);
                 if let PointerState::Owned(id) = dest {
                     if let Some(binding) = heap.get_mut(&id) {
-                        binding.next = next;
+                        match &mut binding.kind {
+                            HeapObjectKind::Node { next: binding_next } => {
+                                *binding_next = next;
+                            }
+                            HeapObjectKind::Buffer { .. } => {
+                                return Err(format!(
+                                    "node `{}` uses buffer object `&{id}` as linked-list node",
+                                    node.name
+                                ));
+                            }
+                        }
                     }
                 }
+            }
+            "store_at" => {
+                ensure_buffer_writable(pointer_arg(&values, &node.op.args[0]), &heap, node)?;
+                ensure_buffer_index_in_bounds(
+                    pointer_arg(&values, &node.op.args[0]),
+                    &heap,
+                    &nodes,
+                    &node.op.args[1],
+                    node,
+                )?;
             }
             "free" => {
                 let source_name = &node.op.args[0];
@@ -338,6 +395,59 @@ fn verify_cpu_heap_protocol(module: &YirModule) -> Result<(), String> {
 
 fn pointer_arg(values: &BTreeMap<String, PointerState>, name: &str) -> PointerState {
     values.get(name).copied().unwrap_or(PointerState::Unknown)
+}
+
+fn known_non_negative_int(
+    nodes: &BTreeMap<&str, &Node>,
+    name: &str,
+) -> Result<Option<usize>, String> {
+    let Some(node) = nodes.get(name).copied() else {
+        return Ok(None);
+    };
+
+    if node.op.module == "cpu" && node.op.instruction == "const" {
+        let value = node.op.args[0]
+            .parse::<i64>()
+            .map_err(|_| format!("node `{}` has invalid integer literal `{}`", node.name, node.op.args[0]))?;
+        if value < 0 {
+            return Err(format!("node `{}` uses negative integer `{}` where non-negative value is required", node.name, value));
+        }
+        return Ok(Some(value as usize));
+    }
+
+    Ok(None)
+}
+
+fn ensure_buffer_index_in_bounds(
+    pointer: PointerState,
+    heap: &BTreeMap<usize, HeapBinding>,
+    nodes: &BTreeMap<&str, &Node>,
+    index_name: &str,
+    node: &Node,
+) -> Result<(), String> {
+    let Some(index) = known_non_negative_int(nodes, index_name)? else {
+        return Ok(());
+    };
+
+    let object_id = match pointer {
+        PointerState::Owned(id) | PointerState::Borrowed(id) => id,
+        PointerState::Null | PointerState::Unknown => return Ok(()),
+    };
+
+    if let Some(HeapBinding {
+        kind: HeapObjectKind::Buffer { len: Some(len) },
+        ..
+    }) = heap.get(&object_id)
+    {
+        if index >= *len {
+            return Err(format!(
+                "node `{}` indexes buffer `&{object_id}` out of bounds: index {} >= len {}",
+                node.name, index, len
+            ));
+        }
+    }
+
+    Ok(())
 }
 
 fn ensure_live_heap(
@@ -381,6 +491,102 @@ fn ensure_pointer_writable(
             "node `{}` writes through borrowed pointer",
             node.name
         )),
+        PointerState::Null => Err(format!("node `{}` writes through null pointer", node.name)),
+        PointerState::Unknown => Ok(()),
+    }
+}
+
+fn ensure_node_readable(
+    pointer: PointerState,
+    heap: &BTreeMap<usize, HeapBinding>,
+    node: &Node,
+) -> Result<(), String> {
+    ensure_pointer_readable(pointer, heap, node)?;
+    match pointer {
+        PointerState::Owned(id) | PointerState::Borrowed(id) => match heap.get(&id).map(|binding| binding.kind) {
+            Some(HeapObjectKind::Node { .. }) => Ok(()),
+            Some(HeapObjectKind::Buffer { .. }) => Err(format!(
+                "node `{}` uses buffer object `&{id}` as linked-list node",
+                node.name
+            )),
+            None => Ok(()),
+        },
+        PointerState::Null | PointerState::Unknown => Ok(()),
+    }
+}
+
+fn ensure_node_writable(
+    pointer: PointerState,
+    heap: &BTreeMap<usize, HeapBinding>,
+    node: &Node,
+) -> Result<(), String> {
+    ensure_pointer_writable(pointer, heap, node)?;
+    match pointer {
+        PointerState::Owned(id) => match heap.get(&id).map(|binding| binding.kind) {
+            Some(HeapObjectKind::Node { .. }) => Ok(()),
+            Some(HeapObjectKind::Buffer { .. }) => Err(format!(
+                "node `{}` uses buffer object `&{id}` as linked-list node",
+                node.name
+            )),
+            None => Ok(()),
+        },
+        PointerState::Borrowed(_) | PointerState::Null | PointerState::Unknown => Ok(()),
+    }
+}
+
+fn ensure_buffer_readable(
+    pointer: PointerState,
+    heap: &BTreeMap<usize, HeapBinding>,
+    node: &Node,
+) -> Result<(), String> {
+    match pointer {
+        PointerState::Owned(id) | PointerState::Borrowed(id) => {
+            ensure_live_heap(heap, id, node)?;
+            match heap.get(&id).map(|binding| binding.kind) {
+                Some(HeapObjectKind::Buffer { .. }) => Ok(()),
+                Some(HeapObjectKind::Node { .. }) => Err(format!(
+                    "node `{}` uses linked-list node `&{id}` as buffer",
+                    node.name
+                )),
+                None => Ok(()),
+            }
+        }
+        PointerState::Null => Err(format!("node `{}` dereferences null pointer", node.name)),
+        PointerState::Unknown => Ok(()),
+    }
+}
+
+fn ensure_buffer_writable(
+    pointer: PointerState,
+    heap: &BTreeMap<usize, HeapBinding>,
+    node: &Node,
+) -> Result<(), String> {
+    match pointer {
+        PointerState::Owned(id) => {
+            ensure_live_heap(heap, id, node)?;
+            match heap.get(&id).map(|binding| binding.kind) {
+                Some(HeapObjectKind::Buffer { .. }) => Ok(()),
+                Some(HeapObjectKind::Node { .. }) => Err(format!(
+                    "node `{}` uses linked-list node `&{id}` as buffer",
+                    node.name
+                )),
+                None => Ok(()),
+            }
+        }
+        PointerState::Borrowed(id) => match heap.get(&id).map(|binding| binding.kind) {
+            Some(HeapObjectKind::Buffer { .. }) => Err(format!(
+                "node `{}` writes through borrowed pointer",
+                node.name
+            )),
+            Some(HeapObjectKind::Node { .. }) => Err(format!(
+                "node `{}` uses linked-list node `&{id}` as buffer",
+                node.name
+            )),
+            None => Err(format!(
+                "node `{}` writes through borrowed pointer",
+                node.name
+            )),
+        },
         PointerState::Null => Err(format!("node `{}` writes through null pointer", node.name)),
         PointerState::Unknown => Ok(()),
     }

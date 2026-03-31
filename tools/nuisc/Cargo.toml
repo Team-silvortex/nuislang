@@ -9,3 +9,6 @@ readme.workspace = true
 description = "Execution scheduler compiler prototype for Nuis."
 
 [dependencies]
+nuis-semantics = { path = "../../crates/nuis-semantics" }
+yir-core = { path = "../../crates/yir-core" }
+yir-lower-llvm = { path = "../../crates/yir-lower-llvm" }

@@ -1,10 +1,15 @@
+mod aot;
+mod cli;
 mod codegen_wasm;
 mod errors;
 mod ir;
 mod parser;
+mod pipeline;
 mod registry;
 
 use std::{env, path::Path};
+
+use cli::CommandKind;
 
 fn main() {
     if let Err(error) = run() {
@@ -20,10 +25,10 @@ fn run() -> Result<(), String> {
         version: "0.44.b-draft",
         profile: "aot",
     };
-    let command = env::args().nth(1).unwrap_or_else(|| "status".to_owned());
+    let command = cli::parse_args(env::args().skip(1))?;
 
-    match command.as_str() {
-        "status" => {
+    match command {
+        CommandKind::Status => {
             let manifests = registry::discover(Path::new("nustar-packages"))?;
             println!(
                 "nuisc compiler prototype: topology-first scheduler frontend ({frontend} -> {backend}, yir={}, profile={}, registered_nustar={})",
@@ -38,7 +43,7 @@ fn run() -> Result<(), String> {
                 );
             }
         }
-        "registry" => {
+        CommandKind::Registry => {
             let manifests = registry::discover(Path::new("nustar-packages"))?;
             if manifests.is_empty() {
                 let placeholder_error = errors::NuiscError {
@@ -57,10 +62,28 @@ fn run() -> Result<(), String> {
                 println!("  ops: {}", manifest.ops.join(", "));
             }
         }
-        other => {
-            return Err(format!(
-                "unknown nuisc command `{other}`; expected `status` or `registry`"
-            ));
+        CommandKind::DumpNir { input } => {
+            let artifacts = pipeline::compile_source_path(&input)?;
+            print!("{}", ir::render_nir(&artifacts.nir));
+        }
+        CommandKind::DumpYir { input } => {
+            let artifacts = pipeline::compile_source_path(&input)?;
+            print!("{}", ir::render_yir(&artifacts.yir));
+        }
+        CommandKind::Compile { input, output_dir } => {
+            let artifacts = pipeline::compile_source_path(&input)?;
+            let written = aot::write_and_link(
+                &input,
+                &output_dir,
+                &artifacts.nir,
+                &artifacts.yir,
+                &artifacts.llvm_ir,
+            )?;
+            println!("compiled nuis source: {}", input.display());
+            println!("nir: {}", written.nir_path);
+            println!("yir: {}", written.yir_path);
+            println!("llvm_ir: {}", written.llvm_ir_path);
+            println!("binary: {}", written.binary_path);
         }
     }
 

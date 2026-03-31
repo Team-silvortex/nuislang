@@ -13,6 +13,16 @@ impl RegisteredMod for CpuMod {
         require_cpu_resource(node, resource)?;
 
         match node.op.instruction.as_str() {
+            "text" => {
+                if node.op.args.len() != 1 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.text <name> <resource> <string>`",
+                        node.name
+                    ));
+                }
+
+                Ok(InstructionSemantics::pure(Vec::new()))
+            }
             "const" => {
                 if node.op.args.len() != 1 {
                     return Err(format!(
@@ -70,6 +80,16 @@ impl RegisteredMod for CpuMod {
 
                 Ok(InstructionSemantics::effect(node.op.args.clone()))
             }
+            "alloc_buffer" => {
+                if node.op.args.len() != 2 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.alloc_buffer <name> <resource> <len> <fill>`",
+                        node.name
+                    ));
+                }
+
+                Ok(InstructionSemantics::effect(node.op.args.clone()))
+            }
             "load_value" | "load_next" | "is_null" => {
                 if node.op.args.len() != 1 {
                     return Err(format!(
@@ -80,11 +100,41 @@ impl RegisteredMod for CpuMod {
 
                 Ok(InstructionSemantics::effect(node.op.args.clone()))
             }
+            "buffer_len" => {
+                if node.op.args.len() != 1 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.buffer_len <name> <resource> <buffer_ptr>`",
+                        node.name
+                    ));
+                }
+
+                Ok(InstructionSemantics::effect(node.op.args.clone()))
+            }
+            "load_at" => {
+                if node.op.args.len() != 2 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.load_at <name> <resource> <buffer_ptr> <index>`",
+                        node.name
+                    ));
+                }
+
+                Ok(InstructionSemantics::effect(node.op.args.clone()))
+            }
             "store_value" | "store_next" => {
                 if node.op.args.len() != 2 {
                     return Err(format!(
                         "node `{}` expects `cpu.{} <name> <resource> <ptr> <value>`",
                         node.name, node.op.instruction
+                    ));
+                }
+
+                Ok(InstructionSemantics::effect(node.op.args.clone()))
+            }
+            "store_at" => {
+                if node.op.args.len() != 3 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.store_at <name> <resource> <buffer_ptr> <index> <value>`",
+                        node.name
                     ));
                 }
 
@@ -209,6 +259,7 @@ impl RegisteredMod for CpuMod {
         state: &mut ExecutionState,
     ) -> Result<Value, String> {
         match node.op.instruction.as_str() {
+            "text" => Ok(Value::Symbol(node.op.args[0].clone())),
             "const" => Ok(Value::Int(node.op.args[0].parse::<i64>().map_err(|_| {
                 format!(
                     "node `{}` has invalid integer literal `{}`",
@@ -247,6 +298,22 @@ impl RegisteredMod for CpuMod {
                 );
                 Ok(Value::Pointer(Some(address)))
             }
+            "alloc_buffer" => {
+                let len = state.expect_int(&node.op.args[0])?;
+                if len < 0 {
+                    return Err(format!("node `{}` allocates negative buffer length", node.name));
+                }
+                let fill = state.expect_int(&node.op.args[1])?;
+                let address = state.alloc_heap_buffer(len as usize, fill);
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.alloc_buffer @{} [{}] -> &{} len={} fill={}",
+                        node.resource, resource.kind.raw, address, len, fill
+                    ),
+                );
+                Ok(Value::Pointer(Some(address)))
+            }
             "load_value" => {
                 let pointer = state.expect_pointer(&node.op.args[0])?;
                 let node_value = state.read_heap_node(pointer)?.value;
@@ -274,6 +341,40 @@ impl RegisteredMod for CpuMod {
                     ),
                 );
                 Ok(Value::Pointer(next))
+            }
+            "buffer_len" => {
+                let pointer = state.expect_pointer(&node.op.args[0])?;
+                let len = state.heap_buffer_len(pointer)? as i64;
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.buffer_len @{} [{}] ptr={} len={}",
+                        node.resource,
+                        resource.kind.raw,
+                        pointer.map(|ptr| format!("&{ptr}")).unwrap_or_else(|| "null".to_owned()),
+                        len
+                    ),
+                );
+                Ok(Value::Int(len))
+            }
+            "load_at" => {
+                let pointer = state.expect_pointer(&node.op.args[0])?;
+                let index = state.expect_int(&node.op.args[1])?;
+                if index < 0 {
+                    return Err(format!("node `{}` reads negative buffer index", node.name));
+                }
+                let value = state.read_heap_buffer_at(pointer, index as usize)?;
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.load_at @{} [{}] ptr={} index={}",
+                        node.resource,
+                        resource.kind.raw,
+                        pointer.map(|ptr| format!("&{ptr}")).unwrap_or_else(|| "null".to_owned()),
+                        index
+                    ),
+                );
+                Ok(Value::Int(value))
             }
             "is_null" => {
                 let pointer = state.expect_pointer(&node.op.args[0])?;
@@ -307,6 +408,27 @@ impl RegisteredMod for CpuMod {
                         resource.kind.raw,
                         pointer.map(|ptr| format!("&{ptr}")).unwrap_or_else(|| "null".to_owned()),
                         next.map(|ptr| format!("&{ptr}")).unwrap_or_else(|| "null".to_owned())
+                    ),
+                );
+                Ok(Value::Unit)
+            }
+            "store_at" => {
+                let pointer = state.expect_pointer(&node.op.args[0])?;
+                let index = state.expect_int(&node.op.args[1])?;
+                if index < 0 {
+                    return Err(format!("node `{}` writes negative buffer index", node.name));
+                }
+                let value = state.expect_int(&node.op.args[2])?;
+                state.write_heap_buffer_at(pointer, index as usize, value)?;
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.store_at @{} [{}] ptr={} index={} value={}",
+                        node.resource,
+                        resource.kind.raw,
+                        pointer.map(|ptr| format!("&{ptr}")).unwrap_or_else(|| "null".to_owned()),
+                        index,
+                        value
                     ),
                 );
                 Ok(Value::Unit)

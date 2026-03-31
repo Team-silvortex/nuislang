@@ -142,10 +142,14 @@ cpu.sub <name> <resource> <lhs> <rhs>
 cpu.mul <name> <resource> <lhs> <rhs>
 cpu.madd <name> <resource> <lhs> <rhs> <acc>
 cpu.alloc_node <name> <resource> <value> <next_ptr>
+cpu.alloc_buffer <name> <resource> <len> <fill>
 cpu.load_value <name> <resource> <ptr>
 cpu.load_next <name> <resource> <ptr>
+cpu.buffer_len <name> <resource> <buffer_ptr>
+cpu.load_at <name> <resource> <buffer_ptr> <index>
 cpu.store_value <name> <resource> <ptr> <value>
 cpu.store_next <name> <resource> <ptr> <next_ptr>
+cpu.store_at <name> <resource> <buffer_ptr> <index> <value>
 cpu.is_null <name> <resource> <ptr>
 cpu.free <name> <resource> <ptr>
 cpu.target_config <name> <resource> <arch> <abi> <vector_bits>
@@ -183,7 +187,7 @@ Important boundary note:
 * They are current `cpu`-mod extension ops used by the reference preview/runtime path.
 * A different frontend, runtime adapter, or future framework can consume the same YIR graph without depending on these specific ops.
 * `cpu.borrow` and `cpu.move_ptr` are the first Rust-like ownership surface for the pure CPU domain: reads may flow through borrowed pointers, while writes and frees remain ownership-sensitive.
-* `cpu.alloc_node / load_* / store_* / free` are an early reference prototype for addressable objects and pointer-like semantics. They are intentionally narrow and currently model a controlled heap-node surface rather than a full general memory model.
+* `cpu.alloc_node / alloc_buffer / load_* / store_* / free` are an early reference prototype for addressable objects and pointer-like semantics. They are intentionally narrow and currently model controlled heap-node and heap-buffer surfaces rather than a full general memory model.
 * `kernel.*` ops are the standard tensor/kernel execution surface. They may lower to `npu`, `gpu-kernel`, or future accelerators without changing the core graph semantics.
 * `data.*` ops are the instruction-level surface for Fabric-style exchange. The architecture term `Fabric` remains valid, but the standard op family name is `data`.
 * These domain surfaces are expected to graduate into `nustar` registration packages; `nuisc` should discover and bind them as registered capability bundles rather than hard-coding them as part of core YIR.

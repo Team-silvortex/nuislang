@@ -11,7 +11,7 @@ pub fn parse_module(input: &str) -> Result<YirModule, String> {
             continue;
         }
 
-        let tokens: Vec<&str> = line.split_whitespace().collect();
+        let tokens = tokenize_line(line).map_err(|error| format!("line {line_no}: {error}"))?;
         match tokens.first().copied() {
             Some("yir") => parse_header(&mut module, &tokens, line_no)?,
             Some("resource") => parse_resource(&mut module, &tokens, line_no)?,
@@ -86,4 +86,62 @@ fn parse_edge(module: &mut YirModule, tokens: &[&str], line_no: usize) -> Result
         to: tokens[3].to_owned(),
     });
     Ok(())
+}
+
+fn tokenize_line(line: &str) -> Result<Vec<&str>, String> {
+    let mut tokens = Vec::new();
+    let mut start = None::<usize>;
+    let mut in_string = false;
+    let mut escaped = false;
+
+    for (index, ch) in line.char_indices() {
+        if in_string {
+            if escaped {
+                escaped = false;
+                continue;
+            }
+            match ch {
+                '\\' => escaped = true,
+                '"' => {
+                    let token_start = start
+                        .take()
+                        .ok_or_else(|| "internal tokenizer error".to_owned())?;
+                    tokens.push(&line[token_start..index]);
+                    in_string = false;
+                }
+                _ => {}
+            }
+            continue;
+        }
+
+        if ch.is_whitespace() {
+            if let Some(token_start) = start.take() {
+                tokens.push(&line[token_start..index]);
+            }
+            continue;
+        }
+
+        if ch == '"' {
+            if start.is_some() {
+                return Err("unexpected quote inside token".to_owned());
+            }
+            in_string = true;
+            start = Some(index + ch.len_utf8());
+            continue;
+        }
+
+        if start.is_none() {
+            start = Some(index);
+        }
+    }
+
+    if in_string {
+        return Err("unterminated string literal".to_owned());
+    }
+
+    if let Some(token_start) = start.take() {
+        tokens.push(&line[token_start..]);
+    }
+
+    Ok(tokens)
 }
