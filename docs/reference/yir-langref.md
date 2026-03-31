@@ -438,8 +438,12 @@ Current reference direction:
   `handle_table` that names its backing render resource
 * current AOT/package generation may also surface `bind_core` so the Fabric
   worker can be pinned to a concrete CPU core
-* current macOS AppKit bundles consume that binding as an affinity hint, not as
-  a hard CPU-core reservation
+* current macOS AppKit bundles consume that binding by spawning a dedicated
+  Fabric worker thread and applying the core as its affinity hint, not as a
+  hard CPU-core reservation
+* current host-side Fabric booting is intentionally thin and AOT-first: `data.*`
+  nodes are lowered into a static boot/action table instead of a heavyweight
+  dynamic metadata runtime
 
 ---
 

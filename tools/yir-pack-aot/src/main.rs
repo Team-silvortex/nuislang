@@ -85,7 +85,7 @@ fn run() -> Result<(), String> {
     if let Some(core_binding) = shader_contract.fabric_core_bindings.first() {
         manifest.push(format!("fabric_worker_resource={}", core_binding.resource));
         manifest.push(format!("fabric_worker_core={}", core_binding.core_index));
-        manifest.push("fabric_worker_core_mode=macos_affinity_hint".to_owned());
+        manifest.push("fabric_worker_core_mode=macos_affinity_worker_thread".to_owned());
     }
     if shader_contract.has_shader_work() {
         fs::write(&shader_contract_path, shader_contract.render_text()).map_err(|error| {
@@ -137,6 +137,14 @@ fn run() -> Result<(), String> {
     }
 
     if let Some(frame_bundle) = &frame_bundle {
+        let fabric_boot_plan = extract_fabric_boot_plan(
+            &module,
+            primary_fabric_binding.as_ref(),
+            shader_contract
+                .fabric_core_bindings
+                .first()
+                .map(|binding| binding.resource.as_str()),
+        );
         fs::write(
             &host_path,
             objc_host_source(
@@ -150,6 +158,15 @@ fn run() -> Result<(), String> {
                     .fabric_core_bindings
                     .first()
                     .map(|binding| binding.core_index),
+                primary_fabric_binding.as_ref().map(|binding| binding.table_id.as_str()),
+                primary_fabric_binding
+                    .as_ref()
+                    .map(|binding| binding.host_resource.as_str()),
+                primary_fabric_binding
+                    .as_ref()
+                    .map(|binding| binding.render_resource.as_str()),
+                &render_fabric_boot_plan(&fabric_boot_plan),
+                fabric_boot_plan.len(),
                 &frame_bundle.embedded_ppm_bytes,
             ),
         )
@@ -160,6 +177,8 @@ fn run() -> Result<(), String> {
         manifest.push(format!("host_stub={}", host_path.display()));
         manifest.push("frame_runtime_mode=embedded_prerendered".to_owned());
         manifest.push("single_binary=true".to_owned());
+        manifest.push(format!("fabric_boot_plan_events={}", fabric_boot_plan.len()));
+        manifest.push("fabric_boot_plan_mode=static_action_table".to_owned());
         if let Some(spec) = &window_spec {
             manifest.push(format!("window_title={}", spec.title));
             manifest.push(format!("window_width={}", spec.width));
@@ -193,6 +212,14 @@ struct PrimaryFabricBinding {
     table_id: String,
     host_resource: String,
     render_resource: String,
+}
+
+#[derive(Debug, Clone)]
+struct FabricBootEvent {
+    event_name: String,
+    table_id: String,
+    source: String,
+    target: String,
 }
 
 fn extract_primary_fabric_binding(
@@ -239,6 +266,77 @@ fn extract_cpu_window_spec(module: &YirModule, host_resource: Option<&str>) -> O
             None
         }
     })
+}
+
+fn extract_fabric_boot_plan(
+    module: &YirModule,
+    primary_binding: Option<&PrimaryFabricBinding>,
+    worker_resource: Option<&str>,
+) -> Vec<FabricBootEvent> {
+    let table_id = primary_binding
+        .map(|binding| binding.table_id.as_str())
+        .unwrap_or("none");
+    let host_resource = primary_binding
+        .map(|binding| binding.host_resource.as_str())
+        .unwrap_or("none");
+    let render_resource = primary_binding
+        .map(|binding| binding.render_resource.as_str())
+        .unwrap_or("none");
+    let worker_resource = worker_resource.unwrap_or("none");
+
+    module
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "data")
+        .map(|node| {
+            let (source, target) = match node.op.instruction.as_str() {
+                "bind_core" => (worker_resource.to_owned(), worker_resource.to_owned()),
+                "handle_table" => (host_resource.to_owned(), render_resource.to_owned()),
+                "output_pipe" => (host_resource.to_owned(), worker_resource.to_owned()),
+                "input_pipe" => (worker_resource.to_owned(), render_resource.to_owned()),
+                "marker" => (worker_resource.to_owned(), worker_resource.to_owned()),
+                "copy_window" | "immutable_window" => {
+                    (worker_resource.to_owned(), render_resource.to_owned())
+                }
+                "move" => (host_resource.to_owned(), render_resource.to_owned()),
+                _ => (node.resource.clone(), node.resource.clone()),
+            };
+
+            FabricBootEvent {
+                event_name: format!("data.{}:{}", node.op.instruction, node.name),
+                table_id: table_id.to_owned(),
+                source,
+                target,
+            }
+        })
+        .collect()
+}
+
+fn render_fabric_boot_plan(events: &[FabricBootEvent]) -> String {
+    if events.is_empty() {
+        return String::new();
+    }
+
+    let mut out = String::new();
+    for event in events {
+        out.push_str("    {\n");
+        out.push_str(&format!(
+            "        \"{}\",\n",
+            c_string_literal(&event.event_name)
+        ));
+        out.push_str(&format!(
+            "        \"{}\",\n",
+            c_string_literal(&event.table_id)
+        ));
+        out.push_str(&format!("        \"{}\",\n", c_string_literal(&event.source)));
+        out.push_str(&format!("        \"{}\",\n", c_string_literal(&event.target)));
+        out.push_str("    },\n");
+    }
+    out
+}
+
+fn c_string_literal(raw: &str) -> String {
+    raw.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
 fn compile_native_binary(ll_path: &Path, shim_path: &Path, exe_path: &Path) -> Result<(), String> {
@@ -371,6 +469,11 @@ fn objc_host_source(
     window_width: usize,
     window_height: usize,
     fabric_worker_core: Option<usize>,
+    fabric_table_id: Option<&str>,
+    fabric_host_resource: Option<&str>,
+    fabric_render_resource: Option<&str>,
+    fabric_boot_plan: &str,
+    fabric_boot_plan_len: usize,
     embedded_ppm_bytes: &str,
 ) -> String {
     let affinity_tag = fabric_worker_core
@@ -378,19 +481,31 @@ fn objc_host_source(
         .unwrap_or(0);
     let affinity_setup = if let Some(core) = fabric_worker_core {
         format!(
-            "    nuis_apply_fabric_affinity_hint({});\n    fprintf(stderr, \"nuis: fabric worker core hint {} applied via macOS thread affinity tag\\n\");\n",
+            "    nuis_start_fabric_worker({});\n    fprintf(stderr, \"nuis: fabric worker thread requested on core hint {}\\n\");\n",
             affinity_tag, core
         )
     } else {
         String::new()
     };
+    let affinity_teardown = if fabric_worker_core.is_some() {
+        "    nuis_stop_fabric_worker();\n".to_owned()
+    } else {
+        String::new()
+    };
+    let fabric_table_id = fabric_table_id.unwrap_or("none");
+    let fabric_host_resource = fabric_host_resource.unwrap_or("none");
+    let fabric_render_resource = fabric_render_resource.unwrap_or("none");
     format!(
         r###"#import <AppKit/AppKit.h>
 #import <Foundation/Foundation.h>
 #include <mach/mach.h>
 #include <mach/thread_policy.h>
+#include <pthread.h>
+#include <stdatomic.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
+#include <unistd.h>
 
 extern int64_t nuis_yir_entry(void);
 
@@ -416,6 +531,205 @@ static void nuis_apply_fabric_affinity_hint(integer_t tag) {{
     }}
 }}
 
+static atomic_bool gNuisFabricWorkerRunning = false;
+static pthread_t gNuisFabricWorker;
+
+typedef struct {{
+    char event_name[32];
+    char table_id[32];
+    char source[32];
+    char target[32];
+}} NuisFabricEvent;
+
+typedef struct {{
+    int handle_table_count;
+    int output_pipe_count;
+    int input_pipe_count;
+    int marker_count;
+    int window_count;
+    int move_count;
+    int bind_core_count;
+}} NuisFabricDispatchState;
+
+static NuisFabricDispatchState gNuisFabricDispatchState = {{0}};
+static const NuisFabricEvent kNuisFabricBootPlan[] = {{
+{fabric_boot_plan}}};
+static const size_t kNuisFabricBootPlanLen = {fabric_boot_plan_len};
+
+static bool nuis_fabric_event_is(const NuisFabricEvent *event, const char *prefix) {{
+    return strncmp(event->event_name, prefix, strlen(prefix)) == 0;
+}}
+
+static void nuis_dispatch_handle_table(const NuisFabricEvent *event) {{
+    gNuisFabricDispatchState.handle_table_count += 1;
+    fprintf(
+        stderr,
+        "nuis: fabric dispatch handle_table table=%s host=%s render=%s\n",
+        event->table_id,
+        event->source,
+        event->target
+    );
+}}
+
+static void nuis_dispatch_output_pipe(const NuisFabricEvent *event) {{
+    gNuisFabricDispatchState.output_pipe_count += 1;
+    fprintf(
+        stderr,
+        "nuis: fabric dispatch output_pipe egress=%s via=%s\n",
+        event->source,
+        event->target
+    );
+}}
+
+static void nuis_dispatch_input_pipe(const NuisFabricEvent *event) {{
+    gNuisFabricDispatchState.input_pipe_count += 1;
+    fprintf(
+        stderr,
+        "nuis: fabric dispatch input_pipe ingress=%s into=%s\n",
+        event->source,
+        event->target
+    );
+}}
+
+static void nuis_dispatch_marker(const NuisFabricEvent *event) {{
+    gNuisFabricDispatchState.marker_count += 1;
+    fprintf(
+        stderr,
+        "nuis: fabric dispatch marker event=%s on=%s\n",
+        event->event_name,
+        event->source
+    );
+}}
+
+static void nuis_dispatch_window(const NuisFabricEvent *event) {{
+    gNuisFabricDispatchState.window_count += 1;
+    fprintf(
+        stderr,
+        "nuis: fabric dispatch window transfer=%s -> %s\n",
+        event->source,
+        event->target
+    );
+}}
+
+static void nuis_dispatch_move(const NuisFabricEvent *event) {{
+    gNuisFabricDispatchState.move_count += 1;
+    fprintf(
+        stderr,
+        "nuis: fabric dispatch move value=%s -> %s\n",
+        event->source,
+        event->target
+    );
+}}
+
+static void nuis_dispatch_bind_core(const NuisFabricEvent *event) {{
+    gNuisFabricDispatchState.bind_core_count += 1;
+    fprintf(
+        stderr,
+        "nuis: fabric dispatch bind_core worker=%s\n",
+        event->source
+    );
+}}
+
+static void nuis_dispatch_host_signal(
+    const char *event_name,
+    const char *table_id,
+    const char *source,
+    const char *target
+) {{
+    fprintf(
+        stderr,
+        "nuis: fabric host signal `%s` table=%s source=%s target=%s\n",
+        event_name,
+        table_id,
+        source,
+        target
+    );
+}}
+
+static void nuis_dispatch_fabric_event(const NuisFabricEvent *event) {{
+    if (nuis_fabric_event_is(event, "data.handle_table:")) {{
+        nuis_dispatch_handle_table(event);
+    }} else if (nuis_fabric_event_is(event, "data.output_pipe:")) {{
+        nuis_dispatch_output_pipe(event);
+    }} else if (nuis_fabric_event_is(event, "data.input_pipe:")) {{
+        nuis_dispatch_input_pipe(event);
+    }} else if (nuis_fabric_event_is(event, "data.marker:")) {{
+        nuis_dispatch_marker(event);
+    }} else if (
+        nuis_fabric_event_is(event, "data.copy_window:")
+        || nuis_fabric_event_is(event, "data.immutable_window:")
+    ) {{
+        nuis_dispatch_window(event);
+    }} else if (nuis_fabric_event_is(event, "data.move:")) {{
+        nuis_dispatch_move(event);
+    }} else if (nuis_fabric_event_is(event, "data.bind_core:")) {{
+        nuis_dispatch_bind_core(event);
+    }} else {{
+        fprintf(
+            stderr,
+            "nuis: fabric dispatch host event `%s` table=%s source=%s target=%s\n",
+            event->event_name,
+            event->table_id,
+            event->source,
+            event->target
+        );
+    }}
+}}
+
+static void nuis_run_fabric_boot_plan(void) {{
+    for (size_t index = 0; index < kNuisFabricBootPlanLen; ++index) {{
+        nuis_dispatch_fabric_event(&kNuisFabricBootPlan[index]);
+    }}
+}}
+
+static void *nuis_fabric_worker_main(void *arg) {{
+    integer_t tag = (integer_t)(intptr_t)arg;
+    nuis_apply_fabric_affinity_hint(tag);
+    fprintf(stderr, "nuis: fabric worker thread started with affinity tag %d\n", (int)tag);
+    nuis_run_fabric_boot_plan();
+    while (atomic_load(&gNuisFabricWorkerRunning)) {{
+        usleep(1000 * 1000);
+    }}
+    fprintf(
+        stderr,
+        "nuis: fabric worker summary handle_table=%d output_pipe=%d input_pipe=%d marker=%d window=%d move=%d bind_core=%d\n",
+        gNuisFabricDispatchState.handle_table_count,
+        gNuisFabricDispatchState.output_pipe_count,
+        gNuisFabricDispatchState.input_pipe_count,
+        gNuisFabricDispatchState.marker_count,
+        gNuisFabricDispatchState.window_count,
+        gNuisFabricDispatchState.move_count,
+        gNuisFabricDispatchState.bind_core_count
+    );
+    return NULL;
+}}
+
+static void nuis_start_fabric_worker(integer_t tag) {{
+    if (tag <= 0) {{
+        return;
+    }}
+    if (atomic_exchange(&gNuisFabricWorkerRunning, true)) {{
+        return;
+    }}
+    int status = pthread_create(
+        &gNuisFabricWorker,
+        NULL,
+        nuis_fabric_worker_main,
+        (void *)(intptr_t)tag
+    );
+    if (status != 0) {{
+        atomic_store(&gNuisFabricWorkerRunning, false);
+        fprintf(stderr, "nuis: failed to start fabric worker thread (pthread status=%d)\n", status);
+    }}
+}}
+
+static void nuis_stop_fabric_worker(void) {{
+    if (!atomic_exchange(&gNuisFabricWorkerRunning, false)) {{
+        return;
+    }}
+    pthread_join(gNuisFabricWorker, NULL);
+}}
+
 @interface NuisPreviewDelegate : NSObject <NSApplicationDelegate>
 @property(nonatomic, strong) NSWindow *window;
 @end
@@ -424,6 +738,7 @@ static void nuis_apply_fabric_affinity_hint(integer_t tag) {{
 
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {{
     (void)notification;
+    nuis_dispatch_host_signal("window_boot", "{fabric_table_id}", "{fabric_host_resource}", "{fabric_render_resource}");
 
     static const unsigned char kNuisFrameBytes[] = {{{embedded_ppm_bytes}}};
     NSData *ppmData = [NSData dataWithBytes:kNuisFrameBytes length:sizeof(kNuisFrameBytes)];
@@ -456,12 +771,18 @@ static void nuis_apply_fabric_affinity_hint(integer_t tag) {{
     [self.window setContentView:imageView];
     [self.window makeKeyAndOrderFront:nil];
     [NSApp activateIgnoringOtherApps:YES];
+    nuis_dispatch_host_signal("window_ready", "{fabric_table_id}", "{fabric_host_resource}", "{fabric_render_resource}");
 }}
 
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender {{
     (void)sender;
     return YES;
 }}
+
+- (void)applicationWillTerminate:(NSNotification *)notification {{
+    (void)notification;
+    nuis_dispatch_host_signal("shutdown", "{fabric_table_id}", "{fabric_render_resource}", "{fabric_host_resource}");
+{affinity_teardown}}}
 
 @end
 
@@ -470,6 +791,7 @@ int main(int argc, const char **argv) {{
     (void)argv;
     nuis_yir_entry();
 {affinity_setup}
+    nuis_dispatch_host_signal("boot", "{fabric_table_id}", "{fabric_host_resource}", "{fabric_render_resource}");
 
     @autoreleasepool {{
         NSApplication *app = [NSApplication sharedApplication];

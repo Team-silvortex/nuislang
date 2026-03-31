@@ -41,7 +41,8 @@ source → nuislang → YIR → execution (via yalivia)
 * `data.handle_table` now also survives packaging as top-level fabric-binding metadata, so resource indirection starts to participate in AOT bundle description instead of only live verification
 * Shader stage packaging now records both the concrete stage resource and the associated fabric handle table when present, so host/render binding decisions can begin to follow Fabric metadata instead of ad hoc scanning
 * The `data` family now also has a first `bind_core` surface, so short-term CPU-hosted Fabric workers can be described and packaged in a DPDK-like “occupy a core” style
-* Current macOS AOT host stubs now read `fabric_worker_core` and apply it as a startup thread-affinity hint; this is intentionally weaker than a true exclusive-core Fabric runtime
+* Current macOS AOT host stubs now read `fabric_worker_core`, start a dedicated Fabric worker thread, and apply it as that thread's startup affinity hint; this is intentionally weaker than a true exclusive-core Fabric runtime
+* Current Fabric host booting is also kept intentionally thin and AOT-first: host stubs embed a static action table derived from `data.*` nodes instead of constructing a heavyweight dynamic metadata system at runtime
 
 ---
 
