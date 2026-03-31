@@ -1,13 +1,15 @@
 mod aot;
 mod cli;
 mod codegen_wasm;
+mod engine;
 mod errors;
-mod ir;
-mod parser;
+mod frontend;
+mod lowering;
 mod pipeline;
 mod registry;
+mod render;
 
-use std::{env, path::Path};
+use std::env;
 
 use cli::CommandKind;
 
@@ -19,9 +21,9 @@ fn main() {
 }
 
 fn run() -> Result<(), String> {
-    let frontend = parser::frontend_name();
+    let frontend = frontend::frontend_name();
     let backend = codegen_wasm::backend_name();
-    let engine = ir::NuiscEngine {
+    let engine = engine::NuiscEngine {
         version: "0.44.b-draft",
         profile: "aot",
     };
@@ -29,7 +31,7 @@ fn run() -> Result<(), String> {
 
     match command {
         CommandKind::Status => {
-            let manifests = registry::discover(Path::new("nustar-packages"))?;
+            let manifests = registry::discover(std::path::Path::new("nustar-packages"))?;
             println!(
                 "nuisc compiler prototype: topology-first scheduler frontend ({frontend} -> {backend}, yir={}, profile={}, registered_nustar={})",
                 engine.version,
@@ -44,7 +46,7 @@ fn run() -> Result<(), String> {
             }
         }
         CommandKind::Registry => {
-            let manifests = registry::discover(Path::new("nustar-packages"))?;
+            let manifests = registry::discover(std::path::Path::new("nustar-packages"))?;
             if manifests.is_empty() {
                 let placeholder_error = errors::NuiscError {
                     message: "no nustar packages discovered",
@@ -64,11 +66,11 @@ fn run() -> Result<(), String> {
         }
         CommandKind::DumpNir { input } => {
             let artifacts = pipeline::compile_source_path(&input)?;
-            print!("{}", ir::render_nir(&artifacts.nir));
+            print!("{}", render::render_nir(&artifacts.nir));
         }
         CommandKind::DumpYir { input } => {
             let artifacts = pipeline::compile_source_path(&input)?;
-            print!("{}", ir::render_yir(&artifacts.yir));
+            print!("{}", render::render_yir(&artifacts.yir));
         }
         CommandKind::Compile { input, output_dir } => {
             let artifacts = pipeline::compile_source_path(&input)?;

@@ -1,0 +1,17 @@
+yir 0.1
+
+resource cpu0 cpu.arm64
+
+cpu.const lhs cpu0 7
+cpu.const rhs cpu0 11
+cpu.lt lhs_lt_rhs cpu0 lhs rhs
+cpu.select max_value cpu0 lhs_lt_rhs rhs lhs
+cpu.print out cpu0 max_value
+
+edge dep lhs lhs_lt_rhs
+edge dep rhs lhs_lt_rhs
+edge dep lhs_lt_rhs max_value
+edge dep rhs max_value
+edge dep lhs max_value
+edge dep max_value out
+edge effect max_value out

@@ -129,10 +129,26 @@ The `cpu` family is the current pure host/system and general compute surface.
 
 ```text
 cpu.const
+cpu.neg
+cpu.not
 cpu.add
 cpu.sub
 cpu.mul
+cpu.div
+cpu.rem
+cpu.eq
+cpu.ne
+cpu.lt
+cpu.gt
+cpu.le
+cpu.ge
+cpu.and
+cpu.or
+cpu.xor
+cpu.shl
+cpu.shr
 cpu.madd
+cpu.select
 cpu.target_config
 cpu.bind_core
 cpu.window
@@ -213,12 +229,39 @@ Current reference ops:
 ```text
 shader.const
 shader.add
+shader.sub
 shader.mul
 shader.target
 shader.viewport
 shader.pipeline
+shader.vertex_layout
+shader.vertex_buffer
+shader.index_buffer
+shader.blend_state
+shader.depth_state
+shader.raster_state
+shader.render_state
+shader.uv
+shader.texture2d
+shader.sampler
+shader.uniform
+shader.storage
+shader.attachment
+shader.texture_binding
+shader.sampler_binding
+shader.vertex_layout_binding
+shader.vertex_binding
+shader.index_binding
+shader.bind_set
 shader.pack_ball_state
 shader.begin_pass
+shader.clear
+shader.overlay
+shader.sample
+shader.sample_uv
+shader.sample_nearest
+shader.sample_uv_nearest
+shader.sample_uv_linear
 shader.dispatch
 shader.draw_instanced
 shader.draw_ball
@@ -233,6 +276,77 @@ shader.target
 shader.pipeline
 shader.begin_pass
 shader.draw_instanced
+```
+
+`shader.draw_instanced` may additionally consume an optional `bind_set` in the
+reference executor so bound geometry/resource inputs can influence validation
+and rendering behavior without changing the backend-facing stage identity.
+
+Current reference geometry interpretation is intentionally small but real:
+
+* `pos2f` influences vertex placement in the reference frame
+* `color2f` influences vertex marker glyph selection
+* `uv2f` influences vertex marker glyph selection when present
+* `triangle_strip` currently interprets vertex attributes, draws reference edges,
+  and fills a minimal triangle area in the handwritten reference renderer
+
+This is not yet a full graphics pipeline, but it means bound vertex data is no
+longer treated as metadata only.
+
+The current minimal texture-resource surface is:
+
+```text
+shader.texture2d
+shader.sampler
+shader.uv
+shader.sample
+shader.sample_uv
+shader.sample_nearest
+shader.sample_uv_nearest
+shader.sample_uv_linear
+```
+
+Preferred reference direction:
+
+* `shader.sample` and `shader.sample_uv` consult `sampler.filter`
+* `nearest` selects nearest sampling
+* `linear` selects linear sampling
+* `shader.sample_nearest`, `shader.sample_uv_nearest`, and
+  `shader.sample_uv_linear` remain as compatibility aliases
+
+The current resource-layout surface around that subset is:
+
+```text
+shader.uniform
+shader.storage
+shader.attachment
+shader.texture_binding
+shader.sampler_binding
+shader.bind_set
+```
+
+Current package/contract direction for that surface:
+
+* `texture_binding` should carry enough metadata for backend-side texture ABI
+  selection, including at least format and shape
+* `sampler_binding` should carry enough metadata for backend-side sampler ABI
+  selection, including at least filter and address mode
+
+The current minimal render-state surface is:
+
+```text
+shader.blend_state
+shader.depth_state
+shader.raster_state
+shader.render_state
+```
+
+The current minimal geometry-input surface is:
+
+```text
+shader.vertex_layout
+shader.vertex_buffer
+shader.index_buffer
 ```
 
 This subset is intended to map cleanly to shared `Metal/Vulkan/DirectX/OpenGL`
@@ -253,8 +367,12 @@ Current reference ops:
 kernel.target_config
 kernel.tensor
 kernel.fill
+kernel.add
+kernel.mul
 kernel.matmul
 kernel.add_bias
+kernel.transpose
+kernel.reduce_sum
 kernel.relu
 kernel.print
 ```
@@ -277,16 +395,51 @@ without changing the core graph meaning.
 The `data` family is the current instruction-level surface for Fabric-style
 exchange.
 
-Current reference op:
+Current reference ops:
 
 ```text
 data.move
+data.copy_window
+data.immutable_window
+data.marker
+data.bind_core
+data.output_pipe
+data.input_pipe
+data.handle_table
 ```
 
 The architecture term `Fabric` remains valid.
 
 The op-family name `data` is the instruction surface used inside current `YIR`
 graphs.
+
+Current reference direction:
+
+* `data.output_pipe` wraps a value as a fabric egress
+* `data.input_pipe` consumes an output pipe and re-materializes the payload on
+  the fabric side
+* `data.marker` is a zero-sized token for fabric-side sequencing
+* `data.bind_core` is the current CPU-hosted worker binding token for the
+  Fabric plane
+* `data.copy_window` / `data.immutable_window` are the first window-shaped
+  payload wrappers in the handwritten prototype
+* `data.handle_table` is the first resource-indirection carrier for fabric-side
+  binding metadata
+* the current verifier already rejects `input_pipe` sources that are not
+  `output_pipe`, nested pipe formation, and window creation from marker/handle
+  carriers
+* `data.move` is intentionally narrow: it is the current `MoveValue` surface
+  and may not consume `window`, `marker`, `handle_table`, or `pipe` values
+* current packaging/lowering reference paths may surface `handle_table`
+  contents as top-level fabric-binding metadata in generated manifests
+* `data.handle_table` entries must remain resource indirections only: slot names
+  must be unique and each entry must name a declared resource, not a data node
+* current shader package generation may also associate a stage with the
+  `handle_table` that names its backing render resource
+* current AOT/package generation may also surface `bind_core` so the Fabric
+  worker can be pinned to a concrete CPU core
+* current macOS AppKit bundles consume that binding as an affinity hint, not as
+  a hard CPU-core reservation
 
 ---
 

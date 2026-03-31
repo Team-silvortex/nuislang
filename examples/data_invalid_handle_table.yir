@@ -1,0 +1,6 @@
+yir 0.1
+
+resource cpu0 cpu.arm64
+resource fabric0 data.fabric
+
+data.handle_table bad_handles fabric0 host=cpu0 host=fabric0

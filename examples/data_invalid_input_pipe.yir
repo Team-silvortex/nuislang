@@ -1,0 +1,9 @@
+yir 0.1
+
+resource cpu0 cpu.arm64
+resource fabric0 data.fabric
+
+cpu.const raw cpu0 9
+data.input_pipe bad_in fabric0 raw
+
+edge xfer raw bad_in

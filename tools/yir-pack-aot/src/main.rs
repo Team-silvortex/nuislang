@@ -68,6 +68,25 @@ fn run() -> Result<(), String> {
     ];
 
     let shader_contract = analyze_shader_lowering(&module);
+    let primary_fabric_binding = extract_primary_fabric_binding(&shader_contract);
+    manifest.push(format!(
+        "fabric_handle_tables={}",
+        shader_contract.fabric_handle_tables.len()
+    ));
+    manifest.push(format!(
+        "fabric_core_bindings={}",
+        shader_contract.fabric_core_bindings.len()
+    ));
+    if let Some(binding) = &primary_fabric_binding {
+        manifest.push(format!("fabric_handle_table_id={}", binding.table_id));
+        manifest.push(format!("fabric_host_resource={}", binding.host_resource));
+        manifest.push(format!("fabric_render_resource={}", binding.render_resource));
+    }
+    if let Some(core_binding) = shader_contract.fabric_core_bindings.first() {
+        manifest.push(format!("fabric_worker_resource={}", core_binding.resource));
+        manifest.push(format!("fabric_worker_core={}", core_binding.core_index));
+        manifest.push("fabric_worker_core_mode=macos_affinity_hint".to_owned());
+    }
     if shader_contract.has_shader_work() {
         fs::write(&shader_contract_path, shader_contract.render_text()).map_err(|error| {
             format!(
@@ -105,7 +124,10 @@ fn run() -> Result<(), String> {
     }
 
     let frame_bundle = maybe_emit_prerendered_frame(&module, &output_dir, stem, frame_scale)?;
-    let window_spec = extract_cpu_window_spec(&module);
+    let window_spec = extract_cpu_window_spec(
+        &module,
+        primary_fabric_binding.as_ref().map(|binding| binding.host_resource.as_str()),
+    );
 
     if let Some(frame_bundle) = &frame_bundle {
         manifest.push(format!("frame_asset={}", frame_bundle.asset_path.display()));
@@ -124,6 +146,10 @@ fn run() -> Result<(), String> {
                     .unwrap_or(stem),
                 window_spec.as_ref().map(|spec| spec.width).unwrap_or(640),
                 window_spec.as_ref().map(|spec| spec.height).unwrap_or(480),
+                shader_contract
+                    .fabric_core_bindings
+                    .first()
+                    .map(|binding| binding.core_index),
                 &frame_bundle.embedded_ppm_bytes,
             ),
         )
@@ -162,9 +188,46 @@ struct CpuWindowSpec {
     height: usize,
 }
 
-fn extract_cpu_window_spec(module: &YirModule) -> Option<CpuWindowSpec> {
+#[derive(Debug, Clone)]
+struct PrimaryFabricBinding {
+    table_id: String,
+    host_resource: String,
+    render_resource: String,
+}
+
+fn extract_primary_fabric_binding(
+    contract: &yir_lower_contract::ShaderLoweringContract,
+) -> Option<PrimaryFabricBinding> {
+    let stage = contract.stages.first()?;
+    let table_id = stage.fabric_handle_table.as_ref()?;
+    let table = contract
+        .fabric_handle_tables
+        .iter()
+        .find(|table| &table.node == table_id)?;
+    let host_resource = table
+        .entries
+        .iter()
+        .find(|entry| entry.slot == "host")
+        .map(|entry| entry.resource.clone())?;
+    let render_resource = table
+        .entries
+        .iter()
+        .find(|entry| entry.slot == "render")
+        .map(|entry| entry.resource.clone())?;
+    Some(PrimaryFabricBinding {
+        table_id: table.node.clone(),
+        host_resource,
+        render_resource,
+    })
+}
+
+fn extract_cpu_window_spec(module: &YirModule, host_resource: Option<&str>) -> Option<CpuWindowSpec> {
     module.nodes.iter().find_map(|node| {
-        if node.op.module == "cpu" && node.op.instruction == "window" && node.op.args.len() == 3 {
+        if node.op.module == "cpu"
+            && node.op.instruction == "window"
+            && node.op.args.len() == 3
+            && host_resource.is_none_or(|resource| resource == node.resource)
+        {
             let width = node.op.args[0].parse::<usize>().ok()?;
             let height = node.op.args[1].parse::<usize>().ok()?;
             Some(CpuWindowSpec {
@@ -307,11 +370,25 @@ fn objc_host_source(
     window_title: &str,
     window_width: usize,
     window_height: usize,
+    fabric_worker_core: Option<usize>,
     embedded_ppm_bytes: &str,
 ) -> String {
+    let affinity_tag = fabric_worker_core
+        .map(|core| core.saturating_add(1))
+        .unwrap_or(0);
+    let affinity_setup = if let Some(core) = fabric_worker_core {
+        format!(
+            "    nuis_apply_fabric_affinity_hint({});\n    fprintf(stderr, \"nuis: fabric worker core hint {} applied via macOS thread affinity tag\\n\");\n",
+            affinity_tag, core
+        )
+    } else {
+        String::new()
+    };
     format!(
         r###"#import <AppKit/AppKit.h>
 #import <Foundation/Foundation.h>
+#include <mach/mach.h>
+#include <mach/thread_policy.h>
 #include <stdint.h>
 #include <stdio.h>
 
@@ -319,6 +396,24 @@ extern int64_t nuis_yir_entry(void);
 
 void nuis_debug_print_i64(int64_t value) {{
     printf("%lld\n", (long long)value);
+}}
+
+static void nuis_apply_fabric_affinity_hint(integer_t tag) {{
+    if (tag <= 0) {{
+        return;
+    }}
+
+    thread_affinity_policy_data_t policy;
+    policy.affinity_tag = tag;
+    kern_return_t status = thread_policy_set(
+        mach_thread_self(),
+        THREAD_AFFINITY_POLICY,
+        (thread_policy_t)&policy,
+        THREAD_AFFINITY_POLICY_COUNT
+    );
+    if (status != KERN_SUCCESS) {{
+        fprintf(stderr, "nuis: failed to apply fabric affinity hint (kern_return_t=%d)\n", status);
+    }}
 }}
 
 @interface NuisPreviewDelegate : NSObject <NSApplicationDelegate>
@@ -374,6 +469,7 @@ int main(int argc, const char **argv) {{
     (void)argc;
     (void)argv;
     nuis_yir_entry();
+{affinity_setup}
 
     @autoreleasepool {{
         NSApplication *app = [NSApplication sharedApplication];

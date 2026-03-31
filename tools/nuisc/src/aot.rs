@@ -7,7 +7,7 @@ use std::{
 use nuis_semantics::model::NirModule;
 use yir_core::YirModule;
 
-use crate::ir;
+use crate::render;
 
 pub struct CompileArtifacts {
     pub nir_path: String,
@@ -36,9 +36,9 @@ pub fn write_and_link(
     let shim_path = output_dir.join(format!("{stem}_shim.c"));
     let exe_path = output_dir.join(stem);
 
-    fs::write(&nir_path, ir::render_nir(nir))
+    fs::write(&nir_path, render::render_nir(nir))
         .map_err(|error| format!("failed to write `{}`: {error}", nir_path.display()))?;
-    fs::write(&yir_path, ir::render_yir(yir))
+    fs::write(&yir_path, render::render_yir(yir))
         .map_err(|error| format!("failed to write `{}`: {error}", yir_path.display()))?;
     fs::write(&ll_path, llvm_ir)
         .map_err(|error| format!("failed to write `{}`: {error}", ll_path.display()))?;

@@ -28,6 +28,20 @@ source → nuislang → YIR → execution (via yalivia)
 * LLVM is used as a backend
 * Designed as a general-purpose system language
 * Forms its own toolchain and execution model (language, IR, runtime, verifier)
+* Current YIR reference surface already includes heterogenous `cpu / shader / kernel / data` families, with shader pass composition and kernel tensor ops expanding incrementally from the same graph model
+* The `shader` family now also has a minimal resource-layout surface (`uniform / storage / attachment / bind_set`) so future backend package manifests can describe stage bindings instead of only pass topology
+* The `shader` family also includes a first texture-resource slice (`texture2d / sampler / sample_nearest`) plus matching binding kinds for package manifests
+* The texture path now also has a normalized UV surface (`uv / sample_uv_nearest / sample_uv_linear`) so sampling semantics do not depend on hard-coded integer texel coordinates
+* The preferred sampling entry points are now `sample / sample_uv`, with actual nearest-vs-linear behavior selected by `sampler.filter`; the older explicit sample ops remain as compatibility aliases
+* The render path also has a first state surface (`blend_state / depth_state / raster_state / render_state`) so backend packages can describe more than pass topology and bindings
+* The render path also has a first geometry-input surface (`vertex_layout / vertex_buffer / index_buffer` plus matching bindings) so package manifests can describe mesh-style stage inputs
+* The handwritten shader reference path now interprets bound `triangle` / `triangle_strip` geometry as point, edge, and minimal area coverage instead of only pass metadata
+* Shader package manifests now also record texture/sampler binding details like texture shape plus sampler filter/address mode, so sampling semantics begin to survive packaging
+* The `data` family now has a first typed Fabric surface (`output_pipe / input_pipe / marker / copy_window / immutable_window / handle_table`) so cross-domain exchange is starting to look like a real data plane instead of a bare value hop
+* `data.handle_table` now also survives packaging as top-level fabric-binding metadata, so resource indirection starts to participate in AOT bundle description instead of only live verification
+* Shader stage packaging now records both the concrete stage resource and the associated fabric handle table when present, so host/render binding decisions can begin to follow Fabric metadata instead of ad hoc scanning
+* The `data` family now also has a first `bind_core` surface, so short-term CPU-hosted Fabric workers can be described and packaged in a DPDK-like “occupy a core” style
+* Current macOS AOT host stubs now read `fabric_worker_core` and apply it as a startup thread-affinity hint; this is intentionally weaker than a true exclusive-core Fabric runtime
 
 ---
 
@@ -601,6 +615,7 @@ nuisc 具有最终否决权：
 * 当前已接入 `cpu` 与 backend-agnostic 的 `shader` mod；窗口/UI/present 作为 `cpu` 域特化能力存在
 * 上述窗口/UI/present 仅是当前 reference preview adapter 消费的 `cpu`-mod 能力，**不是 `YIR` core 对 UI 框架的内建依赖**
 * 当前 `cpu` mod 已开始覆盖 `arm64-family` 的抽象能力面（如 `target_config` / `bind_core` / `madd`）
+* 当前 `cpu` mod 也已有最小条件数据流、位运算与整数基础算子原型（如 `eq / ne / lt / gt / select / and / or / xor / shl / shr / div / rem / neg / not`），用于在保持静态图结构的前提下表达更强的 CPU 语义
 * 当前 `cpu` mod 也已有最小可寻址对象/指针原型（`null / borrow / move_ptr / alloc_node / alloc_buffer / load_* / store_* / free`），用于验证链表和 buffer 这类动态结构
 * 当前 `cpu` verifier 已开始按 Rust 风格收紧所有权边界：借用指针可读不可写，所有权移动后原名不可再用，释放后借用再读会被拒绝
 * 当前 `kernel` mod 已补最小张量计算原型（如 `tensor` / `matmul` / `add_bias` / `relu`），用于 macOS 上先行验证 `cpu <-> kernel/npu` 的异构图

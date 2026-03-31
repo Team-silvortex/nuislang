@@ -135,6 +135,10 @@ Current behavior:
   using embedded prerendered framebuffer content
 * shader packaging already has a contract/package skeleton for future backend
   variants
+* shader package manifests may now include per-stage binding layout entries, texture/sampler/geometry binding kinds, minimal render-state metadata, sampler/texture binding details such as filter, address mode, and texture shape, plus top-level fabric handle-table metadata, per-stage fabric table association, and Fabric worker core binding metadata
+* current macOS AppKit host stubs read `fabric_worker_core` and apply it as a
+  startup thread-affinity hint; this is weaker than a strict reserved-core
+  runtime model
 
 This is the beginning of a `YIR`-native toolchain, not the final shape.
 

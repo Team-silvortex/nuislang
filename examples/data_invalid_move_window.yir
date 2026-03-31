@@ -1,0 +1,12 @@
+yir 0.1
+
+resource cpu0 cpu.arm64
+resource fabric0 data.fabric
+
+cpu.const raw cpu0 9
+data.copy_window slice fabric0 raw 0 1
+data.move bad_move fabric0 slice cpu0
+
+edge xfer raw slice
+edge dep slice bad_move
+edge effect slice bad_move

@@ -125,9 +125,25 @@ pub enum Value {
     Tensor(TensorValue),
     Pointer(Option<usize>),
     Tuple(Vec<Value>),
+    DataWindow(DataWindow),
+    DataPipe(DataPipe),
+    DataMarker(DataMarker),
+    DataHandleTable(DataHandleTable),
+    DataCoreBinding(DataCoreBinding),
     Target(SurfaceTarget),
     Viewport(Viewport),
     Pipeline(RenderPipeline),
+    VertexLayout(VertexLayout),
+    VertexBuffer(VertexBuffer),
+    IndexBuffer(IndexBuffer),
+    Texture(Texture2D),
+    Sampler(SamplerState),
+    Blend(BlendState),
+    Depth(DepthState),
+    Raster(RasterState),
+    RenderState(RenderStateSet),
+    Binding(ShaderBinding),
+    BindingSet(ShaderBindingSet),
     RenderPass(RenderPass),
     Frame(FrameSurface),
     Unit,
@@ -138,6 +154,41 @@ pub struct TensorValue {
     pub rows: usize,
     pub cols: usize,
     pub elements: Vec<i64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DataWindow {
+    pub base: Box<Value>,
+    pub offset: usize,
+    pub len: usize,
+    pub immutable: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DataPipe {
+    pub direction: DataPipeDirection,
+    pub payload: Box<Value>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DataPipeDirection {
+    Input,
+    Output,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DataMarker {
+    pub tag: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DataHandleTable {
+    pub entries: Vec<(String, String)>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DataCoreBinding {
+    pub core_index: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -157,6 +208,77 @@ pub struct Viewport {
 pub struct RenderPipeline {
     pub shading_model: String,
     pub topology: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VertexLayout {
+    pub stride: usize,
+    pub attributes: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VertexBuffer {
+    pub vertex_count: usize,
+    pub elements: Vec<i64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IndexBuffer {
+    pub indices: Vec<usize>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Texture2D {
+    pub format: String,
+    pub width: usize,
+    pub height: usize,
+    pub texels: Vec<i64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SamplerState {
+    pub filter: String,
+    pub address_mode: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BlendState {
+    pub enabled: bool,
+    pub mode: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DepthState {
+    pub test_enabled: bool,
+    pub write_enabled: bool,
+    pub compare: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RasterState {
+    pub cull_mode: String,
+    pub front_face: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RenderStateSet {
+    pub pipeline: RenderPipeline,
+    pub blend: BlendState,
+    pub depth: DepthState,
+    pub raster: RasterState,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShaderBinding {
+    pub kind: String,
+    pub slot: usize,
+    pub value: Box<Value>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShaderBindingSet {
+    pub pipeline: RenderPipeline,
+    pub bindings: Vec<ShaderBinding>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -204,9 +326,25 @@ impl fmt::Display for Value {
                 }
                 write!(f, ")")
             }
+            Self::DataWindow(window) => write!(f, "{window}"),
+            Self::DataPipe(pipe) => write!(f, "{pipe}"),
+            Self::DataMarker(marker) => write!(f, "{marker}"),
+            Self::DataHandleTable(table) => write!(f, "{table}"),
+            Self::DataCoreBinding(binding) => write!(f, "{binding}"),
             Self::Target(target) => write!(f, "{target}"),
             Self::Viewport(viewport) => write!(f, "{viewport}"),
             Self::Pipeline(pipeline) => write!(f, "{pipeline}"),
+            Self::VertexLayout(layout) => write!(f, "{layout}"),
+            Self::VertexBuffer(buffer) => write!(f, "{buffer}"),
+            Self::IndexBuffer(buffer) => write!(f, "{buffer}"),
+            Self::Texture(texture) => write!(f, "{texture}"),
+            Self::Sampler(sampler) => write!(f, "{sampler}"),
+            Self::Blend(blend) => write!(f, "{blend}"),
+            Self::Depth(depth) => write!(f, "{depth}"),
+            Self::Raster(raster) => write!(f, "{raster}"),
+            Self::RenderState(render_state) => write!(f, "{render_state}"),
+            Self::Binding(binding) => write!(f, "{binding}"),
+            Self::BindingSet(binding_set) => write!(f, "{binding_set}"),
             Self::RenderPass(pass) => write!(f, "{pass}"),
             Self::Frame(frame) => write!(f, "{frame}"),
             Self::Unit => write!(f, "()"),
@@ -232,6 +370,57 @@ impl fmt::Display for TensorValue {
     }
 }
 
+impl fmt::Display for DataWindow {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mode = if self.immutable { "immutable" } else { "copy" };
+        write!(
+            f,
+            "window[{mode} offset={} len={} base={}]",
+            self.offset, self.len, self.base
+        )
+    }
+}
+
+impl fmt::Display for DataPipe {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "pipe[{} {}]", self.direction, self.payload)
+    }
+}
+
+impl fmt::Display for DataPipeDirection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Input => write!(f, "input"),
+            Self::Output => write!(f, "output"),
+        }
+    }
+}
+
+impl fmt::Display for DataMarker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "marker[{}]", self.tag)
+    }
+}
+
+impl fmt::Display for DataHandleTable {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "handle_table[")?;
+        for (index, (slot, resource)) in self.entries.iter().enumerate() {
+            if index > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{}={}", slot, resource)?;
+        }
+        write!(f, "]")
+    }
+}
+
+impl fmt::Display for DataCoreBinding {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "core_binding[core={}]", self.core_index)
+    }
+}
+
 impl fmt::Display for SurfaceTarget {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "target[{} {}x{}]", self.format, self.width, self.height)
@@ -247,6 +436,94 @@ impl fmt::Display for Viewport {
 impl fmt::Display for RenderPipeline {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "pipeline[{} {}]", self.shading_model, self.topology)
+    }
+}
+
+impl fmt::Display for VertexLayout {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "vertex_layout[stride={} attrs=", self.stride)?;
+        for (index, attr) in self.attributes.iter().enumerate() {
+            if index > 0 {
+                write!(f, ",")?;
+            }
+            write!(f, "{attr}")?;
+        }
+        write!(f, "]")
+    }
+}
+
+impl fmt::Display for VertexBuffer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "vertex_buffer[count={}]", self.vertex_count)
+    }
+}
+
+impl fmt::Display for IndexBuffer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "index_buffer[count={}]", self.indices.len())
+    }
+}
+
+impl fmt::Display for Texture2D {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "texture2d[{} {}x{}]", self.format, self.width, self.height)
+    }
+}
+
+impl fmt::Display for SamplerState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "sampler[{} {}]", self.filter, self.address_mode)
+    }
+}
+
+impl fmt::Display for BlendState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "blend[enabled={} mode={}]", self.enabled, self.mode)
+    }
+}
+
+impl fmt::Display for DepthState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "depth[test={} write={} compare={}]",
+            self.test_enabled, self.write_enabled, self.compare
+        )
+    }
+}
+
+impl fmt::Display for RasterState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "raster[cull={} front={}]", self.cull_mode, self.front_face)
+    }
+}
+
+impl fmt::Display for RenderStateSet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "render_state[pipeline={}, {}, {}, {}]",
+            self.pipeline, self.blend, self.depth, self.raster
+        )
+    }
+}
+
+impl fmt::Display for ShaderBinding {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}@{}={}", self.kind, self.slot, self.value)
+    }
+}
+
+impl fmt::Display for ShaderBindingSet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "bind_set[pipeline={}, bindings=", self.pipeline)?;
+        for (index, binding) in self.bindings.iter().enumerate() {
+            if index > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{binding}")?;
+        }
+        write!(f, "]")
     }
 }
 
@@ -349,9 +626,25 @@ impl ExecutionState {
             Some(Value::Tensor(_)) => Err(format!("`{name}` is tensor, expected int")),
             Some(Value::Pointer(_)) => Err(format!("`{name}` is pointer, expected int")),
             Some(Value::Tuple(_)) => Err(format!("`{name}` is tuple, expected int")),
+            Some(Value::DataWindow(_)) => Err(format!("`{name}` is window, expected int")),
+            Some(Value::DataPipe(_)) => Err(format!("`{name}` is pipe, expected int")),
+            Some(Value::DataMarker(_)) => Err(format!("`{name}` is marker, expected int")),
+            Some(Value::DataHandleTable(_)) => Err(format!("`{name}` is handle-table, expected int")),
+            Some(Value::DataCoreBinding(_)) => Err(format!("`{name}` is core-binding, expected int")),
             Some(Value::Target(_)) => Err(format!("`{name}` is target, expected int")),
             Some(Value::Viewport(_)) => Err(format!("`{name}` is viewport, expected int")),
             Some(Value::Pipeline(_)) => Err(format!("`{name}` is pipeline, expected int")),
+            Some(Value::VertexLayout(_)) => Err(format!("`{name}` is vertex-layout, expected int")),
+            Some(Value::VertexBuffer(_)) => Err(format!("`{name}` is vertex-buffer, expected int")),
+            Some(Value::IndexBuffer(_)) => Err(format!("`{name}` is index-buffer, expected int")),
+            Some(Value::Texture(_)) => Err(format!("`{name}` is texture, expected int")),
+            Some(Value::Sampler(_)) => Err(format!("`{name}` is sampler, expected int")),
+            Some(Value::Blend(_)) => Err(format!("`{name}` is blend-state, expected int")),
+            Some(Value::Depth(_)) => Err(format!("`{name}` is depth-state, expected int")),
+            Some(Value::Raster(_)) => Err(format!("`{name}` is raster-state, expected int")),
+            Some(Value::RenderState(_)) => Err(format!("`{name}` is render-state, expected int")),
+            Some(Value::Binding(_)) => Err(format!("`{name}` is binding, expected int")),
+            Some(Value::BindingSet(_)) => Err(format!("`{name}` is binding-set, expected int")),
             Some(Value::RenderPass(_)) => Err(format!("`{name}` is render-pass, expected int")),
             Some(Value::Frame(_)) => Err(format!("`{name}` is frame, expected int")),
             Some(Value::Unit) => Err(format!("`{name}` is unit, expected int")),
@@ -531,7 +824,10 @@ impl RegisteredMod for DataMod {
         "data"
     }
 
-    fn describe(&self, node: &Node, _resource: &Resource) -> Result<InstructionSemantics, String> {
+    fn describe(&self, node: &Node, resource: &Resource) -> Result<InstructionSemantics, String> {
+        if node.op.instruction != "move" {
+            require_data_resource(node, resource)?;
+        }
         match node.op.instruction.as_str() {
             "move" => {
                 if node.op.args.len() != 2 {
@@ -543,6 +839,77 @@ impl RegisteredMod for DataMod {
 
                 Ok(InstructionSemantics::effect(vec![node.op.args[0].clone()]))
             }
+            "copy_window" | "immutable_window" => {
+                if node.op.args.len() != 3 {
+                    return Err(format!(
+                        "node `{}` expects `data.{} <name> <resource> <input> <offset> <len>`",
+                        node.name, node.op.instruction
+                    ));
+                }
+                node.op.args[1].parse::<usize>().map_err(|_| {
+                    format!("node `{}` has invalid window offset `{}`", node.name, node.op.args[1])
+                })?;
+                node.op.args[2].parse::<usize>().map_err(|_| {
+                    format!("node `{}` has invalid window len `{}`", node.name, node.op.args[2])
+                })?;
+                Ok(InstructionSemantics::pure(vec![node.op.args[0].clone()]))
+            }
+            "marker" => {
+                if node.op.args.len() != 1 {
+                    return Err(format!(
+                        "node `{}` expects `data.marker <name> <resource> <tag>`",
+                        node.name
+                    ));
+                }
+                Ok(InstructionSemantics::pure(Vec::new()))
+            }
+            "output_pipe" => {
+                if node.op.args.len() != 1 {
+                    return Err(format!(
+                        "node `{}` expects `data.output_pipe <name> <resource> <input>`",
+                        node.name
+                    ));
+                }
+                Ok(InstructionSemantics::effect(vec![node.op.args[0].clone()]))
+            }
+            "input_pipe" => {
+                if node.op.args.len() != 1 {
+                    return Err(format!(
+                        "node `{}` expects `data.input_pipe <name> <resource> <pipe>`",
+                        node.name
+                    ));
+                }
+                Ok(InstructionSemantics::effect(vec![node.op.args[0].clone()]))
+            }
+            "handle_table" => {
+                if node.op.args.is_empty() {
+                    return Err(format!(
+                        "node `{}` expects `data.handle_table <name> <resource> <slot=resource> [slot=resource...]`",
+                        node.name
+                    ));
+                }
+                for entry in &node.op.args {
+                    if entry.split_once('=').is_none() {
+                        return Err(format!(
+                            "node `{}` has invalid handle-table entry `{}`",
+                            node.name, entry
+                        ));
+                    }
+                }
+                Ok(InstructionSemantics::pure(Vec::new()))
+            }
+            "bind_core" => {
+                if node.op.args.len() != 1 {
+                    return Err(format!(
+                        "node `{}` expects `data.bind_core <name> <resource> <core_index>`",
+                        node.name
+                    ));
+                }
+                node.op.args[0].parse::<usize>().map_err(|_| {
+                    format!("node `{}` has invalid fabric core index `{}`", node.name, node.op.args[0])
+                })?;
+                Ok(InstructionSemantics::effect(Vec::new()))
+            }
             other => Err(format!("unknown data instruction `{other}`")),
         }
     }
@@ -553,19 +920,170 @@ impl RegisteredMod for DataMod {
         resource: &Resource,
         state: &mut ExecutionState,
     ) -> Result<Value, String> {
+        if node.op.instruction != "move" {
+            require_data_resource(node, resource)?;
+        }
         match node.op.instruction.as_str() {
             "move" => {
                 let input = &node.op.args[0];
                 let target = &node.op.args[1];
                 let value = state.expect_value(input)?.clone();
+                if !is_move_value_legal(&value) {
+                    return Err(format!(
+                        "data.move only accepts Value payloads, got {}",
+                        value
+                    ));
+                }
                 state.push_resource_event(resource, format!(
                     "effect data.move @{} [{}] -> {}: {}",
                     node.resource, resource.kind.raw, target, value
                 ));
                 Ok(value)
             }
+            "copy_window" | "immutable_window" => {
+                let base = state.expect_value(&node.op.args[0])?.clone();
+                if !is_window_base_legal(&base) {
+                    return Err(format!(
+                        "data.{} cannot wrap non-window-compatible payload {}",
+                        node.op.instruction, base
+                    ));
+                }
+                let offset = node.op.args[1].parse::<usize>().map_err(|_| {
+                    format!("node `{}` has invalid window offset `{}`", node.name, node.op.args[1])
+                })?;
+                let len = node.op.args[2].parse::<usize>().map_err(|_| {
+                    format!("node `{}` has invalid window len `{}`", node.name, node.op.args[2])
+                })?;
+                let window = Value::DataWindow(DataWindow {
+                    base: Box::new(base),
+                    offset,
+                    len,
+                    immutable: node.op.instruction == "immutable_window",
+                });
+                Ok(window)
+            }
+            "marker" => Ok(Value::DataMarker(DataMarker {
+                tag: node.op.args[0].clone(),
+            })),
+            "output_pipe" => {
+                let value = state.expect_value(&node.op.args[0])?.clone();
+                if !is_pipe_payload_legal(&value) {
+                    return Err(format!(
+                        "data.output_pipe cannot wrap illegal pipe payload {}",
+                        value
+                    ));
+                }
+                let pipe = Value::DataPipe(DataPipe {
+                    direction: DataPipeDirection::Output,
+                    payload: Box::new(value),
+                });
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect data.output_pipe @{} [{}]: {}",
+                        node.resource, resource.kind.raw, pipe
+                    ),
+                );
+                Ok(pipe)
+            }
+            "input_pipe" => {
+                let pipe = state.expect_value(&node.op.args[0])?.clone();
+                match pipe {
+                    Value::DataPipe(DataPipe {
+                        direction: DataPipeDirection::Output,
+                        payload,
+                    }) => {
+                        let value = (*payload).clone();
+                        state.push_resource_event(
+                            resource,
+                            format!(
+                                "effect data.input_pipe @{} [{}]: {}",
+                                node.resource, resource.kind.raw, value
+                            ),
+                        );
+                        Ok(value)
+                    }
+                    other => Err(format!(
+                        "data.input_pipe expects output pipe, got {}",
+                        other
+                    )),
+                }
+            }
+            "handle_table" => {
+                let mut entries = Vec::with_capacity(node.op.args.len());
+                for entry in &node.op.args {
+                    let Some((slot, resource_name)) = entry.split_once('=') else {
+                        return Err(format!(
+                            "node `{}` has invalid handle-table entry `{}`",
+                            node.name, entry
+                        ));
+                    };
+                    let slot = slot.trim();
+                    let resource_name = resource_name.trim();
+                    if slot.is_empty() || resource_name.is_empty() {
+                        return Err(format!(
+                            "node `{}` has empty handle-table slot/resource in `{}`",
+                            node.name, entry
+                        ));
+                    }
+                    entries.push((slot.to_owned(), resource_name.to_owned()));
+                }
+                Ok(Value::DataHandleTable(DataHandleTable { entries }))
+            }
+            "bind_core" => {
+                let core_index = node.op.args[0].parse::<usize>().map_err(|_| {
+                    format!("node `{}` has invalid fabric core index `{}`", node.name, node.op.args[0])
+                })?;
+                let binding = Value::DataCoreBinding(DataCoreBinding { core_index });
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect data.bind_core @{} [{}]: {}",
+                        node.resource, resource.kind.raw, binding
+                    ),
+                );
+                Ok(binding)
+            }
             other => Err(format!("unknown data instruction `{other}`")),
         }
+    }
+}
+
+fn require_data_resource(node: &Node, resource: &Resource) -> Result<(), String> {
+    if resource.kind.is_family("data") || resource.kind.is_family("fabric") {
+        Ok(())
+    } else {
+        Err(format!(
+            "node `{}` uses data mod on non-data resource `{}` ({})",
+            node.name, resource.name, resource.kind.raw
+        ))
+    }
+}
+
+fn is_move_value_legal(value: &Value) -> bool {
+    match value {
+        Value::DataWindow(_)
+        | Value::DataPipe(_)
+        | Value::DataMarker(_)
+        | Value::DataHandleTable(_) => false,
+        Value::Tuple(items) => items.iter().all(is_move_value_legal),
+        _ => true,
+    }
+}
+
+fn is_window_base_legal(value: &Value) -> bool {
+    match value {
+        Value::DataHandleTable(_) | Value::DataMarker(_) | Value::DataPipe(_) => false,
+        Value::Tuple(items) => items.iter().all(is_move_value_legal),
+        _ => true,
+    }
+}
+
+fn is_pipe_payload_legal(value: &Value) -> bool {
+    match value {
+        Value::DataPipe(_) => false,
+        Value::Tuple(items) => items.iter().all(is_move_value_legal),
+        _ => true,
     }
 }
 

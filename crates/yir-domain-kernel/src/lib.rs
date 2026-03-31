@@ -92,10 +92,19 @@ fn describe_kernel_node(
             })?;
             Ok(InstructionSemantics::pure(Vec::new()))
         }
-        "matmul" | "add_bias" => {
+        "matmul" | "add_bias" | "add" | "mul" => {
             if node.op.args.len() != 2 {
                 return Err(format!(
                     "node `{}` expects `kernel.{} <name> <resource> <lhs> <rhs>`",
+                    node.name, node.op.instruction
+                ));
+            }
+            Ok(InstructionSemantics::pure(node.op.args.clone()))
+        }
+        "transpose" | "reduce_sum" => {
+            if node.op.args.len() != 1 {
+                return Err(format!(
+                    "node `{}` expects `kernel.{} <name> <resource> <input>`",
                     node.name, node.op.instruction
                 ));
             }
@@ -163,6 +172,34 @@ fn execute_kernel_node(
             let input = state.expect_tensor(&node.op.args[0])?;
             let bias = state.expect_tensor(&node.op.args[1])?;
             Ok(Value::Tensor(add_bias(input, bias)?))
+        }
+        "add" => {
+            let lhs = state.expect_tensor(&node.op.args[0])?;
+            let rhs = state.expect_tensor(&node.op.args[1])?;
+            Ok(Value::Tensor(elementwise_binary(
+                node,
+                lhs,
+                rhs,
+                |lhs, rhs| lhs + rhs,
+            )?))
+        }
+        "mul" => {
+            let lhs = state.expect_tensor(&node.op.args[0])?;
+            let rhs = state.expect_tensor(&node.op.args[1])?;
+            Ok(Value::Tensor(elementwise_binary(
+                node,
+                lhs,
+                rhs,
+                |lhs, rhs| lhs * rhs,
+            )?))
+        }
+        "transpose" => {
+            let input = state.expect_tensor(&node.op.args[0])?;
+            Ok(Value::Tensor(transpose(input)))
+        }
+        "reduce_sum" => {
+            let input = state.expect_tensor(&node.op.args[0])?;
+            Ok(Value::Int(input.elements.iter().copied().sum()))
         }
         "relu" => {
             let input = state.expect_tensor(&node.op.args[0])?;
@@ -317,4 +354,45 @@ fn add_bias(input: &TensorValue, bias: &TensorValue) -> Result<TensorValue, Stri
         "kernel.add_bias shape mismatch: input is {}x{}, bias is {}x{}",
         input.rows, input.cols, bias.rows, bias.cols
     ))
+}
+
+fn elementwise_binary(
+    node: &Node,
+    lhs: &TensorValue,
+    rhs: &TensorValue,
+    op: impl Fn(i64, i64) -> i64,
+) -> Result<TensorValue, String> {
+    if lhs.rows != rhs.rows || lhs.cols != rhs.cols {
+        return Err(format!(
+            "node `{}` expects matching tensor shapes, got {}x{} and {}x{}",
+            node.name, lhs.rows, lhs.cols, rhs.rows, rhs.cols
+        ));
+    }
+
+    Ok(TensorValue {
+        rows: lhs.rows,
+        cols: lhs.cols,
+        elements: lhs
+            .elements
+            .iter()
+            .copied()
+            .zip(rhs.elements.iter().copied())
+            .map(|(lhs, rhs)| op(lhs, rhs))
+            .collect(),
+    })
+}
+
+fn transpose(input: &TensorValue) -> TensorValue {
+    let mut elements = vec![0; input.rows * input.cols];
+    for row in 0..input.rows {
+        for col in 0..input.cols {
+            elements[col * input.rows + row] = input.elements[row * input.cols + col];
+        }
+    }
+
+    TensorValue {
+        rows: input.cols,
+        cols: input.rows,
+        elements,
+    }
 }

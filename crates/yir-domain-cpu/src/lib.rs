@@ -50,21 +50,31 @@ impl RegisteredMod for CpuMod {
 
                 Ok(InstructionSemantics::pure(Vec::new()))
             }
-            "borrow" | "move_ptr" => {
+            "borrow" | "move_ptr" | "neg" | "not" => {
                 if node.op.args.len() != 1 {
                     return Err(format!(
-                        "node `{}` expects `cpu.{} <name> <resource> <ptr>`",
+                        "node `{}` expects `cpu.{} <name> <resource> <input>`",
                         node.name, node.op.instruction
                     ));
                 }
 
                 Ok(InstructionSemantics::pure(node.op.args.clone()))
             }
-            "add" | "sub" | "mul" => {
+            "add" | "sub" | "mul" | "div" | "rem" | "eq" | "ne" | "lt" | "gt" | "le" | "ge" | "and" | "or" | "xor" | "shl" | "shr" => {
                 if node.op.args.len() != 2 {
                     return Err(format!(
                         "node `{}` expects `cpu.{} <name> <resource> <lhs> <rhs>`",
                         node.name, node.op.instruction
+                    ));
+                }
+
+                Ok(InstructionSemantics::pure(node.op.args.clone()))
+            }
+            "select" => {
+                if node.op.args.len() != 3 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.select <name> <resource> <cond> <then> <else>`",
+                        node.name
                     ));
                 }
 
@@ -268,6 +278,8 @@ impl RegisteredMod for CpuMod {
             })?)),
             "null" => Ok(Value::Pointer(None)),
             "borrow" | "move_ptr" => Ok(Value::Pointer(state.expect_pointer(&node.op.args[0])?)),
+            "neg" => Ok(Value::Int(-state.expect_int(&node.op.args[0])?)),
+            "not" => Ok(Value::Int(!state.expect_int(&node.op.args[0])?)),
             "add" => Ok(Value::Int(
                 state.expect_int(&node.op.args[0])? + state.expect_int(&node.op.args[1])?,
             )),
@@ -277,10 +289,81 @@ impl RegisteredMod for CpuMod {
             "mul" => Ok(Value::Int(
                 state.expect_int(&node.op.args[0])? * state.expect_int(&node.op.args[1])?,
             )),
+            "div" => {
+                let lhs = state.expect_int(&node.op.args[0])?;
+                let rhs = state.expect_int(&node.op.args[1])?;
+                if rhs == 0 {
+                    return Err(format!("node `{}` divides by zero", node.name));
+                }
+                Ok(Value::Int(lhs / rhs))
+            }
+            "rem" => {
+                let lhs = state.expect_int(&node.op.args[0])?;
+                let rhs = state.expect_int(&node.op.args[1])?;
+                if rhs == 0 {
+                    return Err(format!("node `{}` computes remainder by zero", node.name));
+                }
+                Ok(Value::Int(lhs % rhs))
+            }
+            "eq" => Ok(Value::Int(
+                (state.expect_int(&node.op.args[0])? == state.expect_int(&node.op.args[1])?)
+                    as i64,
+            )),
+            "ne" => Ok(Value::Int(
+                (state.expect_int(&node.op.args[0])? != state.expect_int(&node.op.args[1])?)
+                    as i64,
+            )),
+            "lt" => Ok(Value::Int(
+                (state.expect_int(&node.op.args[0])? < state.expect_int(&node.op.args[1])?)
+                    as i64,
+            )),
+            "gt" => Ok(Value::Int(
+                (state.expect_int(&node.op.args[0])? > state.expect_int(&node.op.args[1])?)
+                    as i64,
+            )),
+            "le" => Ok(Value::Int(
+                (state.expect_int(&node.op.args[0])? <= state.expect_int(&node.op.args[1])?)
+                    as i64,
+            )),
+            "ge" => Ok(Value::Int(
+                (state.expect_int(&node.op.args[0])? >= state.expect_int(&node.op.args[1])?)
+                    as i64,
+            )),
+            "and" => Ok(Value::Int(
+                state.expect_int(&node.op.args[0])? & state.expect_int(&node.op.args[1])?,
+            )),
+            "or" => Ok(Value::Int(
+                state.expect_int(&node.op.args[0])? | state.expect_int(&node.op.args[1])?,
+            )),
+            "xor" => Ok(Value::Int(
+                state.expect_int(&node.op.args[0])? ^ state.expect_int(&node.op.args[1])?,
+            )),
+            "shl" => {
+                let lhs = state.expect_int(&node.op.args[0])?;
+                let rhs = state.expect_int(&node.op.args[1])?;
+                if rhs < 0 {
+                    return Err(format!("node `{}` shifts by negative amount", node.name));
+                }
+                Ok(Value::Int(lhs.wrapping_shl(rhs as u32)))
+            }
+            "shr" => {
+                let lhs = state.expect_int(&node.op.args[0])?;
+                let rhs = state.expect_int(&node.op.args[1])?;
+                if rhs < 0 {
+                    return Err(format!("node `{}` shifts by negative amount", node.name));
+                }
+                Ok(Value::Int(lhs >> rhs))
+            }
             "madd" => Ok(Value::Int(
                 state.expect_int(&node.op.args[0])? * state.expect_int(&node.op.args[1])?
                     + state.expect_int(&node.op.args[2])?,
             )),
+            "select" => {
+                let cond = state.expect_int(&node.op.args[0])?;
+                let then_value = state.expect_int(&node.op.args[1])?;
+                let else_value = state.expect_int(&node.op.args[2])?;
+                Ok(Value::Int(if cond != 0 { then_value } else { else_value }))
+            }
             "alloc_node" => {
                 let value = state.expect_int(&node.op.args[0])?;
                 let next = state.expect_pointer(&node.op.args[1])?;

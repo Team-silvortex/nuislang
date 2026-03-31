@@ -120,6 +120,7 @@ pub fn verify_module_with_registry(
     }
 
     ensure_acyclic(module)?;
+    verify_data_fabric_protocol(module, &resources)?;
     verify_cpu_heap_protocol(module)?;
     Ok(())
 }
@@ -194,6 +195,158 @@ enum HeapObjectKind {
 struct HeapBinding {
     live: bool,
     kind: HeapObjectKind,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum DataValueKind {
+    Other,
+    PipeOutput,
+    PipeInput,
+    Window,
+    Marker,
+    HandleTable,
+    CoreBinding,
+}
+
+fn verify_data_fabric_protocol(
+    module: &YirModule,
+    resources: &BTreeMap<String, &Resource>,
+) -> Result<(), String> {
+    let order = topological_order(module)?;
+    let nodes = module
+        .nodes
+        .iter()
+        .map(|node| (node.name.as_str(), node))
+        .collect::<BTreeMap<_, _>>();
+    let mut value_kinds = BTreeMap::<String, DataValueKind>::new();
+
+    for node_name in order {
+        let node = nodes
+            .get(node_name.as_str())
+            .copied()
+            .ok_or_else(|| format!("verification order references unknown node `{node_name}`"))?;
+
+        let kind = if node.op.module == "data" || node.op.module == "fabric" {
+            match node.op.instruction.as_str() {
+                "move" => {
+                    let source = infer_data_value_kind(&value_kinds, &nodes, &node.op.args[0]);
+                    if source != DataValueKind::Other {
+                        return Err(format!(
+                            "node `{}` cannot use data.move on non-Value payload `{}`",
+                            node.name, node.op.args[0]
+                        ));
+                    }
+                    DataValueKind::Other
+                }
+                "output_pipe" => {
+                    let source = infer_data_value_kind(&value_kinds, &nodes, &node.op.args[0]);
+                    if source == DataValueKind::PipeOutput || source == DataValueKind::PipeInput {
+                        return Err(format!(
+                            "node `{}` creates nested pipe value from `{}`",
+                            node.name, node.op.args[0]
+                        ));
+                    }
+                    DataValueKind::PipeOutput
+                }
+                "input_pipe" => {
+                    let source = infer_data_value_kind(&value_kinds, &nodes, &node.op.args[0]);
+                    if source != DataValueKind::PipeOutput {
+                        return Err(format!(
+                            "node `{}` expects output_pipe input, got `{}`",
+                            node.name, node.op.args[0]
+                        ));
+                    }
+                    DataValueKind::Other
+                }
+                "copy_window" | "immutable_window" => {
+                    let source = infer_data_value_kind(&value_kinds, &nodes, &node.op.args[0]);
+                    if matches!(
+                        source,
+                        DataValueKind::PipeOutput
+                            | DataValueKind::PipeInput
+                            | DataValueKind::Marker
+                            | DataValueKind::HandleTable
+                    ) {
+                        return Err(format!(
+                            "node `{}` cannot create window from `{}`",
+                            node.name, node.op.args[0]
+                        ));
+                    }
+                    DataValueKind::Window
+                }
+                "marker" => DataValueKind::Marker,
+                "handle_table" => {
+                    let mut seen_slots = BTreeSet::new();
+                    for entry in &node.op.args {
+                        let Some((slot, resource_name)) = entry.split_once('=') else {
+                            return Err(format!(
+                                "node `{}` has invalid handle-table entry `{}`",
+                                node.name, entry
+                            ));
+                        };
+                        let slot = slot.trim();
+                        let resource_name = resource_name.trim();
+                        if slot.is_empty() || resource_name.is_empty() {
+                            return Err(format!(
+                                "node `{}` has empty handle-table slot/resource in `{}`",
+                                node.name, entry
+                            ));
+                        }
+                        if !seen_slots.insert(slot.to_owned()) {
+                            return Err(format!(
+                                "node `{}` has duplicate handle-table slot `{}`",
+                                node.name, slot
+                            ));
+                        }
+                        if !resources.contains_key(resource_name) {
+                            return Err(format!(
+                                "node `{}` references unknown resource `{}` in handle table",
+                                node.name,
+                                resource_name
+                            ));
+                        }
+                    }
+                    DataValueKind::HandleTable
+                }
+                "bind_core" => {
+                    if node.op.args[0].parse::<usize>().is_err() {
+                        return Err(format!(
+                            "node `{}` has invalid fabric core index `{}`",
+                            node.name, node.op.args[0]
+                        ));
+                    }
+                    DataValueKind::CoreBinding
+                }
+                _ => DataValueKind::Other,
+            }
+        } else {
+            DataValueKind::Other
+        };
+
+        value_kinds.insert(node.name.clone(), kind);
+    }
+
+    Ok(())
+}
+
+fn infer_data_value_kind(
+    value_kinds: &BTreeMap<String, DataValueKind>,
+    nodes: &BTreeMap<&str, &Node>,
+    name: &str,
+) -> DataValueKind {
+    value_kinds.get(name).copied().unwrap_or_else(|| {
+        nodes.get(name)
+            .map(|node| match (node.op.module.as_str(), node.op.instruction.as_str()) {
+                ("data" | "fabric", "marker") => DataValueKind::Marker,
+                ("data" | "fabric", "handle_table") => DataValueKind::HandleTable,
+                ("data" | "fabric", "bind_core") => DataValueKind::CoreBinding,
+                ("data" | "fabric", "output_pipe") => DataValueKind::PipeOutput,
+                ("data" | "fabric", "input_pipe") => DataValueKind::Other,
+                ("data" | "fabric", "copy_window" | "immutable_window") => DataValueKind::Window,
+                _ => DataValueKind::Other,
+            })
+            .unwrap_or(DataValueKind::Other)
+    })
 }
 
 fn verify_cpu_heap_protocol(module: &YirModule) -> Result<(), String> {

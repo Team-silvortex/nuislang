@@ -85,6 +85,32 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                     buffer_lengths.insert(node.name.clone(), len);
                 }
             }
+            ("cpu", "neg") => {
+                let Some(input) = get_i64(&registers, &node.op.args[0]) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.neg `{}` because its input is outside the current CPU LLVM slice",
+                        node.name
+                    ));
+                    continue;
+                };
+                let reg = fresh_reg(&mut next_reg);
+                body.push(format!("  {reg} = sub i64 0, {input}"));
+                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                last_cpu_value = Some(reg);
+            }
+            ("cpu", "not") => {
+                let Some(input) = get_i64(&registers, &node.op.args[0]) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.not `{}` because its input is outside the current CPU LLVM slice",
+                        node.name
+                    ));
+                    continue;
+                };
+                let reg = fresh_reg(&mut next_reg);
+                body.push(format!("  {reg} = xor i64 {input}, -1"));
+                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                last_cpu_value = Some(reg);
+            }
             ("cpu", "add") => {
                 let (Some(lhs), Some(rhs)) = (
                     get_i64(&registers, &node.op.args[0]),
@@ -98,6 +124,114 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 };
                 let reg = fresh_reg(&mut next_reg);
                 body.push(format!("  {reg} = add i64 {lhs}, {rhs}"));
+                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                last_cpu_value = Some(reg);
+            }
+            ("cpu", "eq") => {
+                let (Some(lhs), Some(rhs)) = (
+                    get_i64(&registers, &node.op.args[0]),
+                    get_i64(&registers, &node.op.args[1]),
+                ) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.eq `{}` because one or more inputs are outside the current CPU LLVM slice",
+                        node.name
+                    ));
+                    continue;
+                };
+                let cmp = fresh_reg(&mut next_reg);
+                body.push(format!("  {cmp} = icmp eq i64 {lhs}, {rhs}"));
+                let reg = fresh_reg(&mut next_reg);
+                body.push(format!("  {reg} = zext i1 {cmp} to i64"));
+                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                last_cpu_value = Some(reg);
+            }
+            ("cpu", "ne") => {
+                let (Some(lhs), Some(rhs)) = (
+                    get_i64(&registers, &node.op.args[0]),
+                    get_i64(&registers, &node.op.args[1]),
+                ) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.ne `{}` because one or more inputs are outside the current CPU LLVM slice",
+                        node.name
+                    ));
+                    continue;
+                };
+                let cmp = fresh_reg(&mut next_reg);
+                body.push(format!("  {cmp} = icmp ne i64 {lhs}, {rhs}"));
+                let reg = fresh_reg(&mut next_reg);
+                body.push(format!("  {reg} = zext i1 {cmp} to i64"));
+                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                last_cpu_value = Some(reg);
+            }
+            ("cpu", "lt") => {
+                let (Some(lhs), Some(rhs)) = (
+                    get_i64(&registers, &node.op.args[0]),
+                    get_i64(&registers, &node.op.args[1]),
+                ) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.lt `{}` because one or more inputs are outside the current CPU LLVM slice",
+                        node.name
+                    ));
+                    continue;
+                };
+                let cmp = fresh_reg(&mut next_reg);
+                body.push(format!("  {cmp} = icmp slt i64 {lhs}, {rhs}"));
+                let reg = fresh_reg(&mut next_reg);
+                body.push(format!("  {reg} = zext i1 {cmp} to i64"));
+                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                last_cpu_value = Some(reg);
+            }
+            ("cpu", "gt") => {
+                let (Some(lhs), Some(rhs)) = (
+                    get_i64(&registers, &node.op.args[0]),
+                    get_i64(&registers, &node.op.args[1]),
+                ) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.gt `{}` because one or more inputs are outside the current CPU LLVM slice",
+                        node.name
+                    ));
+                    continue;
+                };
+                let cmp = fresh_reg(&mut next_reg);
+                body.push(format!("  {cmp} = icmp sgt i64 {lhs}, {rhs}"));
+                let reg = fresh_reg(&mut next_reg);
+                body.push(format!("  {reg} = zext i1 {cmp} to i64"));
+                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                last_cpu_value = Some(reg);
+            }
+            ("cpu", "le") => {
+                let (Some(lhs), Some(rhs)) = (
+                    get_i64(&registers, &node.op.args[0]),
+                    get_i64(&registers, &node.op.args[1]),
+                ) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.le `{}` because one or more inputs are outside the current CPU LLVM slice",
+                        node.name
+                    ));
+                    continue;
+                };
+                let cmp = fresh_reg(&mut next_reg);
+                body.push(format!("  {cmp} = icmp sle i64 {lhs}, {rhs}"));
+                let reg = fresh_reg(&mut next_reg);
+                body.push(format!("  {reg} = zext i1 {cmp} to i64"));
+                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                last_cpu_value = Some(reg);
+            }
+            ("cpu", "ge") => {
+                let (Some(lhs), Some(rhs)) = (
+                    get_i64(&registers, &node.op.args[0]),
+                    get_i64(&registers, &node.op.args[1]),
+                ) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.ge `{}` because one or more inputs are outside the current CPU LLVM slice",
+                        node.name
+                    ));
+                    continue;
+                };
+                let cmp = fresh_reg(&mut next_reg);
+                body.push(format!("  {cmp} = icmp sge i64 {lhs}, {rhs}"));
+                let reg = fresh_reg(&mut next_reg);
+                body.push(format!("  {reg} = zext i1 {cmp} to i64"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
                 last_cpu_value = Some(reg);
             }
@@ -133,6 +267,118 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
                 last_cpu_value = Some(reg);
             }
+            ("cpu", "div") => {
+                let (Some(lhs), Some(rhs)) = (
+                    get_i64(&registers, &node.op.args[0]),
+                    get_i64(&registers, &node.op.args[1]),
+                ) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.div `{}` because one or more inputs are outside the current CPU LLVM slice",
+                        node.name
+                    ));
+                    continue;
+                };
+                let reg = fresh_reg(&mut next_reg);
+                body.push(format!("  {reg} = sdiv i64 {lhs}, {rhs}"));
+                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                last_cpu_value = Some(reg);
+            }
+            ("cpu", "rem") => {
+                let (Some(lhs), Some(rhs)) = (
+                    get_i64(&registers, &node.op.args[0]),
+                    get_i64(&registers, &node.op.args[1]),
+                ) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.rem `{}` because one or more inputs are outside the current CPU LLVM slice",
+                        node.name
+                    ));
+                    continue;
+                };
+                let reg = fresh_reg(&mut next_reg);
+                body.push(format!("  {reg} = srem i64 {lhs}, {rhs}"));
+                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                last_cpu_value = Some(reg);
+            }
+            ("cpu", "and") => {
+                let (Some(lhs), Some(rhs)) = (
+                    get_i64(&registers, &node.op.args[0]),
+                    get_i64(&registers, &node.op.args[1]),
+                ) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.and `{}` because one or more inputs are outside the current CPU LLVM slice",
+                        node.name
+                    ));
+                    continue;
+                };
+                let reg = fresh_reg(&mut next_reg);
+                body.push(format!("  {reg} = and i64 {lhs}, {rhs}"));
+                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                last_cpu_value = Some(reg);
+            }
+            ("cpu", "or") => {
+                let (Some(lhs), Some(rhs)) = (
+                    get_i64(&registers, &node.op.args[0]),
+                    get_i64(&registers, &node.op.args[1]),
+                ) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.or `{}` because one or more inputs are outside the current CPU LLVM slice",
+                        node.name
+                    ));
+                    continue;
+                };
+                let reg = fresh_reg(&mut next_reg);
+                body.push(format!("  {reg} = or i64 {lhs}, {rhs}"));
+                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                last_cpu_value = Some(reg);
+            }
+            ("cpu", "xor") => {
+                let (Some(lhs), Some(rhs)) = (
+                    get_i64(&registers, &node.op.args[0]),
+                    get_i64(&registers, &node.op.args[1]),
+                ) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.xor `{}` because one or more inputs are outside the current CPU LLVM slice",
+                        node.name
+                    ));
+                    continue;
+                };
+                let reg = fresh_reg(&mut next_reg);
+                body.push(format!("  {reg} = xor i64 {lhs}, {rhs}"));
+                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                last_cpu_value = Some(reg);
+            }
+            ("cpu", "shl") => {
+                let (Some(lhs), Some(rhs)) = (
+                    get_i64(&registers, &node.op.args[0]),
+                    get_i64(&registers, &node.op.args[1]),
+                ) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.shl `{}` because one or more inputs are outside the current CPU LLVM slice",
+                        node.name
+                    ));
+                    continue;
+                };
+                let reg = fresh_reg(&mut next_reg);
+                body.push(format!("  {reg} = shl i64 {lhs}, {rhs}"));
+                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                last_cpu_value = Some(reg);
+            }
+            ("cpu", "shr") => {
+                let (Some(lhs), Some(rhs)) = (
+                    get_i64(&registers, &node.op.args[0]),
+                    get_i64(&registers, &node.op.args[1]),
+                ) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.shr `{}` because one or more inputs are outside the current CPU LLVM slice",
+                        node.name
+                    ));
+                    continue;
+                };
+                let reg = fresh_reg(&mut next_reg);
+                body.push(format!("  {reg} = ashr i64 {lhs}, {rhs}"));
+                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                last_cpu_value = Some(reg);
+            }
             ("cpu", "madd") => {
                 let (Some(lhs), Some(rhs), Some(acc)) = (
                     get_i64(&registers, &node.op.args[0]),
@@ -149,6 +395,27 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 body.push(format!("  {mul} = mul i64 {lhs}, {rhs}"));
                 let reg = fresh_reg(&mut next_reg);
                 body.push(format!("  {reg} = add i64 {mul}, {acc}"));
+                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                last_cpu_value = Some(reg);
+            }
+            ("cpu", "select") => {
+                let (Some(cond), Some(then_value), Some(else_value)) = (
+                    get_i64(&registers, &node.op.args[0]),
+                    get_i64(&registers, &node.op.args[1]),
+                    get_i64(&registers, &node.op.args[2]),
+                ) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.select `{}` because one or more inputs are outside the current CPU LLVM slice",
+                        node.name
+                    ));
+                    continue;
+                };
+                let cond_bool = fresh_reg(&mut next_reg);
+                body.push(format!("  {cond_bool} = icmp ne i64 {cond}, 0"));
+                let reg = fresh_reg(&mut next_reg);
+                body.push(format!(
+                    "  {reg} = select i1 {cond_bool}, i64 {then_value}, i64 {else_value}"
+                ));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
                 last_cpu_value = Some(reg);
             }
