@@ -27,6 +27,15 @@ fn run() -> Result<(), String> {
         cli::CommandKind::Bindings { input } => {
             nuisc::run(nuisc::CommandKind::Bindings { input })?;
         }
+        cli::CommandKind::PackNustar { package_id, output } => {
+            nuisc::run(nuisc::CommandKind::PackNustar { package_id, output })?;
+        }
+        cli::CommandKind::InspectNustar { input } => {
+            nuisc::run(nuisc::CommandKind::InspectNustar { input })?;
+        }
+        cli::CommandKind::LoaderContract { package_id } => {
+            nuisc::run(nuisc::CommandKind::LoaderContract { package_id })?;
+        }
         cli::CommandKind::Check { input } => {
             nuisc::run(nuisc::CommandKind::Check { input })?;
         }

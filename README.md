@@ -629,6 +629,7 @@ nuisc 具有最终否决权：
 * `docs/fabric-spec/DFIR.md`：文件名暂保留历史命名，但内容应以 **Fabric IR / Fabric ABI** 为准
 * `nustar-packages/index.toml`：当前 `nustar` 静态索引入口，`nuisc` 通过它做惰性装载，而非主动扫目录发现
 * 当前 `nuis / nuisc` 也已有最小 `bindings` 工作流：先形成当前编译图，再得到本次真正需要的 `nustar` binding plan
+* 当前 `nuisc` 也已有最小 `nustar` 标准二进制包骨架：可将 manifest + implementation blob 打成统一包体，并做读取/检查
 
 额外边界说明：
 

@@ -1,8 +1,15 @@
+manifest_schema = "nustar-manifest-v1"
 package_id = "official.shader"
 domain_family = "shader"
 frontend = "nustar-shader"
 entry_crate = "crates/yir-domain-shader"
+binary_extension = "nustar"
+package_layout = "single-envelope"
+machine_abi_policy = "exact-match"
+implementation_kinds = ["native-stub", "native-dylib", "llvm-bc"]
+loader_entry = "nustar.bootstrap.v1"
+loader_abi = "nustar-loader-v1"
 profiles = ["aot"]
 resource_families = ["shader", "shader.render"]
 lowering_targets = ["metal", "vulkan", "directx", "opengl"]
-ops = ["shader.const", "shader.add", "shader.mul", "shader.target", "shader.viewport", "shader.pipeline", "shader.pack_ball_state", "shader.begin_pass", "shader.dispatch", "shader.draw_instanced", "shader.draw_ball", "shader.draw_sphere", "shader.print"]
+ops = ["shader.const", "shader.const_bool", "shader.const_i32", "shader.const_i64", "shader.const_f32", "shader.const_f64", "shader.add", "shader.mul", "shader.add_i32", "shader.mul_i32", "shader.add_f32", "shader.mul_f32", "shader.add_f64", "shader.mul_f64", "shader.target", "shader.viewport", "shader.pipeline", "shader.pack_ball_state", "shader.begin_pass", "shader.dispatch", "shader.draw_instanced", "shader.draw_ball", "shader.draw_sphere", "shader.uniform", "shader.attachment", "shader.bind_set", "shader.texture2d", "shader.sampler", "shader.sample", "shader.sample_uv", "shader.print"]

@@ -51,6 +51,9 @@ Current reference commands:
 * `status`
 * `registry`
 * `bindings <input.ns>`
+* `pack-nustar <package-id> <output.nustar>`
+* `inspect-nustar <input.nustar>`
+* `loader-contract <package-id>`
 * `check <input.ns>`
 * `build <input.ns> <output-dir>`
 * `dump-nir <input.ns>`
@@ -64,6 +67,22 @@ Current `nustar` loading policy is:
 * static index
 * lazy manifest loading
 * binding only for families actually required by the current `YIR` graph
+
+Current `nustar` packaging prototype is:
+
+* one standard binary envelope
+* manifest segment
+* format version
+* ABI tag
+* implementation-format tag
+* implementation blob segment
+* implementation checksum
+
+Current loading-contract direction is:
+
+* `native-dylib` and `llvm-bc` both bind through the same canonical loader ABI
+* packages declare a canonical `loader_entry`
+* machine ABI compatibility is explicit and inspectable
 
 ## Core compiler
 

@@ -1,0 +1,405 @@
+use std::{fs, path::Path};
+
+use crate::registry::NustarPackageManifest;
+
+const NUSTAR_MAGIC: &[u8; 8] = b"NUSTAR01";
+const NUSTAR_FORMAT_VERSION: u16 = 1;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NustarBinary {
+    pub manifest: NustarPackageManifest,
+    pub format_version: u16,
+    pub abi_tag: String,
+    pub machine_arch: String,
+    pub machine_os: String,
+    pub object_format: String,
+    pub calling_abi: String,
+    pub implementation_format: String,
+    pub implementation_blob: Vec<u8>,
+    pub implementation_checksum: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ImplementationContract {
+    pub kind: String,
+    pub loader_abi: String,
+    pub entry_symbol: String,
+    pub machine_abi_policy: String,
+    pub notes: String,
+}
+
+pub fn encode(binary: &NustarBinary) -> Vec<u8> {
+    let manifest = render_manifest(&binary.manifest);
+    let abi = binary.abi_tag.as_bytes();
+    let machine_arch = binary.machine_arch.as_bytes();
+    let machine_os = binary.machine_os.as_bytes();
+    let object_format = binary.object_format.as_bytes();
+    let calling_abi = binary.calling_abi.as_bytes();
+    let format = binary.implementation_format.as_bytes();
+    let blob = &binary.implementation_blob;
+
+    let mut out = Vec::new();
+    out.extend_from_slice(NUSTAR_MAGIC);
+    out.extend_from_slice(&binary.format_version.to_le_bytes());
+    out.extend_from_slice(&(manifest.len() as u32).to_le_bytes());
+    out.extend_from_slice(&(abi.len() as u32).to_le_bytes());
+    out.extend_from_slice(&(machine_arch.len() as u32).to_le_bytes());
+    out.extend_from_slice(&(machine_os.len() as u32).to_le_bytes());
+    out.extend_from_slice(&(object_format.len() as u32).to_le_bytes());
+    out.extend_from_slice(&(calling_abi.len() as u32).to_le_bytes());
+    out.extend_from_slice(&(format.len() as u32).to_le_bytes());
+    out.extend_from_slice(&(blob.len() as u32).to_le_bytes());
+    out.extend_from_slice(&binary.implementation_checksum.to_le_bytes());
+    out.extend_from_slice(manifest.as_bytes());
+    out.extend_from_slice(abi);
+    out.extend_from_slice(machine_arch);
+    out.extend_from_slice(machine_os);
+    out.extend_from_slice(object_format);
+    out.extend_from_slice(calling_abi);
+    out.extend_from_slice(format);
+    out.extend_from_slice(blob);
+    out
+}
+
+pub fn decode(bytes: &[u8], source: &Path) -> Result<NustarBinary, String> {
+    if bytes.len() < 46 {
+        return Err(format!(
+            "`{}` is too short to be a nustar binary",
+            source.display()
+        ));
+    }
+    if &bytes[..8] != NUSTAR_MAGIC {
+        return Err(format!(
+            "`{}` does not start with the nustar binary magic",
+            source.display()
+        ));
+    }
+
+    let format_version = u16::from_le_bytes(bytes[8..10].try_into().unwrap());
+    if format_version != NUSTAR_FORMAT_VERSION {
+        return Err(format!(
+            "`{}` has unsupported nustar format version {}; expected {}",
+            source.display(),
+            format_version,
+            NUSTAR_FORMAT_VERSION
+        ));
+    }
+
+    let manifest_len = u32::from_le_bytes(bytes[10..14].try_into().unwrap()) as usize;
+    let abi_len = u32::from_le_bytes(bytes[14..18].try_into().unwrap()) as usize;
+    let machine_arch_len = u32::from_le_bytes(bytes[18..22].try_into().unwrap()) as usize;
+    let machine_os_len = u32::from_le_bytes(bytes[22..26].try_into().unwrap()) as usize;
+    let object_format_len = u32::from_le_bytes(bytes[26..30].try_into().unwrap()) as usize;
+    let calling_abi_len = u32::from_le_bytes(bytes[30..34].try_into().unwrap()) as usize;
+    let format_len = u32::from_le_bytes(bytes[34..38].try_into().unwrap()) as usize;
+    let blob_len = u32::from_le_bytes(bytes[38..42].try_into().unwrap()) as usize;
+    let implementation_checksum = u32::from_le_bytes(bytes[42..46].try_into().unwrap());
+
+    let expected = 46
+        + manifest_len
+        + abi_len
+        + machine_arch_len
+        + machine_os_len
+        + object_format_len
+        + calling_abi_len
+        + format_len
+        + blob_len;
+    if bytes.len() != expected {
+        return Err(format!(
+            "`{}` has invalid nustar binary length: expected {}, got {}",
+            source.display(),
+            expected,
+            bytes.len()
+        ));
+    }
+
+    let manifest_start = 46;
+    let abi_start = manifest_start + manifest_len;
+    let machine_arch_start = abi_start + abi_len;
+    let machine_os_start = machine_arch_start + machine_arch_len;
+    let object_format_start = machine_os_start + machine_os_len;
+    let calling_abi_start = object_format_start + object_format_len;
+    let impl_format_start = calling_abi_start + calling_abi_len;
+    let blob_start = impl_format_start + format_len;
+
+    let manifest_source =
+        std::str::from_utf8(&bytes[manifest_start..abi_start]).map_err(|error| {
+            format!(
+                "`{}` has invalid utf-8 in manifest segment: {error}",
+                source.display()
+            )
+        })?;
+    let abi_tag = std::str::from_utf8(&bytes[abi_start..machine_arch_start])
+        .map_err(|error| {
+            format!(
+                "`{}` has invalid utf-8 in ABI tag segment: {error}",
+                source.display()
+            )
+        })?
+        .to_owned();
+    let machine_arch = std::str::from_utf8(&bytes[machine_arch_start..machine_os_start])
+        .map_err(|error| {
+            format!(
+                "`{}` has invalid utf-8 in machine arch segment: {error}",
+                source.display()
+            )
+        })?
+        .to_owned();
+    let machine_os = std::str::from_utf8(&bytes[machine_os_start..object_format_start])
+        .map_err(|error| {
+            format!(
+                "`{}` has invalid utf-8 in machine os segment: {error}",
+                source.display()
+            )
+        })?
+        .to_owned();
+    let object_format = std::str::from_utf8(&bytes[object_format_start..calling_abi_start])
+        .map_err(|error| {
+            format!(
+                "`{}` has invalid utf-8 in object format segment: {error}",
+                source.display()
+            )
+        })?
+        .to_owned();
+    let calling_abi = std::str::from_utf8(&bytes[calling_abi_start..impl_format_start])
+        .map_err(|error| {
+            format!(
+                "`{}` has invalid utf-8 in calling ABI segment: {error}",
+                source.display()
+            )
+        })?
+        .to_owned();
+    let implementation_format = std::str::from_utf8(&bytes[impl_format_start..blob_start])
+        .map_err(|error| {
+            format!(
+                "`{}` has invalid utf-8 in implementation format segment: {error}",
+                source.display()
+            )
+        })?
+        .to_owned();
+    let implementation_blob = bytes[blob_start..].to_vec();
+    let actual_checksum = checksum(&implementation_blob);
+    if actual_checksum != implementation_checksum {
+        return Err(format!(
+            "`{}` has mismatched implementation checksum: header={}, actual={}",
+            source.display(),
+            implementation_checksum,
+            actual_checksum
+        ));
+    }
+
+    Ok(NustarBinary {
+        manifest: parse_manifest_text(manifest_source, source)?,
+        format_version,
+        abi_tag,
+        machine_arch,
+        machine_os,
+        object_format,
+        calling_abi,
+        implementation_format,
+        implementation_blob,
+        implementation_checksum,
+    })
+}
+
+pub fn write_to_path(path: &Path, binary: &NustarBinary) -> Result<(), String> {
+    fs::write(path, encode(binary))
+        .map_err(|error| format!("failed to write `{}`: {error}", path.display()))
+}
+
+pub fn read_from_path(path: &Path) -> Result<NustarBinary, String> {
+    let bytes =
+        fs::read(path).map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
+    decode(&bytes, path)
+}
+
+pub fn default_binary(
+    manifest: NustarPackageManifest,
+    implementation_blob: Vec<u8>,
+) -> NustarBinary {
+    let implementation_checksum = checksum(&implementation_blob);
+    NustarBinary {
+        manifest,
+        format_version: NUSTAR_FORMAT_VERSION,
+        abi_tag: "nustar-abi-v1".to_owned(),
+        machine_arch: current_machine_arch().to_owned(),
+        machine_os: current_machine_os().to_owned(),
+        object_format: current_object_format().to_owned(),
+        calling_abi: current_calling_abi().to_owned(),
+        implementation_format: "nustar-impl-stub-v1".to_owned(),
+        implementation_blob,
+        implementation_checksum,
+    }
+}
+
+pub fn machine_abi_matches_host(binary: &NustarBinary) -> bool {
+    binary.machine_arch == current_machine_arch()
+        && binary.machine_os == current_machine_os()
+        && binary.object_format == current_object_format()
+        && binary.calling_abi == current_calling_abi()
+}
+
+pub fn implementation_contracts(binary: &NustarBinary) -> Vec<ImplementationContract> {
+    binary
+        .manifest
+        .implementation_kinds
+        .iter()
+        .map(|kind| ImplementationContract {
+            kind: kind.clone(),
+            loader_abi: binary.manifest.loader_abi.clone(),
+            entry_symbol: binary.manifest.loader_entry.clone(),
+            machine_abi_policy: binary.manifest.machine_abi_policy.clone(),
+            notes: match kind.as_str() {
+                "native-dylib" => "expects a host-loadable shared library exporting the canonical loader entry".to_owned(),
+                "llvm-bc" => "expects LLVM bitcode carrying the canonical loader entry symbol for later lowering/link integration".to_owned(),
+                "native-stub" => "prototype-only placeholder implementation; may be inspected and packaged but does not provide executable domain code".to_owned(),
+                other => format!("custom implementation kind `{other}` must still satisfy the canonical loader ABI and entry contract"),
+            },
+        })
+        .collect()
+}
+
+fn render_manifest(manifest: &NustarPackageManifest) -> String {
+    format!(
+        "manifest_schema = \"{}\"\npackage_id = \"{}\"\ndomain_family = \"{}\"\nfrontend = \"{}\"\nentry_crate = \"{}\"\nbinary_extension = \"{}\"\npackage_layout = \"{}\"\nmachine_abi_policy = \"{}\"\nimplementation_kinds = {}\nloader_entry = \"{}\"\nloader_abi = \"{}\"\nprofiles = {}\nresource_families = {}\nlowering_targets = {}\nops = {}\n",
+        manifest.manifest_schema,
+        manifest.package_id,
+        manifest.domain_family,
+        manifest.frontend,
+        manifest.entry_crate,
+        manifest.binary_extension,
+        manifest.package_layout,
+        manifest.machine_abi_policy,
+        render_array(&manifest.implementation_kinds),
+        manifest.loader_entry,
+        manifest.loader_abi,
+        render_array(&manifest.profiles),
+        render_array(&manifest.resource_families),
+        render_array(&manifest.lowering_targets),
+        render_array(&manifest.ops),
+    )
+}
+
+fn render_array(values: &[String]) -> String {
+    let quoted = values
+        .iter()
+        .map(|value| format!("\"{}\"", value))
+        .collect::<Vec<_>>();
+    format!("[{}]", quoted.join(", "))
+}
+
+fn checksum(bytes: &[u8]) -> u32 {
+    bytes.iter().fold(0u32, |acc, byte| {
+        acc.wrapping_mul(16777619).wrapping_add(*byte as u32)
+    })
+}
+
+fn current_machine_arch() -> &'static str {
+    match std::env::consts::ARCH {
+        "aarch64" => "arm64",
+        other => other,
+    }
+}
+
+fn current_machine_os() -> &'static str {
+    match std::env::consts::OS {
+        "macos" => "darwin",
+        other => other,
+    }
+}
+
+fn current_object_format() -> &'static str {
+    match std::env::consts::OS {
+        "macos" => "mach-o",
+        "linux" => "elf",
+        "windows" => "coff",
+        _ => "unknown",
+    }
+}
+
+fn current_calling_abi() -> &'static str {
+    match (current_machine_arch(), current_machine_os()) {
+        ("arm64", "darwin") => "aapcs64-darwin",
+        ("arm64", _) => "aapcs64",
+        ("x86_64", "windows") => "win64",
+        ("x86_64", _) => "sysv64",
+        _ => "unknown",
+    }
+}
+
+fn parse_manifest_text(source: &str, path: &Path) -> Result<NustarPackageManifest, String> {
+    Ok(NustarPackageManifest {
+        manifest_schema: parse_required_string(source, "manifest_schema", path)?,
+        package_id: parse_required_string(source, "package_id", path)?,
+        domain_family: parse_required_string(source, "domain_family", path)?,
+        frontend: parse_required_string(source, "frontend", path)?,
+        entry_crate: parse_required_string(source, "entry_crate", path)?,
+        binary_extension: parse_required_string(source, "binary_extension", path)?,
+        package_layout: parse_required_string(source, "package_layout", path)?,
+        machine_abi_policy: parse_required_string(source, "machine_abi_policy", path)?,
+        implementation_kinds: parse_string_array(source, "implementation_kinds", path)?,
+        loader_entry: parse_required_string(source, "loader_entry", path)?,
+        loader_abi: parse_required_string(source, "loader_abi", path)?,
+        profiles: parse_string_array(source, "profiles", path)?,
+        resource_families: parse_string_array(source, "resource_families", path)?,
+        lowering_targets: parse_string_array(source, "lowering_targets", path)?,
+        ops: parse_string_array(source, "ops", path)?,
+    })
+}
+
+fn parse_required_string(source: &str, key: &str, path: &Path) -> Result<String, String> {
+    let prefix = format!("{key} = ");
+    for raw_line in source.lines() {
+        let line = raw_line.trim();
+        if let Some(rest) = line.strip_prefix(&prefix) {
+            let trimmed = rest.trim();
+            if trimmed.starts_with('"') && trimmed.ends_with('"') && trimmed.len() >= 2 {
+                return Ok(trimmed[1..trimmed.len() - 1].to_owned());
+            }
+            return Err(format!(
+                "`{}` has invalid string value for `{key}`",
+                path.display()
+            ));
+        }
+    }
+    Err(format!(
+        "`{}` is missing required key `{key}`",
+        path.display()
+    ))
+}
+
+fn parse_string_array(source: &str, key: &str, path: &Path) -> Result<Vec<String>, String> {
+    let prefix = format!("{key} = ");
+    for raw_line in source.lines() {
+        let line = raw_line.trim();
+        if let Some(rest) = line.strip_prefix(&prefix) {
+            let trimmed = rest.trim();
+            if !(trimmed.starts_with('[') && trimmed.ends_with(']')) {
+                return Err(format!(
+                    "`{}` has invalid array value for `{key}`",
+                    path.display()
+                ));
+            }
+            let inner = &trimmed[1..trimmed.len() - 1];
+            if inner.trim().is_empty() {
+                return Ok(Vec::new());
+            }
+            let mut items = Vec::new();
+            for part in inner.split(',') {
+                let value = part.trim();
+                if !(value.starts_with('"') && value.ends_with('"') && value.len() >= 2) {
+                    return Err(format!(
+                        "`{}` has invalid array item for `{key}`",
+                        path.display()
+                    ));
+                }
+                items.push(value[1..value.len() - 1].to_owned());
+            }
+            return Ok(items);
+        }
+    }
+    Err(format!(
+        "`{}` is missing required key `{key}`",
+        path.display()
+    ))
+}

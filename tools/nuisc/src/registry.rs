@@ -17,10 +17,17 @@ pub struct NustarPackageIndexEntry {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NustarPackageManifest {
+    pub manifest_schema: String,
     pub package_id: String,
     pub domain_family: String,
     pub frontend: String,
     pub entry_crate: String,
+    pub binary_extension: String,
+    pub package_layout: String,
+    pub machine_abi_policy: String,
+    pub implementation_kinds: Vec<String>,
+    pub loader_entry: String,
+    pub loader_abi: String,
     pub profiles: Vec<String>,
     pub resource_families: Vec<String>,
     pub lowering_targets: Vec<String>,
@@ -192,25 +199,57 @@ fn parse_index_entry(source: &str, path: &Path) -> Result<NustarPackageIndexEntr
 }
 
 fn parse_manifest(source: &str, path: &Path) -> Result<NustarPackageManifest, String> {
+    let manifest_schema = parse_optional_string(source, "manifest_schema")
+        .unwrap_or_else(|| "nustar-manifest-v1".to_owned());
     let package_id = parse_required_string(source, "package_id", path)?;
     let domain_family = parse_required_string(source, "domain_family", path)?;
     let frontend = parse_required_string(source, "frontend", path)?;
     let entry_crate = parse_required_string(source, "entry_crate", path)?;
+    let binary_extension =
+        parse_optional_string(source, "binary_extension").unwrap_or_else(|| "nustar".to_owned());
+    let package_layout = parse_optional_string(source, "package_layout")
+        .unwrap_or_else(|| "single-envelope".to_owned());
+    let machine_abi_policy = parse_optional_string(source, "machine_abi_policy")
+        .unwrap_or_else(|| "exact-match".to_owned());
+    let implementation_kinds = parse_optional_string_array(source, "implementation_kinds")
+        .unwrap_or_else(|| vec!["native-stub".to_owned()]);
+    let loader_entry = parse_optional_string(source, "loader_entry")
+        .unwrap_or_else(|| "nustar.bootstrap.v1".to_owned());
+    let loader_abi = parse_optional_string(source, "loader_abi")
+        .unwrap_or_else(|| "nustar-loader-v1".to_owned());
     let profiles = parse_string_array(source, "profiles", path)?;
     let resource_families = parse_string_array(source, "resource_families", path)?;
     let lowering_targets = parse_string_array(source, "lowering_targets", path)?;
     let ops = parse_string_array(source, "ops", path)?;
 
     Ok(NustarPackageManifest {
+        manifest_schema,
         package_id,
         domain_family,
         frontend,
         entry_crate,
+        binary_extension,
+        package_layout,
+        machine_abi_policy,
+        implementation_kinds,
+        loader_entry,
+        loader_abi,
         profiles,
         resource_families,
         lowering_targets,
         ops,
     })
+}
+
+fn parse_optional_string(source: &str, key: &str) -> Option<String> {
+    let prefix = format!("{key} = ");
+    for raw_line in source.lines() {
+        let line = raw_line.trim();
+        if let Some(rest) = line.strip_prefix(&prefix) {
+            return parse_quoted(rest);
+        }
+    }
+    None
 }
 
 fn parse_required_string(source: &str, key: &str, path: &Path) -> Result<String, String> {
@@ -251,6 +290,17 @@ fn parse_string_array(source: &str, key: &str, path: &Path) -> Result<Vec<String
         "manifest `{}` is missing required key `{key}`",
         path.display()
     ))
+}
+
+fn parse_optional_string_array(source: &str, key: &str) -> Option<Vec<String>> {
+    let prefix = format!("{key} = ");
+    for raw_line in source.lines() {
+        let line = raw_line.trim();
+        if let Some(rest) = line.strip_prefix(&prefix) {
+            return parse_array(rest);
+        }
+    }
+    None
 }
 
 fn parse_quoted(raw: &str) -> Option<String> {

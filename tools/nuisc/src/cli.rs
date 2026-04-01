@@ -5,6 +5,9 @@ pub enum CommandKind {
     Status,
     Registry,
     Bindings { input: PathBuf },
+    PackNustar { package_id: String, output: PathBuf },
+    InspectNustar { input: PathBuf },
+    LoaderContract { package_id: String },
     DumpNir { input: PathBuf },
     DumpYir { input: PathBuf },
     Check { input: PathBuf },
@@ -24,6 +27,27 @@ where
                 args.next()
                     .ok_or_else(|| "usage: nuisc bindings <input.ns>".to_owned())?,
             ),
+        }),
+        "pack-nustar" => Ok(CommandKind::PackNustar {
+            package_id: args
+                .next()
+                .ok_or_else(|| "usage: nuisc pack-nustar <package-id> <output.nustar>".to_owned())?,
+            output: PathBuf::from(
+                args.next().ok_or_else(|| {
+                    "usage: nuisc pack-nustar <package-id> <output.nustar>".to_owned()
+                })?,
+            ),
+        }),
+        "inspect-nustar" => Ok(CommandKind::InspectNustar {
+            input: PathBuf::from(
+                args.next()
+                    .ok_or_else(|| "usage: nuisc inspect-nustar <input.nustar>".to_owned())?,
+            ),
+        }),
+        "loader-contract" => Ok(CommandKind::LoaderContract {
+            package_id: args
+                .next()
+                .ok_or_else(|| "usage: nuisc loader-contract <package-id>".to_owned())?,
         }),
         "dump-nir" => Ok(CommandKind::DumpNir {
             input: PathBuf::from(
@@ -54,7 +78,7 @@ where
             ),
         }),
         other => Err(format!(
-            "unknown nuisc command `{other}`; expected `status`, `registry`, `bindings`, `dump-nir`, `dump-yir`, `check`, or `compile`"
+            "unknown nuisc command `{other}`; expected `status`, `registry`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `dump-nir`, `dump-yir`, `check`, or `compile`"
         )),
     }
 }

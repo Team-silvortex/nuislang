@@ -1,8 +1,15 @@
+manifest_schema = "nustar-manifest-v1"
 package_id = "official.cpu"
 domain_family = "cpu"
 frontend = "nustar-cpu"
 entry_crate = "crates/yir-domain-cpu"
+binary_extension = "nustar"
+package_layout = "single-envelope"
+machine_abi_policy = "exact-match"
+implementation_kinds = ["native-stub", "native-dylib", "llvm-bc"]
+loader_entry = "nustar.bootstrap.v1"
+loader_abi = "nustar-loader-v1"
 profiles = ["aot"]
 resource_families = ["cpu", "cpu.arm64"]
 lowering_targets = ["llvm", "arm64"]
-ops = ["cpu.const", "cpu.add", "cpu.sub", "cpu.mul", "cpu.madd", "cpu.target_config", "cpu.bind_core", "cpu.window", "cpu.input_i64", "cpu.present_frame", "cpu.print"]
+ops = ["cpu.const", "cpu.text", "cpu.add", "cpu.sub", "cpu.mul", "cpu.madd", "cpu.div", "cpu.rem", "cpu.neg", "cpu.not", "cpu.eq", "cpu.ne", "cpu.lt", "cpu.gt", "cpu.le", "cpu.ge", "cpu.select", "cpu.and", "cpu.or", "cpu.xor", "cpu.shl", "cpu.shr", "cpu.target_config", "cpu.bind_core", "cpu.window", "cpu.input_i64", "cpu.present_frame", "cpu.print"]

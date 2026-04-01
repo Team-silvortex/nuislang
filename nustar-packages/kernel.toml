@@ -1,8 +1,15 @@
+manifest_schema = "nustar-manifest-v1"
 package_id = "official.kernel"
 domain_family = "kernel"
 frontend = "nustar-kernel"
 entry_crate = "crates/yir-domain-kernel"
+binary_extension = "nustar"
+package_layout = "single-envelope"
+machine_abi_policy = "exact-match"
+implementation_kinds = ["native-stub", "native-dylib", "llvm-bc"]
+loader_entry = "nustar.bootstrap.v1"
+loader_abi = "nustar-loader-v1"
 profiles = ["aot"]
 resource_families = ["kernel", "kernel.apple", "npu", "npu.apple"]
 lowering_targets = ["coreml", "mps-graph", "ane"]
-ops = ["kernel.target_config", "kernel.tensor", "kernel.fill", "kernel.matmul", "kernel.add_bias", "kernel.relu", "kernel.print"]
+ops = ["kernel.target_config", "kernel.tensor", "kernel.fill", "kernel.splat", "kernel.add", "kernel.mul", "kernel.add_scalar", "kernel.mul_scalar", "kernel.matmul", "kernel.add_bias", "kernel.relu", "kernel.reshape", "kernel.slice", "kernel.row", "kernel.col", "kernel.shape", "kernel.rows", "kernel.cols", "kernel.element_at", "kernel.broadcast", "kernel.reduce_sum", "kernel.reduce_sum_axis", "kernel.reduce_max", "kernel.reduce_max_axis", "kernel.reduce_mean", "kernel.reduce_mean_axis", "kernel.reduce_min", "kernel.reduce_min_axis", "kernel.argmax", "kernel.argmax_axis", "kernel.argmin", "kernel.argmin_axis", "kernel.sort", "kernel.topk", "kernel.topk_axis", "kernel.print"]
