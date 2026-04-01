@@ -1,0 +1,11 @@
+[package]
+name = "nuis-rc"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+readme.workspace = true
+description = "Resident control tool for local Nuis toolchain versions and projects."
+
+[dependencies]

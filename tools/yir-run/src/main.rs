@@ -11,8 +11,8 @@ fn run() -> Result<(), String> {
     let path = env::args()
         .nth(1)
         .ok_or_else(|| "usage: cargo run -p yir-run -- <module.yir>".to_owned())?;
-    let source = fs::read_to_string(&path)
-        .map_err(|error| format!("failed to read `{path}`: {error}"))?;
+    let source =
+        fs::read_to_string(&path).map_err(|error| format!("failed to read `{path}`: {error}"))?;
     let module = yir_syntax::parse_module(&source)?;
     yir_verify::verify_module(&module)?;
     let trace = yir_exec::execute_module(&module)?;

@@ -23,6 +23,7 @@ It should evolve together with the implementation.
 This reference currently covers:
 
 * reference command-line entry points
+* current `nuis / nuisc` tool split
 * current LLVM path
 * current AOT packaging path
 * current preview/export helpers
@@ -36,6 +37,44 @@ This reference does not yet attempt to freeze:
 ---
 
 # 3. Reference Tools
+
+## Front-door workflow tool
+
+[tools/nuis/src/main.rs](/Users/Shared/chroot/dev/nuislang/tools/nuis/src/main.rs)
+
+```text
+cargo run -p nuis -- <command>
+```
+
+Current reference commands:
+
+* `status`
+* `registry`
+* `bindings <input.ns>`
+* `check <input.ns>`
+* `build <input.ns> <output-dir>`
+* `dump-nir <input.ns>`
+* `dump-yir <input.ns>`
+
+`nuis` is the current front-door workflow tool. It should grow into the
+user-facing toolchain surface while reusing `nuisc` as the compiler core.
+
+Current `nustar` loading policy is:
+
+* static index
+* lazy manifest loading
+* binding only for families actually required by the current `YIR` graph
+
+## Core compiler
+
+[tools/nuisc/src/main.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/main.rs)
+
+```text
+cargo run -p nuisc -- <command>
+```
+
+`nuisc` is the current compiler-core CLI. It still exposes the same minimal
+pipeline surface directly while the higher-level `nuis` workflow matures.
 
 ## Parse + verify + execute
 

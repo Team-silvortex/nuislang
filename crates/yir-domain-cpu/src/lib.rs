@@ -1,6 +1,8 @@
 use std::env;
 
-use yir_core::{ExecutionState, InstructionSemantics, Node, RegisteredMod, Resource, StructValue, Value};
+use yir_core::{
+    ExecutionState, InstructionSemantics, Node, RegisteredMod, Resource, StructValue, Value,
+};
 
 pub struct CpuMod;
 
@@ -139,7 +141,11 @@ impl RegisteredMod for CpuMod {
                 Ok(InstructionSemantics::pure(
                     node.op.args[1..]
                         .iter()
-                        .filter_map(|entry| entry.split_once('=').map(|(_, value)| value.trim().to_owned()))
+                        .filter_map(|entry| {
+                            entry
+                                .split_once('=')
+                                .map(|(_, value)| value.trim().to_owned())
+                        })
                         .collect(),
                 ))
             }
@@ -172,7 +178,11 @@ impl RegisteredMod for CpuMod {
 
                 Ok(InstructionSemantics::pure(node.op.args.clone()))
             }
-            "add" | "sub" | "mul" | "div" | "rem" | "eq" | "ne" | "lt" | "gt" | "le" | "ge" | "and" | "or" | "xor" | "shl" | "shr" => {
+            "add" | "sub" | "mul" | "div" | "rem" | "eq" | "ne" | "lt" | "gt" | "le" | "ge"
+            | "and" | "or" | "xor" | "shl" | "shr" | "add_i32" | "sub_i32" | "mul_i32"
+            | "div_i32" | "add_f32" | "sub_f32" | "mul_f32" | "div_f32" | "add_f64" | "sub_f64"
+            | "mul_f64" | "div_f64" | "eq_i32" | "lt_i32" | "gt_i32" | "eq_f32" | "lt_f32"
+            | "gt_f32" | "eq_f64" | "lt_f64" | "gt_f64" => {
                 if node.op.args.len() != 2 {
                     return Err(format!(
                         "node `{}` expects `cpu.{} <name> <resource> <lhs> <rhs>`",
@@ -180,6 +190,16 @@ impl RegisteredMod for CpuMod {
                     ));
                 }
 
+                Ok(InstructionSemantics::pure(node.op.args.clone()))
+            }
+            "cast_i32_to_i64" | "cast_i64_to_i32" | "cast_i32_to_f32" | "cast_i32_to_f64"
+            | "cast_f32_to_f64" | "cast_f64_to_f32" => {
+                if node.op.args.len() != 1 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.{} <name> <resource> <input>`",
+                        node.name, node.op.instruction
+                    ));
+                }
                 Ok(InstructionSemantics::pure(node.op.args.clone()))
             }
             "select" => {
@@ -325,10 +345,16 @@ impl RegisteredMod for CpuMod {
                 }
 
                 node.op.args[0].parse::<i64>().map_err(|_| {
-                    format!("node `{}` has invalid width `{}`", node.name, node.op.args[0])
+                    format!(
+                        "node `{}` has invalid width `{}`",
+                        node.name, node.op.args[0]
+                    )
                 })?;
                 node.op.args[1].parse::<i64>().map_err(|_| {
-                    format!("node `{}` has invalid height `{}`", node.name, node.op.args[1])
+                    format!(
+                        "node `{}` has invalid height `{}`",
+                        node.name, node.op.args[1]
+                    )
                 })?;
 
                 Ok(InstructionSemantics::effect(Vec::new()))
@@ -382,12 +408,14 @@ impl RegisteredMod for CpuMod {
     ) -> Result<Value, String> {
         match node.op.instruction.as_str() {
             "text" => Ok(Value::Symbol(node.op.args[0].clone())),
-            "const" => Ok(Value::Int(node.op.args[0].parse::<i64>().map_err(|_| {
-                format!(
-                    "node `{}` has invalid integer literal `{}`",
-                    node.name, node.op.args[0]
-                )
-            })?)),
+            "const" => Ok(Value::Int(node.op.args[0].parse::<i64>().map_err(
+                |_| {
+                    format!(
+                        "node `{}` has invalid integer literal `{}`",
+                        node.name, node.op.args[0]
+                    )
+                },
+            )?)),
             "const_bool" => Ok(Value::Bool(match node.op.args[0].as_str() {
                 "true" => true,
                 "false" => false,
@@ -398,30 +426,38 @@ impl RegisteredMod for CpuMod {
                     ))
                 }
             })),
-            "const_i32" => Ok(Value::I32(node.op.args[0].parse::<i32>().map_err(|_| {
-                format!(
-                    "node `{}` has invalid i32 literal `{}`",
-                    node.name, node.op.args[0]
-                )
-            })?)),
-            "const_i64" => Ok(Value::Int(node.op.args[0].parse::<i64>().map_err(|_| {
-                format!(
-                    "node `{}` has invalid i64 literal `{}`",
-                    node.name, node.op.args[0]
-                )
-            })?)),
-            "const_f32" => Ok(Value::F32(node.op.args[0].parse::<f32>().map_err(|_| {
-                format!(
-                    "node `{}` has invalid f32 literal `{}`",
-                    node.name, node.op.args[0]
-                )
-            })?)),
-            "const_f64" => Ok(Value::F64(node.op.args[0].parse::<f64>().map_err(|_| {
-                format!(
-                    "node `{}` has invalid f64 literal `{}`",
-                    node.name, node.op.args[0]
-                )
-            })?)),
+            "const_i32" => Ok(Value::I32(node.op.args[0].parse::<i32>().map_err(
+                |_| {
+                    format!(
+                        "node `{}` has invalid i32 literal `{}`",
+                        node.name, node.op.args[0]
+                    )
+                },
+            )?)),
+            "const_i64" => Ok(Value::Int(node.op.args[0].parse::<i64>().map_err(
+                |_| {
+                    format!(
+                        "node `{}` has invalid i64 literal `{}`",
+                        node.name, node.op.args[0]
+                    )
+                },
+            )?)),
+            "const_f32" => Ok(Value::F32(node.op.args[0].parse::<f32>().map_err(
+                |_| {
+                    format!(
+                        "node `{}` has invalid f32 literal `{}`",
+                        node.name, node.op.args[0]
+                    )
+                },
+            )?)),
+            "const_f64" => Ok(Value::F64(node.op.args[0].parse::<f64>().map_err(
+                |_| {
+                    format!(
+                        "node `{}` has invalid f64 literal `{}`",
+                        node.name, node.op.args[0]
+                    )
+                },
+            )?)),
             "struct" => {
                 let type_name = node.op.args[0].clone();
                 let mut fields = Vec::with_capacity(node.op.args.len().saturating_sub(1));
@@ -459,11 +495,38 @@ impl RegisteredMod for CpuMod {
             "add" => Ok(Value::Int(
                 state.expect_int(&node.op.args[0])? + state.expect_int(&node.op.args[1])?,
             )),
+            "add_i32" => Ok(Value::I32(
+                state.expect_i32(&node.op.args[0])? + state.expect_i32(&node.op.args[1])?,
+            )),
+            "add_f32" => Ok(Value::F32(
+                state.expect_f32(&node.op.args[0])? + state.expect_f32(&node.op.args[1])?,
+            )),
+            "add_f64" => Ok(Value::F64(
+                state.expect_f64(&node.op.args[0])? + state.expect_f64(&node.op.args[1])?,
+            )),
             "sub" => Ok(Value::Int(
                 state.expect_int(&node.op.args[0])? - state.expect_int(&node.op.args[1])?,
             )),
+            "sub_i32" => Ok(Value::I32(
+                state.expect_i32(&node.op.args[0])? - state.expect_i32(&node.op.args[1])?,
+            )),
+            "sub_f32" => Ok(Value::F32(
+                state.expect_f32(&node.op.args[0])? - state.expect_f32(&node.op.args[1])?,
+            )),
+            "sub_f64" => Ok(Value::F64(
+                state.expect_f64(&node.op.args[0])? - state.expect_f64(&node.op.args[1])?,
+            )),
             "mul" => Ok(Value::Int(
                 state.expect_int(&node.op.args[0])? * state.expect_int(&node.op.args[1])?,
+            )),
+            "mul_i32" => Ok(Value::I32(
+                state.expect_i32(&node.op.args[0])? * state.expect_i32(&node.op.args[1])?,
+            )),
+            "mul_f32" => Ok(Value::F32(
+                state.expect_f32(&node.op.args[0])? * state.expect_f32(&node.op.args[1])?,
+            )),
+            "mul_f64" => Ok(Value::F64(
+                state.expect_f64(&node.op.args[0])? * state.expect_f64(&node.op.args[1])?,
             )),
             "div" => {
                 let lhs = state.expect_int(&node.op.args[0])?;
@@ -472,6 +535,30 @@ impl RegisteredMod for CpuMod {
                     return Err(format!("node `{}` divides by zero", node.name));
                 }
                 Ok(Value::Int(lhs / rhs))
+            }
+            "div_i32" => {
+                let lhs = state.expect_i32(&node.op.args[0])?;
+                let rhs = state.expect_i32(&node.op.args[1])?;
+                if rhs == 0 {
+                    return Err(format!("node `{}` divides by zero", node.name));
+                }
+                Ok(Value::I32(lhs / rhs))
+            }
+            "div_f32" => {
+                let lhs = state.expect_f32(&node.op.args[0])?;
+                let rhs = state.expect_f32(&node.op.args[1])?;
+                if rhs == 0.0 {
+                    return Err(format!("node `{}` divides by zero", node.name));
+                }
+                Ok(Value::F32(lhs / rhs))
+            }
+            "div_f64" => {
+                let lhs = state.expect_f64(&node.op.args[0])?;
+                let rhs = state.expect_f64(&node.op.args[1])?;
+                if rhs == 0.0 {
+                    return Err(format!("node `{}` divides by zero", node.name));
+                }
+                Ok(Value::F64(lhs / rhs))
             }
             "rem" => {
                 let lhs = state.expect_int(&node.op.args[0])?;
@@ -482,28 +569,49 @@ impl RegisteredMod for CpuMod {
                 Ok(Value::Int(lhs % rhs))
             }
             "eq" => Ok(Value::Int(
-                (state.expect_int(&node.op.args[0])? == state.expect_int(&node.op.args[1])?)
-                    as i64,
+                (state.expect_int(&node.op.args[0])? == state.expect_int(&node.op.args[1])?) as i64,
+            )),
+            "eq_i32" => Ok(Value::Bool(
+                state.expect_i32(&node.op.args[0])? == state.expect_i32(&node.op.args[1])?,
+            )),
+            "eq_f32" => Ok(Value::Bool(
+                state.expect_f32(&node.op.args[0])? == state.expect_f32(&node.op.args[1])?,
+            )),
+            "eq_f64" => Ok(Value::Bool(
+                state.expect_f64(&node.op.args[0])? == state.expect_f64(&node.op.args[1])?,
             )),
             "ne" => Ok(Value::Int(
-                (state.expect_int(&node.op.args[0])? != state.expect_int(&node.op.args[1])?)
-                    as i64,
+                (state.expect_int(&node.op.args[0])? != state.expect_int(&node.op.args[1])?) as i64,
             )),
             "lt" => Ok(Value::Int(
-                (state.expect_int(&node.op.args[0])? < state.expect_int(&node.op.args[1])?)
-                    as i64,
+                (state.expect_int(&node.op.args[0])? < state.expect_int(&node.op.args[1])?) as i64,
+            )),
+            "lt_i32" => Ok(Value::Bool(
+                state.expect_i32(&node.op.args[0])? < state.expect_i32(&node.op.args[1])?,
+            )),
+            "lt_f32" => Ok(Value::Bool(
+                state.expect_f32(&node.op.args[0])? < state.expect_f32(&node.op.args[1])?,
+            )),
+            "lt_f64" => Ok(Value::Bool(
+                state.expect_f64(&node.op.args[0])? < state.expect_f64(&node.op.args[1])?,
             )),
             "gt" => Ok(Value::Int(
-                (state.expect_int(&node.op.args[0])? > state.expect_int(&node.op.args[1])?)
-                    as i64,
+                (state.expect_int(&node.op.args[0])? > state.expect_int(&node.op.args[1])?) as i64,
+            )),
+            "gt_i32" => Ok(Value::Bool(
+                state.expect_i32(&node.op.args[0])? > state.expect_i32(&node.op.args[1])?,
+            )),
+            "gt_f32" => Ok(Value::Bool(
+                state.expect_f32(&node.op.args[0])? > state.expect_f32(&node.op.args[1])?,
+            )),
+            "gt_f64" => Ok(Value::Bool(
+                state.expect_f64(&node.op.args[0])? > state.expect_f64(&node.op.args[1])?,
             )),
             "le" => Ok(Value::Int(
-                (state.expect_int(&node.op.args[0])? <= state.expect_int(&node.op.args[1])?)
-                    as i64,
+                (state.expect_int(&node.op.args[0])? <= state.expect_int(&node.op.args[1])?) as i64,
             )),
             "ge" => Ok(Value::Int(
-                (state.expect_int(&node.op.args[0])? >= state.expect_int(&node.op.args[1])?)
-                    as i64,
+                (state.expect_int(&node.op.args[0])? >= state.expect_int(&node.op.args[1])?) as i64,
             )),
             "and" => Ok(Value::Int(
                 state.expect_int(&node.op.args[0])? & state.expect_int(&node.op.args[1])?,
@@ -540,6 +648,12 @@ impl RegisteredMod for CpuMod {
                 let else_value = state.expect_int(&node.op.args[2])?;
                 Ok(Value::Int(if cond != 0 { then_value } else { else_value }))
             }
+            "cast_i32_to_i64" => Ok(Value::Int(state.expect_i32(&node.op.args[0])? as i64)),
+            "cast_i64_to_i32" => Ok(Value::I32(state.expect_int(&node.op.args[0])? as i32)),
+            "cast_i32_to_f32" => Ok(Value::F32(state.expect_i32(&node.op.args[0])? as f32)),
+            "cast_i32_to_f64" => Ok(Value::F64(state.expect_i32(&node.op.args[0])? as f64)),
+            "cast_f32_to_f64" => Ok(Value::F64(state.expect_f32(&node.op.args[0])? as f64)),
+            "cast_f64_to_f32" => Ok(Value::F32(state.expect_f64(&node.op.args[0])? as f32)),
             "alloc_node" => {
                 let value = state.expect_int(&node.op.args[0])?;
                 let next = state.expect_pointer(&node.op.args[1])?;
@@ -552,7 +666,8 @@ impl RegisteredMod for CpuMod {
                         resource.kind.raw,
                         address,
                         value,
-                        next.map(|ptr| format!("&{ptr}")).unwrap_or_else(|| "null".to_owned())
+                        next.map(|ptr| format!("&{ptr}"))
+                            .unwrap_or_else(|| "null".to_owned())
                     ),
                 );
                 Ok(Value::Pointer(Some(address)))
@@ -560,7 +675,10 @@ impl RegisteredMod for CpuMod {
             "alloc_buffer" => {
                 let len = state.expect_int(&node.op.args[0])?;
                 if len < 0 {
-                    return Err(format!("node `{}` allocates negative buffer length", node.name));
+                    return Err(format!(
+                        "node `{}` allocates negative buffer length",
+                        node.name
+                    ));
                 }
                 let fill = state.expect_int(&node.op.args[1])?;
                 let address = state.alloc_heap_buffer(len as usize, fill);
@@ -582,7 +700,9 @@ impl RegisteredMod for CpuMod {
                         "effect cpu.load_value @{} [{}] ptr={}",
                         node.resource,
                         resource.kind.raw,
-                        pointer.map(|ptr| format!("&{ptr}")).unwrap_or_else(|| "null".to_owned())
+                        pointer
+                            .map(|ptr| format!("&{ptr}"))
+                            .unwrap_or_else(|| "null".to_owned())
                     ),
                 );
                 Ok(Value::Int(node_value))
@@ -596,7 +716,9 @@ impl RegisteredMod for CpuMod {
                         "effect cpu.load_next @{} [{}] ptr={}",
                         node.resource,
                         resource.kind.raw,
-                        pointer.map(|ptr| format!("&{ptr}")).unwrap_or_else(|| "null".to_owned())
+                        pointer
+                            .map(|ptr| format!("&{ptr}"))
+                            .unwrap_or_else(|| "null".to_owned())
                     ),
                 );
                 Ok(Value::Pointer(next))
@@ -610,7 +732,9 @@ impl RegisteredMod for CpuMod {
                         "effect cpu.buffer_len @{} [{}] ptr={} len={}",
                         node.resource,
                         resource.kind.raw,
-                        pointer.map(|ptr| format!("&{ptr}")).unwrap_or_else(|| "null".to_owned()),
+                        pointer
+                            .map(|ptr| format!("&{ptr}"))
+                            .unwrap_or_else(|| "null".to_owned()),
                         len
                     ),
                 );
@@ -629,7 +753,9 @@ impl RegisteredMod for CpuMod {
                         "effect cpu.load_at @{} [{}] ptr={} index={}",
                         node.resource,
                         resource.kind.raw,
-                        pointer.map(|ptr| format!("&{ptr}")).unwrap_or_else(|| "null".to_owned()),
+                        pointer
+                            .map(|ptr| format!("&{ptr}"))
+                            .unwrap_or_else(|| "null".to_owned()),
                         index
                     ),
                 );
@@ -649,7 +775,9 @@ impl RegisteredMod for CpuMod {
                         "effect cpu.store_value @{} [{}] ptr={} value={}",
                         node.resource,
                         resource.kind.raw,
-                        pointer.map(|ptr| format!("&{ptr}")).unwrap_or_else(|| "null".to_owned()),
+                        pointer
+                            .map(|ptr| format!("&{ptr}"))
+                            .unwrap_or_else(|| "null".to_owned()),
                         value
                     ),
                 );
@@ -665,8 +793,11 @@ impl RegisteredMod for CpuMod {
                         "effect cpu.store_next @{} [{}] ptr={} next={}",
                         node.resource,
                         resource.kind.raw,
-                        pointer.map(|ptr| format!("&{ptr}")).unwrap_or_else(|| "null".to_owned()),
-                        next.map(|ptr| format!("&{ptr}")).unwrap_or_else(|| "null".to_owned())
+                        pointer
+                            .map(|ptr| format!("&{ptr}"))
+                            .unwrap_or_else(|| "null".to_owned()),
+                        next.map(|ptr| format!("&{ptr}"))
+                            .unwrap_or_else(|| "null".to_owned())
                     ),
                 );
                 Ok(Value::Unit)
@@ -685,7 +816,9 @@ impl RegisteredMod for CpuMod {
                         "effect cpu.store_at @{} [{}] ptr={} index={} value={}",
                         node.resource,
                         resource.kind.raw,
-                        pointer.map(|ptr| format!("&{ptr}")).unwrap_or_else(|| "null".to_owned()),
+                        pointer
+                            .map(|ptr| format!("&{ptr}"))
+                            .unwrap_or_else(|| "null".to_owned()),
                         index,
                         value
                     ),
@@ -701,7 +834,9 @@ impl RegisteredMod for CpuMod {
                         "effect cpu.free @{} [{}] ptr={}",
                         node.resource,
                         resource.kind.raw,
-                        pointer.map(|ptr| format!("&{ptr}")).unwrap_or_else(|| "null".to_owned())
+                        pointer
+                            .map(|ptr| format!("&{ptr}"))
+                            .unwrap_or_else(|| "null".to_owned())
                     ),
                 );
                 Ok(Value::Unit)
@@ -739,10 +874,16 @@ impl RegisteredMod for CpuMod {
             }
             "window" => {
                 let width = node.op.args[0].parse::<i64>().map_err(|_| {
-                    format!("node `{}` has invalid width `{}`", node.name, node.op.args[0])
+                    format!(
+                        "node `{}` has invalid width `{}`",
+                        node.name, node.op.args[0]
+                    )
                 })?;
                 let height = node.op.args[1].parse::<i64>().map_err(|_| {
-                    format!("node `{}` has invalid height `{}`", node.name, node.op.args[1])
+                    format!(
+                        "node `{}` has invalid height `{}`",
+                        node.name, node.op.args[1]
+                    )
                 })?;
                 let title = &node.op.args[2];
                 state.push_resource_event(
@@ -775,7 +916,11 @@ impl RegisteredMod for CpuMod {
                         resource.kind.raw,
                         channel,
                         sampled,
-                        if sampled == default_value { "default" } else { "env" }
+                        if sampled == default_value {
+                            "default"
+                        } else {
+                            "env"
+                        }
                     ),
                 );
                 Ok(Value::Int(sampled))
@@ -793,10 +938,13 @@ impl RegisteredMod for CpuMod {
             }
             "print" => {
                 let value = state.expect_value(&node.op.args[0])?.clone();
-                state.push_resource_event(resource, format!(
-                    "effect cpu.print @{} [{}]: {}",
-                    node.resource, resource.kind.raw, value
-                ));
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.print @{} [{}]: {}",
+                        node.resource, resource.kind.raw, value
+                    ),
+                );
                 Ok(Value::Unit)
             }
             other => Err(format!("unknown cpu instruction `{other}`")),

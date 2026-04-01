@@ -1,0 +1,23 @@
+yir 0.1
+
+resource kernel0 kernel.apple
+
+kernel.tensor base kernel0 2 3 1,2,3,4,5,6
+kernel.reshape reshaped kernel0 base 3 2
+kernel.slice middle kernel0 base 0 1 2 2
+kernel.row first_row kernel0 base
+kernel.col first_col kernel0 base
+
+kernel.print print_reshaped kernel0 reshaped
+kernel.print print_middle kernel0 middle
+kernel.print print_row kernel0 first_row
+kernel.print print_col kernel0 first_col
+
+edge dep base reshaped
+edge dep base middle
+edge dep base first_row
+edge dep base first_col
+edge dep reshaped print_reshaped
+edge dep middle print_middle
+edge dep first_row print_row
+edge dep first_col print_col

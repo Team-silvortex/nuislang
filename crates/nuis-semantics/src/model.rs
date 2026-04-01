@@ -18,10 +18,7 @@ pub struct NirFunction {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NirStmt {
-    Let {
-        name: String,
-        value: NirValue,
-    },
+    Let { name: String, value: NirValue },
     Print(NirValue),
 }
 

@@ -1,0 +1,12 @@
+[package]
+name = "nuis"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+readme.workspace = true
+description = "Front-door workflow tool for the Nuis toolchain."
+
+[dependencies]
+nuisc = { path = "../nuisc" }

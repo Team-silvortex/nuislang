@@ -24,7 +24,10 @@ pub fn render_yir(module: &YirModule) -> String {
     let mut out = String::new();
     out.push_str(&format!("yir {}\n\n", module.version));
     for resource in &module.resources {
-        out.push_str(&format!("resource {} {}\n", resource.name, resource.kind.raw));
+        out.push_str(&format!(
+            "resource {} {}\n",
+            resource.name, resource.kind.raw
+        ));
     }
     if !module.resources.is_empty() {
         out.push('\n');

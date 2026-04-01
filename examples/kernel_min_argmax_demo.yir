@@ -1,0 +1,31 @@
+yir 0.1
+
+resource kernel0 kernel.apple
+
+kernel.tensor base kernel0 2 3 9,2,7,4,8,1
+kernel.reduce_min min_all kernel0 base
+kernel.reduce_min_axis min_rows kernel0 base rows
+kernel.reduce_min_axis min_cols kernel0 base cols
+kernel.argmax argmax_all kernel0 base
+kernel.argmax_axis argmax_rows kernel0 base rows
+kernel.argmax_axis argmax_cols kernel0 base cols
+
+kernel.print print_min_all kernel0 min_all
+kernel.print print_min_rows kernel0 min_rows
+kernel.print print_min_cols kernel0 min_cols
+kernel.print print_argmax_all kernel0 argmax_all
+kernel.print print_argmax_rows kernel0 argmax_rows
+kernel.print print_argmax_cols kernel0 argmax_cols
+
+edge dep base min_all
+edge dep base min_rows
+edge dep base min_cols
+edge dep base argmax_all
+edge dep base argmax_rows
+edge dep base argmax_cols
+edge dep min_all print_min_all
+edge dep min_rows print_min_rows
+edge dep min_cols print_min_cols
+edge dep argmax_all print_argmax_all
+edge dep argmax_rows print_argmax_rows
+edge dep argmax_cols print_argmax_cols

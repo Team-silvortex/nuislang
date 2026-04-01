@@ -5,10 +5,10 @@ pub enum CommandKind {
     Status,
     Registry,
     Bindings { input: PathBuf },
+    Check { input: PathBuf },
+    Build { input: PathBuf, output_dir: PathBuf },
     DumpNir { input: PathBuf },
     DumpYir { input: PathBuf },
-    Check { input: PathBuf },
-    Compile { input: PathBuf, output_dir: PathBuf },
 }
 
 pub fn parse_args<I>(mut args: I) -> Result<CommandKind, String>
@@ -22,39 +22,39 @@ where
         "bindings" => Ok(CommandKind::Bindings {
             input: PathBuf::from(
                 args.next()
-                    .ok_or_else(|| "usage: nuisc bindings <input.ns>".to_owned())?,
-            ),
-        }),
-        "dump-nir" => Ok(CommandKind::DumpNir {
-            input: PathBuf::from(
-                args.next()
-                    .ok_or_else(|| "usage: nuisc dump-nir <input.ns>".to_owned())?,
-            ),
-        }),
-        "dump-yir" => Ok(CommandKind::DumpYir {
-            input: PathBuf::from(
-                args.next()
-                    .ok_or_else(|| "usage: nuisc dump-yir <input.ns>".to_owned())?,
+                    .ok_or_else(|| "usage: nuis bindings <input.ns>".to_owned())?,
             ),
         }),
         "check" => Ok(CommandKind::Check {
             input: PathBuf::from(
                 args.next()
-                    .ok_or_else(|| "usage: nuisc check <input.ns>".to_owned())?,
+                    .ok_or_else(|| "usage: nuis check <input.ns>".to_owned())?,
             ),
         }),
-        "compile" => Ok(CommandKind::Compile {
+        "build" => Ok(CommandKind::Build {
             input: PathBuf::from(
                 args.next()
-                    .ok_or_else(|| "usage: nuisc compile <input.ns> <output-dir>".to_owned())?,
+                    .ok_or_else(|| "usage: nuis build <input.ns> <output-dir>".to_owned())?,
             ),
             output_dir: PathBuf::from(
                 args.next()
-                    .ok_or_else(|| "usage: nuisc compile <input.ns> <output-dir>".to_owned())?,
+                    .ok_or_else(|| "usage: nuis build <input.ns> <output-dir>".to_owned())?,
+            ),
+        }),
+        "dump-nir" => Ok(CommandKind::DumpNir {
+            input: PathBuf::from(
+                args.next()
+                    .ok_or_else(|| "usage: nuis dump-nir <input.ns>".to_owned())?,
+            ),
+        }),
+        "dump-yir" => Ok(CommandKind::DumpYir {
+            input: PathBuf::from(
+                args.next()
+                    .ok_or_else(|| "usage: nuis dump-yir <input.ns>".to_owned())?,
             ),
         }),
         other => Err(format!(
-            "unknown nuisc command `{other}`; expected `status`, `registry`, `bindings`, `dump-nir`, `dump-yir`, `check`, or `compile`"
+            "unknown nuis command `{other}`; expected `status`, `registry`, `bindings`, `check`, `build`, `dump-nir`, or `dump-yir`"
         )),
     }
 }

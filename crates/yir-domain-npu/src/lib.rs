@@ -132,18 +132,17 @@ impl RegisteredMod for NpuMod {
                 Ok(Value::Tensor(TensorValue {
                     rows: input.rows,
                     cols: input.cols,
-                    elements: input
-                        .elements
-                        .iter()
-                        .map(|value| (*value).max(0))
-                        .collect(),
+                    elements: input.elements.iter().map(|value| (*value).max(0)).collect(),
                 }))
             }
             "print" => {
                 let value = state.expect_value(&node.op.args[0])?.clone();
                 state.push_resource_event(
                     resource,
-                    format!("effect npu.print @{} [{}]: {}", node.resource, resource.kind.raw, value),
+                    format!(
+                        "effect npu.print @{} [{}]: {}",
+                        node.resource, resource.kind.raw, value
+                    ),
                 );
                 Ok(Value::Unit)
             }
@@ -165,13 +164,22 @@ fn require_npu_resource(node: &Node, resource: &Resource) -> Result<(), String> 
 
 fn parse_shape(node: &Node) -> Result<(usize, usize), String> {
     let rows = node.op.args[0].parse::<usize>().map_err(|_| {
-        format!("node `{}` has invalid rows `{}`", node.name, node.op.args[0])
+        format!(
+            "node `{}` has invalid rows `{}`",
+            node.name, node.op.args[0]
+        )
     })?;
     let cols = node.op.args[1].parse::<usize>().map_err(|_| {
-        format!("node `{}` has invalid cols `{}`", node.name, node.op.args[1])
+        format!(
+            "node `{}` has invalid cols `{}`",
+            node.name, node.op.args[1]
+        )
     })?;
     if rows == 0 || cols == 0 {
-        return Err(format!("node `{}` tensor shape must be non-zero", node.name));
+        return Err(format!(
+            "node `{}` tensor shape must be non-zero",
+            node.name
+        ));
     }
     Ok((rows, cols))
 }
@@ -213,7 +221,10 @@ fn parse_csv_elements(node: &Node, raw: &str) -> Result<Vec<i64>, String> {
         .map(|part| {
             let value = part.trim();
             value.parse::<i64>().map_err(|_| {
-                format!("node `{}` has invalid tensor literal element `{value}`", node.name)
+                format!(
+                    "node `{}` has invalid tensor literal element `{value}`",
+                    node.name
+                )
             })
         })
         .collect()

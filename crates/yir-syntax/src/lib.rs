@@ -35,9 +35,7 @@ fn parse_header(module: &mut YirModule, tokens: &[&str], line_no: usize) -> Resu
 
 fn parse_resource(module: &mut YirModule, tokens: &[&str], line_no: usize) -> Result<(), String> {
     if tokens.len() != 3 {
-        return Err(format!(
-            "line {line_no}: expected `resource <name> <kind>`"
-        ));
+        return Err(format!("line {line_no}: expected `resource <name> <kind>`"));
     }
 
     module.resources.push(Resource {
@@ -61,7 +59,10 @@ fn parse_node(
 
     let op = Operation::parse(
         opcode,
-        tokens[3..].iter().map(|token| (*token).to_owned()).collect(),
+        tokens[3..]
+            .iter()
+            .map(|token| (*token).to_owned())
+            .collect(),
     )
     .map_err(|error| format!("line {line_no}: {error}"))?;
 

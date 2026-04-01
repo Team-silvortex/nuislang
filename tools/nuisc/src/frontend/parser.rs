@@ -94,7 +94,10 @@ impl Parser {
     fn expect_word(&mut self, expected: &str) -> Result<(), String> {
         match self.next() {
             Some(Token::Word(actual)) if actual == expected => Ok(()),
-            Some(other) => Err(format!("expected `{expected}`, found {}", describe_token(&other))),
+            Some(other) => Err(format!(
+                "expected `{expected}`, found {}",
+                describe_token(&other)
+            )),
             None => Err(format!("expected `{expected}`, found end of input")),
         }
     }
@@ -102,7 +105,10 @@ impl Parser {
     fn expect_ident(&mut self) -> Result<String, String> {
         match self.next() {
             Some(Token::Word(actual)) => Ok(actual),
-            Some(other) => Err(format!("expected identifier, found {}", describe_token(&other))),
+            Some(other) => Err(format!(
+                "expected identifier, found {}",
+                describe_token(&other)
+            )),
             None => Err("expected identifier, found end of input".to_owned()),
         }
     }

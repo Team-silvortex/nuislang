@@ -136,17 +136,44 @@ cpu.const_f32
 cpu.const_f64
 cpu.struct
 cpu.field
+cpu.cast_i32_to_i64
+cpu.cast_i64_to_i32
+cpu.cast_i32_to_f32
+cpu.cast_i32_to_f64
+cpu.cast_f32_to_f64
+cpu.cast_f64_to_f32
 cpu.neg
 cpu.not
 cpu.add
+cpu.add_i32
+cpu.add_f32
+cpu.add_f64
 cpu.sub
+cpu.sub_i32
+cpu.sub_f32
+cpu.sub_f64
 cpu.mul
+cpu.mul_i32
+cpu.mul_f32
+cpu.mul_f64
 cpu.div
+cpu.div_i32
+cpu.div_f32
+cpu.div_f64
 cpu.rem
 cpu.eq
+cpu.eq_i32
+cpu.eq_f32
+cpu.eq_f64
 cpu.ne
 cpu.lt
+cpu.lt_i32
+cpu.lt_f32
+cpu.lt_f64
 cpu.gt
+cpu.gt_i32
+cpu.gt_f32
+cpu.gt_f64
 cpu.le
 cpu.ge
 cpu.and
@@ -174,6 +201,10 @@ Important boundary:
   surface: `bool`, `i32`, `i64`, `f32`, `f64`, plus named `struct` values
 * current LLVM lowering already supports typed constants and struct field access;
   full stable struct aggregate ABI lowering is still provisional
+* the CPU surface now also has a first typed arithmetic slice for `i32`, `f32`,
+  and `f64`
+* the CPU surface now also has a first typed comparison/conversion slice for
+  `i32`, `f32`, and `f64`
 
 ## Addressable-object prototype
 
@@ -242,6 +273,17 @@ shader.const
 shader.add
 shader.sub
 shader.mul
+shader.const_bool
+shader.const_i32
+shader.const_i64
+shader.const_f32
+shader.const_f64
+shader.add_i32
+shader.mul_i32
+shader.add_f32
+shader.mul_f32
+shader.add_f64
+shader.mul_f64
 shader.target
 shader.viewport
 shader.pipeline
@@ -325,6 +367,34 @@ Preferred reference direction:
 * `shader.sample_nearest`, `shader.sample_uv_nearest`, and
   `shader.sample_uv_linear` remain as compatibility aliases
 
+Current typed-scalar surface inside `shader`:
+
+```text
+shader.const_bool
+shader.const_i32
+shader.const_i64
+shader.const_f32
+shader.const_f64
+shader.add_i32
+shader.mul_i32
+shader.add_f32
+shader.mul_f32
+shader.add_f64
+shader.mul_f64
+```
+
+This is a deliberately small first step so shader-side material/binding setup
+can consume typed scalar values directly without collapsing back into the
+legacy integer-only path.
+
+The current reference draw path also consumes typed scalar packets directly:
+
+* tuple packets like `(color, speed[, radius_scale])`
+* struct packets with at least `color` and `speed`
+
+`color` may currently come from `bool / i32 / i64 / f32 / f64`, while `speed`
+and optional `radius_scale` may come from numeric scalar values.
+
 The current resource-layout surface around that subset is:
 
 ```text
@@ -376,14 +446,51 @@ Current reference ops:
 
 ```text
 kernel.target_config
+kernel.const_bool
+kernel.const_i32
+kernel.const_i64
+kernel.const_f32
+kernel.const_f64
 kernel.tensor
 kernel.fill
+kernel.splat
 kernel.add
 kernel.mul
+kernel.add_scalar
+kernel.mul_scalar
+kernel.add_i32
+kernel.mul_i32
+kernel.add_f32
+kernel.mul_f32
+kernel.add_f64
+kernel.mul_f64
 kernel.matmul
 kernel.add_bias
+kernel.shape
+kernel.rows
+kernel.cols
+kernel.row
+kernel.col
+kernel.element_at
+kernel.reshape
+kernel.slice
+kernel.broadcast
 kernel.transpose
 kernel.reduce_sum
+kernel.reduce_sum_axis
+kernel.reduce_max
+kernel.reduce_max_axis
+kernel.reduce_mean
+kernel.reduce_mean_axis
+kernel.reduce_min
+kernel.reduce_min_axis
+kernel.argmax
+kernel.argmax_axis
+kernel.argmin
+kernel.argmin_axis
+kernel.sort
+kernel.topk
+kernel.topk_axis
 kernel.relu
 kernel.print
 ```
@@ -398,6 +505,76 @@ It may later lower to:
 * future accelerators
 
 without changing the core graph meaning.
+
+The current typed-scalar surface inside `kernel` is:
+
+```text
+kernel.const_bool
+kernel.const_i32
+kernel.const_i64
+kernel.const_f32
+kernel.const_f64
+kernel.add_i32
+kernel.mul_i32
+kernel.add_f32
+kernel.mul_f32
+kernel.add_f64
+kernel.mul_f64
+```
+
+This is intentionally smaller than a full typed tensor design. It establishes
+that the `kernel` domain can now consume typed scalar values directly, while
+full typed tensor ABI/design remains deferred.
+
+The current tensor-shape and tensor-scalar bridge surface is:
+
+```text
+kernel.splat
+kernel.add_scalar
+kernel.mul_scalar
+kernel.shape
+kernel.rows
+kernel.cols
+kernel.row
+kernel.col
+kernel.element_at
+kernel.reshape
+kernel.slice
+kernel.broadcast
+kernel.reduce_sum_axis
+kernel.reduce_max
+kernel.reduce_max_axis
+kernel.reduce_mean
+kernel.reduce_mean_axis
+kernel.reduce_min
+kernel.reduce_min_axis
+kernel.argmax
+kernel.argmax_axis
+kernel.argmin
+kernel.argmin_axis
+kernel.sort
+kernel.topk
+kernel.topk_axis
+```
+
+This keeps the tensor payload model simple while still making the `kernel`
+domain feel more usable for real numerical graph construction.
+
+Current broadcast behavior:
+
+* `kernel.broadcast` remains available as an explicit shape-transform op
+* `kernel.add`, `kernel.mul`, and `kernel.add_bias` now also apply automatic
+  broadcast alignment when shapes are compatible
+
+Current compatibility note for scalar-fed tensor ops:
+
+* `kernel.fill` accepts either a direct integer literal or a typed scalar value
+  reference
+* `kernel.add_bias` accepts either a bias tensor or a typed scalar value
+  reference
+
+This keeps older examples valid while letting newer graphs move toward a more
+uniform typed-scalar setup.
 
 ---
 

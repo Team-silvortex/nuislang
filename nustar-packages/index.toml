@@ -1,0 +1,19 @@
+[[package]]
+package_id = "official.cpu"
+manifest = "cpu.toml"
+domain_family = "cpu"
+
+[[package]]
+package_id = "official.data"
+manifest = "data.toml"
+domain_family = "data"
+
+[[package]]
+package_id = "official.kernel"
+manifest = "kernel.toml"
+domain_family = "kernel"
+
+[[package]]
+package_id = "official.shader"
+manifest = "shader.toml"
+domain_family = "shader"

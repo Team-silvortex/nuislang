@@ -1,6 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use yir_core::{DataMod, EdgeKind, LegacyFabricMod, ModRegistry, Node, Resource, ResourceKind, YirModule};
+use yir_core::{
+    DataMod, EdgeKind, LegacyFabricMod, ModRegistry, Node, Resource, ResourceKind, YirModule,
+};
 
 pub fn default_registry() -> ModRegistry {
     let mut registry = ModRegistry::new();
@@ -94,7 +96,10 @@ pub fn verify_module_with_registry(
             }
 
             let source = nodes.get(&dependency).copied().ok_or_else(|| {
-                format!("node `{}` depends on unknown node `{dependency}`", node.name)
+                format!(
+                    "node `{}` depends on unknown node `{dependency}`",
+                    node.name
+                )
             })?;
 
             let source_resource = resources.get(&source.resource).copied().ok_or_else(|| {
@@ -104,8 +109,13 @@ pub fn verify_module_with_registry(
                 )
             })?;
 
-            let required_kind = required_dependency_edge_kind(&source_resource.kind, &resource.kind);
-            let key = (dependency.clone(), node.name.clone(), required_kind.as_str());
+            let required_kind =
+                required_dependency_edge_kind(&source_resource.kind, &resource.kind);
+            let key = (
+                dependency.clone(),
+                node.name.clone(),
+                required_kind.as_str(),
+            );
 
             if !edge_index.contains(&key) {
                 return Err(format!(
@@ -301,8 +311,7 @@ fn verify_data_fabric_protocol(
                         if !resources.contains_key(resource_name) {
                             return Err(format!(
                                 "node `{}` references unknown resource `{}` in handle table",
-                                node.name,
-                                resource_name
+                                node.name, resource_name
                             ));
                         }
                     }
@@ -335,16 +344,21 @@ fn infer_data_value_kind(
     name: &str,
 ) -> DataValueKind {
     value_kinds.get(name).copied().unwrap_or_else(|| {
-        nodes.get(name)
-            .map(|node| match (node.op.module.as_str(), node.op.instruction.as_str()) {
-                ("data" | "fabric", "marker") => DataValueKind::Marker,
-                ("data" | "fabric", "handle_table") => DataValueKind::HandleTable,
-                ("data" | "fabric", "bind_core") => DataValueKind::CoreBinding,
-                ("data" | "fabric", "output_pipe") => DataValueKind::PipeOutput,
-                ("data" | "fabric", "input_pipe") => DataValueKind::Other,
-                ("data" | "fabric", "copy_window" | "immutable_window") => DataValueKind::Window,
-                _ => DataValueKind::Other,
-            })
+        nodes
+            .get(name)
+            .map(
+                |node| match (node.op.module.as_str(), node.op.instruction.as_str()) {
+                    ("data" | "fabric", "marker") => DataValueKind::Marker,
+                    ("data" | "fabric", "handle_table") => DataValueKind::HandleTable,
+                    ("data" | "fabric", "bind_core") => DataValueKind::CoreBinding,
+                    ("data" | "fabric", "output_pipe") => DataValueKind::PipeOutput,
+                    ("data" | "fabric", "input_pipe") => DataValueKind::Other,
+                    ("data" | "fabric", "copy_window" | "immutable_window") => {
+                        DataValueKind::Window
+                    }
+                    _ => DataValueKind::Other,
+                },
+            )
             .unwrap_or(DataValueKind::Other)
     })
 }
@@ -386,7 +400,10 @@ fn verify_cpu_heap_protocol(module: &YirModule) -> Result<(), String> {
                 values.insert(node.name.clone(), PointerState::Null);
             }
             "alloc_node" => {
-                let next = values.get(&node.op.args[1]).copied().unwrap_or(PointerState::Unknown);
+                let next = values
+                    .get(&node.op.args[1])
+                    .copied()
+                    .unwrap_or(PointerState::Unknown);
                 let id = next_id;
                 next_id += 1;
                 heap.insert(
@@ -559,11 +576,17 @@ fn known_non_negative_int(
     };
 
     if node.op.module == "cpu" && node.op.instruction == "const" {
-        let value = node.op.args[0]
-            .parse::<i64>()
-            .map_err(|_| format!("node `{}` has invalid integer literal `{}`", node.name, node.op.args[0]))?;
+        let value = node.op.args[0].parse::<i64>().map_err(|_| {
+            format!(
+                "node `{}` has invalid integer literal `{}`",
+                node.name, node.op.args[0]
+            )
+        })?;
         if value < 0 {
-            return Err(format!("node `{}` uses negative integer `{}` where non-negative value is required", node.name, value));
+            return Err(format!(
+                "node `{}` uses negative integer `{}` where non-negative value is required",
+                node.name, value
+            ));
         }
         return Ok(Some(value as usize));
     }
@@ -608,9 +631,12 @@ fn ensure_live_heap(
     id: usize,
     node: &Node,
 ) -> Result<(), String> {
-    let binding = heap
-        .get(&id)
-        .ok_or_else(|| format!("node `{}` references unknown heap object `&{id}`", node.name))?;
+    let binding = heap.get(&id).ok_or_else(|| {
+        format!(
+            "node `{}` references unknown heap object `&{id}`",
+            node.name
+        )
+    })?;
     if binding.live {
         Ok(())
     } else {
@@ -656,14 +682,16 @@ fn ensure_node_readable(
 ) -> Result<(), String> {
     ensure_pointer_readable(pointer, heap, node)?;
     match pointer {
-        PointerState::Owned(id) | PointerState::Borrowed(id) => match heap.get(&id).map(|binding| binding.kind) {
-            Some(HeapObjectKind::Node { .. }) => Ok(()),
-            Some(HeapObjectKind::Buffer { .. }) => Err(format!(
-                "node `{}` uses buffer object `&{id}` as linked-list node",
-                node.name
-            )),
-            None => Ok(()),
-        },
+        PointerState::Owned(id) | PointerState::Borrowed(id) => {
+            match heap.get(&id).map(|binding| binding.kind) {
+                Some(HeapObjectKind::Node { .. }) => Ok(()),
+                Some(HeapObjectKind::Buffer { .. }) => Err(format!(
+                    "node `{}` uses buffer object `&{id}` as linked-list node",
+                    node.name
+                )),
+                None => Ok(()),
+            }
+        }
         PointerState::Null | PointerState::Unknown => Ok(()),
     }
 }

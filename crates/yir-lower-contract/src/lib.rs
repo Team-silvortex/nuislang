@@ -158,7 +158,10 @@ impl ShaderLoweringContract {
             out.push_str("\n[[stage]]\n");
             out.push_str(&format!("id = \"{}\"\n", stage.node));
             out.push_str(&format!("op = \"{}\"\n", stage.op));
-            out.push_str(&format!("resource = \"{}\"\n", escape_toml(&stage.resource)));
+            out.push_str(&format!(
+                "resource = \"{}\"\n",
+                escape_toml(&stage.resource)
+            ));
             out.push_str(&format!("lowering = \"{}\"\n", stage.lowering.as_str()));
             out.push_str(&format!("reason = \"{}\"\n", escape_toml(&stage.reason)));
             if let Some(table) = &stage.fabric_handle_table {
@@ -228,18 +231,12 @@ impl ShaderLoweringContract {
                 out.push_str(&format!("backend = \"{}\"\n", variant.backend));
                 out.push_str(&format!("kind = \"{}\"\n", variant.kind));
                 out.push_str(&format!("status = \"{}\"\n", variant.status));
-                out.push_str(&format!(
-                    "entry = \"{}\"\n",
-                    escape_toml(&variant.entry)
-                ));
+                out.push_str(&format!("entry = \"{}\"\n", escape_toml(&variant.entry)));
                 out.push_str(&format!(
                     "artifact = \"{}\"\n",
                     escape_toml(&variant.artifact)
                 ));
-                out.push_str(&format!(
-                    "notes = \"{}\"\n",
-                    escape_toml(&variant.notes)
-                ));
+                out.push_str(&format!("notes = \"{}\"\n", escape_toml(&variant.notes)));
             }
 
             if stage.lowering == ShaderLoweringMode::PrerenderOnly {
@@ -389,7 +386,9 @@ pub fn analyze_shader_lowering(module: &YirModule) -> ShaderLoweringContract {
         .iter()
         .filter(|edge| matches!(edge.kind, EdgeKind::Dep | EdgeKind::Effect))
         .fold(BTreeMap::<&str, Vec<&str>>::new(), |mut acc, edge| {
-            acc.entry(edge.to.as_str()).or_default().push(edge.from.as_str());
+            acc.entry(edge.to.as_str())
+                .or_default()
+                .push(edge.from.as_str());
             acc
         });
 
@@ -577,14 +576,19 @@ fn analyze_draw_instanced(
         .and_then(parse_pipeline_signature)
         .unwrap_or((None, None));
 
-    let (lowering, reason) =
-        classify_backend_eligibility(target_format.as_deref(), pipeline_name.as_deref(), topology.as_deref());
+    let (lowering, reason) = classify_backend_eligibility(
+        target_format.as_deref(),
+        pipeline_name.as_deref(),
+        topology.as_deref(),
+    );
     let bindings = incoming
         .get(node.name.as_str())
         .into_iter()
         .flat_map(|names| names.iter().copied())
         .filter_map(|name| nodes.get(name).copied())
-        .filter(|candidate| candidate.op.module == "shader" && candidate.op.instruction == "bind_set")
+        .filter(|candidate| {
+            candidate.op.module == "shader" && candidate.op.instruction == "bind_set"
+        })
         .flat_map(|bind_set| extract_bindings(bind_set, nodes))
         .collect();
     let render_state = incoming
@@ -592,7 +596,9 @@ fn analyze_draw_instanced(
         .into_iter()
         .flat_map(|names| names.iter().copied())
         .filter_map(|name| nodes.get(name).copied())
-        .find(|candidate| candidate.op.module == "shader" && candidate.op.instruction == "render_state");
+        .find(|candidate| {
+            candidate.op.module == "shader" && candidate.op.instruction == "render_state"
+        });
     let (
         blend_mode,
         blend_enabled,
@@ -606,7 +612,12 @@ fn analyze_draw_instanced(
         .unwrap_or((None, None, None, None, None, None, None));
     let fabric_handle_table = fabric_handle_tables
         .iter()
-        .find(|table| table.entries.iter().any(|entry| entry.resource == node.resource))
+        .find(|table| {
+            table
+                .entries
+                .iter()
+                .any(|entry| entry.resource == node.resource)
+        })
         .map(|table| table.node.clone());
 
     ShaderStageContract {
@@ -655,8 +666,13 @@ fn extract_bindings(node: &Node, nodes: &BTreeMap<&str, &Node>) -> Vec<ShaderRes
             }
             let slot = binding.op.args[0].parse::<usize>().ok()?;
             let source = binding.op.args[1].clone();
-            let (texture_format, texture_width, texture_height, sampler_filter, sampler_address_mode) =
-                extract_binding_metadata(kind, source.as_str(), nodes);
+            let (
+                texture_format,
+                texture_width,
+                texture_height,
+                sampler_filter,
+                sampler_address_mode,
+            ) = extract_binding_metadata(kind, source.as_str(), nodes);
             Some(ShaderResourceBinding {
                 slot,
                 kind: kind.to_owned(),
@@ -687,9 +703,10 @@ fn extract_binding_metadata(
     };
 
     match kind {
-        "texture_binding" if source_node.op.module == "shader"
-            && source_node.op.instruction == "texture2d"
-            && source_node.op.args.len() == 4 =>
+        "texture_binding"
+            if source_node.op.module == "shader"
+                && source_node.op.instruction == "texture2d"
+                && source_node.op.args.len() == 4 =>
         {
             let width = source_node.op.args[1].parse::<usize>().ok();
             let height = source_node.op.args[2].parse::<usize>().ok();
@@ -701,9 +718,10 @@ fn extract_binding_metadata(
                 None,
             )
         }
-        "sampler_binding" if source_node.op.module == "shader"
-            && source_node.op.instruction == "sampler"
-            && source_node.op.args.len() == 2 =>
+        "sampler_binding"
+            if source_node.op.module == "shader"
+                && source_node.op.instruction == "sampler"
+                && source_node.op.args.len() == 2 =>
         {
             (
                 None,
@@ -736,12 +754,17 @@ fn extract_render_state(
     let depth = nodes.get(node.op.args[2].as_str()).copied()?;
     let raster = nodes.get(node.op.args[3].as_str()).copied()?;
 
-    let (blend_enabled, blend_mode) =
-        if blend.op.module == "shader" && blend.op.instruction == "blend_state" && blend.op.args.len() == 2 {
-            Some((parse_bool_literal(&blend.op.args[0])?, Some(blend.op.args[1].clone())))
-        } else {
-            None
-        }?;
+    let (blend_enabled, blend_mode) = if blend.op.module == "shader"
+        && blend.op.instruction == "blend_state"
+        && blend.op.args.len() == 2
+    {
+        Some((
+            parse_bool_literal(&blend.op.args[0])?,
+            Some(blend.op.args[1].clone()),
+        ))
+    } else {
+        None
+    }?;
     let (depth_test_enabled, depth_write_enabled, depth_compare) = if depth.op.module == "shader"
         && depth.op.instruction == "depth_state"
         && depth.op.args.len() == 3
@@ -754,12 +777,17 @@ fn extract_render_state(
     } else {
         None
     }?;
-    let (cull_mode, front_face) =
-        if raster.op.module == "shader" && raster.op.instruction == "raster_state" && raster.op.args.len() == 2 {
-            Some((Some(raster.op.args[0].clone()), Some(raster.op.args[1].clone())))
-        } else {
-            None
-        }?;
+    let (cull_mode, front_face) = if raster.op.module == "shader"
+        && raster.op.instruction == "raster_state"
+        && raster.op.args.len() == 2
+    {
+        Some((
+            Some(raster.op.args[0].clone()),
+            Some(raster.op.args[1].clone()),
+        ))
+    } else {
+        None
+    }?;
 
     Some((
         blend_mode,
@@ -836,8 +864,10 @@ fn classify_backend_eligibility(
         );
     }
 
-    let supported_shading_model =
-        matches!(shading_model, "flat_color" | "ball" | "sphere" | "lit_sphere");
+    let supported_shading_model = matches!(
+        shading_model,
+        "flat_color" | "ball" | "sphere" | "lit_sphere"
+    );
     if !supported_shading_model {
         return (
             ShaderLoweringMode::PrerenderOnly,

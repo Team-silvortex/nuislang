@@ -3,6 +3,17 @@
 version = 4
 
 [[package]]
+name = "nuis"
+version = "0.1.0"
+dependencies = [
+ "nuisc",
+]
+
+[[package]]
+name = "nuis-rc"
+version = "0.1.0"
+
+[[package]]
 name = "nuis-runtime"
 version = "0.1.0"
 

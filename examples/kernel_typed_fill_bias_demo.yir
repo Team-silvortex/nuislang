@@ -1,0 +1,22 @@
+yir 0.1
+
+resource kernel0 kernel.apple
+
+kernel.const_f32 fill_scalar kernel0 2.0
+kernel.const_i32 bias_scalar kernel0 5
+
+kernel.fill filled kernel0 2 2 fill_scalar
+kernel.add_bias biased kernel0 filled bias_scalar
+kernel.reduce_sum total kernel0 biased
+
+kernel.print print_filled kernel0 filled
+kernel.print print_biased kernel0 biased
+kernel.print print_total kernel0 total
+
+edge dep fill_scalar filled
+edge dep filled biased
+edge dep bias_scalar biased
+edge dep biased total
+edge dep filled print_filled
+edge dep biased print_biased
+edge dep total print_total

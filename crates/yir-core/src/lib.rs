@@ -32,7 +32,9 @@ pub struct ResourceKind {
 
 impl ResourceKind {
     pub fn parse(raw: &str) -> Self {
-        Self { raw: raw.to_owned() }
+        Self {
+            raw: raw.to_owned(),
+        }
     }
 
     pub fn family(&self) -> &str {
@@ -65,7 +67,9 @@ impl Operation {
             .ok_or_else(|| format!("operation `{raw}` must be written as <mod>.<instr>"))?;
 
         if module.is_empty() || instruction.is_empty() {
-            return Err(format!("operation `{raw}` must be written as <mod>.<instr>"));
+            return Err(format!(
+                "operation `{raw}` must be written as <mod>.<instr>"
+            ));
         }
 
         Ok(Self {
@@ -512,7 +516,11 @@ impl fmt::Display for IndexBuffer {
 
 impl fmt::Display for Texture2D {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "texture2d[{} {}x{}]", self.format, self.width, self.height)
+        write!(
+            f,
+            "texture2d[{} {}x{}]",
+            self.format, self.width, self.height
+        )
     }
 }
 
@@ -540,7 +548,11 @@ impl fmt::Display for DepthState {
 
 impl fmt::Display for RasterState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "raster[cull={} front={}]", self.cull_mode, self.front_face)
+        write!(
+            f,
+            "raster[cull={} front={}]",
+            self.cull_mode, self.front_face
+        )
     }
 }
 
@@ -680,8 +692,12 @@ impl ExecutionState {
             Some(Value::DataWindow(_)) => Err(format!("`{name}` is window, expected int")),
             Some(Value::DataPipe(_)) => Err(format!("`{name}` is pipe, expected int")),
             Some(Value::DataMarker(_)) => Err(format!("`{name}` is marker, expected int")),
-            Some(Value::DataHandleTable(_)) => Err(format!("`{name}` is handle-table, expected int")),
-            Some(Value::DataCoreBinding(_)) => Err(format!("`{name}` is core-binding, expected int")),
+            Some(Value::DataHandleTable(_)) => {
+                Err(format!("`{name}` is handle-table, expected int"))
+            }
+            Some(Value::DataCoreBinding(_)) => {
+                Err(format!("`{name}` is core-binding, expected int"))
+            }
             Some(Value::Target(_)) => Err(format!("`{name}` is target, expected int")),
             Some(Value::Viewport(_)) => Err(format!("`{name}` is viewport, expected int")),
             Some(Value::Pipeline(_)) => Err(format!("`{name}` is pipeline, expected int")),
@@ -707,6 +723,38 @@ impl ExecutionState {
         match self.values.get(name) {
             Some(Value::Struct(value)) => Ok(value),
             Some(other) => Err(format!("`{name}` is {other}, expected struct")),
+            None => Err(format!("missing value for `{name}`")),
+        }
+    }
+
+    pub fn expect_bool(&self, name: &str) -> Result<bool, String> {
+        match self.values.get(name) {
+            Some(Value::Bool(value)) => Ok(*value),
+            Some(other) => Err(format!("`{name}` is {other}, expected bool")),
+            None => Err(format!("missing value for `{name}`")),
+        }
+    }
+
+    pub fn expect_i32(&self, name: &str) -> Result<i32, String> {
+        match self.values.get(name) {
+            Some(Value::I32(value)) => Ok(*value),
+            Some(other) => Err(format!("`{name}` is {other}, expected i32")),
+            None => Err(format!("missing value for `{name}`")),
+        }
+    }
+
+    pub fn expect_f32(&self, name: &str) -> Result<f32, String> {
+        match self.values.get(name) {
+            Some(Value::F32(value)) => Ok(*value),
+            Some(other) => Err(format!("`{name}` is {other}, expected f32")),
+            None => Err(format!("missing value for `{name}`")),
+        }
+    }
+
+    pub fn expect_f64(&self, name: &str) -> Result<f64, String> {
+        match self.values.get(name) {
+            Some(Value::F64(value)) => Ok(*value),
+            Some(other) => Err(format!("`{name}` is {other}, expected f64")),
             None => Err(format!("missing value for `{name}`")),
         }
     }
@@ -823,11 +871,7 @@ impl ExecutionState {
             .ok_or_else(|| format!("dangling buffer dereference `&{address}`"))
     }
 
-    pub fn read_heap_buffer_at(
-        &self,
-        pointer: Option<usize>,
-        index: usize,
-    ) -> Result<i64, String> {
+    pub fn read_heap_buffer_at(&self, pointer: Option<usize>, index: usize) -> Result<i64, String> {
         let buffer = self.read_heap_buffer(pointer)?;
         buffer
             .elements
@@ -906,10 +950,16 @@ impl RegisteredMod for DataMod {
                     ));
                 }
                 node.op.args[1].parse::<usize>().map_err(|_| {
-                    format!("node `{}` has invalid window offset `{}`", node.name, node.op.args[1])
+                    format!(
+                        "node `{}` has invalid window offset `{}`",
+                        node.name, node.op.args[1]
+                    )
                 })?;
                 node.op.args[2].parse::<usize>().map_err(|_| {
-                    format!("node `{}` has invalid window len `{}`", node.name, node.op.args[2])
+                    format!(
+                        "node `{}` has invalid window len `{}`",
+                        node.name, node.op.args[2]
+                    )
                 })?;
                 Ok(InstructionSemantics::pure(vec![node.op.args[0].clone()]))
             }
@@ -965,7 +1015,10 @@ impl RegisteredMod for DataMod {
                     ));
                 }
                 node.op.args[0].parse::<usize>().map_err(|_| {
-                    format!("node `{}` has invalid fabric core index `{}`", node.name, node.op.args[0])
+                    format!(
+                        "node `{}` has invalid fabric core index `{}`",
+                        node.name, node.op.args[0]
+                    )
                 })?;
                 Ok(InstructionSemantics::effect(Vec::new()))
             }
@@ -993,10 +1046,13 @@ impl RegisteredMod for DataMod {
                         value
                     ));
                 }
-                state.push_resource_event(resource, format!(
-                    "effect data.move @{} [{}] -> {}: {}",
-                    node.resource, resource.kind.raw, target, value
-                ));
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect data.move @{} [{}] -> {}: {}",
+                        node.resource, resource.kind.raw, target, value
+                    ),
+                );
                 Ok(value)
             }
             "copy_window" | "immutable_window" => {
@@ -1008,10 +1064,16 @@ impl RegisteredMod for DataMod {
                     ));
                 }
                 let offset = node.op.args[1].parse::<usize>().map_err(|_| {
-                    format!("node `{}` has invalid window offset `{}`", node.name, node.op.args[1])
+                    format!(
+                        "node `{}` has invalid window offset `{}`",
+                        node.name, node.op.args[1]
+                    )
                 })?;
                 let len = node.op.args[2].parse::<usize>().map_err(|_| {
-                    format!("node `{}` has invalid window len `{}`", node.name, node.op.args[2])
+                    format!(
+                        "node `{}` has invalid window len `{}`",
+                        node.name, node.op.args[2]
+                    )
                 })?;
                 let window = Value::DataWindow(DataWindow {
                     base: Box::new(base),
@@ -1091,7 +1153,10 @@ impl RegisteredMod for DataMod {
             }
             "bind_core" => {
                 let core_index = node.op.args[0].parse::<usize>().map_err(|_| {
-                    format!("node `{}` has invalid fabric core index `{}`", node.name, node.op.args[0])
+                    format!(
+                        "node `{}` has invalid fabric core index `{}`",
+                        node.name, node.op.args[0]
+                    )
                 })?;
                 let binding = Value::DataCoreBinding(DataCoreBinding { core_index });
                 state.push_resource_event(
@@ -1126,7 +1191,10 @@ fn is_move_value_legal(value: &Value) -> bool {
         | Value::DataMarker(_)
         | Value::DataHandleTable(_) => false,
         Value::Tuple(items) => items.iter().all(is_move_value_legal),
-        Value::Struct(value) => value.fields.iter().all(|(_, value)| is_move_value_legal(value)),
+        Value::Struct(value) => value
+            .fields
+            .iter()
+            .all(|(_, value)| is_move_value_legal(value)),
         _ => true,
     }
 }
@@ -1135,7 +1203,10 @@ fn is_window_base_legal(value: &Value) -> bool {
     match value {
         Value::DataHandleTable(_) | Value::DataMarker(_) | Value::DataPipe(_) => false,
         Value::Tuple(items) => items.iter().all(is_move_value_legal),
-        Value::Struct(value) => value.fields.iter().all(|(_, value)| is_move_value_legal(value)),
+        Value::Struct(value) => value
+            .fields
+            .iter()
+            .all(|(_, value)| is_move_value_legal(value)),
         _ => true,
     }
 }
@@ -1144,7 +1215,10 @@ fn is_pipe_payload_legal(value: &Value) -> bool {
     match value {
         Value::DataPipe(_) => false,
         Value::Tuple(items) => items.iter().all(is_move_value_legal),
-        Value::Struct(value) => value.fields.iter().all(|(_, value)| is_move_value_legal(value)),
+        Value::Struct(value) => value
+            .fields
+            .iter()
+            .all(|(_, value)| is_move_value_legal(value)),
         _ => true,
     }
 }

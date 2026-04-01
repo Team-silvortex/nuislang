@@ -1,8 +1,8 @@
 use yir_core::{
-    BlendState, DepthState, ExecutionState, FrameSurface, InstructionSemantics, Node,
-    RasterState, RegisteredMod, RenderPass, RenderPipeline, RenderStateSet, Resource,
-    SamplerState, ShaderBinding, ShaderBindingSet, SurfaceTarget, Texture2D, Value, VertexBuffer,
-    VertexLayout, Viewport, IndexBuffer,
+    BlendState, DepthState, ExecutionState, FrameSurface, IndexBuffer, InstructionSemantics, Node,
+    RasterState, RegisteredMod, RenderPass, RenderPipeline, RenderStateSet, Resource, SamplerState,
+    ShaderBinding, ShaderBindingSet, StructValue, SurfaceTarget, Texture2D, Value, VertexBuffer,
+    VertexLayout, Viewport,
 };
 
 pub struct ShaderMod;
@@ -33,6 +33,81 @@ impl RegisteredMod for ShaderMod {
 
                 Ok(InstructionSemantics::pure(Vec::new()))
             }
+            "const_bool" => {
+                if node.op.args.len() != 1 {
+                    return Err(format!(
+                        "node `{}` expects `shader.const_bool <name> <resource> <value>`",
+                        node.name
+                    ));
+                }
+                match node.op.args[0].as_str() {
+                    "true" | "false" => Ok(InstructionSemantics::pure(Vec::new())),
+                    other => Err(format!(
+                        "node `{}` has invalid bool literal `{other}`",
+                        node.name
+                    )),
+                }
+            }
+            "const_i32" => {
+                if node.op.args.len() != 1 {
+                    return Err(format!(
+                        "node `{}` expects `shader.const_i32 <name> <resource> <value>`",
+                        node.name
+                    ));
+                }
+                node.op.args[0].parse::<i32>().map_err(|_| {
+                    format!(
+                        "node `{}` has invalid i32 literal `{}`",
+                        node.name, node.op.args[0]
+                    )
+                })?;
+                Ok(InstructionSemantics::pure(Vec::new()))
+            }
+            "const_i64" => {
+                if node.op.args.len() != 1 {
+                    return Err(format!(
+                        "node `{}` expects `shader.const_i64 <name> <resource> <value>`",
+                        node.name
+                    ));
+                }
+                node.op.args[0].parse::<i64>().map_err(|_| {
+                    format!(
+                        "node `{}` has invalid i64 literal `{}`",
+                        node.name, node.op.args[0]
+                    )
+                })?;
+                Ok(InstructionSemantics::pure(Vec::new()))
+            }
+            "const_f32" => {
+                if node.op.args.len() != 1 {
+                    return Err(format!(
+                        "node `{}` expects `shader.const_f32 <name> <resource> <value>`",
+                        node.name
+                    ));
+                }
+                node.op.args[0].parse::<f32>().map_err(|_| {
+                    format!(
+                        "node `{}` has invalid f32 literal `{}`",
+                        node.name, node.op.args[0]
+                    )
+                })?;
+                Ok(InstructionSemantics::pure(Vec::new()))
+            }
+            "const_f64" => {
+                if node.op.args.len() != 1 {
+                    return Err(format!(
+                        "node `{}` expects `shader.const_f64 <name> <resource> <value>`",
+                        node.name
+                    ));
+                }
+                node.op.args[0].parse::<f64>().map_err(|_| {
+                    format!(
+                        "node `{}` has invalid f64 literal `{}`",
+                        node.name, node.op.args[0]
+                    )
+                })?;
+                Ok(InstructionSemantics::pure(Vec::new()))
+            }
             "add" | "sub" | "mul" => {
                 if node.op.args.len() != 2 {
                     return Err(format!(
@@ -41,6 +116,15 @@ impl RegisteredMod for ShaderMod {
                     ));
                 }
 
+                Ok(InstructionSemantics::pure(node.op.args.clone()))
+            }
+            "add_i32" | "mul_i32" | "add_f32" | "mul_f32" | "add_f64" | "mul_f64" => {
+                if node.op.args.len() != 2 {
+                    return Err(format!(
+                        "node `{}` expects `shader.{} <name> <resource> <lhs> <rhs>`",
+                        node.name, node.op.instruction
+                    ));
+                }
                 Ok(InstructionSemantics::pure(node.op.args.clone()))
             }
             "target" => {
@@ -52,10 +136,16 @@ impl RegisteredMod for ShaderMod {
                 }
 
                 node.op.args[1].parse::<i64>().map_err(|_| {
-                    format!("node `{}` has invalid width `{}`", node.name, node.op.args[1])
+                    format!(
+                        "node `{}` has invalid width `{}`",
+                        node.name, node.op.args[1]
+                    )
                 })?;
                 node.op.args[2].parse::<i64>().map_err(|_| {
-                    format!("node `{}` has invalid height `{}`", node.name, node.op.args[2])
+                    format!(
+                        "node `{}` has invalid height `{}`",
+                        node.name, node.op.args[2]
+                    )
                 })?;
 
                 Ok(InstructionSemantics::pure(Vec::new()))
@@ -69,10 +159,16 @@ impl RegisteredMod for ShaderMod {
                 }
 
                 node.op.args[0].parse::<i64>().map_err(|_| {
-                    format!("node `{}` has invalid width `{}`", node.name, node.op.args[0])
+                    format!(
+                        "node `{}` has invalid width `{}`",
+                        node.name, node.op.args[0]
+                    )
                 })?;
                 node.op.args[1].parse::<i64>().map_err(|_| {
-                    format!("node `{}` has invalid height `{}`", node.name, node.op.args[1])
+                    format!(
+                        "node `{}` has invalid height `{}`",
+                        node.name, node.op.args[1]
+                    )
                 })?;
 
                 Ok(InstructionSemantics::pure(Vec::new()))
@@ -95,7 +191,10 @@ impl RegisteredMod for ShaderMod {
                     ));
                 }
                 node.op.args[0].parse::<usize>().map_err(|_| {
-                    format!("node `{}` has invalid vertex stride `{}`", node.name, node.op.args[0])
+                    format!(
+                        "node `{}` has invalid vertex stride `{}`",
+                        node.name, node.op.args[0]
+                    )
                 })?;
                 Ok(InstructionSemantics::pure(Vec::new()))
             }
@@ -172,10 +271,16 @@ impl RegisteredMod for ShaderMod {
                     ));
                 }
                 node.op.args[0].parse::<i64>().map_err(|_| {
-                    format!("node `{}` has invalid u coord `{}`", node.name, node.op.args[0])
+                    format!(
+                        "node `{}` has invalid u coord `{}`",
+                        node.name, node.op.args[0]
+                    )
                 })?;
                 node.op.args[1].parse::<i64>().map_err(|_| {
-                    format!("node `{}` has invalid v coord `{}`", node.name, node.op.args[1])
+                    format!(
+                        "node `{}` has invalid v coord `{}`",
+                        node.name, node.op.args[1]
+                    )
                 })?;
                 Ok(InstructionSemantics::pure(Vec::new()))
             }
@@ -375,12 +480,56 @@ impl RegisteredMod for ShaderMod {
         state: &mut ExecutionState,
     ) -> Result<Value, String> {
         match node.op.instruction.as_str() {
-            "const" => Ok(Value::Int(node.op.args[0].parse::<i64>().map_err(|_| {
-                format!(
-                    "node `{}` has invalid integer literal `{}`",
-                    node.name, node.op.args[0]
-                )
-            })?)),
+            "const" => Ok(Value::Int(node.op.args[0].parse::<i64>().map_err(
+                |_| {
+                    format!(
+                        "node `{}` has invalid integer literal `{}`",
+                        node.name, node.op.args[0]
+                    )
+                },
+            )?)),
+            "const_bool" => Ok(Value::Bool(match node.op.args[0].as_str() {
+                "true" => true,
+                "false" => false,
+                other => {
+                    return Err(format!(
+                        "node `{}` has invalid bool literal `{other}`",
+                        node.name
+                    ))
+                }
+            })),
+            "const_i32" => Ok(Value::I32(node.op.args[0].parse::<i32>().map_err(
+                |_| {
+                    format!(
+                        "node `{}` has invalid i32 literal `{}`",
+                        node.name, node.op.args[0]
+                    )
+                },
+            )?)),
+            "const_i64" => Ok(Value::Int(node.op.args[0].parse::<i64>().map_err(
+                |_| {
+                    format!(
+                        "node `{}` has invalid i64 literal `{}`",
+                        node.name, node.op.args[0]
+                    )
+                },
+            )?)),
+            "const_f32" => Ok(Value::F32(node.op.args[0].parse::<f32>().map_err(
+                |_| {
+                    format!(
+                        "node `{}` has invalid f32 literal `{}`",
+                        node.name, node.op.args[0]
+                    )
+                },
+            )?)),
+            "const_f64" => Ok(Value::F64(node.op.args[0].parse::<f64>().map_err(
+                |_| {
+                    format!(
+                        "node `{}` has invalid f64 literal `{}`",
+                        node.name, node.op.args[0]
+                    )
+                },
+            )?)),
             "add" => Ok(Value::Int(
                 state.expect_int(&node.op.args[0])? + state.expect_int(&node.op.args[1])?,
             )),
@@ -390,12 +539,36 @@ impl RegisteredMod for ShaderMod {
             "mul" => Ok(Value::Int(
                 state.expect_int(&node.op.args[0])? * state.expect_int(&node.op.args[1])?,
             )),
+            "add_i32" => Ok(Value::I32(
+                state.expect_i32(&node.op.args[0])? + state.expect_i32(&node.op.args[1])?,
+            )),
+            "mul_i32" => Ok(Value::I32(
+                state.expect_i32(&node.op.args[0])? * state.expect_i32(&node.op.args[1])?,
+            )),
+            "add_f32" => Ok(Value::F32(
+                state.expect_f32(&node.op.args[0])? + state.expect_f32(&node.op.args[1])?,
+            )),
+            "mul_f32" => Ok(Value::F32(
+                state.expect_f32(&node.op.args[0])? * state.expect_f32(&node.op.args[1])?,
+            )),
+            "add_f64" => Ok(Value::F64(
+                state.expect_f64(&node.op.args[0])? + state.expect_f64(&node.op.args[1])?,
+            )),
+            "mul_f64" => Ok(Value::F64(
+                state.expect_f64(&node.op.args[0])? * state.expect_f64(&node.op.args[1])?,
+            )),
             "target" => {
                 let width = node.op.args[1].parse::<i64>().map_err(|_| {
-                    format!("node `{}` has invalid width `{}`", node.name, node.op.args[1])
+                    format!(
+                        "node `{}` has invalid width `{}`",
+                        node.name, node.op.args[1]
+                    )
                 })? as usize;
                 let height = node.op.args[2].parse::<i64>().map_err(|_| {
-                    format!("node `{}` has invalid height `{}`", node.name, node.op.args[2])
+                    format!(
+                        "node `{}` has invalid height `{}`",
+                        node.name, node.op.args[2]
+                    )
                 })? as usize;
                 Ok(Value::Target(SurfaceTarget {
                     format: node.op.args[0].clone(),
@@ -405,10 +578,16 @@ impl RegisteredMod for ShaderMod {
             }
             "viewport" => {
                 let width = node.op.args[0].parse::<i64>().map_err(|_| {
-                    format!("node `{}` has invalid width `{}`", node.name, node.op.args[0])
+                    format!(
+                        "node `{}` has invalid width `{}`",
+                        node.name, node.op.args[0]
+                    )
                 })? as usize;
                 let height = node.op.args[1].parse::<i64>().map_err(|_| {
-                    format!("node `{}` has invalid height `{}`", node.name, node.op.args[1])
+                    format!(
+                        "node `{}` has invalid height `{}`",
+                        node.name, node.op.args[1]
+                    )
                 })? as usize;
                 Ok(Value::Viewport(Viewport { width, height }))
             }
@@ -418,7 +597,10 @@ impl RegisteredMod for ShaderMod {
             })),
             "vertex_layout" => Ok(Value::VertexLayout(VertexLayout {
                 stride: node.op.args[0].parse::<usize>().map_err(|_| {
-                    format!("node `{}` has invalid vertex stride `{}`", node.name, node.op.args[0])
+                    format!(
+                        "node `{}` has invalid vertex stride `{}`",
+                        node.name, node.op.args[0]
+                    )
                 })?,
                 attributes: node.op.args[1]
                     .split(',')
@@ -497,10 +679,16 @@ impl RegisteredMod for ShaderMod {
             }
             "uv" => Ok(Value::Tuple(vec![
                 Value::Int(node.op.args[0].parse::<i64>().map_err(|_| {
-                    format!("node `{}` has invalid u coord `{}`", node.name, node.op.args[0])
+                    format!(
+                        "node `{}` has invalid u coord `{}`",
+                        node.name, node.op.args[0]
+                    )
                 })?),
                 Value::Int(node.op.args[1].parse::<i64>().map_err(|_| {
-                    format!("node `{}` has invalid v coord `{}`", node.name, node.op.args[1])
+                    format!(
+                        "node `{}` has invalid v coord `{}`",
+                        node.name, node.op.args[1]
+                    )
                 })?),
             ])),
             "texture2d" => Ok(Value::Texture(parse_texture_literal(node)?)),
@@ -635,10 +823,7 @@ impl RegisteredMod for ShaderMod {
                 let target = match state.expect_value(&node.op.args[0])?.clone() {
                     Value::Target(target) => target,
                     other => {
-                        return Err(format!(
-                            "shader.clear expects target value, got {}",
-                            other
-                        ))
+                        return Err(format!("shader.clear expects target value, got {}", other))
                     }
                 };
                 let fill = node.op.args[1].parse::<i64>().map_err(|_| {
@@ -661,19 +846,13 @@ impl RegisteredMod for ShaderMod {
                 let base = match state.expect_value(&node.op.args[0])?.clone() {
                     Value::Frame(frame) => frame,
                     other => {
-                        return Err(format!(
-                            "shader.overlay expects base frame, got {}",
-                            other
-                        ))
+                        return Err(format!("shader.overlay expects base frame, got {}", other))
                     }
                 };
                 let top = match state.expect_value(&node.op.args[1])?.clone() {
                     Value::Frame(frame) => frame,
                     other => {
-                        return Err(format!(
-                            "shader.overlay expects top frame, got {}",
-                            other
-                        ))
+                        return Err(format!("shader.overlay expects top frame, got {}", other))
                     }
                 };
                 let frame = overlay_surfaces(&base, &top)?;
@@ -692,8 +871,7 @@ impl RegisteredMod for ShaderMod {
                     other => {
                         return Err(format!(
                             "shader.{} expects texture value, got {}",
-                            node.op.instruction,
-                            other
+                            node.op.instruction, other
                         ))
                     }
                 };
@@ -702,8 +880,7 @@ impl RegisteredMod for ShaderMod {
                     other => {
                         return Err(format!(
                             "shader.{} expects sampler value, got {}",
-                            node.op.instruction,
-                            other
+                            node.op.instruction, other
                         ))
                     }
                 };
@@ -732,10 +909,13 @@ impl RegisteredMod for ShaderMod {
             }
             "dispatch" => {
                 let value = state.expect_value(&node.op.args[0])?.clone();
-                state.push_resource_event(resource, format!(
-                    "effect shader.dispatch @{} [{}]: {}",
-                    node.resource, resource.kind.raw, value
-                ));
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect shader.dispatch @{} [{}]: {}",
+                        node.resource, resource.kind.raw, value
+                    ),
+                );
                 Ok(value)
             }
             "draw_instanced" => {
@@ -815,10 +995,13 @@ impl RegisteredMod for ShaderMod {
             }
             "print" => {
                 let value = state.expect_value(&node.op.args[0])?.clone();
-                state.push_resource_event(resource, format!(
-                    "effect shader.print @{} [{}]: {}",
-                    node.resource, resource.kind.raw, value
-                ));
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect shader.print @{} [{}]: {}",
+                        node.resource, resource.kind.raw, value
+                    ),
+                );
                 Ok(Value::Unit)
             }
             other => Err(format!("unknown shader instruction `{other}`")),
@@ -838,19 +1021,14 @@ fn require_shader_resource(node: &Node, resource: &Resource) -> Result<(), Strin
 }
 
 fn draw_ball_surface(value: &Value) -> Result<FrameSurface, String> {
-    let (color, speed) = match value {
-        Value::Tuple(items) if items.len() == 2 => match (&items[0], &items[1]) {
-            (Value::Int(color), Value::Int(speed)) => (*color, *speed),
-            _ => return Err("shader.draw_ball expects (int, int)".to_owned()),
-        },
-        _ => return Err("shader.draw_ball expects a 2-tuple packet".to_owned()),
-    };
+    let packet = parse_ball_packet(value, "shader.draw_ball")?;
 
     let width = 16usize;
     let height = 9usize;
-    let center_x = (speed.rem_euclid(width as i64)) as usize;
-    let center_y = ((speed / 2).rem_euclid(height as i64)) as usize;
-    let glyph = match color.rem_euclid(3) {
+    let speed = packet.speed;
+    let center_x = (((speed).round() as i64).rem_euclid(width as i64)) as usize;
+    let center_y = ((((speed / 2.0).round()) as i64).rem_euclid(height as i64)) as usize;
+    let glyph = match packet.color_key.rem_euclid(3) {
         0 => 'o',
         1 => 'O',
         _ => '@',
@@ -871,18 +1049,31 @@ fn draw_ball_surface(value: &Value) -> Result<FrameSurface, String> {
         rows.push(row);
     }
 
-    Ok(FrameSurface { width, height, rows })
+    Ok(FrameSurface {
+        width,
+        height,
+        rows,
+    })
 }
 
 fn parse_texture_shape(node: &Node) -> Result<(usize, usize), String> {
     let width = node.op.args[1].parse::<usize>().map_err(|_| {
-        format!("node `{}` has invalid width `{}`", node.name, node.op.args[1])
+        format!(
+            "node `{}` has invalid width `{}`",
+            node.name, node.op.args[1]
+        )
     })?;
     let height = node.op.args[2].parse::<usize>().map_err(|_| {
-        format!("node `{}` has invalid height `{}`", node.name, node.op.args[2])
+        format!(
+            "node `{}` has invalid height `{}`",
+            node.name, node.op.args[2]
+        )
     })?;
     if width == 0 || height == 0 {
-        return Err(format!("node `{}` texture shape must be non-zero", node.name));
+        return Err(format!(
+            "node `{}` texture shape must be non-zero",
+            node.name
+        ));
     }
     Ok((width, height))
 }
@@ -940,9 +1131,9 @@ fn parse_csv_ints(node: &Node, raw: &str, label: &str) -> Result<Vec<i64>, Strin
     raw.split(',')
         .map(|part| {
             let value = part.trim();
-            value.parse::<i64>().map_err(|_| {
-                format!("node `{}` has invalid {} `{value}`", node.name, label)
-            })
+            value
+                .parse::<i64>()
+                .map_err(|_| format!("node `{}` has invalid {} `{value}`", node.name, label))
         })
         .collect()
 }
@@ -951,9 +1142,9 @@ fn parse_csv_indices(node: &Node, raw: &str) -> Result<Vec<usize>, String> {
     raw.split(',')
         .map(|part| {
             let value = part.trim();
-            value.parse::<usize>().map_err(|_| {
-                format!("node `{}` has invalid index literal `{value}`", node.name)
-            })
+            value
+                .parse::<usize>()
+                .map_err(|_| format!("node `{}` has invalid index literal `{value}`", node.name))
         })
         .collect()
 }
@@ -996,7 +1187,12 @@ fn sample_texture_uv_by_filter(
     }
 }
 
-fn sample_texture_linear(texture: &Texture2D, sampler: &SamplerState, u_1024: i64, v_1024: i64) -> i64 {
+fn sample_texture_linear(
+    texture: &Texture2D,
+    sampler: &SamplerState,
+    u_1024: i64,
+    v_1024: i64,
+) -> i64 {
     let (base_x, frac_x) = normalized_uv_to_linear_coord(texture.width, u_1024);
     let (base_y, frac_y) = normalized_uv_to_linear_coord(texture.height, v_1024);
     let address = sampler.address_mode.as_str();
@@ -1035,11 +1231,7 @@ fn apply_address_mode(coord: i64, extent: usize, address_mode: &str) -> usize {
     }
 }
 
-fn expect_texture_value(
-    state: &ExecutionState,
-    name: &str,
-    op: &str,
-) -> Result<Texture2D, String> {
+fn expect_texture_value(state: &ExecutionState, name: &str, op: &str) -> Result<Texture2D, String> {
     match state.expect_value(name)?.clone() {
         Value::Texture(texture) => Ok(texture),
         other => Err(format!("{op} expects texture value, got {}", other)),
@@ -1156,9 +1348,7 @@ fn draw_render_pass_surface(
         return Err("shader.draw_instanced expects positive vertex/instance counts".to_owned());
     }
 
-    let geometry = bindings
-        .map(resolve_geometry_inputs)
-        .transpose()?;
+    let geometry = bindings.map(resolve_geometry_inputs).transpose()?;
 
     let width = pass.viewport.width.min(pass.target.width).max(1);
     let height = pass.viewport.height.min(pass.target.height).max(1);
@@ -1207,21 +1397,19 @@ fn draw_render_pass_surface(
     Ok(frame)
 }
 
-fn draw_ball_surface_with_size(value: &Value, width: usize, height: usize) -> Result<FrameSurface, String> {
-    let (color, speed) = match value {
-        Value::Tuple(items) if items.len() == 2 => match (&items[0], &items[1]) {
-            (Value::Int(color), Value::Int(speed)) => (*color, *speed),
-            _ => return Err("shader.draw_sphere expects (int, int)".to_owned()),
-        },
-        _ => return Err("shader.draw_sphere expects a 2-tuple packet".to_owned()),
-    };
+fn draw_ball_surface_with_size(
+    value: &Value,
+    width: usize,
+    height: usize,
+) -> Result<FrameSurface, String> {
+    let packet = parse_ball_packet(value, "shader.draw_ball")?;
 
     let width = width.max(8);
     let height = height.max(8);
-    let radius = 0.72f32;
-    let offset_x = ((speed as f32) * 0.03).sin() * 0.22;
-    let offset_y = ((speed as f32) * 0.02).cos() * 0.16;
-    let palette = sphere_palette(color);
+    let radius = (0.72f32 * packet.radius_scale).clamp(0.18, 0.95);
+    let offset_x = (packet.speed * 0.03).sin() * 0.22;
+    let offset_y = (packet.speed * 0.02).cos() * 0.16;
+    let palette = sphere_palette(packet.color_key);
 
     let mut rows = Vec::with_capacity(height);
     for y in 0..height {
@@ -1241,34 +1429,37 @@ fn draw_ball_surface_with_size(value: &Value, width: usize, height: usize) -> Re
             let ly = -0.35f32;
             let lz = 0.82f32;
             let ll = (lx * lx + ly * ly + lz * lz).sqrt();
-            let light = ((nx / len) * (lx / ll) + (ny / len) * (ly / ll) + (nz / len) * (lz / ll))
-                .max(0.0);
+            let light =
+                ((nx / len) * (lx / ll) + (ny / len) * (ly / ll) + (nz / len) * (lz / ll)).max(0.0);
             let rim = (1.0 - (nz / radius)).powf(1.6) * 0.35;
             let shade = (light * 0.85 + rim).clamp(0.0, 1.0);
-            let index = ((shade * (palette.len() - 1) as f32).round() as usize).min(palette.len() - 1);
+            let index =
+                ((shade * (palette.len() - 1) as f32).round() as usize).min(palette.len() - 1);
             row.push(palette[index]);
         }
         rows.push(row);
     }
 
-    Ok(FrameSurface { width, height, rows })
+    Ok(FrameSurface {
+        width,
+        height,
+        rows,
+    })
 }
 
-fn draw_sphere_surface_with_size(value: &Value, width: usize, height: usize) -> Result<FrameSurface, String> {
+fn draw_sphere_surface_with_size(
+    value: &Value,
+    width: usize,
+    height: usize,
+) -> Result<FrameSurface, String> {
     let width = width.max(8);
     let height = height.max(8);
-    let (color, speed) = match value {
-        Value::Tuple(items) if items.len() == 2 => match (&items[0], &items[1]) {
-            (Value::Int(color), Value::Int(speed)) => (*color, *speed),
-            _ => return Err("shader.draw_sphere expects (int, int)".to_owned()),
-        },
-        _ => return Err("shader.draw_sphere expects a 2-tuple packet".to_owned()),
-    };
+    let packet = parse_ball_packet(value, "shader.draw_sphere")?;
 
-    let radius = 0.72f32;
-    let offset_x = ((speed as f32) * 0.03).sin() * 0.22;
-    let offset_y = ((speed as f32) * 0.02).cos() * 0.16;
-    let palette = sphere_palette(color);
+    let radius = (0.72f32 * packet.radius_scale).clamp(0.18, 0.95);
+    let offset_x = (packet.speed * 0.03).sin() * 0.22;
+    let offset_y = (packet.speed * 0.02).cos() * 0.16;
+    let palette = sphere_palette(packet.color_key);
 
     let mut rows = Vec::with_capacity(height);
     for y in 0..height {
@@ -1288,17 +1479,22 @@ fn draw_sphere_surface_with_size(value: &Value, width: usize, height: usize) -> 
             let ly = -0.35f32;
             let lz = 0.82f32;
             let ll = (lx * lx + ly * ly + lz * lz).sqrt();
-            let light = ((nx / len) * (lx / ll) + (ny / len) * (ly / ll) + (nz / len) * (lz / ll))
-                .max(0.0);
+            let light =
+                ((nx / len) * (lx / ll) + (ny / len) * (ly / ll) + (nz / len) * (lz / ll)).max(0.0);
             let rim = (1.0 - (nz / radius)).powf(1.6) * 0.35;
             let shade = (light * 0.85 + rim).clamp(0.0, 1.0);
-            let index = ((shade * (palette.len() - 1) as f32).round() as usize).min(palette.len() - 1);
+            let index =
+                ((shade * (palette.len() - 1) as f32).round() as usize).min(palette.len() - 1);
             row.push(palette[index]);
         }
         rows.push(row);
     }
 
-    Ok(FrameSurface { width, height, rows })
+    Ok(FrameSurface {
+        width,
+        height,
+        rows,
+    })
 }
 
 fn sphere_palette(color: i64) -> &'static [char] {
@@ -1306,6 +1502,85 @@ fn sphere_palette(color: i64) -> &'static [char] {
         0 => &[':', '-', '=', '+', '*', 'o'],
         1 => &[':', '-', '=', '+', '*', 'O'],
         _ => &[':', '-', '=', '+', '*', '@'],
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct BallPacket {
+    color_key: i64,
+    speed: f32,
+    radius_scale: f32,
+}
+
+fn parse_ball_packet(value: &Value, op: &str) -> Result<BallPacket, String> {
+    match value {
+        Value::Tuple(items) if items.len() >= 2 => {
+            let color_key = scalar_to_color_key(&items[0], op)?;
+            let speed = scalar_to_f32(&items[1], op)?;
+            let radius_scale = match items.get(2) {
+                Some(value) => scalar_to_f32(value, op)?,
+                None => 1.0,
+            };
+            Ok(BallPacket {
+                color_key,
+                speed,
+                radius_scale,
+            })
+        }
+        Value::Struct(packet) => parse_ball_packet_struct(packet, op),
+        _ => Err(format!(
+            "{op} expects a packet tuple `(color, speed[, radius_scale])` or struct with `color` and `speed`"
+        )),
+    }
+}
+
+fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket, String> {
+    let color = packet
+        .fields
+        .iter()
+        .find(|(name, _)| name == "color")
+        .map(|(_, value)| value)
+        .ok_or_else(|| format!("{op} struct packet is missing `color` field"))?;
+    let speed = packet
+        .fields
+        .iter()
+        .find(|(name, _)| name == "speed")
+        .map(|(_, value)| value)
+        .ok_or_else(|| format!("{op} struct packet is missing `speed` field"))?;
+    let radius_scale = packet
+        .fields
+        .iter()
+        .find(|(name, _)| name == "radius_scale")
+        .map(|(_, value)| scalar_to_f32(value, op))
+        .transpose()?
+        .unwrap_or(1.0);
+
+    Ok(BallPacket {
+        color_key: scalar_to_color_key(color, op)?,
+        speed: scalar_to_f32(speed, op)?,
+        radius_scale,
+    })
+}
+
+fn scalar_to_color_key(value: &Value, op: &str) -> Result<i64, String> {
+    match value {
+        Value::Bool(value) => Ok(if *value { 1 } else { 0 }),
+        Value::I32(value) => Ok(*value as i64),
+        Value::Int(value) => Ok(*value),
+        Value::F32(value) => Ok(value.round() as i64),
+        Value::F64(value) => Ok(value.round() as i64),
+        other => Err(format!("{op} expects scalar `color` value, got {}", other)),
+    }
+}
+
+fn scalar_to_f32(value: &Value, op: &str) -> Result<f32, String> {
+    match value {
+        Value::Bool(value) => Ok(if *value { 1.0 } else { 0.0 }),
+        Value::I32(value) => Ok(*value as f32),
+        Value::Int(value) => Ok(*value as f32),
+        Value::F32(value) => Ok(*value),
+        Value::F64(value) => Ok(*value as f32),
+        other => Err(format!("{op} expects scalar numeric value, got {}", other)),
     }
 }
 
@@ -1516,7 +1791,11 @@ fn interpret_vertex(
 
     let (x, y) = pos?;
     let glyph = if let Some((u, v)) = uv {
-        if u + v >= 1.5 { 'u' } else { 'v' }
+        if u + v >= 1.5 {
+            'u'
+        } else {
+            'v'
+        }
     } else if let Some((r, g)) = color {
         match ((r + g) * 0.5).round() as i64 {
             value if value <= 0 => '#',
@@ -1569,14 +1848,7 @@ fn stamp_vertex_marker(rows: &mut [Vec<char>], x: usize, y: usize, glyph: char) 
     }
 }
 
-fn stamp_line(
-    rows: &mut [Vec<char>],
-    ax: usize,
-    ay: usize,
-    bx: usize,
-    by: usize,
-    glyph: char,
-) {
+fn stamp_line(rows: &mut [Vec<char>], ax: usize, ay: usize, bx: usize, by: usize, glyph: char) {
     if rows.is_empty() {
         return;
     }

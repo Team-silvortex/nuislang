@@ -12,15 +12,15 @@ fn run() -> Result<(), String> {
     // It intentionally interprets a subset of `cpu`-mod ops into a UI plan
     // without making those ops part of YIR core semantics.
     let mut args = env::args().skip(1);
-    let input = args
-        .next()
-        .ok_or_else(|| "usage: cargo run -p yir-export-ui-plan -- <module.yir> <output.plan>".to_owned())?;
-    let output = args
-        .next()
-        .ok_or_else(|| "usage: cargo run -p yir-export-ui-plan -- <module.yir> <output.plan>".to_owned())?;
+    let input = args.next().ok_or_else(|| {
+        "usage: cargo run -p yir-export-ui-plan -- <module.yir> <output.plan>".to_owned()
+    })?;
+    let output = args.next().ok_or_else(|| {
+        "usage: cargo run -p yir-export-ui-plan -- <module.yir> <output.plan>".to_owned()
+    })?;
 
-    let source = fs::read_to_string(&input)
-        .map_err(|error| format!("failed to read `{input}`: {error}"))?;
+    let source =
+        fs::read_to_string(&input).map_err(|error| format!("failed to read `{input}`: {error}"))?;
     let module = yir_syntax::parse_module(&source)?;
 
     let mut lines = Vec::new();

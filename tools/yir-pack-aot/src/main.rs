@@ -80,7 +80,10 @@ fn run() -> Result<(), String> {
     if let Some(binding) = &primary_fabric_binding {
         manifest.push(format!("fabric_handle_table_id={}", binding.table_id));
         manifest.push(format!("fabric_host_resource={}", binding.host_resource));
-        manifest.push(format!("fabric_render_resource={}", binding.render_resource));
+        manifest.push(format!(
+            "fabric_render_resource={}",
+            binding.render_resource
+        ));
     }
     if let Some(core_binding) = shader_contract.fabric_core_bindings.first() {
         manifest.push(format!("fabric_worker_resource={}", core_binding.resource));
@@ -94,22 +97,21 @@ fn run() -> Result<(), String> {
                 shader_contract_path.display()
             )
         })?;
-        fs::write(&shader_package_path, shader_contract.render_package_manifest()).map_err(
-            |error| {
-                format!(
-                    "failed to write `{}`: {error}",
-                    shader_package_path.display()
-                )
-            },
-        )?;
+        fs::write(
+            &shader_package_path,
+            shader_contract.render_package_manifest(),
+        )
+        .map_err(|error| {
+            format!(
+                "failed to write `{}`: {error}",
+                shader_package_path.display()
+            )
+        })?;
         manifest.push(format!(
             "shader_contract={}",
             shader_contract_path.display()
         ));
-        manifest.push(format!(
-            "shader_package={}",
-            shader_package_path.display()
-        ));
+        manifest.push(format!("shader_package={}", shader_package_path.display()));
         manifest.push(format!(
             "shader_backend_eligible={}",
             shader_contract.has_backend_eligible_work()
@@ -126,7 +128,9 @@ fn run() -> Result<(), String> {
     let frame_bundle = maybe_emit_prerendered_frame(&module, &output_dir, stem, frame_scale)?;
     let window_spec = extract_cpu_window_spec(
         &module,
-        primary_fabric_binding.as_ref().map(|binding| binding.host_resource.as_str()),
+        primary_fabric_binding
+            .as_ref()
+            .map(|binding| binding.host_resource.as_str()),
     );
 
     if let Some(frame_bundle) = &frame_bundle {
@@ -158,7 +162,9 @@ fn run() -> Result<(), String> {
                     .fabric_core_bindings
                     .first()
                     .map(|binding| binding.core_index),
-                primary_fabric_binding.as_ref().map(|binding| binding.table_id.as_str()),
+                primary_fabric_binding
+                    .as_ref()
+                    .map(|binding| binding.table_id.as_str()),
                 primary_fabric_binding
                     .as_ref()
                     .map(|binding| binding.host_resource.as_str()),
@@ -170,14 +176,17 @@ fn run() -> Result<(), String> {
                 &frame_bundle.embedded_ppm_bytes,
             ),
         )
-            .map_err(|error| format!("failed to write `{}`: {error}", host_path.display()))?;
+        .map_err(|error| format!("failed to write `{}`: {error}", host_path.display()))?;
         compile_native_appkit_binary(&ll_path, &host_path, &exe_path)?;
         manifest.push(format!("binary={}", exe_path.display()));
         manifest.push("binary_mode=llvm_objc_appkit".to_owned());
         manifest.push(format!("host_stub={}", host_path.display()));
         manifest.push("frame_runtime_mode=embedded_prerendered".to_owned());
         manifest.push("single_binary=true".to_owned());
-        manifest.push(format!("fabric_boot_plan_events={}", fabric_boot_plan.len()));
+        manifest.push(format!(
+            "fabric_boot_plan_events={}",
+            fabric_boot_plan.len()
+        ));
         manifest.push("fabric_boot_plan_mode=static_typed_action_table".to_owned());
         if let Some(spec) = &window_spec {
             manifest.push(format!("window_title={}", spec.title));
@@ -251,7 +260,10 @@ fn extract_primary_fabric_binding(
     })
 }
 
-fn extract_cpu_window_spec(module: &YirModule, host_resource: Option<&str>) -> Option<CpuWindowSpec> {
+fn extract_cpu_window_spec(
+    module: &YirModule,
+    host_resource: Option<&str>,
+) -> Option<CpuWindowSpec> {
     module.nodes.iter().find_map(|node| {
         if node.op.module == "cpu"
             && node.op.instruction == "window"
@@ -293,46 +305,16 @@ fn extract_fabric_boot_plan(
         .filter(|node| node.op.module == "data")
         .map(|node| {
             let (action_kind, action_class, action_slot) = match node.op.instruction.as_str() {
-                "bind_core" => (
-                    "NUIS_FABRIC_ACTION_BIND_CORE",
-                    "worker",
-                    "bind_core",
-                ),
-                "handle_table" => (
-                    "NUIS_FABRIC_ACTION_HANDLE_TABLE",
-                    "binding",
-                    "handle_table",
-                ),
-                "output_pipe" => (
-                    "NUIS_FABRIC_ACTION_OUTPUT_PIPE",
-                    "pipe",
-                    "output",
-                ),
-                "input_pipe" => (
-                    "NUIS_FABRIC_ACTION_INPUT_PIPE",
-                    "pipe",
-                    "input",
-                ),
-                "marker" => (
-                    "NUIS_FABRIC_ACTION_MARKER",
-                    "sync",
-                    "marker",
-                ),
-                "copy_window" => (
-                    "NUIS_FABRIC_ACTION_COPY_WINDOW",
-                    "window",
-                    "copy",
-                ),
-                "immutable_window" => (
-                    "NUIS_FABRIC_ACTION_IMMUTABLE_WINDOW",
-                    "window",
-                    "immutable",
-                ),
-                "move" => (
-                    "NUIS_FABRIC_ACTION_MOVE_VALUE",
-                    "move",
-                    "value",
-                ),
+                "bind_core" => ("NUIS_FABRIC_ACTION_BIND_CORE", "worker", "bind_core"),
+                "handle_table" => ("NUIS_FABRIC_ACTION_HANDLE_TABLE", "binding", "handle_table"),
+                "output_pipe" => ("NUIS_FABRIC_ACTION_OUTPUT_PIPE", "pipe", "output"),
+                "input_pipe" => ("NUIS_FABRIC_ACTION_INPUT_PIPE", "pipe", "input"),
+                "marker" => ("NUIS_FABRIC_ACTION_MARKER", "sync", "marker"),
+                "copy_window" => ("NUIS_FABRIC_ACTION_COPY_WINDOW", "window", "copy"),
+                "immutable_window" => {
+                    ("NUIS_FABRIC_ACTION_IMMUTABLE_WINDOW", "window", "immutable")
+                }
+                "move" => ("NUIS_FABRIC_ACTION_MOVE_VALUE", "move", "value"),
                 _ => ("NUIS_FABRIC_ACTION_UNKNOWN", "unknown", "unknown"),
             };
             let (source, target) = match node.op.instruction.as_str() {
@@ -386,8 +368,14 @@ fn render_fabric_boot_plan(events: &[FabricBootEvent]) -> String {
             "        \"{}\",\n",
             c_string_literal(&event.table_id)
         ));
-        out.push_str(&format!("        \"{}\",\n", c_string_literal(&event.source)));
-        out.push_str(&format!("        \"{}\",\n", c_string_literal(&event.target)));
+        out.push_str(&format!(
+            "        \"{}\",\n",
+            c_string_literal(&event.source)
+        ));
+        out.push_str(&format!(
+            "        \"{}\",\n",
+            c_string_literal(&event.target)
+        ));
         out.push_str("    },\n");
     }
     out

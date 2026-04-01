@@ -140,14 +140,35 @@ cpu.move_ptr <name> <resource> <ptr>
 cpu.neg <name> <resource> <input>
 cpu.not <name> <resource> <input>
 cpu.add <name> <resource> <lhs> <rhs>
+cpu.add_i32 <name> <resource> <lhs> <rhs>
+cpu.add_f32 <name> <resource> <lhs> <rhs>
+cpu.add_f64 <name> <resource> <lhs> <rhs>
 cpu.sub <name> <resource> <lhs> <rhs>
+cpu.sub_i32 <name> <resource> <lhs> <rhs>
+cpu.sub_f32 <name> <resource> <lhs> <rhs>
+cpu.sub_f64 <name> <resource> <lhs> <rhs>
 cpu.mul <name> <resource> <lhs> <rhs>
+cpu.mul_i32 <name> <resource> <lhs> <rhs>
+cpu.mul_f32 <name> <resource> <lhs> <rhs>
+cpu.mul_f64 <name> <resource> <lhs> <rhs>
 cpu.div <name> <resource> <lhs> <rhs>
+cpu.div_i32 <name> <resource> <lhs> <rhs>
+cpu.div_f32 <name> <resource> <lhs> <rhs>
+cpu.div_f64 <name> <resource> <lhs> <rhs>
 cpu.rem <name> <resource> <lhs> <rhs>
 cpu.eq <name> <resource> <lhs> <rhs>
+cpu.eq_i32 <name> <resource> <lhs> <rhs>
+cpu.eq_f32 <name> <resource> <lhs> <rhs>
+cpu.eq_f64 <name> <resource> <lhs> <rhs>
 cpu.ne <name> <resource> <lhs> <rhs>
 cpu.lt <name> <resource> <lhs> <rhs>
+cpu.lt_i32 <name> <resource> <lhs> <rhs>
+cpu.lt_f32 <name> <resource> <lhs> <rhs>
+cpu.lt_f64 <name> <resource> <lhs> <rhs>
 cpu.gt <name> <resource> <lhs> <rhs>
+cpu.gt_i32 <name> <resource> <lhs> <rhs>
+cpu.gt_f32 <name> <resource> <lhs> <rhs>
+cpu.gt_f64 <name> <resource> <lhs> <rhs>
 cpu.le <name> <resource> <lhs> <rhs>
 cpu.ge <name> <resource> <lhs> <rhs>
 cpu.and <name> <resource> <lhs> <rhs>
@@ -175,6 +196,12 @@ cpu.const_f32 <name> <resource> <value>
 cpu.const_f64 <name> <resource> <value>
 cpu.struct <name> <resource> <type_name> <field=value>...
 cpu.field <name> <resource> <struct> <field_name>
+cpu.cast_i32_to_i64 <name> <resource> <input>
+cpu.cast_i64_to_i32 <name> <resource> <input>
+cpu.cast_i32_to_f32 <name> <resource> <input>
+cpu.cast_i32_to_f64 <name> <resource> <input>
+cpu.cast_f32_to_f64 <name> <resource> <input>
+cpu.cast_f64_to_f32 <name> <resource> <input>
 cpu.target_config <name> <resource> <arch> <abi> <vector_bits>
 cpu.bind_core <name> <resource> <core_index>
 cpu.window <name> <resource> <width> <height> <title>
@@ -194,15 +221,67 @@ Current handwritten `YIR` now includes a first typed value surface:
 `cpu.struct` and `cpu.field` currently focus on value expression and field
 extraction. The LLVM path already supports typed constants and struct field
 access; a full stable struct aggregate ABI is still provisional.
+
+The current CPU surface also has a first typed arithmetic slice:
+
+* `add_i32 / sub_i32 / mul_i32 / div_i32`
+* `add_f32 / sub_f32 / mul_f32 / div_f32`
+* `add_f64 / sub_f64 / mul_f64 / div_f64`
+
+It now also has a first typed comparison/conversion slice:
+
+* `eq_i32 / lt_i32 / gt_i32`
+* `eq_f32 / lt_f32 / gt_f32`
+* `eq_f64 / lt_f64 / gt_f64`
+* `cast_i32_to_i64 / cast_i64_to_i32`
+* `cast_i32_to_f32 / cast_i32_to_f64`
+* `cast_f32_to_f64 / cast_f64_to_f32`
 kernel.target_config <name> <resource> <arch> <runtime> <lane_width>
+kernel.const_bool <name> <resource> <value>
+kernel.const_i32 <name> <resource> <value>
+kernel.const_i64 <name> <resource> <value>
+kernel.const_f32 <name> <resource> <value>
+kernel.const_f64 <name> <resource> <value>
 kernel.tensor <name> <resource> <rows> <cols> <csv-elements>
 kernel.fill <name> <resource> <rows> <cols> <value>
+kernel.splat <name> <resource> <rows> <cols> <scalar>
 kernel.add <name> <resource> <lhs> <rhs>
 kernel.mul <name> <resource> <lhs> <rhs>
+kernel.add_scalar <name> <resource> <tensor> <scalar>
+kernel.mul_scalar <name> <resource> <tensor> <scalar>
+kernel.add_i32 <name> <resource> <lhs> <rhs>
+kernel.mul_i32 <name> <resource> <lhs> <rhs>
+kernel.add_f32 <name> <resource> <lhs> <rhs>
+kernel.mul_f32 <name> <resource> <lhs> <rhs>
+kernel.add_f64 <name> <resource> <lhs> <rhs>
+kernel.mul_f64 <name> <resource> <lhs> <rhs>
 kernel.matmul <name> <resource> <lhs> <rhs>
 kernel.add_bias <name> <resource> <input> <bias>
+kernel.shape <name> <resource> <input>
+kernel.rows <name> <resource> <input>
+kernel.cols <name> <resource> <input>
+kernel.row <name> <resource> <input>
+kernel.col <name> <resource> <input>
+kernel.element_at <name> <resource> <input> <row> <col>
+kernel.reshape <name> <resource> <input> <rows> <cols>
+kernel.slice <name> <resource> <input> <row_offset> <col_offset> <rows> <cols>
+kernel.broadcast <name> <resource> <input> <rows> <cols>
 kernel.transpose <name> <resource> <input>
 kernel.reduce_sum <name> <resource> <input>
+kernel.reduce_sum_axis <name> <resource> <input> <rows|cols>
+kernel.reduce_max <name> <resource> <input>
+kernel.reduce_max_axis <name> <resource> <input> <rows|cols>
+kernel.reduce_mean <name> <resource> <input>
+kernel.reduce_mean_axis <name> <resource> <input> <rows|cols>
+kernel.reduce_min <name> <resource> <input>
+kernel.reduce_min_axis <name> <resource> <input> <rows|cols>
+kernel.argmax <name> <resource> <input>
+kernel.argmax_axis <name> <resource> <input> <rows|cols>
+kernel.argmin <name> <resource> <input>
+kernel.argmin_axis <name> <resource> <input> <rows|cols>
+kernel.sort <name> <resource> <input>
+kernel.topk <name> <resource> <input> <k>
+kernel.topk_axis <name> <resource> <input> <k> <rows|cols>
 kernel.relu <name> <resource> <input>
 kernel.print <name> <resource> <input>
 data.move <name> <resource> <input> <to>
@@ -214,9 +293,20 @@ data.output_pipe <name> <resource> <input>
 data.input_pipe <name> <resource> <pipe>
 data.handle_table <name> <resource> <slot=resource> [slot=resource...]
 shader.const <name> <resource> <value>
+shader.const_bool <name> <resource> <value>
+shader.const_i32 <name> <resource> <value>
+shader.const_i64 <name> <resource> <value>
+shader.const_f32 <name> <resource> <value>
+shader.const_f64 <name> <resource> <value>
 shader.add <name> <resource> <lhs> <rhs>
 shader.sub <name> <resource> <lhs> <rhs>
 shader.mul <name> <resource> <lhs> <rhs>
+shader.add_i32 <name> <resource> <lhs> <rhs>
+shader.mul_i32 <name> <resource> <lhs> <rhs>
+shader.add_f32 <name> <resource> <lhs> <rhs>
+shader.mul_f32 <name> <resource> <lhs> <rhs>
+shader.add_f64 <name> <resource> <lhs> <rhs>
+shader.mul_f64 <name> <resource> <lhs> <rhs>
 shader.target <name> <resource> <format> <width> <height>
 shader.viewport <name> <resource> <width> <height>
 shader.pipeline <name> <resource> <shading_model> <topology>
@@ -269,7 +359,7 @@ Important boundary note:
 * `data.move` is the current `MoveValue` primitive surface and therefore only accepts plain value payloads, not `window`, `marker`, `handle`, or `pipe` carriers.
 * `data.handle_table` is strictly a resource-indirection primitive: entries must use unique slots and may only reference declared resources, never concrete data payloads.
 * `data.bind_core` is the current CPU-hosted Fabric worker binding surface: it lets the AOT/bundle path record which CPU core the data-plane worker should occupy, in a DPDK-like style.
-* These domain surfaces are expected to graduate into `nustar` registration packages; `nuisc` should discover and bind them as registered capability bundles rather than hard-coding them as part of core YIR.
+* These domain surfaces are expected to graduate into `nustar` registration packages; `nuisc` should load and bind them through a static index plus lazy package loading, rather than proactively discovering and hard-coding them as part of core YIR.
 
 Resource kinds are intentionally open-ended. For example, the current macOS
 window/backend path may eventually lower to Metal, but the YIR grammar does not
@@ -281,12 +371,26 @@ Current shader lowering contract direction:
 * `shader.uv / shader.texture2d / shader.sampler / shader.sample / shader.sample_uv` provide the current minimal texture-resource and normalized sampling surface.
 * `shader.sample` and `shader.sample_uv` are the preferred sampling ops; they dispatch through `sampler.filter`.
 * `shader.sample_nearest / shader.sample_uv_nearest / shader.sample_uv_linear` remain as compatibility aliases for reference/testing paths.
+* `shader.const_bool / const_i32 / const_i64 / const_f32 / const_f64` and `shader.add_*/mul_*` are the current typed-scalar surface inside the shader family.
+* `shader.draw_ball / shader.draw_sphere / shader.draw_instanced` now accept typed scalar packets directly. The current reference path accepts tuple packets like `(color, speed[, radius_scale])` and struct packets with at least `color` and `speed`.
 * `shader.vertex_layout / shader.vertex_buffer / shader.index_buffer` provide the current minimal geometry-input surface.
 * `shader.uniform / shader.storage / shader.attachment / shader.texture_binding / shader.sampler_binding / shader.vertex_layout_binding / shader.vertex_binding / shader.index_binding / shader.bind_set` are the current resource-layout surface around that subset.
 * `shader.blend_state / shader.depth_state / shader.raster_state / shader.render_state` are the current minimal render-state surface around that subset.
 * The handwritten reference renderer already consumes the bound geometry surface for vertex placement, primitive edge drawing, and minimal triangle-area coverage for `triangle` / `triangle_strip`.
 * This subset is intended to map to common `Metal/Vulkan` concepts, not to either backend's source language directly.
 * Legacy reference ops such as `shader.draw_ball`, `shader.draw_sphere`, and generic `shader.dispatch` remain valid YIR, but currently fall back to prerender/reference execution rather than entering the portable backend subset.
+* `kernel.const_bool / const_i32 / const_i64 / const_f32 / const_f64` and `kernel.add_*/mul_*` are the current typed-scalar surface inside the kernel family.
+* `kernel.fill` now accepts either a direct integer literal or a typed scalar value reference.
+* `kernel.add_bias` now accepts either a bias tensor or a typed scalar value reference.
+* `kernel.splat / add_scalar / mul_scalar` are the current tensor-scalar bridge for the integer tensor surface.
+* `kernel.shape / rows / cols / row / col / element_at / reshape / slice / broadcast` are the current minimal shape/index/transform surface.
+* `kernel.reduce_sum_axis / reduce_max_axis / reduce_mean_axis / reduce_min_axis / argmax_axis / argmin_axis` are the current minimal axis-reduction surface, with `rows` and `cols` as the first supported reduction directions.
+* `kernel.reduce_max / reduce_mean / reduce_min / argmax / argmin` now complement the existing global `reduce_sum`.
+* `kernel.sort / topk / topk_axis` are the current minimal selection surface.
+* `kernel.sort / topk` currently operate on the flattened tensor payload and return a `1xN` result tensor.
+* `kernel.topk_axis rows|cols` returns per-row or per-column top-k values in descending order.
+* `kernel.add / mul / add_bias` now perform automatic shape alignment when the inputs are broadcast-compatible.
+* Full typed tensor ABI is still intentionally deferred.
 * Package-level deployment should treat backend outputs as per-stage variants under one semantic stage id, so the same YIR stage can later carry `Metal`, `Vulkan`, `DirectX`, or `OpenGL` artifacts without changing the core graph.
 
 Cross-domain exchange is represented as a dedicated edge kind:

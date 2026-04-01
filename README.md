@@ -1,15 +1,25 @@
 # nuislang
 
-> AOT system programming language for heterogeneous execution, built on a custom IR (YIR) with a JIT runtime (yalivia) and integrated verification (vulpoya).
+> AOT-first system programming language for heterogeneous execution, built around `nuis -> NIR -> YIR -> LLVM/AOT`, with future external integration points such as `yalivia` and `vulpoya`.
 
 ---
+
+## Toolchain
+
+```text
+nuis     -> front-door workflow tool (build/check/registry)
+nuis-rc  -> resident control tool (local toolchain versions + local project index)
+nuisc    -> core scheduler/compiler (nuis -> NIR -> YIR -> LLVM/AOT)
+yalivia  -> separate project (JIT/runtime adapter, not managed here)
+vulpoya  -> separate project (syntax/constraint analysis, not managed here)
+```
 
 ## Model
 
 ```id="c9qk3b"
-source → nuislang → YIR → execution (via yalivia)
-                     ↓
-                 vulpoya (analysis / verification)
+source → nuis -> nuisc -> NIR -> YIR -> LLVM/AOT
+                         ↓
+                     nustar packages
 ```
 
 ---
@@ -27,7 +37,7 @@ source → nuislang → YIR → execution (via yalivia)
 
 * LLVM is used as a backend
 * Designed as a general-purpose system language
-* Forms its own toolchain and execution model (language, IR, runtime, verifier)
+* Forms its own toolchain and execution model (language, IR, compiler core, external runtime/verifier boundaries)
 * Current YIR reference surface already includes heterogenous `cpu / shader / kernel / data` families, with shader pass composition and kernel tensor ops expanding incrementally from the same graph model
 * The `shader` family now also has a minimal resource-layout surface (`uniform / storage / attachment / bind_set`) so future backend package manifests can describe stage bindings instead of only pass topology
 * The `shader` family also includes a first texture-resource slice (`texture2d / sampler / sample_nearest`) plus matching binding kinds for package manifests
@@ -45,6 +55,19 @@ source → nuislang → YIR → execution (via yalivia)
 * Current Fabric host booting is also kept intentionally thin and AOT-first: host stubs embed a static typed action table derived from `data.*` nodes instead of constructing a heavyweight dynamic metadata system at runtime
 * That typed Fabric action table now also carries a minimal class/slot ABI tag, so host-side dispatch no longer depends only on ad hoc string matching
 * The handwritten `YIR` value layer now also has a first typed scalar/aggregate surface: `bool / i32 / i64 / f32 / f64` plus named `struct` values with `cpu.field` extraction
+* The CPU surface now also has a first typed arithmetic slice for `i32 / f32 / f64`, and that path already runs through reference execution, LLVM IR emission, and AOT packaging
+* The CPU surface now also has a first typed comparison/conversion slice, so typed values can be compared and cast without collapsing back into the untyped `i64` path first
+* `shader` and `kernel` now also have a first typed-scalar surface of their own, so domain-local setup no longer has to collapse back to the old integer-only path for simple constants and scalar arithmetic
+* The handwritten shader draw path now also consumes typed scalar packets directly, so `draw_ball / draw_sphere / draw_instanced` no longer require the old `(int, int)` packet shape
+* The `kernel` family now also has a first tensor-scalar and shape/index query surface (`splat / add_scalar / mul_scalar / shape / rows / cols / element_at`), so it is starting to feel like a real numerical graph tool instead of only a handful of tensor-wide ops
+* `kernel.fill` and `kernel.add_bias` now also accept typed scalar value references directly, so old literal/tensor paths stay valid while newer graphs can move toward a more uniform scalar-fed style
+* The `kernel` family now also has a first shape-transform surface (`reshape / slice / row / col`), so tensor graphs can start doing real structural manipulation instead of only whole-tensor math
+* The `kernel` family now also has a first axis-reduction surface with `reduce_sum_axis rows|cols`, so tensor graphs can start expressing structured reductions without dropping straight to full global sums
+* The `kernel` family now also has a first broadcast surface plus `reduce_max / reduce_mean` and their axis variants, so shape-aligned tensor composition and structured reductions are starting to feel like one coherent subsystem
+* The `kernel` family now also has `reduce_min / argmax` and their axis variants, so the reduction surface is starting to look more like something you could actually use for real ML/kernel graph work
+* The `kernel` family now also has `argmin / sort / topk`, so basic selection and ranking workflows can start to live inside the same YIR kernel surface instead of immediately falling out to another layer
+* `kernel.add / mul / add_bias` now also auto-broadcast compatible tensor shapes, so common row-bias/column-scale style graphs no longer need to spell every expansion out manually
+* `kernel.topk_axis rows|cols` is now in too, so the selection surface is no longer just flat-global; it can already express per-row and per-column ranking in the current reference path
 
 ---
 
@@ -598,16 +621,22 @@ nuisc 具有最终否决权：
 
 当前仓库实现仍处于**骨架阶段**，但从本版本开始，工程命名与职责边界按以下口径收敛：
 
+* `tools/nuis`：作为工具链前门原型入口，代表用户侧 workflow command
+* `tools/nuis-rc`：作为常驻控制器原型入口，负责本机上的 `nuis` 工具链版本与项目索引
 * `tools/nuisc`：作为 `nuisc` 原型入口，代表执行拓扑编译器
 * `crates/nuis-runtime`：仅表示本仓库内的 AOT 侧执行支撑骨架，**不代表 `yalivia`**
 * `crates/nuis-semantics`：承载 NIR / YIR / Fabric / contract 的语义模型占位
 * `docs/fabric-spec/DFIR.md`：文件名暂保留历史命名，但内容应以 **Fabric IR / Fabric ABI** 为准
+* `nustar-packages/index.toml`：当前 `nustar` 静态索引入口，`nuisc` 通过它做惰性装载，而非主动扫目录发现
+* 当前 `nuis / nuisc` 也已有最小 `bindings` 工作流：先形成当前编译图，再得到本次真正需要的 `nustar` binding plan
 
 额外边界说明：
 
 * `yalivia` 是**独立项目**
+* `vulpoya` 是**独立项目**
 * 本仓库主线是 **AOT-first 的 nuis 工具链**
 * 与 `yalivia` 的关系仅是未来的外部对接边界，而不是当前仓库内部 runtime 分层
+* 与 `vulpoya` 的关系仅是未来的外部语法/约束分析协作边界，而不是当前仓库内部前端分层
 
 这意味着：
 
