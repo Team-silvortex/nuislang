@@ -23,11 +23,13 @@ cpu.print out cpu0 sum
 edge dep len buf_raw
 edge dep fill buf_raw
 edge dep buf_raw buf
+edge lifetime buf_raw buf
 edge dep buf idx1
 edge dep idx1 write_slot
 edge dep v9 write_slot
 edge effect buf write_slot
 edge dep buf write_slot
+edge lifetime buf write_slot
 edge dep buf buf_ref
 edge dep buf_ref buf_len
 edge effect buf_ref buf_len

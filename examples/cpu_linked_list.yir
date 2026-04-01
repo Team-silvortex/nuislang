@@ -40,9 +40,11 @@ edge dep head detach_middle
 edge dep node3 detach_middle
 edge effect head detach_middle
 edge effect node3 detach_middle
+edge lifetime head detach_middle
 edge dep node2 free_middle
 edge effect detach_middle free_middle
 edge effect node2 free_middle
+edge lifetime node2 free_middle
 edge dep head head_next_after
 edge effect detach_middle head_next_after
 edge dep head_next_after tail_value_after

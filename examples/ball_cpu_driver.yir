@@ -1,9 +1,9 @@
 yir 0.1
 
-resource cpu0 cpu
+resource cpu0 cpu.arm64
 
-cpu.const hue cpu0 128
-cpu.const speed cpu0 12
+cpu.const_i64 hue cpu0 128
+cpu.const_i64 speed cpu0 12
 cpu.mul color_mix cpu0 hue speed
 cpu.print out cpu0 color_mix
 

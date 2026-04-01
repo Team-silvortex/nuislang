@@ -1,0 +1,20 @@
+[package]
+name = "yir-runtime-host"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+readme.workspace = true
+description = "Embeddable host-side YIR execution and framebuffer export helpers."
+
+[lib]
+path = "src/lib.rs"
+crate-type = ["rlib", "staticlib"]
+
+[dependencies]
+yir-exec = { path = "../yir-exec" }
+yir-host-render = { path = "../yir-host-render" }
+yir-syntax = { path = "../yir-syntax" }
+yir-verify = { path = "../yir-verify" }
+yir-core = { path = "../yir-core" }

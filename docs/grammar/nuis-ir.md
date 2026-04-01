@@ -130,6 +130,17 @@ resource <name> <kind>
 edge <dep|effect|lifetime|xfer> <from> <to>
 ```
 
+Preferred handwritten style in this repository:
+
+* use explicit resource kinds such as `cpu.arm64`, `shader.render`,
+  `kernel.apple`, and `data.fabric`
+* keep `data.*` nodes attached to `data.fabric` resources instead of reusing
+  compute resources
+* prefer typed scalar constructors when the scalar type is known, such as
+  `cpu.const_i64`, `shader.const_i64`, or `kernel.const_f32`
+* prefer canonical ops such as `shader.sample` / `shader.sample_uv` over
+  compatibility aliases in new examples
+
 Current built-in / registered examples:
 
 ```text
@@ -205,7 +216,8 @@ cpu.cast_f64_to_f32 <name> <resource> <input>
 cpu.target_config <name> <resource> <arch> <abi> <vector_bits>
 cpu.bind_core <name> <resource> <core_index>
 cpu.window <name> <resource> <width> <height> <title>
-cpu.input_i64 <name> <resource> <channel> <default>
+cpu.input_i64 <name> <resource> <channel> <default> [<min> <max> <step>]
+cpu.tick_i64 <name> <resource> <start> <step>
 cpu.present_frame <name> <resource> <frame>
 cpu.print <name> <resource> <input>
 
@@ -352,6 +364,7 @@ Important boundary note:
 * A different frontend, runtime adapter, or future framework can consume the same YIR graph without depending on these specific ops.
 * `cpu.borrow` and `cpu.move_ptr` are the first Rust-like ownership surface for the pure CPU domain: reads may flow through borrowed pointers, while writes and frees remain ownership-sensitive.
 * `cpu.alloc_node / alloc_buffer / load_* / store_* / free` are an early reference prototype for addressable objects and pointer-like semantics. They are intentionally narrow and currently model controlled heap-node and heap-buffer surfaces rather than a full general memory model.
+* `lifetime` is now part of the current handwritten reference style for ownership-sensitive `res` flow. In the current prototype, `Own` and `Write` resource accesses require a `lifetime` edge in addition to ordinary `dep` or `xfer` ordering.
 * `kernel.*` ops are the standard tensor/kernel execution surface. They may lower to `npu`, `gpu-kernel`, or future accelerators without changing the core graph semantics.
 * `data.*` ops are the instruction-level surface for Fabric-style exchange. The architecture term `Fabric` remains valid, but the standard op family name is `data`.
 * The current handwritten prototype now includes a first typed Fabric surface: `move`, `copy_window`, `immutable_window`, `marker`, `bind_core`, `output_pipe`, `input_pipe`, and `handle_table`.

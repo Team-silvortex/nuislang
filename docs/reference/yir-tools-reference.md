@@ -67,6 +67,8 @@ Current `nustar` loading policy is:
 * static index
 * lazy manifest loading
 * binding only for families actually required by the current `YIR` graph
+* each loaded `nustar` now also declares its `AST surface`, `NIR surface`, `YIR lowering`, and `part verify` responsibilities so `nuisc` can stay mod-agnostic while still seeing the full package role
+* each loaded `nustar` also declares unified entry names for those four surfaces, so future `nuisc` loading can bind through stable entry points instead of hard-coded per-mod assumptions
 
 Current `nustar` packaging prototype is:
 
@@ -85,6 +87,7 @@ Current loading-contract direction is:
 * the canonical bootstrap symbol is `nustar.bootstrap.v1`
 * the canonical bootstrap signature is `extern "C" fn(*const NustarHostAbiV1, *const u8, usize, *mut NustarBootstrapResultV1) -> i32`
 * host/runtime bootstrap stays machine-ABI aware: current `.nustar` packages carry `machine_arch / machine_os / object_format / calling_abi`
+* `loader-contract` now also defines per-kind implementation-segment requirements, including container kind, implementation section name, required exports, required metadata, and link mode
 * machine ABI compatibility is explicit and inspectable
 
 ## Core compiler
@@ -194,6 +197,11 @@ Current behavior:
 * pure CPU graphs can be compiled to a native binary through LLVM/clang
 * hetero/window demos can be packaged into a macOS AppKit-hosted single binary
   using embedded prerendered framebuffer content
+* hetero/window demos with `cpu.tick_i64` can now also be packaged into a
+  macOS AppKit-hosted single binary with an embedded `YIR` runtime path:
+  generated hosts link `libyir_runtime_host.a`, embed the `.yir` module bytes,
+  and generate live framebuffer updates in-process instead of shelling out to a
+  sidecar exporter
 * shader packaging already has a contract/package skeleton for future backend
   variants
 * shader package manifests may now include per-stage binding layout entries, texture/sampler/geometry binding kinds, minimal render-state metadata, sampler/texture binding details such as filter, address mode, and texture shape, plus top-level fabric handle-table metadata, per-stage fabric table association, and Fabric worker core binding metadata

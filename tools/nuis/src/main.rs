@@ -42,6 +42,9 @@ fn run() -> Result<(), String> {
         cli::CommandKind::Build { input, output_dir } => {
             nuisc::run(nuisc::CommandKind::Compile { input, output_dir })?;
         }
+        cli::CommandKind::DumpAst { input } => {
+            nuisc::run(nuisc::CommandKind::DumpAst { input })?;
+        }
         cli::CommandKind::DumpNir { input } => {
             nuisc::run(nuisc::CommandKind::DumpNir { input })?;
         }

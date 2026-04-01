@@ -1,11 +1,12 @@
 use std::{fs, path::Path, process::Command};
 
-use nuis_semantics::model::NirModule;
+use nuis_semantics::model::{AstModule, NirModule};
 use yir_core::YirModule;
 
 use crate::render;
 
 pub struct CompileArtifacts {
+    pub ast_path: String,
     pub nir_path: String,
     pub yir_path: String,
     pub llvm_ir_path: String,
@@ -15,6 +16,7 @@ pub struct CompileArtifacts {
 pub fn write_and_link(
     input: &Path,
     output_dir: &Path,
+    ast: &AstModule,
     nir: &NirModule,
     yir: &YirModule,
     llvm_ir: &str,
@@ -26,12 +28,15 @@ pub fn write_and_link(
         .file_stem()
         .and_then(|stem| stem.to_str())
         .unwrap_or("nuis_module");
+    let ast_path = output_dir.join(format!("{stem}.ast.txt"));
     let nir_path = output_dir.join(format!("{stem}.nir.txt"));
     let yir_path = output_dir.join(format!("{stem}.yir"));
     let ll_path = output_dir.join(format!("{stem}.ll"));
     let shim_path = output_dir.join(format!("{stem}_shim.c"));
     let exe_path = output_dir.join(stem);
 
+    fs::write(&ast_path, render::render_ast(ast))
+        .map_err(|error| format!("failed to write `{}`: {error}", ast_path.display()))?;
     fs::write(&nir_path, render::render_nir(nir))
         .map_err(|error| format!("failed to write `{}`: {error}", nir_path.display()))?;
     fs::write(&yir_path, render::render_yir(yir))
@@ -44,6 +49,7 @@ pub fn write_and_link(
     compile_native_binary(&ll_path, &shim_path, &exe_path)?;
 
     Ok(CompileArtifacts {
+        ast_path: ast_path.display().to_string(),
         nir_path: nir_path.display().to_string(),
         yir_path: yir_path.display().to_string(),
         llvm_ir_path: ll_path.display().to_string(),

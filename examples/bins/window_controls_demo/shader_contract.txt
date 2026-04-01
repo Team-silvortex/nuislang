@@ -1,0 +1,9 @@
+fabric_handle_table=fabric_handles
+  handle host -> cpu0
+  handle render -> shader0
+fabric_core_binding=fabric_worker resource=fabric0 core=1
+stage=frame op=shader.draw_instanced resource=shader0 lowering=backend_eligible reason=stage fits the current Metal/Vulkan common lowering subset
+  fabric_handle_table=fabric_handles
+  pipeline=lit_sphere
+  target_format=rgba8_unorm
+  topology=triangle_strip

@@ -9,8 +9,4 @@ readme.workspace = true
 description = "Execute a YIR graph and export its frame output as a PPM image."
 
 [dependencies]
-yir-core = { path = "../../crates/yir-core" }
-yir-exec = { path = "../../crates/yir-exec" }
-yir-host-render = { path = "../../crates/yir-host-render" }
-yir-syntax = { path = "../../crates/yir-syntax" }
-yir-verify = { path = "../../crates/yir-verify" }
+yir-runtime-host = { path = "../../crates/yir-runtime-host" }

@@ -23,6 +23,7 @@ cpu.print out cpu0 list_sum
 edge dep tail_value tail_raw
 edge dep nil tail_raw
 edge dep tail_raw tail
+edge lifetime tail_raw tail
 edge dep head_value_init head
 edge dep tail head
 edge dep head head_ref

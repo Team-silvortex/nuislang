@@ -35,7 +35,7 @@ This reference currently covers:
 This reference does not yet attempt to freeze:
 
 * full `NIR`
-* full `GLM`
+* final `GLM`
 * full `Fabric verifier`
 * final `nustar` package ABI
 
@@ -62,6 +62,23 @@ Text order is not the execution model.
 
 Execution order is derived from the graph.
 
+## Preferred Style
+
+The current repository now tries to keep handwritten `YIR` examples in one
+consistent style:
+
+* use explicit resource kinds such as `cpu.arm64`, `shader.render`,
+  `kernel.apple`, `data.fabric`
+* keep `data.*` nodes on `data.fabric` resources instead of attaching them to
+  compute resources directly
+* prefer typed scalar constructors such as `cpu.const_i64`,
+  `shader.const_i64`, `kernel.const_f32` when the scalar type is known
+* prefer canonical ops over compatibility aliases in examples; for example,
+  prefer `shader.sample` / `shader.sample_uv` over legacy explicit sampling
+  aliases
+* group examples in this order: `resource` declarations, configuration nodes,
+  value/material/tensor setup, compute or render nodes, then `edge` clauses
+
 ---
 
 # 4. Edge Kinds
@@ -80,10 +97,19 @@ Used when visible side effects must be preserved in order.
 
 ## `lifetime`
 
-Reserved lifetime ordering edge.
+Lifetime and ownership ordering edge.
 
-The handwritten prototype accepts it as a graph edge kind, but the current
-reference demos do not yet rely on a full lifetime system.
+The current handwritten prototype now uses `lifetime` for a first explicit
+`GLM`-shaped ownership layer.
+
+Current minimum rule:
+
+* `dep` or `xfer` says a node result must be available
+* `lifetime` says a resource must still be live for an ownership-sensitive use
+* `Write` and `Own` resource accesses currently require `lifetime`
+
+This is still intentionally smaller than the final whitepaper `GLM`, but it is
+already part of the current reference verifier.
 
 ## `xfer`
 
@@ -187,6 +213,7 @@ cpu.target_config
 cpu.bind_core
 cpu.window
 cpu.input_i64
+cpu.tick_i64
 cpu.present_frame
 cpu.print
 ```
@@ -205,6 +232,12 @@ Important boundary:
   and `f64`
 * the CPU surface now also has a first typed comparison/conversion slice for
   `i32`, `f32`, and `f64`
+* `cpu.input_i64` accepts either a minimal form
+  `cpu.input_i64 <name> <resource> <channel> <default>`
+  or a control-shaped form
+  `cpu.input_i64 <name> <resource> <channel> <default> <min> <max> <step>`
+* `cpu.tick_i64` is a current host-side timing hook that reads `NUIS_TICK`
+  and returns `start + tick * step`
 
 ## Addressable-object prototype
 
@@ -249,6 +282,47 @@ The current verifier treats this surface as an early Rust-like ownership model:
 * after `cpu.free`, the owned name is consumed
 * reading through a borrow after the owned object has been freed is rejected
 
+## Current GLM Minimum Surface
+
+The current repository now exposes a minimal explicit `GLM` layer.
+
+This layer is still provisional, but it already makes ownership visible in
+handwritten `YIR`.
+
+Current concepts:
+
+* `val`: ordinary SSA-like value flow
+* `res`: resource/object flow that participates in ownership and lifetime
+* `Read`: non-consuming access to a resource
+* `Write`: mutating access to a resource
+* `Own`: consuming or ownership-transferring access to a resource
+
+Current minimum verifier rules:
+
+* if a node uses another node result, there must be a `dep` or `xfer`
+* if that access is `Write` or `Own`, there must also be a `lifetime` edge
+* `cpu.move_ptr`, `cpu.free`, and current mutating CPU heap ops therefore
+  require explicit lifetime edges
+* `data.move` currently participates as an ownership-moving action and is
+  modeled as an `Own` access with domain-move effect
+
+Current canonical handwritten style:
+
+```text
+cpu.alloc_buffer buf_raw cpu0 len fill
+cpu.move_ptr buf cpu0 buf_raw
+cpu.store_at write_slot cpu0 buf idx value
+
+edge dep buf_raw buf
+edge lifetime buf_raw buf
+
+edge dep buf write_slot
+edge lifetime buf write_slot
+```
+
+This style is intentionally explicit: ownership transfer or mutation should be
+visible in the graph rather than hidden inside the opcode name.
+
 This is intentionally partial, but it is already strong enough to guard the
 current linked-list prototype.
 
@@ -258,7 +332,8 @@ Reference examples:
 * valid buffer example: [examples/cpu_buffer_rustish.yir](/Users/Shared/chroot/dev/nuislang/examples/cpu_buffer_rustish.yir)
 * invalid borrowed write: [examples/cpu_borrow_write_invalid.yir](/Users/Shared/chroot/dev/nuislang/examples/cpu_borrow_write_invalid.yir)
 * invalid borrowed buffer write: [examples/cpu_buffer_borrow_write_invalid.yir](/Users/Shared/chroot/dev/nuislang/examples/cpu_buffer_borrow_write_invalid.yir)
-* invalid use-after-free: [examples/cpu_use_after_free_invalid.yir](/Users/Shared/chroot/dev/nuislang/examples/cpu_use_after_free_invalid.yir)
+* invalid post-free access: [examples/cpu_use_after_free_invalid.yir](/Users/Shared/chroot/dev/nuislang/examples/cpu_use_after_free_invalid.yir)
+* invalid missing lifetime edge: [examples/cpu_glm_missing_lifetime_invalid.yir](/Users/Shared/chroot/dev/nuislang/examples/cpu_glm_missing_lifetime_invalid.yir)
 
 ---
 

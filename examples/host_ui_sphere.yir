@@ -9,9 +9,9 @@ cpu.bind_core main_thread cpu0 0
 cpu.window main_window cpu0 640 480 sphere_demo
 cpu.input_i64 color_delta cpu0 color_knob 20
 cpu.input_i64 speed_delta cpu0 speed_knob 4
-cpu.const base_color cpu0 128
-cpu.const base_speed cpu0 12
-cpu.const speed_scale cpu0 3
+cpu.const_i64 base_color cpu0 128
+cpu.const_i64 base_speed cpu0 12
+cpu.const_i64 speed_scale cpu0 3
 cpu.add ball_color cpu0 base_color color_delta
 cpu.madd ball_speed cpu0 speed_delta speed_scale base_speed
 

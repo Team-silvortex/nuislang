@@ -10,6 +10,7 @@ pub enum CommandKind {
     LoaderContract { package_id: String },
     Check { input: PathBuf },
     Build { input: PathBuf, output_dir: PathBuf },
+    DumpAst { input: PathBuf },
     DumpNir { input: PathBuf },
     DumpYir { input: PathBuf },
 }
@@ -65,6 +66,12 @@ where
                     .ok_or_else(|| "usage: nuis build <input.ns> <output-dir>".to_owned())?,
             ),
         }),
+        "dump-ast" => Ok(CommandKind::DumpAst {
+            input: PathBuf::from(
+                args.next()
+                    .ok_or_else(|| "usage: nuis dump-ast <input.ns>".to_owned())?,
+            ),
+        }),
         "dump-nir" => Ok(CommandKind::DumpNir {
             input: PathBuf::from(
                 args.next()
@@ -78,7 +85,7 @@ where
             ),
         }),
         other => Err(format!(
-            "unknown nuis command `{other}`; expected `status`, `registry`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `check`, `build`, `dump-nir`, or `dump-yir`"
+            "unknown nuis command `{other}`; expected `status`, `registry`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `check`, `build`, `dump-ast`, `dump-nir`, or `dump-yir`"
         )),
     }
 }

@@ -1,7 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use yir_core::{
-    DataMod, EdgeKind, LegacyFabricMod, ModRegistry, Node, Resource, ResourceKind, YirModule,
+    glm_profile_for_operation, DataMod, EdgeKind, GlmEffect, GlmUseMode, LegacyFabricMod,
+    ModRegistry, Node, Resource, ResourceKind, YirModule,
 };
 
 pub fn default_registry() -> ModRegistry {
@@ -130,8 +131,79 @@ pub fn verify_module_with_registry(
     }
 
     ensure_acyclic(module)?;
+    verify_glm_protocol(module)?;
     verify_data_fabric_protocol(module, &resources)?;
     verify_cpu_heap_protocol(module)?;
+    Ok(())
+}
+
+fn verify_glm_protocol(module: &YirModule) -> Result<(), String> {
+    let nodes = module
+        .nodes
+        .iter()
+        .map(|node| (node.name.as_str(), node))
+        .collect::<BTreeMap<_, _>>();
+
+    for node in &module.nodes {
+        let profile = glm_profile_for_operation(&node.op);
+        for access in &profile.accesses {
+            if !nodes.contains_key(access.input.as_str()) {
+                continue;
+            }
+            let has_dep = module.edges.iter().any(|edge| {
+                edge.from == access.input
+                    && edge.to == node.name
+                    && matches!(edge.kind, EdgeKind::Dep | EdgeKind::CrossDomainExchange)
+            });
+            if !has_dep {
+                return Err(format!(
+                    "GLM: node `{}` uses `{}` as {} {} without dep/xfer edge",
+                    node.name, access.input, access.class, access.mode
+                ));
+            }
+            if matches!(access.class, yir_core::GlmValueClass::Res)
+                && matches!(access.mode, GlmUseMode::Own | GlmUseMode::Write)
+            {
+                let has_lifetime = module.edges.iter().any(|edge| {
+                    edge.from == access.input
+                        && edge.to == node.name
+                        && matches!(edge.kind, EdgeKind::Lifetime)
+                });
+                if !has_lifetime {
+                    return Err(format!(
+                        "GLM: node `{}` requires lifetime edge from `{}` for {} {} access",
+                        node.name, access.input, access.class, access.mode
+                    ));
+                }
+            }
+        }
+
+        match profile.effect {
+            GlmEffect::DomainMove | GlmEffect::LifetimeEnd => {
+                if let Some(primary) = profile.accesses.first() {
+                    if matches!(primary.class, yir_core::GlmValueClass::Res) {
+                        let lifetime_count = module
+                            .edges
+                            .iter()
+                            .filter(|edge| {
+                                edge.from == primary.input
+                                    && edge.to == node.name
+                                    && matches!(edge.kind, EdgeKind::Lifetime)
+                            })
+                            .count();
+                        if lifetime_count == 0 {
+                            return Err(format!(
+                                "GLM: node `{}` must be ordered by lifetime from `{}`",
+                                node.name, primary.input
+                            ));
+                        }
+                    }
+                }
+            }
+            GlmEffect::None => {}
+        }
+    }
+
     Ok(())
 }
 

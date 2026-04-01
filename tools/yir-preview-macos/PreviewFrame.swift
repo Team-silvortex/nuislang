@@ -14,6 +14,9 @@ struct PpmImage {
 struct UiInput {
     let channel: String
     let defaultValue: Int
+    let minValue: Int
+    let maxValue: Int
+    let stepValue: Int
 }
 
 struct UiPlan {
@@ -62,9 +65,21 @@ func parseUiPlan(at path: String) throws -> UiPlan {
             height = Int(value) ?? height
         } else if line.hasPrefix("input=") {
             let payload = line.dropFirst("input=".count)
-            let parts = payload.split(separator: ",", maxSplits: 1).map(String.init)
-            if parts.count == 2, let defaultValue = Int(parts[1]) {
-                inputs.append(UiInput(channel: parts[0], defaultValue: defaultValue))
+            let parts = payload.split(separator: ",").map(String.init)
+            if parts.count == 5,
+               let defaultValue = Int(parts[1]),
+               let minValue = Int(parts[2]),
+               let maxValue = Int(parts[3]),
+               let stepValue = Int(parts[4]) {
+                inputs.append(
+                    UiInput(
+                        channel: parts[0],
+                        defaultValue: defaultValue,
+                        minValue: minValue,
+                        maxValue: maxValue,
+                        stepValue: max(1, stepValue)
+                    )
+                )
             }
         }
     }
@@ -74,6 +89,10 @@ func parseUiPlan(at path: String) throws -> UiPlan {
 
 func parsePpm(at path: String) throws -> PpmImage {
     let data = try Data(contentsOf: URL(fileURLWithPath: path))
+    return try parsePpm(data: data)
+}
+
+func parsePpm(data: Data) throws -> PpmImage {
     var index = data.startIndex
 
     func skipWhitespaceAndComments() {
@@ -177,6 +196,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var sliders: [String: NSSlider] = [:]
     private var lastRenderedInputs: [String: Int] = [:]
     private var rerenderWorkItem: DispatchWorkItem?
+    private var tickCounter: Int = 0
+    private var tickTimer: Timer?
 
     init(
         planPath: String,
@@ -243,9 +264,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 label.textColor = .labelColor
                 content.addSubview(label)
 
-                let slider = NSSlider(value: Double(input.defaultValue), minValue: 0, maxValue: 255, target: self, action: #selector(sliderChanged(_:)))
+                let slider = NSSlider(
+                    value: Double(input.defaultValue),
+                    minValue: Double(input.minValue),
+                    maxValue: Double(input.maxValue),
+                    target: self,
+                    action: #selector(sliderChanged(_:))
+                )
                 slider.identifier = NSUserInterfaceItemIdentifier(rawValue: input.channel)
                 slider.isContinuous = false
+                slider.numberOfTickMarks = max(0, ((input.maxValue - input.minValue) / input.stepValue) + 1)
+                slider.allowsTickMarkValuesOnly = input.stepValue > 1
                 slider.frame = NSRect(x: 140, y: sliderY, width: windowRect.width - 200, height: 24)
                 slider.autoresizingMask = [.width]
                 content.addSubview(slider)
@@ -266,6 +295,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             window.makeKeyAndOrderFront(nil)
             self.window = window
             NSApp.activate(ignoringOtherApps: true)
+            tickTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
+                self?.renderFromCurrentControls(force: true)
+            }
         } catch {
             fputs("preview failed: \(error)\n", stderr)
             NSApp.terminate(nil)
@@ -274,6 +306,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         true
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        tickTimer?.invalidate()
+        tickTimer = nil
     }
 
     @objc
@@ -288,47 +325,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func scheduleRenderFromCurrentControls() {
         rerenderWorkItem?.cancel()
         let workItem = DispatchWorkItem { [weak self] in
-            self?.renderFromCurrentControls()
+            self?.renderFromCurrentControls(force: false)
         }
         rerenderWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: workItem)
     }
 
-    private func renderFromCurrentControls() {
+    private func renderFromCurrentControls(force: Bool) {
         var currentInputs: [String: Int] = [:]
         for (channel, slider) in sliders {
             currentInputs[channel] = slider.integerValue
         }
-        if currentInputs == lastRenderedInputs {
+        if !force && currentInputs == lastRenderedInputs {
             return
         }
 
         let process = Process()
         process.currentDirectoryURL = URL(fileURLWithPath: rootDir)
         process.executableURL = URL(fileURLWithPath: exportBinaryPath)
-        process.arguments = [modulePath, imagePath, scale]
+        process.arguments = ["--stdout-ppm", modulePath, imagePath, scale]
+        let outputPipe = Pipe()
+        process.standardOutput = outputPipe
 
         var environment = ProcessInfo.processInfo.environment
         for (channel, value) in currentInputs {
             environment["NUIS_UI_\(normalizeChannel(channel))"] = "\(value)"
         }
+        environment["NUIS_TICK"] = "\(tickCounter)"
         process.environment = environment
 
         do {
             try process.run()
             process.waitUntilExit()
             if process.terminationStatus == 0 {
+                let ppmData = outputPipe.fileHandleForReading.readDataToEndOfFile()
                 lastRenderedInputs = currentInputs
-                reloadPreviewImage()
+                tickCounter += 1
+                reloadPreviewImage(from: ppmData)
             }
         } catch {
             fputs("failed to rerender YIR frame: \(error)\n", stderr)
         }
     }
 
-    private func reloadPreviewImage() {
+    private func reloadPreviewImage(from data: Data? = nil) {
         do {
-            let ppm = try parsePpm(at: imagePath)
+            let ppm: PpmImage
+            if let data {
+                ppm = try parsePpm(data: data)
+            } else {
+                ppm = try parsePpm(at: imagePath)
+            }
             if let image = makeImage(from: ppm) {
                 imageView?.image = image
             }

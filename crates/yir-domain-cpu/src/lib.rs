@@ -360,9 +360,9 @@ impl RegisteredMod for CpuMod {
                 Ok(InstructionSemantics::effect(Vec::new()))
             }
             "input_i64" => {
-                if node.op.args.len() != 2 {
+                if node.op.args.len() != 2 && node.op.args.len() != 5 {
                     return Err(format!(
-                        "node `{}` expects `cpu.input_i64 <name> <resource> <channel> <default>`",
+                        "node `{}` expects `cpu.input_i64 <name> <resource> <channel> <default> [<min> <max> <step>]`",
                         node.name
                     ));
                 }
@@ -370,6 +370,61 @@ impl RegisteredMod for CpuMod {
                 node.op.args[1].parse::<i64>().map_err(|_| {
                     format!(
                         "node `{}` has invalid default integer literal `{}`",
+                        node.name, node.op.args[1]
+                    )
+                })?;
+                if node.op.args.len() == 5 {
+                    let min_value = node.op.args[2].parse::<i64>().map_err(|_| {
+                        format!(
+                            "node `{}` has invalid min integer literal `{}`",
+                            node.name, node.op.args[2]
+                        )
+                    })?;
+                    let max_value = node.op.args[3].parse::<i64>().map_err(|_| {
+                        format!(
+                            "node `{}` has invalid max integer literal `{}`",
+                            node.name, node.op.args[3]
+                        )
+                    })?;
+                    let step_value = node.op.args[4].parse::<i64>().map_err(|_| {
+                        format!(
+                            "node `{}` has invalid step integer literal `{}`",
+                            node.name, node.op.args[4]
+                        )
+                    })?;
+                    if min_value > max_value {
+                        return Err(format!(
+                            "node `{}` requires min <= max, got {} > {}",
+                            node.name, min_value, max_value
+                        ));
+                    }
+                    if step_value <= 0 {
+                        return Err(format!(
+                            "node `{}` requires positive step, got `{}`",
+                            node.name, step_value
+                        ));
+                    }
+                }
+
+                Ok(InstructionSemantics::effect(Vec::new()))
+            }
+            "tick_i64" => {
+                if node.op.args.len() != 2 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.tick_i64 <name> <resource> <start> <step>`",
+                        node.name
+                    ));
+                }
+
+                node.op.args[0].parse::<i64>().map_err(|_| {
+                    format!(
+                        "node `{}` has invalid tick start literal `{}`",
+                        node.name, node.op.args[0]
+                    )
+                })?;
+                node.op.args[1].parse::<i64>().map_err(|_| {
+                    format!(
+                        "node `{}` has invalid tick step literal `{}`",
                         node.name, node.op.args[1]
                     )
                 })?;
@@ -903,27 +958,82 @@ impl RegisteredMod for CpuMod {
                         node.name, node.op.args[1]
                     )
                 })?;
+                let (min_value, max_value, step_value) = if node.op.args.len() == 5 {
+                    let min_value = node.op.args[2].parse::<i64>().map_err(|_| {
+                        format!(
+                            "node `{}` has invalid min integer literal `{}`",
+                            node.name, node.op.args[2]
+                        )
+                    })?;
+                    let max_value = node.op.args[3].parse::<i64>().map_err(|_| {
+                        format!(
+                            "node `{}` has invalid max integer literal `{}`",
+                            node.name, node.op.args[3]
+                        )
+                    })?;
+                    let step_value = node.op.args[4].parse::<i64>().map_err(|_| {
+                        format!(
+                            "node `{}` has invalid step integer literal `{}`",
+                            node.name, node.op.args[4]
+                        )
+                    })?;
+                    (min_value, max_value, step_value)
+                } else {
+                    (0, 255, 1)
+                };
                 let env_name = format!("NUIS_UI_{}", normalize_channel(channel));
-                let sampled = env::var(&env_name)
+                let raw_sampled = env::var(&env_name)
                     .ok()
                     .and_then(|value| value.parse::<i64>().ok())
                     .unwrap_or(default_value);
+                let clamped = raw_sampled.clamp(min_value, max_value);
+                let snapped = min_value + ((clamped - min_value) / step_value) * step_value;
                 state.push_resource_event(
                     resource,
                     format!(
-                        "effect cpu.input_i64 @{} [{}] channel={} value={} source={}",
+                        "effect cpu.input_i64 @{} [{}] channel={} value={} source={} range=[{},{}] step={}",
                         node.resource,
                         resource.kind.raw,
                         channel,
-                        sampled,
-                        if sampled == default_value {
+                        snapped,
+                        if raw_sampled == default_value {
                             "default"
                         } else {
                             "env"
-                        }
+                        },
+                        min_value,
+                        max_value,
+                        step_value
                     ),
                 );
-                Ok(Value::Int(sampled))
+                Ok(Value::Int(snapped))
+            }
+            "tick_i64" => {
+                let start = node.op.args[0].parse::<i64>().map_err(|_| {
+                    format!(
+                        "node `{}` has invalid tick start literal `{}`",
+                        node.name, node.op.args[0]
+                    )
+                })?;
+                let step = node.op.args[1].parse::<i64>().map_err(|_| {
+                    format!(
+                        "node `{}` has invalid tick step literal `{}`",
+                        node.name, node.op.args[1]
+                    )
+                })?;
+                let tick_index = env::var("NUIS_TICK")
+                    .ok()
+                    .and_then(|value| value.parse::<i64>().ok())
+                    .unwrap_or(0);
+                let value = start + tick_index * step;
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.tick_i64 @{} [{}] tick={} start={} step={} value={}",
+                        node.resource, resource.kind.raw, tick_index, start, step, value
+                    ),
+                );
+                Ok(Value::Int(value))
             }
             "present_frame" => {
                 let frame = state.expect_value(&node.op.args[0])?.clone();

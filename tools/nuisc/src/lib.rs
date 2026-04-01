@@ -51,6 +51,14 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 println!("  domain: {}", manifest.domain_family);
                 println!("  frontend: {}", manifest.frontend);
                 println!("  crate: {}", manifest.entry_crate);
+                println!("  ast_entry: {}", manifest.ast_entry);
+                println!("  nir_entry: {}", manifest.nir_entry);
+                println!("  yir_lowering_entry: {}", manifest.yir_lowering_entry);
+                println!("  part_verify_entry: {}", manifest.part_verify_entry);
+                println!("  ast_surface: {}", manifest.ast_surface.join(", "));
+                println!("  nir_surface: {}", manifest.nir_surface.join(", "));
+                println!("  yir_lowering: {}", manifest.yir_lowering.join(", "));
+                println!("  part_verify: {}", manifest.part_verify.join(", "));
                 println!("  binary_extension: {}", manifest.binary_extension);
                 println!("  package_layout: {}", manifest.package_layout);
                 println!("  machine_abi_policy: {}", manifest.machine_abi_policy);
@@ -81,6 +89,14 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 println!("  domain: {}", binding.domain_family);
                 println!("  frontend: {}", binding.frontend);
                 println!("  crate: {}", binding.entry_crate);
+                println!("  ast_entry: {}", binding.ast_entry);
+                println!("  nir_entry: {}", binding.nir_entry);
+                println!("  yir_lowering_entry: {}", binding.yir_lowering_entry);
+                println!("  part_verify_entry: {}", binding.part_verify_entry);
+                println!("  ast_surface: {}", binding.ast_surface.join(", "));
+                println!("  nir_surface: {}", binding.nir_surface.join(", "));
+                println!("  yir_lowering: {}", binding.yir_lowering.join(", "));
+                println!("  part_verify: {}", binding.part_verify.join(", "));
                 println!(
                     "  matched_resources: {}",
                     if binding.matched_resources.is_empty() {
@@ -124,6 +140,10 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             println!("  domain: {}", binary.manifest.domain_family);
             println!("  frontend: {}", binary.manifest.frontend);
             println!("  crate: {}", binary.manifest.entry_crate);
+            println!("  ast_entry: {}", binary.manifest.ast_entry);
+            println!("  nir_entry: {}", binary.manifest.nir_entry);
+            println!("  yir_lowering_entry: {}", binary.manifest.yir_lowering_entry);
+            println!("  part_verify_entry: {}", binary.manifest.part_verify_entry);
             println!("  loader_abi: {}", binary.manifest.loader_abi);
             println!("  loader_entry: {}", binary.manifest.loader_entry);
             println!("  format_version: {}", binary.format_version);
@@ -188,9 +208,27 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 println!("    host_abi_struct: {}", contract.host_abi_struct);
                 println!("    result_struct: {}", contract.result_struct);
                 println!("    status_convention: {}", contract.status_convention);
+                println!("    artifact_container: {}", contract.artifact_container);
+                println!(
+                    "    implementation_section: {}",
+                    contract.implementation_section
+                );
+                println!(
+                    "    required_exports: {}",
+                    contract.required_exports.join(", ")
+                );
+                println!(
+                    "    required_metadata: {}",
+                    contract.required_metadata.join(", ")
+                );
+                println!("    link_mode: {}", contract.link_mode);
                 println!("    machine_abi_policy: {}", contract.machine_abi_policy);
                 println!("    notes: {}", contract.notes);
             }
+        }
+        CommandKind::DumpAst { input } => {
+            let artifacts = pipeline::compile_source_path(&input)?;
+            print!("{}", render::render_ast(&artifacts.ast));
         }
         CommandKind::DumpNir { input } => {
             let artifacts = pipeline::compile_source_path(&input)?;
@@ -245,6 +283,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             let written = aot::write_and_link(
                 &input,
                 &output_dir,
+                &artifacts.ast,
                 &artifacts.nir,
                 &artifacts.yir,
                 &artifacts.llvm_ir,
@@ -258,6 +297,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     .collect::<Vec<_>>()
                     .join(", ")
             );
+            println!("ast: {}", written.ast_path);
             println!("nir: {}", written.nir_path);
             println!("yir: {}", written.yir_path);
             println!("llvm_ir: {}", written.llvm_ir_path);

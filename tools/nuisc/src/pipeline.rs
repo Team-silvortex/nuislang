@@ -1,9 +1,10 @@
 use std::{fs, path::Path};
 
-use nuis_semantics::model::NirModule;
+use nuis_semantics::model::{AstModule, NirModule};
 use yir_core::YirModule;
 
 pub struct PipelineArtifacts {
+    pub ast: AstModule,
     pub nir: NirModule,
     pub yir: YirModule,
     pub llvm_ir: String,
@@ -16,8 +17,14 @@ pub fn compile_source_path(path: &Path) -> Result<PipelineArtifacts, String> {
 }
 
 pub fn compile_source(source: &str) -> Result<PipelineArtifacts, String> {
-    let nir = crate::frontend::parse_nuis_module(source)?;
+    let ast = crate::frontend::parse_nuis_ast(source)?;
+    let nir = crate::frontend::lower_ast_to_nir(&ast);
     let yir = crate::lowering::lower_nir_to_yir(&nir)?;
     let llvm_ir = yir_lower_llvm::emit_module(&yir)?;
-    Ok(PipelineArtifacts { nir, yir, llvm_ir })
+    Ok(PipelineArtifacts {
+        ast,
+        nir,
+        yir,
+        llvm_ir,
+    })
 }

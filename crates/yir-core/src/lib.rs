@@ -8,6 +8,40 @@ pub struct YirModule {
     pub edges: Vec<Edge>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GlmValueClass {
+    Val,
+    Res,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GlmUseMode {
+    Own,
+    Read,
+    Write,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GlmEffect {
+    None,
+    DomainMove,
+    LifetimeEnd,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GlmAccess {
+    pub input: String,
+    pub class: GlmValueClass,
+    pub mode: GlmUseMode,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GlmNodeProfile {
+    pub result_class: GlmValueClass,
+    pub accesses: Vec<GlmAccess>,
+    pub effect: GlmEffect,
+}
+
 impl YirModule {
     pub fn new(version: impl Into<String>) -> Self {
         Self {
@@ -122,6 +156,35 @@ impl EdgeKind {
     }
 }
 
+impl fmt::Display for GlmValueClass {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Val => f.write_str("val"),
+            Self::Res => f.write_str("res"),
+        }
+    }
+}
+
+impl fmt::Display for GlmUseMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Own => f.write_str("Own"),
+            Self::Read => f.write_str("Read"),
+            Self::Write => f.write_str("Write"),
+        }
+    }
+}
+
+impl fmt::Display for GlmEffect {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::None => f.write_str("none"),
+            Self::DomainMove => f.write_str("domain-move"),
+            Self::LifetimeEnd => f.write_str("lifetime-end"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Bool(bool),
@@ -156,6 +219,116 @@ pub enum Value {
     RenderPass(RenderPass),
     Frame(FrameSurface),
     Unit,
+}
+
+pub fn glm_profile_for_operation(op: &Operation) -> GlmNodeProfile {
+    match (op.module.as_str(), op.instruction.as_str()) {
+        ("cpu", "alloc_node") | ("cpu", "alloc_buffer") => GlmNodeProfile {
+            result_class: GlmValueClass::Res,
+            accesses: op
+                .args
+                .iter()
+                .map(|input| GlmAccess {
+                    input: input.clone(),
+                    class: GlmValueClass::Val,
+                    mode: GlmUseMode::Read,
+                })
+                .collect(),
+            effect: GlmEffect::None,
+        },
+        ("cpu", "borrow") => GlmNodeProfile {
+            result_class: GlmValueClass::Res,
+            accesses: vec![GlmAccess {
+                input: op.args[0].clone(),
+                class: GlmValueClass::Res,
+                mode: GlmUseMode::Read,
+            }],
+            effect: GlmEffect::None,
+        },
+        ("cpu", "move_ptr") => GlmNodeProfile {
+            result_class: GlmValueClass::Res,
+            accesses: vec![GlmAccess {
+                input: op.args[0].clone(),
+                class: GlmValueClass::Res,
+                mode: GlmUseMode::Own,
+            }],
+            effect: GlmEffect::DomainMove,
+        },
+        ("cpu", "load_value")
+        | ("cpu", "load_next")
+        | ("cpu", "buffer_len")
+        | ("cpu", "load_at") => GlmNodeProfile {
+            result_class: GlmValueClass::Val,
+            accesses: vec![GlmAccess {
+                input: op.args[0].clone(),
+                class: GlmValueClass::Res,
+                mode: GlmUseMode::Read,
+            }],
+            effect: GlmEffect::None,
+        },
+        ("cpu", "store_value") | ("cpu", "store_next") | ("cpu", "store_at") => GlmNodeProfile {
+            result_class: GlmValueClass::Val,
+            accesses: vec![GlmAccess {
+                input: op.args[0].clone(),
+                class: GlmValueClass::Res,
+                mode: GlmUseMode::Write,
+            }],
+            effect: GlmEffect::None,
+        },
+        ("cpu", "free") => GlmNodeProfile {
+            result_class: GlmValueClass::Val,
+            accesses: vec![GlmAccess {
+                input: op.args[0].clone(),
+                class: GlmValueClass::Res,
+                mode: GlmUseMode::Own,
+            }],
+            effect: GlmEffect::LifetimeEnd,
+        },
+        ("data" | "fabric", "move") => GlmNodeProfile {
+            result_class: GlmValueClass::Res,
+            accesses: vec![GlmAccess {
+                input: op.args[0].clone(),
+                class: GlmValueClass::Val,
+                mode: GlmUseMode::Own,
+            }],
+            effect: GlmEffect::DomainMove,
+        },
+        ("data" | "fabric", "copy_window") | ("data" | "fabric", "immutable_window") => {
+            GlmNodeProfile {
+                result_class: GlmValueClass::Res,
+                accesses: vec![GlmAccess {
+                    input: op.args[0].clone(),
+                    class: GlmValueClass::Res,
+                    mode: GlmUseMode::Read,
+                }],
+                effect: GlmEffect::None,
+            }
+        }
+        ("data" | "fabric", "output_pipe") | ("data" | "fabric", "input_pipe") => {
+            GlmNodeProfile {
+                result_class: GlmValueClass::Res,
+                accesses: vec![GlmAccess {
+                    input: op.args[0].clone(),
+                    class: GlmValueClass::Res,
+                    mode: GlmUseMode::Read,
+                }],
+                effect: GlmEffect::None,
+            }
+        }
+        _ => GlmNodeProfile {
+            result_class: GlmValueClass::Val,
+            accesses: op
+                .args
+                .iter()
+                .map(|input| GlmAccess {
+                    input: input.clone(),
+                    class: GlmValueClass::Val,
+                    mode: GlmUseMode::Read,
+                })
+                .collect(),
+            effect: GlmEffect::None,
+        },
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

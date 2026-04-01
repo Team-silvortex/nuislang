@@ -37,6 +37,11 @@ pub struct ImplementationContract {
     pub host_abi_struct: String,
     pub result_struct: String,
     pub status_convention: String,
+    pub artifact_container: String,
+    pub implementation_section: String,
+    pub required_exports: Vec<String>,
+    pub required_metadata: Vec<String>,
+    pub link_mode: String,
     pub machine_abi_policy: String,
     pub notes: String,
 }
@@ -257,22 +262,7 @@ pub fn implementation_contracts(binary: &NustarBinary) -> Vec<ImplementationCont
         .manifest
         .implementation_kinds
         .iter()
-        .map(|kind| ImplementationContract {
-            kind: kind.clone(),
-            loader_abi: binary.manifest.loader_abi.clone(),
-            entry_symbol: binary.manifest.loader_entry.clone(),
-            entry_signature: canonical_entry_signature(binary, kind),
-            host_abi_struct: CANONICAL_HOST_ABI_STRUCT.to_owned(),
-            result_struct: CANONICAL_RESULT_STRUCT.to_owned(),
-            status_convention: CANONICAL_LOADER_STATUS_CONVENTION.to_owned(),
-            machine_abi_policy: binary.manifest.machine_abi_policy.clone(),
-            notes: match kind.as_str() {
-                "native-dylib" => "expects a host-loadable shared library exporting the canonical loader entry with the canonical host/result structs".to_owned(),
-                "llvm-bc" => "expects LLVM bitcode carrying the canonical loader entry symbol and the same bootstrap signature for later lowering/link integration".to_owned(),
-                "native-stub" => "prototype-only placeholder implementation; may be inspected and packaged but does not provide executable domain code".to_owned(),
-                other => format!("custom implementation kind `{other}` must still satisfy the canonical loader ABI and entry contract"),
-            },
-        })
+        .map(|kind| implementation_contract(binary, kind))
         .collect()
 }
 
@@ -294,14 +284,116 @@ fn canonical_entry_signature(binary: &NustarBinary, kind: &str) -> String {
     }
 }
 
+fn implementation_contract(binary: &NustarBinary, kind: &str) -> ImplementationContract {
+    let canonical_export = binary.manifest.loader_entry.clone();
+    match kind {
+        "native-dylib" => ImplementationContract {
+            kind: kind.to_owned(),
+            loader_abi: binary.manifest.loader_abi.clone(),
+            entry_symbol: canonical_export.clone(),
+            entry_signature: canonical_entry_signature(binary, kind),
+            host_abi_struct: CANONICAL_HOST_ABI_STRUCT.to_owned(),
+            result_struct: CANONICAL_RESULT_STRUCT.to_owned(),
+            status_convention: CANONICAL_LOADER_STATUS_CONVENTION.to_owned(),
+            artifact_container: format!("native shared library ({})", binary.object_format),
+            implementation_section: ".nustar.impl.native-dylib".to_owned(),
+            required_exports: vec![
+                canonical_export,
+                "nustar.manifest.v1".to_owned(),
+                "nustar.loader_abi.v1".to_owned(),
+            ],
+            required_metadata: vec![
+                format!("machine_arch={}", binary.machine_arch),
+                format!("machine_os={}", binary.machine_os),
+                format!("object_format={}", binary.object_format),
+                format!("calling_abi={}", binary.calling_abi),
+            ],
+            link_mode: "host-dynamic-load".to_owned(),
+            machine_abi_policy: binary.manifest.machine_abi_policy.clone(),
+            notes: "expects a host-loadable shared library exporting the canonical loader entry with the canonical host/result structs".to_owned(),
+        },
+        "llvm-bc" => ImplementationContract {
+            kind: kind.to_owned(),
+            loader_abi: binary.manifest.loader_abi.clone(),
+            entry_symbol: canonical_export.clone(),
+            entry_signature: canonical_entry_signature(binary, kind),
+            host_abi_struct: CANONICAL_HOST_ABI_STRUCT.to_owned(),
+            result_struct: CANONICAL_RESULT_STRUCT.to_owned(),
+            status_convention: CANONICAL_LOADER_STATUS_CONVENTION.to_owned(),
+            artifact_container: "llvm-bitcode-module".to_owned(),
+            implementation_section: ".nustar.impl.llvm-bc".to_owned(),
+            required_exports: vec![
+                canonical_export,
+                "nustar.manifest.v1".to_owned(),
+                "nustar.loader_abi.v1".to_owned(),
+            ],
+            required_metadata: vec![
+                "llvm_bitcode_version=opaque-pointer-compatible".to_owned(),
+                format!("lowering_target_machine={}", binary.machine_arch),
+                format!("lowering_object_format={}", binary.object_format),
+                format!("lowering_calling_abi={}", binary.calling_abi),
+            ],
+            link_mode: "nuisc-link-or-lower".to_owned(),
+            machine_abi_policy: binary.manifest.machine_abi_policy.clone(),
+            notes: "expects LLVM bitcode carrying the canonical loader entry symbol and the same bootstrap signature for later lowering/link integration".to_owned(),
+        },
+        "native-stub" => ImplementationContract {
+            kind: kind.to_owned(),
+            loader_abi: binary.manifest.loader_abi.clone(),
+            entry_symbol: canonical_export,
+            entry_signature: canonical_entry_signature(binary, kind),
+            host_abi_struct: CANONICAL_HOST_ABI_STRUCT.to_owned(),
+            result_struct: CANONICAL_RESULT_STRUCT.to_owned(),
+            status_convention: CANONICAL_LOADER_STATUS_CONVENTION.to_owned(),
+            artifact_container: "opaque stub payload".to_owned(),
+            implementation_section: ".nustar.impl.stub".to_owned(),
+            required_exports: vec!["nustar.manifest.v1".to_owned()],
+            required_metadata: vec!["prototype_only=true".to_owned()],
+            link_mode: "non-loadable".to_owned(),
+            machine_abi_policy: binary.manifest.machine_abi_policy.clone(),
+            notes: "prototype-only placeholder implementation; may be inspected and packaged but does not provide executable domain code".to_owned(),
+        },
+        other => ImplementationContract {
+            kind: kind.to_owned(),
+            loader_abi: binary.manifest.loader_abi.clone(),
+            entry_symbol: binary.manifest.loader_entry.clone(),
+            entry_signature: canonical_entry_signature(binary, other),
+            host_abi_struct: CANONICAL_HOST_ABI_STRUCT.to_owned(),
+            result_struct: CANONICAL_RESULT_STRUCT.to_owned(),
+            status_convention: CANONICAL_LOADER_STATUS_CONVENTION.to_owned(),
+            artifact_container: "custom-container".to_owned(),
+            implementation_section: format!(".nustar.impl.{other}"),
+            required_exports: vec![
+                binary.manifest.loader_entry.clone(),
+                "nustar.manifest.v1".to_owned(),
+                "nustar.loader_abi.v1".to_owned(),
+            ],
+            required_metadata: vec!["custom_kind_requires_explicit_loader_adapter=true".to_owned()],
+            link_mode: "custom".to_owned(),
+            machine_abi_policy: binary.manifest.machine_abi_policy.clone(),
+            notes: format!(
+                "custom implementation kind `{other}` must still satisfy the canonical loader ABI and entry contract"
+            ),
+        },
+    }
+}
+
 fn render_manifest(manifest: &NustarPackageManifest) -> String {
     format!(
-        "manifest_schema = \"{}\"\npackage_id = \"{}\"\ndomain_family = \"{}\"\nfrontend = \"{}\"\nentry_crate = \"{}\"\nbinary_extension = \"{}\"\npackage_layout = \"{}\"\nmachine_abi_policy = \"{}\"\nimplementation_kinds = {}\nloader_entry = \"{}\"\nloader_abi = \"{}\"\nprofiles = {}\nresource_families = {}\nlowering_targets = {}\nops = {}\n",
+        "manifest_schema = \"{}\"\npackage_id = \"{}\"\ndomain_family = \"{}\"\nfrontend = \"{}\"\nentry_crate = \"{}\"\nast_entry = \"{}\"\nnir_entry = \"{}\"\nyir_lowering_entry = \"{}\"\npart_verify_entry = \"{}\"\nast_surface = {}\nnir_surface = {}\nyir_lowering = {}\npart_verify = {}\nbinary_extension = \"{}\"\npackage_layout = \"{}\"\nmachine_abi_policy = \"{}\"\nimplementation_kinds = {}\nloader_entry = \"{}\"\nloader_abi = \"{}\"\nprofiles = {}\nresource_families = {}\nlowering_targets = {}\nops = {}\n",
         manifest.manifest_schema,
         manifest.package_id,
         manifest.domain_family,
         manifest.frontend,
         manifest.entry_crate,
+        manifest.ast_entry,
+        manifest.nir_entry,
+        manifest.yir_lowering_entry,
+        manifest.part_verify_entry,
+        render_array(&manifest.ast_surface),
+        render_array(&manifest.nir_surface),
+        render_array(&manifest.yir_lowering),
+        render_array(&manifest.part_verify),
         manifest.binary_extension,
         manifest.package_layout,
         manifest.machine_abi_policy,
@@ -369,6 +461,14 @@ fn parse_manifest_text(source: &str, path: &Path) -> Result<NustarPackageManifes
         domain_family: parse_required_string(source, "domain_family", path)?,
         frontend: parse_required_string(source, "frontend", path)?,
         entry_crate: parse_required_string(source, "entry_crate", path)?,
+        ast_entry: parse_required_string(source, "ast_entry", path)?,
+        nir_entry: parse_required_string(source, "nir_entry", path)?,
+        yir_lowering_entry: parse_required_string(source, "yir_lowering_entry", path)?,
+        part_verify_entry: parse_required_string(source, "part_verify_entry", path)?,
+        ast_surface: parse_string_array(source, "ast_surface", path)?,
+        nir_surface: parse_string_array(source, "nir_surface", path)?,
+        yir_lowering: parse_string_array(source, "yir_lowering", path)?,
+        part_verify: parse_string_array(source, "part_verify", path)?,
         binary_extension: parse_required_string(source, "binary_extension", path)?,
         package_layout: parse_required_string(source, "package_layout", path)?,
         machine_abi_policy: parse_required_string(source, "machine_abi_policy", path)?,

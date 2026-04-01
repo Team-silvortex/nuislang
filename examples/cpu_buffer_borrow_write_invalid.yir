@@ -17,3 +17,4 @@ edge dep buf_ref bad_write
 edge dep idx0 bad_write
 edge dep v1 bad_write
 edge effect buf_ref bad_write
+edge lifetime buf_ref bad_write

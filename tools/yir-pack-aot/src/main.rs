@@ -126,6 +126,8 @@ fn run() -> Result<(), String> {
     }
 
     let frame_bundle = maybe_emit_prerendered_frame(&module, &output_dir, stem, frame_scale)?;
+    let runtime_frame_support =
+        maybe_prepare_embedded_runtime_support(&module, &source, frame_scale)?;
     let window_spec = extract_cpu_window_spec(
         &module,
         primary_fabric_binding
@@ -174,15 +176,32 @@ fn run() -> Result<(), String> {
                 &render_fabric_boot_plan(&fabric_boot_plan),
                 fabric_boot_plan.len(),
                 &frame_bundle.embedded_ppm_bytes,
+                runtime_frame_support.as_ref(),
             ),
         )
         .map_err(|error| format!("failed to write `{}`: {error}", host_path.display()))?;
-        compile_native_appkit_binary(&ll_path, &host_path, &exe_path)?;
+        compile_native_appkit_binary(
+            &ll_path,
+            &host_path,
+            runtime_frame_support
+                .as_ref()
+                .map(|support| support.staticlib_path.as_path()),
+            &exe_path,
+        )?;
         manifest.push(format!("binary={}", exe_path.display()));
         manifest.push("binary_mode=llvm_objc_appkit".to_owned());
         manifest.push(format!("host_stub={}", host_path.display()));
-        manifest.push("frame_runtime_mode=embedded_prerendered".to_owned());
-        manifest.push("single_binary=true".to_owned());
+        if let Some(runtime_support) = &runtime_frame_support {
+            manifest.push("frame_runtime_mode=embedded_runtime_tick".to_owned());
+            manifest.push(format!(
+                "runtime_host_staticlib={}",
+                runtime_support.staticlib_path.display()
+            ));
+            manifest.push("single_binary=true".to_owned());
+        } else {
+            manifest.push("frame_runtime_mode=embedded_prerendered".to_owned());
+            manifest.push("single_binary=true".to_owned());
+        }
         manifest.push(format!(
             "fabric_boot_plan_events={}",
             fabric_boot_plan.len()
@@ -409,16 +428,22 @@ fn compile_native_binary(ll_path: &Path, shim_path: &Path, exe_path: &Path) -> R
 fn compile_native_appkit_binary(
     ll_path: &Path,
     host_path: &Path,
+    runtime_staticlib_path: Option<&Path>,
     exe_path: &Path,
 ) -> Result<(), String> {
-    let output = Command::new("/usr/bin/clang")
+    let mut command = Command::new("/usr/bin/clang");
+    command
         .arg(ll_path)
         .arg(host_path)
         .arg("-O2")
         .arg("-framework")
         .arg("AppKit")
         .arg("-framework")
-        .arg("Foundation")
+        .arg("Foundation");
+    if let Some(staticlib_path) = runtime_staticlib_path {
+        command.arg(staticlib_path);
+    }
+    let output = command
         .arg("-o")
         .arg(exe_path)
         .output()
@@ -482,6 +507,12 @@ struct FrameBundle {
     embedded_ppm_bytes: String,
 }
 
+struct RuntimeFrameSupport {
+    staticlib_path: PathBuf,
+    embedded_module_bytes: String,
+    frame_scale: usize,
+}
+
 fn bytes_to_c_array(bytes: &[u8]) -> String {
     let mut out = String::new();
     for (index, byte) in bytes.iter().enumerate() {
@@ -526,6 +557,49 @@ int main(void) {
 "#
 }
 
+fn maybe_prepare_embedded_runtime_support(
+    module: &YirModule,
+    source: &str,
+    frame_scale: usize,
+) -> Result<Option<RuntimeFrameSupport>, String> {
+    let has_tick = module
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "tick_i64");
+    if !has_tick {
+        return Ok(None);
+    }
+
+    let staticlib_path = ensure_runtime_host_staticlib_built()?;
+    Ok(Some(RuntimeFrameSupport {
+        staticlib_path,
+        embedded_module_bytes: bytes_to_c_array(source.as_bytes()),
+        frame_scale,
+    }))
+}
+
+fn ensure_runtime_host_staticlib_built() -> Result<PathBuf, String> {
+    let status = Command::new("cargo")
+        .arg("build")
+        .arg("-p")
+        .arg("yir-runtime-host")
+        .status()
+        .map_err(|error| format!("failed to invoke cargo build for yir-runtime-host: {error}"))?;
+    if !status.success() {
+        return Err("cargo build -p yir-runtime-host failed".to_owned());
+    }
+
+    let debug_path = PathBuf::from("target/debug/libyir_runtime_host.a");
+    if debug_path.exists() {
+        return Ok(debug_path);
+    }
+
+    Err(format!(
+        "expected built runtime host staticlib at `{}`",
+        debug_path.display()
+    ))
+}
+
 fn objc_host_source(
     window_title: &str,
     window_width: usize,
@@ -537,6 +611,7 @@ fn objc_host_source(
     fabric_boot_plan: &str,
     fabric_boot_plan_len: usize,
     embedded_ppm_bytes: &str,
+    runtime_frame_support: Option<&RuntimeFrameSupport>,
 ) -> String {
     let affinity_tag = fabric_worker_core
         .map(|core| core.saturating_add(1))
@@ -557,6 +632,212 @@ fn objc_host_source(
     let fabric_table_id = fabric_table_id.unwrap_or("none");
     let fabric_host_resource = fabric_host_resource.unwrap_or("none");
     let fabric_render_resource = fabric_render_resource.unwrap_or("none");
+    let runtime_mode = runtime_frame_support.is_some();
+    let runtime_frame_scale = runtime_frame_support
+        .map(|support| support.frame_scale)
+        .unwrap_or(4);
+    let embedded_runtime_module_bytes = runtime_frame_support
+        .map(|support| support.embedded_module_bytes.as_str())
+        .unwrap_or("");
+    let runtime_support = if runtime_mode {
+        format!(
+            r#"
+typedef struct {{
+    unsigned char *ptr;
+    uintptr_t len;
+}} NuisRenderedBuffer;
+
+extern int32_t nuis_render_embedded_yir_ppm(
+    const unsigned char *source_ptr,
+    uintptr_t source_len,
+    uintptr_t scale,
+    NuisRenderedBuffer *out_buffer
+);
+
+extern void nuis_rendered_buffer_free(unsigned char *ptr, uintptr_t len);
+extern void nuis_rendered_buffer_reset(NuisRenderedBuffer *out_buffer);
+
+static NSData *nuisGenerateRuntimeFrame(NSUInteger tick) {{
+    @autoreleasepool {{
+        setenv("NUIS_TICK", [[NSString stringWithFormat:@"%lu", (unsigned long)tick] UTF8String], 1);
+        static const unsigned char kNuisEmbeddedYirModule[] = {{{embedded_runtime_module_bytes}}};
+        NuisRenderedBuffer buffer;
+        nuis_rendered_buffer_reset(&buffer);
+        int32_t status = nuis_render_embedded_yir_ppm(
+            kNuisEmbeddedYirModule,
+            sizeof(kNuisEmbeddedYirModule),
+            {runtime_frame_scale},
+            &buffer
+        );
+        if (status != 0 || buffer.ptr == NULL || buffer.len == 0) {{
+            fprintf(stderr, "nuis: embedded runtime frame generation failed with status %d\n", status);
+            if (buffer.ptr != NULL) {{
+                nuis_rendered_buffer_free(buffer.ptr, buffer.len);
+            }}
+            return nil;
+        }}
+        NSData *data = [NSData dataWithBytes:buffer.ptr length:buffer.len];
+        nuis_rendered_buffer_free(buffer.ptr, buffer.len);
+        return data;
+    }}
+}}
+"#
+        )
+    } else {
+        String::new()
+    };
+    let runtime_fields = if runtime_mode {
+        r#"
+@property(nonatomic, strong) NSImageView *imageView;
+@property(nonatomic, assign) NSUInteger tick;
+@property(nonatomic, strong) NSTimer *frameTimer;
+"#
+        .to_owned()
+    } else {
+        r#"
+@property(nonatomic, strong) NSImageView *imageView;
+"#
+        .to_owned()
+    };
+    let runtime_bootstrap = if runtime_mode {
+        r#"
+    self.tick = 0;
+"#
+        .to_owned()
+    } else {
+        String::new()
+    };
+    let runtime_image_assignment = if runtime_mode {
+        r#"
+    self.imageView = imageView;
+    self.frameTimer = [NSTimer scheduledTimerWithTimeInterval:(1.0 / 30.0)
+                                                       repeats:YES
+                                                         block:^(NSTimer *timer) {
+        (void)timer;
+        NSData *frameData = nuisGenerateRuntimeFrame(self.tick);
+        if (frameData == nil) {
+            return;
+        }
+        NSImage *runtimeImage = nuisImageFromPpmData(frameData);
+        if (runtimeImage != nil) {
+            [self.imageView setImage:runtimeImage];
+            self.tick += 1;
+        }
+    }];
+"#
+        .to_owned()
+    } else {
+        String::new()
+    };
+    let runtime_teardown = if runtime_mode {
+        r#"
+    [self.frameTimer invalidate];
+    self.frameTimer = nil;
+"#
+        .to_owned()
+    } else {
+        String::new()
+    };
+    let ppm_support = r#"
+typedef struct {
+    NSUInteger width;
+    NSUInteger height;
+    const unsigned char *pixels;
+    NSUInteger pixel_length;
+} NuisPpmView;
+
+static void nuis_skip_ppm_ws_and_comments(const unsigned char *bytes, NSUInteger length, NSUInteger *index) {
+    while (*index < length) {
+        unsigned char byte = bytes[*index];
+        if (byte == '#') {
+            while (*index < length && bytes[*index] != '\n') {
+                *index += 1;
+            }
+        } else if (byte == ' ' || byte == '\t' || byte == '\n' || byte == '\r') {
+            *index += 1;
+        } else {
+            break;
+        }
+    }
+}
+
+static NSString *nuis_read_ppm_token(NSData *data, NSUInteger *index) {
+    const unsigned char *bytes = data.bytes;
+    NSUInteger length = data.length;
+    nuis_skip_ppm_ws_and_comments(bytes, length, index);
+    NSUInteger start = *index;
+    while (*index < length) {
+        unsigned char byte = bytes[*index];
+        if (byte == ' ' || byte == '\t' || byte == '\n' || byte == '\r' || byte == '#') {
+            break;
+        }
+        *index += 1;
+    }
+    if (start == *index) {
+        return nil;
+    }
+    return [[NSString alloc] initWithBytes:&bytes[start] length:(*index - start) encoding:NSUTF8StringEncoding];
+}
+
+static BOOL nuis_parse_ppm(NSData *data, NuisPpmView *out_view) {
+    NSUInteger index = 0;
+    NSString *magic = nuis_read_ppm_token(data, &index);
+    if (magic == nil || ![magic isEqualToString:@"P6"]) {
+        return NO;
+    }
+    NSString *widthToken = nuis_read_ppm_token(data, &index);
+    NSString *heightToken = nuis_read_ppm_token(data, &index);
+    NSString *maxToken = nuis_read_ppm_token(data, &index);
+    if (widthToken == nil || heightToken == nil || maxToken == nil) {
+        return NO;
+    }
+    NSInteger width = [widthToken integerValue];
+    NSInteger height = [heightToken integerValue];
+    NSInteger maxValue = [maxToken integerValue];
+    if (width <= 0 || height <= 0 || maxValue != 255) {
+        return NO;
+    }
+    const unsigned char *bytes = data.bytes;
+    NSUInteger length = data.length;
+    if (index < length && (bytes[index] == ' ' || bytes[index] == '\t' || bytes[index] == '\n' || bytes[index] == '\r')) {
+        index += 1;
+    }
+    NSUInteger expected = (NSUInteger)width * (NSUInteger)height * 3;
+    if (length < index || (length - index) < expected) {
+        return NO;
+    }
+    out_view->width = (NSUInteger)width;
+    out_view->height = (NSUInteger)height;
+    out_view->pixels = &bytes[index];
+    out_view->pixel_length = expected;
+    return YES;
+}
+
+static NSImage *nuisImageFromPpmData(NSData *ppmData) {
+    NuisPpmView ppm;
+    if (!nuis_parse_ppm(ppmData, &ppm)) {
+        return nil;
+    }
+    NSBitmapImageRep *bitmap = [[NSBitmapImageRep alloc]
+        initWithBitmapDataPlanes:NULL
+                      pixelsWide:(NSInteger)ppm.width
+                      pixelsHigh:(NSInteger)ppm.height
+                   bitsPerSample:8
+                 samplesPerPixel:3
+                        hasAlpha:NO
+                        isPlanar:NO
+                  colorSpaceName:NSDeviceRGBColorSpace
+                     bytesPerRow:(NSInteger)(ppm.width * 3)
+                    bitsPerPixel:24];
+    if (bitmap == nil || bitmap.bitmapData == NULL) {
+        return nil;
+    }
+    memcpy(bitmap.bitmapData, ppm.pixels, ppm.pixel_length);
+    NSImage *image = [[NSImage alloc] initWithSize:NSMakeSize(ppm.width, ppm.height)];
+    [image addRepresentation:bitmap];
+    return image;
+}
+"#;
     format!(
         r###"#import <AppKit/AppKit.h>
 #import <Foundation/Foundation.h>
@@ -590,6 +871,8 @@ void nuis_debug_print_f32(float value) {{
 void nuis_debug_print_f64(double value) {{
     printf("%g\n", value);
 }}
+{runtime_support}
+{ppm_support}
 
 static void nuis_apply_fabric_affinity_hint(integer_t tag) {{
     if (tag <= 0) {{
@@ -841,8 +1124,9 @@ static void nuis_stop_fabric_worker(void) {{
     pthread_join(gNuisFabricWorker, NULL);
 }}
 
-@interface NuisPreviewDelegate : NSObject <NSApplicationDelegate>
+@interface NuisPreviewDelegate : NSObject <NSApplicationDelegate, NSWindowDelegate>
 @property(nonatomic, strong) NSWindow *window;
+{runtime_fields}
 @end
 
 @implementation NuisPreviewDelegate
@@ -853,7 +1137,7 @@ static void nuis_stop_fabric_worker(void) {{
 
     static const unsigned char kNuisFrameBytes[] = {{{embedded_ppm_bytes}}};
     NSData *ppmData = [NSData dataWithBytes:kNuisFrameBytes length:sizeof(kNuisFrameBytes)];
-    NSImage *image = [[NSImage alloc] initWithData:ppmData];
+    NSImage *image = nuisImageFromPpmData(ppmData);
     if (image == nil) {{
         fprintf(stderr, "failed to load embedded frame image\n");
         [NSApp terminate:nil];
@@ -872,6 +1156,7 @@ static void nuis_stop_fabric_worker(void) {{
                              NSWindowStyleMaskResizable)
                     backing:NSBackingStoreBuffered
                       defer:NO];
+    [self.window setDelegate:self];
     [self.window center];
     [self.window setTitle:@"{window_title}"];
 
@@ -880,6 +1165,8 @@ static void nuis_stop_fabric_worker(void) {{
     [imageView setImageScaling:NSImageScaleAxesIndependently];
     [imageView setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
     [self.window setContentView:imageView];
+{runtime_bootstrap}
+{runtime_image_assignment}
     [self.window makeKeyAndOrderFront:nil];
     [NSApp activateIgnoringOtherApps:YES];
     nuis_dispatch_host_signal("window_ready", "{fabric_table_id}", "{fabric_host_resource}", "{fabric_render_resource}");
@@ -890,8 +1177,14 @@ static void nuis_stop_fabric_worker(void) {{
     return YES;
 }}
 
+- (void)windowWillClose:(NSNotification *)notification {{
+    (void)notification;
+    [NSApp terminate:nil];
+}}
+
 - (void)applicationWillTerminate:(NSNotification *)notification {{
     (void)notification;
+{runtime_teardown}
     nuis_dispatch_host_signal("shutdown", "{fabric_table_id}", "{fabric_render_resource}", "{fabric_host_resource}");
 {affinity_teardown}}}
 

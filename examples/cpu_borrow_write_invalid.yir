@@ -15,3 +15,4 @@ edge dep head head_ref
 edge dep head_ref bad_write
 edge dep v2 bad_write
 edge effect head_ref bad_write
+edge lifetime head_ref bad_write

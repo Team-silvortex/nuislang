@@ -6,8 +6,8 @@ shader.target main_target shader0 rgba8_unorm 32 20
 shader.viewport main_view shader0 32 20
 shader.pipeline lit_pipe shader0 lit_sphere triangle_strip
 shader.clear base_frame shader0 main_target 1
-shader.const base_color shader0 64
-shader.const base_speed shader0 18
+shader.const_i64 base_color shader0 64
+shader.const_i64 base_speed shader0 18
 shader.pack_ball_state packet shader0 base_color base_speed
 shader.begin_pass main_pass shader0 main_target lit_pipe main_view
 shader.draw_instanced sphere_frame shader0 main_pass packet 4 1

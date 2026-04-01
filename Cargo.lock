@@ -86,11 +86,7 @@ dependencies = [
 name = "yir-export-frame"
 version = "0.1.0"
 dependencies = [
- "yir-core",
- "yir-exec",
- "yir-host-render",
- "yir-syntax",
- "yir-verify",
+ "yir-runtime-host",
 ]
 
 [[package]]
@@ -140,6 +136,17 @@ name = "yir-run"
 version = "0.1.0"
 dependencies = [
  "yir-exec",
+ "yir-syntax",
+ "yir-verify",
+]
+
+[[package]]
+name = "yir-runtime-host"
+version = "0.1.0"
+dependencies = [
+ "yir-core",
+ "yir-exec",
+ "yir-host-render",
  "yir-syntax",
  "yir-verify",
 ]

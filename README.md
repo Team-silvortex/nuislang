@@ -39,6 +39,7 @@ source → nuis -> nuisc -> NIR -> YIR -> LLVM/AOT
 * Designed as a general-purpose system language
 * Forms its own toolchain and execution model (language, IR, compiler core, external runtime/verifier boundaries)
 * Current YIR reference surface already includes heterogenous `cpu / shader / kernel / data` families, with shader pass composition and kernel tensor ops expanding incrementally from the same graph model
+* The current repo now also has a second host-preview style control demo in `examples/window_controls_demo.yir`, where multiple `cpu.input_i64` controls drive one structured render packet through `data.fabric` into the shader path
 * The `shader` family now also has a minimal resource-layout surface (`uniform / storage / attachment / bind_set`) so future backend package manifests can describe stage bindings instead of only pass topology
 * The `shader` family also includes a first texture-resource slice (`texture2d / sampler / sample_nearest`) plus matching binding kinds for package manifests
 * The texture path now also has a normalized UV surface (`uv / sample_uv_nearest / sample_uv_linear`) so sampling semantics do not depend on hard-coded integer texel coordinates
@@ -631,6 +632,7 @@ nuisc 具有最终否决权：
 * 当前 `nuis / nuisc` 也已有最小 `bindings` 工作流：先形成当前编译图，再得到本次真正需要的 `nustar` binding plan
 * 当前 `nuisc` 也已有最小 `nustar` 标准二进制包骨架：可将 manifest + implementation blob 打成统一包体，并做读取/检查
 * 当前 `nustar` loader contract 也已有最小规范：统一走 `nustar-loader-v1`，canonical entry 为 `nustar.bootstrap.v1`，并带机器 ABI 兼容字段
+* 当前 `cpu / shader / kernel` 三个主 `nustar` 已开始显式声明自己的职责面：具体 `AST`、面向 `nuis` 的 `NIR surface`、到 `YIR` 的 lowering，以及各自负责的 `part verify`
 
 额外边界说明：
 
@@ -642,7 +644,7 @@ nuisc 具有最终否决权：
 
 这意味着：
 
-* 当前仓库**尚未实现完整 NIR / GLM / Fabric verifier**
+* 当前仓库**尚未实现完整 NIR / 最终 GLM / 完整 Fabric verifier**
 * 已具备最小 `YIR` 手写原型：`parse -> verify -> execute`
 * 当前 `YIR` 原型采用 **注册式 mod 指令集** 与**显式图边模型**
 * 当前已新增工作中的 `YIR Reference`：`docs/reference/yir-reference.md`，并拆为 `docs/reference/yir-langref.md` 与 `docs/reference/yir-tools-reference.md`，用于像早期 `LLVM LangRef + tools reference` 那样同步整理现有 reference surface
@@ -652,6 +654,7 @@ nuisc 具有最终否决权：
 * 当前 `cpu` mod 也已有最小条件数据流、位运算与整数基础算子原型（如 `eq / ne / lt / gt / select / and / or / xor / shl / shr / div / rem / neg / not`），用于在保持静态图结构的前提下表达更强的 CPU 语义
 * 当前 `cpu` mod 也已有最小可寻址对象/指针原型（`null / borrow / move_ptr / alloc_node / alloc_buffer / load_* / store_* / free`），用于验证链表和 buffer 这类动态结构
 * 当前 `cpu` verifier 已开始按 Rust 风格收紧所有权边界：借用指针可读不可写，所有权移动后原名不可再用，释放后借用再读会被拒绝
+* 当前 `YIR` verifier 也已接入最小 `GLM` 约束：`res` 的 `Own / Write` 访问需要显式 `lifetime` 图边，`cpu.move_ptr / cpu.free / store_*` 等节点开始进入显式生命周期排序
 * 当前 `kernel` mod 已补最小张量计算原型（如 `tensor` / `matmul` / `add_bias` / `relu`），用于 macOS 上先行验证 `cpu <-> kernel/npu` 的异构图
 * 当前 `shader` mod 已开始覆盖 `Metal/Vulkan` 共有的渲染抽象面（如 `target` / `viewport` / `pipeline` / `begin_pass` / `draw_instanced`）
 * 当前已补 `shader lowering contract` 分析：`draw_instanced + begin_pass + target + pipeline` 会被标注为未来 backend lowering 子集；其余 shader reference op 目前明确走 prerender fallback
@@ -661,8 +664,10 @@ nuisc 具有最终否决权：
 * GPU lane 产出的 `FrameSurface` 已可导出为实际图像文件（PPM）以验证异构执行结果
 * macOS 下已补最小系统窗口预览器骨架：CPU 侧创建窗口并展示 GPU framebuffer 导出的图像；它属于工具层 adapter，不代表 `nuis` 对 Swift/AppKit 的语义依赖
 * 当前已补最小 `AOT bundle` 入口：`tools/yir-pack-aot` 会优先把 CPU slice 走 `YIR -> LLVM IR -> clang` 编成本地二进制；若模块包含异构渲染结果，则会输出 `shader_contract.txt`、`shader_package.toml`，并按当前能力额外打包预渲染 frame 资产
+* 带 `cpu.tick_i64` 的窗口/控件 demo 现在也可走内嵌 runtime 的单体 AOT 路：生成的 macOS AppKit host 会静态链接 `yir-runtime-host`，把 `.yir` 模块字节直接嵌进二进制里，并在进程内持续生成/消费 framebuffer
 * 当前 `nuisc` 已具备最小注册发现入口：`cargo run -p nuisc -- registry`
 * 当前 `nuisc` 也已具备最小前端链：`hello_world.ns` 可走 `nuis -> NIR -> YIR -> LLVM -> arm64 binary`
+* 当前 `nuisc` 前端也已拆成真正的 `AST -> NIR -> YIR` 三层，且最小 `.ns` 已支持 `let`、变量引用、括号和 `+ - * /` 表达式；前门可用 `dump-ast / dump-nir / dump-yir`
 * CPU-hosted UI event demo: `examples/host_ui_sphere.yir`
 * CPU linked-list demo: `examples/cpu_linked_list.yir`
 * Rust-ish CPU ownership demo: `examples/cpu_linked_list_rustish.yir`

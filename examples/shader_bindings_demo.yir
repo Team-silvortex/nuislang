@@ -13,8 +13,8 @@ shader.sampler clamp_sampler shader0 nearest clamp
 shader.blend_state alpha_blend shader0 1 alpha
 shader.depth_state depth_less shader0 1 1 less
 shader.raster_state back_ccw shader0 back ccw
-shader.const base_color shader0 88
-shader.const base_speed shader0 10
+shader.const_i64 base_color shader0 88
+shader.const_i64 base_speed shader0 10
 shader.pack_ball_state packet shader0 base_color base_speed
 shader.uniform material_uniform shader0 0 packet
 shader.attachment color_attachment shader0 1 main_target

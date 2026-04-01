@@ -3,17 +3,18 @@
 
 yir 0.1
 
-resource cpu0 cpu
-resource shader0 shader
+resource cpu0 cpu.arm64
+resource fabric0 data.fabric
+resource shader0 shader.render
 
-cpu.const base_color cpu0 128
-cpu.const color_delta cpu0 20
-cpu.const base_speed cpu0 12
-cpu.const speed_delta cpu0 4
+cpu.const_i64 base_color cpu0 128
+cpu.const_i64 color_delta cpu0 20
+cpu.const_i64 base_speed cpu0 12
+cpu.const_i64 speed_delta cpu0 4
 cpu.add ball_color cpu0 base_color color_delta
 cpu.add ball_speed cpu0 base_speed speed_delta
-data.move gpu_color shader0 ball_color shader0
-data.move gpu_speed shader0 ball_speed shader0
+data.move gpu_color fabric0 ball_color shader0
+data.move gpu_speed fabric0 ball_speed shader0
 shader.pack_ball_state render_packet shader0 gpu_color gpu_speed
 shader.draw_sphere frame shader0 render_packet
 
@@ -23,6 +24,6 @@ edge dep base_speed ball_speed
 edge dep speed_delta ball_speed
 edge xfer ball_color gpu_color
 edge xfer ball_speed gpu_speed
-edge dep gpu_color render_packet
-edge dep gpu_speed render_packet
+edge xfer gpu_color render_packet
+edge xfer gpu_speed render_packet
 edge dep render_packet frame

@@ -1,0 +1,6 @@
+mod cpu Main {
+  fn main() {
+    let config: RenderConfig = RenderConfig { width: 640, speed: 3 };
+    print(config.width);
+  }
+}

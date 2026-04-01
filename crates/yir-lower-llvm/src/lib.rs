@@ -892,13 +892,35 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 last_cpu_value = Some(reg);
             }
             ("cpu", "select") => {
-                let (Some(cond), Some(then_value), Some(else_value)) = (
-                    get_i64(&registers, &node.op.args[0]),
-                    get_i64(&registers, &node.op.args[1]),
-                    get_i64(&registers, &node.op.args[2]),
-                ) else {
+                let cond_value = registers.get(&node.op.args[0]).cloned();
+                let then_value = registers.get(&node.op.args[1]).cloned();
+                let else_value = registers.get(&node.op.args[2]).cloned();
+                let (Some(cond_value), Some(then_value), Some(else_value)) =
+                    (cond_value, then_value, else_value)
+                else {
                     body.push(format!(
                         "  ; deferred lowering for cpu.select `{}` because one or more inputs are outside the current CPU LLVM slice",
+                        node.name
+                    ));
+                    continue;
+                };
+                let Some(cond) = coerce_to_i64(&cond_value, &mut body, &mut next_reg) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.select `{}` because its condition is not coercible to i64",
+                        node.name
+                    ));
+                    continue;
+                };
+                let Some(then_value) = coerce_to_i64(&then_value, &mut body, &mut next_reg) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.select `{}` because its then-value is not coercible to i64",
+                        node.name
+                    ));
+                    continue;
+                };
+                let Some(else_value) = coerce_to_i64(&else_value, &mut body, &mut next_reg) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.select `{}` because its else-value is not coercible to i64",
                         node.name
                     ));
                     continue;

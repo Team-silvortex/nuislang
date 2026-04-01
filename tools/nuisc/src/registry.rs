@@ -22,6 +22,14 @@ pub struct NustarPackageManifest {
     pub domain_family: String,
     pub frontend: String,
     pub entry_crate: String,
+    pub ast_entry: String,
+    pub nir_entry: String,
+    pub yir_lowering_entry: String,
+    pub part_verify_entry: String,
+    pub ast_surface: Vec<String>,
+    pub nir_surface: Vec<String>,
+    pub yir_lowering: Vec<String>,
+    pub part_verify: Vec<String>,
     pub binary_extension: String,
     pub package_layout: String,
     pub machine_abi_policy: String,
@@ -38,6 +46,14 @@ pub struct NustarPackageManifest {
 pub struct NustarBinding {
     pub package_id: String,
     pub domain_family: String,
+    pub ast_entry: String,
+    pub nir_entry: String,
+    pub yir_lowering_entry: String,
+    pub part_verify_entry: String,
+    pub ast_surface: Vec<String>,
+    pub nir_surface: Vec<String>,
+    pub yir_lowering: Vec<String>,
+    pub part_verify: Vec<String>,
     pub matched_resources: Vec<String>,
     pub matched_ops: Vec<String>,
     pub undeclared_ops: Vec<String>,
@@ -147,6 +163,14 @@ pub fn plan_bindings(root: &Path, module: &YirModule) -> Result<NustarBindingPla
         bindings.push(NustarBinding {
             package_id: manifest.package_id,
             domain_family: manifest.domain_family,
+            ast_entry: manifest.ast_entry,
+            nir_entry: manifest.nir_entry,
+            yir_lowering_entry: manifest.yir_lowering_entry,
+            part_verify_entry: manifest.part_verify_entry,
+            ast_surface: manifest.ast_surface,
+            nir_surface: manifest.nir_surface,
+            yir_lowering: manifest.yir_lowering,
+            part_verify: manifest.part_verify,
             matched_resources,
             matched_ops,
             undeclared_ops,
@@ -205,6 +229,22 @@ fn parse_manifest(source: &str, path: &Path) -> Result<NustarPackageManifest, St
     let domain_family = parse_required_string(source, "domain_family", path)?;
     let frontend = parse_required_string(source, "frontend", path)?;
     let entry_crate = parse_required_string(source, "entry_crate", path)?;
+    let ast_entry = parse_optional_string(source, "ast_entry")
+        .unwrap_or_else(|| format!("{}.ast.bootstrap.v1", domain_family));
+    let nir_entry = parse_optional_string(source, "nir_entry")
+        .unwrap_or_else(|| format!("{}.nir.bootstrap.v1", domain_family));
+    let yir_lowering_entry = parse_optional_string(source, "yir_lowering_entry")
+        .unwrap_or_else(|| format!("{}.yir.lowering.v1", domain_family));
+    let part_verify_entry = parse_optional_string(source, "part_verify_entry")
+        .unwrap_or_else(|| format!("{}.verify.partial.v1", domain_family));
+    let ast_surface = parse_optional_string_array(source, "ast_surface")
+        .unwrap_or_else(|| vec![format!("{domain_family}.mod-ast.v1")]);
+    let nir_surface = parse_optional_string_array(source, "nir_surface")
+        .unwrap_or_else(|| vec![format!("nir.{domain_family}.surface.v1")]);
+    let yir_lowering = parse_optional_string_array(source, "yir_lowering")
+        .unwrap_or_else(|| vec![format!("yir.{domain_family}.lowering.v1")]);
+    let part_verify = parse_optional_string_array(source, "part_verify")
+        .unwrap_or_else(|| vec![format!("verify.{domain_family}.contract.v1")]);
     let binary_extension =
         parse_optional_string(source, "binary_extension").unwrap_or_else(|| "nustar".to_owned());
     let package_layout = parse_optional_string(source, "package_layout")
@@ -228,6 +268,14 @@ fn parse_manifest(source: &str, path: &Path) -> Result<NustarPackageManifest, St
         domain_family,
         frontend,
         entry_crate,
+        ast_entry,
+        nir_entry,
+        yir_lowering_entry,
+        part_verify_entry,
+        ast_surface,
+        nir_surface,
+        yir_lowering,
+        part_verify,
         binary_extension,
         package_layout,
         machine_abi_policy,

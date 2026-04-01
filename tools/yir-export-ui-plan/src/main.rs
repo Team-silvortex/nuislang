@@ -36,7 +36,12 @@ fn run() -> Result<(), String> {
             }
             ("cpu", "input_i64") => {
                 if node.op.args.len() == 2 {
-                    lines.push(format!("input={},{}", node.op.args[0], node.op.args[1]));
+                    lines.push(format!("input={},{},0,255,1", node.op.args[0], node.op.args[1]));
+                } else if node.op.args.len() == 5 {
+                    lines.push(format!(
+                        "input={},{},{},{},{}",
+                        node.op.args[0], node.op.args[1], node.op.args[2], node.op.args[3], node.op.args[4]
+                    ));
                 }
             }
             _ => {}

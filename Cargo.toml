@@ -9,6 +9,7 @@ members = [
     "crates/yir-domain-npu",
     "crates/yir-domain-shader",
     "crates/yir-host-render",
+    "crates/yir-runtime-host",
     "crates/yir-lower-contract",
     "crates/yir-lower-llvm",
     "crates/yir-syntax",
