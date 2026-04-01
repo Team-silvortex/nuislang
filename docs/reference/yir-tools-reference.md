@@ -82,6 +82,9 @@ Current loading-contract direction is:
 
 * `native-dylib` and `llvm-bc` both bind through the same canonical loader ABI
 * packages declare a canonical `loader_entry`
+* the canonical bootstrap symbol is `nustar.bootstrap.v1`
+* the canonical bootstrap signature is `extern "C" fn(*const NustarHostAbiV1, *const u8, usize, *mut NustarBootstrapResultV1) -> i32`
+* host/runtime bootstrap stays machine-ABI aware: current `.nustar` packages carry `machine_arch / machine_os / object_format / calling_abi`
 * machine ABI compatibility is explicit and inspectable
 
 ## Core compiler

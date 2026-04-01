@@ -630,6 +630,7 @@ nuisc 具有最终否决权：
 * `nustar-packages/index.toml`：当前 `nustar` 静态索引入口，`nuisc` 通过它做惰性装载，而非主动扫目录发现
 * 当前 `nuis / nuisc` 也已有最小 `bindings` 工作流：先形成当前编译图，再得到本次真正需要的 `nustar` binding plan
 * 当前 `nuisc` 也已有最小 `nustar` 标准二进制包骨架：可将 manifest + implementation blob 打成统一包体，并做读取/检查
+* 当前 `nustar` loader contract 也已有最小规范：统一走 `nustar-loader-v1`，canonical entry 为 `nustar.bootstrap.v1`，并带机器 ABI 兼容字段
 
 额外边界说明：
 

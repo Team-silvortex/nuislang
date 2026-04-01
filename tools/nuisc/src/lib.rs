@@ -124,6 +124,8 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             println!("  domain: {}", binary.manifest.domain_family);
             println!("  frontend: {}", binary.manifest.frontend);
             println!("  crate: {}", binary.manifest.entry_crate);
+            println!("  loader_abi: {}", binary.manifest.loader_abi);
+            println!("  loader_entry: {}", binary.manifest.loader_entry);
             println!("  format_version: {}", binary.format_version);
             println!("  abi: {}", binary.abi_tag);
             println!("  machine_arch: {}", binary.machine_arch);
@@ -155,6 +157,22 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             println!("  loader_abi: {}", binary.manifest.loader_abi);
             println!("  loader_entry: {}", binary.manifest.loader_entry);
             println!(
+                "  canonical_entry_signature: {}",
+                nustar_binary::CANONICAL_ENTRY_SIGNATURE
+            );
+            println!(
+                "  canonical_host_abi_struct: {}",
+                nustar_binary::CANONICAL_HOST_ABI_STRUCT
+            );
+            println!(
+                "  canonical_result_struct: {}",
+                nustar_binary::CANONICAL_RESULT_STRUCT
+            );
+            println!(
+                "  loader_status_convention: {}",
+                nustar_binary::CANONICAL_LOADER_STATUS_CONVENTION
+            );
+            println!(
                 "  machine_abi_policy: {}",
                 binary.manifest.machine_abi_policy
             );
@@ -166,6 +184,10 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 println!("  kind: {}", contract.kind);
                 println!("    loader_abi: {}", contract.loader_abi);
                 println!("    entry_symbol: {}", contract.entry_symbol);
+                println!("    entry_signature: {}", contract.entry_signature);
+                println!("    host_abi_struct: {}", contract.host_abi_struct);
+                println!("    result_struct: {}", contract.result_struct);
+                println!("    status_convention: {}", contract.status_convention);
                 println!("    machine_abi_policy: {}", contract.machine_abi_policy);
                 println!("    notes: {}", contract.notes);
             }

@@ -5,6 +5,15 @@ use crate::registry::NustarPackageManifest;
 const NUSTAR_MAGIC: &[u8; 8] = b"NUSTAR01";
 const NUSTAR_FORMAT_VERSION: u16 = 1;
 
+pub const CANONICAL_LOADER_ABI: &str = "nustar-loader-v1";
+pub const CANONICAL_ENTRY_SYMBOL: &str = "nustar.bootstrap.v1";
+pub const CANONICAL_HOST_ABI_STRUCT: &str = "NustarHostAbiV1";
+pub const CANONICAL_RESULT_STRUCT: &str = "NustarBootstrapResultV1";
+pub const CANONICAL_ENTRY_SIGNATURE: &str =
+    "extern \"C\" fn(*const NustarHostAbiV1, *const u8, usize, *mut NustarBootstrapResultV1) -> i32";
+pub const CANONICAL_LOADER_STATUS_CONVENTION: &str =
+    "returns 0 on success; non-zero loader status on bootstrap failure";
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NustarBinary {
     pub manifest: NustarPackageManifest,
@@ -24,6 +33,10 @@ pub struct ImplementationContract {
     pub kind: String,
     pub loader_abi: String,
     pub entry_symbol: String,
+    pub entry_signature: String,
+    pub host_abi_struct: String,
+    pub result_struct: String,
+    pub status_convention: String,
     pub machine_abi_policy: String,
     pub notes: String,
 }
@@ -248,15 +261,37 @@ pub fn implementation_contracts(binary: &NustarBinary) -> Vec<ImplementationCont
             kind: kind.clone(),
             loader_abi: binary.manifest.loader_abi.clone(),
             entry_symbol: binary.manifest.loader_entry.clone(),
+            entry_signature: canonical_entry_signature(binary, kind),
+            host_abi_struct: CANONICAL_HOST_ABI_STRUCT.to_owned(),
+            result_struct: CANONICAL_RESULT_STRUCT.to_owned(),
+            status_convention: CANONICAL_LOADER_STATUS_CONVENTION.to_owned(),
             machine_abi_policy: binary.manifest.machine_abi_policy.clone(),
             notes: match kind.as_str() {
-                "native-dylib" => "expects a host-loadable shared library exporting the canonical loader entry".to_owned(),
-                "llvm-bc" => "expects LLVM bitcode carrying the canonical loader entry symbol for later lowering/link integration".to_owned(),
+                "native-dylib" => "expects a host-loadable shared library exporting the canonical loader entry with the canonical host/result structs".to_owned(),
+                "llvm-bc" => "expects LLVM bitcode carrying the canonical loader entry symbol and the same bootstrap signature for later lowering/link integration".to_owned(),
                 "native-stub" => "prototype-only placeholder implementation; may be inspected and packaged but does not provide executable domain code".to_owned(),
                 other => format!("custom implementation kind `{other}` must still satisfy the canonical loader ABI and entry contract"),
             },
         })
         .collect()
+}
+
+fn canonical_entry_signature(binary: &NustarBinary, kind: &str) -> String {
+    match kind {
+        "native-dylib" => format!(
+            "{CANONICAL_ENTRY_SIGNATURE} // machine={} / {} / {} / {}",
+            binary.machine_arch, binary.machine_os, binary.object_format, binary.calling_abi
+        ),
+        "llvm-bc" => format!(
+            "{CANONICAL_ENTRY_SIGNATURE} // lowered under {} to {} / {} / {} / {}",
+            binary.manifest.machine_abi_policy,
+            binary.machine_arch,
+            binary.machine_os,
+            binary.object_format,
+            binary.calling_abi
+        ),
+        _ => CANONICAL_ENTRY_SIGNATURE.to_owned(),
+    }
 }
 
 fn render_manifest(manifest: &NustarPackageManifest) -> String {
