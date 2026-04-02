@@ -4,11 +4,36 @@ pub struct NirIntent {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AstModule {
+pub struct AstUse {
     pub domain: String,
     pub unit: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AstModule {
+    pub uses: Vec<AstUse>,
+    pub domain: String,
+    pub unit: String,
+    pub externs: Vec<AstExternFunction>,
+    pub extern_interfaces: Vec<AstExternInterface>,
     pub structs: Vec<AstStructDef>,
     pub functions: Vec<AstFunction>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AstExternFunction {
+    pub abi: String,
+    pub interface: Option<String>,
+    pub name: String,
+    pub params: Vec<AstParam>,
+    pub return_type: AstTypeRef,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AstExternInterface {
+    pub abi: String,
+    pub name: String,
+    pub methods: Vec<AstExternFunction>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -73,6 +98,10 @@ pub enum AstExpr {
     Text(String),
     Int(i64),
     Var(String),
+    Instantiate {
+        domain: String,
+        unit: String,
+    },
     Call {
         callee: String,
         args: Vec<AstExpr>,
@@ -106,11 +135,36 @@ pub enum AstBinaryOp {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NirModule {
+pub struct NirUse {
     pub domain: String,
     pub unit: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NirModule {
+    pub uses: Vec<NirUse>,
+    pub domain: String,
+    pub unit: String,
+    pub externs: Vec<NirExternFunction>,
+    pub extern_interfaces: Vec<NirExternInterface>,
     pub structs: Vec<NirStructDef>,
     pub functions: Vec<NirFunction>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NirExternFunction {
+    pub abi: String,
+    pub interface: Option<String>,
+    pub name: String,
+    pub params: Vec<NirParam>,
+    pub return_type: NirTypeRef,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NirExternInterface {
+    pub abi: String,
+    pub name: String,
+    pub methods: Vec<NirExternFunction>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -208,6 +262,10 @@ pub enum NirExpr {
     Text(String),
     Int(i64),
     Var(String),
+    Instantiate {
+        domain: String,
+        unit: String,
+    },
     Null,
     Borrow(Box<NirExpr>),
     Move(Box<NirExpr>),
@@ -254,6 +312,54 @@ pub enum NirExpr {
         len: Box<NirExpr>,
     },
     DataHandleTable(Vec<(String, String)>),
+    CpuBindCore(i64),
+    CpuWindow {
+        width: i64,
+        height: i64,
+        title: String,
+    },
+    CpuInputI64 {
+        channel: String,
+        default: i64,
+        min: Option<i64>,
+        max: Option<i64>,
+        step: Option<i64>,
+    },
+    CpuTickI64 {
+        start: i64,
+        step: i64,
+    },
+    CpuPresentFrame(Box<NirExpr>),
+    ShaderTarget {
+        format: String,
+        width: i64,
+        height: i64,
+    },
+    ShaderViewport {
+        width: i64,
+        height: i64,
+    },
+    ShaderPipeline {
+        name: String,
+        topology: String,
+    },
+    ShaderBeginPass {
+        target: Box<NirExpr>,
+        pipeline: Box<NirExpr>,
+        viewport: Box<NirExpr>,
+    },
+    ShaderDrawInstanced {
+        pass: Box<NirExpr>,
+        packet: Box<NirExpr>,
+        vertex_count: i64,
+        instance_count: i64,
+    },
+    CpuExternCall {
+        abi: String,
+        interface: Option<String>,
+        callee: String,
+        args: Vec<NirExpr>,
+    },
     Free(Box<NirExpr>),
     IsNull(Box<NirExpr>),
     Call {
@@ -295,6 +401,7 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::Text(_)
         | NirExpr::Int(_)
         | NirExpr::Var(_)
+        | NirExpr::Instantiate { .. }
         | NirExpr::Call { .. }
         | NirExpr::MethodCall { .. }
         | NirExpr::StructLiteral { .. }
@@ -325,7 +432,20 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
             }],
             effect: NirGlmEffect::None,
         }),
-        NirExpr::DataBindCore(_) | NirExpr::DataMarker(_) | NirExpr::DataHandleTable(_) => None,
+        NirExpr::DataBindCore(_)
+        | NirExpr::DataMarker(_)
+        | NirExpr::DataHandleTable(_)
+        | NirExpr::CpuBindCore(_)
+        | NirExpr::CpuWindow { .. }
+        | NirExpr::CpuInputI64 { .. }
+        | NirExpr::CpuTickI64 { .. }
+        | NirExpr::CpuPresentFrame(_)
+        | NirExpr::CpuExternCall { .. }
+        | NirExpr::ShaderTarget { .. }
+        | NirExpr::ShaderViewport { .. }
+        | NirExpr::ShaderPipeline { .. }
+        | NirExpr::ShaderBeginPass { .. }
+        | NirExpr::ShaderDrawInstanced { .. } => None,
         NirExpr::DataOutputPipe(_) => Some(NirGlmProfile {
             result_class: NirGlmValueClass::Val,
             accesses: vec![NirGlmAccess {

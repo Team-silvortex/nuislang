@@ -1,0 +1,3 @@
+name = "window_controls_demo"
+entry = "main.ns"
+modules = ["main.ns", "surface_shader.ns", "fabric_plane.ns"]

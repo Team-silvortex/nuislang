@@ -26,7 +26,7 @@ where
         "bindings" => Ok(CommandKind::Bindings {
             input: PathBuf::from(
                 args.next()
-                    .ok_or_else(|| "usage: nuisc bindings <input.ns>".to_owned())?,
+                    .ok_or_else(|| "usage: nuisc bindings <input.ns|project-dir|nuis.toml>".to_owned())?,
             ),
         }),
         "pack-nustar" => Ok(CommandKind::PackNustar {
@@ -53,35 +53,35 @@ where
         "dump-ast" => Ok(CommandKind::DumpAst {
             input: PathBuf::from(
                 args.next()
-                    .ok_or_else(|| "usage: nuisc dump-ast <input.ns>".to_owned())?,
+                    .ok_or_else(|| "usage: nuisc dump-ast <input.ns|project-dir|nuis.toml>".to_owned())?,
             ),
         }),
         "dump-nir" => Ok(CommandKind::DumpNir {
             input: PathBuf::from(
                 args.next()
-                    .ok_or_else(|| "usage: nuisc dump-nir <input.ns>".to_owned())?,
+                    .ok_or_else(|| "usage: nuisc dump-nir <input.ns|project-dir|nuis.toml>".to_owned())?,
             ),
         }),
         "dump-yir" => Ok(CommandKind::DumpYir {
             input: PathBuf::from(
                 args.next()
-                    .ok_or_else(|| "usage: nuisc dump-yir <input.ns>".to_owned())?,
+                    .ok_or_else(|| "usage: nuisc dump-yir <input.ns|project-dir|nuis.toml>".to_owned())?,
             ),
         }),
         "check" => Ok(CommandKind::Check {
             input: PathBuf::from(
                 args.next()
-                    .ok_or_else(|| "usage: nuisc check <input.ns>".to_owned())?,
+                    .ok_or_else(|| "usage: nuisc check <input.ns|project-dir|nuis.toml>".to_owned())?,
             ),
         }),
         "compile" => Ok(CommandKind::Compile {
             input: PathBuf::from(
                 args.next()
-                    .ok_or_else(|| "usage: nuisc compile <input.ns> <output-dir>".to_owned())?,
+                    .ok_or_else(|| "usage: nuisc compile <input.ns|project-dir|nuis.toml> <output-dir>".to_owned())?,
             ),
             output_dir: PathBuf::from(
                 args.next()
-                    .ok_or_else(|| "usage: nuisc compile <input.ns> <output-dir>".to_owned())?,
+                    .ok_or_else(|| "usage: nuisc compile <input.ns|project-dir|nuis.toml> <output-dir>".to_owned())?,
             ),
         }),
         other => Err(format!(

@@ -5,7 +5,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{
     AstBinaryOp, AstExpr, AstFunction, AstModule, AstParam, AstStmt, AstTypeRef, NirBinaryOp,
-    NirExpr, NirFunction, NirModule, NirParam, NirStmt, NirStructDef, NirStructField, NirTypeRef,
+    NirExpr, NirExternFunction, NirExternInterface, NirFunction, NirModule, NirParam, NirStmt,
+    NirStructDef, NirStructField, NirTypeRef, NirUse,
 };
 
 pub fn frontend_name() -> &'static str {
@@ -40,27 +41,101 @@ pub fn lower_ast_to_nir(module: &AstModule) -> Result<NirModule, String> {
         .collect::<BTreeMap<_, _>>();
 
     let signatures = module
-        .functions
+        .externs
         .iter()
         .map(|function| {
             (
                 function.name.clone(),
                 FunctionSignature {
+                    abi: function.abi.clone(),
+                    interface: None,
+                    symbol_name: function.name.clone(),
                     params: function.params.iter().map(|param| lower_type_ref(&param.ty)).collect(),
-                    return_type: function.return_type.as_ref().map(lower_type_ref),
+                    return_type: Some(lower_type_ref(&function.return_type)),
+                    is_extern: true,
                 },
             )
         })
+        .chain(module.extern_interfaces.iter().flat_map(|interface| {
+            interface.methods.iter().map(move |function| {
+                (
+                    format!("{}.{}", interface.name, function.name),
+                    FunctionSignature {
+                        abi: function.abi.clone(),
+                        interface: Some(interface.name.clone()),
+                        symbol_name: format!("{}__{}", interface.name, function.name),
+                        params: function
+                            .params
+                            .iter()
+                            .map(|param| lower_type_ref(&param.ty))
+                            .collect(),
+                        return_type: Some(lower_type_ref(&function.return_type)),
+                        is_extern: true,
+                    },
+                )
+            })
+        }))
+        .chain(module.functions.iter().map(|function| {
+            (
+                function.name.clone(),
+                FunctionSignature {
+                    abi: "nuis".to_owned(),
+                    interface: None,
+                    symbol_name: function.name.clone(),
+                    params: function.params.iter().map(|param| lower_type_ref(&param.ty)).collect(),
+                    return_type: function.return_type.as_ref().map(lower_type_ref),
+                    is_extern: false,
+                },
+            )
+        }))
         .collect::<BTreeMap<_, _>>();
 
     Ok(NirModule {
+        uses: module
+            .uses
+            .iter()
+            .map(|item| NirUse {
+                domain: item.domain.clone(),
+                unit: item.unit.clone(),
+            })
+            .collect(),
         domain: module.domain.clone(),
         unit: module.unit.clone(),
+        externs: module
+            .externs
+            .iter()
+            .map(|function| NirExternFunction {
+                abi: function.abi.clone(),
+                interface: None,
+                name: function.name.clone(),
+                params: function.params.iter().map(lower_param).collect(),
+                return_type: lower_type_ref(&function.return_type),
+            })
+            .collect(),
+        extern_interfaces: module
+            .extern_interfaces
+            .iter()
+            .map(|interface| NirExternInterface {
+                abi: interface.abi.clone(),
+                name: interface.name.clone(),
+                methods: interface
+                    .methods
+                    .iter()
+                    .map(|function| NirExternFunction {
+                        abi: function.abi.clone(),
+                        interface: Some(interface.name.clone()),
+                        name: function.name.clone(),
+                        params: function.params.iter().map(lower_param).collect(),
+                        return_type: lower_type_ref(&function.return_type),
+                    })
+                    .collect(),
+            })
+            .collect(),
         structs: struct_defs,
         functions: module
             .functions
             .iter()
-            .map(|function| lower_function(function, &signatures, &struct_table))
+            .map(|function| lower_function(function, &module.domain, &signatures, &struct_table))
             .collect::<Result<Vec<_>, _>>()?,
     })
 }
@@ -72,12 +147,17 @@ pub fn parse_nuis_module(input: &str) -> Result<NirModule, String> {
 
 #[derive(Clone)]
 struct FunctionSignature {
+    abi: String,
+    interface: Option<String>,
+    symbol_name: String,
     params: Vec<NirTypeRef>,
     return_type: Option<NirTypeRef>,
+    is_extern: bool,
 }
 
 fn lower_function(
     function: &AstFunction,
+    current_domain: &str,
     signatures: &BTreeMap<String, FunctionSignature>,
     struct_table: &BTreeMap<String, NirStructDef>,
 ) -> Result<NirFunction, String> {
@@ -96,6 +176,7 @@ fn lower_function(
             .map(|stmt| {
                 lower_stmt(
                     stmt,
+                    current_domain,
                     &mut bindings,
                     function.return_type.as_ref(),
                     signatures,
@@ -124,6 +205,7 @@ fn lower_type_ref(ty: &AstTypeRef) -> NirTypeRef {
 
 fn lower_stmt(
     stmt: &AstStmt,
+    current_domain: &str,
     bindings: &mut BTreeMap<String, NirTypeRef>,
     return_type: Option<&AstTypeRef>,
     signatures: &BTreeMap<String, FunctionSignature>,
@@ -132,7 +214,14 @@ fn lower_stmt(
     Ok(match stmt {
         AstStmt::Let { name, ty, value } => {
             let expected = ty.as_ref().map(lower_type_ref);
-            let lowered = lower_expr(value, bindings, signatures, struct_table, expected.as_ref())?;
+            let lowered = lower_expr(
+                value,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                expected.as_ref(),
+            )?;
             let inferred = infer_nir_expr_type(&lowered, bindings, signatures, struct_table);
             let final_type = resolve_declared_or_inferred(name, expected, inferred)?;
             bindings.insert(name.clone(), final_type.clone());
@@ -144,7 +233,14 @@ fn lower_stmt(
         }
         AstStmt::Const { name, ty, value } => {
             let expected = lower_type_ref(ty);
-            let lowered = lower_expr(value, bindings, signatures, struct_table, Some(&expected))?;
+            let lowered = lower_expr(
+                value,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&expected),
+            )?;
             let inferred = infer_nir_expr_type(&lowered, bindings, signatures, struct_table);
             let final_type = resolve_declared_or_inferred(name, Some(expected), inferred)?;
             bindings.insert(name.clone(), final_type.clone());
@@ -155,7 +251,14 @@ fn lower_stmt(
         }
         }
         AstStmt::Print(value) => {
-            NirStmt::Print(lower_expr(value, bindings, signatures, struct_table, None)?)
+            NirStmt::Print(lower_expr(
+                value,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?)
         }
         AstStmt::If {
             condition,
@@ -164,6 +267,7 @@ fn lower_stmt(
         } => NirStmt::If {
             condition: lower_expr(
                 condition,
+                current_domain,
                 bindings,
                 signatures,
                 struct_table,
@@ -174,6 +278,7 @@ fn lower_stmt(
                 .map(|stmt| {
                     lower_stmt(
                         stmt,
+                        current_domain,
                         &mut bindings.clone(),
                         return_type,
                         signatures,
@@ -186,6 +291,7 @@ fn lower_stmt(
                 .map(|stmt| {
                     lower_stmt(
                         stmt,
+                        current_domain,
                         &mut bindings.clone(),
                         return_type,
                         signatures,
@@ -195,13 +301,21 @@ fn lower_stmt(
                 .collect::<Result<Vec<_>, _>>()?,
         },
         AstStmt::Expr(expr) => {
-            NirStmt::Expr(lower_expr(expr, bindings, signatures, struct_table, None)?)
+            NirStmt::Expr(lower_expr(
+                expr,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?)
         }
         AstStmt::Return(value) => {
             let expected = return_type.map(lower_type_ref);
             NirStmt::Return(match value {
                 Some(value) => Some(lower_expr(
                     value,
+                    current_domain,
                     bindings,
                     signatures,
                     struct_table,
@@ -215,6 +329,7 @@ fn lower_stmt(
 
 fn lower_expr(
     expr: &AstExpr,
+    current_domain: &str,
     bindings: &BTreeMap<String, NirTypeRef>,
     signatures: &BTreeMap<String, FunctionSignature>,
     struct_table: &BTreeMap<String, NirStructDef>,
@@ -225,21 +340,90 @@ fn lower_expr(
         AstExpr::Text(text) => NirExpr::Text(text.clone()),
         AstExpr::Int(value) => NirExpr::Int(*value),
         AstExpr::Var(name) => NirExpr::Var(name.clone()),
+        AstExpr::Instantiate { domain, unit } => {
+            if current_domain != "cpu" {
+                return Err(format!(
+                    "instantiate {} {} is only allowed inside `mod cpu <unit>` in the current frontend",
+                    domain, unit
+                ));
+            }
+            NirExpr::Instantiate {
+                domain: domain.clone(),
+                unit: unit.clone(),
+            }
+        }
         AstExpr::Call { callee, args } => {
-            lower_call_expr(callee, args, bindings, signatures, struct_table, expected)?
+            lower_call_expr(
+                callee,
+                args,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                expected,
+            )?
         }
         AstExpr::MethodCall {
             receiver,
             method,
             args,
-        } => NirExpr::MethodCall {
-            receiver: Box::new(lower_expr(receiver, bindings, signatures, struct_table, None)?),
-            method: method.clone(),
-            args: args
-                .iter()
-                .map(|arg| lower_expr(arg, bindings, signatures, struct_table, None))
-                .collect::<Result<Vec<_>, _>>()?,
-        },
+        } => {
+            if let AstExpr::Var(receiver_name) = receiver.as_ref() {
+                let signature_key = format!("{receiver_name}.{method}");
+                if let Some(signature) = signatures.get(&signature_key) {
+                    let lowered_args = args
+                        .iter()
+                        .map(|arg| {
+                            lower_expr(
+                                arg,
+                                current_domain,
+                                bindings,
+                                signatures,
+                                struct_table,
+                                None,
+                            )
+                        })
+                        .collect::<Result<Vec<_>, _>>()?;
+                    if signature.params.len() != lowered_args.len() {
+                        return Err(format!(
+                            "method `{signature_key}` expects {} args, found {}",
+                            signature.params.len(),
+                            lowered_args.len()
+                        ));
+                    }
+                    if signature.is_extern {
+                        if current_domain != "cpu" {
+                            return Err(format!(
+                                "extern method `{signature_key}` is currently only allowed inside `mod cpu <unit>`"
+                            ));
+                        }
+                        return Ok(NirExpr::CpuExternCall {
+                            abi: signature.abi.clone(),
+                            interface: signature.interface.clone(),
+                            callee: signature.symbol_name.clone(),
+                            args: lowered_args,
+                        });
+                    }
+                }
+            }
+            NirExpr::MethodCall {
+                receiver: Box::new(lower_expr(
+                    receiver,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    None,
+                )?),
+                method: method.clone(),
+                args: args
+                    .iter()
+                    .map(|arg| {
+                        lower_expr(arg, current_domain, bindings, signatures, struct_table, None)
+                    })
+                    .collect::<Result<Vec<_>, _>>()?,
+            }
+        }
         AstExpr::StructLiteral { type_name, fields } => {
             let definition = struct_table.get(type_name).ok_or_else(|| {
                 format!("unknown struct type `{}`", type_name)
@@ -259,7 +443,14 @@ fn lower_expr(
                     ));
                 }
                 let lowered =
-                    lower_expr(value, bindings, signatures, struct_table, Some(&field.ty))?;
+                    lower_expr(
+                        value,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        Some(&field.ty),
+                    )?;
                 let inferred =
                     infer_nir_expr_type(&lowered, bindings, signatures, struct_table);
                 let _ = resolve_declared_or_inferred(name, Some(field.ty.clone()), inferred)?;
@@ -278,7 +469,14 @@ fn lower_expr(
             }
         }
         AstExpr::FieldAccess { base, field } => {
-            let lowered_base = lower_expr(base, bindings, signatures, struct_table, None)?;
+            let lowered_base = lower_expr(
+                base,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
             let base_ty =
                 infer_nir_expr_type(&lowered_base, bindings, signatures, struct_table)
                     .ok_or_else(|| {
@@ -305,8 +503,22 @@ fn lower_expr(
                 AstBinaryOp::Mul => NirBinaryOp::Mul,
                 AstBinaryOp::Div => NirBinaryOp::Div,
             },
-            lhs: Box::new(lower_expr(lhs, bindings, signatures, struct_table, None)?),
-            rhs: Box::new(lower_expr(rhs, bindings, signatures, struct_table, None)?),
+            lhs: Box::new(lower_expr(
+                lhs,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?),
+            rhs: Box::new(lower_expr(
+                rhs,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?),
         },
     })
 }
@@ -314,6 +526,7 @@ fn lower_expr(
 fn lower_call_expr(
     callee: &str,
     args: &[AstExpr],
+    current_domain: &str,
     bindings: &BTreeMap<String, NirTypeRef>,
     signatures: &BTreeMap<String, FunctionSignature>,
     struct_table: &BTreeMap<String, NirStructDef>,
@@ -335,7 +548,14 @@ fn lower_call_expr(
             let [value] = args else {
                 return Err("borrow(...) expects 1 arg".to_owned());
             };
-            let lowered = lower_expr(value, bindings, signatures, struct_table, None)?;
+            let lowered = lower_expr(
+                value,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
             ensure_ref_like("borrow", &lowered, bindings, signatures, struct_table)?;
             Ok(NirExpr::Borrow(Box::new(lowered)))
         }
@@ -343,7 +563,14 @@ fn lower_call_expr(
             let [value] = args else {
                 return Err("move(...) expects 1 arg".to_owned());
             };
-            let lowered = lower_expr(value, bindings, signatures, struct_table, None)?;
+            let lowered = lower_expr(
+                value,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
             ensure_ref_like("move", &lowered, bindings, signatures, struct_table)?;
             Ok(NirExpr::Move(Box::new(lowered)))
         }
@@ -351,10 +578,17 @@ fn lower_call_expr(
             let [value, next] = args else {
                 return Err("alloc_node(...) expects 2 args".to_owned());
             };
-            let lowered_value =
-                lower_expr(value, bindings, signatures, struct_table, Some(&i64_type()))?;
+            let lowered_value = lower_expr(
+                value,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
             let lowered_next = lower_expr(
                 next,
+                current_domain,
                 bindings,
                 signatures,
                 struct_table,
@@ -371,17 +605,19 @@ fn lower_call_expr(
             };
             Ok(NirExpr::AllocBuffer {
                 len: Box::new(lower_expr(
-                    len,
-                    bindings,
-                    signatures,
-                    struct_table,
+                len,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
                     Some(&i64_type()),
                 )?),
                 fill: Box::new(lower_expr(
-                    fill,
-                    bindings,
-                    signatures,
-                    struct_table,
+                fill,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
                     Some(&i64_type()),
                 )?),
             })
@@ -392,6 +628,7 @@ fn lower_call_expr(
             };
             let lowered = lower_expr(
                 ptr,
+                current_domain,
                 bindings,
                 signatures,
                 struct_table,
@@ -405,6 +642,7 @@ fn lower_call_expr(
             };
             let lowered = lower_expr(
                 ptr,
+                current_domain,
                 bindings,
                 signatures,
                 struct_table,
@@ -418,6 +656,7 @@ fn lower_call_expr(
             };
             let lowered = lower_expr(
                 ptr,
+                current_domain,
                 bindings,
                 signatures,
                 struct_table,
@@ -432,6 +671,7 @@ fn lower_call_expr(
             Ok(NirExpr::LoadAt {
                 buffer: Box::new(lower_expr(
                     buffer,
+                    current_domain,
                     bindings,
                     signatures,
                     struct_table,
@@ -439,6 +679,7 @@ fn lower_call_expr(
                 )?),
                 index: Box::new(lower_expr(
                     index,
+                    current_domain,
                     bindings,
                     signatures,
                     struct_table,
@@ -453,6 +694,7 @@ fn lower_call_expr(
             Ok(NirExpr::StoreValue {
                 target: Box::new(lower_expr(
                     target,
+                    current_domain,
                     bindings,
                     signatures,
                     struct_table,
@@ -460,6 +702,7 @@ fn lower_call_expr(
                 )?),
                 value: Box::new(lower_expr(
                     value,
+                    current_domain,
                     bindings,
                     signatures,
                     struct_table,
@@ -474,6 +717,7 @@ fn lower_call_expr(
             Ok(NirExpr::StoreNext {
                 target: Box::new(lower_expr(
                     target,
+                    current_domain,
                     bindings,
                     signatures,
                     struct_table,
@@ -481,6 +725,7 @@ fn lower_call_expr(
                 )?),
                 next: Box::new(lower_expr(
                     next,
+                    current_domain,
                     bindings,
                     signatures,
                     struct_table,
@@ -495,6 +740,7 @@ fn lower_call_expr(
             Ok(NirExpr::StoreAt {
                 buffer: Box::new(lower_expr(
                     buffer,
+                    current_domain,
                     bindings,
                     signatures,
                     struct_table,
@@ -502,6 +748,7 @@ fn lower_call_expr(
                 )?),
                 index: Box::new(lower_expr(
                     index,
+                    current_domain,
                     bindings,
                     signatures,
                     struct_table,
@@ -509,6 +756,7 @@ fn lower_call_expr(
                 )?),
                 value: Box::new(lower_expr(
                     value,
+                    current_domain,
                     bindings,
                     signatures,
                     struct_table,
@@ -538,14 +786,28 @@ fn lower_call_expr(
             let [value] = args else {
                 return Err("data_output_pipe(...) expects 1 arg".to_owned());
             };
-            let lowered = lower_expr(value, bindings, signatures, struct_table, None)?;
+            let lowered = lower_expr(
+                value,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
             Ok(NirExpr::DataOutputPipe(Box::new(lowered)))
         }
         "data_input_pipe" => {
             let [pipe] = args else {
                 return Err("data_input_pipe(...) expects 1 arg".to_owned());
             };
-            let lowered = lower_expr(pipe, bindings, signatures, struct_table, None)?;
+            let lowered = lower_expr(
+                pipe,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
             Ok(NirExpr::DataInputPipe(Box::new(lowered)))
         }
         "data_copy_window" => {
@@ -553,9 +815,17 @@ fn lower_call_expr(
                 return Err("data_copy_window(...) expects 3 args".to_owned());
             };
             Ok(NirExpr::DataCopyWindow {
-                input: Box::new(lower_expr(input, bindings, signatures, struct_table, None)?),
+                input: Box::new(lower_expr(
+                    input,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    None,
+                )?),
                 offset: Box::new(lower_expr(
                     offset,
+                    current_domain,
                     bindings,
                     signatures,
                     struct_table,
@@ -563,6 +833,7 @@ fn lower_call_expr(
                 )?),
                 len: Box::new(lower_expr(
                     len,
+                    current_domain,
                     bindings,
                     signatures,
                     struct_table,
@@ -575,9 +846,17 @@ fn lower_call_expr(
                 return Err("data_immutable_window(...) expects 3 args".to_owned());
             };
             Ok(NirExpr::DataImmutableWindow {
-                input: Box::new(lower_expr(input, bindings, signatures, struct_table, None)?),
+                input: Box::new(lower_expr(
+                    input,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    None,
+                )?),
                 offset: Box::new(lower_expr(
                     offset,
+                    current_domain,
                     bindings,
                     signatures,
                     struct_table,
@@ -585,6 +864,7 @@ fn lower_call_expr(
                 )?),
                 len: Box::new(lower_expr(
                     len,
+                    current_domain,
                     bindings,
                     signatures,
                     struct_table,
@@ -613,11 +893,200 @@ fn lower_call_expr(
             }
             Ok(NirExpr::DataHandleTable(entries))
         }
+        "cpu_bind_core" => {
+            let [core] = args else {
+                return Err("cpu_bind_core(...) expects 1 arg".to_owned());
+            };
+            let AstExpr::Int(core_index) = core else {
+                return Err("cpu_bind_core(...) currently expects an integer literal".to_owned());
+            };
+            Ok(NirExpr::CpuBindCore(*core_index))
+        }
+        "cpu_window" => {
+            let [width, height, title] = args else {
+                return Err("cpu_window(...) expects 3 args".to_owned());
+            };
+            let AstExpr::Int(width) = width else {
+                return Err("cpu_window(...) width must be an integer literal".to_owned());
+            };
+            let AstExpr::Int(height) = height else {
+                return Err("cpu_window(...) height must be an integer literal".to_owned());
+            };
+            let AstExpr::Text(title) = title else {
+                return Err("cpu_window(...) title must be a string literal".to_owned());
+            };
+            Ok(NirExpr::CpuWindow {
+                width: *width,
+                height: *height,
+                title: title.clone(),
+            })
+        }
+        "cpu_input_i64" => {
+            match args {
+                [channel, default] | [channel, default, ..] => {
+                    let AstExpr::Text(channel) = channel else {
+                        return Err("cpu_input_i64(...) channel must be a string literal".to_owned());
+                    };
+                    let AstExpr::Int(default) = default else {
+                        return Err("cpu_input_i64(...) default must be an integer literal".to_owned());
+                    };
+                    let (min, max, step) = match args {
+                        [_, _, min, max, step] => {
+                            let AstExpr::Int(min) = min else {
+                                return Err("cpu_input_i64(...) min must be an integer literal".to_owned());
+                            };
+                            let AstExpr::Int(max) = max else {
+                                return Err("cpu_input_i64(...) max must be an integer literal".to_owned());
+                            };
+                            let AstExpr::Int(step) = step else {
+                                return Err("cpu_input_i64(...) step must be an integer literal".to_owned());
+                            };
+                            (Some(*min), Some(*max), Some(*step))
+                        }
+                        [_, _] => (None, None, None),
+                        _ => {
+                            return Err(
+                                "cpu_input_i64(...) expects 2 args or 5 args".to_owned()
+                            )
+                        }
+                    };
+                    Ok(NirExpr::CpuInputI64 {
+                        channel: channel.clone(),
+                        default: *default,
+                        min,
+                        max,
+                        step,
+                    })
+                }
+                _ => Err("cpu_input_i64(...) expects 2 args or 5 args".to_owned()),
+            }
+        }
+        "cpu_tick_i64" => {
+            let [start, step] = args else {
+                return Err("cpu_tick_i64(...) expects 2 args".to_owned());
+            };
+            let AstExpr::Int(start) = start else {
+                return Err("cpu_tick_i64(...) start must be an integer literal".to_owned());
+            };
+            let AstExpr::Int(step) = step else {
+                return Err("cpu_tick_i64(...) step must be an integer literal".to_owned());
+            };
+            Ok(NirExpr::CpuTickI64 {
+                start: *start,
+                step: *step,
+            })
+        }
+        "cpu_present_frame" => {
+            let [frame] = args else {
+                return Err("cpu_present_frame(...) expects 1 arg".to_owned());
+            };
+            Ok(NirExpr::CpuPresentFrame(Box::new(lower_expr(
+                frame,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?)))
+        }
+        "shader_target" => {
+            let [format, width, height] = args else {
+                return Err("shader_target(...) expects 3 args".to_owned());
+            };
+            let AstExpr::Text(format) = format else {
+                return Err("shader_target(...) format must be a string literal".to_owned());
+            };
+            let AstExpr::Int(width) = width else {
+                return Err("shader_target(...) width must be an integer literal".to_owned());
+            };
+            let AstExpr::Int(height) = height else {
+                return Err("shader_target(...) height must be an integer literal".to_owned());
+            };
+            Ok(NirExpr::ShaderTarget {
+                format: format.clone(),
+                width: *width,
+                height: *height,
+            })
+        }
+        "shader_viewport" => {
+            let [width, height] = args else {
+                return Err("shader_viewport(...) expects 2 args".to_owned());
+            };
+            let AstExpr::Int(width) = width else {
+                return Err("shader_viewport(...) width must be an integer literal".to_owned());
+            };
+            let AstExpr::Int(height) = height else {
+                return Err("shader_viewport(...) height must be an integer literal".to_owned());
+            };
+            Ok(NirExpr::ShaderViewport {
+                width: *width,
+                height: *height,
+            })
+        }
+        "shader_pipeline" => {
+            let [name, topology] = args else {
+                return Err("shader_pipeline(...) expects 2 args".to_owned());
+            };
+            let AstExpr::Text(name) = name else {
+                return Err("shader_pipeline(...) name must be a string literal".to_owned());
+            };
+            let AstExpr::Text(topology) = topology else {
+                return Err("shader_pipeline(...) topology must be a string literal".to_owned());
+            };
+            Ok(NirExpr::ShaderPipeline {
+                name: name.clone(),
+                topology: topology.clone(),
+            })
+        }
+        "shader_begin_pass" => {
+            let [target, pipeline, viewport] = args else {
+                return Err("shader_begin_pass(...) expects 3 args".to_owned());
+            };
+            Ok(NirExpr::ShaderBeginPass {
+                target: Box::new(lower_expr(
+                    target, current_domain, bindings, signatures, struct_table, None,
+                )?),
+                pipeline: Box::new(lower_expr(
+                    pipeline, current_domain, bindings, signatures, struct_table, None,
+                )?),
+                viewport: Box::new(lower_expr(
+                    viewport, current_domain, bindings, signatures, struct_table, None,
+                )?),
+            })
+        }
+        "shader_draw_instanced" => {
+            let [pass, packet, vertex_count, instance_count] = args else {
+                return Err("shader_draw_instanced(...) expects 4 args".to_owned());
+            };
+            let AstExpr::Int(vertex_count) = vertex_count else {
+                return Err("shader_draw_instanced(...) vertex_count must be an integer literal".to_owned());
+            };
+            let AstExpr::Int(instance_count) = instance_count else {
+                return Err("shader_draw_instanced(...) instance_count must be an integer literal".to_owned());
+            };
+            Ok(NirExpr::ShaderDrawInstanced {
+                pass: Box::new(lower_expr(
+                    pass, current_domain, bindings, signatures, struct_table, None,
+                )?),
+                packet: Box::new(lower_expr(
+                    packet, current_domain, bindings, signatures, struct_table, None,
+                )?),
+                vertex_count: *vertex_count,
+                instance_count: *instance_count,
+            })
+        }
         "free" => {
             let [value] = args else {
                 return Err("free(...) expects 1 arg".to_owned());
             };
-            let lowered = lower_expr(value, bindings, signatures, struct_table, None)?;
+            let lowered = lower_expr(
+                value,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
             ensure_ref_like("free", &lowered, bindings, signatures, struct_table)?;
             Ok(NirExpr::Free(Box::new(lowered)))
         }
@@ -625,14 +1094,23 @@ fn lower_call_expr(
             let [value] = args else {
                 return Err("is_null(...) expects 1 arg".to_owned());
             };
-            let lowered = lower_expr(value, bindings, signatures, struct_table, None)?;
+            let lowered = lower_expr(
+                value,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
             ensure_ref_like("is_null", &lowered, bindings, signatures, struct_table)?;
             Ok(NirExpr::IsNull(Box::new(lowered)))
         }
         _ => {
             let lowered_args = args
                 .iter()
-                .map(|arg| lower_expr(arg, bindings, signatures, struct_table, None))
+                .map(|arg| {
+                    lower_expr(arg, current_domain, bindings, signatures, struct_table, None)
+                })
                 .collect::<Result<Vec<_>, _>>()?;
             if let Some(signature) = signatures.get(callee) {
                 if signature.params.len() != lowered_args.len() {
@@ -641,6 +1119,19 @@ fn lower_call_expr(
                         signature.params.len(),
                         lowered_args.len()
                     ));
+                }
+                if signature.is_extern {
+                    if current_domain != "cpu" {
+                        return Err(format!(
+                            "extern call `{callee}` is currently only allowed inside `mod cpu <unit>`"
+                        ));
+                    }
+                    return Ok(NirExpr::CpuExternCall {
+                        abi: signature.abi.clone(),
+                        interface: None,
+                        callee: signature.symbol_name.clone(),
+                        args: lowered_args,
+                    });
                 }
             }
             Ok(NirExpr::Call {
@@ -679,15 +1170,29 @@ fn infer_nir_expr_type(
         NirExpr::Text(_) => Some(named_type("String")),
         NirExpr::Int(_) => Some(i64_type()),
         NirExpr::Var(name) => bindings.get(name).cloned(),
+        NirExpr::Instantiate { unit, .. } => {
+            Some(generic_named_type("Instance", vec![named_type(unit)]))
+        }
         NirExpr::Null => None,
         NirExpr::Borrow(value) | NirExpr::Move(value) => {
             infer_nir_expr_type(value, bindings, signatures, struct_table)
         }
         NirExpr::AllocNode { .. } => Some(ref_type("Node")),
         NirExpr::AllocBuffer { .. } => Some(ref_type("Buffer")),
-        NirExpr::DataBindCore(_) => Some(named_type("Unit")),
+        NirExpr::DataBindCore(_) | NirExpr::CpuBindCore(_) => Some(named_type("Unit")),
+        NirExpr::CpuWindow { .. } => Some(named_type("Window")),
+        NirExpr::CpuInputI64 { .. } | NirExpr::CpuTickI64 { .. } => Some(i64_type()),
+        NirExpr::CpuPresentFrame(_) => Some(named_type("Unit")),
+        NirExpr::CpuExternCall { callee, .. } => {
+            signatures.get(callee).and_then(|sig| sig.return_type.clone())
+        }
         NirExpr::DataMarker(_) => Some(named_type("Marker")),
         NirExpr::DataHandleTable(_) => Some(named_type("HandleTable")),
+        NirExpr::ShaderTarget { .. } => Some(named_type("Target")),
+        NirExpr::ShaderViewport { .. } => Some(named_type("Viewport")),
+        NirExpr::ShaderPipeline { .. } => Some(named_type("Pipeline")),
+        NirExpr::ShaderBeginPass { .. } => Some(named_type("Pass")),
+        NirExpr::ShaderDrawInstanced { .. } => Some(named_type("Frame")),
         NirExpr::DataOutputPipe(value) => {
             let inner = infer_nir_expr_type(value, bindings, signatures, struct_table)?;
             Some(generic_named_type("Pipe", vec![inner]))

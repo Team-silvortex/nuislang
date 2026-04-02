@@ -1,12 +1,33 @@
 use nuis_semantics::model::{
-    AstBinaryOp, AstExpr, AstModule, AstStmt, AstStructDef, NirBinaryOp, NirExpr, NirModule,
-    NirStmt, NirStructDef,
+    AstBinaryOp, AstExpr, AstExternInterface, AstModule, AstStmt, AstStructDef, NirBinaryOp,
+    NirExpr, NirExternInterface, NirModule, NirStmt, NirStructDef,
 };
 use yir_core::YirModule;
 
 pub fn render_ast(module: &AstModule) -> String {
     let mut out = String::new();
+    for item in &module.uses {
+        out.push_str(&format!("use {} {}\n", item.domain, item.unit));
+    }
     out.push_str(&format!("ast mod {} unit {}\n", module.domain, module.unit));
+    for function in &module.externs {
+        let params = function
+            .params
+            .iter()
+            .map(|param| format!("{}: {}", param.name, render_ast_type(&param.ty)))
+            .collect::<Vec<_>>()
+            .join(", ");
+        out.push_str(&format!(
+            "  extern \"{}\" fn {}({}) -> {}\n",
+            function.abi,
+            function.name,
+            params,
+            render_ast_type(&function.return_type)
+        ));
+    }
+    for interface in &module.extern_interfaces {
+        out.push_str(&render_ast_extern_interface(interface));
+    }
     for definition in &module.structs {
         out.push_str(&render_ast_struct(definition));
     }
@@ -78,7 +99,28 @@ pub fn render_ast(module: &AstModule) -> String {
 
 pub fn render_nir(module: &NirModule) -> String {
     let mut out = String::new();
+    for item in &module.uses {
+        out.push_str(&format!("use {} {}\n", item.domain, item.unit));
+    }
     out.push_str(&format!("nir mod {} unit {}\n", module.domain, module.unit));
+    for function in &module.externs {
+        let params = function
+            .params
+            .iter()
+            .map(|param| format!("{}: {}", param.name, render_nir_type(&param.ty)))
+            .collect::<Vec<_>>()
+            .join(", ");
+        out.push_str(&format!(
+            "  extern \"{}\" fn {}({}) -> {}\n",
+            function.abi,
+            function.name,
+            params,
+            render_nir_type(&function.return_type)
+        ));
+    }
+    for interface in &module.extern_interfaces {
+        out.push_str(&render_nir_extern_interface(interface));
+    }
     for definition in &module.structs {
         out.push_str(&render_nir_struct(definition));
     }
@@ -194,6 +236,7 @@ fn render_ast_expr(value: &AstExpr) -> String {
         AstExpr::Text(text) => format!("\"{}\"", escape_debug(text)),
         AstExpr::Int(value) => value.to_string(),
         AstExpr::Var(name) => name.clone(),
+        AstExpr::Instantiate { domain, unit } => format!("instantiate {} {}", domain, unit),
         AstExpr::Call { callee, args } => format!(
             "{}({})",
             callee,
@@ -241,12 +284,36 @@ fn render_ast_struct(definition: &AstStructDef) -> String {
     out
 }
 
+fn render_ast_extern_interface(interface: &AstExternInterface) -> String {
+    let mut out = String::new();
+    out.push_str(&format!(
+        "  extern \"{}\" interface {}\n",
+        interface.abi, interface.name
+    ));
+    for function in &interface.methods {
+        let params = function
+            .params
+            .iter()
+            .map(|param| format!("{}: {}", param.name, render_ast_type(&param.ty)))
+            .collect::<Vec<_>>()
+            .join(", ");
+        out.push_str(&format!(
+            "    fn {}({}) -> {}\n",
+            function.name,
+            params,
+            render_ast_type(&function.return_type)
+        ));
+    }
+    out
+}
+
 fn render_nir_expr(value: &NirExpr) -> String {
     match value {
         NirExpr::Bool(value) => value.to_string(),
         NirExpr::Text(text) => format!("\"{}\"", escape_debug(text)),
         NirExpr::Int(value) => value.to_string(),
         NirExpr::Var(name) => name.clone(),
+        NirExpr::Instantiate { domain, unit } => format!("instantiate {} {}", domain, unit),
         NirExpr::Null => "null()".to_owned(),
         NirExpr::Borrow(value) => format!("borrow({})", render_nir_expr(value)),
         NirExpr::Move(value) => format!("move({})", render_nir_expr(value)),
@@ -279,6 +346,88 @@ fn render_nir_expr(value: &NirExpr) -> String {
                 .map(|(slot, resource)| format!("\"{}={}\"", escape_debug(slot), escape_debug(resource)))
                 .collect::<Vec<_>>()
                 .join(", ")
+        ),
+        NirExpr::CpuBindCore(core) => format!("cpu_bind_core({core})"),
+        NirExpr::CpuWindow {
+            width,
+            height,
+            title,
+        } => format!("cpu_window({}, {}, \"{}\")", width, height, escape_debug(title)),
+        NirExpr::CpuInputI64 {
+            channel,
+            default,
+            min,
+            max,
+            step,
+        } => match (min, max, step) {
+            (Some(min), Some(max), Some(step)) => format!(
+                "cpu_input_i64(\"{}\", {}, {}, {}, {})",
+                escape_debug(channel),
+                default,
+                min,
+                max,
+                step
+            ),
+            _ => format!("cpu_input_i64(\"{}\", {})", escape_debug(channel), default),
+        },
+        NirExpr::CpuTickI64 { start, step } => format!("cpu_tick_i64({}, {})", start, step),
+        NirExpr::CpuPresentFrame(value) => {
+            format!("cpu_present_frame({})", render_nir_expr(value))
+        }
+        NirExpr::CpuExternCall {
+            abi,
+            interface,
+            callee,
+            args,
+        } => format!(
+            "extern \"{}\" {}{}({})",
+            abi,
+            interface
+                .as_ref()
+                .map(|name| format!("{name}::"))
+                .unwrap_or_default(),
+            callee,
+            args.iter().map(render_nir_expr).collect::<Vec<_>>().join(", ")
+        ),
+        NirExpr::ShaderTarget {
+            format,
+            width,
+            height,
+        } => format!(
+            "shader_target(\"{}\", {}, {})",
+            escape_debug(format),
+            width,
+            height
+        ),
+        NirExpr::ShaderViewport { width, height } => {
+            format!("shader_viewport({}, {})", width, height)
+        }
+        NirExpr::ShaderPipeline { name, topology } => format!(
+            "shader_pipeline(\"{}\", \"{}\")",
+            escape_debug(name),
+            escape_debug(topology)
+        ),
+        NirExpr::ShaderBeginPass {
+            target,
+            pipeline,
+            viewport,
+        } => format!(
+            "shader_begin_pass({}, {}, {})",
+            render_nir_expr(target),
+            render_nir_expr(pipeline),
+            render_nir_expr(viewport)
+        ),
+        NirExpr::ShaderDrawInstanced {
+            pass,
+            packet,
+            vertex_count,
+            instance_count,
+        } => format!(
+            "shader_draw_instanced({}, {}, {}, {})",
+            render_nir_expr(pass),
+            render_nir_expr(packet),
+            vertex_count,
+            instance_count
         ),
         NirExpr::LoadValue(value) => format!("load_value({})", render_nir_expr(value)),
         NirExpr::LoadNext(value) => format!("load_next({})", render_nir_expr(value)),
@@ -346,6 +495,29 @@ fn render_nir_struct(definition: &NirStructDef) -> String {
             "    field {}: {}\n",
             field.name,
             render_nir_type(&field.ty)
+        ));
+    }
+    out
+}
+
+fn render_nir_extern_interface(interface: &NirExternInterface) -> String {
+    let mut out = String::new();
+    out.push_str(&format!(
+        "  extern \"{}\" interface {}\n",
+        interface.abi, interface.name
+    ));
+    for function in &interface.methods {
+        let params = function
+            .params
+            .iter()
+            .map(|param| format!("{}: {}", param.name, render_nir_type(&param.ty)))
+            .collect::<Vec<_>>()
+            .join(", ");
+        out.push_str(&format!(
+            "    fn {}({}) -> {}\n",
+            function.name,
+            params,
+            render_nir_type(&function.return_type)
         ));
     }
     out

@@ -1,4 +1,4 @@
-module=examples/window_controls_demo.yir
+module=examples/yir/window_controls_demo.yir
 llvm_ir=examples/bins/window_controls_demo/window_controls_demo.ll
 fabric_handle_tables=1
 fabric_core_bindings=1

@@ -144,8 +144,37 @@ fn verify_expr(
         | NirExpr::Text(_)
         | NirExpr::Int(_)
         | NirExpr::Var(_)
-        | NirExpr::Null => {}
-        NirExpr::DataBindCore(_) | NirExpr::DataMarker(_) | NirExpr::DataHandleTable(_) => {}
+        | NirExpr::Null
+        | NirExpr::Instantiate { .. } => {}
+        NirExpr::DataBindCore(_)
+        | NirExpr::DataMarker(_)
+        | NirExpr::DataHandleTable(_)
+        | NirExpr::CpuBindCore(_)
+        | NirExpr::CpuWindow { .. }
+        | NirExpr::CpuInputI64 { .. }
+        | NirExpr::CpuTickI64 { .. }
+        | NirExpr::ShaderTarget { .. }
+        | NirExpr::ShaderViewport { .. }
+        | NirExpr::ShaderPipeline { .. } => {}
+        NirExpr::CpuPresentFrame(inner) => verify_expr(inner, moved, borrows)?,
+        NirExpr::CpuExternCall { args, .. } => {
+            for arg in args {
+                verify_expr(arg, moved, borrows)?;
+            }
+        }
+        NirExpr::ShaderBeginPass {
+            target,
+            pipeline,
+            viewport,
+        } => {
+            verify_expr(target, moved, borrows)?;
+            verify_expr(pipeline, moved, borrows)?;
+            verify_expr(viewport, moved, borrows)?;
+        }
+        NirExpr::ShaderDrawInstanced { pass, packet, .. } => {
+            verify_expr(pass, moved, borrows)?;
+            verify_expr(packet, moved, borrows)?;
+        }
         NirExpr::DataOutputPipe(inner) | NirExpr::DataInputPipe(inner) => {
             verify_expr(inner, moved, borrows)?
         }
@@ -226,7 +255,36 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
                 }
             }
         }
-        NirExpr::DataBindCore(_) | NirExpr::DataMarker(_) | NirExpr::DataHandleTable(_) => {}
+        NirExpr::Instantiate { .. } => {}
+        NirExpr::DataBindCore(_)
+        | NirExpr::DataMarker(_)
+        | NirExpr::DataHandleTable(_)
+        | NirExpr::CpuBindCore(_)
+        | NirExpr::CpuWindow { .. }
+        | NirExpr::CpuInputI64 { .. }
+        | NirExpr::CpuTickI64 { .. }
+        | NirExpr::ShaderTarget { .. }
+        | NirExpr::ShaderViewport { .. }
+        | NirExpr::ShaderPipeline { .. } => {}
+        NirExpr::CpuPresentFrame(inner) => verify_expr_uses(inner, moved)?,
+        NirExpr::CpuExternCall { args, .. } => {
+            for arg in args {
+                verify_expr_uses(arg, moved)?;
+            }
+        }
+        NirExpr::ShaderBeginPass {
+            target,
+            pipeline,
+            viewport,
+        } => {
+            verify_expr_uses(target, moved)?;
+            verify_expr_uses(pipeline, moved)?;
+            verify_expr_uses(viewport, moved)?;
+        }
+        NirExpr::ShaderDrawInstanced { pass, packet, .. } => {
+            verify_expr_uses(pass, moved)?;
+            verify_expr_uses(packet, moved)?;
+        }
         NirExpr::DataOutputPipe(inner) | NirExpr::DataInputPipe(inner) => {
             verify_expr_uses(inner, moved)?
         }

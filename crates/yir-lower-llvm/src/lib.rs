@@ -1232,6 +1232,45 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
                 last_cpu_value = Some(reg);
             }
+            ("cpu", "extern_call_i64") => {
+                let abi = &node.op.args[0];
+                let symbol = &node.op.args[1];
+                if abi != "nurs" && abi != "c" {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.extern_call_i64 `{}` because ABI `{}` is not supported by the current LLVM bridge",
+                        node.name, abi
+                    ));
+                    continue;
+                }
+                let lowered_args = node.op.args[2..]
+                    .iter()
+                    .map(|arg| get_i64(&registers, arg).map(str::to_owned))
+                    .collect::<Option<Vec<_>>>();
+                let Some(lowered_args) = lowered_args else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.extern_call_i64 `{}` because one or more inputs are outside the current CPU LLVM slice",
+                        node.name
+                    ));
+                    continue;
+                };
+                let reg = fresh_reg(&mut next_reg);
+                let call = match lowered_args.as_slice() {
+                    [a0] => format!("call i64 @{symbol}(i64 {a0})"),
+                    [a0, a1] => format!("call i64 @{symbol}(i64 {a0}, i64 {a1})"),
+                    _ => {
+                        body.push(format!(
+                            "  ; deferred lowering for cpu.extern_call_i64 `{}` because symbol `{}` has unsupported arity {}",
+                            node.name,
+                            symbol,
+                            lowered_args.len()
+                        ));
+                        continue;
+                    }
+                };
+                body.push(format!("  {reg} = {call}"));
+                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                last_cpu_value = Some(reg);
+            }
             ("cpu", "print") => {
                 if let Some(input) = get_i64(&registers, &node.op.args[0]) {
                     body.push(format!("  call void @nuis_debug_print_i64(i64 {input})"));
@@ -1295,6 +1334,15 @@ declare void @nuis_debug_print_i32(i32)\n\
 declare void @nuis_debug_print_i64(i64)\n\n\
 declare void @nuis_debug_print_f32(float)\n\
 declare void @nuis_debug_print_f64(double)\n\n\
+declare i64 @host_color_bias(i64)\n\
+declare i64 @host_speed_curve(i64)\n\
+declare i64 @host_radius_curve(i64)\n\
+declare i64 @host_mix_tick(i64, i64)\n\n\
+declare i64 @HostRenderCurves__color_bias(i64)\n\
+declare i64 @HostRenderCurves__speed_curve(i64)\n\
+declare i64 @HostRenderCurves__radius_curve(i64)\n\
+declare i64 @HostRenderCurves__mix_tick(i64, i64)\n\
+declare i64 @HostMath__speed_curve(i64)\n\n\
 define i64 @nuis_yir_entry() {{\n{}\n  ret i64 {}\n}}\n",
         module.version,
         globals.join("\n"),

@@ -176,9 +176,9 @@ The current LLVM path is intentionally narrow:
 
 Current examples:
 
-* [examples/ball_cpu_driver.yir](/Users/Shared/chroot/dev/nuislang/examples/ball_cpu_driver.yir)
-* [examples/cpu_linked_list.yir](/Users/Shared/chroot/dev/nuislang/examples/cpu_linked_list.yir)
-* [examples/cpu_linked_list_rustish.yir](/Users/Shared/chroot/dev/nuislang/examples/cpu_linked_list_rustish.yir)
+* [examples/yir/ball_cpu_driver.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/ball_cpu_driver.yir)
+* [examples/yir/cpu_linked_list.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/cpu_linked_list.yir)
+* [examples/yir/cpu_linked_list_rustish.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/cpu_linked_list_rustish.yir)
 
 The current hetero render path may still package prerendered or cooked artifacts
 for non-CPU slices.

@@ -339,14 +339,14 @@ current linked-list prototype.
 
 Reference examples:
 
-* valid: [examples/cpu_linked_list_rustish.yir](/Users/Shared/chroot/dev/nuislang/examples/cpu_linked_list_rustish.yir)
-* valid buffer example: [examples/cpu_buffer_rustish.yir](/Users/Shared/chroot/dev/nuislang/examples/cpu_buffer_rustish.yir)
-* invalid borrowed write: [examples/cpu_borrow_write_invalid.yir](/Users/Shared/chroot/dev/nuislang/examples/cpu_borrow_write_invalid.yir)
-* invalid owner write while borrowed: [examples/cpu_owner_write_while_borrowed_invalid.yir](/Users/Shared/chroot/dev/nuislang/examples/cpu_owner_write_while_borrowed_invalid.yir)
-* invalid borrowed buffer write: [examples/cpu_buffer_borrow_write_invalid.yir](/Users/Shared/chroot/dev/nuislang/examples/cpu_buffer_borrow_write_invalid.yir)
-* invalid post-free access: [examples/cpu_use_after_free_invalid.yir](/Users/Shared/chroot/dev/nuislang/examples/cpu_use_after_free_invalid.yir)
-* invalid move while borrowed: [examples/cpu_move_while_borrowed_invalid.yir](/Users/Shared/chroot/dev/nuislang/examples/cpu_move_while_borrowed_invalid.yir)
-* invalid missing lifetime edge: [examples/cpu_glm_missing_lifetime_invalid.yir](/Users/Shared/chroot/dev/nuislang/examples/cpu_glm_missing_lifetime_invalid.yir)
+* valid: [examples/yir/cpu_linked_list_rustish.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/cpu_linked_list_rustish.yir)
+* valid buffer example: [examples/yir/cpu_buffer_rustish.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/cpu_buffer_rustish.yir)
+* invalid borrowed write: [examples/invalid/yir/cpu_borrow_write_invalid.yir](/Users/Shared/chroot/dev/nuislang/examples/invalid/yir/cpu_borrow_write_invalid.yir)
+* invalid owner write while borrowed: [examples/invalid/yir/cpu_owner_write_while_borrowed_invalid.yir](/Users/Shared/chroot/dev/nuislang/examples/invalid/yir/cpu_owner_write_while_borrowed_invalid.yir)
+* invalid borrowed buffer write: [examples/invalid/yir/cpu_buffer_borrow_write_invalid.yir](/Users/Shared/chroot/dev/nuislang/examples/invalid/yir/cpu_buffer_borrow_write_invalid.yir)
+* invalid post-free access: [examples/invalid/yir/cpu_use_after_free_invalid.yir](/Users/Shared/chroot/dev/nuislang/examples/invalid/yir/cpu_use_after_free_invalid.yir)
+* invalid move while borrowed: [examples/invalid/yir/cpu_move_while_borrowed_invalid.yir](/Users/Shared/chroot/dev/nuislang/examples/invalid/yir/cpu_move_while_borrowed_invalid.yir)
+* invalid missing lifetime edge: [examples/invalid/yir/cpu_glm_missing_lifetime_invalid.yir](/Users/Shared/chroot/dev/nuislang/examples/invalid/yir/cpu_glm_missing_lifetime_invalid.yir)
 
 ---
 

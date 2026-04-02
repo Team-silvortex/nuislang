@@ -1,0 +1,7 @@
+use shader UnknownUnit;
+
+mod cpu Main {
+  fn main() {
+    print(1);
+  }
+}

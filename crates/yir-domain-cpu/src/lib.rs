@@ -319,6 +319,16 @@ impl RegisteredMod for CpuMod {
 
                 Ok(InstructionSemantics::pure(Vec::new()))
             }
+            "instantiate_unit" => {
+                if node.op.args.len() != 2 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.instantiate_unit <name> <resource> <domain> <unit>`",
+                        node.name
+                    ));
+                }
+
+                Ok(InstructionSemantics::effect(Vec::new()))
+            }
             "bind_core" => {
                 if node.op.args.len() != 1 {
                     return Err(format!(
@@ -358,6 +368,15 @@ impl RegisteredMod for CpuMod {
                 })?;
 
                 Ok(InstructionSemantics::effect(Vec::new()))
+            }
+            "extern_call_i64" => {
+                if node.op.args.len() < 2 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.extern_call_i64 <name> <resource> <abi> <symbol> [args...]`",
+                        node.name
+                    ));
+                }
+                Ok(InstructionSemantics::effect(node.op.args[2..].to_vec()))
             }
             "input_i64" => {
                 if node.op.args.len() != 2 && node.op.args.len() != 5 {
@@ -911,6 +930,24 @@ impl RegisteredMod for CpuMod {
                     Value::Int(vector_bits),
                 ]))
             }
+            "instantiate_unit" => {
+                let domain = node.op.args[0].clone();
+                let unit = node.op.args[1].clone();
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.instantiate_unit @{} [{}] {}::{}",
+                        node.resource, resource.kind.raw, domain, unit
+                    ),
+                );
+                Ok(Value::Struct(StructValue {
+                    type_name: "UnitInstance".to_owned(),
+                    fields: vec![
+                        ("domain".to_owned(), Value::Symbol(domain)),
+                        ("unit".to_owned(), Value::Symbol(unit)),
+                    ],
+                }))
+            }
             "bind_core" => {
                 let core_index = node.op.args[0].parse::<i64>().map_err(|_| {
                     format!(
@@ -949,6 +986,33 @@ impl RegisteredMod for CpuMod {
                     ),
                 );
                 Ok(Value::Tuple(vec![Value::Int(width), Value::Int(height)]))
+            }
+            "extern_call_i64" => {
+                let abi = &node.op.args[0];
+                let symbol = &node.op.args[1];
+                let args = node.op.args[2..]
+                    .iter()
+                    .map(|arg| state.expect_int(arg))
+                    .collect::<Result<Vec<_>, _>>()?;
+                let value = execute_extern_i64(abi, symbol, &args).map_err(|message| {
+                    format!("node `{}` extern call `{symbol}` failed: {message}", node.name)
+                })?;
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.extern_call_i64 @{} [{}] {}::{}({}) -> {}",
+                        node.resource,
+                        resource.kind.raw,
+                        abi,
+                        symbol,
+                        args.iter()
+                            .map(|value| value.to_string())
+                            .collect::<Vec<_>>()
+                            .join(", "),
+                        value
+                    ),
+                );
+                Ok(Value::Int(value))
             }
             "input_i64" => {
                 let channel = &node.op.args[0];
@@ -1084,4 +1148,37 @@ fn normalize_channel(channel: &str) -> String {
             }
         })
         .collect()
+}
+
+fn execute_extern_i64(abi: &str, symbol: &str, args: &[i64]) -> Result<i64, String> {
+    if abi != "nurs" && abi != "c" {
+        return Err(format!("unsupported extern ABI `{abi}`"));
+    }
+    match symbol {
+        "host_color_bias" | "HostRenderCurves__color_bias" | "HostMath__color_bias" => {
+            let [value] = args else {
+                return Err("host_color_bias expects 1 arg".to_owned());
+            };
+            Ok((value + 12).clamp(0, 255))
+        }
+        "host_speed_curve" | "HostRenderCurves__speed_curve" | "HostMath__speed_curve" => {
+            let [value] = args else {
+                return Err("host_speed_curve expects 1 arg".to_owned());
+            };
+            Ok(value * 2 + 3)
+        }
+        "host_radius_curve" | "HostRenderCurves__radius_curve" => {
+            let [value] = args else {
+                return Err("host_radius_curve expects 1 arg".to_owned());
+            };
+            Ok((value * 3) / 2 + 8)
+        }
+        "host_mix_tick" | "HostRenderCurves__mix_tick" => {
+            let [base, tick] = args else {
+                return Err("host_mix_tick expects 2 args".to_owned());
+            };
+            Ok(base + tick)
+        }
+        _ => Err("unknown extern symbol".to_owned()),
+    }
 }

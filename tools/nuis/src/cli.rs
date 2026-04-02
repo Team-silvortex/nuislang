@@ -26,7 +26,7 @@ where
         "bindings" => Ok(CommandKind::Bindings {
             input: PathBuf::from(
                 args.next()
-                    .ok_or_else(|| "usage: nuis bindings <input.ns>".to_owned())?,
+                    .ok_or_else(|| "usage: nuis bindings <input.ns|project-dir|nuis.toml>".to_owned())?,
             ),
         }),
         "pack-nustar" => Ok(CommandKind::PackNustar {
@@ -53,35 +53,35 @@ where
         "check" => Ok(CommandKind::Check {
             input: PathBuf::from(
                 args.next()
-                    .ok_or_else(|| "usage: nuis check <input.ns>".to_owned())?,
+                    .ok_or_else(|| "usage: nuis check <input.ns|project-dir|nuis.toml>".to_owned())?,
             ),
         }),
         "build" => Ok(CommandKind::Build {
             input: PathBuf::from(
                 args.next()
-                    .ok_or_else(|| "usage: nuis build <input.ns> <output-dir>".to_owned())?,
+                    .ok_or_else(|| "usage: nuis build <input.ns|project-dir|nuis.toml> <output-dir>".to_owned())?,
             ),
             output_dir: PathBuf::from(
                 args.next()
-                    .ok_or_else(|| "usage: nuis build <input.ns> <output-dir>".to_owned())?,
+                    .ok_or_else(|| "usage: nuis build <input.ns|project-dir|nuis.toml> <output-dir>".to_owned())?,
             ),
         }),
         "dump-ast" => Ok(CommandKind::DumpAst {
             input: PathBuf::from(
                 args.next()
-                    .ok_or_else(|| "usage: nuis dump-ast <input.ns>".to_owned())?,
+                    .ok_or_else(|| "usage: nuis dump-ast <input.ns|project-dir|nuis.toml>".to_owned())?,
             ),
         }),
         "dump-nir" => Ok(CommandKind::DumpNir {
             input: PathBuf::from(
                 args.next()
-                    .ok_or_else(|| "usage: nuis dump-nir <input.ns>".to_owned())?,
+                    .ok_or_else(|| "usage: nuis dump-nir <input.ns|project-dir|nuis.toml>".to_owned())?,
             ),
         }),
         "dump-yir" => Ok(CommandKind::DumpYir {
             input: PathBuf::from(
                 args.next()
-                    .ok_or_else(|| "usage: nuis dump-yir <input.ns>".to_owned())?,
+                    .ok_or_else(|| "usage: nuis dump-yir <input.ns|project-dir|nuis.toml>".to_owned())?,
             ),
         }),
         other => Err(format!(

@@ -6,12 +6,12 @@ ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
   echo "usage: run-preview.sh [module.yir output.ppm [scale]]" >&2
-  echo "defaults: examples/host_ui_sphere.yir /tmp/host_ui_sphere.ppm 4" >&2
+  echo "defaults: examples/yir/host_ui_sphere.yir /tmp/host_ui_sphere.ppm 4" >&2
   exit 0
 fi
 
 if [ "$#" -eq 0 ]; then
-  MODULE_PATH="examples/host_ui_sphere.yir"
+  MODULE_PATH="examples/yir/host_ui_sphere.yir"
   OUTPUT_PATH="/tmp/host_ui_sphere.ppm"
   PLAN_PATH="/tmp/host_ui_sphere.plan"
   SCALE="4"

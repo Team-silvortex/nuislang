@@ -260,6 +260,19 @@ fn lower_expr(
             push_dep_edges(state, &fill_name, &name);
             Ok(name)
         }
+        NirExpr::Instantiate { domain, unit } => {
+            let name = next_name(state, "instantiate_unit");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "cpu0".to_owned(),
+                op: Operation {
+                    module: "cpu".to_owned(),
+                    instruction: "instantiate_unit".to_owned(),
+                    args: vec![domain.clone(), unit.clone()],
+                },
+            });
+            Ok(name)
+        }
         NirExpr::DataBindCore(core_index) => {
             ensure_fabric_resource(state.yir);
             let name = next_name(state, "data_bind_core");
@@ -376,6 +389,219 @@ fn lower_expr(
                         .collect(),
                 },
             });
+            Ok(name)
+        }
+        NirExpr::CpuBindCore(core_index) => {
+            let name = next_name(state, "cpu_bind_core");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "cpu0".to_owned(),
+                op: Operation {
+                    module: "cpu".to_owned(),
+                    instruction: "bind_core".to_owned(),
+                    args: vec![core_index.to_string()],
+                },
+            });
+            Ok(name)
+        }
+        NirExpr::CpuWindow { width, height, title } => {
+            let name = next_name(state, "cpu_window");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "cpu0".to_owned(),
+                op: Operation {
+                    module: "cpu".to_owned(),
+                    instruction: "window".to_owned(),
+                    args: vec![width.to_string(), height.to_string(), title.clone()],
+                },
+            });
+            Ok(name)
+        }
+        NirExpr::CpuInputI64 {
+            channel,
+            default,
+            min,
+            max,
+            step,
+        } => {
+            let name = next_name(state, "cpu_input_i64");
+            let mut args = vec![channel.clone(), default.to_string()];
+            if let (Some(min), Some(max), Some(step)) = (min, max, step) {
+                args.push(min.to_string());
+                args.push(max.to_string());
+                args.push(step.to_string());
+            }
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "cpu0".to_owned(),
+                op: Operation {
+                    module: "cpu".to_owned(),
+                    instruction: "input_i64".to_owned(),
+                    args,
+                },
+            });
+            Ok(name)
+        }
+        NirExpr::CpuTickI64 { start, step } => {
+            let name = next_name(state, "cpu_tick_i64");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "cpu0".to_owned(),
+                op: Operation {
+                    module: "cpu".to_owned(),
+                    instruction: "tick_i64".to_owned(),
+                    args: vec![start.to_string(), step.to_string()],
+                },
+            });
+            Ok(name)
+        }
+        NirExpr::CpuPresentFrame(frame) => {
+            let frame_name = lower_expr(frame, state, bindings)?;
+            let name = next_name(state, "cpu_present_frame");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "cpu0".to_owned(),
+                op: Operation {
+                    module: "cpu".to_owned(),
+                    instruction: "present_frame".to_owned(),
+                    args: vec![frame_name.clone()],
+                },
+            });
+            push_xfer_edge(state, &frame_name, &name);
+            state.yir.edges.push(Edge {
+                kind: EdgeKind::Effect,
+                from: frame_name,
+                to: name.clone(),
+            });
+            Ok(name)
+        }
+        NirExpr::CpuExternCall {
+            abi,
+            interface: _,
+            callee,
+            args,
+        } => {
+            let lowered_args = args
+                .iter()
+                .map(|arg| lower_expr(arg, state, bindings))
+                .collect::<Result<Vec<_>, _>>()?;
+            let name = next_name(state, "cpu_extern_call");
+            let mut op_args = vec![abi.clone(), callee.clone()];
+            op_args.extend(lowered_args.clone());
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "cpu0".to_owned(),
+                op: Operation {
+                    module: "cpu".to_owned(),
+                    instruction: "extern_call_i64".to_owned(),
+                    args: op_args,
+                },
+            });
+            for arg in lowered_args {
+                push_dep_edges(state, &arg, &name);
+            }
+            Ok(name)
+        }
+        NirExpr::ShaderTarget {
+            format,
+            width,
+            height,
+        } => {
+            ensure_shader_resource(state.yir);
+            let name = next_name(state, "shader_target");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "shader0".to_owned(),
+                op: Operation {
+                    module: "shader".to_owned(),
+                    instruction: "target".to_owned(),
+                    args: vec![format.clone(), width.to_string(), height.to_string()],
+                },
+            });
+            Ok(name)
+        }
+        NirExpr::ShaderViewport { width, height } => {
+            ensure_shader_resource(state.yir);
+            let name = next_name(state, "shader_viewport");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "shader0".to_owned(),
+                op: Operation {
+                    module: "shader".to_owned(),
+                    instruction: "viewport".to_owned(),
+                    args: vec![width.to_string(), height.to_string()],
+                },
+            });
+            Ok(name)
+        }
+        NirExpr::ShaderPipeline { name: pipe_name, topology } => {
+            ensure_shader_resource(state.yir);
+            let name = next_name(state, "shader_pipeline");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "shader0".to_owned(),
+                op: Operation {
+                    module: "shader".to_owned(),
+                    instruction: "pipeline".to_owned(),
+                    args: vec![pipe_name.clone(), topology.clone()],
+                },
+            });
+            Ok(name)
+        }
+        NirExpr::ShaderBeginPass {
+            target,
+            pipeline,
+            viewport,
+        } => {
+            ensure_shader_resource(state.yir);
+            let target_name = lower_expr(target, state, bindings)?;
+            let pipeline_name = lower_expr(pipeline, state, bindings)?;
+            let viewport_name = lower_expr(viewport, state, bindings)?;
+            let name = next_name(state, "shader_begin_pass");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "shader0".to_owned(),
+                op: Operation {
+                    module: "shader".to_owned(),
+                    instruction: "begin_pass".to_owned(),
+                    args: vec![
+                        target_name.clone(),
+                        pipeline_name.clone(),
+                        viewport_name.clone(),
+                    ],
+                },
+            });
+            push_dep_edges(state, &target_name, &name);
+            push_dep_edges(state, &pipeline_name, &name);
+            push_dep_edges(state, &viewport_name, &name);
+            Ok(name)
+        }
+        NirExpr::ShaderDrawInstanced {
+            pass,
+            packet,
+            vertex_count,
+            instance_count,
+        } => {
+            ensure_shader_resource(state.yir);
+            let pass_name = lower_expr(pass, state, bindings)?;
+            let packet_name = lower_expr(packet, state, bindings)?;
+            let name = next_name(state, "shader_draw_instanced");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "shader0".to_owned(),
+                op: Operation {
+                    module: "shader".to_owned(),
+                    instruction: "draw_instanced".to_owned(),
+                    args: vec![
+                        pass_name.clone(),
+                        packet_name.clone(),
+                        vertex_count.to_string(),
+                        instance_count.to_string(),
+                    ],
+                },
+            });
+            push_dep_edges(state, &pass_name, &name);
+            push_xfer_edge(state, &packet_name, &name);
             Ok(name)
         }
         NirExpr::LoadValue(value) => lower_unary_cpu_expr("load_value", value, state, bindings),
@@ -736,6 +962,16 @@ fn ensure_fabric_resource(yir: &mut YirModule) {
     yir.resources.push(Resource {
         name: "fabric0".to_owned(),
         kind: ResourceKind::parse("data.fabric"),
+    });
+}
+
+fn ensure_shader_resource(yir: &mut YirModule) {
+    if yir.resources.iter().any(|resource| resource.name == "shader0") {
+        return;
+    }
+    yir.resources.push(Resource {
+        name: "shader0".to_owned(),
+        kind: ResourceKind::parse("shader.render"),
     });
 }
 

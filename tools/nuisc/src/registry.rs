@@ -36,6 +36,9 @@ pub struct NustarPackageManifest {
     pub implementation_kinds: Vec<String>,
     pub loader_entry: String,
     pub loader_abi: String,
+    pub host_ffi_surface: Vec<String>,
+    pub host_ffi_abis: Vec<String>,
+    pub host_ffi_bridge: String,
     pub profiles: Vec<String>,
     pub resource_families: Vec<String>,
     pub unit_types: Vec<String>,
@@ -57,6 +60,10 @@ pub struct NustarBinding {
     pub part_verify: Vec<String>,
     pub registered_units: Vec<String>,
     pub bound_unit: Option<String>,
+    pub used_units: Vec<String>,
+    pub instantiated_units: Vec<String>,
+    pub used_host_ffi_abis: Vec<String>,
+    pub used_host_ffi_symbols: Vec<String>,
     pub matched_resources: Vec<String>,
     pub matched_ops: Vec<String>,
     pub undeclared_ops: Vec<String>,
@@ -130,6 +137,11 @@ pub fn required_package_ids(module: &YirModule) -> Vec<String> {
     let mut package_ids = BTreeSet::new();
     for node in &module.nodes {
         package_ids.insert(format!("official.{}", node.op.module));
+        if node.op.module == "cpu" && node.op.instruction == "instantiate_unit" {
+            if let Some(domain) = node.op.args.first() {
+                package_ids.insert(format!("official.{domain}"));
+            }
+        }
     }
     package_ids.into_iter().collect()
 }
@@ -151,6 +163,8 @@ pub fn plan_bindings(
     module: &YirModule,
     domain: &str,
     unit: &str,
+    declared_used_units: &[(String, String)],
+    declared_externs: &[(String, String)],
 ) -> Result<NustarBindingPlan, String> {
     let manifests = load_required_manifests(root, module)?;
     validate_unit_binding(&manifests, domain, unit)?;
@@ -167,6 +181,41 @@ pub fn plan_bindings(
             Some(unit.to_owned())
         } else {
             None
+        };
+        let used_units = declared_used_units
+            .iter()
+            .filter(|(used_domain, _)| used_domain == &manifest.domain_family)
+            .map(|(_, used_unit)| used_unit.clone())
+            .collect::<Vec<_>>();
+        let instantiated_units = module
+            .nodes
+            .iter()
+            .filter(|node| {
+                node.op.module == "cpu"
+                    && node.op.instruction == "instantiate_unit"
+                    && node.op.args.first().map(String::as_str) == Some(manifest.domain_family.as_str())
+            })
+            .filter_map(|node| node.op.args.get(1).cloned())
+            .collect::<Vec<_>>();
+        let used_host_ffi_abis = if manifest.domain_family == "cpu" {
+            declared_externs
+                .iter()
+                .map(|(abi, _)| abi.clone())
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .collect::<Vec<_>>()
+        } else {
+            Vec::new()
+        };
+        let used_host_ffi_symbols = if manifest.domain_family == "cpu" {
+            declared_externs
+                .iter()
+                .map(|(_, symbol)| symbol.clone())
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .collect::<Vec<_>>()
+        } else {
+            Vec::new()
         };
 
         let matched_resources = module
@@ -188,7 +237,7 @@ pub fn plan_bindings(
             .map(|node| node.op.full_name())
             .collect::<Vec<_>>();
 
-        if matched_ops.is_empty() {
+        if matched_ops.is_empty() && instantiated_units.is_empty() && used_units.is_empty() {
             return Err(format!(
                 "nustar package `{}` was selected but no matching ops were bound",
                 manifest.package_id
@@ -214,6 +263,10 @@ pub fn plan_bindings(
             part_verify: manifest.part_verify,
             registered_units,
             bound_unit,
+            used_units,
+            instantiated_units,
+            used_host_ffi_abis,
+            used_host_ffi_symbols,
             matched_resources,
             matched_ops,
             undeclared_ops,
@@ -324,6 +377,12 @@ fn parse_manifest(source: &str, path: &Path) -> Result<NustarPackageManifest, St
         .unwrap_or_else(|| "nustar.bootstrap.v1".to_owned());
     let loader_abi = parse_optional_string(source, "loader_abi")
         .unwrap_or_else(|| "nustar-loader-v1".to_owned());
+    let host_ffi_surface = parse_optional_string_array(source, "host_ffi_surface")
+        .unwrap_or_default();
+    let host_ffi_abis = parse_optional_string_array(source, "host_ffi_abis")
+        .unwrap_or_default();
+    let host_ffi_bridge = parse_optional_string(source, "host_ffi_bridge")
+        .unwrap_or_else(|| "none".to_owned());
     let profiles = parse_string_array(source, "profiles", path)?;
     let resource_families = parse_string_array(source, "resource_families", path)?;
     let unit_types = parse_optional_string_array(source, "unit_types").unwrap_or_default();
@@ -350,6 +409,9 @@ fn parse_manifest(source: &str, path: &Path) -> Result<NustarPackageManifest, St
         implementation_kinds,
         loader_entry,
         loader_abi,
+        host_ffi_surface,
+        host_ffi_abis,
+        host_ffi_bridge,
         profiles,
         resource_families,
         unit_types,

@@ -380,7 +380,7 @@ fn implementation_contract(binary: &NustarBinary, kind: &str) -> ImplementationC
 
 fn render_manifest(manifest: &NustarPackageManifest) -> String {
     format!(
-        "manifest_schema = \"{}\"\npackage_id = \"{}\"\ndomain_family = \"{}\"\nfrontend = \"{}\"\nentry_crate = \"{}\"\nast_entry = \"{}\"\nnir_entry = \"{}\"\nyir_lowering_entry = \"{}\"\npart_verify_entry = \"{}\"\nast_surface = {}\nnir_surface = {}\nyir_lowering = {}\npart_verify = {}\nbinary_extension = \"{}\"\npackage_layout = \"{}\"\nmachine_abi_policy = \"{}\"\nimplementation_kinds = {}\nloader_entry = \"{}\"\nloader_abi = \"{}\"\nprofiles = {}\nresource_families = {}\nunit_types = {}\nlowering_targets = {}\nops = {}\n",
+        "manifest_schema = \"{}\"\npackage_id = \"{}\"\ndomain_family = \"{}\"\nfrontend = \"{}\"\nentry_crate = \"{}\"\nast_entry = \"{}\"\nnir_entry = \"{}\"\nyir_lowering_entry = \"{}\"\npart_verify_entry = \"{}\"\nast_surface = {}\nnir_surface = {}\nyir_lowering = {}\npart_verify = {}\nbinary_extension = \"{}\"\npackage_layout = \"{}\"\nmachine_abi_policy = \"{}\"\nimplementation_kinds = {}\nloader_entry = \"{}\"\nloader_abi = \"{}\"\nhost_ffi_surface = {}\nhost_ffi_abis = {}\nhost_ffi_bridge = \"{}\"\nprofiles = {}\nresource_families = {}\nunit_types = {}\nlowering_targets = {}\nops = {}\n",
         manifest.manifest_schema,
         manifest.package_id,
         manifest.domain_family,
@@ -400,6 +400,9 @@ fn render_manifest(manifest: &NustarPackageManifest) -> String {
         render_array(&manifest.implementation_kinds),
         manifest.loader_entry,
         manifest.loader_abi,
+        render_array(&manifest.host_ffi_surface),
+        render_array(&manifest.host_ffi_abis),
+        manifest.host_ffi_bridge,
         render_array(&manifest.profiles),
         render_array(&manifest.resource_families),
         render_array(&manifest.unit_types),
@@ -476,6 +479,9 @@ fn parse_manifest_text(source: &str, path: &Path) -> Result<NustarPackageManifes
         implementation_kinds: parse_string_array(source, "implementation_kinds", path)?,
         loader_entry: parse_required_string(source, "loader_entry", path)?,
         loader_abi: parse_required_string(source, "loader_abi", path)?,
+        host_ffi_surface: parse_string_array(source, "host_ffi_surface", path)?,
+        host_ffi_abis: parse_string_array(source, "host_ffi_abis", path)?,
+        host_ffi_bridge: parse_required_string(source, "host_ffi_bridge", path)?,
         profiles: parse_string_array(source, "profiles", path)?,
         resource_families: parse_string_array(source, "resource_families", path)?,
         unit_types: parse_string_array(source, "unit_types", path)?,

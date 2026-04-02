@@ -1,6 +1,6 @@
 use nuis_semantics::model::{
-    AstBinaryOp, AstExpr, AstFunction, AstModule, AstParam, AstStmt, AstStructDef,
-    AstStructField, AstTypeRef,
+    AstBinaryOp, AstExpr, AstExternFunction, AstExternInterface, AstFunction, AstModule, AstParam,
+    AstStmt, AstStructDef, AstStructField, AstTypeRef,
 };
 
 use super::lexer::{describe_token, Token};
@@ -16,6 +16,20 @@ impl Parser {
     }
 
     pub fn parse_module(&mut self) -> Result<AstModule, String> {
+        let mut uses = Vec::new();
+        let mut externs = Vec::new();
+        let mut extern_interfaces = Vec::new();
+        while self.peek_word("use") {
+            uses.push(self.parse_use_decl()?);
+        }
+        while self.peek_word("extern") {
+            let abi = self.parse_extern_abi()?;
+            if self.peek_word("interface") {
+                extern_interfaces.push(self.parse_extern_interface(abi)?);
+            } else {
+                externs.push(self.parse_extern_function_with_abi(abi, None)?);
+            }
+        }
         self.expect_word("mod")?;
         let domain = self.expect_ident()?;
         let unit = self.expect_ident()?;
@@ -24,7 +38,17 @@ impl Parser {
         let mut structs = Vec::new();
         let mut functions = Vec::new();
         while !self.peek_symbol('}') {
-            if self.peek_word("struct") {
+            if self.peek_word("mod") {
+                return Err("nested mod definitions are not allowed".to_owned());
+            }
+            if self.peek_word("extern") {
+                let abi = self.parse_extern_abi()?;
+                if self.peek_word("interface") {
+                    extern_interfaces.push(self.parse_extern_interface(abi)?);
+                } else {
+                    externs.push(self.parse_extern_function_with_abi(abi, None)?);
+                }
+            } else if self.peek_word("struct") {
                 structs.push(self.parse_struct_def()?);
             } else {
                 functions.push(self.parse_function()?);
@@ -35,11 +59,22 @@ impl Parser {
         self.expect_eof()?;
 
         Ok(AstModule {
+            uses,
             domain,
             unit,
+            externs,
+            extern_interfaces,
             structs,
             functions,
         })
+    }
+
+    fn parse_use_decl(&mut self) -> Result<nuis_semantics::model::AstUse, String> {
+        self.expect_word("use")?;
+        let domain = self.expect_ident()?;
+        let unit = self.expect_ident()?;
+        self.expect_symbol(';')?;
+        Ok(nuis_semantics::model::AstUse { domain, unit })
     }
 
     fn parse_struct_def(&mut self) -> Result<AstStructDef, String> {
@@ -63,6 +98,56 @@ impl Parser {
         }
         self.expect_symbol('}')?;
         Ok(AstStructDef { name, fields })
+    }
+
+    fn parse_extern_abi(&mut self) -> Result<String, String> {
+        self.expect_word("extern")?;
+        Ok(match self.tokens.get(self.cursor) {
+            Some(Token::String(value)) => {
+                let abi = value.clone();
+                self.cursor += 1;
+                abi
+            }
+            _ => "nurs".to_owned(),
+        })
+    }
+
+    fn parse_extern_interface(&mut self, abi: String) -> Result<AstExternInterface, String> {
+        self.expect_word("interface")?;
+        let name = self.expect_ident()?;
+        self.expect_symbol('{')?;
+        let mut methods = Vec::new();
+        while !self.peek_symbol('}') {
+            methods.push(self.parse_extern_function_with_abi(abi.clone(), Some(name.clone()))?);
+        }
+        self.expect_symbol('}')?;
+        Ok(AstExternInterface { abi, name, methods })
+    }
+
+    fn parse_extern_function_with_abi(
+        &mut self,
+        abi: String,
+        interface: Option<String>,
+    ) -> Result<AstExternFunction, String> {
+        self.expect_word("fn")?;
+        let name = self.expect_ident()?;
+        self.expect_symbol('(')?;
+        let params = if self.peek_symbol(')') {
+            Vec::new()
+        } else {
+            self.parse_param_list()?
+        };
+        self.expect_symbol(')')?;
+        self.expect_arrow()?;
+        let return_type = self.parse_type_ref()?;
+        self.expect_symbol(';')?;
+        Ok(AstExternFunction {
+            abi,
+            interface,
+            name,
+            params,
+            return_type,
+        })
     }
 
     fn parse_function(&mut self) -> Result<AstFunction, String> {
@@ -167,6 +252,9 @@ impl Parser {
         }
         if self.peek_word("return") {
             return self.parse_return_stmt();
+        }
+        if self.peek_word("mod") {
+            return Err("nested mod definitions are not allowed".to_owned());
         }
 
         let expr = self.parse_expr()?;
@@ -364,6 +452,11 @@ impl Parser {
 
     fn parse_primary(&mut self) -> Result<AstExpr, String> {
         match self.next() {
+            Some(Token::Word(word)) if word == "instantiate" => {
+                let domain = self.expect_ident()?;
+                let unit = self.expect_ident()?;
+                Ok(AstExpr::Instantiate { domain, unit })
+            }
             Some(Token::Word(word)) if word == "true" => Ok(AstExpr::Bool(true)),
             Some(Token::Word(word)) if word == "false" => Ok(AstExpr::Bool(false)),
             Some(Token::String(text)) => Ok(AstExpr::Text(text)),
@@ -392,7 +485,7 @@ impl Parser {
                 Ok(expr)
             }
             Some(other) => Err(format!(
-                "minimal nuisc frontend expected string, integer, identifier, or grouped expression, found {}",
+                "minimal nuisc frontend expected instantiate, string, integer, identifier, or grouped expression, found {}",
                 describe_token(&other)
             )),
             None => Err("minimal nuisc frontend expected value, found end of input".to_owned()),

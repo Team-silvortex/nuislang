@@ -31,6 +31,32 @@ source → nuis -> nuisc -> NIR -> YIR -> LLVM/AOT
 * Custom IR (YIR) as primary semantic layer
 * Integrated analysis and verification
 
+## Examples
+
+The example set is now organized around the current project stage rather than
+only historical file order.
+
+Start here:
+
+* [examples/README.md](/Users/Shared/chroot/dev/nuislang/examples/README.md)
+* [examples/ns/README.md](/Users/Shared/chroot/dev/nuislang/examples/ns/README.md)
+* [examples/yir/README.md](/Users/Shared/chroot/dev/nuislang/examples/yir/README.md)
+
+Current high-signal examples:
+
+* [examples/ns/hello_world.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/hello_world.ns)
+* [examples/ns/hello_ref_struct.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/hello_ref_struct.ns)
+* [examples/ns/hello_data.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/hello_data.ns)
+* [examples/ns/hello_instantiate.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/hello_instantiate.ns)
+* [examples/ns/hello_ffi.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/hello_ffi.ns)
+* [examples/ns/hello_c_ffi.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/hello_c_ffi.ns)
+* [examples/ns/window_controls_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/window_controls_demo.ns)
+* [examples/projects/window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo)
+* [examples/yir/window_controls_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/window_controls_demo.yir)
+* [examples/yir/shader_bindings_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/shader_bindings_demo.yir)
+* [examples/yir/kernel_auto_broadcast_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/kernel_auto_broadcast_demo.yir)
+* [examples/yir/data_fabric_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/data_fabric_demo.yir)
+
 ---
 
 ## Notes
@@ -39,7 +65,7 @@ source → nuis -> nuisc -> NIR -> YIR -> LLVM/AOT
 * Designed as a general-purpose system language
 * Forms its own toolchain and execution model (language, IR, compiler core, external runtime/verifier boundaries)
 * Current YIR reference surface already includes heterogenous `cpu / shader / kernel / data` families, with shader pass composition and kernel tensor ops expanding incrementally from the same graph model
-* The current repo now also has a second host-preview style control demo in `examples/window_controls_demo.yir`, where multiple `cpu.input_i64` controls drive one structured render packet through `data.fabric` into the shader path
+* The current repo now also has a second host-preview style control demo in `examples/yir/window_controls_demo.yir`, where multiple `cpu.input_i64` controls drive one structured render packet through `data.fabric` into the shader path
 * The `shader` family now also has a minimal resource-layout surface (`uniform / storage / attachment / bind_set`) so future backend package manifests can describe stage bindings instead of only pass topology
 * The `shader` family also includes a first texture-resource slice (`texture2d / sampler / sample_nearest`) plus matching binding kinds for package manifests
 * The texture path now also has a normalized UV surface (`uv / sample_uv_nearest / sample_uv_linear`) so sampling semantics do not depend on hard-coded integer texel coordinates
@@ -55,6 +81,9 @@ source → nuis -> nuisc -> NIR -> YIR -> LLVM/AOT
 * Current macOS AOT host stubs now read `fabric_worker_core`, start a dedicated Fabric worker thread, and apply it as that thread's startup affinity hint; this is intentionally weaker than a true exclusive-core Fabric runtime
 * Current Fabric host booting is also kept intentionally thin and AOT-first: host stubs embed a static typed action table derived from `data.*` nodes instead of constructing a heavyweight dynamic metadata system at runtime
 * That typed Fabric action table now also carries a minimal class/slot ABI tag, so host-side dispatch no longer depends only on ad hoc string matching
+* The current `.ns` frontend now treats `mod` as a top-level builtin declaration and rejects nested `mod` definitions inside functions or other `mod` bodies
+* The current `.ns` frontend also has a first `instantiate <domain> <unit>` surface: inside `mod cpu <unit>`, CPU code can request other domain units by name, and `nuisc` now validates those unit names lazily against the corresponding `nustar` package registration
+* The current `.ns` frontend also has a first `extern "nurs" interface ...` surface for CPU-side host integration; today it bridges through a C-compatible ABI, but the source language already distinguishes the Rust-oriented `NURS` interface from plain `extern "c"`
 * The handwritten `YIR` value layer now also has a first typed scalar/aggregate surface: `bool / i32 / i64 / f32 / f64` plus named `struct` values with `cpu.field` extraction
 * The CPU surface now also has a first typed arithmetic slice for `i32 / f32 / f64`, and that path already runs through reference execution, LLVM IR emission, and AOT packaging
 * The CPU surface now also has a first typed comparison/conversion slice, so typed values can be compared and cast without collapsing back into the untyped `i64` path first
@@ -668,15 +697,15 @@ nuisc 具有最终否决权：
 * 当前 `nuisc` 已具备最小注册发现入口：`cargo run -p nuisc -- registry`
 * 当前 `nuisc` 也已具备最小前端链：`hello_world.ns` 可走 `nuis -> NIR -> YIR -> LLVM -> arm64 binary`
 * 当前 `nuisc` 前端也已拆成真正的 `AST -> NIR -> YIR` 三层，且最小 `.ns` 已支持 `let`、变量引用、括号和 `+ - * /` 表达式；前门可用 `dump-ast / dump-nir / dump-yir`
-* CPU-hosted UI event demo: `examples/host_ui_sphere.yir`
-* CPU linked-list demo: `examples/cpu_linked_list.yir`
-* Rust-ish CPU ownership demo: `examples/cpu_linked_list_rustish.yir`
-* Rust-ish CPU buffer demo: `examples/cpu_buffer_rustish.yir`
-* Invalid borrowed-write demo: `examples/cpu_borrow_write_invalid.yir`
-* Invalid borrowed-buffer-write demo: `examples/cpu_buffer_borrow_write_invalid.yir`
-* Invalid use-after-free demo: `examples/cpu_use_after_free_invalid.yir`
-* CPU/kernel tensor demo: `examples/kernel_tensor_demo.yir`
-* Legacy CPU/NPU tensor demo: `examples/npu_tensor_demo.yir`
+* CPU-hosted UI event demo: `examples/yir/host_ui_sphere.yir`
+* CPU linked-list demo: `examples/yir/cpu_linked_list.yir`
+* Rust-ish CPU ownership demo: `examples/yir/cpu_linked_list_rustish.yir`
+* Rust-ish CPU buffer demo: `examples/yir/cpu_buffer_rustish.yir`
+* Invalid borrowed-write demo: `examples/invalid/yir/cpu_borrow_write_invalid.yir`
+* Invalid borrowed-buffer-write demo: `examples/invalid/yir/cpu_buffer_borrow_write_invalid.yir`
+* Invalid use-after-free demo: `examples/invalid/yir/cpu_use_after_free_invalid.yir`
+* CPU/kernel tensor demo: `examples/yir/kernel_tensor_demo.yir`
+* Legacy CPU/NPU tensor demo: `examples/legacy/npu_tensor_demo.yir`
 * 一次性窗口入口：`bash tools/yir-preview-macos/run-ball-once.sh`
 * 现有 Rust crate 主要用于固定术语、边界与后续实现入口
 * 后续整改优先级应为：`YIR expand -> semantics model -> verifier hardening -> AOT executable path`

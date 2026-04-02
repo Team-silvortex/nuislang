@@ -8,6 +8,7 @@ pub mod lowering;
 pub mod nir_verify;
 pub mod nustar_binary;
 pub mod pipeline;
+pub mod project;
 pub mod registry;
 pub mod render;
 
@@ -69,6 +70,11 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 );
                 println!("  loader_entry: {}", manifest.loader_entry);
                 println!("  loader_abi: {}", manifest.loader_abi);
+                if !manifest.host_ffi_surface.is_empty() {
+                    println!("  host_ffi_surface: {}", manifest.host_ffi_surface.join(", "));
+                    println!("  host_ffi_abis: {}", manifest.host_ffi_abis.join(", "));
+                    println!("  host_ffi_bridge: {}", manifest.host_ffi_bridge);
+                }
                 println!("  profiles: {}", manifest.profiles.join(", "));
                 println!(
                     "  resource_families: {}",
@@ -91,11 +97,31 @@ pub fn run(command: CommandKind) -> Result<(), String> {
         }
         CommandKind::Bindings { input } => {
             let artifacts = pipeline::compile_source_path(&input)?;
+            let declared_used_units = artifacts
+                .ast
+                .uses
+                .iter()
+                .map(|item| (item.domain.clone(), item.unit.clone()))
+                .collect::<Vec<_>>();
+            let declared_externs = artifacts
+                .ast
+                .externs
+                .iter()
+                .map(|item| (item.abi.clone(), item.name.clone()))
+                .chain(artifacts.ast.extern_interfaces.iter().flat_map(|interface| {
+                    interface
+                        .methods
+                        .iter()
+                        .map(move |method| (method.abi.clone(), format!("{}__{}", interface.name, method.name)))
+                }))
+                .collect::<Vec<_>>();
             let plan = registry::plan_bindings(
                 Path::new("nustar-packages"),
                 &artifacts.yir,
                 &artifacts.ast.domain,
                 &artifacts.ast.unit,
+                &declared_used_units,
+                &declared_externs,
             )?;
             println!("binding plan for: {}", input.display());
             for binding in plan.bindings {
@@ -122,6 +148,27 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 if let Some(bound_unit) = &binding.bound_unit {
                     println!("  bound_unit: {}", bound_unit);
                 }
+                if !binding.used_units.is_empty() {
+                    println!("  used_units: {}", binding.used_units.join(", "));
+                }
+                if !binding.instantiated_units.is_empty() {
+                    println!(
+                        "  instantiated_units: {}",
+                        binding.instantiated_units.join(", ")
+                    );
+                }
+                if !binding.used_host_ffi_abis.is_empty() {
+                    println!(
+                        "  used_host_ffi_abis: {}",
+                        binding.used_host_ffi_abis.join(", ")
+                    );
+                }
+                if !binding.used_host_ffi_symbols.is_empty() {
+                    println!(
+                        "  used_host_ffi_symbols: {}",
+                        binding.used_host_ffi_symbols.join(", ")
+                    );
+                }
                 println!(
                     "  matched_resources: {}",
                     if binding.matched_resources.is_empty() {
@@ -130,7 +177,14 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                         binding.matched_resources.join(", ")
                     }
                 );
-                println!("  matched_ops: {}", binding.matched_ops.join(", "));
+                println!(
+                    "  matched_ops: {}",
+                    if binding.matched_ops.is_empty() {
+                        "<none>".to_owned()
+                    } else {
+                        binding.matched_ops.join(", ")
+                    }
+                );
                 if !binding.undeclared_ops.is_empty() {
                     println!("  undeclared_ops: {}", binding.undeclared_ops.join(", "));
                 }
@@ -171,6 +225,17 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             println!("  part_verify_entry: {}", binary.manifest.part_verify_entry);
             println!("  loader_abi: {}", binary.manifest.loader_abi);
             println!("  loader_entry: {}", binary.manifest.loader_entry);
+            if !binary.manifest.host_ffi_surface.is_empty() {
+                println!(
+                    "  host_ffi_surface: {}",
+                    binary.manifest.host_ffi_surface.join(", ")
+                );
+                println!(
+                    "  host_ffi_abis: {}",
+                    binary.manifest.host_ffi_abis.join(", ")
+                );
+                println!("  host_ffi_bridge: {}", binary.manifest.host_ffi_bridge);
+            }
             println!("  format_version: {}", binary.format_version);
             println!("  abi: {}", binary.abi_tag);
             println!("  machine_arch: {}", binary.machine_arch);
@@ -295,15 +360,13 @@ pub fn run(command: CommandKind) -> Result<(), String> {
         }
         CommandKind::Check { input } => {
             let artifacts = pipeline::compile_source_path(&input)?;
-            let required =
-                registry::load_required_manifests(Path::new("nustar-packages"), &artifacts.yir)?;
-            registry::validate_unit_binding(&required, &artifacts.ast.domain, &artifacts.ast.unit)?;
             println!("checked nuis source: {}", input.display());
             println!(
                 "loaded_nustar: {}",
-                required
+                artifacts
+                    .loaded_nustar
                     .iter()
-                    .map(|manifest| manifest.package_id.as_str())
+                    .map(String::as_str)
                     .collect::<Vec<_>>()
                     .join(", ")
             );
@@ -313,12 +376,17 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             println!("llvm_ir_bytes: {}", artifacts.llvm_ir.len());
         }
         CommandKind::Compile { input, output_dir } => {
+            let effective_input = if project::is_project_input(&input) {
+                let project = project::load_project(&input)?;
+                project
+                    .root
+                    .join(format!("{}.ns", project.manifest.name))
+            } else {
+                input.clone()
+            };
             let artifacts = pipeline::compile_source_path(&input)?;
-            let required =
-                registry::load_required_manifests(Path::new("nustar-packages"), &artifacts.yir)?;
-            registry::validate_unit_binding(&required, &artifacts.ast.domain, &artifacts.ast.unit)?;
             let written = aot::write_and_link(
-                &input,
+                &effective_input,
                 &output_dir,
                 &artifacts.ast,
                 &artifacts.nir,
@@ -328,9 +396,10 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             println!("compiled nuis source: {}", input.display());
             println!(
                 "loaded_nustar: {}",
-                required
+                artifacts
+                    .loaded_nustar
                     .iter()
-                    .map(|manifest| manifest.package_id.as_str())
+                    .map(String::as_str)
                     .collect::<Vec<_>>()
                     .join(", ")
             );
@@ -338,6 +407,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             println!("nir: {}", written.nir_path);
             println!("yir: {}", written.yir_path);
             println!("llvm_ir: {}", written.llvm_ir_path);
+            println!("packaging_mode: {}", written.packaging_mode);
             println!("binary: {}", written.binary_path);
         }
     }

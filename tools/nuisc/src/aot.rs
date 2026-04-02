@@ -11,6 +11,7 @@ pub struct CompileArtifacts {
     pub yir_path: String,
     pub llvm_ir_path: String,
     pub binary_path: String,
+    pub packaging_mode: String,
 }
 
 pub fn write_and_link(
@@ -46,15 +47,57 @@ pub fn write_and_link(
     fs::write(&shim_path, c_shim_source())
         .map_err(|error| format!("failed to write `{}`: {error}", shim_path.display()))?;
 
-    compile_native_binary(&ll_path, &shim_path, &exe_path)?;
+    let (binary_path, packaging_mode) = if requires_window_bundle(yir) {
+        build_window_bundle(&yir_path, output_dir, &exe_path)?
+    } else {
+        compile_native_binary(&ll_path, &shim_path, &exe_path)?;
+        (exe_path.display().to_string(), "native-cpu-llvm".to_owned())
+    };
 
     Ok(CompileArtifacts {
         ast_path: ast_path.display().to_string(),
         nir_path: nir_path.display().to_string(),
         yir_path: yir_path.display().to_string(),
         llvm_ir_path: ll_path.display().to_string(),
-        binary_path: exe_path.display().to_string(),
+        binary_path,
+        packaging_mode,
     })
+}
+
+fn requires_window_bundle(yir: &YirModule) -> bool {
+    yir.nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "window")
+}
+
+fn build_window_bundle(
+    yir_path: &Path,
+    output_dir: &Path,
+    exe_path: &Path,
+) -> Result<(String, String), String> {
+    let output = Command::new("cargo")
+        .arg("run")
+        .arg("-p")
+        .arg("yir-pack-aot")
+        .arg("--")
+        .arg(yir_path)
+        .arg(output_dir)
+        .arg("4")
+        .output()
+        .map_err(|error| format!("failed to invoke cargo for yir-pack-aot: {error}"))?;
+
+    if !output.status.success() {
+        return Err(format!(
+            "yir-pack-aot failed:\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+
+    Ok((
+        exe_path.display().to_string(),
+        "window-aot-bundle".to_owned(),
+    ))
 }
 
 fn compile_native_binary(ll_path: &Path, shim_path: &Path, exe_path: &Path) -> Result<(), String> {
@@ -102,6 +145,45 @@ void nuis_debug_print_f32(float value) {
 
 void nuis_debug_print_f64(double value) {
     printf("%g\n", value);
+}
+
+int64_t host_color_bias(int64_t value) {
+    int64_t biased = value + 12;
+    if (biased < 0) return 0;
+    if (biased > 255) return 255;
+    return biased;
+}
+
+int64_t host_speed_curve(int64_t value) {
+    return value * 2 + 3;
+}
+
+int64_t host_radius_curve(int64_t value) {
+    return (value * 3) / 2 + 8;
+}
+
+int64_t host_mix_tick(int64_t base, int64_t tick) {
+    return base + tick;
+}
+
+int64_t HostRenderCurves__color_bias(int64_t value) {
+    return host_color_bias(value);
+}
+
+int64_t HostRenderCurves__speed_curve(int64_t value) {
+    return host_speed_curve(value);
+}
+
+int64_t HostRenderCurves__radius_curve(int64_t value) {
+    return host_radius_curve(value);
+}
+
+int64_t HostRenderCurves__mix_tick(int64_t base, int64_t tick) {
+    return host_mix_tick(base, tick);
+}
+
+int64_t HostMath__speed_curve(int64_t value) {
+    return host_speed_curve(value);
 }
 
 int main(void) {
