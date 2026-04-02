@@ -146,10 +146,7 @@ impl Parser {
                 let value = args.into_iter().next().expect("checked len == 1");
                 Ok(AstStmt::Print(value))
             }
-            other => Err(format!(
-                "minimal nuisc frontend currently only supports `let`, `return`, and `print(...)`; found expression statement `{}`",
-                render_expr_for_error(&other)
-            )),
+            other => Ok(AstStmt::Expr(other)),
         }
     }
 
@@ -443,33 +440,5 @@ impl Parser {
             self.cursor += 1;
         }
         token
-    }
-}
-
-fn render_expr_for_error(expr: &AstExpr) -> String {
-    match expr {
-        AstExpr::Bool(value) => value.to_string(),
-        AstExpr::Text(text) => format!("\"{text}\""),
-        AstExpr::Int(value) => value.to_string(),
-        AstExpr::Var(name) => name.clone(),
-        AstExpr::Call { callee, .. } => format!("{callee}(...)"),
-        AstExpr::MethodCall { receiver, method, .. } => {
-            format!("{}.{}(...)", render_expr_for_error(receiver), method)
-        }
-        AstExpr::StructLiteral { type_name, .. } => format!("{type_name} {{ ... }}"),
-        AstExpr::FieldAccess { base, field } => {
-            format!("{}.{}", render_expr_for_error(base), field)
-        }
-        AstExpr::Binary { op, lhs, rhs } => format!(
-            "({} {} {})",
-            render_expr_for_error(lhs),
-            match op {
-                AstBinaryOp::Add => "+",
-                AstBinaryOp::Sub => "-",
-                AstBinaryOp::Mul => "*",
-                AstBinaryOp::Div => "/",
-            },
-            render_expr_for_error(rhs)
-            ),
     }
 }

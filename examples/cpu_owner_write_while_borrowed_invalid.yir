@@ -1,0 +1,20 @@
+yir 0.1
+
+resource cpu0 cpu.arm64
+
+cpu.null nil cpu0
+cpu.const v1 cpu0 10
+cpu.const v2 cpu0 99
+cpu.alloc_node head_raw cpu0 v1 nil
+cpu.move_ptr head cpu0 head_raw
+cpu.borrow head_ref cpu0 head
+cpu.store_value bad_write cpu0 head v2
+
+edge dep v1 head_raw
+edge dep nil head_raw
+edge dep head_raw head
+edge lifetime head_raw head
+edge dep head head_ref
+edge dep head bad_write
+edge dep v2 bad_write
+edge lifetime head bad_write

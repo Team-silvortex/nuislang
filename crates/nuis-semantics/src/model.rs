@@ -50,6 +50,7 @@ pub enum AstStmt {
         then_body: Vec<AstStmt>,
         else_body: Vec<AstStmt>,
     },
+    Expr(AstExpr),
     Return(Option<AstExpr>),
 }
 
@@ -138,7 +139,41 @@ pub enum NirStmt {
         then_body: Vec<NirStmt>,
         else_body: Vec<NirStmt>,
     },
+    Expr(NirExpr),
     Return(Option<NirExpr>),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NirGlmValueClass {
+    Val,
+    Res,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NirGlmUseMode {
+    Own,
+    Read,
+    Write,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NirGlmEffect {
+    None,
+    DomainMove,
+    LifetimeEnd,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NirGlmAccess {
+    pub class: NirGlmValueClass,
+    pub mode: NirGlmUseMode,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NirGlmProfile {
+    pub result_class: NirGlmValueClass,
+    pub accesses: Vec<NirGlmAccess>,
+    pub effect: NirGlmEffect,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -147,6 +182,39 @@ pub enum NirExpr {
     Text(String),
     Int(i64),
     Var(String),
+    Null,
+    Borrow(Box<NirExpr>),
+    Move(Box<NirExpr>),
+    AllocNode {
+        value: Box<NirExpr>,
+        next: Box<NirExpr>,
+    },
+    AllocBuffer {
+        len: Box<NirExpr>,
+        fill: Box<NirExpr>,
+    },
+    LoadValue(Box<NirExpr>),
+    LoadNext(Box<NirExpr>),
+    BufferLen(Box<NirExpr>),
+    LoadAt {
+        buffer: Box<NirExpr>,
+        index: Box<NirExpr>,
+    },
+    StoreValue {
+        target: Box<NirExpr>,
+        value: Box<NirExpr>,
+    },
+    StoreNext {
+        target: Box<NirExpr>,
+        next: Box<NirExpr>,
+    },
+    StoreAt {
+        buffer: Box<NirExpr>,
+        index: Box<NirExpr>,
+        value: Box<NirExpr>,
+    },
+    Free(Box<NirExpr>),
+    IsNull(Box<NirExpr>),
     Call {
         callee: String,
         args: Vec<NirExpr>,
@@ -177,6 +245,75 @@ pub enum NirBinaryOp {
     Sub,
     Mul,
     Div,
+}
+
+pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
+    match expr {
+        NirExpr::Null
+        | NirExpr::Bool(_)
+        | NirExpr::Text(_)
+        | NirExpr::Int(_)
+        | NirExpr::Var(_)
+        | NirExpr::Call { .. }
+        | NirExpr::MethodCall { .. }
+        | NirExpr::StructLiteral { .. }
+        | NirExpr::FieldAccess { .. }
+        | NirExpr::Binary { .. }
+        | NirExpr::IsNull(_) => None,
+        NirExpr::Borrow(_) => Some(NirGlmProfile {
+            result_class: NirGlmValueClass::Res,
+            accesses: vec![NirGlmAccess {
+                class: NirGlmValueClass::Res,
+                mode: NirGlmUseMode::Read,
+            }],
+            effect: NirGlmEffect::None,
+        }),
+        NirExpr::Move(_) => Some(NirGlmProfile {
+            result_class: NirGlmValueClass::Res,
+            accesses: vec![NirGlmAccess {
+                class: NirGlmValueClass::Res,
+                mode: NirGlmUseMode::Own,
+            }],
+            effect: NirGlmEffect::DomainMove,
+        }),
+        NirExpr::AllocNode { .. } | NirExpr::AllocBuffer { .. } => Some(NirGlmProfile {
+            result_class: NirGlmValueClass::Res,
+            accesses: vec![NirGlmAccess {
+                class: NirGlmValueClass::Val,
+                mode: NirGlmUseMode::Read,
+            }],
+            effect: NirGlmEffect::None,
+        }),
+        NirExpr::LoadValue(_)
+        | NirExpr::LoadNext(_)
+        | NirExpr::BufferLen(_)
+        | NirExpr::LoadAt { .. } => Some(NirGlmProfile {
+            result_class: NirGlmValueClass::Val,
+            accesses: vec![NirGlmAccess {
+                class: NirGlmValueClass::Res,
+                mode: NirGlmUseMode::Read,
+            }],
+            effect: NirGlmEffect::None,
+        }),
+        NirExpr::StoreValue { .. }
+        | NirExpr::StoreNext { .. }
+        | NirExpr::StoreAt { .. } => Some(NirGlmProfile {
+            result_class: NirGlmValueClass::Val,
+            accesses: vec![NirGlmAccess {
+                class: NirGlmValueClass::Res,
+                mode: NirGlmUseMode::Write,
+            }],
+            effect: NirGlmEffect::None,
+        }),
+        NirExpr::Free(_) => Some(NirGlmProfile {
+            result_class: NirGlmValueClass::Val,
+            accesses: vec![NirGlmAccess {
+                class: NirGlmValueClass::Res,
+                mode: NirGlmUseMode::Own,
+            }],
+            effect: NirGlmEffect::LifetimeEnd,
+        }),
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

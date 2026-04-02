@@ -57,6 +57,9 @@ pub fn render_ast(module: &AstModule) -> String {
                         out.push_str(&format!("      else {}\n", render_ast_stmt_inline(stmt)));
                     }
                 }
+                AstStmt::Expr(expr) => {
+                    out.push_str(&format!("    expr {}\n", render_ast_expr(expr)));
+                }
                 AstStmt::Return(value) => match value {
                     Some(value) => {
                         out.push_str(&format!("    return {}\n", render_ast_expr(value)));
@@ -122,6 +125,9 @@ pub fn render_nir(module: &NirModule) -> String {
                     for stmt in else_body {
                         out.push_str(&format!("      else {}\n", render_nir_stmt_inline(stmt)));
                     }
+                }
+                NirStmt::Expr(expr) => {
+                    out.push_str(&format!("    expr {}\n", render_nir_expr(expr)));
                 }
                 NirStmt::Return(value) => match value {
                     Some(value) => {
@@ -221,6 +227,39 @@ fn render_nir_expr(value: &NirExpr) -> String {
         NirExpr::Text(text) => format!("\"{}\"", escape_debug(text)),
         NirExpr::Int(value) => value.to_string(),
         NirExpr::Var(name) => name.clone(),
+        NirExpr::Null => "null()".to_owned(),
+        NirExpr::Borrow(value) => format!("borrow({})", render_nir_expr(value)),
+        NirExpr::Move(value) => format!("move({})", render_nir_expr(value)),
+        NirExpr::AllocNode { value, next } => {
+            format!("alloc_node({}, {})", render_nir_expr(value), render_nir_expr(next))
+        }
+        NirExpr::AllocBuffer { len, fill } => {
+            format!("alloc_buffer({}, {})", render_nir_expr(len), render_nir_expr(fill))
+        }
+        NirExpr::LoadValue(value) => format!("load_value({})", render_nir_expr(value)),
+        NirExpr::LoadNext(value) => format!("load_next({})", render_nir_expr(value)),
+        NirExpr::BufferLen(value) => format!("buffer_len({})", render_nir_expr(value)),
+        NirExpr::LoadAt { buffer, index } => {
+            format!("load_at({}, {})", render_nir_expr(buffer), render_nir_expr(index))
+        }
+        NirExpr::StoreValue { target, value } => {
+            format!("store_value({}, {})", render_nir_expr(target), render_nir_expr(value))
+        }
+        NirExpr::StoreNext { target, next } => {
+            format!("store_next({}, {})", render_nir_expr(target), render_nir_expr(next))
+        }
+        NirExpr::StoreAt {
+            buffer,
+            index,
+            value,
+        } => format!(
+            "store_at({}, {}, {})",
+            render_nir_expr(buffer),
+            render_nir_expr(index),
+            render_nir_expr(value)
+        ),
+        NirExpr::Free(value) => format!("free({})", render_nir_expr(value)),
+        NirExpr::IsNull(value) => format!("is_null({})", render_nir_expr(value)),
         NirExpr::Call { callee, args } => format!(
             "{}({})",
             callee,
@@ -332,6 +371,7 @@ fn render_ast_stmt_inline(stmt: &AstStmt) -> String {
             format!("const {}: {} = {}", name, render_ast_type(ty), render_ast_expr(value))
         }
         AstStmt::Print(value) => format!("print {}", render_ast_expr(value)),
+        AstStmt::Expr(expr) => render_ast_expr(expr),
         AstStmt::If { .. } => "if ...".to_owned(),
         AstStmt::Return(value) => match value {
             Some(value) => format!("return {}", render_ast_expr(value)),
@@ -353,6 +393,7 @@ fn render_nir_stmt_inline(stmt: &NirStmt) -> String {
             format!("const {}: {} = {}", name, render_nir_type(ty), render_nir_expr(value))
         }
         NirStmt::Print(value) => format!("print {}", render_nir_expr(value)),
+        NirStmt::Expr(expr) => render_nir_expr(expr),
         NirStmt::If { .. } => "if ...".to_owned(),
         NirStmt::Return(value) => match value {
             Some(value) => format!("return {}", render_nir_expr(value)),

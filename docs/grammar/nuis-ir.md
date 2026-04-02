@@ -365,11 +365,13 @@ Important boundary note:
 * `cpu.borrow` and `cpu.move_ptr` are the first Rust-like ownership surface for the pure CPU domain: reads may flow through borrowed pointers, while writes and frees remain ownership-sensitive.
 * `cpu.alloc_node / alloc_buffer / load_* / store_* / free` are an early reference prototype for addressable objects and pointer-like semantics. They are intentionally narrow and currently model controlled heap-node and heap-buffer surfaces rather than a full general memory model.
 * `lifetime` is now part of the current handwritten reference style for ownership-sensitive `res` flow. In the current prototype, `Own` and `Write` resource accesses require a `lifetime` edge in addition to ordinary `dep` or `xfer` ordering.
+* The current CPU verifier also treats borrows conservatively: once a borrow exists, later `move/free/write` on the same owned object are rejected unless the model grows an explicit borrow-end surface.
 * `kernel.*` ops are the standard tensor/kernel execution surface. They may lower to `npu`, `gpu-kernel`, or future accelerators without changing the core graph semantics.
 * `data.*` ops are the instruction-level surface for Fabric-style exchange. The architecture term `Fabric` remains valid, but the standard op family name is `data`.
 * The current handwritten prototype now includes a first typed Fabric surface: `move`, `copy_window`, `immutable_window`, `marker`, `bind_core`, `output_pipe`, `input_pipe`, and `handle_table`.
 * The current verifier already enforces a minimal legality set for that surface: `input_pipe` must consume `output_pipe`, nested pipes are rejected, and `window` wrappers may not be formed from marker/handle carriers.
 * `data.move` is the current `MoveValue` primitive surface and therefore only accepts plain value payloads, not `window`, `marker`, `handle`, or `pipe` carriers.
+* `data.move` also currently behaves as an `Own` consume in the verifier: after a move, later graph-visible uses of the same source must already be ordered before that move node.
 * `data.handle_table` is strictly a resource-indirection primitive: entries must use unique slots and may only reference declared resources, never concrete data payloads.
 * `data.bind_core` is the current CPU-hosted Fabric worker binding surface: it lets the AOT/bundle path record which CPU core the data-plane worker should occupy, in a DPDK-like style.
 * These domain surfaces are expected to graduate into `nustar` registration packages; `nuisc` should load and bind them through a static index plus lazy package loading, rather than proactively discovering and hard-coding them as part of core YIR.

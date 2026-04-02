@@ -102,6 +102,9 @@ fn lower_function_body(
                     return Ok(Some(returned));
                 }
             }
+            NirStmt::Expr(expr) => {
+                let _ = lower_expr(expr, state, bindings)?;
+            }
             NirStmt::Return(value) => {
                 return match value {
                     Some(value) => Ok(Some(lower_expr(value, state, bindings)?)),
@@ -170,6 +173,167 @@ fn lower_expr(
             .get(name)
             .cloned()
             .ok_or_else(|| format!("minimal nuisc lowering found unbound variable `{name}`")),
+        NirExpr::Null => {
+            let name = next_name(state, "null");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "cpu0".to_owned(),
+                op: Operation {
+                    module: "cpu".to_owned(),
+                    instruction: "null".to_owned(),
+                    args: vec![],
+                },
+            });
+            Ok(name)
+        }
+        NirExpr::Borrow(value) => lower_unary_cpu_expr("borrow", value, state, bindings),
+        NirExpr::Move(value) => {
+            let ptr = lower_expr(value, state, bindings)?;
+            let name = next_name(state, "move");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "cpu0".to_owned(),
+                op: Operation {
+                    module: "cpu".to_owned(),
+                    instruction: "move_ptr".to_owned(),
+                    args: vec![ptr.clone()],
+                },
+            });
+            push_dep_edges(state, &ptr, &name);
+            push_lifetime_edge(state, &ptr, &name);
+            Ok(name)
+        }
+        NirExpr::AllocNode { value, next } => {
+            let value_name = lower_expr(value, state, bindings)?;
+            let next_ptr_name = lower_expr(next, state, bindings)?;
+            let name = next_name(state, "alloc_node");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "cpu0".to_owned(),
+                op: Operation {
+                    module: "cpu".to_owned(),
+                    instruction: "alloc_node".to_owned(),
+                    args: vec![value_name.clone(), next_ptr_name.clone()],
+                },
+            });
+            push_dep_edges(state, &value_name, &name);
+            push_dep_edges(state, &next_ptr_name, &name);
+            Ok(name)
+        }
+        NirExpr::AllocBuffer { len, fill } => {
+            let len_name = lower_expr(len, state, bindings)?;
+            let fill_name = lower_expr(fill, state, bindings)?;
+            let name = next_name(state, "alloc_buffer");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "cpu0".to_owned(),
+                op: Operation {
+                    module: "cpu".to_owned(),
+                    instruction: "alloc_buffer".to_owned(),
+                    args: vec![len_name.clone(), fill_name.clone()],
+                },
+            });
+            push_dep_edges(state, &len_name, &name);
+            push_dep_edges(state, &fill_name, &name);
+            Ok(name)
+        }
+        NirExpr::LoadValue(value) => lower_unary_cpu_expr("load_value", value, state, bindings),
+        NirExpr::LoadNext(value) => lower_unary_cpu_expr("load_next", value, state, bindings),
+        NirExpr::BufferLen(value) => lower_unary_cpu_expr("buffer_len", value, state, bindings),
+        NirExpr::IsNull(value) => lower_unary_cpu_expr("is_null", value, state, bindings),
+        NirExpr::LoadAt { buffer, index } => {
+            let buffer_name = lower_expr(buffer, state, bindings)?;
+            let index_name = lower_expr(index, state, bindings)?;
+            let name = next_name(state, "load_at");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "cpu0".to_owned(),
+                op: Operation {
+                    module: "cpu".to_owned(),
+                    instruction: "load_at".to_owned(),
+                    args: vec![buffer_name.clone(), index_name.clone()],
+                },
+            });
+            push_dep_edges(state, &buffer_name, &name);
+            push_dep_edges(state, &index_name, &name);
+            Ok(name)
+        }
+        NirExpr::StoreValue { target, value } => {
+            let target_name = lower_expr(target, state, bindings)?;
+            let value_name = lower_expr(value, state, bindings)?;
+            let name = next_name(state, "store_value");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "cpu0".to_owned(),
+                op: Operation {
+                    module: "cpu".to_owned(),
+                    instruction: "store_value".to_owned(),
+                    args: vec![target_name.clone(), value_name.clone()],
+                },
+            });
+            push_dep_edges(state, &target_name, &name);
+            push_dep_edges(state, &value_name, &name);
+            push_lifetime_edge(state, &target_name, &name);
+            Ok(name)
+        }
+        NirExpr::StoreNext { target, next } => {
+            let target_name = lower_expr(target, state, bindings)?;
+            let next_name_value = lower_expr(next, state, bindings)?;
+            let name = next_name(state, "store_next");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "cpu0".to_owned(),
+                op: Operation {
+                    module: "cpu".to_owned(),
+                    instruction: "store_next".to_owned(),
+                    args: vec![target_name.clone(), next_name_value.clone()],
+                },
+            });
+            push_dep_edges(state, &target_name, &name);
+            push_dep_edges(state, &next_name_value, &name);
+            push_lifetime_edge(state, &target_name, &name);
+            Ok(name)
+        }
+        NirExpr::StoreAt {
+            buffer,
+            index,
+            value,
+        } => {
+            let buffer_name = lower_expr(buffer, state, bindings)?;
+            let index_name = lower_expr(index, state, bindings)?;
+            let value_name = lower_expr(value, state, bindings)?;
+            let name = next_name(state, "store_at");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "cpu0".to_owned(),
+                op: Operation {
+                    module: "cpu".to_owned(),
+                    instruction: "store_at".to_owned(),
+                    args: vec![buffer_name.clone(), index_name.clone(), value_name.clone()],
+                },
+            });
+            push_dep_edges(state, &buffer_name, &name);
+            push_dep_edges(state, &index_name, &name);
+            push_dep_edges(state, &value_name, &name);
+            push_lifetime_edge(state, &buffer_name, &name);
+            Ok(name)
+        }
+        NirExpr::Free(value) => {
+            let ptr = lower_expr(value, state, bindings)?;
+            let name = next_name(state, "free");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "cpu0".to_owned(),
+                op: Operation {
+                    module: "cpu".to_owned(),
+                    instruction: "free".to_owned(),
+                    args: vec![ptr.clone()],
+                },
+            });
+            push_dep_edges(state, &ptr, &name);
+            push_lifetime_edge(state, &ptr, &name);
+            Ok(name)
+        }
         NirExpr::Binary { op, lhs, rhs } => {
             let lhs_name = lower_expr(lhs, state, bindings)?;
             let rhs_name = lower_expr(rhs, state, bindings)?;
@@ -430,4 +594,33 @@ fn push_dep_edges(state: &mut LoweringState<'_>, from: &str, to: &str) {
         from: from.to_owned(),
         to: to.to_owned(),
     });
+}
+
+fn push_lifetime_edge(state: &mut LoweringState<'_>, from: &str, to: &str) {
+    state.yir.edges.push(Edge {
+        kind: EdgeKind::Lifetime,
+        from: from.to_owned(),
+        to: to.to_owned(),
+    });
+}
+
+fn lower_unary_cpu_expr(
+    instruction: &str,
+    value: &NirExpr,
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<String, String> {
+    let lowered = lower_expr(value, state, bindings)?;
+    let name = next_name(state, instruction);
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: instruction.to_owned(),
+            args: vec![lowered.clone()],
+        },
+    });
+    push_dep_edges(state, &lowered, &name);
+    Ok(name)
 }

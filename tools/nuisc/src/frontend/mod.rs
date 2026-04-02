@@ -76,6 +76,7 @@ fn lower_stmt(stmt: &AstStmt) -> NirStmt {
             then_body: then_body.iter().map(lower_stmt).collect(),
             else_body: else_body.iter().map(lower_stmt).collect(),
         },
+        AstStmt::Expr(expr) => NirStmt::Expr(lower_expr(expr)),
         AstStmt::Return(value) => NirStmt::Return(value.as_ref().map(lower_expr)),
     }
 }
@@ -86,10 +87,7 @@ fn lower_expr(expr: &AstExpr) -> NirExpr {
         AstExpr::Text(text) => NirExpr::Text(text.clone()),
         AstExpr::Int(value) => NirExpr::Int(*value),
         AstExpr::Var(name) => NirExpr::Var(name.clone()),
-        AstExpr::Call { callee, args } => NirExpr::Call {
-            callee: callee.clone(),
-            args: args.iter().map(lower_expr).collect(),
-        },
+        AstExpr::Call { callee, args } => lower_call_expr(callee, args),
         AstExpr::MethodCall {
             receiver,
             method,
@@ -119,6 +117,49 @@ fn lower_expr(expr: &AstExpr) -> NirExpr {
             },
             lhs: Box::new(lower_expr(lhs)),
             rhs: Box::new(lower_expr(rhs)),
+        },
+    }
+}
+
+fn lower_call_expr(callee: &str, args: &[AstExpr]) -> NirExpr {
+    let lowered_args = args.iter().map(lower_expr).collect::<Vec<_>>();
+    match (callee, lowered_args.as_slice()) {
+        ("null", []) => NirExpr::Null,
+        ("borrow", [value]) => NirExpr::Borrow(Box::new(value.clone())),
+        ("move", [value]) => NirExpr::Move(Box::new(value.clone())),
+        ("alloc_node", [value, next]) => NirExpr::AllocNode {
+            value: Box::new(value.clone()),
+            next: Box::new(next.clone()),
+        },
+        ("alloc_buffer", [len, fill]) => NirExpr::AllocBuffer {
+            len: Box::new(len.clone()),
+            fill: Box::new(fill.clone()),
+        },
+        ("load_value", [ptr]) => NirExpr::LoadValue(Box::new(ptr.clone())),
+        ("load_next", [ptr]) => NirExpr::LoadNext(Box::new(ptr.clone())),
+        ("buffer_len", [ptr]) => NirExpr::BufferLen(Box::new(ptr.clone())),
+        ("load_at", [buffer, index]) => NirExpr::LoadAt {
+            buffer: Box::new(buffer.clone()),
+            index: Box::new(index.clone()),
+        },
+        ("store_value", [target, value]) => NirExpr::StoreValue {
+            target: Box::new(target.clone()),
+            value: Box::new(value.clone()),
+        },
+        ("store_next", [target, next]) => NirExpr::StoreNext {
+            target: Box::new(target.clone()),
+            next: Box::new(next.clone()),
+        },
+        ("store_at", [buffer, index, value]) => NirExpr::StoreAt {
+            buffer: Box::new(buffer.clone()),
+            index: Box::new(index.clone()),
+            value: Box::new(value.clone()),
+        },
+        ("free", [value]) => NirExpr::Free(Box::new(value.clone())),
+        ("is_null", [value]) => NirExpr::IsNull(Box::new(value.clone())),
+        _ => NirExpr::Call {
+            callee: callee.to_owned(),
+            args: lowered_args,
         },
     }
 }

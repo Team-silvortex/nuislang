@@ -281,6 +281,8 @@ The current verifier treats this surface as an early Rust-like ownership model:
 * after `cpu.move_ptr`, the source name may not be used again
 * after `cpu.free`, the owned name is consumed
 * reading through a borrow after the owned object has been freed is rejected
+* current reference verifier also treats borrows conservatively: while a borrow
+  is active, moving, freeing, or mutating the owned object is rejected
 
 ## Current GLM Minimum Surface
 
@@ -305,6 +307,8 @@ Current minimum verifier rules:
   require explicit lifetime edges
 * `data.move` currently participates as an ownership-moving action and is
   modeled as an `Own` access with domain-move effect
+* any `Own` access is currently treated as the final graph-visible consume of
+  that source; all other uses must be ordered before it
 
 Current canonical handwritten style:
 
@@ -323,6 +327,13 @@ edge lifetime buf write_slot
 This style is intentionally explicit: ownership transfer or mutation should be
 visible in the graph rather than hidden inside the opcode name.
 
+Current domain-move consequence:
+
+* once `data.move` consumes a value for cross-domain transfer, later uses of
+  that source must already be ordered before the move
+* this is the current reference approximation of “source domain immediately
+  invalid after move”
+
 This is intentionally partial, but it is already strong enough to guard the
 current linked-list prototype.
 
@@ -331,8 +342,10 @@ Reference examples:
 * valid: [examples/cpu_linked_list_rustish.yir](/Users/Shared/chroot/dev/nuislang/examples/cpu_linked_list_rustish.yir)
 * valid buffer example: [examples/cpu_buffer_rustish.yir](/Users/Shared/chroot/dev/nuislang/examples/cpu_buffer_rustish.yir)
 * invalid borrowed write: [examples/cpu_borrow_write_invalid.yir](/Users/Shared/chroot/dev/nuislang/examples/cpu_borrow_write_invalid.yir)
+* invalid owner write while borrowed: [examples/cpu_owner_write_while_borrowed_invalid.yir](/Users/Shared/chroot/dev/nuislang/examples/cpu_owner_write_while_borrowed_invalid.yir)
 * invalid borrowed buffer write: [examples/cpu_buffer_borrow_write_invalid.yir](/Users/Shared/chroot/dev/nuislang/examples/cpu_buffer_borrow_write_invalid.yir)
 * invalid post-free access: [examples/cpu_use_after_free_invalid.yir](/Users/Shared/chroot/dev/nuislang/examples/cpu_use_after_free_invalid.yir)
+* invalid move while borrowed: [examples/cpu_move_while_borrowed_invalid.yir](/Users/Shared/chroot/dev/nuislang/examples/cpu_move_while_borrowed_invalid.yir)
 * invalid missing lifetime edge: [examples/cpu_glm_missing_lifetime_invalid.yir](/Users/Shared/chroot/dev/nuislang/examples/cpu_glm_missing_lifetime_invalid.yir)
 
 ---

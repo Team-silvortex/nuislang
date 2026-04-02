@@ -143,6 +143,7 @@ fn verify_glm_protocol(module: &YirModule) -> Result<(), String> {
         .iter()
         .map(|node| (node.name.as_str(), node))
         .collect::<BTreeMap<_, _>>();
+    let mut consumers = BTreeMap::<String, Vec<(String, yir_core::GlmValueClass, GlmUseMode)>>::new();
 
     for node in &module.nodes {
         let profile = glm_profile_for_operation(&node.op);
@@ -150,6 +151,10 @@ fn verify_glm_protocol(module: &YirModule) -> Result<(), String> {
             if !nodes.contains_key(access.input.as_str()) {
                 continue;
             }
+            consumers
+                .entry(access.input.clone())
+                .or_default()
+                .push((node.name.clone(), access.class, access.mode));
             let has_dep = module.edges.iter().any(|edge| {
                 edge.from == access.input
                     && edge.to == node.name
@@ -201,6 +206,25 @@ fn verify_glm_protocol(module: &YirModule) -> Result<(), String> {
                 }
             }
             GlmEffect::None => {}
+        }
+    }
+
+    for (source, consumers_for_source) in &consumers {
+        for (owner_node, class, mode) in consumers_for_source {
+            if !matches!(mode, GlmUseMode::Own) {
+                continue;
+            }
+            for (other_node, _, _) in consumers_for_source {
+                if other_node == owner_node {
+                    continue;
+                }
+                if !path_exists(module, other_node, owner_node) {
+                    return Err(format!(
+                        "GLM: node `{}` consumes {} `{}` with Own, but `{}` is not ordered before that consume",
+                        owner_node, class, source, other_node
+                    ));
+                }
+            }
         }
     }
 
@@ -445,6 +469,7 @@ fn verify_cpu_heap_protocol(module: &YirModule) -> Result<(), String> {
 
     let mut values = BTreeMap::<String, PointerState>::new();
     let mut heap = BTreeMap::<usize, HeapBinding>::new();
+    let mut borrow_counts = BTreeMap::<usize, usize>::new();
     let mut next_id = 1usize;
     let mut moved_names = BTreeSet::<String>::new();
 
@@ -505,6 +530,7 @@ fn verify_cpu_heap_protocol(module: &YirModule) -> Result<(), String> {
                 match source {
                     PointerState::Owned(id) | PointerState::Borrowed(id) => {
                         ensure_live_heap(&heap, id, node)?;
+                        *borrow_counts.entry(id).or_insert(0) += 1;
                         values.insert(node.name.clone(), PointerState::Borrowed(id));
                     }
                     PointerState::Null => {
@@ -521,6 +547,7 @@ fn verify_cpu_heap_protocol(module: &YirModule) -> Result<(), String> {
                 match source {
                     PointerState::Owned(id) => {
                         ensure_live_heap(&heap, id, node)?;
+                        ensure_no_active_borrows(&borrow_counts, id, node, "move")?;
                         values.insert(node.name.clone(), PointerState::Owned(id));
                         moved_names.insert(source_name.clone());
                     }
@@ -574,11 +601,16 @@ fn verify_cpu_heap_protocol(module: &YirModule) -> Result<(), String> {
                 ensure_buffer_index_in_bounds(pointer, &heap, &nodes, &node.op.args[1], node)?;
             }
             "store_value" => {
-                ensure_node_writable(pointer_arg(&values, &node.op.args[0]), &heap, node)?;
+                ensure_node_writable(
+                    pointer_arg(&values, &node.op.args[0]),
+                    &heap,
+                    &borrow_counts,
+                    node,
+                )?;
             }
             "store_next" => {
                 let dest = pointer_arg(&values, &node.op.args[0]);
-                ensure_node_writable(dest, &heap, node)?;
+                ensure_node_writable(dest, &heap, &borrow_counts, node)?;
                 let next = pointer_arg(&values, &node.op.args[1]);
                 if let PointerState::Owned(id) = dest {
                     if let Some(binding) = heap.get_mut(&id) {
@@ -597,7 +629,12 @@ fn verify_cpu_heap_protocol(module: &YirModule) -> Result<(), String> {
                 }
             }
             "store_at" => {
-                ensure_buffer_writable(pointer_arg(&values, &node.op.args[0]), &heap, node)?;
+                ensure_buffer_writable(
+                    pointer_arg(&values, &node.op.args[0]),
+                    &heap,
+                    &borrow_counts,
+                    node,
+                )?;
                 ensure_buffer_index_in_bounds(
                     pointer_arg(&values, &node.op.args[0]),
                     &heap,
@@ -611,6 +648,7 @@ fn verify_cpu_heap_protocol(module: &YirModule) -> Result<(), String> {
                 match pointer_arg(&values, source_name) {
                     PointerState::Owned(id) => {
                         ensure_live_heap(&heap, id, node)?;
+                        ensure_no_active_borrows(&borrow_counts, id, node, "free")?;
                         if let Some(binding) = heap.get_mut(&id) {
                             binding.live = false;
                         }
@@ -734,10 +772,15 @@ fn ensure_pointer_readable(
 fn ensure_pointer_writable(
     pointer: PointerState,
     heap: &BTreeMap<usize, HeapBinding>,
+    borrow_counts: &BTreeMap<usize, usize>,
     node: &Node,
 ) -> Result<(), String> {
     match pointer {
-        PointerState::Owned(id) => ensure_live_heap(heap, id, node),
+        PointerState::Owned(id) => {
+            ensure_live_heap(heap, id, node)?;
+            ensure_no_active_borrows(borrow_counts, id, node, "write")?;
+            Ok(())
+        }
         PointerState::Borrowed(_) => Err(format!(
             "node `{}` writes through borrowed pointer",
             node.name
@@ -771,9 +814,10 @@ fn ensure_node_readable(
 fn ensure_node_writable(
     pointer: PointerState,
     heap: &BTreeMap<usize, HeapBinding>,
+    borrow_counts: &BTreeMap<usize, usize>,
     node: &Node,
 ) -> Result<(), String> {
-    ensure_pointer_writable(pointer, heap, node)?;
+    ensure_pointer_writable(pointer, heap, borrow_counts, node)?;
     match pointer {
         PointerState::Owned(id) => match heap.get(&id).map(|binding| binding.kind) {
             Some(HeapObjectKind::Node { .. }) => Ok(()),
@@ -812,11 +856,13 @@ fn ensure_buffer_readable(
 fn ensure_buffer_writable(
     pointer: PointerState,
     heap: &BTreeMap<usize, HeapBinding>,
+    borrow_counts: &BTreeMap<usize, usize>,
     node: &Node,
 ) -> Result<(), String> {
     match pointer {
         PointerState::Owned(id) => {
             ensure_live_heap(heap, id, node)?;
+            ensure_no_active_borrows(borrow_counts, id, node, "write")?;
             match heap.get(&id).map(|binding| binding.kind) {
                 Some(HeapObjectKind::Buffer { .. }) => Ok(()),
                 Some(HeapObjectKind::Node { .. }) => Err(format!(
@@ -843,6 +889,23 @@ fn ensure_buffer_writable(
         PointerState::Null => Err(format!("node `{}` writes through null pointer", node.name)),
         PointerState::Unknown => Ok(()),
     }
+}
+
+fn ensure_no_active_borrows(
+    borrow_counts: &BTreeMap<usize, usize>,
+    id: usize,
+    node: &Node,
+    action: &str,
+) -> Result<(), String> {
+    let active = borrow_counts.get(&id).copied().unwrap_or(0);
+    if active == 0 {
+        return Ok(());
+    }
+
+    Err(format!(
+        "node `{}` cannot {} `&{}` while {} borrow(s) are active",
+        node.name, action, id, active
+    ))
 }
 
 fn topological_order(module: &YirModule) -> Result<Vec<String>, String> {
@@ -890,4 +953,37 @@ fn topological_order(module: &YirModule) -> Result<Vec<String>, String> {
     }
 
     Ok(order)
+}
+
+fn path_exists(module: &YirModule, from: &str, to: &str) -> bool {
+    if from == to {
+        return true;
+    }
+
+    let mut adjacency = BTreeMap::<&str, Vec<&str>>::new();
+    for edge in &module.edges {
+        adjacency
+            .entry(edge.from.as_str())
+            .or_default()
+            .push(edge.to.as_str());
+    }
+
+    let mut stack = vec![from];
+    let mut visited = BTreeSet::<&str>::new();
+
+    while let Some(current) = stack.pop() {
+        if !visited.insert(current) {
+            continue;
+        }
+        if let Some(targets) = adjacency.get(current) {
+            for target in targets {
+                if *target == to {
+                    return true;
+                }
+                stack.push(target);
+            }
+        }
+    }
+
+    false
 }
