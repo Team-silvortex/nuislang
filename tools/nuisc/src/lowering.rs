@@ -3,7 +3,34 @@ use std::collections::BTreeMap;
 use nuis_semantics::model::{NirBinaryOp, NirExpr, NirFunction, NirModule, NirStmt};
 use yir_core::{Edge, EdgeKind, Node, Operation, Resource, ResourceKind, YirModule};
 
-pub fn lower_nir_to_yir(module: &NirModule) -> Result<YirModule, String> {
+use crate::registry::NustarPackageManifest;
+
+pub fn lower_nir_to_yir(
+    module: &NirModule,
+    nustar_manifest: &NustarPackageManifest,
+) -> Result<YirModule, String> {
+    dispatch_nustar_lowering(module, nustar_manifest)
+}
+
+fn dispatch_nustar_lowering(
+    module: &NirModule,
+    nustar_manifest: &NustarPackageManifest,
+) -> Result<YirModule, String> {
+    if nustar_manifest.domain_family != module.domain {
+        return Err(format!(
+            "nustar package `{}` cannot lower mod domain `{}`",
+            nustar_manifest.package_id, module.domain
+        ));
+    }
+    match nustar_manifest.yir_lowering_entry.as_str() {
+        "cpu.yir.lowering.v1" => lower_nir_to_yir_builtin_cpu(module),
+        other => Err(format!(
+            "nuisc scheduler has no bootstrap compatibility shim for lowering entry `{other}`; this must be provided by the loaded nustar implementation"
+        )),
+    }
+}
+
+fn lower_nir_to_yir_builtin_cpu(module: &NirModule) -> Result<YirModule, String> {
     if module.domain != "cpu" {
         return Err(format!(
             "minimal nuisc lowering currently only supports `mod cpu`, found `{}`",
@@ -80,11 +107,7 @@ fn lower_function_body(
                         args: vec![lowered.clone()],
                     },
                 });
-                state.yir.edges.push(Edge {
-                    kind: EdgeKind::Dep,
-                    from: lowered.clone(),
-                    to: print_name.clone(),
-                });
+                push_dep_edges(state, &lowered, &print_name);
                 state.yir.edges.push(Edge {
                     kind: EdgeKind::Effect,
                     from: lowered,
@@ -235,6 +258,124 @@ fn lower_expr(
             });
             push_dep_edges(state, &len_name, &name);
             push_dep_edges(state, &fill_name, &name);
+            Ok(name)
+        }
+        NirExpr::DataBindCore(core_index) => {
+            ensure_fabric_resource(state.yir);
+            let name = next_name(state, "data_bind_core");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "fabric0".to_owned(),
+                op: Operation {
+                    module: "data".to_owned(),
+                    instruction: "bind_core".to_owned(),
+                    args: vec![core_index.to_string()],
+                },
+            });
+            Ok(name)
+        }
+        NirExpr::DataMarker(tag) => {
+            ensure_fabric_resource(state.yir);
+            let name = next_name(state, "data_marker");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "fabric0".to_owned(),
+                op: Operation {
+                    module: "data".to_owned(),
+                    instruction: "marker".to_owned(),
+                    args: vec![tag.clone()],
+                },
+            });
+            Ok(name)
+        }
+        NirExpr::DataOutputPipe(value) => {
+            ensure_fabric_resource(state.yir);
+            let value_name = lower_expr(value, state, bindings)?;
+            let name = next_name(state, "data_output_pipe");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "fabric0".to_owned(),
+                op: Operation {
+                    module: "data".to_owned(),
+                    instruction: "output_pipe".to_owned(),
+                    args: vec![value_name.clone()],
+                },
+            });
+            push_xfer_edge(state, &value_name, &name);
+            Ok(name)
+        }
+        NirExpr::DataInputPipe(pipe) => {
+            ensure_fabric_resource(state.yir);
+            let pipe_name = lower_expr(pipe, state, bindings)?;
+            let name = next_name(state, "data_input_pipe");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "fabric0".to_owned(),
+                op: Operation {
+                    module: "data".to_owned(),
+                    instruction: "input_pipe".to_owned(),
+                    args: vec![pipe_name.clone()],
+                },
+            });
+            push_dep_edges(state, &pipe_name, &name);
+            state.yir.edges.push(Edge {
+                kind: EdgeKind::Effect,
+                from: pipe_name,
+                to: name.clone(),
+            });
+            Ok(name)
+        }
+        NirExpr::DataCopyWindow { input, offset, len } => {
+            ensure_fabric_resource(state.yir);
+            let input_name = lower_expr(input, state, bindings)?;
+            let offset_name = lower_inline_i64_literal(offset, "data_copy_window offset")?;
+            let len_name = lower_inline_i64_literal(len, "data_copy_window len")?;
+            let name = next_name(state, "data_copy_window");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "fabric0".to_owned(),
+                op: Operation {
+                    module: "data".to_owned(),
+                    instruction: "copy_window".to_owned(),
+                    args: vec![input_name.clone(), offset_name.clone(), len_name.clone()],
+                },
+            });
+            push_dep_edges(state, &input_name, &name);
+            Ok(name)
+        }
+        NirExpr::DataImmutableWindow { input, offset, len } => {
+            ensure_fabric_resource(state.yir);
+            let input_name = lower_expr(input, state, bindings)?;
+            let offset_name = lower_inline_i64_literal(offset, "data_immutable_window offset")?;
+            let len_name = lower_inline_i64_literal(len, "data_immutable_window len")?;
+            let name = next_name(state, "data_immutable_window");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "fabric0".to_owned(),
+                op: Operation {
+                    module: "data".to_owned(),
+                    instruction: "immutable_window".to_owned(),
+                    args: vec![input_name.clone(), offset_name.clone(), len_name.clone()],
+                },
+            });
+            push_dep_edges(state, &input_name, &name);
+            Ok(name)
+        }
+        NirExpr::DataHandleTable(entries) => {
+            ensure_fabric_resource(state.yir);
+            let name = next_name(state, "data_handle_table");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "fabric0".to_owned(),
+                op: Operation {
+                    module: "data".to_owned(),
+                    instruction: "handle_table".to_owned(),
+                    args: entries
+                        .iter()
+                        .map(|(slot, resource)| format!("{slot}={resource}"))
+                        .collect(),
+                },
+            });
             Ok(name)
         }
         NirExpr::LoadValue(value) => lower_unary_cpu_expr("load_value", value, state, bindings),
@@ -588,9 +729,45 @@ fn next_name(state: &mut LoweringState<'_>, prefix: &str) -> String {
     name
 }
 
+fn ensure_fabric_resource(yir: &mut YirModule) {
+    if yir.resources.iter().any(|resource| resource.name == "fabric0") {
+        return;
+    }
+    yir.resources.push(Resource {
+        name: "fabric0".to_owned(),
+        kind: ResourceKind::parse("data.fabric"),
+    });
+}
+
 fn push_dep_edges(state: &mut LoweringState<'_>, from: &str, to: &str) {
+    let from_resource = state
+        .yir
+        .nodes
+        .iter()
+        .find(|node| node.name == from)
+        .map(|node| node.resource.as_str());
+    let to_resource = state
+        .yir
+        .nodes
+        .iter()
+        .find(|node| node.name == to)
+        .map(|node| node.resource.as_str());
+    if let (Some(from_resource), Some(to_resource)) = (from_resource, to_resource) {
+        if from_resource != to_resource {
+            push_xfer_edge(state, from, to);
+            return;
+        }
+    }
     state.yir.edges.push(Edge {
         kind: EdgeKind::Dep,
+        from: from.to_owned(),
+        to: to.to_owned(),
+    });
+}
+
+fn push_xfer_edge(state: &mut LoweringState<'_>, from: &str, to: &str) {
+    state.yir.edges.push(Edge {
+        kind: EdgeKind::CrossDomainExchange,
         from: from.to_owned(),
         to: to.to_owned(),
     });
@@ -623,4 +800,14 @@ fn lower_unary_cpu_expr(
     });
     push_dep_edges(state, &lowered, &name);
     Ok(name)
+}
+
+fn lower_inline_i64_literal(expr: &NirExpr, label: &str) -> Result<String, String> {
+    match expr {
+        NirExpr::Int(value) => Ok(value.to_string()),
+        other => Err(format!(
+            "{label} currently requires a literal i64 in minimal nuisc lowering, found {:?}",
+            other
+        )),
+    }
 }

@@ -5,6 +5,7 @@ pub mod engine;
 pub mod errors;
 pub mod frontend;
 pub mod lowering;
+pub mod nir_verify;
 pub mod nustar_binary;
 pub mod pipeline;
 pub mod registry;
@@ -74,6 +75,14 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     manifest.resource_families.join(", ")
                 );
                 println!(
+                    "  unit_types: {}",
+                    if manifest.unit_types.is_empty() {
+                        "<any>".to_owned()
+                    } else {
+                        manifest.unit_types.join(", ")
+                    }
+                );
+                println!(
                     "  lowering_targets: {}",
                     manifest.lowering_targets.join(", ")
                 );
@@ -82,7 +91,12 @@ pub fn run(command: CommandKind) -> Result<(), String> {
         }
         CommandKind::Bindings { input } => {
             let artifacts = pipeline::compile_source_path(&input)?;
-            let plan = registry::plan_bindings(Path::new("nustar-packages"), &artifacts.yir)?;
+            let plan = registry::plan_bindings(
+                Path::new("nustar-packages"),
+                &artifacts.yir,
+                &artifacts.ast.domain,
+                &artifacts.ast.unit,
+            )?;
             println!("binding plan for: {}", input.display());
             for binding in plan.bindings {
                 println!("package: {}", binding.package_id);
@@ -97,6 +111,17 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 println!("  nir_surface: {}", binding.nir_surface.join(", "));
                 println!("  yir_lowering: {}", binding.yir_lowering.join(", "));
                 println!("  part_verify: {}", binding.part_verify.join(", "));
+                println!(
+                    "  registered_units: {}",
+                    if binding.registered_units.is_empty() {
+                        "<registry-only>".to_owned()
+                    } else {
+                        binding.registered_units.join(", ")
+                    }
+                );
+                if let Some(bound_unit) = &binding.bound_unit {
+                    println!("  bound_unit: {}", bound_unit);
+                }
                 println!(
                     "  matched_resources: {}",
                     if binding.matched_resources.is_empty() {
@@ -162,6 +187,14 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             println!(
                 "  resource_families: {}",
                 binary.manifest.resource_families.join(", ")
+            );
+            println!(
+                "  unit_types: {}",
+                if binary.manifest.unit_types.is_empty() {
+                    "<any>".to_owned()
+                } else {
+                    binary.manifest.unit_types.join(", ")
+                }
             );
             println!(
                 "  lowering_targets: {}",
@@ -234,6 +267,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             let artifacts = pipeline::compile_source_path(&input)?;
             let required =
                 registry::load_required_manifests(Path::new("nustar-packages"), &artifacts.yir)?;
+            registry::validate_unit_binding(&required, &artifacts.ast.domain, &artifacts.ast.unit)?;
             eprintln!(
                 "nuisc: lazily loaded nustar = {}",
                 required
@@ -248,6 +282,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             let artifacts = pipeline::compile_source_path(&input)?;
             let required =
                 registry::load_required_manifests(Path::new("nustar-packages"), &artifacts.yir)?;
+            registry::validate_unit_binding(&required, &artifacts.ast.domain, &artifacts.ast.unit)?;
             eprintln!(
                 "nuisc: lazily loaded nustar = {}",
                 required
@@ -262,6 +297,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             let artifacts = pipeline::compile_source_path(&input)?;
             let required =
                 registry::load_required_manifests(Path::new("nustar-packages"), &artifacts.yir)?;
+            registry::validate_unit_binding(&required, &artifacts.ast.domain, &artifacts.ast.unit)?;
             println!("checked nuis source: {}", input.display());
             println!(
                 "loaded_nustar: {}",
@@ -280,6 +316,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             let artifacts = pipeline::compile_source_path(&input)?;
             let required =
                 registry::load_required_manifests(Path::new("nustar-packages"), &artifacts.yir)?;
+            registry::validate_unit_binding(&required, &artifacts.ast.domain, &artifacts.ast.unit)?;
             let written = aot::write_and_link(
                 &input,
                 &output_dir,

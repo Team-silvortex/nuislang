@@ -1,12 +1,12 @@
 mod cpu Main {
   fn main() {
-    let nil = null();
-    let tail_raw = alloc_node(30, nil);
-    let tail = move(tail_raw);
-    let head = alloc_node(10, tail);
-    let head_ref = borrow(head);
-    let next_ptr = load_next(head_ref);
-    let tail_ref = borrow(next_ptr);
+    let nil: ref Node? = null();
+    let tail_raw: ref Node = alloc_node(30, nil);
+    let tail: ref Node = move(tail_raw);
+    let head: ref Node = alloc_node(10, tail);
+    let head_ref: ref Node = borrow(head);
+    let next_ptr: ref Node = load_next(head_ref);
+    let tail_ref: ref Node = borrow(next_ptr);
     let head_value = load_value(head_ref);
     let tail_value = load_value(tail_ref);
     print(head_value + tail_value);

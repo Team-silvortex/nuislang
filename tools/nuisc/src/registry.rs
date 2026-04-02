@@ -38,6 +38,7 @@ pub struct NustarPackageManifest {
     pub loader_abi: String,
     pub profiles: Vec<String>,
     pub resource_families: Vec<String>,
+    pub unit_types: Vec<String>,
     pub lowering_targets: Vec<String>,
     pub ops: Vec<String>,
 }
@@ -54,6 +55,8 @@ pub struct NustarBinding {
     pub nir_surface: Vec<String>,
     pub yir_lowering: Vec<String>,
     pub part_verify: Vec<String>,
+    pub registered_units: Vec<String>,
+    pub bound_unit: Option<String>,
     pub matched_resources: Vec<String>,
     pub matched_ops: Vec<String>,
     pub undeclared_ops: Vec<String>,
@@ -94,6 +97,26 @@ pub fn load_manifest(root: &Path, package_id: &str) -> Result<NustarPackageManif
     parse_manifest(&source, &path)
 }
 
+pub fn load_manifest_for_domain(
+    root: &Path,
+    domain_family: &str,
+) -> Result<NustarPackageManifest, String> {
+    let index = load_index(root)?;
+    let entry = index
+        .into_iter()
+        .find(|entry| entry.domain_family == domain_family)
+        .ok_or_else(|| {
+            format!(
+                "no nustar package is indexed for mod domain `{domain_family}` in `{}`",
+                root.join(INDEX_FILE).display()
+            )
+        })?;
+    let path = manifest_path(root, &entry);
+    let source = fs::read_to_string(&path)
+        .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
+    parse_manifest(&source, &path)
+}
+
 pub fn load_all_manifests(root: &Path) -> Result<Vec<NustarPackageManifest>, String> {
     let mut manifests = Vec::new();
     for entry in load_index(root)? {
@@ -123,11 +146,29 @@ pub fn load_required_manifests(
     Ok(manifests)
 }
 
-pub fn plan_bindings(root: &Path, module: &YirModule) -> Result<NustarBindingPlan, String> {
+pub fn plan_bindings(
+    root: &Path,
+    module: &YirModule,
+    domain: &str,
+    unit: &str,
+) -> Result<NustarBindingPlan, String> {
     let manifests = load_required_manifests(root, module)?;
+    validate_unit_binding(&manifests, domain, unit)?;
     let mut bindings = Vec::new();
 
     for manifest in manifests {
+        let registered_units = manifest
+            .unit_types
+            .iter()
+            .filter(|unit| !unit.is_empty())
+            .cloned()
+            .collect::<Vec<_>>();
+        let bound_unit = if manifest.domain_family == domain {
+            Some(unit.to_owned())
+        } else {
+            None
+        };
+
         let matched_resources = module
             .resources
             .iter()
@@ -171,6 +212,8 @@ pub fn plan_bindings(root: &Path, module: &YirModule) -> Result<NustarBindingPla
             nir_surface: manifest.nir_surface,
             yir_lowering: manifest.yir_lowering,
             part_verify: manifest.part_verify,
+            registered_units,
+            bound_unit,
             matched_resources,
             matched_ops,
             undeclared_ops,
@@ -181,6 +224,30 @@ pub fn plan_bindings(root: &Path, module: &YirModule) -> Result<NustarBindingPla
 
     bindings.sort_by(|lhs, rhs| lhs.package_id.cmp(&rhs.package_id));
     Ok(NustarBindingPlan { bindings })
+}
+
+pub fn validate_unit_binding(
+    manifests: &[NustarPackageManifest],
+    domain: &str,
+    unit: &str,
+) -> Result<(), String> {
+    let manifest = manifests
+        .iter()
+        .find(|manifest| manifest.domain_family == domain)
+        .ok_or_else(|| format!("no nustar manifest loaded for mod domain `{domain}`"))?;
+
+    if manifest.unit_types.is_empty() {
+        return Ok(());
+    }
+
+    if manifest.unit_types.iter().any(|candidate| candidate == unit) {
+        return Ok(());
+    }
+
+    Err(format!(
+        "unit `{unit}` is not registered by nustar package `{}` for mod domain `{domain}`",
+        manifest.package_id
+    ))
 }
 
 pub fn manifest_path(root: &Path, entry: &NustarPackageIndexEntry) -> PathBuf {
@@ -259,6 +326,7 @@ fn parse_manifest(source: &str, path: &Path) -> Result<NustarPackageManifest, St
         .unwrap_or_else(|| "nustar-loader-v1".to_owned());
     let profiles = parse_string_array(source, "profiles", path)?;
     let resource_families = parse_string_array(source, "resource_families", path)?;
+    let unit_types = parse_optional_string_array(source, "unit_types").unwrap_or_default();
     let lowering_targets = parse_string_array(source, "lowering_targets", path)?;
     let ops = parse_string_array(source, "ops", path)?;
 
@@ -284,6 +352,7 @@ fn parse_manifest(source: &str, path: &Path) -> Result<NustarPackageManifest, St
         loader_abi,
         profiles,
         resource_families,
+        unit_types,
         lowering_targets,
         ops,
     })

@@ -1,0 +1,10 @@
+mod cpu Main {
+  fn main() {
+    data_bind_core(1);
+    link ready: Marker = marker "loopback_ready";
+    let source: i64 = 42;
+    link pipe: Pipe<i64> = output source;
+    link roundtrip: i64 = input pipe;
+    print(roundtrip);
+  }
+}

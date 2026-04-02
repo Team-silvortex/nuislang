@@ -6,8 +6,21 @@ pub struct NirIntent {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AstModule {
     pub domain: String,
-    pub name: String,
+    pub unit: String,
+    pub structs: Vec<AstStructDef>,
     pub functions: Vec<AstFunction>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AstStructField {
+    pub name: String,
+    pub ty: AstTypeRef,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AstStructDef {
+    pub name: String,
+    pub fields: Vec<AstStructField>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -95,8 +108,21 @@ pub enum AstBinaryOp {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NirModule {
     pub domain: String,
-    pub name: String,
+    pub unit: String,
+    pub structs: Vec<NirStructDef>,
     pub functions: Vec<NirFunction>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NirStructField {
+    pub name: String,
+    pub ty: NirTypeRef,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NirStructDef {
+    pub name: String,
+    pub fields: Vec<NirStructField>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -213,6 +239,21 @@ pub enum NirExpr {
         index: Box<NirExpr>,
         value: Box<NirExpr>,
     },
+    DataBindCore(i64),
+    DataMarker(String),
+    DataOutputPipe(Box<NirExpr>),
+    DataInputPipe(Box<NirExpr>),
+    DataCopyWindow {
+        input: Box<NirExpr>,
+        offset: Box<NirExpr>,
+        len: Box<NirExpr>,
+    },
+    DataImmutableWindow {
+        input: Box<NirExpr>,
+        offset: Box<NirExpr>,
+        len: Box<NirExpr>,
+    },
+    DataHandleTable(Vec<(String, String)>),
     Free(Box<NirExpr>),
     IsNull(Box<NirExpr>),
     Call {
@@ -278,6 +319,31 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         }),
         NirExpr::AllocNode { .. } | NirExpr::AllocBuffer { .. } => Some(NirGlmProfile {
             result_class: NirGlmValueClass::Res,
+            accesses: vec![NirGlmAccess {
+                class: NirGlmValueClass::Val,
+                mode: NirGlmUseMode::Read,
+            }],
+            effect: NirGlmEffect::None,
+        }),
+        NirExpr::DataBindCore(_) | NirExpr::DataMarker(_) | NirExpr::DataHandleTable(_) => None,
+        NirExpr::DataOutputPipe(_) => Some(NirGlmProfile {
+            result_class: NirGlmValueClass::Val,
+            accesses: vec![NirGlmAccess {
+                class: NirGlmValueClass::Val,
+                mode: NirGlmUseMode::Own,
+            }],
+            effect: NirGlmEffect::DomainMove,
+        }),
+        NirExpr::DataCopyWindow { .. } | NirExpr::DataImmutableWindow { .. } => Some(NirGlmProfile {
+            result_class: NirGlmValueClass::Val,
+            accesses: vec![NirGlmAccess {
+                class: NirGlmValueClass::Val,
+                mode: NirGlmUseMode::Read,
+            }],
+            effect: NirGlmEffect::None,
+        }),
+        NirExpr::DataInputPipe(_) => Some(NirGlmProfile {
+            result_class: NirGlmValueClass::Val,
             accesses: vec![NirGlmAccess {
                 class: NirGlmValueClass::Val,
                 mode: NirGlmUseMode::Read,

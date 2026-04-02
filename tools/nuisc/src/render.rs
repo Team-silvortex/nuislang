@@ -1,22 +1,26 @@
 use nuis_semantics::model::{
-    AstBinaryOp, AstExpr, AstModule, AstStmt, NirBinaryOp, NirExpr, NirModule, NirStmt,
+    AstBinaryOp, AstExpr, AstModule, AstStmt, AstStructDef, NirBinaryOp, NirExpr, NirModule,
+    NirStmt, NirStructDef,
 };
 use yir_core::YirModule;
 
 pub fn render_ast(module: &AstModule) -> String {
     let mut out = String::new();
-    out.push_str(&format!("ast module {}::{}\n", module.domain, module.name));
+    out.push_str(&format!("ast mod {} unit {}\n", module.domain, module.unit));
+    for definition in &module.structs {
+        out.push_str(&render_ast_struct(definition));
+    }
     for function in &module.functions {
         let params = function
             .params
             .iter()
-            .map(|param| format!("{}: {}", param.name, param.ty.name))
+            .map(|param| format!("{}: {}", param.name, render_ast_type(&param.ty)))
             .collect::<Vec<_>>()
             .join(", ");
         let return_suffix = function
             .return_type
             .as_ref()
-            .map(|ty| format!(" -> {}", ty.name))
+            .map(|ty| format!(" -> {}", render_ast_type(ty)))
             .unwrap_or_default();
         out.push_str(&format!("  fn {}({}){}\n", function.name, params, return_suffix));
         for stmt in &function.body {
@@ -24,7 +28,7 @@ pub fn render_ast(module: &AstModule) -> String {
                 AstStmt::Let { name, ty, value } => {
                     let type_suffix = ty
                         .as_ref()
-                        .map(|ty| format!(": {}", ty.name))
+                        .map(|ty| format!(": {}", render_ast_type(ty)))
                         .unwrap_or_default();
                     out.push_str(&format!(
                         "    let {}{} = {}\n",
@@ -74,18 +78,21 @@ pub fn render_ast(module: &AstModule) -> String {
 
 pub fn render_nir(module: &NirModule) -> String {
     let mut out = String::new();
-    out.push_str(&format!("nir module {}::{}\n", module.domain, module.name));
+    out.push_str(&format!("nir mod {} unit {}\n", module.domain, module.unit));
+    for definition in &module.structs {
+        out.push_str(&render_nir_struct(definition));
+    }
     for function in &module.functions {
         let params = function
             .params
             .iter()
-            .map(|param| format!("{}: {}", param.name, param.ty.name))
+            .map(|param| format!("{}: {}", param.name, render_nir_type(&param.ty)))
             .collect::<Vec<_>>()
             .join(", ");
         let return_suffix = function
             .return_type
             .as_ref()
-            .map(|ty| format!(" -> {}", ty.name))
+            .map(|ty| format!(" -> {}", render_nir_type(ty)))
             .unwrap_or_default();
         out.push_str(&format!("  fn {}({}){}\n", function.name, params, return_suffix));
         for stmt in &function.body {
@@ -93,7 +100,7 @@ pub fn render_nir(module: &NirModule) -> String {
                 NirStmt::Let { name, ty, value } => {
                     let type_suffix = ty
                         .as_ref()
-                        .map(|ty| format!(": {}", ty.name))
+                        .map(|ty| format!(": {}", render_nir_type(ty)))
                         .unwrap_or_default();
                     out.push_str(&format!(
                         "    let {}{} = {}\n",
@@ -221,6 +228,19 @@ fn render_ast_expr(value: &AstExpr) -> String {
     }
 }
 
+fn render_ast_struct(definition: &AstStructDef) -> String {
+    let mut out = String::new();
+    out.push_str(&format!("  struct {}\n", definition.name));
+    for field in &definition.fields {
+        out.push_str(&format!(
+            "    field {}: {}\n",
+            field.name,
+            render_ast_type(&field.ty)
+        ));
+    }
+    out
+}
+
 fn render_nir_expr(value: &NirExpr) -> String {
     match value {
         NirExpr::Bool(value) => value.to_string(),
@@ -236,6 +256,30 @@ fn render_nir_expr(value: &NirExpr) -> String {
         NirExpr::AllocBuffer { len, fill } => {
             format!("alloc_buffer({}, {})", render_nir_expr(len), render_nir_expr(fill))
         }
+        NirExpr::DataBindCore(core) => format!("data_bind_core({core})"),
+        NirExpr::DataMarker(tag) => format!("data_marker(\"{}\")", escape_debug(tag)),
+        NirExpr::DataOutputPipe(value) => format!("data_output_pipe({})", render_nir_expr(value)),
+        NirExpr::DataInputPipe(value) => format!("data_input_pipe({})", render_nir_expr(value)),
+        NirExpr::DataCopyWindow { input, offset, len } => format!(
+            "data_copy_window({}, {}, {})",
+            render_nir_expr(input),
+            render_nir_expr(offset),
+            render_nir_expr(len)
+        ),
+        NirExpr::DataImmutableWindow { input, offset, len } => format!(
+            "data_immutable_window({}, {}, {})",
+            render_nir_expr(input),
+            render_nir_expr(offset),
+            render_nir_expr(len)
+        ),
+        NirExpr::DataHandleTable(entries) => format!(
+            "data_handle_table({})",
+            entries
+                .iter()
+                .map(|(slot, resource)| format!("\"{}={}\"", escape_debug(slot), escape_debug(resource)))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
         NirExpr::LoadValue(value) => format!("load_value({})", render_nir_expr(value)),
         NirExpr::LoadNext(value) => format!("load_next({})", render_nir_expr(value)),
         NirExpr::BufferLen(value) => format!("buffer_len({})", render_nir_expr(value)),
@@ -292,6 +336,19 @@ fn render_nir_expr(value: &NirExpr) -> String {
             render_nir_expr(rhs)
         ),
     }
+}
+
+fn render_nir_struct(definition: &NirStructDef) -> String {
+    let mut out = String::new();
+    out.push_str(&format!("  struct {}\n", definition.name));
+    for field in &definition.fields {
+        out.push_str(&format!(
+            "    field {}: {}\n",
+            field.name,
+            render_nir_type(&field.ty)
+        ));
+    }
+    out
 }
 
 fn render_ast_binary_op(op: AstBinaryOp) -> &'static str {

@@ -19,5 +19,6 @@ loader_entry = "nustar.bootstrap.v1"
 loader_abi = "nustar-loader-v1"
 profiles = ["aot"]
 resource_families = ["cpu", "cpu.arm64"]
+unit_types = ["Main", "HostWindow", "CpuWorker"]
 lowering_targets = ["llvm", "arm64"]
 ops = ["cpu.const", "cpu.text", "cpu.add", "cpu.sub", "cpu.mul", "cpu.madd", "cpu.div", "cpu.rem", "cpu.neg", "cpu.not", "cpu.eq", "cpu.ne", "cpu.lt", "cpu.gt", "cpu.le", "cpu.ge", "cpu.select", "cpu.and", "cpu.or", "cpu.xor", "cpu.shl", "cpu.shr", "cpu.target_config", "cpu.bind_core", "cpu.window", "cpu.input_i64", "cpu.present_frame", "cpu.print"]

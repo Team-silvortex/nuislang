@@ -1,0 +1,5 @@
+mod cpu UnknownUnit {
+  fn main() {
+    print(1);
+  }
+}

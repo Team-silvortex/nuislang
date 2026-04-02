@@ -1,5 +1,6 @@
 use nuis_semantics::model::{
-    AstBinaryOp, AstExpr, AstFunction, AstModule, AstParam, AstStmt, AstTypeRef,
+    AstBinaryOp, AstExpr, AstFunction, AstModule, AstParam, AstStmt, AstStructDef,
+    AstStructField, AstTypeRef,
 };
 
 use super::lexer::{describe_token, Token};
@@ -17,12 +18,17 @@ impl Parser {
     pub fn parse_module(&mut self) -> Result<AstModule, String> {
         self.expect_word("mod")?;
         let domain = self.expect_ident()?;
-        let name = self.expect_ident()?;
+        let unit = self.expect_ident()?;
         self.expect_symbol('{')?;
 
+        let mut structs = Vec::new();
         let mut functions = Vec::new();
         while !self.peek_symbol('}') {
-            functions.push(self.parse_function()?);
+            if self.peek_word("struct") {
+                structs.push(self.parse_struct_def()?);
+            } else {
+                functions.push(self.parse_function()?);
+            }
         }
 
         self.expect_symbol('}')?;
@@ -30,9 +36,33 @@ impl Parser {
 
         Ok(AstModule {
             domain,
-            name,
+            unit,
+            structs,
             functions,
         })
+    }
+
+    fn parse_struct_def(&mut self) -> Result<AstStructDef, String> {
+        self.expect_word("struct")?;
+        let name = self.expect_ident()?;
+        self.expect_symbol('{')?;
+        let mut fields = Vec::new();
+        while !self.peek_symbol('}') {
+            let field_name = self.expect_ident()?;
+            self.expect_symbol(':')?;
+            let ty = self.parse_type_ref()?;
+            fields.push(AstStructField {
+                name: field_name,
+                ty,
+            });
+            if self.peek_symbol(',') {
+                self.expect_symbol(',')?;
+            } else {
+                break;
+            }
+        }
+        self.expect_symbol('}')?;
+        Ok(AstStructDef { name, fields })
     }
 
     fn parse_function(&mut self) -> Result<AstFunction, String> {
@@ -129,6 +159,9 @@ impl Parser {
         if self.peek_word("const") {
             return self.parse_const_stmt();
         }
+        if self.peek_word("link") {
+            return self.parse_link_stmt();
+        }
         if self.peek_word("if") {
             return self.parse_if_stmt();
         }
@@ -185,6 +218,47 @@ impl Parser {
         let value = self.parse_expr()?;
         self.expect_symbol(';')?;
         Ok(AstStmt::Const { name, ty, value })
+    }
+
+    fn parse_link_stmt(&mut self) -> Result<AstStmt, String> {
+        self.expect_word("link")?;
+        let name = self.expect_ident()?;
+        let ty = if self.peek_symbol(':') {
+            self.expect_symbol(':')?;
+            Some(self.parse_type_ref()?)
+        } else {
+            None
+        };
+        self.expect_symbol('=')?;
+        let value = if self.peek_word("output") {
+            self.expect_word("output")?;
+            let expr = self.parse_expr()?;
+            AstExpr::Call {
+                callee: "data_output_pipe".to_owned(),
+                args: vec![expr],
+            }
+        } else if self.peek_word("input") {
+            self.expect_word("input")?;
+            let expr = self.parse_expr()?;
+            AstExpr::Call {
+                callee: "data_input_pipe".to_owned(),
+                args: vec![expr],
+            }
+        } else if self.peek_word("marker") {
+            self.expect_word("marker")?;
+            let expr = self.parse_expr()?;
+            AstExpr::Call {
+                callee: "data_marker".to_owned(),
+                args: vec![expr],
+            }
+        } else {
+            return Err(
+                "link statement currently expects `output <expr>`, `input <expr>`, or `marker <expr>`"
+                    .to_owned(),
+            );
+        };
+        self.expect_symbol(';')?;
+        Ok(AstStmt::Let { name, ty, value })
     }
 
     fn parse_if_stmt(&mut self) -> Result<AstStmt, String> {

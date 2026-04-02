@@ -380,7 +380,7 @@ fn implementation_contract(binary: &NustarBinary, kind: &str) -> ImplementationC
 
 fn render_manifest(manifest: &NustarPackageManifest) -> String {
     format!(
-        "manifest_schema = \"{}\"\npackage_id = \"{}\"\ndomain_family = \"{}\"\nfrontend = \"{}\"\nentry_crate = \"{}\"\nast_entry = \"{}\"\nnir_entry = \"{}\"\nyir_lowering_entry = \"{}\"\npart_verify_entry = \"{}\"\nast_surface = {}\nnir_surface = {}\nyir_lowering = {}\npart_verify = {}\nbinary_extension = \"{}\"\npackage_layout = \"{}\"\nmachine_abi_policy = \"{}\"\nimplementation_kinds = {}\nloader_entry = \"{}\"\nloader_abi = \"{}\"\nprofiles = {}\nresource_families = {}\nlowering_targets = {}\nops = {}\n",
+        "manifest_schema = \"{}\"\npackage_id = \"{}\"\ndomain_family = \"{}\"\nfrontend = \"{}\"\nentry_crate = \"{}\"\nast_entry = \"{}\"\nnir_entry = \"{}\"\nyir_lowering_entry = \"{}\"\npart_verify_entry = \"{}\"\nast_surface = {}\nnir_surface = {}\nyir_lowering = {}\npart_verify = {}\nbinary_extension = \"{}\"\npackage_layout = \"{}\"\nmachine_abi_policy = \"{}\"\nimplementation_kinds = {}\nloader_entry = \"{}\"\nloader_abi = \"{}\"\nprofiles = {}\nresource_families = {}\nunit_types = {}\nlowering_targets = {}\nops = {}\n",
         manifest.manifest_schema,
         manifest.package_id,
         manifest.domain_family,
@@ -402,6 +402,7 @@ fn render_manifest(manifest: &NustarPackageManifest) -> String {
         manifest.loader_abi,
         render_array(&manifest.profiles),
         render_array(&manifest.resource_families),
+        render_array(&manifest.unit_types),
         render_array(&manifest.lowering_targets),
         render_array(&manifest.ops),
     )
@@ -477,6 +478,7 @@ fn parse_manifest_text(source: &str, path: &Path) -> Result<NustarPackageManifes
         loader_abi: parse_required_string(source, "loader_abi", path)?,
         profiles: parse_string_array(source, "profiles", path)?,
         resource_families: parse_string_array(source, "resource_families", path)?,
+        unit_types: parse_string_array(source, "unit_types", path)?,
         lowering_targets: parse_string_array(source, "lowering_targets", path)?,
         ops: parse_string_array(source, "ops", path)?,
     })

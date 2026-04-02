@@ -1,4 +1,9 @@
 mod cpu Main {
+  struct RenderConfig {
+    width: i64,
+    speed: i64,
+  }
+
   fn main() {
     let config: RenderConfig = RenderConfig { width: 640, speed: 3 };
     print(config.width);
