@@ -1,0 +1,6 @@
+name = "bad_links_missing_downlink"
+entry = "main.ns"
+modules = ["main.ns", "surface_shader.ns", "fabric_plane.ns"]
+links = [
+  "cpu.Main -> shader.SurfaceShader via data.FabricPlane"
+]

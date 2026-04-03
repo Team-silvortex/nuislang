@@ -374,6 +374,43 @@ fn render_nir_expr(value: &NirExpr) -> String {
         NirExpr::CpuPresentFrame(value) => {
             format!("cpu_present_frame({})", render_nir_expr(value))
         }
+        NirExpr::ShaderProfileTargetRef { unit } => {
+            format!("shader_profile_target(\"{}\")", escape_debug(unit))
+        }
+        NirExpr::ShaderProfileViewportRef { unit } => {
+            format!("shader_profile_viewport(\"{}\")", escape_debug(unit))
+        }
+        NirExpr::ShaderProfilePipelineRef { unit } => {
+            format!("shader_profile_pipeline(\"{}\")", escape_debug(unit))
+        }
+        NirExpr::ShaderProfileVertexCountRef { unit } => {
+            format!("shader_profile_vertex_count(\"{}\")", escape_debug(unit))
+        }
+        NirExpr::ShaderProfileInstanceCountRef { unit } => {
+            format!("shader_profile_instance_count(\"{}\")", escape_debug(unit))
+        }
+        NirExpr::DataProfileBindCoreRef { unit } => {
+            format!("data_profile_bind_core(\"{}\")", escape_debug(unit))
+        }
+        NirExpr::DataProfileWindowOffsetRef { unit } => {
+            format!("data_profile_window_offset(\"{}\")", escape_debug(unit))
+        }
+        NirExpr::DataProfileUplinkLenRef { unit } => {
+            format!("data_profile_uplink_len(\"{}\")", escape_debug(unit))
+        }
+        NirExpr::DataProfileDownlinkLenRef { unit } => {
+            format!("data_profile_downlink_len(\"{}\")", escape_debug(unit))
+        }
+        NirExpr::DataProfileHandleTableRef { unit } => {
+            format!("data_profile_handle_table(\"{}\")", escape_debug(unit))
+        }
+        NirExpr::DataProfileMarkerRef { unit, tag } => {
+            format!(
+                "data_profile_marker(\"{}\", \"{}\")",
+                escape_debug(unit),
+                escape_debug(tag)
+            )
+        }
         NirExpr::CpuExternCall {
             abi,
             interface,

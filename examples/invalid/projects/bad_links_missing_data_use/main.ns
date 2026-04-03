@@ -1,0 +1,7 @@
+use shader SurfaceShader;
+
+mod cpu Main {
+  fn main() {
+    print(1);
+  }
+}

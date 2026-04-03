@@ -341,8 +341,8 @@ fn lower_expr(
         NirExpr::DataCopyWindow { input, offset, len } => {
             ensure_fabric_resource(state.yir);
             let input_name = lower_expr(input, state, bindings)?;
-            let offset_name = lower_inline_i64_literal(offset, "data_copy_window offset")?;
-            let len_name = lower_inline_i64_literal(len, "data_copy_window len")?;
+            let offset_name = lower_expr(offset, state, bindings)?;
+            let len_name = lower_expr(len, state, bindings)?;
             let name = next_name(state, "data_copy_window");
             state.yir.nodes.push(Node {
                 name: name.clone(),
@@ -354,13 +354,15 @@ fn lower_expr(
                 },
             });
             push_dep_edges(state, &input_name, &name);
+            push_dep_edges(state, &offset_name, &name);
+            push_dep_edges(state, &len_name, &name);
             Ok(name)
         }
         NirExpr::DataImmutableWindow { input, offset, len } => {
             ensure_fabric_resource(state.yir);
             let input_name = lower_expr(input, state, bindings)?;
-            let offset_name = lower_inline_i64_literal(offset, "data_immutable_window offset")?;
-            let len_name = lower_inline_i64_literal(len, "data_immutable_window len")?;
+            let offset_name = lower_expr(offset, state, bindings)?;
+            let len_name = lower_expr(len, state, bindings)?;
             let name = next_name(state, "data_immutable_window");
             state.yir.nodes.push(Node {
                 name: name.clone(),
@@ -372,6 +374,8 @@ fn lower_expr(
                 },
             });
             push_dep_edges(state, &input_name, &name);
+            push_dep_edges(state, &offset_name, &name);
+            push_dep_edges(state, &len_name, &name);
             Ok(name)
         }
         NirExpr::DataHandleTable(entries) => {
@@ -501,6 +505,39 @@ fn lower_expr(
                 push_dep_edges(state, &arg, &name);
             }
             Ok(name)
+        }
+        NirExpr::ShaderProfileTargetRef { unit } => {
+            lower_project_profile_ref(state, "shader", unit, "target")
+        }
+        NirExpr::ShaderProfileViewportRef { unit } => {
+            lower_project_profile_ref(state, "shader", unit, "viewport")
+        }
+        NirExpr::ShaderProfilePipelineRef { unit } => {
+            lower_project_profile_ref(state, "shader", unit, "pipeline")
+        }
+        NirExpr::ShaderProfileVertexCountRef { unit } => {
+            lower_project_profile_ref(state, "shader", unit, "vertex_count")
+        }
+        NirExpr::ShaderProfileInstanceCountRef { unit } => {
+            lower_project_profile_ref(state, "shader", unit, "instance_count")
+        }
+        NirExpr::DataProfileBindCoreRef { unit } => {
+            lower_project_profile_ref(state, "data", unit, "bind_core")
+        }
+        NirExpr::DataProfileWindowOffsetRef { unit } => {
+            lower_project_profile_ref(state, "data", unit, "window_offset")
+        }
+        NirExpr::DataProfileUplinkLenRef { unit } => {
+            lower_project_profile_ref(state, "data", unit, "uplink_len")
+        }
+        NirExpr::DataProfileDownlinkLenRef { unit } => {
+            lower_project_profile_ref(state, "data", unit, "downlink_len")
+        }
+        NirExpr::DataProfileHandleTableRef { unit } => {
+            lower_project_profile_ref(state, "data", unit, "handle_table")
+        }
+        NirExpr::DataProfileMarkerRef { unit, tag } => {
+            lower_project_profile_ref(state, "data", unit, &format!("marker:{tag}"))
         }
         NirExpr::ShaderTarget {
             format,
@@ -955,6 +992,25 @@ fn next_name(state: &mut LoweringState<'_>, prefix: &str) -> String {
     name
 }
 
+fn lower_project_profile_ref(
+    state: &mut LoweringState<'_>,
+    domain: &str,
+    unit: &str,
+    slot: &str,
+) -> Result<String, String> {
+    let name = next_name(state, "project_profile_ref");
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "project_profile_ref".to_owned(),
+            args: vec![domain.to_owned(), unit.to_owned(), slot.to_owned()],
+        },
+    });
+    Ok(name)
+}
+
 fn ensure_fabric_resource(yir: &mut YirModule) {
     if yir.resources.iter().any(|resource| resource.name == "fabric0") {
         return;
@@ -1036,14 +1092,4 @@ fn lower_unary_cpu_expr(
     });
     push_dep_edges(state, &lowered, &name);
     Ok(name)
-}
-
-fn lower_inline_i64_literal(expr: &NirExpr, label: &str) -> Result<String, String> {
-    match expr {
-        NirExpr::Int(value) => Ok(value.to_string()),
-        other => Err(format!(
-            "{label} currently requires a literal i64 in minimal nuisc lowering, found {:?}",
-            other
-        )),
-    }
 }

@@ -153,6 +153,17 @@ fn verify_expr(
         | NirExpr::CpuWindow { .. }
         | NirExpr::CpuInputI64 { .. }
         | NirExpr::CpuTickI64 { .. }
+        | NirExpr::ShaderProfileTargetRef { .. }
+        | NirExpr::ShaderProfileViewportRef { .. }
+        | NirExpr::ShaderProfilePipelineRef { .. }
+        | NirExpr::ShaderProfileVertexCountRef { .. }
+        | NirExpr::ShaderProfileInstanceCountRef { .. }
+        | NirExpr::DataProfileBindCoreRef { .. }
+        | NirExpr::DataProfileWindowOffsetRef { .. }
+        | NirExpr::DataProfileUplinkLenRef { .. }
+        | NirExpr::DataProfileDownlinkLenRef { .. }
+        | NirExpr::DataProfileHandleTableRef { .. }
+        | NirExpr::DataProfileMarkerRef { .. }
         | NirExpr::ShaderTarget { .. }
         | NirExpr::ShaderViewport { .. }
         | NirExpr::ShaderPipeline { .. } => {}
@@ -263,6 +274,17 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
         | NirExpr::CpuWindow { .. }
         | NirExpr::CpuInputI64 { .. }
         | NirExpr::CpuTickI64 { .. }
+        | NirExpr::ShaderProfileTargetRef { .. }
+        | NirExpr::ShaderProfileViewportRef { .. }
+        | NirExpr::ShaderProfilePipelineRef { .. }
+        | NirExpr::ShaderProfileVertexCountRef { .. }
+        | NirExpr::ShaderProfileInstanceCountRef { .. }
+        | NirExpr::DataProfileBindCoreRef { .. }
+        | NirExpr::DataProfileWindowOffsetRef { .. }
+        | NirExpr::DataProfileUplinkLenRef { .. }
+        | NirExpr::DataProfileDownlinkLenRef { .. }
+        | NirExpr::DataProfileHandleTableRef { .. }
+        | NirExpr::DataProfileMarkerRef { .. }
         | NirExpr::ShaderTarget { .. }
         | NirExpr::ShaderViewport { .. }
         | NirExpr::ShaderPipeline { .. } => {}

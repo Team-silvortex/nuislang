@@ -14,7 +14,38 @@ pub struct PipelineArtifacts {
 pub fn compile_source_path(path: &Path) -> Result<PipelineArtifacts, String> {
     if crate::project::is_project_input(path) {
         let project = crate::project::load_project(path)?;
-        return compile_source(&project.entry_source);
+        let ast = crate::frontend::parse_nuis_ast(&project.entry_source)?;
+        let nir = crate::frontend::lower_ast_to_nir(&ast)?;
+        crate::nir_verify::verify_nir_module(&nir)?;
+        let lowering_manifest =
+            crate::registry::load_manifest_for_domain(Path::new("nustar-packages"), &nir.domain)?;
+        validate_externs(&ast, &lowering_manifest)?;
+        crate::registry::validate_unit_binding(
+            std::slice::from_ref(&lowering_manifest),
+            &ast.domain,
+            &ast.unit,
+        )?;
+        validate_used_units(&nir)?;
+        validate_instantiated_units(&nir)?;
+        let yir = crate::lowering::lower_nir_to_yir(&nir, &lowering_manifest)?;
+        let mut loaded_nustar =
+            collect_loaded_nustar(&nir, &yir, &lowering_manifest.package_id)?;
+        let mut artifacts = PipelineArtifacts {
+            ast,
+            nir,
+            yir,
+            llvm_ir: String::new(),
+            loaded_nustar: std::mem::take(&mut loaded_nustar),
+        };
+        crate::project::apply_project_support_modules_to_yir(&project, &mut artifacts.yir)?;
+        crate::project::apply_project_links_to_yir(&project, &mut artifacts.yir)?;
+        crate::project::validate_project_links_against_yir(&project, &artifacts.yir)?;
+        artifacts.llvm_ir = yir_lower_llvm::emit_module(&artifacts.yir)?;
+        let lowering_manifest =
+            crate::registry::load_manifest_for_domain(Path::new("nustar-packages"), &artifacts.nir.domain)?;
+        artifacts.loaded_nustar =
+            collect_loaded_nustar(&artifacts.nir, &artifacts.yir, &lowering_manifest.package_id)?;
+        return Ok(artifacts);
     }
     let source = fs::read_to_string(path)
         .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
@@ -162,6 +193,17 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         | NirExpr::CpuWindow { .. }
         | NirExpr::CpuInputI64 { .. }
         | NirExpr::CpuTickI64 { .. }
+        | NirExpr::ShaderProfileTargetRef { .. }
+        | NirExpr::ShaderProfileViewportRef { .. }
+        | NirExpr::ShaderProfilePipelineRef { .. }
+        | NirExpr::ShaderProfileVertexCountRef { .. }
+        | NirExpr::ShaderProfileInstanceCountRef { .. }
+        | NirExpr::DataProfileBindCoreRef { .. }
+        | NirExpr::DataProfileWindowOffsetRef { .. }
+        | NirExpr::DataProfileUplinkLenRef { .. }
+        | NirExpr::DataProfileDownlinkLenRef { .. }
+        | NirExpr::DataProfileHandleTableRef { .. }
+        | NirExpr::DataProfileMarkerRef { .. }
         | NirExpr::ShaderTarget { .. }
         | NirExpr::ShaderViewport { .. }
         | NirExpr::ShaderPipeline { .. } => {}

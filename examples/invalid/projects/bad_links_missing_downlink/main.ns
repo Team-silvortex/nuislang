@@ -1,0 +1,12 @@
+use data FabricPlane;
+use shader SurfaceShader;
+
+mod cpu Main {
+  fn main() {
+    data_bind_core(1);
+    let value: i64 = 7;
+    link uplink_ready: Marker = marker "cpu_to_shader";
+    link packet_out: Pipe<i64> = output value;
+    print(value);
+  }
+}

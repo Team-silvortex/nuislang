@@ -96,6 +96,11 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             }
         }
         CommandKind::Bindings { input } => {
+            let project = if project::is_project_input(&input) {
+                Some(project::load_project(&input)?)
+            } else {
+                None
+            };
             let artifacts = pipeline::compile_source_path(&input)?;
             let declared_used_units = artifacts
                 .ast
@@ -124,6 +129,9 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 &declared_externs,
             )?;
             println!("binding plan for: {}", input.display());
+            if let Some(project) = &project {
+                println!("project: {}", project::describe_project(project));
+            }
             for binding in plan.bindings {
                 println!("package: {}", binding.package_id);
                 println!("  domain: {}", binding.domain_family);
@@ -325,10 +333,18 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             }
         }
         CommandKind::DumpAst { input } => {
+            if project::is_project_input(&input) {
+                let project = project::load_project(&input)?;
+                eprintln!("nuisc: {}", project::describe_project(&project));
+            }
             let artifacts = pipeline::compile_source_path(&input)?;
             print!("{}", render::render_ast(&artifacts.ast));
         }
         CommandKind::DumpNir { input } => {
+            if project::is_project_input(&input) {
+                let project = project::load_project(&input)?;
+                eprintln!("nuisc: {}", project::describe_project(&project));
+            }
             let artifacts = pipeline::compile_source_path(&input)?;
             let required =
                 registry::load_required_manifests(Path::new("nustar-packages"), &artifacts.yir)?;
@@ -344,6 +360,10 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             print!("{}", render::render_nir(&artifacts.nir));
         }
         CommandKind::DumpYir { input } => {
+            if project::is_project_input(&input) {
+                let project = project::load_project(&input)?;
+                eprintln!("nuisc: {}", project::describe_project(&project));
+            }
             let artifacts = pipeline::compile_source_path(&input)?;
             let required =
                 registry::load_required_manifests(Path::new("nustar-packages"), &artifacts.yir)?;
@@ -359,8 +379,16 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             print!("{}", render::render_yir(&artifacts.yir));
         }
         CommandKind::Check { input } => {
+            let project = if project::is_project_input(&input) {
+                Some(project::load_project(&input)?)
+            } else {
+                None
+            };
             let artifacts = pipeline::compile_source_path(&input)?;
             println!("checked nuis source: {}", input.display());
+            if let Some(project) = &project {
+                println!("project: {}", project::describe_project(project));
+            }
             println!(
                 "loaded_nustar: {}",
                 artifacts
@@ -376,8 +404,12 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             println!("llvm_ir_bytes: {}", artifacts.llvm_ir.len());
         }
         CommandKind::Compile { input, output_dir } => {
-            let effective_input = if project::is_project_input(&input) {
-                let project = project::load_project(&input)?;
+            let project = if project::is_project_input(&input) {
+                Some(project::load_project(&input)?)
+            } else {
+                None
+            };
+            let effective_input = if let Some(project) = &project {
                 project
                     .root
                     .join(format!("{}.ns", project.manifest.name))
@@ -393,7 +425,15 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 &artifacts.yir,
                 &artifacts.llvm_ir,
             )?;
+            let project_metadata = if let Some(project) = &project {
+                Some(project::write_project_metadata(&output_dir, project)?)
+            } else {
+                None
+            };
             println!("compiled nuis source: {}", input.display());
+            if let Some(project) = &project {
+                println!("project: {}", project::describe_project(project));
+            }
             println!(
                 "loaded_nustar: {}",
                 artifacts
@@ -409,6 +449,11 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             println!("llvm_ir: {}", written.llvm_ir_path);
             println!("packaging_mode: {}", written.packaging_mode);
             println!("binary: {}", written.binary_path);
+            if let Some(metadata) = &project_metadata {
+                println!("project_manifest: {}", metadata.manifest_copy_path);
+                println!("project_modules: {}", metadata.modules_index_path);
+                println!("project_links: {}", metadata.links_index_path);
+            }
         }
     }
 

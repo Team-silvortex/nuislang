@@ -7,7 +7,7 @@ backend_eligible = true
 requires_prerender_fallback = false
 
 [[fabric_handle_table]]
-id = "data_handle_table_24"
+id = "project_profile_data_FabricPlane_profile_handles"
 
 [[fabric_handle_table.entry]]
 slot = "host"
@@ -18,17 +18,17 @@ slot = "render"
 resource = "shader0"
 
 [[fabric_core_binding]]
-id = "data_bind_core_23"
+id = "project_profile_data_FabricPlane_data_bind_core"
 resource = "fabric0"
 core_index = 1
 
 [[stage]]
-id = "shader_draw_instanced_29"
+id = "shader_draw_instanced_33"
 op = "shader.draw_instanced"
 resource = "shader0"
 lowering = "backend_eligible"
 reason = "stage fits the current Metal/Vulkan common lowering subset"
-fabric_handle_table = "data_handle_table_24"
+fabric_handle_table = "project_profile_data_FabricPlane_profile_handles"
 pipeline = "lit_sphere"
 target_format = "rgba8_unorm"
 topology = "triangle_strip"
@@ -37,30 +37,30 @@ topology = "triangle_strip"
 backend = "metal"
 kind = "library"
 status = "planned"
-entry = "shader_draw_instanced_29"
-artifact = "metal/shader_draw_instanced_29.metallib"
+entry = "shader_draw_instanced_33"
+artifact = "metal/shader_draw_instanced_33.metallib"
 notes = "Apple GPU backend artifact"
 
 [[stage.variant]]
 backend = "vulkan"
 kind = "spirv"
 status = "planned"
-entry = "shader_draw_instanced_29"
-artifact = "vulkan/shader_draw_instanced_29.spv"
+entry = "shader_draw_instanced_33"
+artifact = "vulkan/shader_draw_instanced_33.spv"
 notes = "Portable Vulkan/SPIR-V artifact"
 
 [[stage.variant]]
 backend = "directx"
 kind = "dxil"
 status = "planned"
-entry = "shader_draw_instanced_29"
-artifact = "directx/shader_draw_instanced_29.dxil"
+entry = "shader_draw_instanced_33"
+artifact = "directx/shader_draw_instanced_33.dxil"
 notes = "Windows DirectX backend artifact"
 
 [[stage.variant]]
 backend = "opengl"
 kind = "glsl"
 status = "planned"
-entry = "shader_draw_instanced_29"
-artifact = "opengl/shader_draw_instanced_29.glsl"
+entry = "shader_draw_instanced_33"
+artifact = "opengl/shader_draw_instanced_33.glsl"
 notes = "Legacy OpenGL fallback artifact"

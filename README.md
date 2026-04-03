@@ -81,6 +81,7 @@ Current high-signal examples:
 * Current macOS AOT host stubs now read `fabric_worker_core`, start a dedicated Fabric worker thread, and apply it as that thread's startup affinity hint; this is intentionally weaker than a true exclusive-core Fabric runtime
 * Current Fabric host booting is also kept intentionally thin and AOT-first: host stubs embed a static typed action table derived from `data.*` nodes instead of constructing a heavyweight dynamic metadata system at runtime
 * That typed Fabric action table now also carries a minimal class/slot ABI tag, so host-side dispatch no longer depends only on ad hoc string matching
+* Project-level `links` are no longer only manifest hints: they now participate in project validation, auto-instantiate CPU-side units from the project graph, and require a real `source -> data -> target` `xfer` shape in final `YIR`
 * The current `.ns` frontend now treats `mod` as a top-level builtin declaration and rejects nested `mod` definitions inside functions or other `mod` bodies
 * The current `.ns` frontend also has a first `instantiate <domain> <unit>` surface: inside `mod cpu <unit>`, CPU code can request other domain units by name, and `nuisc` now validates those unit names lazily against the corresponding `nustar` package registration
 * The current `.ns` frontend also has a first `extern "nurs" interface ...` surface for CPU-side host integration; today it bridges through a C-compatible ABI, but the source language already distinguishes the Rust-oriented `NURS` interface from plain `extern "c"`

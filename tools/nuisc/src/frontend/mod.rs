@@ -989,6 +989,177 @@ fn lower_call_expr(
                 None,
             )?)))
         }
+        "shader_profile_target" => {
+            let [unit] = args else {
+                return Err("shader_profile_target(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "shader_profile_target(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err("shader_profile_target(...) expects a string literal unit name".to_owned());
+            };
+            Ok(NirExpr::ShaderProfileTargetRef { unit: unit.clone() })
+        }
+        "shader_profile_viewport" => {
+            let [unit] = args else {
+                return Err("shader_profile_viewport(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "shader_profile_viewport(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err("shader_profile_viewport(...) expects a string literal unit name".to_owned());
+            };
+            Ok(NirExpr::ShaderProfileViewportRef { unit: unit.clone() })
+        }
+        "shader_profile_pipeline" => {
+            let [unit] = args else {
+                return Err("shader_profile_pipeline(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "shader_profile_pipeline(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err("shader_profile_pipeline(...) expects a string literal unit name".to_owned());
+            };
+            Ok(NirExpr::ShaderProfilePipelineRef { unit: unit.clone() })
+        }
+        "shader_profile_vertex_count" => {
+            let [unit] = args else {
+                return Err("shader_profile_vertex_count(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "shader_profile_vertex_count(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err("shader_profile_vertex_count(...) expects a string literal unit name".to_owned());
+            };
+            Ok(NirExpr::ShaderProfileVertexCountRef { unit: unit.clone() })
+        }
+        "shader_profile_instance_count" => {
+            let [unit] = args else {
+                return Err("shader_profile_instance_count(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "shader_profile_instance_count(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err("shader_profile_instance_count(...) expects a string literal unit name".to_owned());
+            };
+            Ok(NirExpr::ShaderProfileInstanceCountRef { unit: unit.clone() })
+        }
+        "data_profile_bind_core" => {
+            let [unit] = args else {
+                return Err("data_profile_bind_core(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "data_profile_bind_core(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err("data_profile_bind_core(...) expects a string literal unit name".to_owned());
+            };
+            Ok(NirExpr::DataProfileBindCoreRef { unit: unit.clone() })
+        }
+        "data_profile_window_offset" => {
+            let [unit] = args else {
+                return Err("data_profile_window_offset(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "data_profile_window_offset(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err("data_profile_window_offset(...) expects a string literal unit name".to_owned());
+            };
+            Ok(NirExpr::DataProfileWindowOffsetRef { unit: unit.clone() })
+        }
+        "data_profile_uplink_len" => {
+            let [unit] = args else {
+                return Err("data_profile_uplink_len(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "data_profile_uplink_len(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err("data_profile_uplink_len(...) expects a string literal unit name".to_owned());
+            };
+            Ok(NirExpr::DataProfileUplinkLenRef { unit: unit.clone() })
+        }
+        "data_profile_downlink_len" => {
+            let [unit] = args else {
+                return Err("data_profile_downlink_len(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "data_profile_downlink_len(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err("data_profile_downlink_len(...) expects a string literal unit name".to_owned());
+            };
+            Ok(NirExpr::DataProfileDownlinkLenRef { unit: unit.clone() })
+        }
+        "data_profile_handle_table" => {
+            let [unit] = args else {
+                return Err("data_profile_handle_table(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "data_profile_handle_table(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err("data_profile_handle_table(...) expects a string literal unit name".to_owned());
+            };
+            Ok(NirExpr::DataProfileHandleTableRef { unit: unit.clone() })
+        }
+        "data_profile_marker" => {
+            let [unit, tag] = args else {
+                return Err("data_profile_marker(...) expects 2 args".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "data_profile_marker(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err("data_profile_marker(...) expects a string literal unit name".to_owned());
+            };
+            let AstExpr::Text(tag) = tag else {
+                return Err("data_profile_marker(...) expects a string literal marker tag".to_owned());
+            };
+            Ok(NirExpr::DataProfileMarkerRef {
+                unit: unit.clone(),
+                tag: tag.clone(),
+            })
+        }
         "shader_target" => {
             let [format, width, height] = args else {
                 return Err("shader_target(...) expects 3 args".to_owned());
@@ -1183,6 +1354,17 @@ fn infer_nir_expr_type(
         NirExpr::CpuWindow { .. } => Some(named_type("Window")),
         NirExpr::CpuInputI64 { .. } | NirExpr::CpuTickI64 { .. } => Some(i64_type()),
         NirExpr::CpuPresentFrame(_) => Some(named_type("Unit")),
+        NirExpr::ShaderProfileTargetRef { .. } => Some(named_type("Target")),
+        NirExpr::ShaderProfileViewportRef { .. } => Some(named_type("Viewport")),
+        NirExpr::ShaderProfilePipelineRef { .. } => Some(named_type("Pipeline")),
+        NirExpr::ShaderProfileVertexCountRef { .. } => Some(i64_type()),
+        NirExpr::ShaderProfileInstanceCountRef { .. } => Some(i64_type()),
+        NirExpr::DataProfileBindCoreRef { .. } => Some(named_type("Unit")),
+        NirExpr::DataProfileWindowOffsetRef { .. } => Some(i64_type()),
+        NirExpr::DataProfileUplinkLenRef { .. } => Some(i64_type()),
+        NirExpr::DataProfileDownlinkLenRef { .. } => Some(i64_type()),
+        NirExpr::DataProfileHandleTableRef { .. } => Some(named_type("HandleTable")),
+        NirExpr::DataProfileMarkerRef { .. } => Some(named_type("Marker")),
         NirExpr::CpuExternCall { callee, .. } => {
             signatures.get(callee).and_then(|sig| sig.return_type.clone())
         }

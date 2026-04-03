@@ -1,0 +1,6 @@
+use data FabricPlane;
+
+mod shader SurfaceShader {
+  fn profile() {
+  }
+}

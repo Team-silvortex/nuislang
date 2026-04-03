@@ -330,6 +330,40 @@ pub enum NirExpr {
         step: i64,
     },
     CpuPresentFrame(Box<NirExpr>),
+    ShaderProfileTargetRef {
+        unit: String,
+    },
+    ShaderProfileViewportRef {
+        unit: String,
+    },
+    ShaderProfilePipelineRef {
+        unit: String,
+    },
+    ShaderProfileVertexCountRef {
+        unit: String,
+    },
+    ShaderProfileInstanceCountRef {
+        unit: String,
+    },
+    DataProfileBindCoreRef {
+        unit: String,
+    },
+    DataProfileWindowOffsetRef {
+        unit: String,
+    },
+    DataProfileUplinkLenRef {
+        unit: String,
+    },
+    DataProfileDownlinkLenRef {
+        unit: String,
+    },
+    DataProfileHandleTableRef {
+        unit: String,
+    },
+    DataProfileMarkerRef {
+        unit: String,
+        tag: String,
+    },
     ShaderTarget {
         format: String,
         width: i64,
@@ -440,6 +474,17 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::CpuInputI64 { .. }
         | NirExpr::CpuTickI64 { .. }
         | NirExpr::CpuPresentFrame(_)
+        | NirExpr::ShaderProfileTargetRef { .. }
+        | NirExpr::ShaderProfileViewportRef { .. }
+        | NirExpr::ShaderProfilePipelineRef { .. }
+        | NirExpr::ShaderProfileVertexCountRef { .. }
+        | NirExpr::ShaderProfileInstanceCountRef { .. }
+        | NirExpr::DataProfileBindCoreRef { .. }
+        | NirExpr::DataProfileWindowOffsetRef { .. }
+        | NirExpr::DataProfileUplinkLenRef { .. }
+        | NirExpr::DataProfileDownlinkLenRef { .. }
+        | NirExpr::DataProfileHandleTableRef { .. }
+        | NirExpr::DataProfileMarkerRef { .. }
         | NirExpr::CpuExternCall { .. }
         | NirExpr::ShaderTarget { .. }
         | NirExpr::ShaderViewport { .. }
