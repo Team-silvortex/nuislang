@@ -1,0 +1,42 @@
+yir 0.1
+
+resource kernel0 kernel.apple
+
+kernel.tensor row_bias kernel0 1 3 10,20,30
+kernel.tensor col_bias kernel0 2 1 1,2
+kernel.broadcast row_full kernel0 row_bias 2 3
+kernel.broadcast col_full kernel0 col_bias 2 3
+kernel.add combined kernel0 row_full col_full
+
+kernel.reduce_max max_all kernel0 combined
+kernel.reduce_mean mean_all kernel0 combined
+kernel.reduce_max_axis max_rows kernel0 combined rows
+kernel.reduce_max_axis max_cols kernel0 combined cols
+kernel.reduce_mean_axis mean_rows kernel0 combined rows
+kernel.reduce_mean_axis mean_cols kernel0 combined cols
+
+kernel.print print_combined kernel0 combined
+kernel.print print_max_all kernel0 max_all
+kernel.print print_mean_all kernel0 mean_all
+kernel.print print_max_rows kernel0 max_rows
+kernel.print print_max_cols kernel0 max_cols
+kernel.print print_mean_rows kernel0 mean_rows
+kernel.print print_mean_cols kernel0 mean_cols
+
+edge dep row_bias row_full
+edge dep col_bias col_full
+edge dep row_full combined
+edge dep col_full combined
+edge dep combined max_all
+edge dep combined mean_all
+edge dep combined max_rows
+edge dep combined max_cols
+edge dep combined mean_rows
+edge dep combined mean_cols
+edge dep combined print_combined
+edge dep max_all print_max_all
+edge dep mean_all print_mean_all
+edge dep max_rows print_max_rows
+edge dep max_cols print_max_cols
+edge dep mean_rows print_mean_rows
+edge dep mean_cols print_mean_cols

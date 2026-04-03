@@ -1,0 +1,75 @@
+yir 0.1
+
+resource cpu0 cpu.arm64
+resource fabric0 data.fabric
+resource shader0 shader.render
+
+cpu.target_config cpu_profile cpu0 arm64 apple_aapcs64 128
+cpu.bind_core main_thread cpu0 0
+cpu.window control_window cpu0 720 520 control_panel_demo
+cpu.input_i64 color_delta cpu0 color_knob 24 0 96 4
+cpu.input_i64 speed_delta cpu0 speed_knob 6 0 30 2
+cpu.input_i64 radius_delta cpu0 radius_knob 18 0 48 3
+cpu.tick_i64 frame_tick cpu0 0 1
+cpu.const_i64 base_color cpu0 104
+cpu.const_i64 base_speed cpu0 10
+cpu.const_i64 base_radius cpu0 96
+cpu.const_i64 speed_scale cpu0 2
+cpu.add panel_color cpu0 base_color color_delta
+cpu.madd base_panel_speed cpu0 speed_delta speed_scale base_speed
+cpu.add panel_speed cpu0 base_panel_speed frame_tick
+cpu.add base_panel_radius cpu0 base_radius radius_delta
+cpu.add panel_radius cpu0 base_panel_radius frame_tick
+cpu.struct render_controls cpu0 RenderControls color=panel_color speed=panel_speed radius_scale=panel_radius
+
+shader.target swapchain shader0 rgba8_unorm 160 120
+shader.viewport main_view shader0 160 120
+shader.pipeline lit_pipe shader0 lit_sphere triangle_strip
+data.bind_core fabric_worker fabric0 1
+data.handle_table fabric_handles fabric0 host=cpu0 render=shader0
+data.output_pipe packet_out fabric0 render_controls
+data.marker uplink_ready fabric0 cpu_to_shader
+data.input_pipe gpu_packet fabric0 packet_out
+shader.begin_pass main_pass shader0 swapchain lit_pipe main_view
+shader.draw_instanced frame shader0 main_pass gpu_packet 4 1
+data.output_pipe frame_out fabric0 frame
+data.marker downlink_ready fabric0 shader_to_cpu
+data.input_pipe host_frame fabric0 frame_out
+cpu.present_frame present cpu0 host_frame
+
+edge effect main_thread control_window
+edge effect control_window color_delta
+edge effect control_window speed_delta
+edge effect control_window radius_delta
+edge dep base_color panel_color
+edge dep color_delta panel_color
+edge dep speed_delta base_panel_speed
+edge dep speed_scale base_panel_speed
+edge dep base_speed base_panel_speed
+edge dep base_panel_speed panel_speed
+edge dep frame_tick panel_speed
+edge dep base_radius base_panel_radius
+edge dep radius_delta base_panel_radius
+edge dep base_panel_radius panel_radius
+edge dep frame_tick panel_radius
+edge dep panel_color render_controls
+edge dep panel_speed render_controls
+edge dep panel_radius render_controls
+edge dep swapchain main_pass
+edge dep lit_pipe main_pass
+edge dep main_view main_pass
+edge dep fabric_worker packet_out
+edge xfer render_controls packet_out
+edge dep fabric_handles uplink_ready
+edge dep uplink_ready gpu_packet
+edge dep packet_out gpu_packet
+edge xfer gpu_packet frame
+edge dep main_pass frame
+edge xfer frame frame_out
+edge dep fabric_handles downlink_ready
+edge dep frame_out host_frame
+edge dep downlink_ready host_frame
+edge xfer host_frame present
+edge effect packet_out gpu_packet
+edge effect frame_out host_frame
+edge effect host_frame present

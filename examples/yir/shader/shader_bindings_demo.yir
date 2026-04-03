@@ -1,0 +1,61 @@
+yir 0.1
+
+resource shader0 shader.render
+
+shader.target main_target shader0 rgba8_unorm 40 24
+shader.viewport main_view shader0 40 24
+shader.pipeline lit_pipe shader0 lit_sphere triangle_strip
+shader.vertex_layout pos_color_layout shader0 4 pos2f,color2f
+shader.vertex_buffer quad_vertices shader0 4 -1,-1,0,0,1,-1,1,0,-1,1,0,1,1,1,1,1
+shader.index_buffer quad_indices shader0 0,1,2,2,1,3
+shader.texture2d checker shader0 r8_unorm 2 2 8,16,24,32
+shader.sampler clamp_sampler shader0 nearest clamp
+shader.blend_state alpha_blend shader0 1 alpha
+shader.depth_state depth_less shader0 1 1 less
+shader.raster_state back_ccw shader0 back ccw
+shader.const_i64 base_color shader0 88
+shader.const_i64 base_speed shader0 10
+shader.pack_ball_state packet shader0 base_color base_speed
+shader.uniform material_uniform shader0 0 packet
+shader.attachment color_attachment shader0 1 main_target
+shader.texture_binding albedo_texture shader0 2 checker
+shader.sampler_binding albedo_sampler shader0 3 clamp_sampler
+shader.vertex_layout_binding mesh_layout shader0 4 pos_color_layout
+shader.vertex_binding mesh_vertices shader0 5 quad_vertices
+shader.index_binding mesh_indices shader0 6 quad_indices
+shader.bind_set material_bindings shader0 lit_pipe material_uniform color_attachment albedo_texture albedo_sampler mesh_layout mesh_vertices mesh_indices
+shader.render_state main_states shader0 lit_pipe alpha_blend depth_less back_ccw
+shader.begin_pass main_pass shader0 main_target lit_pipe main_view
+shader.draw_instanced frame shader0 main_pass packet 4 1 material_bindings
+shader.print trace shader0 frame
+
+edge dep quad_vertices mesh_vertices
+edge dep quad_indices mesh_indices
+edge dep checker albedo_texture
+edge dep clamp_sampler albedo_sampler
+edge dep lit_pipe main_states
+edge dep alpha_blend main_states
+edge dep depth_less main_states
+edge dep back_ccw main_states
+edge dep base_color packet
+edge dep base_speed packet
+edge dep packet material_uniform
+edge dep main_target color_attachment
+edge dep pos_color_layout mesh_layout
+edge dep lit_pipe material_bindings
+edge dep material_uniform material_bindings
+edge dep color_attachment material_bindings
+edge dep albedo_texture material_bindings
+edge dep albedo_sampler material_bindings
+edge dep mesh_layout material_bindings
+edge dep mesh_vertices material_bindings
+edge dep mesh_indices material_bindings
+edge dep main_target main_pass
+edge dep lit_pipe main_pass
+edge dep main_view main_pass
+edge dep main_pass frame
+edge dep packet frame
+edge dep material_bindings frame
+edge dep main_states frame
+edge dep frame trace
+edge effect frame trace

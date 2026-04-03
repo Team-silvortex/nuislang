@@ -40,22 +40,24 @@ Start here:
 
 * [examples/README.md](/Users/Shared/chroot/dev/nuislang/examples/README.md)
 * [examples/ns/README.md](/Users/Shared/chroot/dev/nuislang/examples/ns/README.md)
+* [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
 * [examples/yir/README.md](/Users/Shared/chroot/dev/nuislang/examples/yir/README.md)
+* [examples/bins/README.md](/Users/Shared/chroot/dev/nuislang/examples/bins/README.md)
 
 Current high-signal examples:
 
-* [examples/ns/hello_world.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/hello_world.ns)
-* [examples/ns/hello_ref_struct.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/hello_ref_struct.ns)
-* [examples/ns/hello_data.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/hello_data.ns)
-* [examples/ns/hello_instantiate.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/hello_instantiate.ns)
-* [examples/ns/hello_ffi.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/hello_ffi.ns)
-* [examples/ns/hello_c_ffi.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/hello_c_ffi.ns)
-* [examples/ns/window_controls_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/window_controls_demo.ns)
+* [examples/ns/core/hello_world.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/core/hello_world.ns)
+* [examples/ns/types/hello_ref_struct.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/types/hello_ref_struct.ns)
+* [examples/ns/data/hello_data.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/data/hello_data.ns)
+* [examples/ns/data/hello_instantiate.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/data/hello_instantiate.ns)
+* [examples/ns/ffi/hello_ffi.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_ffi.ns)
+* [examples/ns/ffi/hello_c_ffi.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_c_ffi.ns)
+* [examples/ns/demos/window_controls_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/window_controls_demo.ns)
 * [examples/projects/window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo)
-* [examples/yir/window_controls_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/window_controls_demo.yir)
-* [examples/yir/shader_bindings_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/shader_bindings_demo.yir)
-* [examples/yir/kernel_auto_broadcast_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/kernel_auto_broadcast_demo.yir)
-* [examples/yir/data_fabric_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/data_fabric_demo.yir)
+* [examples/yir/demos/window_controls_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/demos/window_controls_demo.yir)
+* [examples/yir/shader/shader_bindings_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/shader/shader_bindings_demo.yir)
+* [examples/yir/kernel/kernel_auto_broadcast_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/kernel/kernel_auto_broadcast_demo.yir)
+* [examples/yir/data/data_fabric_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/data/data_fabric_demo.yir)
 
 ---
 
@@ -65,7 +67,7 @@ Current high-signal examples:
 * Designed as a general-purpose system language
 * Forms its own toolchain and execution model (language, IR, compiler core, external runtime/verifier boundaries)
 * Current YIR reference surface already includes heterogenous `cpu / shader / kernel / data` families, with shader pass composition and kernel tensor ops expanding incrementally from the same graph model
-* The current repo now also has a second host-preview style control demo in `examples/yir/window_controls_demo.yir`, where multiple `cpu.input_i64` controls drive one structured render packet through `data.fabric` into the shader path
+* The current repo now also has a second host-preview style control demo in `examples/yir/demos/window_controls_demo.yir`, where multiple `cpu.input_i64` controls drive one structured render packet through `data.fabric` into the shader path
 * The `shader` family now also has a minimal resource-layout surface (`uniform / storage / attachment / bind_set`) so future backend package manifests can describe stage bindings instead of only pass topology
 * The `shader` family also includes a first texture-resource slice (`texture2d / sampler / sample_nearest`) plus matching binding kinds for package manifests
 * The texture path now also has a normalized UV surface (`uv / sample_uv_nearest / sample_uv_linear`) so sampling semantics do not depend on hard-coded integer texel coordinates
@@ -698,14 +700,14 @@ nuisc 具有最终否决权：
 * 当前 `nuisc` 已具备最小注册发现入口：`cargo run -p nuisc -- registry`
 * 当前 `nuisc` 也已具备最小前端链：`hello_world.ns` 可走 `nuis -> NIR -> YIR -> LLVM -> arm64 binary`
 * 当前 `nuisc` 前端也已拆成真正的 `AST -> NIR -> YIR` 三层，且最小 `.ns` 已支持 `let`、变量引用、括号和 `+ - * /` 表达式；前门可用 `dump-ast / dump-nir / dump-yir`
-* CPU-hosted UI event demo: `examples/yir/host_ui_sphere.yir`
-* CPU linked-list demo: `examples/yir/cpu_linked_list.yir`
-* Rust-ish CPU ownership demo: `examples/yir/cpu_linked_list_rustish.yir`
-* Rust-ish CPU buffer demo: `examples/yir/cpu_buffer_rustish.yir`
+* CPU-hosted UI event demo: `examples/yir/demos/host_ui_sphere.yir`
+* CPU linked-list demo: `examples/yir/cpu/cpu_linked_list.yir`
+* Rust-ish CPU ownership demo: `examples/yir/cpu/cpu_linked_list_rustish.yir`
+* Rust-ish CPU buffer demo: `examples/yir/cpu/cpu_buffer_rustish.yir`
 * Invalid borrowed-write demo: `examples/invalid/yir/cpu_borrow_write_invalid.yir`
 * Invalid borrowed-buffer-write demo: `examples/invalid/yir/cpu_buffer_borrow_write_invalid.yir`
 * Invalid use-after-free demo: `examples/invalid/yir/cpu_use_after_free_invalid.yir`
-* CPU/kernel tensor demo: `examples/yir/kernel_tensor_demo.yir`
+* CPU/kernel tensor demo: `examples/yir/kernel/kernel_tensor_demo.yir`
 * Legacy CPU/NPU tensor demo: `examples/legacy/npu_tensor_demo.yir`
 * 一次性窗口入口：`bash tools/yir-preview-macos/run-ball-once.sh`
 * 现有 Rust crate 主要用于固定术语、边界与后续实现入口

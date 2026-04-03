@@ -27,3 +27,7 @@ cargo run -p nuis -- check examples/projects/window_controls_demo
 cargo run -p nuis -- dump-ast examples/projects/window_controls_demo
 cargo run -p nuis -- build examples/projects/window_controls_demo examples/bins/window_controls_demo_project
 ```
+
+Output bundle:
+
+* [examples/bins/window_controls_demo_project/window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/bins/window_controls_demo_project/window_controls_demo)

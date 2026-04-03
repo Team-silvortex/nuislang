@@ -1,1 +1,0 @@
-mod cpu Main { fn main() { let greeting = "Hello, bound Nuis!"; print(greeting); } }

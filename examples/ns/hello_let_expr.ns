@@ -1,6 +1,0 @@
-mod cpu Main {
-  fn main() {
-    let value = (10 + 2) * 4;
-    print(value);
-  }
-}

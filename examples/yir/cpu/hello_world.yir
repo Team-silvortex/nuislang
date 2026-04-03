@@ -1,0 +1,9 @@
+yir 0.1
+
+resource cpu0 cpu.arm64
+
+cpu.text greeting cpu0 "Hello, Nuis!"
+cpu.print out cpu0 greeting
+
+edge dep greeting out
+edge effect greeting out

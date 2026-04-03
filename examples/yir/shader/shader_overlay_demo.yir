@@ -1,0 +1,30 @@
+yir 0.1
+
+resource shader0 shader.render
+
+shader.target main_target shader0 rgba8_unorm 32 20
+shader.viewport main_view shader0 32 20
+shader.pipeline lit_pipe shader0 lit_sphere triangle_strip
+shader.clear base_frame shader0 main_target 1
+shader.const_i64 base_color shader0 64
+shader.const_i64 base_speed shader0 18
+shader.pack_ball_state packet shader0 base_color base_speed
+shader.begin_pass main_pass shader0 main_target lit_pipe main_view
+shader.draw_instanced sphere_frame shader0 main_pass packet 4 1
+shader.overlay composed shader0 base_frame sphere_frame
+shader.print trace shader0 composed
+
+edge dep main_target base_frame
+edge dep base_color packet
+edge dep base_speed packet
+edge dep main_target main_pass
+edge dep lit_pipe main_pass
+edge dep main_view main_pass
+edge dep main_pass sphere_frame
+edge dep packet sphere_frame
+edge dep base_frame composed
+edge dep sphere_frame composed
+edge effect base_frame composed
+edge effect sphere_frame composed
+edge dep composed trace
+edge effect composed trace

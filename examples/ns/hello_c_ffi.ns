@@ -1,9 +1,0 @@
-mod cpu Main {
-  extern "c" fn host_speed_curve(value: i64) -> i64;
-
-  fn main() {
-    let base: i64 = 7;
-    let curved: i64 = host_speed_curve(base);
-    print(curved);
-  }
-}

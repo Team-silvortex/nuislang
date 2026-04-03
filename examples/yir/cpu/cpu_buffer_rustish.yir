@@ -1,0 +1,47 @@
+yir 0.1
+
+resource cpu0 cpu.arm64
+
+cpu.target_config cpu_profile cpu0 arm64 apple_aapcs64 128
+cpu.const len cpu0 4
+cpu.const fill cpu0 7
+cpu.alloc_buffer buf_raw cpu0 len fill
+cpu.move_ptr buf cpu0 buf_raw
+
+cpu.const idx1 cpu0 1
+cpu.const idx2 cpu0 2
+cpu.const v9 cpu0 9
+cpu.store_at write_slot cpu0 buf idx1 v9
+
+cpu.borrow buf_ref cpu0 buf
+cpu.buffer_len buf_len cpu0 buf_ref
+cpu.load_at read_slot1 cpu0 buf_ref idx1
+cpu.load_at read_slot2 cpu0 buf_ref idx2
+cpu.add sum cpu0 read_slot1 read_slot2
+cpu.print out cpu0 sum
+
+edge dep len buf_raw
+edge dep fill buf_raw
+edge dep buf_raw buf
+edge lifetime buf_raw buf
+edge dep buf idx1
+edge dep idx1 write_slot
+edge dep v9 write_slot
+edge effect buf write_slot
+edge dep buf write_slot
+edge lifetime buf write_slot
+edge dep buf buf_ref
+edge dep buf_ref buf_len
+edge effect buf_ref buf_len
+edge dep buf_ref read_slot1
+edge dep idx1 read_slot1
+edge effect buf_ref read_slot1
+edge dep buf_ref read_slot2
+edge dep idx2 read_slot2
+edge effect buf_ref read_slot2
+edge dep read_slot1 sum
+edge dep read_slot2 sum
+edge dep buf_len out
+edge dep sum out
+edge effect buf_len out
+edge effect sum out

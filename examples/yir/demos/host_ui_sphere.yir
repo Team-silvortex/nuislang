@@ -1,0 +1,68 @@
+yir 0.1
+
+resource cpu0 cpu.arm64
+resource fabric0 data.fabric
+resource shader0 shader.render
+
+cpu.target_config cpu_profile cpu0 arm64 apple_aapcs64 128
+cpu.bind_core main_thread cpu0 0
+cpu.window main_window cpu0 640 480 sphere_demo
+cpu.input_i64 color_delta cpu0 color_knob 20
+cpu.input_i64 speed_delta cpu0 speed_knob 4
+cpu.const_i64 base_color cpu0 128
+cpu.const_i64 base_speed cpu0 12
+cpu.const_i64 speed_scale cpu0 3
+cpu.add ball_color cpu0 base_color color_delta
+cpu.madd ball_speed cpu0 speed_delta speed_scale base_speed
+
+shader.target swapchain shader0 rgba8_unorm 128 96
+shader.viewport main_view shader0 128 96
+shader.pipeline lit_pipe shader0 lit_sphere triangle_strip
+data.bind_core fabric_worker fabric0 1
+data.handle_table fabric_handles fabric0 host=cpu0 render=shader0
+data.output_pipe color_out fabric0 ball_color
+data.output_pipe speed_out fabric0 ball_speed
+data.marker uplink_ready fabric0 cpu_to_shader
+data.input_pipe gpu_color fabric0 color_out
+data.input_pipe gpu_speed fabric0 speed_out
+shader.pack_ball_state render_packet shader0 gpu_color gpu_speed
+shader.begin_pass main_pass shader0 swapchain lit_pipe main_view
+shader.draw_instanced frame shader0 main_pass render_packet 4 1
+data.output_pipe frame_out fabric0 frame
+data.marker downlink_ready fabric0 shader_to_cpu
+data.input_pipe host_frame fabric0 frame_out
+cpu.present_frame present cpu0 host_frame
+
+edge effect main_thread main_window
+edge effect main_window color_delta
+edge effect main_window speed_delta
+edge dep base_color ball_color
+edge dep color_delta ball_color
+edge dep speed_delta ball_speed
+edge dep speed_scale ball_speed
+edge dep base_speed ball_speed
+edge dep swapchain main_pass
+edge dep lit_pipe main_pass
+edge dep main_view main_pass
+edge xfer ball_color color_out
+edge xfer ball_speed speed_out
+edge dep fabric_worker color_out
+edge dep fabric_worker speed_out
+edge dep color_out gpu_color
+edge dep speed_out gpu_speed
+edge dep fabric_handles uplink_ready
+edge dep uplink_ready gpu_color
+edge dep uplink_ready gpu_speed
+edge xfer gpu_color render_packet
+edge xfer gpu_speed render_packet
+edge dep main_pass frame
+edge dep render_packet frame
+edge xfer frame frame_out
+edge dep frame_out host_frame
+edge dep downlink_ready host_frame
+edge dep fabric_handles downlink_ready
+edge xfer host_frame present
+edge effect color_out gpu_color
+edge effect speed_out gpu_speed
+edge effect frame_out host_frame
+edge effect host_frame present

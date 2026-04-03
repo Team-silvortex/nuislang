@@ -1,0 +1,74 @@
+yir 0.1
+
+resource cpu0 cpu.arm64
+
+cpu.const_i32 small_i32 cpu0 3
+cpu.const_i32 big_i32 cpu0 8
+cpu.lt_i32 small_lt_big cpu0 small_i32 big_i32
+cpu.gt_i32 big_gt_small cpu0 big_i32 small_i32
+cpu.eq_i32 same_i32 cpu0 big_i32 big_i32
+
+cpu.const_f32 left_f32 cpu0 1.25
+cpu.const_f32 right_f32 cpu0 2.5
+cpu.lt_f32 left_lt_right cpu0 left_f32 right_f32
+cpu.eq_f32 same_f32 cpu0 right_f32 right_f32
+
+cpu.const_f64 wide_f64 cpu0 9.5
+cpu.const_f64 narrow_f64 cpu0 2.0
+cpu.gt_f64 wide_gt_narrow cpu0 wide_f64 narrow_f64
+
+cpu.cast_i32_to_i64 widened_i64 cpu0 big_i32
+cpu.cast_i32_to_f32 as_f32 cpu0 small_i32
+cpu.cast_f32_to_f64 widened_f64 cpu0 as_f32
+cpu.cast_f64_to_f32 narrowed_f32 cpu0 wide_f64
+cpu.cast_i64_to_i32 narrowed_i32 cpu0 widened_i64
+
+cpu.print print_lt_i32 cpu0 small_lt_big
+cpu.print print_gt_i32 cpu0 big_gt_small
+cpu.print print_eq_i32 cpu0 same_i32
+cpu.print print_lt_f32 cpu0 left_lt_right
+cpu.print print_eq_f32 cpu0 same_f32
+cpu.print print_gt_f64 cpu0 wide_gt_narrow
+cpu.print print_widened_i64 cpu0 widened_i64
+cpu.print print_as_f32 cpu0 as_f32
+cpu.print print_widened_f64 cpu0 widened_f64
+cpu.print print_narrowed_f32 cpu0 narrowed_f32
+cpu.print print_narrowed_i32 cpu0 narrowed_i32
+
+edge dep small_i32 small_lt_big
+edge dep big_i32 small_lt_big
+edge dep big_i32 big_gt_small
+edge dep small_i32 big_gt_small
+edge dep big_i32 same_i32
+edge dep left_f32 left_lt_right
+edge dep right_f32 left_lt_right
+edge dep right_f32 same_f32
+edge dep wide_f64 wide_gt_narrow
+edge dep narrow_f64 wide_gt_narrow
+edge dep big_i32 widened_i64
+edge dep small_i32 as_f32
+edge dep as_f32 widened_f64
+edge dep wide_f64 narrowed_f32
+edge dep widened_i64 narrowed_i32
+edge dep small_lt_big print_lt_i32
+edge dep big_gt_small print_gt_i32
+edge dep same_i32 print_eq_i32
+edge dep left_lt_right print_lt_f32
+edge dep same_f32 print_eq_f32
+edge dep wide_gt_narrow print_gt_f64
+edge dep widened_i64 print_widened_i64
+edge dep as_f32 print_as_f32
+edge dep widened_f64 print_widened_f64
+edge dep narrowed_f32 print_narrowed_f32
+edge dep narrowed_i32 print_narrowed_i32
+edge effect small_lt_big print_lt_i32
+edge effect big_gt_small print_gt_i32
+edge effect same_i32 print_eq_i32
+edge effect left_lt_right print_lt_f32
+edge effect same_f32 print_eq_f32
+edge effect wide_gt_narrow print_gt_f64
+edge effect widened_i64 print_widened_i64
+edge effect as_f32 print_as_f32
+edge effect widened_f64 print_widened_f64
+edge effect narrowed_f32 print_narrowed_f32
+edge effect narrowed_i32 print_narrowed_i32

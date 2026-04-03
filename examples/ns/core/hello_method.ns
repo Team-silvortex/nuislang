@@ -1,0 +1,10 @@
+mod cpu Main {
+  fn add(lhs: i64, rhs: i64) -> i64 {
+    return lhs + rhs;
+  }
+
+  fn main() {
+    let base: i64 = 40;
+    print(base.add(2));
+  }
+}

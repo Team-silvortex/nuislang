@@ -1,0 +1,6 @@
+mod cpu Main {
+  fn main() {
+    let surface: Instance<SurfaceShader> = instantiate shader SurfaceShader;
+    print(1);
+  }
+}

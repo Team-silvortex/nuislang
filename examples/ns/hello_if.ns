@@ -1,9 +1,0 @@
-mod cpu Main {
-  fn main() {
-    if true {
-      print(7);
-    } else {
-      print(9);
-    }
-  }
-}

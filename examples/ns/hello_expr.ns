@@ -1,5 +1,0 @@
-mod cpu Main {
-  fn main() {
-    print(1 + 2 * 3);
-  }
-}

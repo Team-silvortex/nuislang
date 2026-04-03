@@ -1,0 +1,57 @@
+yir 0.1
+
+resource cpu0 cpu.arm64
+
+cpu.target_config cpu_profile cpu0 arm64 apple_aapcs64 128
+cpu.null nil cpu0
+
+cpu.const v3 cpu0 30
+cpu.alloc_node node3 cpu0 v3 nil
+
+cpu.const v2 cpu0 20
+cpu.alloc_node node2 cpu0 v2 node3
+
+cpu.const v1 cpu0 10
+cpu.alloc_node head cpu0 v1 node2
+
+cpu.load_next head_next_before cpu0 head
+cpu.load_value middle_value_before cpu0 head_next_before
+
+cpu.store_next detach_middle cpu0 head node3
+cpu.free free_middle cpu0 node2
+
+cpu.load_next head_next_after cpu0 head
+cpu.load_value tail_value_after cpu0 head_next_after
+cpu.load_value head_value cpu0 head
+cpu.add list_sum cpu0 head_value tail_value_after
+cpu.print out cpu0 list_sum
+
+edge dep v3 node3
+edge dep nil node3
+edge dep v2 node2
+edge dep node3 node2
+edge dep v1 head
+edge dep node2 head
+edge dep head head_next_before
+edge dep head_next_before middle_value_before
+edge effect head head_next_before
+edge effect head_next_before middle_value_before
+edge dep head detach_middle
+edge dep node3 detach_middle
+edge effect head detach_middle
+edge effect node3 detach_middle
+edge lifetime head detach_middle
+edge dep node2 free_middle
+edge effect detach_middle free_middle
+edge effect node2 free_middle
+edge lifetime node2 free_middle
+edge dep head head_next_after
+edge effect detach_middle head_next_after
+edge dep head_next_after tail_value_after
+edge effect head_next_after tail_value_after
+edge dep head head_value
+edge effect head head_value
+edge dep head_value list_sum
+edge dep tail_value_after list_sum
+edge dep list_sum out
+edge effect list_sum out

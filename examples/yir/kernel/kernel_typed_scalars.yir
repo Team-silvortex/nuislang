@@ -1,0 +1,29 @@
+yir 0.1
+
+resource kernel0 kernel.apple
+
+kernel.const_bool training_enabled kernel0 true
+kernel.const_i32 batch_size kernel0 8
+kernel.const_f32 lr kernel0 0.125
+kernel.const_f32 momentum kernel0 0.75
+kernel.const_f64 loss kernel0 1.5
+kernel.const_f64 regularizer kernel0 0.25
+
+kernel.mul_i32 doubled_batch kernel0 batch_size batch_size
+kernel.mul_f32 effective_lr kernel0 lr momentum
+kernel.add_f64 total_loss kernel0 loss regularizer
+
+kernel.print print_training kernel0 training_enabled
+kernel.print print_batch kernel0 doubled_batch
+kernel.print print_lr kernel0 effective_lr
+kernel.print print_loss kernel0 total_loss
+
+edge dep batch_size doubled_batch
+edge dep lr effective_lr
+edge dep momentum effective_lr
+edge dep loss total_loss
+edge dep regularizer total_loss
+edge dep training_enabled print_training
+edge dep doubled_batch print_batch
+edge dep effective_lr print_lr
+edge dep total_loss print_loss

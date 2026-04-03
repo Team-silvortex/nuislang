@@ -1,0 +1,19 @@
+yir 0.1
+
+resource cpu0 cpu.arm64
+resource fabric0 data.fabric
+resource shader0 shader.render
+
+cpu.const_i64 seed cpu0 4
+cpu.const_i64 inc cpu0 3
+cpu.add sum cpu0 seed inc
+data.move sum_on_shader fabric0 sum shader0
+shader.dispatch shaded shader0 sum_on_shader
+shader.print done shader0 shaded
+
+edge dep seed sum
+edge dep inc sum
+edge xfer sum sum_on_shader
+edge xfer sum_on_shader shaded
+edge dep shaded done
+edge effect shaded done
