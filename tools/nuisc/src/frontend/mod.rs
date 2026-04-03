@@ -1064,6 +1064,60 @@ fn lower_call_expr(
             };
             Ok(NirExpr::ShaderProfileInstanceCountRef { unit: unit.clone() })
         }
+        "shader_profile_packet_color_slot" => {
+            let [unit] = args else {
+                return Err("shader_profile_packet_color_slot(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "shader_profile_packet_color_slot(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err(
+                    "shader_profile_packet_color_slot(...) expects a string literal unit name"
+                        .to_owned(),
+                );
+            };
+            Ok(NirExpr::ShaderProfilePacketColorSlotRef { unit: unit.clone() })
+        }
+        "shader_profile_packet_speed_slot" => {
+            let [unit] = args else {
+                return Err("shader_profile_packet_speed_slot(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "shader_profile_packet_speed_slot(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err(
+                    "shader_profile_packet_speed_slot(...) expects a string literal unit name"
+                        .to_owned(),
+                );
+            };
+            Ok(NirExpr::ShaderProfilePacketSpeedSlotRef { unit: unit.clone() })
+        }
+        "shader_profile_packet_radius_slot" => {
+            let [unit] = args else {
+                return Err("shader_profile_packet_radius_slot(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "shader_profile_packet_radius_slot(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err(
+                    "shader_profile_packet_radius_slot(...) expects a string literal unit name"
+                        .to_owned(),
+                );
+            };
+            Ok(NirExpr::ShaderProfilePacketRadiusSlotRef { unit: unit.clone() })
+        }
         "data_profile_bind_core" => {
             let [unit] = args else {
                 return Err("data_profile_bind_core(...) expects 1 arg".to_owned());
@@ -1229,12 +1283,6 @@ fn lower_call_expr(
             let [pass, packet, vertex_count, instance_count] = args else {
                 return Err("shader_draw_instanced(...) expects 4 args".to_owned());
             };
-            let AstExpr::Int(vertex_count) = vertex_count else {
-                return Err("shader_draw_instanced(...) vertex_count must be an integer literal".to_owned());
-            };
-            let AstExpr::Int(instance_count) = instance_count else {
-                return Err("shader_draw_instanced(...) instance_count must be an integer literal".to_owned());
-            };
             Ok(NirExpr::ShaderDrawInstanced {
                 pass: Box::new(lower_expr(
                     pass, current_domain, bindings, signatures, struct_table, None,
@@ -1242,8 +1290,22 @@ fn lower_call_expr(
                 packet: Box::new(lower_expr(
                     packet, current_domain, bindings, signatures, struct_table, None,
                 )?),
-                vertex_count: *vertex_count,
-                instance_count: *instance_count,
+                vertex_count: Box::new(lower_expr(
+                    vertex_count,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    Some(&i64_type()),
+                )?),
+                instance_count: Box::new(lower_expr(
+                    instance_count,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    Some(&i64_type()),
+                )?),
             })
         }
         "free" => {
@@ -1359,6 +1421,9 @@ fn infer_nir_expr_type(
         NirExpr::ShaderProfilePipelineRef { .. } => Some(named_type("Pipeline")),
         NirExpr::ShaderProfileVertexCountRef { .. } => Some(i64_type()),
         NirExpr::ShaderProfileInstanceCountRef { .. } => Some(i64_type()),
+        NirExpr::ShaderProfilePacketColorSlotRef { .. } => Some(i64_type()),
+        NirExpr::ShaderProfilePacketSpeedSlotRef { .. } => Some(i64_type()),
+        NirExpr::ShaderProfilePacketRadiusSlotRef { .. } => Some(i64_type()),
         NirExpr::DataProfileBindCoreRef { .. } => Some(named_type("Unit")),
         NirExpr::DataProfileWindowOffsetRef { .. } => Some(i64_type()),
         NirExpr::DataProfileUplinkLenRef { .. } => Some(i64_type()),

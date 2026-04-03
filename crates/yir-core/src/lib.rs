@@ -1122,19 +1122,14 @@ impl RegisteredMod for DataMod {
                         node.name, node.op.instruction
                     ));
                 }
-                node.op.args[1].parse::<usize>().map_err(|_| {
-                    format!(
-                        "node `{}` has invalid window offset `{}`",
-                        node.name, node.op.args[1]
-                    )
-                })?;
-                node.op.args[2].parse::<usize>().map_err(|_| {
-                    format!(
-                        "node `{}` has invalid window len `{}`",
-                        node.name, node.op.args[2]
-                    )
-                })?;
-                Ok(InstructionSemantics::pure(vec![node.op.args[0].clone()]))
+                let mut deps = vec![node.op.args[0].clone()];
+                if node.op.args[1].parse::<usize>().is_err() {
+                    deps.push(node.op.args[1].clone());
+                }
+                if node.op.args[2].parse::<usize>().is_err() {
+                    deps.push(node.op.args[2].clone());
+                }
+                Ok(InstructionSemantics::pure(deps))
             }
             "marker" => {
                 if node.op.args.len() != 1 {
@@ -1236,18 +1231,8 @@ impl RegisteredMod for DataMod {
                         node.op.instruction, base
                     ));
                 }
-                let offset = node.op.args[1].parse::<usize>().map_err(|_| {
-                    format!(
-                        "node `{}` has invalid window offset `{}`",
-                        node.name, node.op.args[1]
-                    )
-                })?;
-                let len = node.op.args[2].parse::<usize>().map_err(|_| {
-                    format!(
-                        "node `{}` has invalid window len `{}`",
-                        node.name, node.op.args[2]
-                    )
-                })?;
+                let offset = resolve_window_usize_arg(state, node, 1, "offset")?;
+                let len = resolve_window_usize_arg(state, node, 2, "len")?;
                 let window = Value::DataWindow(DataWindow {
                     base: Box::new(base),
                     offset,
@@ -1394,6 +1379,25 @@ fn is_pipe_payload_legal(value: &Value) -> bool {
             .all(|(_, value)| is_move_value_legal(value)),
         _ => true,
     }
+}
+
+fn resolve_window_usize_arg(
+    state: &ExecutionState,
+    node: &Node,
+    index: usize,
+    label: &str,
+) -> Result<usize, String> {
+    let raw = &node.op.args[index];
+    if let Ok(value) = raw.parse::<usize>() {
+        return Ok(value);
+    }
+    let value = state.expect_int(raw)?;
+    usize::try_from(value).map_err(|_| {
+        format!(
+            "node `{}` has invalid window {} `{}`",
+            node.name, label, raw
+        )
+    })
 }
 
 pub struct LegacyFabricMod;

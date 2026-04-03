@@ -1100,7 +1100,7 @@ impl RegisteredMod for CpuMod {
                 Ok(Value::Int(value))
             }
             "present_frame" => {
-                let frame = state.expect_value(&node.op.args[0])?.clone();
+                let frame = unwrap_present_frame_payload(state.expect_value(&node.op.args[0])?.clone());
                 state.push_resource_event(
                     resource,
                     format!(
@@ -1123,6 +1123,13 @@ impl RegisteredMod for CpuMod {
             }
             other => Err(format!("unknown cpu instruction `{other}`")),
         }
+    }
+}
+
+fn unwrap_present_frame_payload(value: Value) -> Value {
+    match value {
+        Value::DataWindow(window) => (*window.base).clone(),
+        other => other,
     }
 }
 

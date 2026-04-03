@@ -389,6 +389,24 @@ fn render_nir_expr(value: &NirExpr) -> String {
         NirExpr::ShaderProfileInstanceCountRef { unit } => {
             format!("shader_profile_instance_count(\"{}\")", escape_debug(unit))
         }
+        NirExpr::ShaderProfilePacketColorSlotRef { unit } => {
+            format!(
+                "shader_profile_packet_color_slot(\"{}\")",
+                escape_debug(unit)
+            )
+        }
+        NirExpr::ShaderProfilePacketSpeedSlotRef { unit } => {
+            format!(
+                "shader_profile_packet_speed_slot(\"{}\")",
+                escape_debug(unit)
+            )
+        }
+        NirExpr::ShaderProfilePacketRadiusSlotRef { unit } => {
+            format!(
+                "shader_profile_packet_radius_slot(\"{}\")",
+                escape_debug(unit)
+            )
+        }
         NirExpr::DataProfileBindCoreRef { unit } => {
             format!("data_profile_bind_core(\"{}\")", escape_debug(unit))
         }
@@ -463,8 +481,8 @@ fn render_nir_expr(value: &NirExpr) -> String {
             "shader_draw_instanced({}, {}, {}, {})",
             render_nir_expr(pass),
             render_nir_expr(packet),
-            vertex_count,
-            instance_count
+            render_nir_expr(vertex_count),
+            render_nir_expr(instance_count)
         ),
         NirExpr::LoadValue(value) => format!("load_value({})", render_nir_expr(value)),
         NirExpr::LoadNext(value) => format!("load_next({})", render_nir_expr(value)),

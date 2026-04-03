@@ -4,6 +4,9 @@ mod shader SurfaceShader {
   fn profile() {
     const vertex_count: i64 = 4;
     const instance_count: i64 = 1;
+    const packet_color_slot: i64 = 0;
+    const packet_speed_slot: i64 = 1;
+    const packet_radius_slot: i64 = 2;
     let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
     let profile_view: Viewport = shader_viewport(160, 120);
     let profile_pipe: Pipeline = shader_pipeline("lit_sphere", "triangle_strip");

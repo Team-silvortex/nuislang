@@ -23,7 +23,7 @@ resource = "fabric0"
 core_index = 1
 
 [[stage]]
-id = "shader_draw_instanced_33"
+id = "shader_draw_instanced_43"
 op = "shader.draw_instanced"
 resource = "shader0"
 lowering = "backend_eligible"
@@ -37,30 +37,30 @@ topology = "triangle_strip"
 backend = "metal"
 kind = "library"
 status = "planned"
-entry = "shader_draw_instanced_33"
-artifact = "metal/shader_draw_instanced_33.metallib"
+entry = "shader_draw_instanced_43"
+artifact = "metal/shader_draw_instanced_43.metallib"
 notes = "Apple GPU backend artifact"
 
 [[stage.variant]]
 backend = "vulkan"
 kind = "spirv"
 status = "planned"
-entry = "shader_draw_instanced_33"
-artifact = "vulkan/shader_draw_instanced_33.spv"
+entry = "shader_draw_instanced_43"
+artifact = "vulkan/shader_draw_instanced_43.spv"
 notes = "Portable Vulkan/SPIR-V artifact"
 
 [[stage.variant]]
 backend = "directx"
 kind = "dxil"
 status = "planned"
-entry = "shader_draw_instanced_33"
-artifact = "directx/shader_draw_instanced_33.dxil"
+entry = "shader_draw_instanced_43"
+artifact = "directx/shader_draw_instanced_43.dxil"
 notes = "Windows DirectX backend artifact"
 
 [[stage.variant]]
 backend = "opengl"
 kind = "glsl"
 status = "planned"
-entry = "shader_draw_instanced_33"
-artifact = "opengl/shader_draw_instanced_33.glsl"
+entry = "shader_draw_instanced_43"
+artifact = "opengl/shader_draw_instanced_43.glsl"
 notes = "Legacy OpenGL fallback artifact"

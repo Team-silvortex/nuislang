@@ -158,6 +158,9 @@ fn verify_expr(
         | NirExpr::ShaderProfilePipelineRef { .. }
         | NirExpr::ShaderProfileVertexCountRef { .. }
         | NirExpr::ShaderProfileInstanceCountRef { .. }
+        | NirExpr::ShaderProfilePacketColorSlotRef { .. }
+        | NirExpr::ShaderProfilePacketSpeedSlotRef { .. }
+        | NirExpr::ShaderProfilePacketRadiusSlotRef { .. }
         | NirExpr::DataProfileBindCoreRef { .. }
         | NirExpr::DataProfileWindowOffsetRef { .. }
         | NirExpr::DataProfileUplinkLenRef { .. }
@@ -185,6 +188,15 @@ fn verify_expr(
         NirExpr::ShaderDrawInstanced { pass, packet, .. } => {
             verify_expr(pass, moved, borrows)?;
             verify_expr(packet, moved, borrows)?;
+            if let NirExpr::ShaderDrawInstanced {
+                vertex_count,
+                instance_count,
+                ..
+            } = expr
+            {
+                verify_expr(vertex_count, moved, borrows)?;
+                verify_expr(instance_count, moved, borrows)?;
+            }
         }
         NirExpr::DataOutputPipe(inner) | NirExpr::DataInputPipe(inner) => {
             verify_expr(inner, moved, borrows)?
@@ -279,6 +291,9 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
         | NirExpr::ShaderProfilePipelineRef { .. }
         | NirExpr::ShaderProfileVertexCountRef { .. }
         | NirExpr::ShaderProfileInstanceCountRef { .. }
+        | NirExpr::ShaderProfilePacketColorSlotRef { .. }
+        | NirExpr::ShaderProfilePacketSpeedSlotRef { .. }
+        | NirExpr::ShaderProfilePacketRadiusSlotRef { .. }
         | NirExpr::DataProfileBindCoreRef { .. }
         | NirExpr::DataProfileWindowOffsetRef { .. }
         | NirExpr::DataProfileUplinkLenRef { .. }
@@ -306,6 +321,15 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
         NirExpr::ShaderDrawInstanced { pass, packet, .. } => {
             verify_expr_uses(pass, moved)?;
             verify_expr_uses(packet, moved)?;
+            if let NirExpr::ShaderDrawInstanced {
+                vertex_count,
+                instance_count,
+                ..
+            } = expr
+            {
+                verify_expr_uses(vertex_count, moved)?;
+                verify_expr_uses(instance_count, moved)?;
+            }
         }
         NirExpr::DataOutputPipe(inner) | NirExpr::DataInputPipe(inner) => {
             verify_expr_uses(inner, moved)?

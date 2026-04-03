@@ -771,6 +771,18 @@ fn resolve_project_profile_target_name(domain: &str, unit: &str, slot: &str) -> 
             "project_profile_shader_{}_instance_count",
             sanitize_ident(unit)
         ),
+        ("shader", "packet_color_slot") => format!(
+            "project_profile_shader_{}_packet_color_slot",
+            sanitize_ident(unit)
+        ),
+        ("shader", "packet_speed_slot") => format!(
+            "project_profile_shader_{}_packet_speed_slot",
+            sanitize_ident(unit)
+        ),
+        ("shader", "packet_radius_slot") => format!(
+            "project_profile_shader_{}_packet_radius_slot",
+            sanitize_ident(unit)
+        ),
         ("data", "bind_core") => format!(
             "project_profile_data_{}_data_bind_core",
             sanitize_ident(unit)
@@ -829,6 +841,46 @@ fn stitch_data_profile_edges(module: &mut YirModule) {
             node.op.module == "data"
                 && node.op.instruction == "marker"
                 && node.op.args.first().map(String::as_str) == Some("cpu_to_shader")
+        })
+        .map(|node| node.name.clone())
+        .collect::<Vec<_>>();
+    let uplink_pipe_markers = module
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "data"
+                && node.op.instruction == "marker"
+                && node.op.args.first().map(String::as_str) == Some("uplink_pipe")
+        })
+        .map(|node| node.name.clone())
+        .collect::<Vec<_>>();
+    let downlink_pipe_markers = module
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "data"
+                && node.op.instruction == "marker"
+                && node.op.args.first().map(String::as_str) == Some("downlink_pipe")
+        })
+        .map(|node| node.name.clone())
+        .collect::<Vec<_>>();
+    let uplink_window_policy_markers = module
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "data"
+                && node.op.instruction == "marker"
+                && node.op.args.first().map(String::as_str) == Some("uplink_window_policy")
+        })
+        .map(|node| node.name.clone())
+        .collect::<Vec<_>>();
+    let downlink_window_policy_markers = module
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "data"
+                && node.op.instruction == "marker"
+                && node.op.args.first().map(String::as_str) == Some("downlink_window_policy")
         })
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
@@ -902,7 +954,20 @@ fn stitch_data_profile_edges(module: &mut YirModule) {
             push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
         }
     }
+    if let Some(marker) = uplink_pipe_markers.first() {
+        for pipe in data_pipe_nodes.iter().take(2) {
+            push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
+        }
+    }
+    if let Some(marker) = downlink_pipe_markers.first() {
+        for pipe in data_pipe_nodes.iter().skip(2).take(2) {
+            push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
+        }
+    }
     for window in &uplink_windows {
+        if let Some(marker) = uplink_window_policy_markers.first() {
+            push_edge_if_missing(module, EdgeKind::Effect, marker, window);
+        }
         for pipe in data_pipe_nodes.iter().take(2) {
             push_project_dependency_edge_if_missing(
                 module,
@@ -932,6 +997,9 @@ fn stitch_data_profile_edges(module: &mut YirModule) {
         }
     }
     for window in &downlink_windows {
+        if let Some(marker) = downlink_window_policy_markers.first() {
+            push_edge_if_missing(module, EdgeKind::Effect, marker, window);
+        }
         for pipe in data_pipe_nodes.iter().skip(2).take(2) {
             push_project_dependency_edge_if_missing(
                 module,

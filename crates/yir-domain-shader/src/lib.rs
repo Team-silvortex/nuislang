@@ -420,20 +420,13 @@ impl RegisteredMod for ShaderMod {
                     ));
                 }
 
-                node.op.args[2].parse::<i64>().map_err(|_| {
-                    format!(
-                        "node `{}` has invalid vertex_count `{}`",
-                        node.name, node.op.args[2]
-                    )
-                })?;
-                node.op.args[3].parse::<i64>().map_err(|_| {
-                    format!(
-                        "node `{}` has invalid instance_count `{}`",
-                        node.name, node.op.args[3]
-                    )
-                })?;
-
                 let mut deps = vec![node.op.args[0].clone(), node.op.args[1].clone()];
+                if node.op.args[2].parse::<i64>().is_err() {
+                    deps.push(node.op.args[2].clone());
+                }
+                if node.op.args[3].parse::<i64>().is_err() {
+                    deps.push(node.op.args[3].clone());
+                }
                 if let Some(bind_set) = node.op.args.get(4) {
                     deps.push(bind_set.clone());
                 }
@@ -928,19 +921,9 @@ impl RegisteredMod for ShaderMod {
                         ))
                     }
                 };
-                let packet = state.expect_value(&node.op.args[1])?.clone();
-                let vertex_count = node.op.args[2].parse::<i64>().map_err(|_| {
-                    format!(
-                        "node `{}` has invalid vertex_count `{}`",
-                        node.name, node.op.args[2]
-                    )
-                })?;
-                let instance_count = node.op.args[3].parse::<i64>().map_err(|_| {
-                    format!(
-                        "node `{}` has invalid instance_count `{}`",
-                        node.name, node.op.args[3]
-                    )
-                })?;
+                let packet = unwrap_data_window(state.expect_value(&node.op.args[1])?.clone());
+                let vertex_count = resolve_draw_count(state, node, 2, "vertex_count")?;
+                let instance_count = resolve_draw_count(state, node, 3, "instance_count")?;
                 let bindings = match node.op.args.get(4) {
                     Some(name) => match state.expect_value(name)?.clone() {
                         Value::BindingSet(bindings) => Some(bindings),
@@ -1941,4 +1924,32 @@ fn stamp_triangle_fill(
 
 fn edge_function(ax: f32, ay: f32, bx: f32, by: f32, px: f32, py: f32) -> f32 {
     (px - ax) * (by - ay) - (py - ay) * (bx - ax)
+}
+
+fn unwrap_data_window(value: Value) -> Value {
+    match value {
+        Value::DataWindow(window) => (*window.base).clone(),
+        other => other,
+    }
+}
+
+fn resolve_draw_count(
+    state: &ExecutionState,
+    node: &Node,
+    index: usize,
+    label: &str,
+) -> Result<i64, String> {
+    let raw = &node.op.args[index];
+    if let Ok(value) = raw.parse::<i64>() {
+        return Ok(value);
+    }
+    match state.expect_value(raw)? {
+        Value::Int(value) => Ok(*value),
+        Value::I32(value) => Ok(*value as i64),
+        Value::Bool(value) => Ok(if *value { 1 } else { 0 }),
+        other => Err(format!(
+            "node `{}` expects integer-like {} value, got {}",
+            node.name, label, other
+        )),
+    }
 }

@@ -198,6 +198,9 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         | NirExpr::ShaderProfilePipelineRef { .. }
         | NirExpr::ShaderProfileVertexCountRef { .. }
         | NirExpr::ShaderProfileInstanceCountRef { .. }
+        | NirExpr::ShaderProfilePacketColorSlotRef { .. }
+        | NirExpr::ShaderProfilePacketSpeedSlotRef { .. }
+        | NirExpr::ShaderProfilePacketRadiusSlotRef { .. }
         | NirExpr::DataProfileBindCoreRef { .. }
         | NirExpr::DataProfileWindowOffsetRef { .. }
         | NirExpr::DataProfileUplinkLenRef { .. }

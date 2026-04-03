@@ -30,13 +30,18 @@ mod cpu Main {
     const speed_scale: i64 = 2;
     let shader_vertex_budget: i64 = shader_profile_vertex_count("SurfaceShader");
     let shader_instance_budget: i64 = shader_profile_instance_count("SurfaceShader");
+    let shader_color_slot: i64 = shader_profile_packet_color_slot("SurfaceShader");
+    let shader_speed_slot: i64 = shader_profile_packet_speed_slot("SurfaceShader");
+    let shader_radius_slot: i64 = shader_profile_packet_radius_slot("SurfaceShader");
 
-    let panel_color_seed: i64 = base_color + color_delta;
+    let panel_color_seed: i64 = base_color + color_delta + shader_color_slot;
     let panel_color: i64 = HostRenderCurves.color_bias(panel_color_seed);
-    let base_panel_speed: i64 = speed_delta * speed_scale + base_speed + shader_instance_budget;
+    let base_panel_speed: i64 =
+      speed_delta * speed_scale + base_speed + shader_instance_budget + shader_speed_slot;
     let curved_panel_speed: i64 = HostRenderCurves.speed_curve(base_panel_speed);
     let panel_speed: i64 = HostRenderCurves.mix_tick(curved_panel_speed, frame_tick);
-    let base_panel_radius: i64 = base_radius + radius_delta + shader_vertex_budget;
+    let base_panel_radius: i64 =
+      base_radius + radius_delta + shader_vertex_budget + shader_radius_slot;
     let curved_panel_radius: i64 = HostRenderCurves.radius_curve(base_panel_radius);
     let panel_radius: i64 = HostRenderCurves.mix_tick(curved_panel_radius, frame_tick);
 
@@ -49,19 +54,31 @@ mod cpu Main {
     let swapchain: Target = shader_profile_target("SurfaceShader");
     let main_view: Viewport = shader_profile_viewport("SurfaceShader");
     let lit_pipe: Pipeline = shader_profile_pipeline("SurfaceShader");
+    let data_window_offset: i64 = data_profile_window_offset("FabricPlane");
+    let data_uplink_len: i64 = data_profile_uplink_len("FabricPlane");
+    let data_downlink_len: i64 = data_profile_downlink_len("FabricPlane");
 
     data_profile_bind_core("FabricPlane");
     let fabric_handles: HandleTable = data_profile_handle_table("FabricPlane");
     let uplink_ready: Marker = data_profile_marker("FabricPlane", "cpu_to_shader");
-    link packet_out: Pipe<RenderControls> = output render_controls;
-    let gpu_packet: RenderControls = data_input_pipe(packet_out);
+    let uplink_window: Window =
+      data_immutable_window(render_controls, data_window_offset, data_uplink_len);
+    link packet_out: Pipe<Window> = output uplink_window;
+    let gpu_packet: Window = data_input_pipe(packet_out);
 
     let main_pass: Pass = shader_begin_pass(swapchain, lit_pipe, main_view);
-    let frame: Frame = shader_draw_instanced(main_pass, gpu_packet, 4, 1);
+    let frame: Frame = shader_draw_instanced(
+      main_pass,
+      gpu_packet,
+      shader_vertex_budget,
+      shader_instance_budget
+    );
 
     let downlink_ready: Marker = data_profile_marker("FabricPlane", "shader_to_cpu");
-    link frame_out: Pipe<Frame> = output frame;
-    let host_frame: Frame = data_input_pipe(frame_out);
+    let downlink_window: Window =
+      data_copy_window(frame, data_window_offset, data_downlink_len);
+    link frame_out: Pipe<Window> = output downlink_window;
+    let host_frame: Window = data_input_pipe(frame_out);
 
     cpu_present_frame(host_frame);
   }

@@ -314,7 +314,7 @@ fn lower_expr(
                     args: vec![value_name.clone()],
                 },
             });
-            push_xfer_edge(state, &value_name, &name);
+            push_dep_edges(state, &value_name, &name);
             Ok(name)
         }
         NirExpr::DataInputPipe(pipe) => {
@@ -521,6 +521,15 @@ fn lower_expr(
         NirExpr::ShaderProfileInstanceCountRef { unit } => {
             lower_project_profile_ref(state, "shader", unit, "instance_count")
         }
+        NirExpr::ShaderProfilePacketColorSlotRef { unit } => {
+            lower_project_profile_ref(state, "shader", unit, "packet_color_slot")
+        }
+        NirExpr::ShaderProfilePacketSpeedSlotRef { unit } => {
+            lower_project_profile_ref(state, "shader", unit, "packet_speed_slot")
+        }
+        NirExpr::ShaderProfilePacketRadiusSlotRef { unit } => {
+            lower_project_profile_ref(state, "shader", unit, "packet_radius_slot")
+        }
         NirExpr::DataProfileBindCoreRef { unit } => {
             lower_project_profile_ref(state, "data", unit, "bind_core")
         }
@@ -622,6 +631,8 @@ fn lower_expr(
             ensure_shader_resource(state.yir);
             let pass_name = lower_expr(pass, state, bindings)?;
             let packet_name = lower_expr(packet, state, bindings)?;
+            let vertex_count_name = lower_expr(vertex_count, state, bindings)?;
+            let instance_count_name = lower_expr(instance_count, state, bindings)?;
             let name = next_name(state, "shader_draw_instanced");
             state.yir.nodes.push(Node {
                 name: name.clone(),
@@ -632,13 +643,15 @@ fn lower_expr(
                     args: vec![
                         pass_name.clone(),
                         packet_name.clone(),
-                        vertex_count.to_string(),
-                        instance_count.to_string(),
+                        vertex_count_name.clone(),
+                        instance_count_name.clone(),
                     ],
                 },
             });
             push_dep_edges(state, &pass_name, &name);
             push_xfer_edge(state, &packet_name, &name);
+            push_xfer_edge(state, &vertex_count_name, &name);
+            push_xfer_edge(state, &instance_count_name, &name);
             Ok(name)
         }
         NirExpr::LoadValue(value) => lower_unary_cpu_expr("load_value", value, state, bindings),

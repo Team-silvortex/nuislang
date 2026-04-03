@@ -345,6 +345,15 @@ pub enum NirExpr {
     ShaderProfileInstanceCountRef {
         unit: String,
     },
+    ShaderProfilePacketColorSlotRef {
+        unit: String,
+    },
+    ShaderProfilePacketSpeedSlotRef {
+        unit: String,
+    },
+    ShaderProfilePacketRadiusSlotRef {
+        unit: String,
+    },
     DataProfileBindCoreRef {
         unit: String,
     },
@@ -385,8 +394,8 @@ pub enum NirExpr {
     ShaderDrawInstanced {
         pass: Box<NirExpr>,
         packet: Box<NirExpr>,
-        vertex_count: i64,
-        instance_count: i64,
+        vertex_count: Box<NirExpr>,
+        instance_count: Box<NirExpr>,
     },
     CpuExternCall {
         abi: String,
@@ -479,6 +488,9 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::ShaderProfilePipelineRef { .. }
         | NirExpr::ShaderProfileVertexCountRef { .. }
         | NirExpr::ShaderProfileInstanceCountRef { .. }
+        | NirExpr::ShaderProfilePacketColorSlotRef { .. }
+        | NirExpr::ShaderProfilePacketSpeedSlotRef { .. }
+        | NirExpr::ShaderProfilePacketRadiusSlotRef { .. }
         | NirExpr::DataProfileBindCoreRef { .. }
         | NirExpr::DataProfileWindowOffsetRef { .. }
         | NirExpr::DataProfileUplinkLenRef { .. }
