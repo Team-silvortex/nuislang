@@ -441,6 +441,15 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 println!("    notes: {}", contract.notes);
             }
         }
+        CommandKind::VerifyBuildManifest { manifest } => {
+            let report = aot::verify_build_manifest(&manifest)?;
+            println!("build manifest verified: {}", manifest.display());
+            println!("  schema: {}", report.schema);
+            println!("  input: {}", report.input);
+            println!("  output_dir: {}", report.output_dir);
+            println!("  packaging_mode: {}", report.packaging_mode);
+            println!("  artifacts_checked: {}", report.artifacts_checked);
+        }
         CommandKind::DumpAst { input } => {
             if project::is_project_input(&input) {
                 let project = project::load_project(&input)?;
@@ -537,6 +546,60 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             } else {
                 None
             };
+            let project_abi_resolution = if let Some(project) = &project {
+                Some(project::resolve_project_abi(project)?)
+            } else {
+                None
+            };
+            let build_manifest = aot::write_build_manifest(
+                &output_dir,
+                &written,
+                &aot::BuildManifestContext {
+                    input_path: input.display().to_string(),
+                    output_dir: output_dir.display().to_string(),
+                    loaded_nustar: artifacts.loaded_nustar.clone(),
+                    project: project
+                        .as_ref()
+                        .map(|project| aot::BuildManifestProjectInfo {
+                            name: project.manifest.name.clone(),
+                            abi_mode: project_abi_resolution
+                                .as_ref()
+                                .map(|resolution| {
+                                    if resolution.explicit {
+                                        "explicit".to_owned()
+                                    } else {
+                                        "auto-recommended".to_owned()
+                                    }
+                                })
+                                .unwrap_or_else(|| "none".to_owned()),
+                            abi_entries: project_abi_resolution
+                                .as_ref()
+                                .map(|resolution| {
+                                    resolution
+                                        .requirements
+                                        .iter()
+                                        .map(|item| (item.domain.clone(), item.abi.clone()))
+                                        .collect::<Vec<_>>()
+                                })
+                                .unwrap_or_default(),
+                            manifest_copy_path: project_metadata
+                                .as_ref()
+                                .map(|item| item.manifest_copy_path.clone()),
+                            modules_index_path: project_metadata
+                                .as_ref()
+                                .map(|item| item.modules_index_path.clone()),
+                            links_index_path: project_metadata
+                                .as_ref()
+                                .map(|item| item.links_index_path.clone()),
+                            host_ffi_index_path: project_metadata
+                                .as_ref()
+                                .map(|item| item.host_ffi_index_path.clone()),
+                            abi_index_path: project_metadata
+                                .as_ref()
+                                .map(|item| item.abi_index_path.clone()),
+                        }),
+                },
+            )?;
             println!("compiled nuis source: {}", input.display());
             if let Some(project) = &project {
                 println!("project: {}", project::describe_project(project));
@@ -556,6 +619,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             println!("llvm_ir: {}", written.llvm_ir_path);
             println!("packaging_mode: {}", written.packaging_mode);
             println!("binary: {}", written.binary_path);
+            println!("build_manifest: {}", build_manifest);
             if let Some(metadata) = &project_metadata {
                 println!("project_manifest: {}", metadata.manifest_copy_path);
                 println!("project_modules: {}", metadata.modules_index_path);

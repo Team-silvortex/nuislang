@@ -9,6 +9,8 @@ pub enum CommandKind {
     PackNustar { package_id: String, output: PathBuf },
     InspectNustar { input: PathBuf },
     LoaderContract { package_id: String },
+    VerifyBuildManifest { manifest: PathBuf },
+    ReleaseCheck { input: PathBuf, output_dir: PathBuf },
     Check { input: PathBuf },
     Build { input: PathBuf, output_dir: PathBuf },
     DumpAst { input: PathBuf },
@@ -53,6 +55,27 @@ where
                 .next()
                 .ok_or_else(|| "usage: nuis loader-contract <package-id>".to_owned())?,
         }),
+        "verify-build-manifest" => Ok(CommandKind::VerifyBuildManifest {
+            manifest: PathBuf::from(args.next().ok_or_else(|| {
+                "usage: nuis verify-build-manifest <nuis.build.manifest.toml>".to_owned()
+            })?),
+        }),
+        "release-check" => {
+            let input = PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned()));
+            let output_dir = PathBuf::from(args.next().unwrap_or_else(|| {
+                format!(
+                    "target/nuis-release-check/{}",
+                    sanitize_path_label(
+                        input
+                            .file_stem()
+                            .or_else(|| input.file_name())
+                            .and_then(|item| item.to_str())
+                            .unwrap_or("input")
+                    )
+                )
+            }));
+            Ok(CommandKind::ReleaseCheck { input, output_dir })
+        }
         "check" => Ok(CommandKind::Check {
             input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
         }),
@@ -81,7 +104,23 @@ where
             args: args.collect::<Vec<_>>(),
         }),
         other => Err(format!(
-            "unknown nuis command `{other}`; expected `help`, `status`, `registry`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `check`, `build`, `dump-ast`, `dump-nir`, `dump-yir`, or `rc`"
+            "unknown nuis command `{other}`; expected `help`, `status`, `registry`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `verify-build-manifest`, `release-check`, `check`, `build`, `dump-ast`, `dump-nir`, `dump-yir`, or `rc`"
         )),
+    }
+}
+
+fn sanitize_path_label(raw: &str) -> String {
+    let mut out = String::new();
+    for ch in raw.chars() {
+        if ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_') {
+            out.push(ch);
+        } else {
+            out.push('_');
+        }
+    }
+    if out.is_empty() {
+        "input".to_owned()
+    } else {
+        out
     }
 }

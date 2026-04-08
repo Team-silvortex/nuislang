@@ -8,6 +8,7 @@ pub enum CommandKind {
     PackNustar { package_id: String, output: PathBuf },
     InspectNustar { input: PathBuf },
     LoaderContract { package_id: String },
+    VerifyBuildManifest { manifest: PathBuf },
     DumpAst { input: PathBuf },
     DumpNir { input: PathBuf },
     DumpYir { input: PathBuf },
@@ -50,6 +51,11 @@ where
                 .next()
                 .ok_or_else(|| "usage: nuisc loader-contract <package-id>".to_owned())?,
         }),
+        "verify-build-manifest" => Ok(CommandKind::VerifyBuildManifest {
+            manifest: PathBuf::from(args.next().ok_or_else(|| {
+                "usage: nuisc verify-build-manifest <nuis.build.manifest.toml>".to_owned()
+            })?),
+        }),
         "dump-ast" => Ok(CommandKind::DumpAst {
             input: PathBuf::from(
                 args.next()
@@ -85,7 +91,7 @@ where
             ),
         }),
         other => Err(format!(
-            "unknown nuisc command `{other}`; expected `status`, `registry`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `dump-ast`, `dump-nir`, `dump-yir`, `check`, or `compile`"
+            "unknown nuisc command `{other}`; expected `status`, `registry`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `verify-build-manifest`, `dump-ast`, `dump-nir`, `dump-yir`, `check`, or `compile`"
         )),
     }
 }

@@ -1,4 +1,10 @@
-use std::{collections::BTreeMap, fs, path::Path, process::Command};
+use std::{
+    collections::BTreeMap,
+    fs,
+    path::{Path, PathBuf},
+    process::Command,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use nuis_semantics::model::{AstExternFunction, AstModule, AstTypeRef, NirModule};
 use yir_core::YirModule;
@@ -12,6 +18,34 @@ pub struct CompileArtifacts {
     pub llvm_ir_path: String,
     pub binary_path: String,
     pub packaging_mode: String,
+}
+
+pub struct BuildManifestProjectInfo {
+    pub name: String,
+    pub abi_mode: String,
+    pub abi_entries: Vec<(String, String)>,
+    pub manifest_copy_path: Option<String>,
+    pub modules_index_path: Option<String>,
+    pub links_index_path: Option<String>,
+    pub host_ffi_index_path: Option<String>,
+    pub abi_index_path: Option<String>,
+}
+
+pub struct BuildManifestContext {
+    pub input_path: String,
+    pub output_dir: String,
+    pub loaded_nustar: Vec<String>,
+    pub project: Option<BuildManifestProjectInfo>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum VcsInfo {
+    Git {
+        root: String,
+        head: String,
+        dirty: bool,
+    },
+    None,
 }
 
 pub fn write_and_link(
@@ -61,6 +95,436 @@ pub fn write_and_link(
         llvm_ir_path: ll_path.display().to_string(),
         binary_path,
         packaging_mode,
+    })
+}
+
+pub fn write_build_manifest(
+    output_dir: &Path,
+    written: &CompileArtifacts,
+    context: &BuildManifestContext,
+) -> Result<String, String> {
+    let path = output_dir.join("nuis.build.manifest.toml");
+    let generated_at_unix = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| format!("failed to read current time: {error}"))?
+        .as_secs();
+    let engine = crate::engine::default_engine();
+    let vcs = detect_vcs_info(&context.input_path, &context.output_dir);
+
+    let mut loaded_nustar = context.loaded_nustar.clone();
+    loaded_nustar.sort();
+    loaded_nustar.dedup();
+
+    let artifacts = vec![
+        ("ast".to_owned(), PathBuf::from(&written.ast_path)),
+        ("nir".to_owned(), PathBuf::from(&written.nir_path)),
+        ("yir".to_owned(), PathBuf::from(&written.yir_path)),
+        ("llvm_ir".to_owned(), PathBuf::from(&written.llvm_ir_path)),
+        ("binary".to_owned(), PathBuf::from(&written.binary_path)),
+    ];
+
+    let mut out = String::new();
+    out.push_str("manifest_schema = \"nuis-build-manifest-v1\"\n");
+    out.push_str(&format!("generated_at_unix = {generated_at_unix}\n"));
+    out.push_str(&format!(
+        "input = \"{}\"\n",
+        escape_toml_string(&context.input_path)
+    ));
+    out.push_str(&format!(
+        "output_dir = \"{}\"\n",
+        escape_toml_string(&context.output_dir)
+    ));
+    out.push_str(&format!(
+        "packaging_mode = \"{}\"\n",
+        escape_toml_string(&written.packaging_mode)
+    ));
+    out.push_str(&format!(
+        "tool_nuisc = \"{}\"\n",
+        escape_toml_string(env!("CARGO_PKG_VERSION"))
+    ));
+    out.push_str(&format!(
+        "engine_version = \"{}\"\n",
+        escape_toml_string(engine.version)
+    ));
+    out.push_str(&format!(
+        "engine_profile = \"{}\"\n",
+        escape_toml_string(engine.profile)
+    ));
+    match vcs {
+        VcsInfo::Git { root, head, dirty } => {
+            out.push_str("vcs = \"git\"\n");
+            out.push_str(&format!(
+                "vcs_dirty = {}\n",
+                if dirty { "true" } else { "false" }
+            ));
+            out.push_str(&format!("vcs_head = \"{}\"\n", escape_toml_string(&head)));
+            out.push_str(&format!("vcs_root = \"{}\"\n", escape_toml_string(&root)));
+        }
+        VcsInfo::None => {
+            out.push_str("vcs = \"none\"\n");
+        }
+    }
+    out.push_str(&format!(
+        "loaded_nustar = {}\n",
+        render_string_array(&loaded_nustar)
+    ));
+    out.push('\n');
+    out.push_str("[artifacts]\n");
+    for (kind, artifact_path) in &artifacts {
+        out.push_str(&format!(
+            "{kind} = \"{}\"\n",
+            escape_toml_string(&artifact_path.display().to_string())
+        ));
+    }
+
+    for (kind, artifact_path) in &artifacts {
+        let bytes = fs::read(artifact_path).map_err(|error| {
+            format!(
+                "failed to read artifact `{}`: {error}",
+                artifact_path.display()
+            )
+        })?;
+        out.push('\n');
+        out.push_str("[[artifact_hash]]\n");
+        out.push_str(&format!("kind = \"{}\"\n", escape_toml_string(kind)));
+        out.push_str(&format!(
+            "path = \"{}\"\n",
+            escape_toml_string(&artifact_path.display().to_string())
+        ));
+        out.push_str(&format!("bytes = {}\n", bytes.len()));
+        out.push_str(&format!("fnv1a64 = \"{}\"\n", fnv1a64_hex(&bytes)));
+    }
+
+    if let Some(project) = &context.project {
+        out.push('\n');
+        out.push_str("[project]\n");
+        out.push_str(&format!(
+            "name = \"{}\"\n",
+            escape_toml_string(&project.name)
+        ));
+        out.push_str(&format!(
+            "abi_mode = \"{}\"\n",
+            escape_toml_string(&project.abi_mode)
+        ));
+        let mut abi_entries = project
+            .abi_entries
+            .iter()
+            .map(|(domain, abi)| format!("{domain}={abi}"))
+            .collect::<Vec<_>>();
+        abi_entries.sort();
+        out.push_str(&format!("abi = {}\n", render_string_array(&abi_entries)));
+        if let Some(value) = &project.manifest_copy_path {
+            out.push_str(&format!(
+                "manifest_copy = \"{}\"\n",
+                escape_toml_string(value)
+            ));
+        }
+        if let Some(value) = &project.modules_index_path {
+            out.push_str(&format!(
+                "modules_index = \"{}\"\n",
+                escape_toml_string(value)
+            ));
+        }
+        if let Some(value) = &project.links_index_path {
+            out.push_str(&format!(
+                "links_index = \"{}\"\n",
+                escape_toml_string(value)
+            ));
+        }
+        if let Some(value) = &project.host_ffi_index_path {
+            out.push_str(&format!(
+                "host_ffi_index = \"{}\"\n",
+                escape_toml_string(value)
+            ));
+        }
+        if let Some(value) = &project.abi_index_path {
+            out.push_str(&format!("abi_index = \"{}\"\n", escape_toml_string(value)));
+        }
+    }
+
+    fs::write(&path, out)
+        .map_err(|error| format!("failed to write `{}`: {error}", path.display()))?;
+    Ok(path.display().to_string())
+}
+
+fn fnv1a64_hex(bytes: &[u8]) -> String {
+    const FNV_OFFSET: u64 = 0xcbf29ce484222325;
+    const FNV_PRIME: u64 = 0x100000001b3;
+    let mut hash = FNV_OFFSET;
+    for byte in bytes {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(FNV_PRIME);
+    }
+    format!("0x{hash:016x}")
+}
+
+fn render_string_array(values: &[String]) -> String {
+    let quoted = values
+        .iter()
+        .map(|value| format!("\"{}\"", escape_toml_string(value)))
+        .collect::<Vec<_>>();
+    format!("[{}]", quoted.join(", "))
+}
+
+fn escape_toml_string(value: &str) -> String {
+    value.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+fn detect_vcs_info(input_path: &str, output_dir: &str) -> VcsInfo {
+    let candidates = [
+        PathBuf::from(input_path),
+        PathBuf::from(output_dir),
+        std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+    ];
+    for candidate in candidates {
+        if let Some(root) = git_toplevel(&candidate) {
+            let head = git_head(&root).unwrap_or_else(|| "unknown".to_owned());
+            let dirty = git_is_dirty(&root).unwrap_or(false);
+            return VcsInfo::Git { root, head, dirty };
+        }
+    }
+    VcsInfo::None
+}
+
+fn git_toplevel(candidate: &Path) -> Option<String> {
+    let directory = if candidate.is_dir() {
+        candidate.to_path_buf()
+    } else {
+        candidate
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .to_path_buf()
+    };
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(&directory)
+        .arg("rev-parse")
+        .arg("--show-toplevel")
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let root = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+    if root.is_empty() {
+        None
+    } else {
+        Some(root)
+    }
+}
+
+fn git_head(root: &str) -> Option<String> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .arg("rev-parse")
+        .arg("HEAD")
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let head = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+    if head.is_empty() {
+        None
+    } else {
+        Some(head)
+    }
+}
+
+fn git_is_dirty(root: &str) -> Option<bool> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(["status", "--porcelain", "--untracked-files=normal"])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let dirty = !String::from_utf8_lossy(&output.stdout).trim().is_empty();
+    Some(dirty)
+}
+
+pub struct BuildManifestVerifyReport {
+    pub schema: String,
+    pub input: String,
+    pub output_dir: String,
+    pub packaging_mode: String,
+    pub artifacts_checked: usize,
+}
+
+pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, String> {
+    let source = fs::read_to_string(path)
+        .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
+    let schema = parse_required_toml_string(&source, "manifest_schema", path)?;
+    if schema != "nuis-build-manifest-v1" {
+        return Err(format!(
+            "`{}` has unsupported manifest schema `{}`; expected `nuis-build-manifest-v1`",
+            path.display(),
+            schema
+        ));
+    }
+    let input = parse_required_toml_string(&source, "input", path)?;
+    let output_dir = parse_required_toml_string(&source, "output_dir", path)?;
+    let packaging_mode = parse_required_toml_string(&source, "packaging_mode", path)?;
+
+    let artifacts = parse_artifact_hash_blocks(&source, path)?;
+    if artifacts.is_empty() {
+        return Err(format!(
+            "`{}` does not contain any `[[artifact_hash]]` blocks",
+            path.display()
+        ));
+    }
+
+    for item in &artifacts {
+        let bytes = fs::read(&item.path)
+            .map_err(|error| format!("failed to read artifact `{}`: {error}", item.path))?;
+        if bytes.len() != item.bytes {
+            return Err(format!(
+                "artifact `{}` bytes mismatch for kind `{}`: manifest={}, actual={}",
+                item.path,
+                item.kind,
+                item.bytes,
+                bytes.len()
+            ));
+        }
+        let actual_hash = fnv1a64_hex(&bytes);
+        if actual_hash != item.fnv1a64 {
+            return Err(format!(
+                "artifact `{}` hash mismatch for kind `{}`: manifest={}, actual={}",
+                item.path, item.kind, item.fnv1a64, actual_hash
+            ));
+        }
+    }
+
+    Ok(BuildManifestVerifyReport {
+        schema,
+        input,
+        output_dir,
+        packaging_mode,
+        artifacts_checked: artifacts.len(),
+    })
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ArtifactHashRow {
+    kind: String,
+    path: String,
+    bytes: usize,
+    fnv1a64: String,
+}
+
+fn parse_artifact_hash_blocks(source: &str, path: &Path) -> Result<Vec<ArtifactHashRow>, String> {
+    let mut rows = Vec::new();
+    let mut current = BTreeMap::<String, String>::new();
+    let mut in_block = false;
+    for raw in source.lines() {
+        let line = raw.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        if line == "[[artifact_hash]]" {
+            if in_block {
+                rows.push(parse_artifact_hash_row(&current, path)?);
+                current.clear();
+            }
+            in_block = true;
+            continue;
+        }
+        if line.starts_with('[') {
+            if in_block {
+                rows.push(parse_artifact_hash_row(&current, path)?);
+                current.clear();
+                in_block = false;
+            }
+            continue;
+        }
+        if in_block {
+            if let Some((key, value)) = line.split_once('=') {
+                current.insert(key.trim().to_owned(), value.trim().to_owned());
+            }
+        }
+    }
+    if in_block {
+        rows.push(parse_artifact_hash_row(&current, path)?);
+    }
+    Ok(rows)
+}
+
+fn parse_artifact_hash_row(
+    values: &BTreeMap<String, String>,
+    path: &Path,
+) -> Result<ArtifactHashRow, String> {
+    let kind = parse_required_map_string(values, "kind", path)?;
+    let artifact_path = parse_required_map_string(values, "path", path)?;
+    let bytes = parse_required_map_usize(values, "bytes", path)?;
+    let fnv1a64 = parse_required_map_string(values, "fnv1a64", path)?;
+    Ok(ArtifactHashRow {
+        kind,
+        path: artifact_path,
+        bytes,
+        fnv1a64,
+    })
+}
+
+fn parse_required_toml_string(source: &str, key: &str, path: &Path) -> Result<String, String> {
+    let prefix = format!("{key} = ");
+    for raw in source.lines() {
+        let line = raw.trim();
+        if let Some(rest) = line.strip_prefix(&prefix) {
+            let value = rest.trim();
+            if value.starts_with('"') && value.ends_with('"') && value.len() >= 2 {
+                return Ok(value[1..value.len() - 1].to_owned());
+            }
+            return Err(format!(
+                "`{}` has invalid string value for `{key}`",
+                path.display()
+            ));
+        }
+    }
+    Err(format!(
+        "`{}` is missing required key `{key}`",
+        path.display()
+    ))
+}
+
+fn parse_required_map_string(
+    values: &BTreeMap<String, String>,
+    key: &str,
+    manifest_path: &Path,
+) -> Result<String, String> {
+    let value = values.get(key).ok_or_else(|| {
+        format!(
+            "`{}` artifact_hash block is missing required key `{key}`",
+            manifest_path.display()
+        )
+    })?;
+    if value.starts_with('"') && value.ends_with('"') && value.len() >= 2 {
+        return Ok(value[1..value.len() - 1].to_owned());
+    }
+    Err(format!(
+        "`{}` artifact_hash key `{key}` must be a quoted string",
+        manifest_path.display()
+    ))
+}
+
+fn parse_required_map_usize(
+    values: &BTreeMap<String, String>,
+    key: &str,
+    manifest_path: &Path,
+) -> Result<usize, String> {
+    let value = values.get(key).ok_or_else(|| {
+        format!(
+            "`{}` artifact_hash block is missing required key `{key}`",
+            manifest_path.display()
+        )
+    })?;
+    value.parse::<usize>().map_err(|_| {
+        format!(
+            "`{}` artifact_hash key `{key}` must be an unsigned integer",
+            manifest_path.display()
+        )
     })
 }
 

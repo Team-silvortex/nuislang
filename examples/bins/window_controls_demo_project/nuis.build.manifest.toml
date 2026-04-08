@@ -1,0 +1,60 @@
+manifest_schema = "nuis-build-manifest-v1"
+generated_at_unix = 1775645833
+input = "examples/projects/window_controls_demo"
+output_dir = "examples/bins/window_controls_demo_project"
+packaging_mode = "window-aot-bundle"
+tool_nuisc = "0.1.0"
+engine_version = "0.44.b-draft"
+engine_profile = "aot"
+vcs = "git"
+vcs_dirty = true
+vcs_head = "157afecab83231c1f584e733fb1d4c8a4b9be342"
+vcs_root = "/Users/Shared/chroot/dev/nuislang"
+loaded_nustar = ["official.cpu", "official.data", "official.shader"]
+
+[artifacts]
+ast = "examples/bins/window_controls_demo_project/window_controls_demo.ast.txt"
+nir = "examples/bins/window_controls_demo_project/window_controls_demo.nir.txt"
+yir = "examples/bins/window_controls_demo_project/window_controls_demo.yir"
+llvm_ir = "examples/bins/window_controls_demo_project/window_controls_demo.ll"
+binary = "examples/bins/window_controls_demo_project/window_controls_demo"
+
+[[artifact_hash]]
+kind = "ast"
+path = "examples/bins/window_controls_demo_project/window_controls_demo.ast.txt"
+bytes = 1974
+fnv1a64 = "0xebcd548a192f3ecd"
+
+[[artifact_hash]]
+kind = "nir"
+path = "examples/bins/window_controls_demo_project/window_controls_demo.nir.txt"
+bytes = 2160
+fnv1a64 = "0xe3fa4c197aa5506c"
+
+[[artifact_hash]]
+kind = "yir"
+path = "examples/bins/window_controls_demo_project/window_controls_demo.yir"
+bytes = 13308
+fnv1a64 = "0xdfe35a1c4fbc38f1"
+
+[[artifact_hash]]
+kind = "llvm_ir"
+path = "examples/bins/window_controls_demo_project/window_controls_demo.ll"
+bytes = 4518
+fnv1a64 = "0x028a4ed77e9bd0e3"
+
+[[artifact_hash]]
+kind = "binary"
+path = "examples/bins/window_controls_demo_project/window_controls_demo"
+bytes = 5603352
+fnv1a64 = "0xd7fd22cbc777ea8b"
+
+[project]
+name = "window_controls_demo"
+abi_mode = "explicit"
+abi = ["cpu=cpu.arm64.apple_aapcs64", "data=data.fabric.macos.arm64.v1", "shader=shader.metal.msl2_4"]
+manifest_copy = "examples/bins/window_controls_demo_project/nuis.project.toml"
+modules_index = "examples/bins/window_controls_demo_project/nuis.project.modules.txt"
+links_index = "examples/bins/window_controls_demo_project/nuis.project.links.txt"
+host_ffi_index = "examples/bins/window_controls_demo_project/nuis.project.host_ffi.txt"
+abi_index = "examples/bins/window_controls_demo_project/nuis.project.abi.txt"

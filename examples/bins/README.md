@@ -16,6 +16,7 @@ Current kept bundles:
 Notes:
 
 * These folders may contain generated `.ast.txt`, `.nir.txt`, `.yir`, `.ll`, host stub, and bundle metadata files.
+* All `nuis build` outputs now emit `nuis.build.manifest.toml` with toolchain/profile info, loaded nustar list, effective project ABI mode, and per-artifact FNV-1a hashes.
 * Project builds now also emit `nuis.project.host_ffi.txt` that records the host FFI contract surface used by the project entry.
 * Project builds now also emit `nuis.project.abi.txt` that records required ABI profile locks per domain.
 * Stale duplicate artifacts are periodically cleaned; the canonical output binary should match the folder name.

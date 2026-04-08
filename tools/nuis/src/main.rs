@@ -40,6 +40,28 @@ fn run() -> Result<(), String> {
         cli::CommandKind::LoaderContract { package_id } => {
             nuisc::run(nuisc::CommandKind::LoaderContract { package_id })?;
         }
+        cli::CommandKind::VerifyBuildManifest { manifest } => {
+            nuisc::run(nuisc::CommandKind::VerifyBuildManifest { manifest })?;
+        }
+        cli::CommandKind::ReleaseCheck { input, output_dir } => {
+            println!("release-check: check");
+            nuisc::run(nuisc::CommandKind::Check {
+                input: input.clone(),
+            })?;
+            println!("release-check: build");
+            nuisc::run(nuisc::CommandKind::Compile {
+                input: input.clone(),
+                output_dir: output_dir.clone(),
+            })?;
+            println!("release-check: verify-build-manifest");
+            let manifest = output_dir.join("nuis.build.manifest.toml");
+            nuisc::run(nuisc::CommandKind::VerifyBuildManifest {
+                manifest: manifest.clone(),
+            })?;
+            println!("release-check: ok");
+            println!("  output_dir: {}", output_dir.display());
+            println!("  manifest: {}", manifest.display());
+        }
         cli::CommandKind::Check { input } => {
             nuisc::run(nuisc::CommandKind::Check { input })?;
         }
@@ -77,6 +99,8 @@ fn print_help() {
     println!("  nuis pack-nustar <package-id> <output.nustar>");
     println!("  nuis inspect-nustar <input.nustar>");
     println!("  nuis loader-contract <package-id>");
+    println!("  nuis verify-build-manifest <nuis.build.manifest.toml>");
+    println!("  nuis release-check [input.ns|project-dir|nuis.toml] [output-dir]");
     println!("  nuis rc <status|start|stop|track|projects|versions> [...]");
 }
 
