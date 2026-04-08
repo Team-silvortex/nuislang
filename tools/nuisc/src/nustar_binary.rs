@@ -380,7 +380,7 @@ fn implementation_contract(binary: &NustarBinary, kind: &str) -> ImplementationC
 
 fn render_manifest(manifest: &NustarPackageManifest) -> String {
     format!(
-        "manifest_schema = \"{}\"\npackage_id = \"{}\"\ndomain_family = \"{}\"\nfrontend = \"{}\"\nentry_crate = \"{}\"\nast_entry = \"{}\"\nnir_entry = \"{}\"\nyir_lowering_entry = \"{}\"\npart_verify_entry = \"{}\"\nast_surface = {}\nnir_surface = {}\nyir_lowering = {}\npart_verify = {}\nbinary_extension = \"{}\"\npackage_layout = \"{}\"\nmachine_abi_policy = \"{}\"\nimplementation_kinds = {}\nloader_entry = \"{}\"\nloader_abi = \"{}\"\nhost_ffi_surface = {}\nhost_ffi_abis = {}\nhost_ffi_bridge = \"{}\"\nprofiles = {}\nresource_families = {}\nunit_types = {}\nlowering_targets = {}\nops = {}\n",
+        "manifest_schema = \"{}\"\npackage_id = \"{}\"\ndomain_family = \"{}\"\nfrontend = \"{}\"\nentry_crate = \"{}\"\nast_entry = \"{}\"\nnir_entry = \"{}\"\nyir_lowering_entry = \"{}\"\npart_verify_entry = \"{}\"\nast_surface = {}\nnir_surface = {}\nyir_lowering = {}\npart_verify = {}\nbinary_extension = \"{}\"\npackage_layout = \"{}\"\nmachine_abi_policy = \"{}\"\nimplementation_kinds = {}\nloader_entry = \"{}\"\nloader_abi = \"{}\"\nhost_ffi_surface = {}\nhost_ffi_abis = {}\nhost_ffi_bridge = \"{}\"\nsupport_surface = {}\nsupport_profile_slots = {}\nprofiles = {}\nresource_families = {}\nunit_types = {}\nlowering_targets = {}\nops = {}\n",
         manifest.manifest_schema,
         manifest.package_id,
         manifest.domain_family,
@@ -403,6 +403,8 @@ fn render_manifest(manifest: &NustarPackageManifest) -> String {
         render_array(&manifest.host_ffi_surface),
         render_array(&manifest.host_ffi_abis),
         manifest.host_ffi_bridge,
+        render_array(&manifest.support_surface),
+        render_array(&manifest.support_profile_slots),
         render_array(&manifest.profiles),
         render_array(&manifest.resource_families),
         render_array(&manifest.unit_types),
@@ -482,6 +484,9 @@ fn parse_manifest_text(source: &str, path: &Path) -> Result<NustarPackageManifes
         host_ffi_surface: parse_string_array(source, "host_ffi_surface", path)?,
         host_ffi_abis: parse_string_array(source, "host_ffi_abis", path)?,
         host_ffi_bridge: parse_required_string(source, "host_ffi_bridge", path)?,
+        support_surface: parse_optional_string_array(source, "support_surface").unwrap_or_default(),
+        support_profile_slots: parse_optional_string_array(source, "support_profile_slots")
+            .unwrap_or_default(),
         profiles: parse_string_array(source, "profiles", path)?,
         resource_families: parse_string_array(source, "resource_families", path)?,
         unit_types: parse_string_array(source, "unit_types", path)?,
@@ -545,4 +550,31 @@ fn parse_string_array(source: &str, key: &str, path: &Path) -> Result<Vec<String
         "`{}` is missing required key `{key}`",
         path.display()
     ))
+}
+
+fn parse_optional_string_array(source: &str, key: &str) -> Option<Vec<String>> {
+    let prefix = format!("{key} = ");
+    for raw_line in source.lines() {
+        let line = raw_line.trim();
+        if let Some(rest) = line.strip_prefix(&prefix) {
+            let trimmed = rest.trim();
+            if !(trimmed.starts_with('[') && trimmed.ends_with(']')) {
+                return None;
+            }
+            let inner = &trimmed[1..trimmed.len() - 1];
+            if inner.trim().is_empty() {
+                return Some(Vec::new());
+            }
+            let mut values = Vec::new();
+            for part in inner.split(',') {
+                let item = part.trim();
+                if !(item.starts_with('"') && item.ends_with('"') && item.len() >= 2) {
+                    return None;
+                }
+                values.push(item[1..item.len() - 1].to_owned());
+            }
+            return Some(values);
+        }
+    }
+    None
 }

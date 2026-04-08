@@ -75,6 +75,15 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     println!("  host_ffi_abis: {}", manifest.host_ffi_abis.join(", "));
                     println!("  host_ffi_bridge: {}", manifest.host_ffi_bridge);
                 }
+                if !manifest.support_surface.is_empty() {
+                    println!("  support_surface: {}", manifest.support_surface.join(", "));
+                }
+                if !manifest.support_profile_slots.is_empty() {
+                    println!(
+                        "  support_profile_slots: {}",
+                        manifest.support_profile_slots.join(", ")
+                    );
+                }
                 println!("  profiles: {}", manifest.profiles.join(", "));
                 println!(
                     "  resource_families: {}",
@@ -122,6 +131,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 .collect::<Vec<_>>();
             let plan = registry::plan_bindings(
                 Path::new("nustar-packages"),
+                &artifacts.nir,
                 &artifacts.yir,
                 &artifacts.ast.domain,
                 &artifacts.ast.unit,
@@ -145,6 +155,39 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 println!("  nir_surface: {}", binding.nir_surface.join(", "));
                 println!("  yir_lowering: {}", binding.yir_lowering.join(", "));
                 println!("  part_verify: {}", binding.part_verify.join(", "));
+                if !binding.support_surface.is_empty() {
+                    println!("  support_surface: {}", binding.support_surface.join(", "));
+                }
+                if !binding.support_profile_slots.is_empty() {
+                    println!(
+                        "  support_profile_slots: {}",
+                        binding.support_profile_slots.join(", ")
+                    );
+                }
+                if !binding.matched_support_surface.is_empty() {
+                    println!(
+                        "  matched_support_surface: {}",
+                        binding.matched_support_surface.join(", ")
+                    );
+                }
+                if !binding.matched_support_profile_slots.is_empty() {
+                    println!(
+                        "  matched_support_profile_slots: {}",
+                        binding.matched_support_profile_slots.join(", ")
+                    );
+                }
+                if !binding.covered_support_profile_slots.is_empty() {
+                    println!(
+                        "  covered_support_profile_slots: {}",
+                        binding.covered_support_profile_slots.join(", ")
+                    );
+                }
+                if !binding.uncovered_support_profile_slots.is_empty() {
+                    println!(
+                        "  uncovered_support_profile_slots: {}",
+                        binding.uncovered_support_profile_slots.join(", ")
+                    );
+                }
                 println!(
                     "  registered_units: {}",
                     if binding.registered_units.is_empty() {
@@ -243,6 +286,18 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     binary.manifest.host_ffi_abis.join(", ")
                 );
                 println!("  host_ffi_bridge: {}", binary.manifest.host_ffi_bridge);
+            }
+            if !binary.manifest.support_surface.is_empty() {
+                println!(
+                    "  support_surface: {}",
+                    binary.manifest.support_surface.join(", ")
+                );
+            }
+            if !binary.manifest.support_profile_slots.is_empty() {
+                println!(
+                    "  support_profile_slots: {}",
+                    binary.manifest.support_profile_slots.join(", ")
+                );
             }
             println!("  format_version: {}", binary.format_version);
             println!("  abi: {}", binary.abi_tag);

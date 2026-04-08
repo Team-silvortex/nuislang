@@ -352,28 +352,54 @@ pub fn validate_project_links_against_nir(
     project: &LoadedProject,
     module: &NirModule,
 ) -> Result<(), String> {
+    let mut support_surface_cache = BTreeMap::<String, BTreeSet<String>>::new();
     for link in &project.manifest.links {
         let (from_domain, _from_unit) = split_domain_unit(&link.from)?;
         let (to_domain, to_unit) = split_domain_unit(&link.to)?;
         if from_domain == "cpu" && to_domain == "shader" {
+            let shader_support = support_surface_for_domain(&mut support_surface_cache, "shader")?;
+            require_declared_support_surface(
+                &shader_support,
+                "shader",
+                &to_unit,
+                "shader.profile.render.v1",
+            )?;
             if !nir_uses_shader_profile_render(module, &to_unit) {
                 return Err(format!(
                     "project link `{}` -> `{}` requires CPU entry to use shader_profile_render(\"{}\") at NIR level",
                     link.from, link.to, to_unit
                 ));
             }
+            require_declared_support_surface(
+                &shader_support,
+                "shader",
+                &to_unit,
+                "shader.profile.seed.color.v1",
+            )?;
             if !nir_uses_shader_profile_color_seed(module, &to_unit) {
                 return Err(format!(
                     "project link `{}` -> `{}` requires CPU entry to use shader_profile_color_seed(\"{}\", ...) at NIR level",
                     link.from, link.to, to_unit
                 ));
             }
+            require_declared_support_surface(
+                &shader_support,
+                "shader",
+                &to_unit,
+                "shader.profile.seed.speed.v1",
+            )?;
             if !nir_uses_shader_profile_speed_seed(module, &to_unit) {
                 return Err(format!(
                     "project link `{}` -> `{}` requires CPU entry to use shader_profile_speed_seed(\"{}\", ...) at NIR level",
                     link.from, link.to, to_unit
                 ));
             }
+            require_declared_support_surface(
+                &shader_support,
+                "shader",
+                &to_unit,
+                "shader.profile.seed.radius.v1",
+            )?;
             if !nir_uses_shader_profile_radius_seed(module, &to_unit) {
                 return Err(format!(
                     "project link `{}` -> `{}` requires CPU entry to use shader_profile_radius_seed(\"{}\", ...) at NIR level",
@@ -384,18 +410,37 @@ pub fn validate_project_links_against_nir(
         if let Some(via) = &link.via {
             let (via_domain, via_unit) = split_domain_unit(via)?;
             if via_domain == "data" {
+                let data_support = support_surface_for_domain(&mut support_surface_cache, "data")?;
+                require_declared_support_surface(
+                    &data_support,
+                    "data",
+                    &via_unit,
+                    "data.profile.bind-core.v1",
+                )?;
                 if !nir_uses_data_profile_bind_core(module, &via_unit) {
                     return Err(format!(
                         "project link `{}` -> `{}` via `{}` requires CPU entry to use data_profile_bind_core(\"{}\") at NIR level",
                         link.from, link.to, via, via_unit
                     ));
                 }
+                require_declared_support_surface(
+                    &data_support,
+                    "data",
+                    &via_unit,
+                    "data.profile.send.uplink.v1",
+                )?;
                 if !nir_uses_data_profile_send_uplink(module, &via_unit) {
                     return Err(format!(
                         "project link `{}` -> `{}` via `{}` requires CPU entry to use data_profile_send_uplink(\"{}\") at NIR level",
                         link.from, link.to, via, via_unit
                     ));
                 }
+                require_declared_support_surface(
+                    &data_support,
+                    "data",
+                    &via_unit,
+                    "data.profile.send.downlink.v1",
+                )?;
                 if !nir_uses_data_profile_send_downlink(module, &via_unit) {
                     return Err(format!(
                         "project link `{}` -> `{}` via `{}` requires CPU entry to use data_profile_send_downlink(\"{}\") at NIR level",
@@ -408,61 +453,72 @@ pub fn validate_project_links_against_nir(
     Ok(())
 }
 
+fn support_surface_for_domain(
+    cache: &mut BTreeMap<String, BTreeSet<String>>,
+    domain: &str,
+) -> Result<BTreeSet<String>, String> {
+    if let Some(surface) = cache.get(domain) {
+        return Ok(surface.clone());
+    }
+    let manifest =
+        crate::registry::load_manifest_for_domain(Path::new("nustar-packages"), domain)?;
+    let surface = manifest.support_surface.into_iter().collect::<BTreeSet<_>>();
+    cache.insert(domain.to_owned(), surface.clone());
+    Ok(surface)
+}
+
+fn require_declared_support_surface(
+    declared_surface: &BTreeSet<String>,
+    domain: &str,
+    unit: &str,
+    required_surface: &str,
+) -> Result<(), String> {
+    if declared_surface.contains(required_surface) {
+        return Ok(());
+    }
+    Err(format!(
+        "project {} unit `{}.{}` requires nustar to declare support surface `{}`",
+        domain, domain, unit, required_surface
+    ))
+}
+
+fn support_profile_slots_for_domain(domain: &str) -> Result<BTreeSet<String>, String> {
+    let manifest =
+        crate::registry::load_manifest_for_domain(Path::new("nustar-packages"), domain)?;
+    Ok(manifest
+        .support_profile_slots
+        .into_iter()
+        .collect::<BTreeSet<_>>())
+}
+
+fn require_declared_profile_slot(
+    declared_slots: &BTreeSet<String>,
+    domain: &str,
+    unit: &str,
+    required_slot: &str,
+) -> Result<(), String> {
+    if declared_slots.contains(required_slot) {
+        return Ok(());
+    }
+    Err(format!(
+        "project {} unit `{}.{}` requires nustar to declare profile slot `{}`",
+        domain, domain, unit, required_slot
+    ))
+}
+
 fn validate_shader_profile_for_link(module: &YirModule, endpoint: &str) -> Result<(), String> {
     let (domain, unit) = split_domain_unit(endpoint)?;
     if domain != "shader" {
         return Ok(());
     }
+    let declared_support = support_surface_for_domain(&mut BTreeMap::new(), "shader")?;
+    let declared_slots = support_profile_slots_for_domain("shader")?;
+    for required_surface in shader_support_surface_contract() {
+        require_declared_support_surface(&declared_support, "shader", &unit, required_surface)?;
+    }
 
-    let required = [
-        ("target", resolve_project_profile_target_name("shader", &unit, "target")),
-        (
-            "viewport",
-            resolve_project_profile_target_name("shader", &unit, "viewport"),
-        ),
-        (
-            "pipeline",
-            resolve_project_profile_target_name("shader", &unit, "pipeline"),
-        ),
-        (
-            "vertex_count",
-            resolve_project_profile_target_name("shader", &unit, "vertex_count"),
-        ),
-        (
-            "instance_count",
-            resolve_project_profile_target_name("shader", &unit, "instance_count"),
-        ),
-        (
-            "packet_color_slot",
-            resolve_project_profile_target_name("shader", &unit, "packet_color_slot"),
-        ),
-        (
-            "packet_speed_slot",
-            resolve_project_profile_target_name("shader", &unit, "packet_speed_slot"),
-        ),
-        (
-            "packet_radius_slot",
-            resolve_project_profile_target_name("shader", &unit, "packet_radius_slot"),
-        ),
-        (
-            "packet_tag",
-            resolve_project_profile_target_name("shader", &unit, "packet_tag"),
-        ),
-        (
-            "material_mode",
-            resolve_project_profile_target_name("shader", &unit, "material_mode"),
-        ),
-        (
-            "pass_kind",
-            resolve_project_profile_target_name("shader", &unit, "pass_kind"),
-        ),
-        (
-            "packet_field_count",
-            resolve_project_profile_target_name("shader", &unit, "packet_field_count"),
-        ),
-    ];
-
-    for (slot, node_name) in required {
+    for (slot, node_name) in shader_profile_slot_targets(&unit) {
+        require_declared_profile_slot(&declared_slots, "shader", &unit, slot)?;
         let exists = module.nodes.iter().any(|node| node.name == node_name);
         if !exists {
             return Err(format!(
@@ -974,28 +1030,14 @@ fn validate_data_profile_for_link(module: &YirModule, endpoint: &str) -> Result<
     if domain != "data" {
         return Ok(());
     }
+    let declared_support = support_surface_for_domain(&mut BTreeMap::new(), "data")?;
+    let declared_slots = support_profile_slots_for_domain("data")?;
+    for required_surface in data_support_surface_contract() {
+        require_declared_support_surface(&declared_support, "data", &unit, required_surface)?;
+    }
 
-    let required = [
-        ("bind_core", resolve_project_profile_target_name("data", &unit, "bind_core")),
-        ("window_offset", resolve_project_profile_target_name("data", &unit, "window_offset")),
-        ("uplink_len", resolve_project_profile_target_name("data", &unit, "uplink_len")),
-        ("downlink_len", resolve_project_profile_target_name("data", &unit, "downlink_len")),
-        ("handle_table", resolve_project_profile_target_name("data", &unit, "handle_table")),
-        ("marker:cpu_to_shader", resolve_project_profile_target_name("data", &unit, "marker:cpu_to_shader")),
-        ("marker:shader_to_cpu", resolve_project_profile_target_name("data", &unit, "marker:shader_to_cpu")),
-        ("marker:uplink_pipe", resolve_project_profile_target_name("data", &unit, "marker:uplink_pipe")),
-        ("marker:downlink_pipe", resolve_project_profile_target_name("data", &unit, "marker:downlink_pipe")),
-        ("marker:uplink_pipe_class", resolve_project_profile_target_name("data", &unit, "marker:uplink_pipe_class")),
-        ("marker:downlink_pipe_class", resolve_project_profile_target_name("data", &unit, "marker:downlink_pipe_class")),
-        ("marker:uplink_payload_class", resolve_project_profile_target_name("data", &unit, "marker:uplink_payload_class")),
-        ("marker:downlink_payload_class", resolve_project_profile_target_name("data", &unit, "marker:downlink_payload_class")),
-        ("marker:uplink_payload_shape", resolve_project_profile_target_name("data", &unit, "marker:uplink_payload_shape")),
-        ("marker:downlink_payload_shape", resolve_project_profile_target_name("data", &unit, "marker:downlink_payload_shape")),
-        ("marker:uplink_window_policy", resolve_project_profile_target_name("data", &unit, "marker:uplink_window_policy")),
-        ("marker:downlink_window_policy", resolve_project_profile_target_name("data", &unit, "marker:downlink_window_policy")),
-    ];
-
-    for (slot, node_name) in required {
+    for (slot, node_name) in data_profile_slot_targets(&unit) {
+        require_declared_profile_slot(&declared_slots, "data", &unit, slot)?;
         let exists = module.nodes.iter().any(|node| node.name == node_name);
         if !exists {
             return Err(format!(
@@ -1087,6 +1129,151 @@ fn validate_data_profile_for_link(module: &YirModule, endpoint: &str) -> Result<
 
 fn has_edge_to(module: &YirModule, from: &str, to: &str) -> bool {
     module.edges.iter().any(|edge| edge.from == from && edge.to == to)
+}
+
+fn shader_support_surface_contract() -> &'static [&'static str] {
+    &[
+        "shader.profile.target.v1",
+        "shader.profile.viewport.v1",
+        "shader.profile.pipeline.v1",
+        "shader.profile.draw-budget.v1",
+        "shader.profile.packet-slots.v1",
+        "shader.profile.packet-tag.v1",
+        "shader.profile.material-mode.v1",
+        "shader.profile.pass-kind.v1",
+        "shader.profile.packet-field-count.v1",
+    ]
+}
+
+fn data_support_surface_contract() -> &'static [&'static str] {
+    &[
+        "data.profile.bind-core.v1",
+        "data.profile.handle-table.v1",
+        "data.profile.window-layout.v1",
+        "data.profile.sync-markers.v1",
+        "data.profile.pipe-markers.v1",
+        "data.profile.pipe-class.v1",
+        "data.profile.payload-class.v1",
+        "data.profile.payload-shape.v1",
+        "data.profile.window-policy.v1",
+    ]
+}
+
+fn shader_profile_slot_targets(unit: &str) -> Vec<(&'static str, String)> {
+    vec![
+        ("target", resolve_project_profile_target_name("shader", unit, "target")),
+        (
+            "viewport",
+            resolve_project_profile_target_name("shader", unit, "viewport"),
+        ),
+        (
+            "pipeline",
+            resolve_project_profile_target_name("shader", unit, "pipeline"),
+        ),
+        (
+            "vertex_count",
+            resolve_project_profile_target_name("shader", unit, "vertex_count"),
+        ),
+        (
+            "instance_count",
+            resolve_project_profile_target_name("shader", unit, "instance_count"),
+        ),
+        (
+            "packet_color_slot",
+            resolve_project_profile_target_name("shader", unit, "packet_color_slot"),
+        ),
+        (
+            "packet_speed_slot",
+            resolve_project_profile_target_name("shader", unit, "packet_speed_slot"),
+        ),
+        (
+            "packet_radius_slot",
+            resolve_project_profile_target_name("shader", unit, "packet_radius_slot"),
+        ),
+        (
+            "packet_tag",
+            resolve_project_profile_target_name("shader", unit, "packet_tag"),
+        ),
+        (
+            "material_mode",
+            resolve_project_profile_target_name("shader", unit, "material_mode"),
+        ),
+        (
+            "pass_kind",
+            resolve_project_profile_target_name("shader", unit, "pass_kind"),
+        ),
+        (
+            "packet_field_count",
+            resolve_project_profile_target_name("shader", unit, "packet_field_count"),
+        ),
+    ]
+}
+
+fn data_profile_slot_targets(unit: &str) -> Vec<(&'static str, String)> {
+    vec![
+        ("bind_core", resolve_project_profile_target_name("data", unit, "bind_core")),
+        (
+            "window_offset",
+            resolve_project_profile_target_name("data", unit, "window_offset"),
+        ),
+        ("uplink_len", resolve_project_profile_target_name("data", unit, "uplink_len")),
+        (
+            "downlink_len",
+            resolve_project_profile_target_name("data", unit, "downlink_len"),
+        ),
+        (
+            "handle_table",
+            resolve_project_profile_target_name("data", unit, "handle_table"),
+        ),
+        (
+            "marker:cpu_to_shader",
+            resolve_project_profile_target_name("data", unit, "marker:cpu_to_shader"),
+        ),
+        (
+            "marker:shader_to_cpu",
+            resolve_project_profile_target_name("data", unit, "marker:shader_to_cpu"),
+        ),
+        (
+            "marker:uplink_pipe",
+            resolve_project_profile_target_name("data", unit, "marker:uplink_pipe"),
+        ),
+        (
+            "marker:downlink_pipe",
+            resolve_project_profile_target_name("data", unit, "marker:downlink_pipe"),
+        ),
+        (
+            "marker:uplink_pipe_class",
+            resolve_project_profile_target_name("data", unit, "marker:uplink_pipe_class"),
+        ),
+        (
+            "marker:downlink_pipe_class",
+            resolve_project_profile_target_name("data", unit, "marker:downlink_pipe_class"),
+        ),
+        (
+            "marker:uplink_payload_class",
+            resolve_project_profile_target_name("data", unit, "marker:uplink_payload_class"),
+        ),
+        (
+            "marker:downlink_payload_class",
+            resolve_project_profile_target_name("data", unit, "marker:downlink_payload_class"),
+        ),
+        (
+            "marker:uplink_payload_shape",
+            resolve_project_profile_target_name("data", unit, "marker:uplink_payload_shape"),
+        ),
+        (
+            "marker:downlink_payload_shape",
+            resolve_project_profile_target_name("data", unit, "marker:downlink_payload_shape"),
+        ),
+        (
+            "marker:uplink_window_policy",
+            resolve_project_profile_target_name("data", unit, "marker:uplink_window_policy"),
+        ),
+        (
+            "marker:downlink_window_policy",
+            resolve_project_profile_target_name("data", unit, "marker:downlink_window_policy"),
+        ),
+    ]
 }
 
 fn stitch_shader_profile_edges(module: &mut YirModule) {

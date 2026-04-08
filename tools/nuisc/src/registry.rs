@@ -4,6 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use nuis_semantics::model::{NirExpr, NirModule, NirStmt};
 use yir_core::YirModule;
 
 const INDEX_FILE: &str = "index.toml";
@@ -39,6 +40,8 @@ pub struct NustarPackageManifest {
     pub host_ffi_surface: Vec<String>,
     pub host_ffi_abis: Vec<String>,
     pub host_ffi_bridge: String,
+    pub support_surface: Vec<String>,
+    pub support_profile_slots: Vec<String>,
     pub profiles: Vec<String>,
     pub resource_families: Vec<String>,
     pub unit_types: Vec<String>,
@@ -58,6 +61,12 @@ pub struct NustarBinding {
     pub nir_surface: Vec<String>,
     pub yir_lowering: Vec<String>,
     pub part_verify: Vec<String>,
+    pub support_surface: Vec<String>,
+    pub support_profile_slots: Vec<String>,
+    pub matched_support_surface: Vec<String>,
+    pub matched_support_profile_slots: Vec<String>,
+    pub covered_support_profile_slots: Vec<String>,
+    pub uncovered_support_profile_slots: Vec<String>,
     pub registered_units: Vec<String>,
     pub bound_unit: Option<String>,
     pub used_units: Vec<String>,
@@ -160,6 +169,7 @@ pub fn load_required_manifests(
 
 pub fn plan_bindings(
     root: &Path,
+    nir: &NirModule,
     module: &YirModule,
     domain: &str,
     unit: &str,
@@ -217,6 +227,19 @@ pub fn plan_bindings(
         } else {
             Vec::new()
         };
+        let (matched_support_surface, matched_support_profile_slots) =
+            detect_matched_support_usage(nir, &manifest.domain_family);
+        let covered_support_profile_slots = covered_profile_slots(
+            &manifest.domain_family,
+            &matched_support_surface,
+            &matched_support_profile_slots,
+        );
+        let uncovered_support_profile_slots = manifest
+            .support_profile_slots
+            .iter()
+            .filter(|slot| !covered_support_profile_slots.iter().any(|covered| covered == *slot))
+            .cloned()
+            .collect::<Vec<_>>();
 
         let matched_resources = module
             .resources
@@ -261,6 +284,12 @@ pub fn plan_bindings(
             nir_surface: manifest.nir_surface,
             yir_lowering: manifest.yir_lowering,
             part_verify: manifest.part_verify,
+            support_surface: manifest.support_surface,
+            support_profile_slots: manifest.support_profile_slots,
+            matched_support_surface,
+            matched_support_profile_slots,
+            covered_support_profile_slots,
+            uncovered_support_profile_slots,
             registered_units,
             bound_unit,
             used_units,
@@ -277,6 +306,373 @@ pub fn plan_bindings(
 
     bindings.sort_by(|lhs, rhs| lhs.package_id.cmp(&rhs.package_id));
     Ok(NustarBindingPlan { bindings })
+}
+
+fn covered_profile_slots(
+    domain_family: &str,
+    matched_support_surface: &[String],
+    matched_support_profile_slots: &[String],
+) -> Vec<String> {
+    let mut covered = matched_support_profile_slots
+        .iter()
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    for surface in matched_support_surface {
+        for slot in implied_slots_for_surface(domain_family, surface) {
+            covered.insert(slot.to_string());
+        }
+    }
+    covered.into_iter().collect::<Vec<_>>()
+}
+
+fn implied_slots_for_surface(domain_family: &str, surface: &str) -> &'static [&'static str] {
+    match (domain_family, surface) {
+        ("shader", "shader.profile.render.v1") => {
+            &[
+                "target",
+                "viewport",
+                "pipeline",
+                "vertex_count",
+                "instance_count",
+                "pass_kind",
+                "packet_field_count",
+            ]
+        }
+        ("shader", "shader.profile.seed.color.v1") => {
+            &["packet_color_slot", "material_mode"]
+        }
+        ("shader", "shader.profile.seed.speed.v1") => {
+            &["packet_speed_slot", "packet_tag"]
+        }
+        ("shader", "shader.profile.seed.radius.v1") => {
+            &["packet_radius_slot", "packet_field_count"]
+        }
+        ("shader", "shader.profile.target.v1") => &["target"],
+        ("shader", "shader.profile.viewport.v1") => &["viewport"],
+        ("shader", "shader.profile.pipeline.v1") => &["pipeline"],
+        ("shader", "shader.profile.draw-budget.v1") => &["vertex_count", "instance_count"],
+        ("shader", "shader.profile.packet-slots.v1") => {
+            &["packet_color_slot", "packet_speed_slot", "packet_radius_slot"]
+        }
+        ("shader", "shader.profile.packet-tag.v1") => &["packet_tag"],
+        ("shader", "shader.profile.material-mode.v1") => &["material_mode"],
+        ("shader", "shader.profile.pass-kind.v1") => &["pass_kind"],
+        ("shader", "shader.profile.packet-field-count.v1") => &["packet_field_count"],
+        ("data", "data.profile.bind-core.v1") => &["bind_core"],
+        ("data", "data.profile.send.uplink.v1") => {
+            &[
+                "window_offset",
+                "uplink_len",
+                "marker:cpu_to_shader",
+                "marker:uplink_pipe",
+                "marker:uplink_pipe_class",
+                "marker:uplink_payload_class",
+                "marker:uplink_payload_shape",
+                "marker:uplink_window_policy",
+            ]
+        }
+        ("data", "data.profile.send.downlink.v1") => {
+            &[
+                "window_offset",
+                "downlink_len",
+                "marker:shader_to_cpu",
+                "marker:downlink_pipe",
+                "marker:downlink_pipe_class",
+                "marker:downlink_payload_class",
+                "marker:downlink_payload_shape",
+                "marker:downlink_window_policy",
+            ]
+        }
+        ("data", "data.profile.handle-table.v1") => &["handle_table"],
+        ("data", "data.profile.window-layout.v1") => {
+            &["window_offset", "uplink_len", "downlink_len"]
+        }
+        ("data", "data.profile.sync-markers.v1") => {
+            &["marker:cpu_to_shader", "marker:shader_to_cpu"]
+        }
+        ("data", "data.profile.pipe-markers.v1") => {
+            &["marker:uplink_pipe", "marker:downlink_pipe"]
+        }
+        ("data", "data.profile.pipe-class.v1") => {
+            &["marker:uplink_pipe_class", "marker:downlink_pipe_class"]
+        }
+        ("data", "data.profile.payload-class.v1") => {
+            &["marker:uplink_payload_class", "marker:downlink_payload_class"]
+        }
+        ("data", "data.profile.payload-shape.v1") => {
+            &["marker:uplink_payload_shape", "marker:downlink_payload_shape"]
+        }
+        ("data", "data.profile.window-policy.v1") => {
+            &["marker:uplink_window_policy", "marker:downlink_window_policy"]
+        }
+        _ => &[],
+    }
+}
+
+fn detect_matched_support_usage(
+    module: &NirModule,
+    domain_family: &str,
+) -> (Vec<String>, Vec<String>) {
+    let mut surfaces = BTreeSet::new();
+    let mut slots = BTreeSet::new();
+    for function in &module.functions {
+        for stmt in &function.body {
+            collect_support_usage_stmt(stmt, domain_family, &mut surfaces, &mut slots);
+        }
+    }
+    (
+        surfaces.into_iter().collect::<Vec<_>>(),
+        slots.into_iter().collect::<Vec<_>>(),
+    )
+}
+
+fn collect_support_usage_stmt(
+    stmt: &NirStmt,
+    domain_family: &str,
+    surfaces: &mut BTreeSet<String>,
+    slots: &mut BTreeSet<String>,
+) {
+    match stmt {
+        NirStmt::Let { value, .. }
+        | NirStmt::Const { value, .. }
+        | NirStmt::Print(value)
+        | NirStmt::Expr(value) => {
+            collect_support_usage_expr(value, domain_family, surfaces, slots)
+        }
+        NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            collect_support_usage_expr(condition, domain_family, surfaces, slots);
+            for stmt in then_body {
+                collect_support_usage_stmt(stmt, domain_family, surfaces, slots);
+            }
+            for stmt in else_body {
+                collect_support_usage_stmt(stmt, domain_family, surfaces, slots);
+            }
+        }
+        NirStmt::Return(value) => {
+            if let Some(value) = value {
+                collect_support_usage_expr(value, domain_family, surfaces, slots);
+            }
+        }
+    }
+}
+
+fn collect_support_usage_expr(
+    expr: &NirExpr,
+    domain_family: &str,
+    surfaces: &mut BTreeSet<String>,
+    slots: &mut BTreeSet<String>,
+) {
+    match expr {
+        NirExpr::ShaderProfileTargetRef { .. } if domain_family == "shader" => {
+            surfaces.insert("shader.profile.target.v1".to_owned());
+            slots.insert("target".to_owned());
+        }
+        NirExpr::ShaderProfileViewportRef { .. } if domain_family == "shader" => {
+            surfaces.insert("shader.profile.viewport.v1".to_owned());
+            slots.insert("viewport".to_owned());
+        }
+        NirExpr::ShaderProfilePipelineRef { .. } if domain_family == "shader" => {
+            surfaces.insert("shader.profile.pipeline.v1".to_owned());
+            slots.insert("pipeline".to_owned());
+        }
+        NirExpr::ShaderProfileVertexCountRef { .. } if domain_family == "shader" => {
+            surfaces.insert("shader.profile.draw-budget.v1".to_owned());
+            slots.insert("vertex_count".to_owned());
+        }
+        NirExpr::ShaderProfileInstanceCountRef { .. } if domain_family == "shader" => {
+            surfaces.insert("shader.profile.draw-budget.v1".to_owned());
+            slots.insert("instance_count".to_owned());
+        }
+        NirExpr::ShaderProfilePacketColorSlotRef { .. } if domain_family == "shader" => {
+            surfaces.insert("shader.profile.packet-slots.v1".to_owned());
+            slots.insert("packet_color_slot".to_owned());
+        }
+        NirExpr::ShaderProfilePacketSpeedSlotRef { .. } if domain_family == "shader" => {
+            surfaces.insert("shader.profile.packet-slots.v1".to_owned());
+            slots.insert("packet_speed_slot".to_owned());
+        }
+        NirExpr::ShaderProfilePacketRadiusSlotRef { .. } if domain_family == "shader" => {
+            surfaces.insert("shader.profile.packet-slots.v1".to_owned());
+            slots.insert("packet_radius_slot".to_owned());
+        }
+        NirExpr::ShaderProfilePacketTagRef { .. } if domain_family == "shader" => {
+            surfaces.insert("shader.profile.packet-tag.v1".to_owned());
+            slots.insert("packet_tag".to_owned());
+        }
+        NirExpr::ShaderProfileMaterialModeRef { .. } if domain_family == "shader" => {
+            surfaces.insert("shader.profile.material-mode.v1".to_owned());
+            slots.insert("material_mode".to_owned());
+        }
+        NirExpr::ShaderProfilePassKindRef { .. } if domain_family == "shader" => {
+            surfaces.insert("shader.profile.pass-kind.v1".to_owned());
+            slots.insert("pass_kind".to_owned());
+        }
+        NirExpr::ShaderProfilePacketFieldCountRef { .. } if domain_family == "shader" => {
+            surfaces.insert("shader.profile.packet-field-count.v1".to_owned());
+            slots.insert("packet_field_count".to_owned());
+        }
+        NirExpr::ShaderProfileColorSeed { .. } if domain_family == "shader" => {
+            surfaces.insert("shader.profile.seed.color.v1".to_owned());
+        }
+        NirExpr::ShaderProfileSpeedSeed { .. } if domain_family == "shader" => {
+            surfaces.insert("shader.profile.seed.speed.v1".to_owned());
+        }
+        NirExpr::ShaderProfileRadiusSeed { .. } if domain_family == "shader" => {
+            surfaces.insert("shader.profile.seed.radius.v1".to_owned());
+        }
+        NirExpr::ShaderProfileRender { .. } if domain_family == "shader" => {
+            surfaces.insert("shader.profile.render.v1".to_owned());
+        }
+        NirExpr::DataProfileBindCoreRef { .. } if domain_family == "data" => {
+            surfaces.insert("data.profile.bind-core.v1".to_owned());
+            slots.insert("bind_core".to_owned());
+        }
+        NirExpr::DataProfileWindowOffsetRef { .. } if domain_family == "data" => {
+            surfaces.insert("data.profile.window-layout.v1".to_owned());
+            slots.insert("window_offset".to_owned());
+        }
+        NirExpr::DataProfileUplinkLenRef { .. } if domain_family == "data" => {
+            surfaces.insert("data.profile.window-layout.v1".to_owned());
+            slots.insert("uplink_len".to_owned());
+        }
+        NirExpr::DataProfileDownlinkLenRef { .. } if domain_family == "data" => {
+            surfaces.insert("data.profile.window-layout.v1".to_owned());
+            slots.insert("downlink_len".to_owned());
+        }
+        NirExpr::DataProfileHandleTableRef { .. } if domain_family == "data" => {
+            surfaces.insert("data.profile.handle-table.v1".to_owned());
+            slots.insert("handle_table".to_owned());
+        }
+        NirExpr::DataProfileMarkerRef { tag, .. } if domain_family == "data" => {
+            let (surface, slot) = match tag.as_str() {
+                "cpu_to_shader" | "shader_to_cpu" => ("data.profile.sync-markers.v1", format!("marker:{tag}")),
+                "uplink_pipe" | "downlink_pipe" => ("data.profile.pipe-markers.v1", format!("marker:{tag}")),
+                "uplink_pipe_class" | "downlink_pipe_class" => ("data.profile.pipe-class.v1", format!("marker:{tag}")),
+                "uplink_payload_class" | "downlink_payload_class" => ("data.profile.payload-class.v1", format!("marker:{tag}")),
+                "uplink_payload_shape" | "downlink_payload_shape" => ("data.profile.payload-shape.v1", format!("marker:{tag}")),
+                "uplink_window_policy" | "downlink_window_policy" => ("data.profile.window-policy.v1", format!("marker:{tag}")),
+                _ => ("data.profile.sync-markers.v1", format!("marker:{tag}")),
+            };
+            surfaces.insert(surface.to_owned());
+            slots.insert(slot);
+        }
+        NirExpr::DataProfileSendUplink { .. } if domain_family == "data" => {
+            surfaces.insert("data.profile.send.uplink.v1".to_owned());
+        }
+        NirExpr::DataProfileSendDownlink { .. } if domain_family == "data" => {
+            surfaces.insert("data.profile.send.downlink.v1".to_owned());
+        }
+        _ => {}
+    }
+
+    walk_child_exprs(expr, &mut |child| {
+        collect_support_usage_expr(child, domain_family, surfaces, slots);
+    });
+}
+
+fn walk_child_exprs(expr: &NirExpr, f: &mut dyn FnMut(&NirExpr)) {
+    match expr {
+        NirExpr::Borrow(inner)
+        | NirExpr::Move(inner)
+        | NirExpr::LoadValue(inner)
+        | NirExpr::LoadNext(inner)
+        | NirExpr::BufferLen(inner)
+        | NirExpr::DataOutputPipe(inner)
+        | NirExpr::DataInputPipe(inner)
+        | NirExpr::CpuPresentFrame(inner)
+        | NirExpr::Free(inner)
+        | NirExpr::IsNull(inner) => f(inner),
+        NirExpr::AllocNode { value, next } => {
+            f(value);
+            f(next);
+        }
+        NirExpr::AllocBuffer { len, fill } => {
+            f(len);
+            f(fill);
+        }
+        NirExpr::LoadAt { buffer, index } => {
+            f(buffer);
+            f(index);
+        }
+        NirExpr::StoreValue { target, value } => {
+            f(target);
+            f(value);
+        }
+        NirExpr::StoreNext { target, next } => {
+            f(target);
+            f(next);
+        }
+        NirExpr::StoreAt { buffer, index, value } => {
+            f(buffer);
+            f(index);
+            f(value);
+        }
+        NirExpr::DataCopyWindow { input, offset, len }
+        | NirExpr::DataImmutableWindow { input, offset, len } => {
+            f(input);
+            f(offset);
+            f(len);
+        }
+        NirExpr::ShaderProfileColorSeed { base, delta, .. }
+        | NirExpr::ShaderProfileRadiusSeed { base, delta, .. } => {
+            f(base);
+            f(delta);
+        }
+        NirExpr::ShaderProfileSpeedSeed { delta, scale, base, .. } => {
+            f(delta);
+            f(scale);
+            f(base);
+        }
+        NirExpr::DataProfileSendUplink { input, .. }
+        | NirExpr::DataProfileSendDownlink { input, .. }
+        | NirExpr::ShaderProfileRender { packet: input, .. }
+        | NirExpr::FieldAccess { base: input, .. } => f(input),
+        NirExpr::CpuExternCall { args, .. } | NirExpr::Call { args, .. } => {
+            for arg in args {
+                f(arg);
+            }
+        }
+        NirExpr::MethodCall { receiver, args, .. } => {
+            f(receiver);
+            for arg in args {
+                f(arg);
+            }
+        }
+        NirExpr::StructLiteral { fields, .. } => {
+            for (_, value) in fields {
+                f(value);
+            }
+        }
+        NirExpr::Binary { lhs, rhs, .. } => {
+            f(lhs);
+            f(rhs);
+        }
+        NirExpr::ShaderBeginPass {
+            target,
+            pipeline,
+            viewport,
+        } => {
+            f(target);
+            f(pipeline);
+            f(viewport);
+        }
+        NirExpr::ShaderDrawInstanced {
+            pass,
+            packet,
+            vertex_count,
+            instance_count,
+        } => {
+            f(pass);
+            f(packet);
+            f(vertex_count);
+            f(instance_count);
+        }
+        _ => {}
+    }
 }
 
 pub fn validate_unit_binding(
@@ -383,6 +779,10 @@ fn parse_manifest(source: &str, path: &Path) -> Result<NustarPackageManifest, St
         .unwrap_or_default();
     let host_ffi_bridge = parse_optional_string(source, "host_ffi_bridge")
         .unwrap_or_else(|| "none".to_owned());
+    let support_surface = parse_optional_string_array(source, "support_surface")
+        .unwrap_or_default();
+    let support_profile_slots = parse_optional_string_array(source, "support_profile_slots")
+        .unwrap_or_default();
     let profiles = parse_string_array(source, "profiles", path)?;
     let resource_families = parse_string_array(source, "resource_families", path)?;
     let unit_types = parse_optional_string_array(source, "unit_types").unwrap_or_default();
@@ -412,6 +812,8 @@ fn parse_manifest(source: &str, path: &Path) -> Result<NustarPackageManifest, St
         host_ffi_surface,
         host_ffi_abis,
         host_ffi_bridge,
+        support_surface,
+        support_profile_slots,
         profiles,
         resource_families,
         unit_types,
