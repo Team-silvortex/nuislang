@@ -441,6 +441,8 @@ pub fn validate_project_links_against_yir(
 
         validate_shader_profile_for_link(module, &link.from)?;
         validate_shader_profile_for_link(module, &link.to)?;
+        validate_kernel_profile_for_link(module, &link.from)?;
+        validate_kernel_profile_for_link(module, &link.to)?;
     }
     Ok(())
 }
@@ -512,6 +514,45 @@ pub fn validate_project_links_against_nir(
             if !nir_uses_shader_profile_radius_seed(module, &to_unit) {
                 return Err(format!(
                     "project link `{}` -> `{}` requires CPU entry to use shader_profile_radius_seed(\"{}\", ...) at NIR level",
+                    link.from, link.to, to_unit
+                ));
+            }
+        }
+        if from_domain == "cpu" && to_domain == "kernel" {
+            let kernel_support = support_surface_for_domain(&mut support_surface_cache, "kernel")?;
+            require_declared_support_surface(
+                &kernel_support,
+                "kernel",
+                &to_unit,
+                "kernel.profile.bind-core.v1",
+            )?;
+            if !nir_uses_kernel_profile_bind_core(module, &to_unit) {
+                return Err(format!(
+                    "project link `{}` -> `{}` requires CPU entry to use kernel_profile_bind_core(\"{}\") at NIR level",
+                    link.from, link.to, to_unit
+                ));
+            }
+            require_declared_support_surface(
+                &kernel_support,
+                "kernel",
+                &to_unit,
+                "kernel.profile.queue-depth.v1",
+            )?;
+            if !nir_uses_kernel_profile_queue_depth(module, &to_unit) {
+                return Err(format!(
+                    "project link `{}` -> `{}` requires CPU entry to use kernel_profile_queue_depth(\"{}\") at NIR level",
+                    link.from, link.to, to_unit
+                ));
+            }
+            require_declared_support_surface(
+                &kernel_support,
+                "kernel",
+                &to_unit,
+                "kernel.profile.batch-lanes.v1",
+            )?;
+            if !nir_uses_kernel_profile_batch_lanes(module, &to_unit) {
+                return Err(format!(
+                    "project link `{}` -> `{}` requires CPU entry to use kernel_profile_batch_lanes(\"{}\") at NIR level",
                     link.from, link.to, to_unit
                 ));
             }
@@ -648,6 +689,39 @@ fn validate_shader_profile_for_link(module: &YirModule, endpoint: &str) -> Resul
     Ok(())
 }
 
+fn validate_kernel_profile_for_link(module: &YirModule, endpoint: &str) -> Result<(), String> {
+    let (domain, unit) = split_domain_unit(endpoint)?;
+    if domain != "kernel" {
+        return Ok(());
+    }
+    let declared_support = support_surface_for_domain(&mut BTreeMap::new(), "kernel")?;
+    let declared_slots = support_profile_slots_for_domain("kernel")?;
+    for required_surface in kernel_support_surface_contract() {
+        require_declared_support_surface(&declared_support, "kernel", &unit, required_surface)?;
+    }
+
+    for (slot, node_name) in kernel_profile_slot_targets(&unit) {
+        require_declared_profile_slot(&declared_slots, "kernel", &unit, slot)?;
+        let exists = module.nodes.iter().any(|node| node.name == node_name);
+        if !exists {
+            return Err(format!(
+                "project kernel unit `kernel.{}` requires support profile slot `{}` in YIR",
+                unit, slot
+            ));
+        }
+    }
+
+    let has_kernel_work = module.nodes.iter().any(|node| node.op.module == "kernel");
+    if !has_kernel_work {
+        return Err(format!(
+            "project kernel unit `kernel.{}` requires at least one kernel.* node in YIR",
+            unit
+        ));
+    }
+
+    Ok(())
+}
+
 fn nir_uses_shader_profile_render(module: &NirModule, unit: &str) -> bool {
     module
         .functions
@@ -709,6 +783,27 @@ fn nir_uses_data_profile_send_downlink(module: &NirModule, unit: &str) -> bool {
         .functions
         .iter()
         .any(|function| function.body.iter().any(|stmt| stmt_uses_data_profile_send_downlink(stmt, unit)))
+}
+
+fn nir_uses_kernel_profile_bind_core(module: &NirModule, unit: &str) -> bool {
+    module
+        .functions
+        .iter()
+        .any(|function| function.body.iter().any(|stmt| stmt_uses_kernel_profile_bind_core(stmt, unit)))
+}
+
+fn nir_uses_kernel_profile_queue_depth(module: &NirModule, unit: &str) -> bool {
+    module
+        .functions
+        .iter()
+        .any(|function| function.body.iter().any(|stmt| stmt_uses_kernel_profile_queue_depth(stmt, unit)))
+}
+
+fn nir_uses_kernel_profile_batch_lanes(module: &NirModule, unit: &str) -> bool {
+    module
+        .functions
+        .iter()
+        .any(|function| function.body.iter().any(|stmt| stmt_uses_kernel_profile_batch_lanes(stmt, unit)))
 }
 
 fn stmt_uses_shader_profile_render(stmt: &NirStmt, unit: &str) -> bool {
@@ -936,6 +1031,81 @@ fn stmt_uses_data_profile_send_downlink(stmt: &NirStmt, unit: &str) -> bool {
     }
 }
 
+fn stmt_uses_kernel_profile_bind_core(stmt: &NirStmt, unit: &str) -> bool {
+    match stmt {
+        NirStmt::Let { value, .. }
+        | NirStmt::Const { value, .. }
+        | NirStmt::Print(value)
+        | NirStmt::Expr(value) => expr_uses_kernel_profile_bind_core(value, unit),
+        NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            expr_uses_kernel_profile_bind_core(condition, unit)
+                || then_body
+                    .iter()
+                    .any(|stmt| stmt_uses_kernel_profile_bind_core(stmt, unit))
+                || else_body
+                    .iter()
+                    .any(|stmt| stmt_uses_kernel_profile_bind_core(stmt, unit))
+        }
+        NirStmt::Return(value) => value
+            .as_ref()
+            .is_some_and(|value| expr_uses_kernel_profile_bind_core(value, unit)),
+    }
+}
+
+fn stmt_uses_kernel_profile_queue_depth(stmt: &NirStmt, unit: &str) -> bool {
+    match stmt {
+        NirStmt::Let { value, .. }
+        | NirStmt::Const { value, .. }
+        | NirStmt::Print(value)
+        | NirStmt::Expr(value) => expr_uses_kernel_profile_queue_depth(value, unit),
+        NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            expr_uses_kernel_profile_queue_depth(condition, unit)
+                || then_body
+                    .iter()
+                    .any(|stmt| stmt_uses_kernel_profile_queue_depth(stmt, unit))
+                || else_body
+                    .iter()
+                    .any(|stmt| stmt_uses_kernel_profile_queue_depth(stmt, unit))
+        }
+        NirStmt::Return(value) => value
+            .as_ref()
+            .is_some_and(|value| expr_uses_kernel_profile_queue_depth(value, unit)),
+    }
+}
+
+fn stmt_uses_kernel_profile_batch_lanes(stmt: &NirStmt, unit: &str) -> bool {
+    match stmt {
+        NirStmt::Let { value, .. }
+        | NirStmt::Const { value, .. }
+        | NirStmt::Print(value)
+        | NirStmt::Expr(value) => expr_uses_kernel_profile_batch_lanes(value, unit),
+        NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            expr_uses_kernel_profile_batch_lanes(condition, unit)
+                || then_body
+                    .iter()
+                    .any(|stmt| stmt_uses_kernel_profile_batch_lanes(stmt, unit))
+                || else_body
+                    .iter()
+                    .any(|stmt| stmt_uses_kernel_profile_batch_lanes(stmt, unit))
+        }
+        NirStmt::Return(value) => value
+            .as_ref()
+            .is_some_and(|value| expr_uses_kernel_profile_batch_lanes(value, unit)),
+    }
+}
+
 fn expr_uses_shader_profile_render(expr: &NirExpr, unit: &str) -> bool {
     match expr {
         NirExpr::ShaderProfileRender {
@@ -1097,6 +1267,27 @@ fn expr_uses_data_profile_send_downlink(expr: &NirExpr, unit: &str) -> bool {
     match expr {
         NirExpr::DataProfileSendDownlink { unit: data_unit, .. } => data_unit == unit,
         _ => expr_walk_any(expr, &|inner| expr_uses_data_profile_send_downlink(inner, unit)),
+    }
+}
+
+fn expr_uses_kernel_profile_bind_core(expr: &NirExpr, unit: &str) -> bool {
+    match expr {
+        NirExpr::KernelProfileBindCoreRef { unit: kernel_unit } => kernel_unit == unit,
+        _ => expr_walk_any(expr, &|inner| expr_uses_kernel_profile_bind_core(inner, unit)),
+    }
+}
+
+fn expr_uses_kernel_profile_queue_depth(expr: &NirExpr, unit: &str) -> bool {
+    match expr {
+        NirExpr::KernelProfileQueueDepthRef { unit: kernel_unit } => kernel_unit == unit,
+        _ => expr_walk_any(expr, &|inner| expr_uses_kernel_profile_queue_depth(inner, unit)),
+    }
+}
+
+fn expr_uses_kernel_profile_batch_lanes(expr: &NirExpr, unit: &str) -> bool {
+    match expr {
+        NirExpr::KernelProfileBatchLanesRef { unit: kernel_unit } => kernel_unit == unit,
+        _ => expr_walk_any(expr, &|inner| expr_uses_kernel_profile_batch_lanes(inner, unit)),
     }
 }
 
@@ -1345,6 +1536,15 @@ fn shader_support_surface_contract() -> &'static [&'static str] {
     ]
 }
 
+fn kernel_support_surface_contract() -> &'static [&'static str] {
+    &[
+        "kernel.profile.bind-core.v1",
+        "kernel.profile.queue-depth.v1",
+        "kernel.profile.batch-lanes.v1",
+        "kernel.profile.entry.v1",
+    ]
+}
+
 fn data_support_surface_contract() -> &'static [&'static str] {
     &[
         "data.profile.bind-core.v1",
@@ -1405,6 +1605,23 @@ fn shader_profile_slot_targets(unit: &str) -> Vec<(&'static str, String)> {
         (
             "packet_field_count",
             resolve_project_profile_target_name("shader", unit, "packet_field_count"),
+        ),
+    ]
+}
+
+fn kernel_profile_slot_targets(unit: &str) -> Vec<(&'static str, String)> {
+    vec![
+        (
+            "bind_core",
+            resolve_project_profile_target_name("kernel", unit, "bind_core"),
+        ),
+        (
+            "queue_depth",
+            resolve_project_profile_target_name("kernel", unit, "queue_depth"),
+        ),
+        (
+            "batch_lanes",
+            resolve_project_profile_target_name("kernel", unit, "batch_lanes"),
         ),
     ]
 }
@@ -1542,6 +1759,12 @@ fn apply_support_module_profile(ast: &AstModule, module: &mut YirModule) -> Resu
             ensure_project_resource(module, "shader0", "shader.render");
             for stmt in &profile.body {
                 apply_shader_profile_stmt(ast, stmt, module, &int_bindings)?;
+            }
+        }
+        "kernel" => {
+            ensure_project_resource(module, "kernel0", "kernel.apple");
+            for stmt in &profile.body {
+                apply_kernel_profile_stmt(ast, stmt, module, &int_bindings)?;
             }
         }
         "data" => {
@@ -1699,6 +1922,57 @@ fn apply_data_profile_stmt(
         _ => return Ok(()),
     };
     push_profile_node(module, name, "fabric0", op);
+    Ok(())
+}
+
+fn apply_kernel_profile_stmt(
+    ast: &AstModule,
+    stmt: &AstStmt,
+    module: &mut YirModule,
+    int_bindings: &BTreeMap<String, i64>,
+) -> Result<(), String> {
+    if let Some((node_name, value)) = extract_profile_int_binding(stmt) {
+        let name = format!(
+            "project_profile_{}_{}_{}",
+            sanitize_ident(&ast.domain),
+            sanitize_ident(&ast.unit),
+            sanitize_ident(node_name)
+        );
+        push_profile_node(
+            module,
+            name,
+            "cpu0",
+            Operation {
+                module: "cpu".to_owned(),
+                instruction: "const_i64".to_owned(),
+                args: vec![value.to_string()],
+            },
+        );
+        return Ok(());
+    }
+
+    let Some((node_name, callee, args)) = extract_profile_call(stmt) else {
+        return Ok(());
+    };
+    let name = format!(
+        "project_profile_{}_{}_{}",
+        sanitize_ident(&ast.domain),
+        sanitize_ident(&ast.unit),
+        sanitize_ident(node_name)
+    );
+    let op = match callee {
+        "kernel_target_config" => Operation {
+            module: "kernel".to_owned(),
+            instruction: "target_config".to_owned(),
+            args: vec![
+                expect_text_arg(args, 0, "kernel_target_config")?,
+                expect_text_arg(args, 1, "kernel_target_config")?,
+                expect_profile_int_arg(args, 2, "kernel_target_config", int_bindings)?.to_string(),
+            ],
+        },
+        _ => return Ok(()),
+    };
+    push_profile_node(module, name, "kernel0", op);
     Ok(())
 }
 
@@ -1970,6 +2244,18 @@ fn resolve_project_profile_target_name(domain: &str, unit: &str, slot: &str) -> 
             "project_profile_shader_{}_packet_field_count",
             sanitize_ident(unit)
         ),
+        ("kernel", "bind_core") => format!(
+            "project_profile_kernel_{}_bind_core",
+            sanitize_ident(unit)
+        ),
+        ("kernel", "queue_depth") => format!(
+            "project_profile_kernel_{}_queue_depth",
+            sanitize_ident(unit)
+        ),
+        ("kernel", "batch_lanes") => format!(
+            "project_profile_kernel_{}_batch_lanes",
+            sanitize_ident(unit)
+        ),
         ("data", "bind_core") => format!(
             "project_profile_data_{}_data_bind_core",
             sanitize_ident(unit)
@@ -2028,6 +2314,16 @@ fn stitch_data_profile_edges(module: &mut YirModule) {
             node.op.module == "data"
                 && node.op.instruction == "marker"
                 && node.op.args.first().map(String::as_str) == Some("cpu_to_shader")
+        })
+        .map(|node| node.name.clone())
+        .collect::<Vec<_>>();
+    let cpu_to_kernel_markers = module
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "data"
+                && node.op.instruction == "marker"
+                && node.op.args.first().map(String::as_str) == Some("cpu_to_kernel")
         })
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
@@ -2141,6 +2437,22 @@ fn stitch_data_profile_edges(module: &mut YirModule) {
         })
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
+    let kernel_to_cpu_markers = module
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "data"
+                && node.op.instruction == "marker"
+                && node.op.args.first().map(String::as_str) == Some("kernel_to_cpu")
+        })
+        .map(|node| node.name.clone())
+        .collect::<Vec<_>>();
+    let kernel_nodes = module
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "kernel")
+        .map(|node| node.name.clone())
+        .collect::<Vec<_>>();
     let data_pipe_nodes = module
         .nodes
         .iter()
@@ -2197,6 +2509,16 @@ fn stitch_data_profile_edges(module: &mut YirModule) {
         }
     }
     if let Some(marker) = shader_to_cpu_markers.first() {
+        for pipe in data_pipe_nodes.iter().skip(2).take(2) {
+            push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
+        }
+    }
+    if let Some(marker) = cpu_to_kernel_markers.first() {
+        for pipe in data_pipe_nodes.iter().take(2) {
+            push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
+        }
+    }
+    if let Some(marker) = kernel_to_cpu_markers.first() {
         for pipe in data_pipe_nodes.iter().skip(2).take(2) {
             push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
         }
@@ -2354,6 +2676,30 @@ fn stitch_data_profile_edges(module: &mut YirModule) {
                     &resource_families,
                     &node_resources,
                     len,
+                    pipe,
+                );
+            }
+        }
+    }
+    if !kernel_nodes.is_empty() {
+        for pipe in data_pipe_nodes.iter().take(2) {
+            for kernel_node in &kernel_nodes {
+                push_project_dependency_edge_if_missing(
+                    module,
+                    &resource_families,
+                    &node_resources,
+                    pipe,
+                    kernel_node,
+                );
+            }
+        }
+        for pipe in data_pipe_nodes.iter().skip(2).take(2) {
+            for kernel_node in &kernel_nodes {
+                push_project_dependency_edge_if_missing(
+                    module,
+                    &resource_families,
+                    &node_resources,
+                    kernel_node,
                     pipe,
                 );
             }

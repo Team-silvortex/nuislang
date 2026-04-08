@@ -1593,6 +1593,57 @@ fn lower_call_expr(
                 tag: tag.clone(),
             })
         }
+        "kernel_profile_bind_core" => {
+            let [unit] = args else {
+                return Err("kernel_profile_bind_core(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "kernel_profile_bind_core(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err(
+                    "kernel_profile_bind_core(...) expects a string literal unit name".to_owned()
+                );
+            };
+            Ok(NirExpr::KernelProfileBindCoreRef { unit: unit.clone() })
+        }
+        "kernel_profile_queue_depth" => {
+            let [unit] = args else {
+                return Err("kernel_profile_queue_depth(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "kernel_profile_queue_depth(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err(
+                    "kernel_profile_queue_depth(...) expects a string literal unit name".to_owned()
+                );
+            };
+            Ok(NirExpr::KernelProfileQueueDepthRef { unit: unit.clone() })
+        }
+        "kernel_profile_batch_lanes" => {
+            let [unit] = args else {
+                return Err("kernel_profile_batch_lanes(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "kernel_profile_batch_lanes(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err(
+                    "kernel_profile_batch_lanes(...) expects a string literal unit name".to_owned()
+                );
+            };
+            Ok(NirExpr::KernelProfileBatchLanesRef { unit: unit.clone() })
+        }
         "shader_target" => {
             let [format, width, height] = args else {
                 return Err("shader_target(...) expects 3 args".to_owned());
@@ -1888,6 +1939,9 @@ fn infer_nir_expr_type(
         NirExpr::DataProfileDownlinkLenRef { .. } => Some(i64_type()),
         NirExpr::DataProfileHandleTableRef { .. } => Some(named_type("HandleTable")),
         NirExpr::DataProfileMarkerRef { .. } => Some(named_type("Marker")),
+        NirExpr::KernelProfileBindCoreRef { .. } => Some(i64_type()),
+        NirExpr::KernelProfileQueueDepthRef { .. } => Some(i64_type()),
+        NirExpr::KernelProfileBatchLanesRef { .. } => Some(i64_type()),
         NirExpr::DataProfileSendUplink { input, .. }
         | NirExpr::DataProfileSendDownlink { input, .. } => {
             let window_inner = infer_nir_expr_type(input, bindings, signatures, struct_table)?;

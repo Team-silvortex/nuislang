@@ -42,25 +42,22 @@ int64_t host_mix_tick(int64_t base, int64_t tick) {
     return base + tick;
 }
 
-int64_t HostRenderCurves__color_bias(int64_t value) {
-    return host_color_bias(value);
+int64_t HostRenderCurves__color_bias(int64_t arg0) {
+    return host_color_bias(arg0);
 }
 
-int64_t HostRenderCurves__speed_curve(int64_t value) {
-    return host_speed_curve(value);
+int64_t HostRenderCurves__mix_tick(int64_t arg0, int64_t arg1) {
+    return host_mix_tick(arg0, arg1);
 }
 
-int64_t HostRenderCurves__radius_curve(int64_t value) {
-    return host_radius_curve(value);
+int64_t HostRenderCurves__radius_curve(int64_t arg0) {
+    return host_radius_curve(arg0);
 }
 
-int64_t HostRenderCurves__mix_tick(int64_t base, int64_t tick) {
-    return host_mix_tick(base, tick);
+int64_t HostRenderCurves__speed_curve(int64_t arg0) {
+    return host_speed_curve(arg0);
 }
 
-int64_t HostMath__speed_curve(int64_t value) {
-    return host_speed_curve(value);
-}
 
 int main(void) {
     return (int)nuis_yir_entry();

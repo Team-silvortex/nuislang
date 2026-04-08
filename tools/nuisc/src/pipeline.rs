@@ -212,6 +212,9 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         | NirExpr::DataProfileDownlinkLenRef { .. }
         | NirExpr::DataProfileHandleTableRef { .. }
         | NirExpr::DataProfileMarkerRef { .. }
+        | NirExpr::KernelProfileBindCoreRef { .. }
+        | NirExpr::KernelProfileQueueDepthRef { .. }
+        | NirExpr::KernelProfileBatchLanesRef { .. }
         | NirExpr::ShaderTarget { .. }
         | NirExpr::ShaderViewport { .. }
         | NirExpr::ShaderPipeline { .. } => {}

@@ -711,6 +711,15 @@ fn lower_expr(
         NirExpr::DataProfileMarkerRef { unit, tag } => {
             lower_project_profile_ref(state, "data", unit, &format!("marker:{tag}"))
         }
+        NirExpr::KernelProfileBindCoreRef { unit } => {
+            lower_project_profile_ref(state, "kernel", unit, "bind_core")
+        }
+        NirExpr::KernelProfileQueueDepthRef { unit } => {
+            lower_project_profile_ref(state, "kernel", unit, "queue_depth")
+        }
+        NirExpr::KernelProfileBatchLanesRef { unit } => {
+            lower_project_profile_ref(state, "kernel", unit, "batch_lanes")
+        }
         NirExpr::ShaderTarget {
             format,
             width,

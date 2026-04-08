@@ -480,6 +480,15 @@ fn render_nir_expr(value: &NirExpr) -> String {
                 escape_debug(tag)
             )
         }
+        NirExpr::KernelProfileBindCoreRef { unit } => {
+            format!("kernel_profile_bind_core(\"{}\")", escape_debug(unit))
+        }
+        NirExpr::KernelProfileQueueDepthRef { unit } => {
+            format!("kernel_profile_queue_depth(\"{}\")", escape_debug(unit))
+        }
+        NirExpr::KernelProfileBatchLanesRef { unit } => {
+            format!("kernel_profile_batch_lanes(\"{}\")", escape_debug(unit))
+        }
         NirExpr::DataProfileSendUplink { unit, input } => format!(
             "data_profile_send_uplink(\"{}\", {})",
             escape_debug(unit),

@@ -1,6 +1,11 @@
-use std::{fs, path::Path, process::Command};
+use std::{
+    collections::BTreeMap,
+    fs,
+    path::Path,
+    process::Command,
+};
 
-use nuis_semantics::model::{AstModule, NirModule};
+use nuis_semantics::model::{AstExternFunction, AstModule, AstTypeRef, NirModule};
 use yir_core::YirModule;
 
 use crate::render;
@@ -44,7 +49,7 @@ pub fn write_and_link(
         .map_err(|error| format!("failed to write `{}`: {error}", yir_path.display()))?;
     fs::write(&ll_path, llvm_ir)
         .map_err(|error| format!("failed to write `{}`: {error}", ll_path.display()))?;
-    fs::write(&shim_path, c_shim_source())
+    fs::write(&shim_path, c_shim_source(ast))
         .map_err(|error| format!("failed to write `{}`: {error}", shim_path.display()))?;
 
     let (binary_path, packaging_mode) = if requires_window_bundle(yir) {
@@ -121,8 +126,10 @@ fn compile_native_binary(ll_path: &Path, shim_path: &Path, exe_path: &Path) -> R
     }
 }
 
-fn c_shim_source() -> &'static str {
-    r#"#include <stdint.h>
+fn c_shim_source(ast: &AstModule) -> String {
+    let mut out = String::new();
+    out.push_str(
+        r#"#include <stdint.h>
 #include <stdio.h>
 
 extern int64_t nuis_yir_entry(void);
@@ -165,29 +172,110 @@ int64_t host_radius_curve(int64_t value) {
 int64_t host_mix_tick(int64_t base, int64_t tick) {
     return base + tick;
 }
-
-int64_t HostRenderCurves__color_bias(int64_t value) {
-    return host_color_bias(value);
-}
-
-int64_t HostRenderCurves__speed_curve(int64_t value) {
-    return host_speed_curve(value);
-}
-
-int64_t HostRenderCurves__radius_curve(int64_t value) {
-    return host_radius_curve(value);
-}
-
-int64_t HostRenderCurves__mix_tick(int64_t base, int64_t tick) {
-    return host_mix_tick(base, tick);
-}
-
-int64_t HostMath__speed_curve(int64_t value) {
-    return host_speed_curve(value);
-}
+"#,
+    );
+    for (symbol, function) in collect_host_ffi_symbols(ast) {
+        out.push('\n');
+        out.push_str(&render_host_ffi_stub(&symbol, function));
+    }
+    out.push_str(
+        r#"
 
 int main(void) {
     return (int)nuis_yir_entry();
 }
-"#
+"#,
+    );
+    out
+}
+
+fn collect_host_ffi_symbols(ast: &AstModule) -> BTreeMap<String, AstExternFunction> {
+    let mut out = BTreeMap::new();
+    for function in &ast.externs {
+        out.insert(function.name.clone(), function.clone());
+    }
+    for interface in &ast.extern_interfaces {
+        for method in &interface.methods {
+            out.insert(format!("{}__{}", interface.name, method.name), method.clone());
+        }
+    }
+    out
+}
+
+fn render_host_ffi_stub(symbol: &str, function: AstExternFunction) -> String {
+    let mut signature = String::new();
+    if function.params.is_empty() {
+        signature.push_str("void");
+    } else {
+        let mut first = true;
+        for param in &function.params {
+            if !first {
+                signature.push_str(", ");
+            }
+            first = false;
+            signature.push_str(&format!(
+                "{} {}",
+                c_type_for_ast_type(&param.ty),
+                param.name
+            ));
+        }
+    }
+    let body = if symbol.ends_with("color_bias") {
+        format!("    return host_color_bias({});", arg_name(0, &function))
+    } else if symbol.ends_with("speed_curve") {
+        format!("    return host_speed_curve({});", arg_name(0, &function))
+    } else if symbol.ends_with("radius_curve") {
+        format!("    return host_radius_curve({});", arg_name(0, &function))
+    } else if symbol.ends_with("mix_tick") {
+        format!(
+            "    return host_mix_tick({}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function)
+        )
+    } else {
+        render_generic_host_ffi_body(&function)
+    };
+    format!(
+        "{} {}({}) {{\n{}\n}}\n",
+        c_type_for_ast_type(&function.return_type),
+        symbol,
+        signature,
+        body
+    )
+}
+
+fn arg_name(index: usize, function: &AstExternFunction) -> String {
+    function
+        .params
+        .get(index)
+        .map(|param| param.name.clone())
+        .unwrap_or_else(|| "0".to_owned())
+}
+
+fn render_generic_host_ffi_body(function: &AstExternFunction) -> String {
+    if function.params.is_empty() {
+        return "    return 0;".to_owned();
+    }
+    if function.params.len() == 1 {
+        return format!("    return {};", function.params[0].name);
+    }
+    let mut expr = String::new();
+    for (idx, param) in function.params.iter().enumerate() {
+        if idx > 0 {
+            expr.push_str(" + ");
+        }
+        expr.push_str(&param.name);
+    }
+    format!("    return {};", expr)
+}
+
+fn c_type_for_ast_type(ty: &AstTypeRef) -> &'static str {
+    match ty.name.as_str() {
+        "i32" => "int32_t",
+        "i64" => "int64_t",
+        "f32" => "float",
+        "f64" => "double",
+        "bool" => "int32_t",
+        _ => "int64_t",
+    }
 }

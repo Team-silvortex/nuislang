@@ -566,6 +566,18 @@ fn collect_support_usage_expr(
             surfaces.insert(surface.to_owned());
             slots.insert(slot);
         }
+        NirExpr::KernelProfileBindCoreRef { .. } if domain_family == "kernel" => {
+            surfaces.insert("kernel.profile.bind-core.v1".to_owned());
+            slots.insert("bind_core".to_owned());
+        }
+        NirExpr::KernelProfileQueueDepthRef { .. } if domain_family == "kernel" => {
+            surfaces.insert("kernel.profile.queue-depth.v1".to_owned());
+            slots.insert("queue_depth".to_owned());
+        }
+        NirExpr::KernelProfileBatchLanesRef { .. } if domain_family == "kernel" => {
+            surfaces.insert("kernel.profile.batch-lanes.v1".to_owned());
+            slots.insert("batch_lanes".to_owned());
+        }
         NirExpr::DataProfileSendUplink { .. } if domain_family == "data" => {
             surfaces.insert("data.profile.send.uplink.v1".to_owned());
         }

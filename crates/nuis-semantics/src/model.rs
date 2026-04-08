@@ -407,6 +407,15 @@ pub enum NirExpr {
         unit: String,
         tag: String,
     },
+    KernelProfileBindCoreRef {
+        unit: String,
+    },
+    KernelProfileQueueDepthRef {
+        unit: String,
+    },
+    KernelProfileBatchLanesRef {
+        unit: String,
+    },
     DataProfileSendUplink {
         unit: String,
         input: Box<NirExpr>,
@@ -551,6 +560,9 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::DataProfileDownlinkLenRef { .. }
         | NirExpr::DataProfileHandleTableRef { .. }
         | NirExpr::DataProfileMarkerRef { .. }
+        | NirExpr::KernelProfileBindCoreRef { .. }
+        | NirExpr::KernelProfileQueueDepthRef { .. }
+        | NirExpr::KernelProfileBatchLanesRef { .. }
         | NirExpr::DataProfileSendUplink { .. }
         | NirExpr::DataProfileSendDownlink { .. }
         | NirExpr::CpuExternCall { .. }

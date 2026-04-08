@@ -20,12 +20,25 @@ Recommended starting point:
   explicit uplink/downlink window policy nodes that are stitched into the final
   data-plane graph.
 
+Also included:
+
+* [kernel_tensor_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/kernel_tensor_demo)
+  three-file `cpu + data + kernel` demo:
+  `main.ns`, `kernel_unit.ns`, `fabric_plane.ns`
+  with project links:
+  `cpu.Main -> kernel.KernelUnit via data.FabricPlane`
+  `kernel.KernelUnit -> cpu.Main via data.FabricPlane`
+  and kernel profile slots consumed from CPU via
+  `kernel_profile_bind_core/kernel_profile_queue_depth/kernel_profile_batch_lanes`.
+
 Use:
 
 ```bash
 cargo run -p nuis -- check examples/projects/window_controls_demo
 cargo run -p nuis -- dump-ast examples/projects/window_controls_demo
 cargo run -p nuis -- build examples/projects/window_controls_demo examples/bins/window_controls_demo_project
+cargo run -p nuis -- check examples/projects/kernel_tensor_demo
+cargo run -p nuis -- build examples/projects/kernel_tensor_demo examples/bins/kernel_tensor_demo_project
 ```
 
 Output bundle:

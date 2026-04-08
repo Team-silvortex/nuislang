@@ -1,0 +1,21 @@
+use data FabricPlane;
+use kernel KernelUnit;
+
+mod cpu Main {
+  fn main() {
+    cpu_bind_core(0);
+
+    const seed: i64 = 7;
+    let bind_core: i64 = kernel_profile_bind_core("KernelUnit");
+    let queue_depth: i64 = kernel_profile_queue_depth("KernelUnit");
+    let batch_lanes: i64 = kernel_profile_batch_lanes("KernelUnit");
+    let mixed: i64 = seed + bind_core + queue_depth + batch_lanes;
+
+    data_profile_bind_core("FabricPlane");
+    let handles: HandleTable = data_profile_handle_table("FabricPlane");
+    let uplink: Window = data_profile_send_uplink("FabricPlane", mixed);
+    let downlink: Window = data_profile_send_downlink("FabricPlane", uplink);
+
+    print(downlink);
+  }
+}

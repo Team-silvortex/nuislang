@@ -1,0 +1,7 @@
+name = "kernel_tensor_demo"
+entry = "main.ns"
+modules = ["main.ns", "kernel_unit.ns", "fabric_plane.ns"]
+links = [
+  "cpu.Main -> kernel.KernelUnit via data.FabricPlane",
+  "kernel.KernelUnit -> cpu.Main via data.FabricPlane"
+]

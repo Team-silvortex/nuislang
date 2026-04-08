@@ -1,4 +1,5 @@
 use std::{
+    collections::BTreeMap,
     env, fs,
     path::{Path, PathBuf},
     process::{self, Command},
@@ -39,6 +40,9 @@ fn run() -> Result<(), String> {
         fs::read_to_string(&input).map_err(|error| format!("failed to read `{input}`: {error}"))?;
     let module = yir_syntax::parse_module(&source)?;
     verify_module(&module)?;
+    validate_host_ffi_symbols(&module)?;
+    let host_ffi_symbols = collect_host_ffi_symbols(&module);
+    let host_ffi_stub_source = render_host_ffi_stubs(&module);
 
     let output_dir = PathBuf::from(output_dir);
     fs::create_dir_all(&output_dir)
@@ -59,13 +63,23 @@ fn run() -> Result<(), String> {
     let llvm_ir = emit_module(&module)?;
     fs::write(&ll_path, llvm_ir)
         .map_err(|error| format!("failed to write `{}`: {error}", ll_path.display()))?;
-    fs::write(&shim_path, c_shim_source())
+    fs::write(&shim_path, c_shim_source(&module))
         .map_err(|error| format!("failed to write `{}`: {error}", shim_path.display()))?;
 
     let mut manifest = vec![
         format!("module={input}"),
         format!("llvm_ir={}", ll_path.display()),
     ];
+    if host_ffi_symbols.is_empty() {
+        manifest.push("host_ffi_symbols=none".to_owned());
+    } else {
+        let symbol_list = host_ffi_symbols
+            .iter()
+            .map(|(symbol, arg_count)| format!("{symbol}:{arg_count}"))
+            .collect::<Vec<_>>()
+            .join(",");
+        manifest.push(format!("host_ffi_symbols={symbol_list}"));
+    }
 
     let shader_contract = analyze_shader_lowering(&module);
     let primary_fabric_binding = extract_primary_fabric_binding(&shader_contract);
@@ -177,6 +191,7 @@ fn run() -> Result<(), String> {
                 fabric_boot_plan.len(),
                 &frame_bundle.embedded_ppm_bytes,
                 runtime_frame_support.as_ref(),
+                &host_ffi_stub_source,
             ),
         )
         .map_err(|error| format!("failed to write `{}`: {error}", host_path.display()))?;
@@ -525,8 +540,11 @@ fn bytes_to_c_array(bytes: &[u8]) -> String {
     out
 }
 
-fn c_shim_source() -> &'static str {
-    r#"#include <stdint.h>
+fn c_shim_source(module: &YirModule) -> String {
+    let host_ffi_stubs = render_host_ffi_stubs(module);
+    let mut out = String::new();
+    out.push_str(
+        r#"#include <stdint.h>
 #include <stdio.h>
 
 extern int64_t nuis_yir_entry(void);
@@ -569,31 +587,138 @@ int64_t host_radius_curve(int64_t value) {
 int64_t host_mix_tick(int64_t base, int64_t tick) {
     return base + tick;
 }
-
-int64_t HostRenderCurves__color_bias(int64_t value) {
-    return host_color_bias(value);
-}
-
-int64_t HostRenderCurves__speed_curve(int64_t value) {
-    return host_speed_curve(value);
-}
-
-int64_t HostRenderCurves__radius_curve(int64_t value) {
-    return host_radius_curve(value);
-}
-
-int64_t HostRenderCurves__mix_tick(int64_t base, int64_t tick) {
-    return host_mix_tick(base, tick);
-}
-
-int64_t HostMath__speed_curve(int64_t value) {
-    return host_speed_curve(value);
-}
+"#,
+    );
+    out.push_str(&host_ffi_stubs);
+    out.push_str(
+        r#"
 
 int main(void) {
     return (int)nuis_yir_entry();
 }
-"#
+"#,
+    );
+    out
+}
+
+fn validate_host_ffi_symbols(module: &YirModule) -> Result<(), String> {
+    for node in &module.nodes {
+        if node.op.module != "cpu" || node.op.instruction != "extern_call_i64" {
+            continue;
+        }
+        if node.op.args.len() < 2 {
+            return Err(format!(
+                "cpu.extern_call_i64 node `{}` must include abi and symbol arguments",
+                node.name
+            ));
+        }
+        let abi = node.op.args[0].as_str();
+        if abi != "nurs" && abi != "c" {
+            return Err(format!(
+                "cpu.extern_call_i64 node `{}` uses unsupported abi `{abi}`; expected `nurs` or `c`",
+                node.name
+            ));
+        }
+        let symbol = node.op.args[1].as_str();
+        if symbol.trim().is_empty() {
+            return Err(format!(
+                "cpu.extern_call_i64 node `{}` has an empty symbol name",
+                node.name
+            ));
+        }
+    }
+
+    for (symbol, arg_count) in collect_host_ffi_symbols(module) {
+        let expected = if symbol.ends_with("color_bias")
+            || symbol.ends_with("speed_curve")
+            || symbol.ends_with("radius_curve")
+        {
+            Some(1usize)
+        } else if symbol.ends_with("mix_tick") {
+            Some(2usize)
+        } else {
+            None
+        };
+        if let Some(expected_arg_count) = expected {
+            if arg_count != expected_arg_count {
+                return Err(format!(
+                    "host ffi symbol `{symbol}` expects {expected_arg_count} argument(s) but YIR uses {arg_count}"
+                ));
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn collect_host_ffi_symbols(module: &YirModule) -> BTreeMap<String, usize> {
+    let mut out = BTreeMap::new();
+    for node in &module.nodes {
+        if node.op.module != "cpu" || node.op.instruction != "extern_call_i64" {
+            continue;
+        }
+        if node.op.args.len() < 2 {
+            continue;
+        }
+        let symbol = node.op.args[1].clone();
+        let arg_count = node.op.args.len().saturating_sub(2);
+        out.entry(symbol)
+            .and_modify(|current| {
+                if *current < arg_count {
+                    *current = arg_count;
+                }
+            })
+            .or_insert(arg_count);
+    }
+    out
+}
+
+fn render_host_ffi_stubs(module: &YirModule) -> String {
+    let mut out = String::new();
+    for (symbol, arg_count) in collect_host_ffi_symbols(module) {
+        out.push('\n');
+        out.push_str(&render_host_ffi_stub(&symbol, arg_count));
+    }
+    out
+}
+
+fn render_host_ffi_stub(symbol: &str, arg_count: usize) -> String {
+    let mut signature = String::new();
+    if arg_count == 0 {
+        signature.push_str("void");
+    } else {
+        for index in 0..arg_count {
+            if index > 0 {
+                signature.push_str(", ");
+            }
+            signature.push_str(&format!("int64_t arg{index}"));
+        }
+    }
+
+    let body = if symbol.ends_with("color_bias") && arg_count >= 1 {
+        "    return host_color_bias(arg0);".to_owned()
+    } else if symbol.ends_with("speed_curve") && arg_count >= 1 {
+        "    return host_speed_curve(arg0);".to_owned()
+    } else if symbol.ends_with("radius_curve") && arg_count >= 1 {
+        "    return host_radius_curve(arg0);".to_owned()
+    } else if symbol.ends_with("mix_tick") && arg_count >= 2 {
+        "    return host_mix_tick(arg0, arg1);".to_owned()
+    } else if arg_count == 0 {
+        "    return 0;".to_owned()
+    } else if arg_count == 1 {
+        "    return arg0;".to_owned()
+    } else {
+        let mut expr = String::new();
+        for index in 0..arg_count {
+            if index > 0 {
+                expr.push_str(" + ");
+            }
+            expr.push_str(&format!("arg{index}"));
+        }
+        format!("    return {expr};")
+    };
+
+    format!("int64_t {symbol}({signature}) {{\n{body}\n}}\n")
 }
 
 fn maybe_prepare_embedded_runtime_support(
@@ -651,6 +776,7 @@ fn objc_host_source(
     fabric_boot_plan_len: usize,
     embedded_ppm_bytes: &str,
     runtime_frame_support: Option<&RuntimeFrameSupport>,
+    host_ffi_stubs: &str,
 ) -> String {
     let affinity_tag = fabric_worker_core
         .map(|core| core.saturating_add(1))
@@ -929,26 +1055,7 @@ int64_t host_radius_curve(int64_t value) {{
 int64_t host_mix_tick(int64_t base, int64_t tick) {{
     return base + tick;
 }}
-
-int64_t HostRenderCurves__color_bias(int64_t value) {{
-    return host_color_bias(value);
-}}
-
-int64_t HostRenderCurves__speed_curve(int64_t value) {{
-    return host_speed_curve(value);
-}}
-
-int64_t HostRenderCurves__radius_curve(int64_t value) {{
-    return host_radius_curve(value);
-}}
-
-int64_t HostRenderCurves__mix_tick(int64_t base, int64_t tick) {{
-    return host_mix_tick(base, tick);
-}}
-
-int64_t HostMath__speed_curve(int64_t value) {{
-    return host_speed_curve(value);
-}}
+{host_ffi_stubs}
 {runtime_support}
 {ppm_support}
 
