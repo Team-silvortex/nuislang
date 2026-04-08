@@ -22,6 +22,7 @@ edge dep projected biased
 edge dep bias biased
 edge dep biased activated
 edge dep activated kernel_trace
+edge xfer kernel_trace host_tensor
 edge xfer activated host_tensor
 edge dep host_tensor host_trace
 edge effect activated kernel_trace

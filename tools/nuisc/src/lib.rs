@@ -508,6 +508,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 println!("project_manifest: {}", metadata.manifest_copy_path);
                 println!("project_modules: {}", metadata.modules_index_path);
                 println!("project_links: {}", metadata.links_index_path);
+                println!("project_host_ffi: {}", metadata.host_ffi_index_path);
             }
         }
     }

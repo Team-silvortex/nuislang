@@ -382,6 +382,12 @@ pub enum NirExpr {
         base: Box<NirExpr>,
         delta: Box<NirExpr>,
     },
+    ShaderProfilePacket {
+        unit: String,
+        color: Box<NirExpr>,
+        speed: Box<NirExpr>,
+        radius: Box<NirExpr>,
+    },
     DataProfileBindCoreRef {
         unit: String,
     },
@@ -538,6 +544,7 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::ShaderProfileColorSeed { .. }
         | NirExpr::ShaderProfileSpeedSeed { .. }
         | NirExpr::ShaderProfileRadiusSeed { .. }
+        | NirExpr::ShaderProfilePacket { .. }
         | NirExpr::DataProfileBindCoreRef { .. }
         | NirExpr::DataProfileWindowOffsetRef { .. }
         | NirExpr::DataProfileUplinkLenRef { .. }

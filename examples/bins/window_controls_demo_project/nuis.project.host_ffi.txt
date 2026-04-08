@@ -1,0 +1,4 @@
+main.ns	mod cpu Main	abi=nurs	interface=HostRenderCurves	symbol=HostRenderCurves__color_bias	signature=fn color_bias(value: i64) -> i64
+main.ns	mod cpu Main	abi=nurs	interface=HostRenderCurves	symbol=HostRenderCurves__speed_curve	signature=fn speed_curve(value: i64) -> i64
+main.ns	mod cpu Main	abi=nurs	interface=HostRenderCurves	symbol=HostRenderCurves__radius_curve	signature=fn radius_curve(value: i64) -> i64
+main.ns	mod cpu Main	abi=nurs	interface=HostRenderCurves	symbol=HostRenderCurves__mix_tick	signature=fn mix_tick(base: i64, tick: i64) -> i64

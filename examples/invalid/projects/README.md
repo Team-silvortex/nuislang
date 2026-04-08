@@ -13,5 +13,7 @@ cargo run -p nuis -- check examples/invalid/projects/bad_data_profile_missing_pa
 cargo run -p nuis -- check examples/invalid/projects/bad_data_profile_missing_payload_shape
 cargo run -p nuis -- check examples/invalid/projects/bad_nir_surface_missing_shader_render
 cargo run -p nuis -- check examples/invalid/projects/bad_nir_surface_missing_data_send
+cargo run -p nuis -- check examples/invalid/projects/bad_nir_surface_missing_data_handle_table
 cargo run -p nuis -- check examples/invalid/projects/bad_nir_surface_missing_shader_seed
+cargo run -p nuis -- check examples/invalid/projects/bad_nir_surface_missing_shader_packet
 ```

@@ -9,12 +9,6 @@ extern "nurs" interface HostRenderCurves {
 }
 
 mod cpu Main {
-  struct RenderControls {
-    color: i64,
-    speed: i64,
-    radius_scale: i64
-  }
-
   fn main() {
     cpu_bind_core(0);
     cpu_window(720, 520, "control_panel_demo");
@@ -40,13 +34,15 @@ mod cpu Main {
     let curved_panel_radius: i64 = HostRenderCurves.radius_curve(base_panel_radius);
     let panel_radius: i64 = HostRenderCurves.mix_tick(curved_panel_radius, frame_tick);
 
-    let render_controls: RenderControls = RenderControls {
-      color: panel_color,
-      speed: panel_speed,
-      radius_scale: panel_radius
-    };
+    let render_controls = shader_profile_packet(
+      "SurfaceShader",
+      panel_color,
+      panel_speed,
+      panel_radius
+    );
 
     data_profile_bind_core("FabricPlane");
+    let fabric_handles: HandleTable = data_profile_handle_table("FabricPlane");
     let gpu_packet: Window = data_profile_send_uplink("FabricPlane", render_controls);
     let frame: Frame = shader_profile_render("SurfaceShader", gpu_packet);
 

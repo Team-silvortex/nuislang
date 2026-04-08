@@ -6,10 +6,6 @@ nir mod cpu unit Main
     fn speed_curve(value: i64) -> i64
     fn radius_curve(value: i64) -> i64
     fn mix_tick(base: i64, tick: i64) -> i64
-  struct RenderControls
-    field color: i64
-    field speed: i64
-    field radius_scale: i64
   fn main()
     expr cpu_bind_core(0)
     expr cpu_window(720, 520, "control_panel_demo")
@@ -29,8 +25,9 @@ nir mod cpu unit Main
     let base_panel_radius: i64 = shader_profile_radius_seed("SurfaceShader", base_radius, radius_delta)
     let curved_panel_radius: i64 = extern "nurs" HostRenderCurves::HostRenderCurves__radius_curve(base_panel_radius)
     let panel_radius: i64 = extern "nurs" HostRenderCurves::HostRenderCurves__mix_tick(curved_panel_radius, frame_tick)
-    let render_controls: RenderControls = RenderControls { color: panel_color, speed: panel_speed, radius_scale: panel_radius }
+    let render_controls: SurfaceShaderPacket = shader_profile_packet("SurfaceShader", panel_color, panel_speed, panel_radius)
     expr data_profile_bind_core("FabricPlane")
+    let fabric_handles: HandleTable = data_profile_handle_table("FabricPlane")
     let gpu_packet: Window = data_profile_send_uplink("FabricPlane", render_controls)
     let frame: Frame = shader_profile_render("SurfaceShader", gpu_packet)
     let host_frame: Window = data_profile_send_downlink("FabricPlane", frame)

@@ -347,6 +347,9 @@ fn implied_slots_for_surface(domain_family: &str, surface: &str) -> &'static [&'
         ("shader", "shader.profile.seed.radius.v1") => {
             &["packet_radius_slot", "packet_field_count"]
         }
+        ("shader", "shader.profile.packet.v1") => {
+            &["packet_color_slot", "packet_speed_slot", "packet_radius_slot"]
+        }
         ("shader", "shader.profile.target.v1") => &["target"],
         ("shader", "shader.profile.viewport.v1") => &["viewport"],
         ("shader", "shader.profile.pipeline.v1") => &["pipeline"],
@@ -524,6 +527,9 @@ fn collect_support_usage_expr(
         NirExpr::ShaderProfileRadiusSeed { .. } if domain_family == "shader" => {
             surfaces.insert("shader.profile.seed.radius.v1".to_owned());
         }
+        NirExpr::ShaderProfilePacket { .. } if domain_family == "shader" => {
+            surfaces.insert("shader.profile.packet.v1".to_owned());
+        }
         NirExpr::ShaderProfileRender { .. } if domain_family == "shader" => {
             surfaces.insert("shader.profile.render.v1".to_owned());
         }
@@ -621,6 +627,16 @@ fn walk_child_exprs(expr: &NirExpr, f: &mut dyn FnMut(&NirExpr)) {
         | NirExpr::ShaderProfileRadiusSeed { base, delta, .. } => {
             f(base);
             f(delta);
+        }
+        NirExpr::ShaderProfilePacket {
+            color,
+            speed,
+            radius,
+            ..
+        } => {
+            f(color);
+            f(speed);
+            f(radius);
         }
         NirExpr::ShaderProfileSpeedSeed { delta, scale, base, .. } => {
             f(delta);

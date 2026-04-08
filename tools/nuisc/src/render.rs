@@ -446,6 +446,18 @@ fn render_nir_expr(value: &NirExpr) -> String {
             render_nir_expr(base),
             render_nir_expr(delta)
         ),
+        NirExpr::ShaderProfilePacket {
+            unit,
+            color,
+            speed,
+            radius,
+        } => format!(
+            "shader_profile_packet(\"{}\", {}, {}, {})",
+            escape_debug(unit),
+            render_nir_expr(color),
+            render_nir_expr(speed),
+            render_nir_expr(radius)
+        ),
         NirExpr::DataProfileBindCoreRef { unit } => {
             format!("data_profile_bind_core(\"{}\")", escape_debug(unit))
         }

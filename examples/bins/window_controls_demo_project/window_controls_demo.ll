@@ -88,7 +88,7 @@ define i64 @nuis_yir_entry() {
   %33 = add i64 %32, %7
   %34 = add i64 %33, %31
   %35 = call i64 @HostRenderCurves__color_bias(i64 %34)
-  ; deferred lowering for cpu.struct `struct_37` because field `speed` comes from outside the current CPU LLVM slice
+  ; deferred lowering for cpu.struct `shader_profile_packet_37` because field `speed` comes from outside the current CPU LLVM slice
   ; deferred lowering for data.immutable_window on fabric0 (data.fabric)
   ; deferred lowering for data.output_pipe on fabric0 (data.fabric)
   ; deferred lowering for data.input_pipe on fabric0 (data.fabric)

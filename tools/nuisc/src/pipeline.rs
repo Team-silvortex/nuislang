@@ -233,6 +233,16 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
             collect_instantiated_units_expr(base, units);
             collect_instantiated_units_expr(delta, units);
         }
+        NirExpr::ShaderProfilePacket {
+            color,
+            speed,
+            radius,
+            ..
+        } => {
+            collect_instantiated_units_expr(color, units);
+            collect_instantiated_units_expr(speed, units);
+            collect_instantiated_units_expr(radius, units);
+        }
         NirExpr::Borrow(inner)
         | NirExpr::Move(inner)
         | NirExpr::LoadValue(inner)

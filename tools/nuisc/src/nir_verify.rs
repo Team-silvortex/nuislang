@@ -210,6 +210,16 @@ fn verify_expr(
             verify_expr(base, moved, borrows)?;
             verify_expr(delta, moved, borrows)?;
         }
+        NirExpr::ShaderProfilePacket {
+            color,
+            speed,
+            radius,
+            ..
+        } => {
+            verify_expr(color, moved, borrows)?;
+            verify_expr(speed, moved, borrows)?;
+            verify_expr(radius, moved, borrows)?;
+        }
         NirExpr::ShaderDrawInstanced { pass, packet, .. } => {
             verify_expr(pass, moved, borrows)?;
             verify_expr(packet, moved, borrows)?;
@@ -369,6 +379,16 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
         NirExpr::ShaderProfileRadiusSeed { base, delta, .. } => {
             verify_expr_uses(base, moved)?;
             verify_expr_uses(delta, moved)?;
+        }
+        NirExpr::ShaderProfilePacket {
+            color,
+            speed,
+            radius,
+            ..
+        } => {
+            verify_expr_uses(color, moved)?;
+            verify_expr_uses(speed, moved)?;
+            verify_expr_uses(radius, moved)?;
         }
         NirExpr::ShaderDrawInstanced { pass, packet, .. } => {
             verify_expr_uses(pass, moved)?;

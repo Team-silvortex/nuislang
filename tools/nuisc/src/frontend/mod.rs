@@ -1209,6 +1209,52 @@ fn lower_call_expr(
                 delta: Box::new(delta),
             })
         }
+        "shader_profile_packet" => {
+            let [unit, color, speed, radius] = args else {
+                return Err("shader_profile_packet(...) expects 4 args".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "shader_profile_packet(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err(
+                    "shader_profile_packet(...) expects a string literal unit name".to_owned(),
+                );
+            };
+            let color = lower_expr(
+                color,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let speed = lower_expr(
+                speed,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let radius = lower_expr(
+                radius,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::ShaderProfilePacket {
+                unit: unit.clone(),
+                color: Box::new(color),
+                speed: Box::new(speed),
+                radius: Box::new(radius),
+            })
+        }
         "shader_profile_packet_color_slot" => {
             let [unit] = args else {
                 return Err("shader_profile_packet_color_slot(...) expects 1 arg".to_owned());
@@ -1833,6 +1879,9 @@ fn infer_nir_expr_type(
         NirExpr::ShaderProfileColorSeed { .. } => Some(i64_type()),
         NirExpr::ShaderProfileSpeedSeed { .. } => Some(i64_type()),
         NirExpr::ShaderProfileRadiusSeed { .. } => Some(i64_type()),
+        NirExpr::ShaderProfilePacket { unit, .. } => {
+            Some(named_type(&format!("{unit}Packet")))
+        }
         NirExpr::DataProfileBindCoreRef { .. } => Some(named_type("Unit")),
         NirExpr::DataProfileWindowOffsetRef { .. } => Some(i64_type()),
         NirExpr::DataProfileUplinkLenRef { .. } => Some(i64_type()),

@@ -347,26 +347,53 @@ fn lower_expr(
             };
             lower_expr(&expanded, state, bindings)
         }
-        NirExpr::DataProfileSendUplink { unit, input } => {
-            let expanded = NirExpr::DataInputPipe(Box::new(NirExpr::DataOutputPipe(Box::new(
-                NirExpr::DataImmutableWindow {
-                    input: Box::new((**input).clone()),
-                    offset: Box::new(NirExpr::DataProfileWindowOffsetRef { unit: unit.clone() }),
-                    len: Box::new(NirExpr::DataProfileUplinkLenRef { unit: unit.clone() }),
+        NirExpr::ShaderProfilePacket {
+            unit,
+            color,
+            speed,
+            radius,
+        } => {
+            let color_name = lower_expr(color, state, bindings)?;
+            let speed_name = lower_expr(speed, state, bindings)?;
+            let radius_name = lower_expr(radius, state, bindings)?;
+            let name = next_name(state, "shader_profile_packet");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "cpu0".to_owned(),
+                op: Operation {
+                    module: "cpu".to_owned(),
+                    instruction: "struct".to_owned(),
+                    args: vec![
+                        format!("{unit}Packet"),
+                        format!("color={color_name}"),
+                        format!("speed={speed_name}"),
+                        format!("radius_scale={radius_name}"),
+                    ],
                 },
-            ))));
-            lower_expr(&expanded, state, bindings)
+            });
+            push_dep_edges(state, &color_name, &name);
+            push_dep_edges(state, &speed_name, &name);
+            push_dep_edges(state, &radius_name, &name);
+            Ok(name)
         }
-        NirExpr::DataProfileSendDownlink { unit, input } => {
-            let expanded = NirExpr::DataInputPipe(Box::new(NirExpr::DataOutputPipe(Box::new(
-                NirExpr::DataCopyWindow {
-                    input: Box::new((**input).clone()),
-                    offset: Box::new(NirExpr::DataProfileWindowOffsetRef { unit: unit.clone() }),
-                    len: Box::new(NirExpr::DataProfileDownlinkLenRef { unit: unit.clone() }),
-                },
-            ))));
-            lower_expr(&expanded, state, bindings)
-        }
+        NirExpr::DataProfileSendUplink { unit, input } => lower_data_profile_send(
+            state,
+            bindings,
+            unit,
+            input,
+            "data_immutable_window",
+            "immutable_window",
+            "uplink_len",
+        ),
+        NirExpr::DataProfileSendDownlink { unit, input } => lower_data_profile_send(
+            state,
+            bindings,
+            unit,
+            input,
+            "data_copy_window",
+            "copy_window",
+            "downlink_len",
+        ),
         NirExpr::ShaderProfileRender { unit, packet } => {
             let expanded = NirExpr::ShaderDrawInstanced {
                 pass: Box::new(NirExpr::ShaderBeginPass {
@@ -1158,6 +1185,71 @@ fn lower_project_profile_ref(
         },
     });
     Ok(name)
+}
+
+fn lower_data_profile_send(
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+    unit: &str,
+    input: &NirExpr,
+    window_prefix: &str,
+    window_instruction: &str,
+    len_slot: &str,
+) -> Result<String, String> {
+    ensure_fabric_resource(state.yir);
+
+    let input_name = lower_expr(input, state, bindings)?;
+    let offset_name = lower_project_profile_ref(state, "data", unit, "window_offset")?;
+    let len_name = lower_project_profile_ref(state, "data", unit, len_slot)?;
+    let handle_table_name = lower_project_profile_ref(state, "data", unit, "handle_table")?;
+
+    let window_name = next_name(state, window_prefix);
+    state.yir.nodes.push(Node {
+        name: window_name.clone(),
+        resource: "fabric0".to_owned(),
+        op: Operation {
+            module: "data".to_owned(),
+            instruction: window_instruction.to_owned(),
+            args: vec![input_name.clone(), offset_name.clone(), len_name.clone()],
+        },
+    });
+    push_dep_edges(state, &input_name, &window_name);
+    push_dep_edges(state, &offset_name, &window_name);
+    push_dep_edges(state, &len_name, &window_name);
+    push_dep_edges(state, &handle_table_name, &window_name);
+
+    let output_name = next_name(state, "data_output_pipe");
+    state.yir.nodes.push(Node {
+        name: output_name.clone(),
+        resource: "fabric0".to_owned(),
+        op: Operation {
+            module: "data".to_owned(),
+            instruction: "output_pipe".to_owned(),
+            args: vec![window_name.clone()],
+        },
+    });
+    push_dep_edges(state, &window_name, &output_name);
+    push_dep_edges(state, &handle_table_name, &output_name);
+
+    let input_pipe_name = next_name(state, "data_input_pipe");
+    state.yir.nodes.push(Node {
+        name: input_pipe_name.clone(),
+        resource: "fabric0".to_owned(),
+        op: Operation {
+            module: "data".to_owned(),
+            instruction: "input_pipe".to_owned(),
+            args: vec![output_name.clone()],
+        },
+    });
+    push_dep_edges(state, &output_name, &input_pipe_name);
+    push_dep_edges(state, &handle_table_name, &input_pipe_name);
+    state.yir.edges.push(Edge {
+        kind: EdgeKind::Effect,
+        from: output_name,
+        to: input_pipe_name.clone(),
+    });
+
+    Ok(input_pipe_name)
 }
 
 fn ensure_fabric_resource(yir: &mut YirModule) {

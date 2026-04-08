@@ -4,7 +4,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use nuis_semantics::model::{AstExpr, AstModule, AstStmt, NirExpr, NirModule, NirStmt};
+use nuis_semantics::model::{
+    AstExpr, AstExternFunction, AstModule, AstStmt, AstTypeRef, NirExpr, NirModule, NirStmt,
+};
 use yir_core::{EdgeKind, Node, Operation, Resource, ResourceKind, YirModule};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -43,6 +45,7 @@ pub struct ProjectBuildMetadata {
     pub manifest_copy_path: String,
     pub modules_index_path: String,
     pub links_index_path: String,
+    pub host_ffi_index_path: String,
 }
 
 pub fn is_project_input(path: &Path) -> bool {
@@ -150,6 +153,7 @@ pub fn write_project_metadata(
     let manifest_copy_path = output_dir.join("nuis.project.toml");
     let modules_index_path = output_dir.join("nuis.project.modules.txt");
     let links_index_path = output_dir.join("nuis.project.links.txt");
+    let host_ffi_index_path = output_dir.join("nuis.project.host_ffi.txt");
     fs::copy(&project.manifest_path, &manifest_copy_path).map_err(|error| {
         format!(
             "failed to copy project manifest `{}` -> `{}`: {error}",
@@ -201,11 +205,104 @@ pub fn write_project_metadata(
             links_index_path.display()
         )
     })?;
+    let host_ffi_index = render_project_host_ffi_index(project);
+    fs::write(&host_ffi_index_path, host_ffi_index).map_err(|error| {
+        format!(
+            "failed to write project host ffi index `{}`: {error}",
+            host_ffi_index_path.display()
+        )
+    })?;
     Ok(ProjectBuildMetadata {
         manifest_copy_path: manifest_copy_path.display().to_string(),
         modules_index_path: modules_index_path.display().to_string(),
         links_index_path: links_index_path.display().to_string(),
+        host_ffi_index_path: host_ffi_index_path.display().to_string(),
     })
+}
+
+fn render_project_host_ffi_index(project: &LoadedProject) -> String {
+    let mut lines = Vec::new();
+    for module in &project.modules {
+        let relative = module
+            .path
+            .strip_prefix(&project.root)
+            .unwrap_or(module.path.as_path())
+            .display()
+            .to_string();
+
+        for function in &module.ast.externs {
+            lines.push(format!(
+                "{}\tmod {} {}\tabi={}\tinterface={}\tsymbol={}\tsignature={}",
+                relative,
+                module.ast.domain,
+                module.ast.unit,
+                function.abi,
+                function.interface.as_deref().unwrap_or("-"),
+                function.name,
+                render_host_ffi_signature(function),
+            ));
+        }
+
+        for interface in &module.ast.extern_interfaces {
+            for method in &interface.methods {
+                lines.push(format!(
+                    "{}\tmod {} {}\tabi={}\tinterface={}\tsymbol={}__{}\tsignature={}",
+                    relative,
+                    module.ast.domain,
+                    module.ast.unit,
+                    interface.abi,
+                    interface.name,
+                    interface.name,
+                    method.name,
+                    render_host_ffi_signature(method),
+                ));
+            }
+        }
+    }
+
+    if lines.is_empty() {
+        String::new()
+    } else {
+        format!("{}\n", lines.join("\n"))
+    }
+}
+
+fn render_host_ffi_signature(function: &AstExternFunction) -> String {
+    let params = function
+        .params
+        .iter()
+        .map(|param| format!("{}: {}", param.name, render_ast_type_ref(&param.ty)))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!(
+        "fn {}({}) -> {}",
+        function.name,
+        params,
+        render_ast_type_ref(&function.return_type)
+    )
+}
+
+fn render_ast_type_ref(ty: &AstTypeRef) -> String {
+    let mut rendered = ty.name.clone();
+    if !ty.generic_args.is_empty() {
+        rendered.push('<');
+        rendered.push_str(
+            &ty.generic_args
+                .iter()
+                .map(render_ast_type_ref)
+                .collect::<Vec<_>>()
+                .join(", "),
+        );
+        rendered.push('>');
+    }
+    if ty.is_optional {
+        rendered.push('?');
+    }
+    if ty.is_ref {
+        format!("ref {rendered}")
+    } else {
+        rendered
+    }
 }
 
 pub fn apply_project_links_to_yir(
@@ -362,6 +459,18 @@ pub fn validate_project_links_against_nir(
                 &shader_support,
                 "shader",
                 &to_unit,
+                "shader.profile.packet.v1",
+            )?;
+            if !nir_uses_shader_profile_packet(module, &to_unit) {
+                return Err(format!(
+                    "project link `{}` -> `{}` requires CPU entry to use shader_profile_packet(\"{}\", ...) at NIR level",
+                    link.from, link.to, to_unit
+                ));
+            }
+            require_declared_support_surface(
+                &shader_support,
+                "shader",
+                &to_unit,
                 "shader.profile.render.v1",
             )?;
             if !nir_uses_shader_profile_render(module, &to_unit) {
@@ -420,6 +529,12 @@ pub fn validate_project_links_against_nir(
                 if !nir_uses_data_profile_bind_core(module, &via_unit) {
                     return Err(format!(
                         "project link `{}` -> `{}` via `{}` requires CPU entry to use data_profile_bind_core(\"{}\") at NIR level",
+                        link.from, link.to, via, via_unit
+                    ));
+                }
+                if !nir_uses_data_profile_handle_table(module, &via_unit) {
+                    return Err(format!(
+                        "project link `{}` -> `{}` via `{}` requires CPU entry to use data_profile_handle_table(\"{}\") at NIR level",
                         link.from, link.to, via, via_unit
                     ));
                 }
@@ -540,6 +655,13 @@ fn nir_uses_shader_profile_render(module: &NirModule, unit: &str) -> bool {
         .any(|function| function.body.iter().any(|stmt| stmt_uses_shader_profile_render(stmt, unit)))
 }
 
+fn nir_uses_shader_profile_packet(module: &NirModule, unit: &str) -> bool {
+    module
+        .functions
+        .iter()
+        .any(|function| function.body.iter().any(|stmt| stmt_uses_shader_profile_packet(stmt, unit)))
+}
+
 fn nir_uses_shader_profile_color_seed(module: &NirModule, unit: &str) -> bool {
     module
         .functions
@@ -566,6 +688,13 @@ fn nir_uses_data_profile_bind_core(module: &NirModule, unit: &str) -> bool {
         .functions
         .iter()
         .any(|function| function.body.iter().any(|stmt| stmt_uses_data_profile_bind_core(stmt, unit)))
+}
+
+fn nir_uses_data_profile_handle_table(module: &NirModule, unit: &str) -> bool {
+    module
+        .functions
+        .iter()
+        .any(|function| function.body.iter().any(|stmt| stmt_uses_data_profile_handle_table(stmt, unit)))
 }
 
 fn nir_uses_data_profile_send_uplink(module: &NirModule, unit: &str) -> bool {
@@ -604,6 +733,31 @@ fn stmt_uses_shader_profile_render(stmt: &NirStmt, unit: &str) -> bool {
         NirStmt::Return(value) => value
             .as_ref()
             .is_some_and(|value| expr_uses_shader_profile_render(value, unit)),
+    }
+}
+
+fn stmt_uses_shader_profile_packet(stmt: &NirStmt, unit: &str) -> bool {
+    match stmt {
+        NirStmt::Let { value, .. }
+        | NirStmt::Const { value, .. }
+        | NirStmt::Print(value)
+        | NirStmt::Expr(value) => expr_uses_shader_profile_packet(value, unit),
+        NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            expr_uses_shader_profile_packet(condition, unit)
+                || then_body
+                    .iter()
+                    .any(|stmt| stmt_uses_shader_profile_packet(stmt, unit))
+                || else_body
+                    .iter()
+                    .any(|stmt| stmt_uses_shader_profile_packet(stmt, unit))
+        }
+        NirStmt::Return(value) => value
+            .as_ref()
+            .is_some_and(|value| expr_uses_shader_profile_packet(value, unit)),
     }
 }
 
@@ -704,6 +858,31 @@ fn stmt_uses_data_profile_bind_core(stmt: &NirStmt, unit: &str) -> bool {
         NirStmt::Return(value) => value
             .as_ref()
             .is_some_and(|value| expr_uses_data_profile_bind_core(value, unit)),
+    }
+}
+
+fn stmt_uses_data_profile_handle_table(stmt: &NirStmt, unit: &str) -> bool {
+    match stmt {
+        NirStmt::Let { value, .. }
+        | NirStmt::Const { value, .. }
+        | NirStmt::Print(value)
+        | NirStmt::Expr(value) => expr_uses_data_profile_handle_table(value, unit),
+        NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            expr_uses_data_profile_handle_table(condition, unit)
+                || then_body
+                    .iter()
+                    .any(|stmt| stmt_uses_data_profile_handle_table(stmt, unit))
+                || else_body
+                    .iter()
+                    .any(|stmt| stmt_uses_data_profile_handle_table(stmt, unit))
+        }
+        NirStmt::Return(value) => value
+            .as_ref()
+            .is_some_and(|value| expr_uses_data_profile_handle_table(value, unit)),
     }
 }
 
@@ -865,6 +1044,13 @@ fn expr_uses_shader_profile_render(expr: &NirExpr, unit: &str) -> bool {
     }
 }
 
+fn expr_uses_shader_profile_packet(expr: &NirExpr, unit: &str) -> bool {
+    match expr {
+        NirExpr::ShaderProfilePacket { unit: shader_unit, .. } => shader_unit == unit,
+        _ => expr_walk_any(expr, &|inner| expr_uses_shader_profile_packet(inner, unit)),
+    }
+}
+
 fn expr_uses_shader_profile_color_seed(expr: &NirExpr, unit: &str) -> bool {
     match expr {
         NirExpr::ShaderProfileColorSeed { unit: shader_unit, .. } => shader_unit == unit,
@@ -890,6 +1076,13 @@ fn expr_uses_data_profile_bind_core(expr: &NirExpr, unit: &str) -> bool {
     match expr {
         NirExpr::DataProfileBindCoreRef { unit: data_unit } => data_unit == unit,
         _ => expr_walk_any(expr, &|inner| expr_uses_data_profile_bind_core(inner, unit)),
+    }
+}
+
+fn expr_uses_data_profile_handle_table(expr: &NirExpr, unit: &str) -> bool {
+    match expr {
+        NirExpr::DataProfileHandleTableRef { unit: data_unit } => data_unit == unit,
+        _ => expr_walk_any(expr, &|inner| expr_uses_data_profile_handle_table(inner, unit)),
     }
 }
 
@@ -946,6 +1139,12 @@ fn expr_walk_any(expr: &NirExpr, predicate: &dyn Fn(&NirExpr) -> bool) -> bool {
             base,
             ..
         } => predicate(delta) || predicate(scale) || predicate(base),
+        NirExpr::ShaderProfilePacket {
+            color,
+            speed,
+            radius,
+            ..
+        } => predicate(color) || predicate(speed) || predicate(radius),
         NirExpr::CpuExternCall { args, .. } | NirExpr::Call { args, .. } => {
             args.iter().any(predicate)
         }
@@ -1133,6 +1332,7 @@ fn has_edge_to(module: &YirModule, from: &str, to: &str) -> bool {
 
 fn shader_support_surface_contract() -> &'static [&'static str] {
     &[
+        "shader.profile.packet.v1",
         "shader.profile.target.v1",
         "shader.profile.viewport.v1",
         "shader.profile.pipeline.v1",

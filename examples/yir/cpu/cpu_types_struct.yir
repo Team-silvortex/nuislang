@@ -28,6 +28,9 @@ edge dep precise config
 edge dep config config_enabled
 edge dep config config_width
 edge dep config config_precise
+edge dep enabled config_enabled
+edge dep width config_width
+edge dep precise config_precise
 edge dep enabled print_enabled
 edge dep width print_width
 edge dep counter print_counter
