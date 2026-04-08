@@ -3,6 +3,7 @@ pub mod cli;
 pub mod codegen_wasm;
 pub mod engine;
 pub mod errors;
+pub mod fmt;
 pub mod frontend;
 pub mod lowering;
 pub mod nir_verify;
@@ -114,6 +115,15 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     manifest.lowering_targets.join(", ")
                 );
                 println!("  ops: {}", manifest.ops.join(", "));
+            }
+        }
+        CommandKind::Fmt { input } => {
+            let report = fmt::format_input(&input)?;
+            println!("formatted nuis input: {}", input.display());
+            println!("  total_files: {}", report.total_files);
+            println!("  changed_files: {}", report.changed_files.len());
+            for file in report.changed_files {
+                println!("  - {}", file);
             }
         }
         CommandKind::Bindings { input } => {

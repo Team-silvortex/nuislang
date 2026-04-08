@@ -5,6 +5,7 @@ pub enum CommandKind {
     Help,
     Status,
     Registry,
+    Fmt { input: PathBuf },
     Bindings { input: PathBuf },
     PackNustar { package_id: String, output: PathBuf },
     InspectNustar { input: PathBuf },
@@ -17,6 +18,8 @@ pub enum CommandKind {
     DumpNir { input: PathBuf },
     DumpYir { input: PathBuf },
     Rc { args: Vec<String> },
+    ProjectStatus { input: PathBuf },
+    ProjectLockAbi { input: PathBuf },
 }
 
 pub fn parse_args<I>(mut args: I) -> Result<CommandKind, String>
@@ -28,6 +31,9 @@ where
         "help" | "--help" | "-h" => Ok(CommandKind::Help),
         "status" => Ok(CommandKind::Status),
         "registry" => Ok(CommandKind::Registry),
+        "fmt" => Ok(CommandKind::Fmt {
+            input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
+        }),
         "bindings" => Ok(CommandKind::Bindings {
             input: PathBuf::from(
                 args.next()
@@ -103,8 +109,14 @@ where
         "rc" => Ok(CommandKind::Rc {
             args: args.collect::<Vec<_>>(),
         }),
+        "project-status" => Ok(CommandKind::ProjectStatus {
+            input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
+        }),
+        "project-lock-abi" => Ok(CommandKind::ProjectLockAbi {
+            input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
+        }),
         other => Err(format!(
-            "unknown nuis command `{other}`; expected `help`, `status`, `registry`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `verify-build-manifest`, `release-check`, `check`, `build`, `dump-ast`, `dump-nir`, `dump-yir`, or `rc`"
+            "unknown nuis command `{other}`; expected `help`, `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `verify-build-manifest`, `release-check`, `check`, `build`, `dump-ast`, `dump-nir`, `dump-yir`, `rc`, `project-status`, or `project-lock-abi`"
         )),
     }
 }

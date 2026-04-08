@@ -1,5 +1,7 @@
 mod cli;
 
+use std::{collections::BTreeSet, fs};
+
 fn main() {
     if let Err(error) = run() {
         eprintln!("{error}");
@@ -27,6 +29,9 @@ fn run() -> Result<(), String> {
         }
         cli::CommandKind::Registry => {
             nuisc::run(nuisc::CommandKind::Registry)?;
+        }
+        cli::CommandKind::Fmt { input } => {
+            nuisc::run(nuisc::CommandKind::Fmt { input })?;
         }
         cli::CommandKind::Bindings { input } => {
             nuisc::run(nuisc::CommandKind::Bindings { input })?;
@@ -80,6 +85,85 @@ fn run() -> Result<(), String> {
         cli::CommandKind::Rc { args } => {
             run_nuis_rc(&args)?;
         }
+        cli::CommandKind::ProjectStatus { input } => {
+            let project = nuisc::project::load_project(&input)?;
+            let resolution = nuisc::project::resolve_project_abi(&project)?;
+            let mut domains = project
+                .modules
+                .iter()
+                .map(|module| module.ast.domain.clone())
+                .collect::<BTreeSet<_>>();
+            for link in &project.manifest.links {
+                if let Some((domain, _)) = link.from.split_once('.') {
+                    domains.insert(domain.to_owned());
+                }
+                if let Some((domain, _)) = link.to.split_once('.') {
+                    domains.insert(domain.to_owned());
+                }
+                if let Some(via) = &link.via {
+                    if let Some((domain, _)) = via.split_once('.') {
+                        domains.insert(domain.to_owned());
+                    }
+                }
+            }
+            println!("project status: {}", project.manifest.name);
+            println!("  root: {}", project.root.display());
+            println!("  manifest: {}", project.manifest_path.display());
+            println!("  entry: {}", project.manifest.entry);
+            println!("  modules: {}", project.modules.len());
+            println!("  links: {}", project.manifest.links.len());
+            println!(
+                "  domains: {}",
+                domains.into_iter().collect::<Vec<_>>().join(", ")
+            );
+            println!(
+                "  abi_mode: {}",
+                if resolution.explicit {
+                    "explicit"
+                } else {
+                    "auto-recommended"
+                }
+            );
+            for item in resolution.requirements {
+                println!("  abi: {}={}", item.domain, item.abi);
+            }
+        }
+        cli::CommandKind::ProjectLockAbi { input } => {
+            let project = nuisc::project::load_project(&input)?;
+            let resolution = nuisc::project::resolve_project_abi(&project)?;
+            let manifest_source = fs::read_to_string(&project.manifest_path).map_err(|error| {
+                format!(
+                    "failed to read `{}`: {error}",
+                    project.manifest_path.display()
+                )
+            })?;
+            let updated = upsert_abi_block(&manifest_source, &resolution.requirements);
+            if updated == manifest_source {
+                println!(
+                    "project abi already locked: {}",
+                    project.manifest_path.display()
+                );
+            } else {
+                fs::write(&project.manifest_path, updated).map_err(|error| {
+                    format!(
+                        "failed to write `{}`: {error}",
+                        project.manifest_path.display()
+                    )
+                })?;
+                println!("locked project abi: {}", project.manifest_path.display());
+            }
+            println!(
+                "  mode: {}",
+                if resolution.explicit {
+                    "explicit (normalized)"
+                } else {
+                    "auto -> explicit"
+                }
+            );
+            for item in resolution.requirements {
+                println!("  abi: {}={}", item.domain, item.abi);
+            }
+        }
     }
 
     Ok(())
@@ -90,6 +174,7 @@ fn print_help() {
     println!("usage:");
     println!("  nuis status");
     println!("  nuis registry");
+    println!("  nuis fmt [input.ns|project-dir|nuis.toml]");
     println!("  nuis bindings <input.ns|project-dir|nuis.toml>");
     println!("  nuis check [input.ns|project-dir|nuis.toml]");
     println!("  nuis build [input.ns|project-dir|nuis.toml] <output-dir>");
@@ -102,6 +187,8 @@ fn print_help() {
     println!("  nuis verify-build-manifest <nuis.build.manifest.toml>");
     println!("  nuis release-check [input.ns|project-dir|nuis.toml] [output-dir]");
     println!("  nuis rc <status|start|stop|track|projects|versions> [...]");
+    println!("  nuis project-status [project-dir|nuis.toml]");
+    println!("  nuis project-lock-abi [project-dir|nuis.toml]");
 }
 
 fn run_nuis_rc(args: &[String]) -> Result<(), String> {
@@ -141,4 +228,68 @@ fn run_nuis_rc(args: &[String]) -> Result<(), String> {
         }
         Err(error) => Err(format!("failed to run nuis-rc: {error}")),
     }
+}
+
+fn upsert_abi_block(
+    source: &str,
+    requirements: &[nuisc::project::ProjectAbiRequirement],
+) -> String {
+    let mut entries = requirements
+        .iter()
+        .map(|item| (item.domain.clone(), item.abi.clone()))
+        .collect::<Vec<_>>();
+    entries.sort_by(|lhs, rhs| lhs.0.cmp(&rhs.0));
+    let block = render_abi_block(&entries);
+
+    if let Some((start, end)) = find_abi_block_span(source) {
+        let mut out = String::new();
+        out.push_str(&source[..start]);
+        out.push_str(&block);
+        out.push_str(&source[end..]);
+        out
+    } else if source.ends_with('\n') {
+        format!("{source}\n{block}")
+    } else {
+        format!("{source}\n\n{block}")
+    }
+}
+
+fn render_abi_block(entries: &[(String, String)]) -> String {
+    let mut out = String::new();
+    out.push_str("abi = [\n");
+    for (domain, abi) in entries {
+        out.push_str(&format!("  \"{}={}\",\n", domain, abi));
+    }
+    out.push_str("]\n");
+    out
+}
+
+fn find_abi_block_span(source: &str) -> Option<(usize, usize)> {
+    let mut offset = 0usize;
+    let mut start = None::<usize>;
+    let mut depth = 0i32;
+    let mut seen_open = false;
+    for line in source.split_inclusive('\n') {
+        let trimmed = line.trim_start();
+        if start.is_none() && trimmed.starts_with("abi") && trimmed.contains('=') {
+            start = Some(offset);
+            depth += line.matches('[').count() as i32;
+            depth -= line.matches(']').count() as i32;
+            seen_open = line.contains('[');
+            if seen_open && depth <= 0 {
+                return Some((start?, offset + line.len()));
+            }
+        } else if start.is_some() {
+            depth += line.matches('[').count() as i32;
+            depth -= line.matches(']').count() as i32;
+            if line.contains('[') {
+                seen_open = true;
+            }
+            if seen_open && depth <= 0 {
+                return Some((start?, offset + line.len()));
+            }
+        }
+        offset += line.len();
+    }
+    start.map(|s| (s, source.len()))
 }

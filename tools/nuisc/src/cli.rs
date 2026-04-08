@@ -4,6 +4,7 @@ use std::path::PathBuf;
 pub enum CommandKind {
     Status,
     Registry,
+    Fmt { input: PathBuf },
     Bindings { input: PathBuf },
     PackNustar { package_id: String, output: PathBuf },
     InspectNustar { input: PathBuf },
@@ -24,6 +25,9 @@ where
     match command.as_str() {
         "status" => Ok(CommandKind::Status),
         "registry" => Ok(CommandKind::Registry),
+        "fmt" => Ok(CommandKind::Fmt {
+            input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
+        }),
         "bindings" => Ok(CommandKind::Bindings {
             input: PathBuf::from(
                 args.next()
@@ -91,7 +95,7 @@ where
             ),
         }),
         other => Err(format!(
-            "unknown nuisc command `{other}`; expected `status`, `registry`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `verify-build-manifest`, `dump-ast`, `dump-nir`, `dump-yir`, `check`, or `compile`"
+            "unknown nuisc command `{other}`; expected `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `verify-build-manifest`, `dump-ast`, `dump-nir`, `dump-yir`, `check`, or `compile`"
         )),
     }
 }
