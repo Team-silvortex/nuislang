@@ -189,6 +189,27 @@ fn verify_expr(
             verify_expr(pipeline, moved, borrows)?;
             verify_expr(viewport, moved, borrows)?;
         }
+        NirExpr::ShaderProfileRender { packet, .. } => {
+            verify_expr(packet, moved, borrows)?;
+        }
+        NirExpr::ShaderProfileColorSeed { base, delta, .. } => {
+            verify_expr(base, moved, borrows)?;
+            verify_expr(delta, moved, borrows)?;
+        }
+        NirExpr::ShaderProfileSpeedSeed {
+            delta,
+            scale,
+            base,
+            ..
+        } => {
+            verify_expr(delta, moved, borrows)?;
+            verify_expr(scale, moved, borrows)?;
+            verify_expr(base, moved, borrows)?;
+        }
+        NirExpr::ShaderProfileRadiusSeed { base, delta, .. } => {
+            verify_expr(base, moved, borrows)?;
+            verify_expr(delta, moved, borrows)?;
+        }
         NirExpr::ShaderDrawInstanced { pass, packet, .. } => {
             verify_expr(pass, moved, borrows)?;
             verify_expr(packet, moved, borrows)?;
@@ -205,6 +226,8 @@ fn verify_expr(
         NirExpr::DataOutputPipe(inner) | NirExpr::DataInputPipe(inner) => {
             verify_expr(inner, moved, borrows)?
         }
+        NirExpr::DataProfileSendUplink { input, .. }
+        | NirExpr::DataProfileSendDownlink { input, .. } => verify_expr(input, moved, borrows)?,
         NirExpr::DataCopyWindow { input, offset, len }
         | NirExpr::DataImmutableWindow { input, offset, len } => {
             verify_expr(input, moved, borrows)?;
@@ -326,6 +349,27 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
             verify_expr_uses(pipeline, moved)?;
             verify_expr_uses(viewport, moved)?;
         }
+        NirExpr::ShaderProfileRender { packet, .. } => {
+            verify_expr_uses(packet, moved)?;
+        }
+        NirExpr::ShaderProfileColorSeed { base, delta, .. } => {
+            verify_expr_uses(base, moved)?;
+            verify_expr_uses(delta, moved)?;
+        }
+        NirExpr::ShaderProfileSpeedSeed {
+            delta,
+            scale,
+            base,
+            ..
+        } => {
+            verify_expr_uses(delta, moved)?;
+            verify_expr_uses(scale, moved)?;
+            verify_expr_uses(base, moved)?;
+        }
+        NirExpr::ShaderProfileRadiusSeed { base, delta, .. } => {
+            verify_expr_uses(base, moved)?;
+            verify_expr_uses(delta, moved)?;
+        }
         NirExpr::ShaderDrawInstanced { pass, packet, .. } => {
             verify_expr_uses(pass, moved)?;
             verify_expr_uses(packet, moved)?;
@@ -342,6 +386,8 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
         NirExpr::DataOutputPipe(inner) | NirExpr::DataInputPipe(inner) => {
             verify_expr_uses(inner, moved)?
         }
+        NirExpr::DataProfileSendUplink { input, .. }
+        | NirExpr::DataProfileSendDownlink { input, .. } => verify_expr_uses(input, moved)?,
         NirExpr::DataCopyWindow { input, offset, len }
         | NirExpr::DataImmutableWindow { input, offset, len } => {
             verify_expr_uses(input, moved)?;

@@ -260,6 +260,130 @@ fn lower_expr(
             push_dep_edges(state, &fill_name, &name);
             Ok(name)
         }
+        NirExpr::ShaderProfileColorSeed { unit, base, delta } => {
+            let expanded = NirExpr::Binary {
+                op: NirBinaryOp::Add,
+                lhs: Box::new(NirExpr::Binary {
+                    op: NirBinaryOp::Add,
+                    lhs: Box::new(NirExpr::Binary {
+                        op: NirBinaryOp::Add,
+                        lhs: Box::new((**base).clone()),
+                        rhs: Box::new((**delta).clone()),
+                    }),
+                    rhs: Box::new(NirExpr::ShaderProfilePacketColorSlotRef {
+                        unit: unit.clone(),
+                    }),
+                }),
+                rhs: Box::new(NirExpr::Binary {
+                    op: NirBinaryOp::Add,
+                    lhs: Box::new(NirExpr::ShaderProfileMaterialModeRef {
+                        unit: unit.clone(),
+                    }),
+                    rhs: Box::new(NirExpr::ShaderProfilePassKindRef {
+                        unit: unit.clone(),
+                    }),
+                }),
+            };
+            lower_expr(&expanded, state, bindings)
+        }
+        NirExpr::ShaderProfileSpeedSeed {
+            unit,
+            delta,
+            scale,
+            base,
+        } => {
+            let expanded = NirExpr::Binary {
+                op: NirBinaryOp::Add,
+                lhs: Box::new(NirExpr::Binary {
+                    op: NirBinaryOp::Add,
+                    lhs: Box::new(NirExpr::Binary {
+                        op: NirBinaryOp::Add,
+                        lhs: Box::new(NirExpr::Binary {
+                            op: NirBinaryOp::Add,
+                            lhs: Box::new(NirExpr::Binary {
+                                op: NirBinaryOp::Mul,
+                                lhs: Box::new((**delta).clone()),
+                                rhs: Box::new((**scale).clone()),
+                            }),
+                            rhs: Box::new((**base).clone()),
+                        }),
+                        rhs: Box::new(NirExpr::ShaderProfileInstanceCountRef {
+                            unit: unit.clone(),
+                        }),
+                    }),
+                    rhs: Box::new(NirExpr::ShaderProfilePacketSpeedSlotRef {
+                        unit: unit.clone(),
+                    }),
+                }),
+                rhs: Box::new(NirExpr::ShaderProfilePacketTagRef {
+                    unit: unit.clone(),
+                }),
+            };
+            lower_expr(&expanded, state, bindings)
+        }
+        NirExpr::ShaderProfileRadiusSeed { unit, base, delta } => {
+            let expanded = NirExpr::Binary {
+                op: NirBinaryOp::Add,
+                lhs: Box::new(NirExpr::Binary {
+                    op: NirBinaryOp::Add,
+                    lhs: Box::new(NirExpr::Binary {
+                        op: NirBinaryOp::Add,
+                        lhs: Box::new(NirExpr::Binary {
+                            op: NirBinaryOp::Add,
+                            lhs: Box::new((**base).clone()),
+                            rhs: Box::new((**delta).clone()),
+                        }),
+                        rhs: Box::new(NirExpr::ShaderProfileVertexCountRef {
+                            unit: unit.clone(),
+                        }),
+                    }),
+                    rhs: Box::new(NirExpr::ShaderProfilePacketRadiusSlotRef {
+                        unit: unit.clone(),
+                    }),
+                }),
+                rhs: Box::new(NirExpr::ShaderProfilePacketFieldCountRef {
+                    unit: unit.clone(),
+                }),
+            };
+            lower_expr(&expanded, state, bindings)
+        }
+        NirExpr::DataProfileSendUplink { unit, input } => {
+            let expanded = NirExpr::DataInputPipe(Box::new(NirExpr::DataOutputPipe(Box::new(
+                NirExpr::DataImmutableWindow {
+                    input: Box::new((**input).clone()),
+                    offset: Box::new(NirExpr::DataProfileWindowOffsetRef { unit: unit.clone() }),
+                    len: Box::new(NirExpr::DataProfileUplinkLenRef { unit: unit.clone() }),
+                },
+            ))));
+            lower_expr(&expanded, state, bindings)
+        }
+        NirExpr::DataProfileSendDownlink { unit, input } => {
+            let expanded = NirExpr::DataInputPipe(Box::new(NirExpr::DataOutputPipe(Box::new(
+                NirExpr::DataCopyWindow {
+                    input: Box::new((**input).clone()),
+                    offset: Box::new(NirExpr::DataProfileWindowOffsetRef { unit: unit.clone() }),
+                    len: Box::new(NirExpr::DataProfileDownlinkLenRef { unit: unit.clone() }),
+                },
+            ))));
+            lower_expr(&expanded, state, bindings)
+        }
+        NirExpr::ShaderProfileRender { unit, packet } => {
+            let expanded = NirExpr::ShaderDrawInstanced {
+                pass: Box::new(NirExpr::ShaderBeginPass {
+                    target: Box::new(NirExpr::ShaderProfileTargetRef { unit: unit.clone() }),
+                    pipeline: Box::new(NirExpr::ShaderProfilePipelineRef { unit: unit.clone() }),
+                    viewport: Box::new(NirExpr::ShaderProfileViewportRef { unit: unit.clone() }),
+                }),
+                packet: Box::new((**packet).clone()),
+                vertex_count: Box::new(NirExpr::ShaderProfileVertexCountRef {
+                    unit: unit.clone(),
+                }),
+                instance_count: Box::new(NirExpr::ShaderProfileInstanceCountRef {
+                    unit: unit.clone(),
+                }),
+            };
+            lower_expr(&expanded, state, bindings)
+        }
         NirExpr::Instantiate { domain, unit } => {
             let name = next_name(state, "instantiate_unit");
             state.yir.nodes.push(Node {

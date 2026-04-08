@@ -366,6 +366,22 @@ pub enum NirExpr {
     ShaderProfilePacketFieldCountRef {
         unit: String,
     },
+    ShaderProfileColorSeed {
+        unit: String,
+        base: Box<NirExpr>,
+        delta: Box<NirExpr>,
+    },
+    ShaderProfileSpeedSeed {
+        unit: String,
+        delta: Box<NirExpr>,
+        scale: Box<NirExpr>,
+        base: Box<NirExpr>,
+    },
+    ShaderProfileRadiusSeed {
+        unit: String,
+        base: Box<NirExpr>,
+        delta: Box<NirExpr>,
+    },
     DataProfileBindCoreRef {
         unit: String,
     },
@@ -384,6 +400,14 @@ pub enum NirExpr {
     DataProfileMarkerRef {
         unit: String,
         tag: String,
+    },
+    DataProfileSendUplink {
+        unit: String,
+        input: Box<NirExpr>,
+    },
+    DataProfileSendDownlink {
+        unit: String,
+        input: Box<NirExpr>,
     },
     ShaderTarget {
         format: String,
@@ -408,6 +432,10 @@ pub enum NirExpr {
         packet: Box<NirExpr>,
         vertex_count: Box<NirExpr>,
         instance_count: Box<NirExpr>,
+    },
+    ShaderProfileRender {
+        unit: String,
+        packet: Box<NirExpr>,
     },
     CpuExternCall {
         abi: String,
@@ -507,18 +535,24 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::ShaderProfileMaterialModeRef { .. }
         | NirExpr::ShaderProfilePassKindRef { .. }
         | NirExpr::ShaderProfilePacketFieldCountRef { .. }
+        | NirExpr::ShaderProfileColorSeed { .. }
+        | NirExpr::ShaderProfileSpeedSeed { .. }
+        | NirExpr::ShaderProfileRadiusSeed { .. }
         | NirExpr::DataProfileBindCoreRef { .. }
         | NirExpr::DataProfileWindowOffsetRef { .. }
         | NirExpr::DataProfileUplinkLenRef { .. }
         | NirExpr::DataProfileDownlinkLenRef { .. }
         | NirExpr::DataProfileHandleTableRef { .. }
         | NirExpr::DataProfileMarkerRef { .. }
+        | NirExpr::DataProfileSendUplink { .. }
+        | NirExpr::DataProfileSendDownlink { .. }
         | NirExpr::CpuExternCall { .. }
         | NirExpr::ShaderTarget { .. }
         | NirExpr::ShaderViewport { .. }
         | NirExpr::ShaderPipeline { .. }
         | NirExpr::ShaderBeginPass { .. }
-        | NirExpr::ShaderDrawInstanced { .. } => None,
+        | NirExpr::ShaderDrawInstanced { .. }
+        | NirExpr::ShaderProfileRender { .. } => None,
         NirExpr::DataOutputPipe(_) => Some(NirGlmProfile {
             result_class: NirGlmValueClass::Val,
             accesses: vec![NirGlmAccess {

@@ -422,6 +422,30 @@ fn render_nir_expr(value: &NirExpr) -> String {
                 escape_debug(unit)
             )
         }
+        NirExpr::ShaderProfileColorSeed { unit, base, delta } => format!(
+            "shader_profile_color_seed(\"{}\", {}, {})",
+            escape_debug(unit),
+            render_nir_expr(base),
+            render_nir_expr(delta)
+        ),
+        NirExpr::ShaderProfileSpeedSeed {
+            unit,
+            delta,
+            scale,
+            base,
+        } => format!(
+            "shader_profile_speed_seed(\"{}\", {}, {}, {})",
+            escape_debug(unit),
+            render_nir_expr(delta),
+            render_nir_expr(scale),
+            render_nir_expr(base)
+        ),
+        NirExpr::ShaderProfileRadiusSeed { unit, base, delta } => format!(
+            "shader_profile_radius_seed(\"{}\", {}, {})",
+            escape_debug(unit),
+            render_nir_expr(base),
+            render_nir_expr(delta)
+        ),
         NirExpr::DataProfileBindCoreRef { unit } => {
             format!("data_profile_bind_core(\"{}\")", escape_debug(unit))
         }
@@ -444,6 +468,16 @@ fn render_nir_expr(value: &NirExpr) -> String {
                 escape_debug(tag)
             )
         }
+        NirExpr::DataProfileSendUplink { unit, input } => format!(
+            "data_profile_send_uplink(\"{}\", {})",
+            escape_debug(unit),
+            render_nir_expr(input)
+        ),
+        NirExpr::DataProfileSendDownlink { unit, input } => format!(
+            "data_profile_send_downlink(\"{}\", {})",
+            escape_debug(unit),
+            render_nir_expr(input)
+        ),
         NirExpr::CpuExternCall {
             abi,
             interface,
@@ -498,6 +532,11 @@ fn render_nir_expr(value: &NirExpr) -> String {
             render_nir_expr(packet),
             render_nir_expr(vertex_count),
             render_nir_expr(instance_count)
+        ),
+        NirExpr::ShaderProfileRender { unit, packet } => format!(
+            "shader_profile_render(\"{}\", {})",
+            escape_debug(unit),
+            render_nir_expr(packet)
         ),
         NirExpr::LoadValue(value) => format!("load_value({})", render_nir_expr(value)),
         NirExpr::LoadNext(value) => format!("load_next({})", render_nir_expr(value)),

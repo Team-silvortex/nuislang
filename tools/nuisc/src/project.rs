@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use nuis_semantics::model::{AstExpr, AstModule, AstStmt};
+use nuis_semantics::model::{AstExpr, AstModule, AstStmt, NirExpr, NirModule, NirStmt};
 use yir_core::{EdgeKind, Node, Operation, Resource, ResourceKind, YirModule};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -265,6 +265,7 @@ pub fn apply_project_support_modules_to_yir(
         apply_support_module_profile(&project_module.ast, module)?;
     }
     resolve_project_profile_refs(module)?;
+    stitch_shader_profile_edges(module);
     stitch_data_profile_edges(module);
     Ok(())
 }
@@ -347,6 +348,66 @@ pub fn validate_project_links_against_yir(
     Ok(())
 }
 
+pub fn validate_project_links_against_nir(
+    project: &LoadedProject,
+    module: &NirModule,
+) -> Result<(), String> {
+    for link in &project.manifest.links {
+        let (from_domain, _from_unit) = split_domain_unit(&link.from)?;
+        let (to_domain, to_unit) = split_domain_unit(&link.to)?;
+        if from_domain == "cpu" && to_domain == "shader" {
+            if !nir_uses_shader_profile_render(module, &to_unit) {
+                return Err(format!(
+                    "project link `{}` -> `{}` requires CPU entry to use shader_profile_render(\"{}\") at NIR level",
+                    link.from, link.to, to_unit
+                ));
+            }
+            if !nir_uses_shader_profile_color_seed(module, &to_unit) {
+                return Err(format!(
+                    "project link `{}` -> `{}` requires CPU entry to use shader_profile_color_seed(\"{}\", ...) at NIR level",
+                    link.from, link.to, to_unit
+                ));
+            }
+            if !nir_uses_shader_profile_speed_seed(module, &to_unit) {
+                return Err(format!(
+                    "project link `{}` -> `{}` requires CPU entry to use shader_profile_speed_seed(\"{}\", ...) at NIR level",
+                    link.from, link.to, to_unit
+                ));
+            }
+            if !nir_uses_shader_profile_radius_seed(module, &to_unit) {
+                return Err(format!(
+                    "project link `{}` -> `{}` requires CPU entry to use shader_profile_radius_seed(\"{}\", ...) at NIR level",
+                    link.from, link.to, to_unit
+                ));
+            }
+        }
+        if let Some(via) = &link.via {
+            let (via_domain, via_unit) = split_domain_unit(via)?;
+            if via_domain == "data" {
+                if !nir_uses_data_profile_bind_core(module, &via_unit) {
+                    return Err(format!(
+                        "project link `{}` -> `{}` via `{}` requires CPU entry to use data_profile_bind_core(\"{}\") at NIR level",
+                        link.from, link.to, via, via_unit
+                    ));
+                }
+                if !nir_uses_data_profile_send_uplink(module, &via_unit) {
+                    return Err(format!(
+                        "project link `{}` -> `{}` via `{}` requires CPU entry to use data_profile_send_uplink(\"{}\") at NIR level",
+                        link.from, link.to, via, via_unit
+                    ));
+                }
+                if !nir_uses_data_profile_send_downlink(module, &via_unit) {
+                    return Err(format!(
+                        "project link `{}` -> `{}` via `{}` requires CPU entry to use data_profile_send_downlink(\"{}\") at NIR level",
+                        link.from, link.to, via, via_unit
+                    ));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 fn validate_shader_profile_for_link(module: &YirModule, endpoint: &str) -> Result<(), String> {
     let (domain, unit) = split_domain_unit(endpoint)?;
     if domain != "shader" {
@@ -416,12 +477,457 @@ fn validate_shader_profile_for_link(module: &YirModule, endpoint: &str) -> Resul
     Ok(())
 }
 
+fn nir_uses_shader_profile_render(module: &NirModule, unit: &str) -> bool {
+    module
+        .functions
+        .iter()
+        .any(|function| function.body.iter().any(|stmt| stmt_uses_shader_profile_render(stmt, unit)))
+}
+
+fn nir_uses_shader_profile_color_seed(module: &NirModule, unit: &str) -> bool {
+    module
+        .functions
+        .iter()
+        .any(|function| function.body.iter().any(|stmt| stmt_uses_shader_profile_color_seed(stmt, unit)))
+}
+
+fn nir_uses_shader_profile_speed_seed(module: &NirModule, unit: &str) -> bool {
+    module
+        .functions
+        .iter()
+        .any(|function| function.body.iter().any(|stmt| stmt_uses_shader_profile_speed_seed(stmt, unit)))
+}
+
+fn nir_uses_shader_profile_radius_seed(module: &NirModule, unit: &str) -> bool {
+    module
+        .functions
+        .iter()
+        .any(|function| function.body.iter().any(|stmt| stmt_uses_shader_profile_radius_seed(stmt, unit)))
+}
+
+fn nir_uses_data_profile_bind_core(module: &NirModule, unit: &str) -> bool {
+    module
+        .functions
+        .iter()
+        .any(|function| function.body.iter().any(|stmt| stmt_uses_data_profile_bind_core(stmt, unit)))
+}
+
+fn nir_uses_data_profile_send_uplink(module: &NirModule, unit: &str) -> bool {
+    module
+        .functions
+        .iter()
+        .any(|function| function.body.iter().any(|stmt| stmt_uses_data_profile_send_uplink(stmt, unit)))
+}
+
+fn nir_uses_data_profile_send_downlink(module: &NirModule, unit: &str) -> bool {
+    module
+        .functions
+        .iter()
+        .any(|function| function.body.iter().any(|stmt| stmt_uses_data_profile_send_downlink(stmt, unit)))
+}
+
+fn stmt_uses_shader_profile_render(stmt: &NirStmt, unit: &str) -> bool {
+    match stmt {
+        NirStmt::Let { value, .. }
+        | NirStmt::Const { value, .. }
+        | NirStmt::Print(value)
+        | NirStmt::Expr(value) => expr_uses_shader_profile_render(value, unit),
+        NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            expr_uses_shader_profile_render(condition, unit)
+                || then_body
+                    .iter()
+                    .any(|stmt| stmt_uses_shader_profile_render(stmt, unit))
+                || else_body
+                    .iter()
+                    .any(|stmt| stmt_uses_shader_profile_render(stmt, unit))
+        }
+        NirStmt::Return(value) => value
+            .as_ref()
+            .is_some_and(|value| expr_uses_shader_profile_render(value, unit)),
+    }
+}
+
+fn stmt_uses_shader_profile_color_seed(stmt: &NirStmt, unit: &str) -> bool {
+    match stmt {
+        NirStmt::Let { value, .. }
+        | NirStmt::Const { value, .. }
+        | NirStmt::Print(value)
+        | NirStmt::Expr(value) => expr_uses_shader_profile_color_seed(value, unit),
+        NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            expr_uses_shader_profile_color_seed(condition, unit)
+                || then_body
+                    .iter()
+                    .any(|stmt| stmt_uses_shader_profile_color_seed(stmt, unit))
+                || else_body
+                    .iter()
+                    .any(|stmt| stmt_uses_shader_profile_color_seed(stmt, unit))
+        }
+        NirStmt::Return(value) => value
+            .as_ref()
+            .is_some_and(|value| expr_uses_shader_profile_color_seed(value, unit)),
+    }
+}
+
+fn stmt_uses_shader_profile_speed_seed(stmt: &NirStmt, unit: &str) -> bool {
+    match stmt {
+        NirStmt::Let { value, .. }
+        | NirStmt::Const { value, .. }
+        | NirStmt::Print(value)
+        | NirStmt::Expr(value) => expr_uses_shader_profile_speed_seed(value, unit),
+        NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            expr_uses_shader_profile_speed_seed(condition, unit)
+                || then_body
+                    .iter()
+                    .any(|stmt| stmt_uses_shader_profile_speed_seed(stmt, unit))
+                || else_body
+                    .iter()
+                    .any(|stmt| stmt_uses_shader_profile_speed_seed(stmt, unit))
+        }
+        NirStmt::Return(value) => value
+            .as_ref()
+            .is_some_and(|value| expr_uses_shader_profile_speed_seed(value, unit)),
+    }
+}
+
+fn stmt_uses_shader_profile_radius_seed(stmt: &NirStmt, unit: &str) -> bool {
+    match stmt {
+        NirStmt::Let { value, .. }
+        | NirStmt::Const { value, .. }
+        | NirStmt::Print(value)
+        | NirStmt::Expr(value) => expr_uses_shader_profile_radius_seed(value, unit),
+        NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            expr_uses_shader_profile_radius_seed(condition, unit)
+                || then_body
+                    .iter()
+                    .any(|stmt| stmt_uses_shader_profile_radius_seed(stmt, unit))
+                || else_body
+                    .iter()
+                    .any(|stmt| stmt_uses_shader_profile_radius_seed(stmt, unit))
+        }
+        NirStmt::Return(value) => value
+            .as_ref()
+            .is_some_and(|value| expr_uses_shader_profile_radius_seed(value, unit)),
+    }
+}
+
+fn stmt_uses_data_profile_bind_core(stmt: &NirStmt, unit: &str) -> bool {
+    match stmt {
+        NirStmt::Let { value, .. }
+        | NirStmt::Const { value, .. }
+        | NirStmt::Print(value)
+        | NirStmt::Expr(value) => expr_uses_data_profile_bind_core(value, unit),
+        NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            expr_uses_data_profile_bind_core(condition, unit)
+                || then_body
+                    .iter()
+                    .any(|stmt| stmt_uses_data_profile_bind_core(stmt, unit))
+                || else_body
+                    .iter()
+                    .any(|stmt| stmt_uses_data_profile_bind_core(stmt, unit))
+        }
+        NirStmt::Return(value) => value
+            .as_ref()
+            .is_some_and(|value| expr_uses_data_profile_bind_core(value, unit)),
+    }
+}
+
+fn stmt_uses_data_profile_send_uplink(stmt: &NirStmt, unit: &str) -> bool {
+    match stmt {
+        NirStmt::Let { value, .. }
+        | NirStmt::Const { value, .. }
+        | NirStmt::Print(value)
+        | NirStmt::Expr(value) => expr_uses_data_profile_send_uplink(value, unit),
+        NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            expr_uses_data_profile_send_uplink(condition, unit)
+                || then_body
+                    .iter()
+                    .any(|stmt| stmt_uses_data_profile_send_uplink(stmt, unit))
+                || else_body
+                    .iter()
+                    .any(|stmt| stmt_uses_data_profile_send_uplink(stmt, unit))
+        }
+        NirStmt::Return(value) => value
+            .as_ref()
+            .is_some_and(|value| expr_uses_data_profile_send_uplink(value, unit)),
+    }
+}
+
+fn stmt_uses_data_profile_send_downlink(stmt: &NirStmt, unit: &str) -> bool {
+    match stmt {
+        NirStmt::Let { value, .. }
+        | NirStmt::Const { value, .. }
+        | NirStmt::Print(value)
+        | NirStmt::Expr(value) => expr_uses_data_profile_send_downlink(value, unit),
+        NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            expr_uses_data_profile_send_downlink(condition, unit)
+                || then_body
+                    .iter()
+                    .any(|stmt| stmt_uses_data_profile_send_downlink(stmt, unit))
+                || else_body
+                    .iter()
+                    .any(|stmt| stmt_uses_data_profile_send_downlink(stmt, unit))
+        }
+        NirStmt::Return(value) => value
+            .as_ref()
+            .is_some_and(|value| expr_uses_data_profile_send_downlink(value, unit)),
+    }
+}
+
+fn expr_uses_shader_profile_render(expr: &NirExpr, unit: &str) -> bool {
+    match expr {
+        NirExpr::ShaderProfileRender {
+            unit: shader_unit,
+            packet,
+        } => shader_unit == unit || expr_uses_shader_profile_render(packet, unit),
+        NirExpr::Borrow(inner)
+        | NirExpr::Move(inner)
+        | NirExpr::LoadValue(inner)
+        | NirExpr::LoadNext(inner)
+        | NirExpr::BufferLen(inner)
+        | NirExpr::DataOutputPipe(inner)
+        | NirExpr::DataInputPipe(inner)
+        | NirExpr::CpuPresentFrame(inner)
+        | NirExpr::Free(inner)
+        | NirExpr::IsNull(inner) => expr_uses_shader_profile_render(inner, unit),
+        NirExpr::AllocNode { value, next } => {
+            expr_uses_shader_profile_render(value, unit)
+                || expr_uses_shader_profile_render(next, unit)
+        }
+        NirExpr::AllocBuffer { len, fill } => {
+            expr_uses_shader_profile_render(len, unit)
+                || expr_uses_shader_profile_render(fill, unit)
+        }
+        NirExpr::LoadAt { buffer, index } => {
+            expr_uses_shader_profile_render(buffer, unit)
+                || expr_uses_shader_profile_render(index, unit)
+        }
+        NirExpr::StoreValue { target, value } => {
+            expr_uses_shader_profile_render(target, unit)
+                || expr_uses_shader_profile_render(value, unit)
+        }
+        NirExpr::StoreNext { target, next } => {
+            expr_uses_shader_profile_render(target, unit)
+                || expr_uses_shader_profile_render(next, unit)
+        }
+        NirExpr::StoreAt {
+            buffer,
+            index,
+            value,
+        } => {
+            expr_uses_shader_profile_render(buffer, unit)
+                || expr_uses_shader_profile_render(index, unit)
+                || expr_uses_shader_profile_render(value, unit)
+        }
+        NirExpr::DataCopyWindow { input, offset, len }
+        | NirExpr::DataImmutableWindow { input, offset, len } => {
+            expr_uses_shader_profile_render(input, unit)
+                || expr_uses_shader_profile_render(offset, unit)
+                || expr_uses_shader_profile_render(len, unit)
+        }
+        NirExpr::DataProfileSendUplink { input, .. }
+        | NirExpr::DataProfileSendDownlink { input, .. }
+        | NirExpr::ShaderProfileColorSeed { base: input, .. }
+        | NirExpr::ShaderProfileRadiusSeed { base: input, .. } => {
+            expr_uses_shader_profile_render(input, unit)
+        }
+        NirExpr::ShaderProfileSpeedSeed {
+            delta,
+            scale,
+            base,
+            ..
+        } => {
+            expr_uses_shader_profile_render(delta, unit)
+                || expr_uses_shader_profile_render(scale, unit)
+                || expr_uses_shader_profile_render(base, unit)
+        }
+        NirExpr::CpuExternCall { args, .. } | NirExpr::Call { args, .. } => args
+            .iter()
+            .any(|arg| expr_uses_shader_profile_render(arg, unit)),
+        NirExpr::MethodCall { receiver, args, .. } => {
+            expr_uses_shader_profile_render(receiver, unit)
+                || args
+                    .iter()
+                    .any(|arg| expr_uses_shader_profile_render(arg, unit))
+        }
+        NirExpr::StructLiteral { fields, .. } => fields
+            .iter()
+            .any(|(_, value)| expr_uses_shader_profile_render(value, unit)),
+        NirExpr::FieldAccess { base, .. } => expr_uses_shader_profile_render(base, unit),
+        NirExpr::Binary { lhs, rhs, .. } => {
+            expr_uses_shader_profile_render(lhs, unit)
+                || expr_uses_shader_profile_render(rhs, unit)
+        }
+        NirExpr::ShaderBeginPass {
+            target,
+            pipeline,
+            viewport,
+        } => {
+            expr_uses_shader_profile_render(target, unit)
+                || expr_uses_shader_profile_render(pipeline, unit)
+                || expr_uses_shader_profile_render(viewport, unit)
+        }
+        NirExpr::ShaderDrawInstanced {
+            pass,
+            packet,
+            vertex_count,
+            instance_count,
+        } => {
+            expr_uses_shader_profile_render(pass, unit)
+                || expr_uses_shader_profile_render(packet, unit)
+                || expr_uses_shader_profile_render(vertex_count, unit)
+                || expr_uses_shader_profile_render(instance_count, unit)
+        }
+        _ => false,
+    }
+}
+
+fn expr_uses_shader_profile_color_seed(expr: &NirExpr, unit: &str) -> bool {
+    match expr {
+        NirExpr::ShaderProfileColorSeed { unit: shader_unit, .. } => shader_unit == unit,
+        _ => expr_walk_any(expr, &|inner| expr_uses_shader_profile_color_seed(inner, unit)),
+    }
+}
+
+fn expr_uses_shader_profile_speed_seed(expr: &NirExpr, unit: &str) -> bool {
+    match expr {
+        NirExpr::ShaderProfileSpeedSeed { unit: shader_unit, .. } => shader_unit == unit,
+        _ => expr_walk_any(expr, &|inner| expr_uses_shader_profile_speed_seed(inner, unit)),
+    }
+}
+
+fn expr_uses_shader_profile_radius_seed(expr: &NirExpr, unit: &str) -> bool {
+    match expr {
+        NirExpr::ShaderProfileRadiusSeed { unit: shader_unit, .. } => shader_unit == unit,
+        _ => expr_walk_any(expr, &|inner| expr_uses_shader_profile_radius_seed(inner, unit)),
+    }
+}
+
+fn expr_uses_data_profile_bind_core(expr: &NirExpr, unit: &str) -> bool {
+    match expr {
+        NirExpr::DataProfileBindCoreRef { unit: data_unit } => data_unit == unit,
+        _ => expr_walk_any(expr, &|inner| expr_uses_data_profile_bind_core(inner, unit)),
+    }
+}
+
+fn expr_uses_data_profile_send_uplink(expr: &NirExpr, unit: &str) -> bool {
+    match expr {
+        NirExpr::DataProfileSendUplink { unit: data_unit, .. } => data_unit == unit,
+        _ => expr_walk_any(expr, &|inner| expr_uses_data_profile_send_uplink(inner, unit)),
+    }
+}
+
+fn expr_uses_data_profile_send_downlink(expr: &NirExpr, unit: &str) -> bool {
+    match expr {
+        NirExpr::DataProfileSendDownlink { unit: data_unit, .. } => data_unit == unit,
+        _ => expr_walk_any(expr, &|inner| expr_uses_data_profile_send_downlink(inner, unit)),
+    }
+}
+
+fn expr_walk_any(expr: &NirExpr, predicate: &dyn Fn(&NirExpr) -> bool) -> bool {
+    match expr {
+        NirExpr::Borrow(inner)
+        | NirExpr::Move(inner)
+        | NirExpr::LoadValue(inner)
+        | NirExpr::LoadNext(inner)
+        | NirExpr::BufferLen(inner)
+        | NirExpr::DataOutputPipe(inner)
+        | NirExpr::DataInputPipe(inner)
+        | NirExpr::CpuPresentFrame(inner)
+        | NirExpr::Free(inner)
+        | NirExpr::IsNull(inner)
+        | NirExpr::FieldAccess { base: inner, .. } => predicate(inner),
+        NirExpr::AllocNode { value, next } => predicate(value) || predicate(next),
+        NirExpr::AllocBuffer { len, fill } => predicate(len) || predicate(fill),
+        NirExpr::LoadAt { buffer, index } => predicate(buffer) || predicate(index),
+        NirExpr::StoreValue { target, value } => predicate(target) || predicate(value),
+        NirExpr::StoreNext { target, next } => predicate(target) || predicate(next),
+        NirExpr::StoreAt {
+            buffer,
+            index,
+            value,
+        } => predicate(buffer) || predicate(index) || predicate(value),
+        NirExpr::DataCopyWindow { input, offset, len }
+        | NirExpr::DataImmutableWindow { input, offset, len } => {
+            predicate(input) || predicate(offset) || predicate(len)
+        }
+        NirExpr::DataProfileSendUplink { input, .. }
+        | NirExpr::DataProfileSendDownlink { input, .. } => predicate(input),
+        NirExpr::ShaderProfileColorSeed { base, delta, .. }
+        | NirExpr::ShaderProfileRadiusSeed { base, delta, .. } => {
+            predicate(base) || predicate(delta)
+        }
+        NirExpr::ShaderProfileSpeedSeed {
+            delta,
+            scale,
+            base,
+            ..
+        } => predicate(delta) || predicate(scale) || predicate(base),
+        NirExpr::CpuExternCall { args, .. } | NirExpr::Call { args, .. } => {
+            args.iter().any(predicate)
+        }
+        NirExpr::MethodCall { receiver, args, .. } => {
+            predicate(receiver) || args.iter().any(predicate)
+        }
+        NirExpr::StructLiteral { fields, .. } => fields.iter().any(|(_, value)| predicate(value)),
+        NirExpr::Binary { lhs, rhs, .. } => predicate(lhs) || predicate(rhs),
+        NirExpr::ShaderBeginPass {
+            target,
+            pipeline,
+            viewport,
+        } => predicate(target) || predicate(pipeline) || predicate(viewport),
+        NirExpr::ShaderDrawInstanced {
+            pass,
+            packet,
+            vertex_count,
+            instance_count,
+        } => {
+            predicate(pass)
+                || predicate(packet)
+                || predicate(vertex_count)
+                || predicate(instance_count)
+        }
+        NirExpr::ShaderProfileRender { packet, .. } => predicate(packet),
+        _ => false,
+    }
+}
+
 fn validate_shader_profile_flow(module: &YirModule, unit: &str) -> Result<(), String> {
     let target = resolve_project_profile_target_name("shader", unit, "target");
     let viewport = resolve_project_profile_target_name("shader", unit, "viewport");
     let pipeline = resolve_project_profile_target_name("shader", unit, "pipeline");
     let vertex_count = resolve_project_profile_target_name("shader", unit, "vertex_count");
     let instance_count = resolve_project_profile_target_name("shader", unit, "instance_count");
+    let pass_kind = resolve_project_profile_target_name("shader", unit, "pass_kind");
+    let packet_field_count =
+        resolve_project_profile_target_name("shader", unit, "packet_field_count");
 
     let begin_passes = module
         .nodes
@@ -430,11 +936,14 @@ fn validate_shader_profile_flow(module: &YirModule, unit: &str) -> Result<(), St
         .map(|node| node.name.as_str())
         .collect::<Vec<_>>();
     let begin_pass_wired = begin_passes.iter().any(|pass| {
-        has_edge_to(module, &target, pass) && has_edge_to(module, &viewport, pass) && has_edge_to(module, &pipeline, pass)
+        has_edge_to(module, &target, pass)
+            && has_edge_to(module, &viewport, pass)
+            && has_edge_to(module, &pipeline, pass)
+            && has_edge_to(module, &pass_kind, pass)
     });
     if !begin_pass_wired {
         return Err(format!(
-            "project shader unit `shader.{}` requires target/viewport/pipeline profile nodes to feed a shader.begin_pass node",
+            "project shader unit `shader.{}` requires target/viewport/pipeline/pass_kind profile nodes to feed a shader.begin_pass node",
             unit
         ));
     }
@@ -446,11 +955,13 @@ fn validate_shader_profile_flow(module: &YirModule, unit: &str) -> Result<(), St
         .map(|node| node.name.as_str())
         .collect::<Vec<_>>();
     let draw_wired = draws.iter().any(|draw| {
-        has_edge_to(module, &vertex_count, draw) && has_edge_to(module, &instance_count, draw)
+        has_edge_to(module, &vertex_count, draw)
+            && has_edge_to(module, &instance_count, draw)
+            && has_edge_to(module, &packet_field_count, draw)
     });
     if !draw_wired {
         return Err(format!(
-            "project shader unit `shader.{}` requires vertex_count/instance_count profile nodes to feed a shader.draw_instanced node",
+            "project shader unit `shader.{}` requires vertex_count/instance_count/packet_field_count profile nodes to feed a shader.draw_instanced node",
             unit
         ));
     }
@@ -478,6 +989,8 @@ fn validate_data_profile_for_link(module: &YirModule, endpoint: &str) -> Result<
         ("marker:downlink_pipe_class", resolve_project_profile_target_name("data", &unit, "marker:downlink_pipe_class")),
         ("marker:uplink_payload_class", resolve_project_profile_target_name("data", &unit, "marker:uplink_payload_class")),
         ("marker:downlink_payload_class", resolve_project_profile_target_name("data", &unit, "marker:downlink_payload_class")),
+        ("marker:uplink_payload_shape", resolve_project_profile_target_name("data", &unit, "marker:uplink_payload_shape")),
+        ("marker:downlink_payload_shape", resolve_project_profile_target_name("data", &unit, "marker:downlink_payload_shape")),
         ("marker:uplink_window_policy", resolve_project_profile_target_name("data", &unit, "marker:uplink_window_policy")),
         ("marker:downlink_window_policy", resolve_project_profile_target_name("data", &unit, "marker:downlink_window_policy")),
     ];
@@ -509,10 +1022,44 @@ fn validate_data_profile_for_link(module: &YirModule, endpoint: &str) -> Result<
         .collect::<Vec<_>>();
     let uplink_payload = resolve_project_profile_target_name("data", &unit, "marker:uplink_payload_class");
     let downlink_payload = resolve_project_profile_target_name("data", &unit, "marker:downlink_payload_class");
+    let uplink_shape = resolve_project_profile_target_name("data", &unit, "marker:uplink_payload_shape");
+    let downlink_shape = resolve_project_profile_target_name("data", &unit, "marker:downlink_payload_shape");
+    let uplink_windows = module
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "data"
+                && matches!(node.op.instruction.as_str(), "copy_window" | "immutable_window")
+                && node.name.contains("_uplink_window")
+        })
+        .map(|node| node.name.clone())
+        .collect::<Vec<_>>();
+    let downlink_windows = module
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "data"
+                && matches!(node.op.instruction.as_str(), "copy_window" | "immutable_window")
+                && node.name.contains("_downlink_window")
+        })
+        .map(|node| node.name.clone())
+        .collect::<Vec<_>>();
 
     if !uplink_nodes.iter().all(|pipe| has_edge_to(module, &uplink_payload, pipe)) {
         return Err(format!(
             "project data unit `data.{}` requires uplink payload class to feed all uplink pipe nodes",
+            unit
+        ));
+    }
+    if !uplink_nodes.iter().all(|pipe| has_edge_to(module, &uplink_shape, pipe)) {
+        return Err(format!(
+            "project data unit `data.{}` requires uplink payload shape to feed all uplink pipe nodes",
+            unit
+        ));
+    }
+    if !uplink_windows.iter().all(|window| has_edge_to(module, &uplink_shape, window)) {
+        return Err(format!(
+            "project data unit `data.{}` requires uplink payload shape to feed all uplink window nodes",
             unit
         ));
     }
@@ -522,12 +1069,62 @@ fn validate_data_profile_for_link(module: &YirModule, endpoint: &str) -> Result<
             unit
         ));
     }
+    if !downlink_nodes.iter().all(|pipe| has_edge_to(module, &downlink_shape, pipe)) {
+        return Err(format!(
+            "project data unit `data.{}` requires downlink payload shape to feed all downlink pipe nodes",
+            unit
+        ));
+    }
+    if !downlink_windows.iter().all(|window| has_edge_to(module, &downlink_shape, window)) {
+        return Err(format!(
+            "project data unit `data.{}` requires downlink payload shape to feed all downlink window nodes",
+            unit
+        ));
+    }
 
     Ok(())
 }
 
 fn has_edge_to(module: &YirModule, from: &str, to: &str) -> bool {
     module.edges.iter().any(|edge| edge.from == from && edge.to == to)
+}
+
+fn stitch_shader_profile_edges(module: &mut YirModule) {
+    let pass_kind_nodes = module
+        .nodes
+        .iter()
+        .filter(|node| node.name.contains("_pass_kind"))
+        .map(|node| node.name.clone())
+        .collect::<Vec<_>>();
+    let packet_field_count_nodes = module
+        .nodes
+        .iter()
+        .filter(|node| node.name.contains("_packet_field_count"))
+        .map(|node| node.name.clone())
+        .collect::<Vec<_>>();
+    let begin_pass_nodes = module
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "shader" && node.op.instruction == "begin_pass")
+        .map(|node| node.name.clone())
+        .collect::<Vec<_>>();
+    let draw_nodes = module
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "shader" && node.op.instruction == "draw_instanced")
+        .map(|node| node.name.clone())
+        .collect::<Vec<_>>();
+
+    for pass_kind in &pass_kind_nodes {
+        for begin_pass in &begin_pass_nodes {
+            push_edge_if_missing(module, EdgeKind::CrossDomainExchange, pass_kind, begin_pass);
+        }
+    }
+    for packet_field_count in &packet_field_count_nodes {
+        for draw in &draw_nodes {
+            push_edge_if_missing(module, EdgeKind::CrossDomainExchange, packet_field_count, draw);
+        }
+    }
 }
 
 fn has_xfer_segment(
@@ -1077,6 +1674,16 @@ fn stitch_data_profile_edges(module: &mut YirModule) {
         })
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
+    let uplink_payload_shape_markers = module
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "data"
+                && node.op.instruction == "marker"
+                && node.op.args.first().map(String::as_str) == Some("uplink_payload_shape")
+        })
+        .map(|node| node.name.clone())
+        .collect::<Vec<_>>();
     let downlink_pipe_markers = module
         .nodes
         .iter()
@@ -1094,6 +1701,16 @@ fn stitch_data_profile_edges(module: &mut YirModule) {
             node.op.module == "data"
                 && node.op.instruction == "marker"
                 && node.op.args.first().map(String::as_str) == Some("downlink_payload_class")
+        })
+        .map(|node| node.name.clone())
+        .collect::<Vec<_>>();
+    let downlink_payload_shape_markers = module
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "data"
+                && node.op.instruction == "marker"
+                && node.op.args.first().map(String::as_str) == Some("downlink_payload_shape")
         })
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
@@ -1212,6 +1829,14 @@ fn stitch_data_profile_edges(module: &mut YirModule) {
             push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
         }
     }
+    if let Some(marker) = uplink_payload_shape_markers.first() {
+        for pipe in data_pipe_nodes.iter().take(2) {
+            push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
+        }
+        for window in &uplink_windows {
+            push_edge_if_missing(module, EdgeKind::Effect, marker, window);
+        }
+    }
     if let Some(marker) = downlink_pipe_markers.first() {
         for pipe in data_pipe_nodes.iter().skip(2).take(2) {
             push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
@@ -1225,6 +1850,14 @@ fn stitch_data_profile_edges(module: &mut YirModule) {
     if let Some(marker) = downlink_payload_class_markers.first() {
         for pipe in data_pipe_nodes.iter().skip(2).take(2) {
             push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
+        }
+    }
+    if let Some(marker) = downlink_payload_shape_markers.first() {
+        for pipe in data_pipe_nodes.iter().skip(2).take(2) {
+            push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
+        }
+        for window in &downlink_windows {
+            push_edge_if_missing(module, EdgeKind::Effect, marker, window);
         }
     }
     for window in &uplink_windows {

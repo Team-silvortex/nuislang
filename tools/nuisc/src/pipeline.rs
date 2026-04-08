@@ -27,6 +27,7 @@ pub fn compile_source_path(path: &Path) -> Result<PipelineArtifacts, String> {
         )?;
         validate_used_units(&nir)?;
         validate_instantiated_units(&nir)?;
+        crate::project::validate_project_links_against_nir(&project, &nir)?;
         let yir = crate::lowering::lower_nir_to_yir(&nir, &lowering_manifest)?;
         let mut loaded_nustar =
             collect_loaded_nustar(&nir, &yir, &lowering_manifest.package_id)?;
@@ -214,6 +215,24 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         | NirExpr::ShaderTarget { .. }
         | NirExpr::ShaderViewport { .. }
         | NirExpr::ShaderPipeline { .. } => {}
+        NirExpr::ShaderProfileColorSeed { base, delta, .. } => {
+            collect_instantiated_units_expr(base, units);
+            collect_instantiated_units_expr(delta, units);
+        }
+        NirExpr::ShaderProfileSpeedSeed {
+            delta,
+            scale,
+            base,
+            ..
+        } => {
+            collect_instantiated_units_expr(delta, units);
+            collect_instantiated_units_expr(scale, units);
+            collect_instantiated_units_expr(base, units);
+        }
+        NirExpr::ShaderProfileRadiusSeed { base, delta, .. } => {
+            collect_instantiated_units_expr(base, units);
+            collect_instantiated_units_expr(delta, units);
+        }
         NirExpr::Borrow(inner)
         | NirExpr::Move(inner)
         | NirExpr::LoadValue(inner)
@@ -232,6 +251,9 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
             collect_instantiated_units_expr(target, units);
             collect_instantiated_units_expr(pipeline, units);
             collect_instantiated_units_expr(viewport, units);
+        }
+        NirExpr::ShaderProfileRender { packet, .. } => {
+            collect_instantiated_units_expr(packet, units);
         }
         NirExpr::ShaderDrawInstanced { pass, packet, .. } => {
             collect_instantiated_units_expr(pass, units);
@@ -276,6 +298,10 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
             collect_instantiated_units_expr(input, units);
             collect_instantiated_units_expr(offset, units);
             collect_instantiated_units_expr(len, units);
+        }
+        NirExpr::DataProfileSendUplink { input, .. }
+        | NirExpr::DataProfileSendDownlink { input, .. } => {
+            collect_instantiated_units_expr(input, units);
         }
         NirExpr::Call { args, .. } => {
             for arg in args {

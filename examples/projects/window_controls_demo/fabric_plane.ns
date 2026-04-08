@@ -13,6 +13,8 @@ mod data FabricPlane {
     let downlink_pipe_class: Marker = data_marker("downlink_pipe_class");
     let uplink_payload_class: Marker = data_marker("uplink_payload_class");
     let downlink_payload_class: Marker = data_marker("downlink_payload_class");
+    let uplink_payload_shape: Marker = data_marker("uplink_payload_shape");
+    let downlink_payload_shape: Marker = data_marker("downlink_payload_shape");
     let uplink_window_policy: Marker = data_marker("uplink_window_policy");
     let downlink_window_policy: Marker = data_marker("downlink_window_policy");
     let uplink_window: Window = data_immutable_window(window_offset, window_offset, uplink_len);
