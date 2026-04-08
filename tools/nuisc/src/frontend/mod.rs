@@ -1118,6 +1118,78 @@ fn lower_call_expr(
             };
             Ok(NirExpr::ShaderProfilePacketRadiusSlotRef { unit: unit.clone() })
         }
+        "shader_profile_packet_tag" => {
+            let [unit] = args else {
+                return Err("shader_profile_packet_tag(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "shader_profile_packet_tag(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err(
+                    "shader_profile_packet_tag(...) expects a string literal unit name"
+                        .to_owned(),
+                );
+            };
+            Ok(NirExpr::ShaderProfilePacketTagRef { unit: unit.clone() })
+        }
+        "shader_profile_material_mode" => {
+            let [unit] = args else {
+                return Err("shader_profile_material_mode(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "shader_profile_material_mode(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err(
+                    "shader_profile_material_mode(...) expects a string literal unit name"
+                        .to_owned(),
+                );
+            };
+            Ok(NirExpr::ShaderProfileMaterialModeRef { unit: unit.clone() })
+        }
+        "shader_profile_pass_kind" => {
+            let [unit] = args else {
+                return Err("shader_profile_pass_kind(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "shader_profile_pass_kind(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err(
+                    "shader_profile_pass_kind(...) expects a string literal unit name"
+                        .to_owned(),
+                );
+            };
+            Ok(NirExpr::ShaderProfilePassKindRef { unit: unit.clone() })
+        }
+        "shader_profile_packet_field_count" => {
+            let [unit] = args else {
+                return Err("shader_profile_packet_field_count(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "shader_profile_packet_field_count(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err(
+                    "shader_profile_packet_field_count(...) expects a string literal unit name"
+                        .to_owned(),
+                );
+            };
+            Ok(NirExpr::ShaderProfilePacketFieldCountRef { unit: unit.clone() })
+        }
         "data_profile_bind_core" => {
             let [unit] = args else {
                 return Err("data_profile_bind_core(...) expects 1 arg".to_owned());
@@ -1424,6 +1496,10 @@ fn infer_nir_expr_type(
         NirExpr::ShaderProfilePacketColorSlotRef { .. } => Some(i64_type()),
         NirExpr::ShaderProfilePacketSpeedSlotRef { .. } => Some(i64_type()),
         NirExpr::ShaderProfilePacketRadiusSlotRef { .. } => Some(i64_type()),
+        NirExpr::ShaderProfilePacketTagRef { .. } => Some(i64_type()),
+        NirExpr::ShaderProfileMaterialModeRef { .. } => Some(i64_type()),
+        NirExpr::ShaderProfilePassKindRef { .. } => Some(i64_type()),
+        NirExpr::ShaderProfilePacketFieldCountRef { .. } => Some(i64_type()),
         NirExpr::DataProfileBindCoreRef { .. } => Some(named_type("Unit")),
         NirExpr::DataProfileWindowOffsetRef { .. } => Some(i64_type()),
         NirExpr::DataProfileUplinkLenRef { .. } => Some(i64_type()),

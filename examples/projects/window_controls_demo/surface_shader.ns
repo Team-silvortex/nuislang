@@ -7,6 +7,10 @@ mod shader SurfaceShader {
     const packet_color_slot: i64 = 0;
     const packet_speed_slot: i64 = 1;
     const packet_radius_slot: i64 = 2;
+    const packet_tag: i64 = 17;
+    const material_mode: i64 = 2;
+    const pass_kind: i64 = 1;
+    const packet_field_count: i64 = 3;
     let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
     let profile_view: Viewport = shader_viewport(160, 120);
     let profile_pipe: Pipeline = shader_pipeline("lit_sphere", "triangle_strip");

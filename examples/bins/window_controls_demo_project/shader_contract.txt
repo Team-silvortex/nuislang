@@ -2,7 +2,7 @@ fabric_handle_table=project_profile_data_FabricPlane_profile_handles
   handle host -> cpu0
   handle render -> shader0
 fabric_core_binding=project_profile_data_FabricPlane_data_bind_core resource=fabric0 core=1
-stage=shader_draw_instanced_43 op=shader.draw_instanced resource=shader0 lowering=backend_eligible reason=stage fits the current Metal/Vulkan common lowering subset
+stage=shader_draw_instanced_47 op=shader.draw_instanced resource=shader0 lowering=backend_eligible reason=stage fits the current Metal/Vulkan common lowering subset
   fabric_handle_table=project_profile_data_FabricPlane_profile_handles
   pipeline=lit_sphere
   target_format=rgba8_unorm

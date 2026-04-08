@@ -161,6 +161,10 @@ fn verify_expr(
         | NirExpr::ShaderProfilePacketColorSlotRef { .. }
         | NirExpr::ShaderProfilePacketSpeedSlotRef { .. }
         | NirExpr::ShaderProfilePacketRadiusSlotRef { .. }
+        | NirExpr::ShaderProfilePacketTagRef { .. }
+        | NirExpr::ShaderProfileMaterialModeRef { .. }
+        | NirExpr::ShaderProfilePassKindRef { .. }
+        | NirExpr::ShaderProfilePacketFieldCountRef { .. }
         | NirExpr::DataProfileBindCoreRef { .. }
         | NirExpr::DataProfileWindowOffsetRef { .. }
         | NirExpr::DataProfileUplinkLenRef { .. }
@@ -294,6 +298,10 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
         | NirExpr::ShaderProfilePacketColorSlotRef { .. }
         | NirExpr::ShaderProfilePacketSpeedSlotRef { .. }
         | NirExpr::ShaderProfilePacketRadiusSlotRef { .. }
+        | NirExpr::ShaderProfilePacketTagRef { .. }
+        | NirExpr::ShaderProfileMaterialModeRef { .. }
+        | NirExpr::ShaderProfilePassKindRef { .. }
+        | NirExpr::ShaderProfilePacketFieldCountRef { .. }
         | NirExpr::DataProfileBindCoreRef { .. }
         | NirExpr::DataProfileWindowOffsetRef { .. }
         | NirExpr::DataProfileUplinkLenRef { .. }

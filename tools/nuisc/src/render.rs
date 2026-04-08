@@ -407,6 +407,21 @@ fn render_nir_expr(value: &NirExpr) -> String {
                 escape_debug(unit)
             )
         }
+        NirExpr::ShaderProfilePacketTagRef { unit } => {
+            format!("shader_profile_packet_tag(\"{}\")", escape_debug(unit))
+        }
+        NirExpr::ShaderProfileMaterialModeRef { unit } => {
+            format!("shader_profile_material_mode(\"{}\")", escape_debug(unit))
+        }
+        NirExpr::ShaderProfilePassKindRef { unit } => {
+            format!("shader_profile_pass_kind(\"{}\")", escape_debug(unit))
+        }
+        NirExpr::ShaderProfilePacketFieldCountRef { unit } => {
+            format!(
+                "shader_profile_packet_field_count(\"{}\")",
+                escape_debug(unit)
+            )
+        }
         NirExpr::DataProfileBindCoreRef { unit } => {
             format!("data_profile_bind_core(\"{}\")", escape_debug(unit))
         }

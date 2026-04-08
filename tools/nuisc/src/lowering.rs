@@ -530,6 +530,18 @@ fn lower_expr(
         NirExpr::ShaderProfilePacketRadiusSlotRef { unit } => {
             lower_project_profile_ref(state, "shader", unit, "packet_radius_slot")
         }
+        NirExpr::ShaderProfilePacketTagRef { unit } => {
+            lower_project_profile_ref(state, "shader", unit, "packet_tag")
+        }
+        NirExpr::ShaderProfileMaterialModeRef { unit } => {
+            lower_project_profile_ref(state, "shader", unit, "material_mode")
+        }
+        NirExpr::ShaderProfilePassKindRef { unit } => {
+            lower_project_profile_ref(state, "shader", unit, "pass_kind")
+        }
+        NirExpr::ShaderProfilePacketFieldCountRef { unit } => {
+            lower_project_profile_ref(state, "shader", unit, "packet_field_count")
+        }
         NirExpr::DataProfileBindCoreRef { unit } => {
             lower_project_profile_ref(state, "data", unit, "bind_core")
         }

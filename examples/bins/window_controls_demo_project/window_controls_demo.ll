@@ -28,53 +28,59 @@ define i64 @nuis_yir_entry() {
   ; deferred lowering for shader.target on shader0 (shader.render)
   ; deferred lowering for shader.pipeline on shader0 (shader.render)
   ; deferred lowering for shader.begin_pass on shader0 (shader.render)
-  %2 = add i64 0, 1
-  %3 = add i64 0, 2
-  %4 = add i64 0, 0
-  %5 = add i64 0, 1
-  %6 = add i64 0, 0
-  ; deferred lowering for data.marker on fabric0 (data.fabric)
-  ; deferred lowering for data.marker on fabric0 (data.fabric)
+  %2 = add i64 0, 17
+  %3 = add i64 0, 1
+  %4 = add i64 0, 2
+  %5 = add i64 0, 0
+  %6 = add i64 0, 2
   %7 = add i64 0, 1
+  %8 = add i64 0, 0
+  ; deferred lowering for data.marker on fabric0 (data.fabric)
+  ; deferred lowering for data.marker on fabric0 (data.fabric)
+  ; deferred lowering for data.marker on fabric0 (data.fabric)
+  %9 = add i64 0, 1
   ; deferred lowering for data.immutable_window on fabric0 (data.fabric)
   ; deferred lowering for data.marker on fabric0 (data.fabric)
   ; deferred lowering for data.handle_table on fabric0 (data.fabric)
   ; deferred lowering for data.marker on fabric0 (data.fabric)
   ; deferred lowering for data.marker on fabric0 (data.fabric)
-  %8 = add i64 0, 1
+  ; deferred lowering for data.marker on fabric0 (data.fabric)
+  %10 = add i64 0, 1
   ; deferred lowering for data.copy_window on fabric0 (data.fabric)
   ; deferred lowering for data.bind_core on fabric0 (data.fabric)
   ; deferred lowering for data.marker on fabric0 (data.fabric)
   ; deferred lowering for cpu.instantiate_unit on cpu0 (cpu.arm64)
   ; deferred lowering for cpu.instantiate_unit on cpu0 (cpu.arm64)
-  %9 = add i64 0, 2
-  %10 = add i64 0, 96
-  %11 = add i64 0, 10
-  %12 = add i64 0, 104
+  %11 = add i64 0, 2
+  %12 = add i64 0, 96
+  %13 = add i64 0, 10
+  %14 = add i64 0, 104
   ; deferred lowering for cpu.window on cpu0 (cpu.arm64)
   ; deferred lowering for cpu.tick_i64 on cpu0 (cpu.arm64)
   ; static AOT lowering freezes cpu.input_i64 `radius_knob` to its default value
-  %13 = add i64 0, 18
+  %15 = add i64 0, 18
   ; static AOT lowering freezes cpu.input_i64 `speed_knob` to its default value
-  %14 = add i64 0, 6
-  %15 = mul i64 %14, %9
+  %16 = add i64 0, 6
+  %17 = mul i64 %16, %11
   ; static AOT lowering freezes cpu.input_i64 `color_knob` to its default value
-  %16 = add i64 0, 24
+  %18 = add i64 0, 24
   ; deferred lowering for cpu.bind_core on cpu0 (cpu.arm64)
-  %17 = add i64 %10, %13
-  %18 = add i64 %17, %1
-  %19 = add i64 %18, %3
-  %20 = call i64 @HostRenderCurves__radius_curve(i64 %19)
-  ; deferred lowering for cpu.extern_call_i64 `cpu_extern_call_28` because one or more inputs are outside the current CPU LLVM slice
-  %21 = add i64 %15, %11
-  %22 = add i64 %21, %5
-  %23 = add i64 %22, %2
-  %24 = call i64 @HostRenderCurves__speed_curve(i64 %23)
-  ; deferred lowering for cpu.extern_call_i64 `cpu_extern_call_23` because one or more inputs are outside the current CPU LLVM slice
-  %25 = add i64 %12, %16
-  %26 = add i64 %25, %4
-  %27 = call i64 @HostRenderCurves__color_bias(i64 %26)
-  ; deferred lowering for cpu.struct `struct_29` because field `speed` comes from outside the current CPU LLVM slice
+  %19 = add i64 %12, %15
+  %20 = add i64 %19, %1
+  %21 = add i64 %20, %4
+  %22 = call i64 @HostRenderCurves__radius_curve(i64 %21)
+  ; deferred lowering for cpu.extern_call_i64 `cpu_extern_call_32` because one or more inputs are outside the current CPU LLVM slice
+  %23 = add i64 %17, %13
+  %24 = add i64 %23, %7
+  %25 = add i64 %24, %3
+  %26 = add i64 %25, %2
+  %27 = call i64 @HostRenderCurves__speed_curve(i64 %26)
+  ; deferred lowering for cpu.extern_call_i64 `cpu_extern_call_27` because one or more inputs are outside the current CPU LLVM slice
+  %28 = add i64 %14, %18
+  %29 = add i64 %28, %5
+  %30 = add i64 %29, %6
+  %31 = call i64 @HostRenderCurves__color_bias(i64 %30)
+  ; deferred lowering for cpu.struct `struct_33` because field `speed` comes from outside the current CPU LLVM slice
   ; deferred lowering for data.immutable_window on fabric0 (data.fabric)
   ; deferred lowering for data.output_pipe on fabric0 (data.fabric)
   ; deferred lowering for data.input_pipe on fabric0 (data.fabric)
@@ -83,5 +89,5 @@ define i64 @nuis_yir_entry() {
   ; deferred lowering for data.output_pipe on fabric0 (data.fabric)
   ; deferred lowering for data.input_pipe on fabric0 (data.fabric)
   ; deferred lowering for cpu.present_frame on cpu0 (cpu.arm64)
-  ret i64 %27
+  ret i64 %31
 }

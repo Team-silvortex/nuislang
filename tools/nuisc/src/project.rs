@@ -337,10 +337,197 @@ pub fn validate_project_links_against_yir(
                         link.from, link.to, via, to_domain
                     ));
                 }
+                validate_data_profile_for_link(module, via)?;
             }
         }
+
+        validate_shader_profile_for_link(module, &link.from)?;
+        validate_shader_profile_for_link(module, &link.to)?;
     }
     Ok(())
+}
+
+fn validate_shader_profile_for_link(module: &YirModule, endpoint: &str) -> Result<(), String> {
+    let (domain, unit) = split_domain_unit(endpoint)?;
+    if domain != "shader" {
+        return Ok(());
+    }
+
+    let required = [
+        ("target", resolve_project_profile_target_name("shader", &unit, "target")),
+        (
+            "viewport",
+            resolve_project_profile_target_name("shader", &unit, "viewport"),
+        ),
+        (
+            "pipeline",
+            resolve_project_profile_target_name("shader", &unit, "pipeline"),
+        ),
+        (
+            "vertex_count",
+            resolve_project_profile_target_name("shader", &unit, "vertex_count"),
+        ),
+        (
+            "instance_count",
+            resolve_project_profile_target_name("shader", &unit, "instance_count"),
+        ),
+        (
+            "packet_color_slot",
+            resolve_project_profile_target_name("shader", &unit, "packet_color_slot"),
+        ),
+        (
+            "packet_speed_slot",
+            resolve_project_profile_target_name("shader", &unit, "packet_speed_slot"),
+        ),
+        (
+            "packet_radius_slot",
+            resolve_project_profile_target_name("shader", &unit, "packet_radius_slot"),
+        ),
+        (
+            "packet_tag",
+            resolve_project_profile_target_name("shader", &unit, "packet_tag"),
+        ),
+        (
+            "material_mode",
+            resolve_project_profile_target_name("shader", &unit, "material_mode"),
+        ),
+        (
+            "pass_kind",
+            resolve_project_profile_target_name("shader", &unit, "pass_kind"),
+        ),
+        (
+            "packet_field_count",
+            resolve_project_profile_target_name("shader", &unit, "packet_field_count"),
+        ),
+    ];
+
+    for (slot, node_name) in required {
+        let exists = module.nodes.iter().any(|node| node.name == node_name);
+        if !exists {
+            return Err(format!(
+                "project shader unit `shader.{}` requires support profile slot `{}` in YIR",
+                unit, slot
+            ));
+        }
+    }
+
+    validate_shader_profile_flow(module, &unit)?;
+
+    Ok(())
+}
+
+fn validate_shader_profile_flow(module: &YirModule, unit: &str) -> Result<(), String> {
+    let target = resolve_project_profile_target_name("shader", unit, "target");
+    let viewport = resolve_project_profile_target_name("shader", unit, "viewport");
+    let pipeline = resolve_project_profile_target_name("shader", unit, "pipeline");
+    let vertex_count = resolve_project_profile_target_name("shader", unit, "vertex_count");
+    let instance_count = resolve_project_profile_target_name("shader", unit, "instance_count");
+
+    let begin_passes = module
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "shader" && node.op.instruction == "begin_pass")
+        .map(|node| node.name.as_str())
+        .collect::<Vec<_>>();
+    let begin_pass_wired = begin_passes.iter().any(|pass| {
+        has_edge_to(module, &target, pass) && has_edge_to(module, &viewport, pass) && has_edge_to(module, &pipeline, pass)
+    });
+    if !begin_pass_wired {
+        return Err(format!(
+            "project shader unit `shader.{}` requires target/viewport/pipeline profile nodes to feed a shader.begin_pass node",
+            unit
+        ));
+    }
+
+    let draws = module
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "shader" && node.op.instruction == "draw_instanced")
+        .map(|node| node.name.as_str())
+        .collect::<Vec<_>>();
+    let draw_wired = draws.iter().any(|draw| {
+        has_edge_to(module, &vertex_count, draw) && has_edge_to(module, &instance_count, draw)
+    });
+    if !draw_wired {
+        return Err(format!(
+            "project shader unit `shader.{}` requires vertex_count/instance_count profile nodes to feed a shader.draw_instanced node",
+            unit
+        ));
+    }
+
+    Ok(())
+}
+
+fn validate_data_profile_for_link(module: &YirModule, endpoint: &str) -> Result<(), String> {
+    let (domain, unit) = split_domain_unit(endpoint)?;
+    if domain != "data" {
+        return Ok(());
+    }
+
+    let required = [
+        ("bind_core", resolve_project_profile_target_name("data", &unit, "bind_core")),
+        ("window_offset", resolve_project_profile_target_name("data", &unit, "window_offset")),
+        ("uplink_len", resolve_project_profile_target_name("data", &unit, "uplink_len")),
+        ("downlink_len", resolve_project_profile_target_name("data", &unit, "downlink_len")),
+        ("handle_table", resolve_project_profile_target_name("data", &unit, "handle_table")),
+        ("marker:cpu_to_shader", resolve_project_profile_target_name("data", &unit, "marker:cpu_to_shader")),
+        ("marker:shader_to_cpu", resolve_project_profile_target_name("data", &unit, "marker:shader_to_cpu")),
+        ("marker:uplink_pipe", resolve_project_profile_target_name("data", &unit, "marker:uplink_pipe")),
+        ("marker:downlink_pipe", resolve_project_profile_target_name("data", &unit, "marker:downlink_pipe")),
+        ("marker:uplink_pipe_class", resolve_project_profile_target_name("data", &unit, "marker:uplink_pipe_class")),
+        ("marker:downlink_pipe_class", resolve_project_profile_target_name("data", &unit, "marker:downlink_pipe_class")),
+        ("marker:uplink_payload_class", resolve_project_profile_target_name("data", &unit, "marker:uplink_payload_class")),
+        ("marker:downlink_payload_class", resolve_project_profile_target_name("data", &unit, "marker:downlink_payload_class")),
+        ("marker:uplink_window_policy", resolve_project_profile_target_name("data", &unit, "marker:uplink_window_policy")),
+        ("marker:downlink_window_policy", resolve_project_profile_target_name("data", &unit, "marker:downlink_window_policy")),
+    ];
+
+    for (slot, node_name) in required {
+        let exists = module.nodes.iter().any(|node| node.name == node_name);
+        if !exists {
+            return Err(format!(
+                "project data unit `data.{}` requires support profile slot `{}` in YIR",
+                unit, slot
+            ));
+        }
+    }
+
+    let uplink_nodes = module
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "data" && matches!(node.op.instruction.as_str(), "output_pipe" | "input_pipe"))
+        .take(2)
+        .map(|node| node.name.clone())
+        .collect::<Vec<_>>();
+    let downlink_nodes = module
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "data" && matches!(node.op.instruction.as_str(), "output_pipe" | "input_pipe"))
+        .skip(2)
+        .take(2)
+        .map(|node| node.name.clone())
+        .collect::<Vec<_>>();
+    let uplink_payload = resolve_project_profile_target_name("data", &unit, "marker:uplink_payload_class");
+    let downlink_payload = resolve_project_profile_target_name("data", &unit, "marker:downlink_payload_class");
+
+    if !uplink_nodes.iter().all(|pipe| has_edge_to(module, &uplink_payload, pipe)) {
+        return Err(format!(
+            "project data unit `data.{}` requires uplink payload class to feed all uplink pipe nodes",
+            unit
+        ));
+    }
+    if !downlink_nodes.iter().all(|pipe| has_edge_to(module, &downlink_payload, pipe)) {
+        return Err(format!(
+            "project data unit `data.{}` requires downlink payload class to feed all downlink pipe nodes",
+            unit
+        ));
+    }
+
+    Ok(())
+}
+
+fn has_edge_to(module: &YirModule, from: &str, to: &str) -> bool {
+    module.edges.iter().any(|edge| edge.from == from && edge.to == to)
 }
 
 fn has_xfer_segment(
@@ -783,6 +970,22 @@ fn resolve_project_profile_target_name(domain: &str, unit: &str, slot: &str) -> 
             "project_profile_shader_{}_packet_radius_slot",
             sanitize_ident(unit)
         ),
+        ("shader", "packet_tag") => format!(
+            "project_profile_shader_{}_packet_tag",
+            sanitize_ident(unit)
+        ),
+        ("shader", "material_mode") => format!(
+            "project_profile_shader_{}_material_mode",
+            sanitize_ident(unit)
+        ),
+        ("shader", "pass_kind") => format!(
+            "project_profile_shader_{}_pass_kind",
+            sanitize_ident(unit)
+        ),
+        ("shader", "packet_field_count") => format!(
+            "project_profile_shader_{}_packet_field_count",
+            sanitize_ident(unit)
+        ),
         ("data", "bind_core") => format!(
             "project_profile_data_{}_data_bind_core",
             sanitize_ident(unit)
@@ -854,6 +1057,26 @@ fn stitch_data_profile_edges(module: &mut YirModule) {
         })
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
+    let uplink_pipe_class_markers = module
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "data"
+                && node.op.instruction == "marker"
+                && node.op.args.first().map(String::as_str) == Some("uplink_pipe_class")
+        })
+        .map(|node| node.name.clone())
+        .collect::<Vec<_>>();
+    let uplink_payload_class_markers = module
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "data"
+                && node.op.instruction == "marker"
+                && node.op.args.first().map(String::as_str) == Some("uplink_payload_class")
+        })
+        .map(|node| node.name.clone())
+        .collect::<Vec<_>>();
     let downlink_pipe_markers = module
         .nodes
         .iter()
@@ -861,6 +1084,26 @@ fn stitch_data_profile_edges(module: &mut YirModule) {
             node.op.module == "data"
                 && node.op.instruction == "marker"
                 && node.op.args.first().map(String::as_str) == Some("downlink_pipe")
+        })
+        .map(|node| node.name.clone())
+        .collect::<Vec<_>>();
+    let downlink_payload_class_markers = module
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "data"
+                && node.op.instruction == "marker"
+                && node.op.args.first().map(String::as_str) == Some("downlink_payload_class")
+        })
+        .map(|node| node.name.clone())
+        .collect::<Vec<_>>();
+    let downlink_pipe_class_markers = module
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "data"
+                && node.op.instruction == "marker"
+                && node.op.args.first().map(String::as_str) == Some("downlink_pipe_class")
         })
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
@@ -959,7 +1202,27 @@ fn stitch_data_profile_edges(module: &mut YirModule) {
             push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
         }
     }
+    if let Some(marker) = uplink_pipe_class_markers.first() {
+        for pipe in data_pipe_nodes.iter().take(2) {
+            push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
+        }
+    }
+    if let Some(marker) = uplink_payload_class_markers.first() {
+        for pipe in data_pipe_nodes.iter().take(2) {
+            push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
+        }
+    }
     if let Some(marker) = downlink_pipe_markers.first() {
+        for pipe in data_pipe_nodes.iter().skip(2).take(2) {
+            push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
+        }
+    }
+    if let Some(marker) = downlink_pipe_class_markers.first() {
+        for pipe in data_pipe_nodes.iter().skip(2).take(2) {
+            push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
+        }
+    }
+    if let Some(marker) = downlink_payload_class_markers.first() {
         for pipe in data_pipe_nodes.iter().skip(2).take(2) {
             push_edge_if_missing(module, EdgeKind::Effect, marker, pipe);
         }

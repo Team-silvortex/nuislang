@@ -354,6 +354,18 @@ pub enum NirExpr {
     ShaderProfilePacketRadiusSlotRef {
         unit: String,
     },
+    ShaderProfilePacketTagRef {
+        unit: String,
+    },
+    ShaderProfileMaterialModeRef {
+        unit: String,
+    },
+    ShaderProfilePassKindRef {
+        unit: String,
+    },
+    ShaderProfilePacketFieldCountRef {
+        unit: String,
+    },
     DataProfileBindCoreRef {
         unit: String,
     },
@@ -491,6 +503,10 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::ShaderProfilePacketColorSlotRef { .. }
         | NirExpr::ShaderProfilePacketSpeedSlotRef { .. }
         | NirExpr::ShaderProfilePacketRadiusSlotRef { .. }
+        | NirExpr::ShaderProfilePacketTagRef { .. }
+        | NirExpr::ShaderProfileMaterialModeRef { .. }
+        | NirExpr::ShaderProfilePassKindRef { .. }
+        | NirExpr::ShaderProfilePacketFieldCountRef { .. }
         | NirExpr::DataProfileBindCoreRef { .. }
         | NirExpr::DataProfileWindowOffsetRef { .. }
         | NirExpr::DataProfileUplinkLenRef { .. }

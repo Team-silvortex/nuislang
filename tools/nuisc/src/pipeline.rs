@@ -201,6 +201,10 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         | NirExpr::ShaderProfilePacketColorSlotRef { .. }
         | NirExpr::ShaderProfilePacketSpeedSlotRef { .. }
         | NirExpr::ShaderProfilePacketRadiusSlotRef { .. }
+        | NirExpr::ShaderProfilePacketTagRef { .. }
+        | NirExpr::ShaderProfileMaterialModeRef { .. }
+        | NirExpr::ShaderProfilePassKindRef { .. }
+        | NirExpr::ShaderProfilePacketFieldCountRef { .. }
         | NirExpr::DataProfileBindCoreRef { .. }
         | NirExpr::DataProfileWindowOffsetRef { .. }
         | NirExpr::DataProfileUplinkLenRef { .. }

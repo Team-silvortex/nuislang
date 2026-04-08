@@ -33,15 +33,22 @@ mod cpu Main {
     let shader_color_slot: i64 = shader_profile_packet_color_slot("SurfaceShader");
     let shader_speed_slot: i64 = shader_profile_packet_speed_slot("SurfaceShader");
     let shader_radius_slot: i64 = shader_profile_packet_radius_slot("SurfaceShader");
+    let shader_packet_tag: i64 = shader_profile_packet_tag("SurfaceShader");
+    let shader_material_mode: i64 = shader_profile_material_mode("SurfaceShader");
+    let shader_pass_kind: i64 = shader_profile_pass_kind("SurfaceShader");
+    let shader_packet_field_count: i64 = shader_profile_packet_field_count("SurfaceShader");
 
-    let panel_color_seed: i64 = base_color + color_delta + shader_color_slot;
+    let panel_color_seed: i64 =
+      base_color + color_delta + shader_color_slot + shader_material_mode + shader_pass_kind;
     let panel_color: i64 = HostRenderCurves.color_bias(panel_color_seed);
     let base_panel_speed: i64 =
-      speed_delta * speed_scale + base_speed + shader_instance_budget + shader_speed_slot;
+      speed_delta * speed_scale + base_speed + shader_instance_budget + shader_speed_slot
+      + shader_packet_tag;
     let curved_panel_speed: i64 = HostRenderCurves.speed_curve(base_panel_speed);
     let panel_speed: i64 = HostRenderCurves.mix_tick(curved_panel_speed, frame_tick);
     let base_panel_radius: i64 =
-      base_radius + radius_delta + shader_vertex_budget + shader_radius_slot;
+      base_radius + radius_delta + shader_vertex_budget + shader_radius_slot
+      + shader_packet_field_count;
     let curved_panel_radius: i64 = HostRenderCurves.radius_curve(base_panel_radius);
     let panel_radius: i64 = HostRenderCurves.mix_tick(curved_panel_radius, frame_tick);
 
