@@ -9,12 +9,16 @@ fn main() {
 
 fn run() -> Result<(), String> {
     match cli::parse_args(std::env::args().skip(1))? {
+        cli::CommandKind::Help => {
+            print_help();
+        }
         cli::CommandKind::Status => {
             let index = nuisc::registry::load_index(std::path::Path::new("nustar-packages"))?;
             let engine = nuisc::engine::default_engine();
             println!("nuis toolchain frontdoor");
             println!("  tool: nuis");
             println!("  compiler_core: nuisc");
+            println!("  resident_control: nuis-rc");
             println!("  profile: {}", engine.profile);
             println!("  yir: {}", engine.version);
             println!("  indexed_nustar: {}", index.len());
@@ -51,7 +55,66 @@ fn run() -> Result<(), String> {
         cli::CommandKind::DumpYir { input } => {
             nuisc::run(nuisc::CommandKind::DumpYir { input })?;
         }
+        cli::CommandKind::Rc { args } => {
+            run_nuis_rc(&args)?;
+        }
     }
 
     Ok(())
+}
+
+fn print_help() {
+    println!("nuis toolchain frontdoor");
+    println!("usage:");
+    println!("  nuis status");
+    println!("  nuis registry");
+    println!("  nuis bindings <input.ns|project-dir|nuis.toml>");
+    println!("  nuis check [input.ns|project-dir|nuis.toml]");
+    println!("  nuis build [input.ns|project-dir|nuis.toml] <output-dir>");
+    println!("  nuis dump-ast [input.ns|project-dir|nuis.toml]");
+    println!("  nuis dump-nir [input.ns|project-dir|nuis.toml]");
+    println!("  nuis dump-yir [input.ns|project-dir|nuis.toml]");
+    println!("  nuis pack-nustar <package-id> <output.nustar>");
+    println!("  nuis inspect-nustar <input.nustar>");
+    println!("  nuis loader-contract <package-id>");
+    println!("  nuis rc <status|start|stop|track|projects|versions> [...]");
+}
+
+fn run_nuis_rc(args: &[String]) -> Result<(), String> {
+    let status = std::process::Command::new("nuis-rc").args(args).status();
+    match status {
+        Ok(status) => {
+            if status.success() {
+                Ok(())
+            } else {
+                Err(format!(
+                    "nuis-rc exited with status {}",
+                    status
+                        .code()
+                        .map(|code| code.to_string())
+                        .unwrap_or_else(|| "signal".to_owned())
+                ))
+            }
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            let fallback = std::process::Command::new("cargo")
+                .args(["run", "-q", "-p", "nuis-rc", "--"])
+                .args(args)
+                .status();
+            match fallback {
+                Ok(status) if status.success() => Ok(()),
+                Ok(status) => Err(format!(
+                    "failed to run nuis-rc via PATH and cargo fallback exited with status {}",
+                    status
+                        .code()
+                        .map(|code| code.to_string())
+                        .unwrap_or_else(|| "signal".to_owned())
+                )),
+                Err(fallback_error) => Err(format!(
+                    "failed to run nuis-rc via PATH ({error}) and cargo fallback ({fallback_error})"
+                )),
+            }
+        }
+        Err(error) => Err(format!("failed to run nuis-rc: {error}")),
+    }
 }
