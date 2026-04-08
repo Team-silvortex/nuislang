@@ -34,6 +34,8 @@ pub struct NustarPackageManifest {
     pub binary_extension: String,
     pub package_layout: String,
     pub machine_abi_policy: String,
+    pub abi_profiles: Vec<String>,
+    pub abi_capabilities: Vec<String>,
     pub implementation_kinds: Vec<String>,
     pub loader_entry: String,
     pub loader_abi: String,
@@ -57,6 +59,9 @@ pub struct NustarBinding {
     pub nir_entry: String,
     pub yir_lowering_entry: String,
     pub part_verify_entry: String,
+    pub machine_abi_policy: String,
+    pub abi_profiles: Vec<String>,
+    pub abi_capabilities: Vec<String>,
     pub ast_surface: Vec<String>,
     pub nir_surface: Vec<String>,
     pub yir_lowering: Vec<String>,
@@ -203,7 +208,8 @@ pub fn plan_bindings(
             .filter(|node| {
                 node.op.module == "cpu"
                     && node.op.instruction == "instantiate_unit"
-                    && node.op.args.first().map(String::as_str) == Some(manifest.domain_family.as_str())
+                    && node.op.args.first().map(String::as_str)
+                        == Some(manifest.domain_family.as_str())
             })
             .filter_map(|node| node.op.args.get(1).cloned())
             .collect::<Vec<_>>();
@@ -237,7 +243,11 @@ pub fn plan_bindings(
         let uncovered_support_profile_slots = manifest
             .support_profile_slots
             .iter()
-            .filter(|slot| !covered_support_profile_slots.iter().any(|covered| covered == *slot))
+            .filter(|slot| {
+                !covered_support_profile_slots
+                    .iter()
+                    .any(|covered| covered == *slot)
+            })
             .cloned()
             .collect::<Vec<_>>();
 
@@ -280,6 +290,9 @@ pub fn plan_bindings(
             nir_entry: manifest.nir_entry,
             yir_lowering_entry: manifest.yir_lowering_entry,
             part_verify_entry: manifest.part_verify_entry,
+            machine_abi_policy: manifest.machine_abi_policy,
+            abi_profiles: manifest.abi_profiles,
+            abi_capabilities: manifest.abi_capabilities,
             ast_surface: manifest.ast_surface,
             nir_surface: manifest.nir_surface,
             yir_lowering: manifest.yir_lowering,
@@ -327,65 +340,59 @@ fn covered_profile_slots(
 
 fn implied_slots_for_surface(domain_family: &str, surface: &str) -> &'static [&'static str] {
     match (domain_family, surface) {
-        ("shader", "shader.profile.render.v1") => {
-            &[
-                "target",
-                "viewport",
-                "pipeline",
-                "vertex_count",
-                "instance_count",
-                "pass_kind",
-                "packet_field_count",
-            ]
-        }
-        ("shader", "shader.profile.seed.color.v1") => {
-            &["packet_color_slot", "material_mode"]
-        }
-        ("shader", "shader.profile.seed.speed.v1") => {
-            &["packet_speed_slot", "packet_tag"]
-        }
+        ("shader", "shader.profile.render.v1") => &[
+            "target",
+            "viewport",
+            "pipeline",
+            "vertex_count",
+            "instance_count",
+            "pass_kind",
+            "packet_field_count",
+        ],
+        ("shader", "shader.profile.seed.color.v1") => &["packet_color_slot", "material_mode"],
+        ("shader", "shader.profile.seed.speed.v1") => &["packet_speed_slot", "packet_tag"],
         ("shader", "shader.profile.seed.radius.v1") => {
             &["packet_radius_slot", "packet_field_count"]
         }
-        ("shader", "shader.profile.packet.v1") => {
-            &["packet_color_slot", "packet_speed_slot", "packet_radius_slot"]
-        }
+        ("shader", "shader.profile.packet.v1") => &[
+            "packet_color_slot",
+            "packet_speed_slot",
+            "packet_radius_slot",
+        ],
         ("shader", "shader.profile.target.v1") => &["target"],
         ("shader", "shader.profile.viewport.v1") => &["viewport"],
         ("shader", "shader.profile.pipeline.v1") => &["pipeline"],
         ("shader", "shader.profile.draw-budget.v1") => &["vertex_count", "instance_count"],
-        ("shader", "shader.profile.packet-slots.v1") => {
-            &["packet_color_slot", "packet_speed_slot", "packet_radius_slot"]
-        }
+        ("shader", "shader.profile.packet-slots.v1") => &[
+            "packet_color_slot",
+            "packet_speed_slot",
+            "packet_radius_slot",
+        ],
         ("shader", "shader.profile.packet-tag.v1") => &["packet_tag"],
         ("shader", "shader.profile.material-mode.v1") => &["material_mode"],
         ("shader", "shader.profile.pass-kind.v1") => &["pass_kind"],
         ("shader", "shader.profile.packet-field-count.v1") => &["packet_field_count"],
         ("data", "data.profile.bind-core.v1") => &["bind_core"],
-        ("data", "data.profile.send.uplink.v1") => {
-            &[
-                "window_offset",
-                "uplink_len",
-                "marker:cpu_to_shader",
-                "marker:uplink_pipe",
-                "marker:uplink_pipe_class",
-                "marker:uplink_payload_class",
-                "marker:uplink_payload_shape",
-                "marker:uplink_window_policy",
-            ]
-        }
-        ("data", "data.profile.send.downlink.v1") => {
-            &[
-                "window_offset",
-                "downlink_len",
-                "marker:shader_to_cpu",
-                "marker:downlink_pipe",
-                "marker:downlink_pipe_class",
-                "marker:downlink_payload_class",
-                "marker:downlink_payload_shape",
-                "marker:downlink_window_policy",
-            ]
-        }
+        ("data", "data.profile.send.uplink.v1") => &[
+            "window_offset",
+            "uplink_len",
+            "marker:cpu_to_shader",
+            "marker:uplink_pipe",
+            "marker:uplink_pipe_class",
+            "marker:uplink_payload_class",
+            "marker:uplink_payload_shape",
+            "marker:uplink_window_policy",
+        ],
+        ("data", "data.profile.send.downlink.v1") => &[
+            "window_offset",
+            "downlink_len",
+            "marker:shader_to_cpu",
+            "marker:downlink_pipe",
+            "marker:downlink_pipe_class",
+            "marker:downlink_payload_class",
+            "marker:downlink_payload_shape",
+            "marker:downlink_window_policy",
+        ],
         ("data", "data.profile.handle-table.v1") => &["handle_table"],
         ("data", "data.profile.window-layout.v1") => {
             &["window_offset", "uplink_len", "downlink_len"]
@@ -393,21 +400,22 @@ fn implied_slots_for_surface(domain_family: &str, surface: &str) -> &'static [&'
         ("data", "data.profile.sync-markers.v1") => {
             &["marker:cpu_to_shader", "marker:shader_to_cpu"]
         }
-        ("data", "data.profile.pipe-markers.v1") => {
-            &["marker:uplink_pipe", "marker:downlink_pipe"]
-        }
+        ("data", "data.profile.pipe-markers.v1") => &["marker:uplink_pipe", "marker:downlink_pipe"],
         ("data", "data.profile.pipe-class.v1") => {
             &["marker:uplink_pipe_class", "marker:downlink_pipe_class"]
         }
-        ("data", "data.profile.payload-class.v1") => {
-            &["marker:uplink_payload_class", "marker:downlink_payload_class"]
-        }
-        ("data", "data.profile.payload-shape.v1") => {
-            &["marker:uplink_payload_shape", "marker:downlink_payload_shape"]
-        }
-        ("data", "data.profile.window-policy.v1") => {
-            &["marker:uplink_window_policy", "marker:downlink_window_policy"]
-        }
+        ("data", "data.profile.payload-class.v1") => &[
+            "marker:uplink_payload_class",
+            "marker:downlink_payload_class",
+        ],
+        ("data", "data.profile.payload-shape.v1") => &[
+            "marker:uplink_payload_shape",
+            "marker:downlink_payload_shape",
+        ],
+        ("data", "data.profile.window-policy.v1") => &[
+            "marker:uplink_window_policy",
+            "marker:downlink_window_policy",
+        ],
         _ => &[],
     }
 }
@@ -439,9 +447,7 @@ fn collect_support_usage_stmt(
         NirStmt::Let { value, .. }
         | NirStmt::Const { value, .. }
         | NirStmt::Print(value)
-        | NirStmt::Expr(value) => {
-            collect_support_usage_expr(value, domain_family, surfaces, slots)
-        }
+        | NirStmt::Expr(value) => collect_support_usage_expr(value, domain_family, surfaces, slots),
         NirStmt::If {
             condition,
             then_body,
@@ -533,6 +539,9 @@ fn collect_support_usage_expr(
         NirExpr::ShaderProfileRender { .. } if domain_family == "shader" => {
             surfaces.insert("shader.profile.render.v1".to_owned());
         }
+        NirExpr::ShaderInlineWgsl { .. } if domain_family == "shader" => {
+            surfaces.insert("shader.inline.wgsl.v1".to_owned());
+        }
         NirExpr::DataProfileBindCoreRef { .. } if domain_family == "data" => {
             surfaces.insert("data.profile.bind-core.v1".to_owned());
             slots.insert("bind_core".to_owned());
@@ -555,12 +564,24 @@ fn collect_support_usage_expr(
         }
         NirExpr::DataProfileMarkerRef { tag, .. } if domain_family == "data" => {
             let (surface, slot) = match tag.as_str() {
-                "cpu_to_shader" | "shader_to_cpu" => ("data.profile.sync-markers.v1", format!("marker:{tag}")),
-                "uplink_pipe" | "downlink_pipe" => ("data.profile.pipe-markers.v1", format!("marker:{tag}")),
-                "uplink_pipe_class" | "downlink_pipe_class" => ("data.profile.pipe-class.v1", format!("marker:{tag}")),
-                "uplink_payload_class" | "downlink_payload_class" => ("data.profile.payload-class.v1", format!("marker:{tag}")),
-                "uplink_payload_shape" | "downlink_payload_shape" => ("data.profile.payload-shape.v1", format!("marker:{tag}")),
-                "uplink_window_policy" | "downlink_window_policy" => ("data.profile.window-policy.v1", format!("marker:{tag}")),
+                "cpu_to_shader" | "shader_to_cpu" => {
+                    ("data.profile.sync-markers.v1", format!("marker:{tag}"))
+                }
+                "uplink_pipe" | "downlink_pipe" => {
+                    ("data.profile.pipe-markers.v1", format!("marker:{tag}"))
+                }
+                "uplink_pipe_class" | "downlink_pipe_class" => {
+                    ("data.profile.pipe-class.v1", format!("marker:{tag}"))
+                }
+                "uplink_payload_class" | "downlink_payload_class" => {
+                    ("data.profile.payload-class.v1", format!("marker:{tag}"))
+                }
+                "uplink_payload_shape" | "downlink_payload_shape" => {
+                    ("data.profile.payload-shape.v1", format!("marker:{tag}"))
+                }
+                "uplink_window_policy" | "downlink_window_policy" => {
+                    ("data.profile.window-policy.v1", format!("marker:{tag}"))
+                }
                 _ => ("data.profile.sync-markers.v1", format!("marker:{tag}")),
             };
             surfaces.insert(surface.to_owned());
@@ -624,7 +645,11 @@ fn walk_child_exprs(expr: &NirExpr, f: &mut dyn FnMut(&NirExpr)) {
             f(target);
             f(next);
         }
-        NirExpr::StoreAt { buffer, index, value } => {
+        NirExpr::StoreAt {
+            buffer,
+            index,
+            value,
+        } => {
             f(buffer);
             f(index);
             f(value);
@@ -650,7 +675,9 @@ fn walk_child_exprs(expr: &NirExpr, f: &mut dyn FnMut(&NirExpr)) {
             f(speed);
             f(radius);
         }
-        NirExpr::ShaderProfileSpeedSeed { delta, scale, base, .. } => {
+        NirExpr::ShaderProfileSpeedSeed {
+            delta, scale, base, ..
+        } => {
             f(delta);
             f(scale);
             f(base);
@@ -717,7 +744,11 @@ pub fn validate_unit_binding(
         return Ok(());
     }
 
-    if manifest.unit_types.iter().any(|candidate| candidate == unit) {
+    if manifest
+        .unit_types
+        .iter()
+        .any(|candidate| candidate == unit)
+    {
         return Ok(());
     }
 
@@ -725,6 +756,158 @@ pub fn validate_unit_binding(
         "unit `{unit}` is not registered by nustar package `{}` for mod domain `{domain}`",
         manifest.package_id
     ))
+}
+
+pub fn validate_manifest_abi(
+    manifest: &NustarPackageManifest,
+    required_abi: &str,
+) -> Result<(), String> {
+    if manifest
+        .abi_profiles
+        .iter()
+        .any(|profile| profile == required_abi)
+    {
+        return Ok(());
+    }
+    Err(format!(
+        "nustar package `{}` for domain `{}` does not declare required ABI `{}`; declared ABI profiles: {}",
+        manifest.package_id,
+        manifest.domain_family,
+        required_abi,
+        if manifest.abi_profiles.is_empty() {
+            "<none>".to_owned()
+        } else {
+            manifest.abi_profiles.join(", ")
+        }
+    ))
+}
+
+pub fn used_ops_for_domain(module: &YirModule, domain_family: &str) -> Vec<String> {
+    let mut ops = module
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == domain_family)
+        .map(|node| node.op.full_name())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    ops.sort();
+    ops
+}
+
+pub fn validate_abi_capabilities(
+    manifest: &NustarPackageManifest,
+    required_abi: &str,
+    used_surfaces: &[String],
+    used_ops: &[String],
+) -> Result<(), String> {
+    if manifest.abi_capabilities.is_empty() {
+        return Ok(());
+    }
+
+    let mut surface_allowed = BTreeSet::new();
+    let mut op_allowed = BTreeSet::new();
+    let mut saw_required_abi = false;
+    for raw in &manifest.abi_capabilities {
+        let Some((abi, caps)) = raw.split_once(':') else {
+            return Err(format!(
+                "nustar package `{}` has invalid abi_capabilities entry `{}`; expected `abi:kind:value[|kind:value...]`",
+                manifest.package_id, raw
+            ));
+        };
+        if abi.trim().is_empty() {
+            return Err(format!(
+                "nustar package `{}` has invalid abi_capabilities entry `{}`; ABI id must not be empty",
+                manifest.package_id, raw
+            ));
+        }
+        let abi_matches = abi.trim() == required_abi;
+        if !abi_matches {
+            continue;
+        }
+        saw_required_abi = true;
+        for cap in caps.split('|').map(str::trim).filter(|cap| !cap.is_empty()) {
+            if let Some(value) = cap.strip_prefix("surface:") {
+                if value.trim().is_empty() {
+                    return Err(format!(
+                        "nustar package `{}` has invalid abi_capabilities entry `{}`; `surface:` capability must include a pattern",
+                        manifest.package_id, raw
+                    ));
+                }
+                surface_allowed.insert(value.to_owned());
+            } else if let Some(value) = cap.strip_prefix("op:") {
+                if value.trim().is_empty() {
+                    return Err(format!(
+                        "nustar package `{}` has invalid abi_capabilities entry `{}`; `op:` capability must include a pattern",
+                        manifest.package_id, raw
+                    ));
+                }
+                op_allowed.insert(value.to_owned());
+            } else {
+                return Err(format!(
+                    "nustar package `{}` has invalid abi_capabilities capability `{}` in `{}`; expected `surface:<pattern>` or `op:<pattern>`",
+                    manifest.package_id, cap, raw
+                ));
+            }
+        }
+    }
+
+    if !saw_required_abi {
+        return Err(format!(
+            "ABI `{}` of nustar package `{}` has no abi_capabilities mapping; add `{}:...` in manifest",
+            required_abi, manifest.package_id, required_abi
+        ));
+    }
+
+    if !surface_allowed.is_empty() && !surface_allowed.contains("*") {
+        for surface in used_surfaces {
+            if !surface_allowed
+                .iter()
+                .any(|allowed| capability_matches(allowed, surface))
+            {
+                return Err(format!(
+                    "ABI `{}` of nustar package `{}` does not allow support surface `{}` (allowed: {})",
+                    required_abi,
+                    manifest.package_id,
+                    surface,
+                    surface_allowed
+                        .iter()
+                        .cloned()
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ));
+            }
+        }
+    }
+
+    if !op_allowed.is_empty() && !op_allowed.contains("*") {
+        for op in used_ops {
+            if !op_allowed
+                .iter()
+                .any(|allowed| capability_matches(allowed, op))
+            {
+                return Err(format!(
+                    "ABI `{}` of nustar package `{}` does not allow op `{}` (allowed: {})",
+                    required_abi,
+                    manifest.package_id,
+                    op,
+                    op_allowed.iter().cloned().collect::<Vec<_>>().join(", ")
+                ));
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn capability_matches(pattern: &str, actual: &str) -> bool {
+    if pattern == "*" {
+        return true;
+    }
+    if let Some(prefix) = pattern.strip_suffix('*') {
+        return actual.starts_with(prefix);
+    }
+    pattern == actual
 }
 
 pub fn manifest_path(root: &Path, entry: &NustarPackageIndexEntry) -> PathBuf {
@@ -795,22 +978,24 @@ fn parse_manifest(source: &str, path: &Path) -> Result<NustarPackageManifest, St
         .unwrap_or_else(|| "single-envelope".to_owned());
     let machine_abi_policy = parse_optional_string(source, "machine_abi_policy")
         .unwrap_or_else(|| "exact-match".to_owned());
+    let abi_profiles = parse_optional_string_array(source, "abi_profiles").unwrap_or_default();
+    let abi_capabilities =
+        parse_optional_string_array(source, "abi_capabilities").unwrap_or_default();
     let implementation_kinds = parse_optional_string_array(source, "implementation_kinds")
         .unwrap_or_else(|| vec!["native-stub".to_owned()]);
     let loader_entry = parse_optional_string(source, "loader_entry")
         .unwrap_or_else(|| "nustar.bootstrap.v1".to_owned());
     let loader_abi = parse_optional_string(source, "loader_abi")
         .unwrap_or_else(|| "nustar-loader-v1".to_owned());
-    let host_ffi_surface = parse_optional_string_array(source, "host_ffi_surface")
-        .unwrap_or_default();
-    let host_ffi_abis = parse_optional_string_array(source, "host_ffi_abis")
-        .unwrap_or_default();
-    let host_ffi_bridge = parse_optional_string(source, "host_ffi_bridge")
-        .unwrap_or_else(|| "none".to_owned());
-    let support_surface = parse_optional_string_array(source, "support_surface")
-        .unwrap_or_default();
-    let support_profile_slots = parse_optional_string_array(source, "support_profile_slots")
-        .unwrap_or_default();
+    let host_ffi_surface =
+        parse_optional_string_array(source, "host_ffi_surface").unwrap_or_default();
+    let host_ffi_abis = parse_optional_string_array(source, "host_ffi_abis").unwrap_or_default();
+    let host_ffi_bridge =
+        parse_optional_string(source, "host_ffi_bridge").unwrap_or_else(|| "none".to_owned());
+    let support_surface =
+        parse_optional_string_array(source, "support_surface").unwrap_or_default();
+    let support_profile_slots =
+        parse_optional_string_array(source, "support_profile_slots").unwrap_or_default();
     let profiles = parse_string_array(source, "profiles", path)?;
     let resource_families = parse_string_array(source, "resource_families", path)?;
     let unit_types = parse_optional_string_array(source, "unit_types").unwrap_or_default();
@@ -834,6 +1019,8 @@ fn parse_manifest(source: &str, path: &Path) -> Result<NustarPackageManifest, St
         binary_extension,
         package_layout,
         machine_abi_policy,
+        abi_profiles,
+        abi_capabilities,
         implementation_kinds,
         loader_entry,
         loader_abi,

@@ -29,8 +29,7 @@ pub fn compile_source_path(path: &Path) -> Result<PipelineArtifacts, String> {
         validate_instantiated_units(&nir)?;
         crate::project::validate_project_links_against_nir(&project, &nir)?;
         let yir = crate::lowering::lower_nir_to_yir(&nir, &lowering_manifest)?;
-        let mut loaded_nustar =
-            collect_loaded_nustar(&nir, &yir, &lowering_manifest.package_id)?;
+        let mut loaded_nustar = collect_loaded_nustar(&nir, &yir, &lowering_manifest.package_id)?;
         let mut artifacts = PipelineArtifacts {
             ast,
             nir,
@@ -41,11 +40,17 @@ pub fn compile_source_path(path: &Path) -> Result<PipelineArtifacts, String> {
         crate::project::apply_project_support_modules_to_yir(&project, &mut artifacts.yir)?;
         crate::project::apply_project_links_to_yir(&project, &mut artifacts.yir)?;
         crate::project::validate_project_links_against_yir(&project, &artifacts.yir)?;
+        crate::project::validate_project_abi_against_yir(&project, &artifacts.yir)?;
         artifacts.llvm_ir = yir_lower_llvm::emit_module(&artifacts.yir)?;
-        let lowering_manifest =
-            crate::registry::load_manifest_for_domain(Path::new("nustar-packages"), &artifacts.nir.domain)?;
-        artifacts.loaded_nustar =
-            collect_loaded_nustar(&artifacts.nir, &artifacts.yir, &lowering_manifest.package_id)?;
+        let lowering_manifest = crate::registry::load_manifest_for_domain(
+            Path::new("nustar-packages"),
+            &artifacts.nir.domain,
+        )?;
+        artifacts.loaded_nustar = collect_loaded_nustar(
+            &artifacts.nir,
+            &artifacts.yir,
+            &lowering_manifest.package_id,
+        )?;
         return Ok(artifacts);
     }
     let source = fs::read_to_string(path)
@@ -87,13 +92,15 @@ fn validate_externs(
         return Ok(());
     }
     if ast.domain != "cpu" {
-        return Err("extern declarations are currently only supported inside `mod cpu <unit>`".to_owned());
+        return Err(
+            "extern declarations are currently only supported inside `mod cpu <unit>`".to_owned(),
+        );
     }
-    for function in ast
-        .externs
-        .iter()
-        .chain(ast.extern_interfaces.iter().flat_map(|item| item.methods.iter()))
-    {
+    for function in ast.externs.iter().chain(
+        ast.extern_interfaces
+            .iter()
+            .flat_map(|item| item.methods.iter()),
+    ) {
         if !lowering_manifest
             .host_ffi_abis
             .iter()
@@ -217,16 +224,14 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         | NirExpr::KernelProfileBatchLanesRef { .. }
         | NirExpr::ShaderTarget { .. }
         | NirExpr::ShaderViewport { .. }
-        | NirExpr::ShaderPipeline { .. } => {}
+        | NirExpr::ShaderPipeline { .. }
+        | NirExpr::ShaderInlineWgsl { .. } => {}
         NirExpr::ShaderProfileColorSeed { base, delta, .. } => {
             collect_instantiated_units_expr(base, units);
             collect_instantiated_units_expr(delta, units);
         }
         NirExpr::ShaderProfileSpeedSeed {
-            delta,
-            scale,
-            base,
-            ..
+            delta, scale, base, ..
         } => {
             collect_instantiated_units_expr(delta, units);
             collect_instantiated_units_expr(scale, units);

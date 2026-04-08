@@ -1,0 +1,4 @@
+name = "bad_shader_profile_missing_inline_wgsl"
+entry = "main.ns"
+modules = ["main.ns", "surface_shader.ns", "fabric_plane.ns"]
+links = ["cpu.Main -> shader.SurfaceShader via data.FabricPlane", "shader.SurfaceShader -> cpu.Main via data.FabricPlane"]

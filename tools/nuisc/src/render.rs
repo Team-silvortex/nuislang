@@ -43,7 +43,10 @@ pub fn render_ast(module: &AstModule) -> String {
             .as_ref()
             .map(|ty| format!(" -> {}", render_ast_type(ty)))
             .unwrap_or_default();
-        out.push_str(&format!("  fn {}({}){}\n", function.name, params, return_suffix));
+        out.push_str(&format!(
+            "  fn {}({}){}\n",
+            function.name, params, return_suffix
+        ));
         for stmt in &function.body {
             match stmt {
                 AstStmt::Let { name, ty, value } => {
@@ -136,7 +139,10 @@ pub fn render_nir(module: &NirModule) -> String {
             .as_ref()
             .map(|ty| format!(" -> {}", render_nir_type(ty)))
             .unwrap_or_default();
-        out.push_str(&format!("  fn {}({}){}\n", function.name, params, return_suffix));
+        out.push_str(&format!(
+            "  fn {}({}){}\n",
+            function.name, params, return_suffix
+        ));
         for stmt in &function.body {
             match stmt {
                 NirStmt::Let { name, ty, value } => {
@@ -240,7 +246,10 @@ fn render_ast_expr(value: &AstExpr) -> String {
         AstExpr::Call { callee, args } => format!(
             "{}({})",
             callee,
-            args.iter().map(render_ast_expr).collect::<Vec<_>>().join(", ")
+            args.iter()
+                .map(render_ast_expr)
+                .collect::<Vec<_>>()
+                .join(", ")
         ),
         AstExpr::MethodCall {
             receiver,
@@ -250,7 +259,10 @@ fn render_ast_expr(value: &AstExpr) -> String {
             "{}.{}({})",
             render_ast_expr(receiver),
             method,
-            args.iter().map(render_ast_expr).collect::<Vec<_>>().join(", ")
+            args.iter()
+                .map(render_ast_expr)
+                .collect::<Vec<_>>()
+                .join(", ")
         ),
         AstExpr::StructLiteral { type_name, fields } => format!(
             "{} {{ {} }}",
@@ -318,10 +330,18 @@ fn render_nir_expr(value: &NirExpr) -> String {
         NirExpr::Borrow(value) => format!("borrow({})", render_nir_expr(value)),
         NirExpr::Move(value) => format!("move({})", render_nir_expr(value)),
         NirExpr::AllocNode { value, next } => {
-            format!("alloc_node({}, {})", render_nir_expr(value), render_nir_expr(next))
+            format!(
+                "alloc_node({}, {})",
+                render_nir_expr(value),
+                render_nir_expr(next)
+            )
         }
         NirExpr::AllocBuffer { len, fill } => {
-            format!("alloc_buffer({}, {})", render_nir_expr(len), render_nir_expr(fill))
+            format!(
+                "alloc_buffer({}, {})",
+                render_nir_expr(len),
+                render_nir_expr(fill)
+            )
         }
         NirExpr::DataBindCore(core) => format!("data_bind_core({core})"),
         NirExpr::DataMarker(tag) => format!("data_marker(\"{}\")", escape_debug(tag)),
@@ -343,7 +363,11 @@ fn render_nir_expr(value: &NirExpr) -> String {
             "data_handle_table({})",
             entries
                 .iter()
-                .map(|(slot, resource)| format!("\"{}={}\"", escape_debug(slot), escape_debug(resource)))
+                .map(|(slot, resource)| format!(
+                    "\"{}={}\"",
+                    escape_debug(slot),
+                    escape_debug(resource)
+                ))
                 .collect::<Vec<_>>()
                 .join(", ")
         ),
@@ -352,7 +376,12 @@ fn render_nir_expr(value: &NirExpr) -> String {
             width,
             height,
             title,
-        } => format!("cpu_window({}, {}, \"{}\")", width, height, escape_debug(title)),
+        } => format!(
+            "cpu_window({}, {}, \"{}\")",
+            width,
+            height,
+            escape_debug(title)
+        ),
         NirExpr::CpuInputI64 {
             channel,
             default,
@@ -512,7 +541,10 @@ fn render_nir_expr(value: &NirExpr) -> String {
                 .map(|name| format!("{name}::"))
                 .unwrap_or_default(),
             callee,
-            args.iter().map(render_nir_expr).collect::<Vec<_>>().join(", ")
+            args.iter()
+                .map(render_nir_expr)
+                .collect::<Vec<_>>()
+                .join(", ")
         ),
         NirExpr::ShaderTarget {
             format,
@@ -531,6 +563,11 @@ fn render_nir_expr(value: &NirExpr) -> String {
             "shader_pipeline(\"{}\", \"{}\")",
             escape_debug(name),
             escape_debug(topology)
+        ),
+        NirExpr::ShaderInlineWgsl { entry, source } => format!(
+            "shader_inline_wgsl(\"{}\", \"{}\")",
+            escape_debug(entry),
+            escape_debug(source)
         ),
         NirExpr::ShaderBeginPass {
             target,
@@ -563,13 +600,25 @@ fn render_nir_expr(value: &NirExpr) -> String {
         NirExpr::LoadNext(value) => format!("load_next({})", render_nir_expr(value)),
         NirExpr::BufferLen(value) => format!("buffer_len({})", render_nir_expr(value)),
         NirExpr::LoadAt { buffer, index } => {
-            format!("load_at({}, {})", render_nir_expr(buffer), render_nir_expr(index))
+            format!(
+                "load_at({}, {})",
+                render_nir_expr(buffer),
+                render_nir_expr(index)
+            )
         }
         NirExpr::StoreValue { target, value } => {
-            format!("store_value({}, {})", render_nir_expr(target), render_nir_expr(value))
+            format!(
+                "store_value({}, {})",
+                render_nir_expr(target),
+                render_nir_expr(value)
+            )
         }
         NirExpr::StoreNext { target, next } => {
-            format!("store_next({}, {})", render_nir_expr(target), render_nir_expr(next))
+            format!(
+                "store_next({}, {})",
+                render_nir_expr(target),
+                render_nir_expr(next)
+            )
         }
         NirExpr::StoreAt {
             buffer,
@@ -586,7 +635,10 @@ fn render_nir_expr(value: &NirExpr) -> String {
         NirExpr::Call { callee, args } => format!(
             "{}({})",
             callee,
-            args.iter().map(render_nir_expr).collect::<Vec<_>>().join(", ")
+            args.iter()
+                .map(render_nir_expr)
+                .collect::<Vec<_>>()
+                .join(", ")
         ),
         NirExpr::MethodCall {
             receiver,
@@ -596,7 +648,10 @@ fn render_nir_expr(value: &NirExpr) -> String {
             "{}.{}({})",
             render_nir_expr(receiver),
             method,
-            args.iter().map(render_nir_expr).collect::<Vec<_>>().join(", ")
+            args.iter()
+                .map(render_nir_expr)
+                .collect::<Vec<_>>()
+                .join(", ")
         ),
         NirExpr::StructLiteral { type_name, fields } => format!(
             "{} {{ {} }}",
@@ -727,7 +782,12 @@ fn render_ast_stmt_inline(stmt: &AstStmt) -> String {
             format!("let {}{} = {}", name, suffix, render_ast_expr(value))
         }
         AstStmt::Const { name, ty, value } => {
-            format!("const {}: {} = {}", name, render_ast_type(ty), render_ast_expr(value))
+            format!(
+                "const {}: {} = {}",
+                name,
+                render_ast_type(ty),
+                render_ast_expr(value)
+            )
         }
         AstStmt::Print(value) => format!("print {}", render_ast_expr(value)),
         AstStmt::Expr(expr) => render_ast_expr(expr),
@@ -749,7 +809,12 @@ fn render_nir_stmt_inline(stmt: &NirStmt) -> String {
             format!("let {}{} = {}", name, suffix, render_nir_expr(value))
         }
         NirStmt::Const { name, ty, value } => {
-            format!("const {}: {} = {}", name, render_nir_type(ty), render_nir_expr(value))
+            format!(
+                "const {}: {} = {}",
+                name,
+                render_nir_type(ty),
+                render_nir_expr(value)
+            )
         }
         NirStmt::Print(value) => format!("print {}", render_nir_expr(value)),
         NirStmt::Expr(expr) => render_nir_expr(expr),

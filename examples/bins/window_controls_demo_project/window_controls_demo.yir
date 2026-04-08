@@ -54,6 +54,7 @@ cpu.const_i64 project_profile_shader_SurfaceShader_packet_field_count cpu0 3
 shader.target project_profile_shader_SurfaceShader_profile_target shader0 rgba8_unorm 160 120
 shader.viewport project_profile_shader_SurfaceShader_profile_view shader0 160 120
 shader.pipeline project_profile_shader_SurfaceShader_profile_pipe shader0 lit_sphere triangle_strip
+shader.inline_wgsl project_profile_shader_SurfaceShader_profile_wgsl shader0 lit_sphere "struct VsOut {\n        @builtin(position) pos: vec4<f32>,\n      };\n\n      @vertex\n      fn vs_main(@builtin(vertex_index) vid: u32) -> VsOut {\n        var out: VsOut;\n        let x: f32 = f32((vid << 1u) & 2u);\n        let y: f32 = f32(vid & 2u);\n        out.pos = vec4<f32>(x * 2.0 - 1.0, y * -2.0 + 1.0, 0.0, 1.0);\n        return out;\n      }\n\n      @fragment\n      fn fs_main() -> @location(0) vec4<f32> {\n        return vec4<f32>(0.82, 0.88, 0.97, 1.0);\n      }"
 cpu.const_i64 project_profile_data_FabricPlane_window_offset cpu0 0
 cpu.const_i64 project_profile_data_FabricPlane_uplink_len cpu0 1
 cpu.const_i64 project_profile_data_FabricPlane_downlink_len cpu0 1

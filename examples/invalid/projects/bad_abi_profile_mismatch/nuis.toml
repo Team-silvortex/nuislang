@@ -1,0 +1,4 @@
+name = "bad_abi_profile_mismatch"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.invalid_abi"]

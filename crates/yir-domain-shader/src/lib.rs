@@ -183,6 +183,29 @@ impl RegisteredMod for ShaderMod {
 
                 Ok(InstructionSemantics::pure(Vec::new()))
             }
+            "inline_wgsl" => {
+                if node.op.args.len() != 2 {
+                    return Err(format!(
+                        "node `{}` expects `shader.inline_wgsl <name> <resource> <entry> <source>`",
+                        node.name
+                    ));
+                }
+                let entry = node.op.args[0].trim();
+                let source = node.op.args[1].trim();
+                if entry.is_empty() {
+                    return Err(format!("node `{}` has empty inline_wgsl entry", node.name));
+                }
+                if source.is_empty() {
+                    return Err(format!("node `{}` has empty inline_wgsl source", node.name));
+                }
+                if !source.contains("@vertex") || !source.contains("@fragment") {
+                    return Err(format!(
+                        "node `{}` inline_wgsl source must contain both @vertex and @fragment",
+                        node.name
+                    ));
+                }
+                Ok(InstructionSemantics::pure(Vec::new()))
+            }
             "vertex_layout" => {
                 if node.op.args.len() != 2 {
                     return Err(format!(
@@ -587,6 +610,13 @@ impl RegisteredMod for ShaderMod {
             "pipeline" => Ok(Value::Pipeline(RenderPipeline {
                 shading_model: node.op.args[0].clone(),
                 topology: node.op.args[1].clone(),
+            })),
+            "inline_wgsl" => Ok(Value::Struct(StructValue {
+                type_name: "ShaderInlineWgsl".to_owned(),
+                fields: vec![
+                    ("entry".to_owned(), Value::Symbol(node.op.args[0].clone())),
+                    ("source".to_owned(), Value::Symbol(node.op.args[1].clone())),
+                ],
             })),
             "vertex_layout" => Ok(Value::VertexLayout(VertexLayout {
                 stride: node.op.args[0].parse::<usize>().map_err(|_| {

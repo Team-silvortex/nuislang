@@ -16,4 +16,7 @@ cargo run -p nuis -- check examples/invalid/projects/bad_nir_surface_missing_dat
 cargo run -p nuis -- check examples/invalid/projects/bad_nir_surface_missing_data_handle_table
 cargo run -p nuis -- check examples/invalid/projects/bad_nir_surface_missing_shader_seed
 cargo run -p nuis -- check examples/invalid/projects/bad_nir_surface_missing_shader_packet
+cargo run -p nuis -- check examples/invalid/projects/bad_shader_profile_missing_inline_wgsl
+cargo run -p nuis -- check examples/invalid/projects/bad_abi_profile_mismatch
+cargo run -p nuis -- check examples/invalid/projects/bad_shader_abi_inline_wgsl_forbidden
 ```

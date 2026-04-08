@@ -1,4 +1,8 @@
-use std::{fs, path::Path};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fs,
+    path::Path,
+};
 
 use crate::registry::NustarPackageManifest;
 
@@ -44,6 +48,147 @@ pub struct ImplementationContract {
     pub link_mode: String,
     pub machine_abi_policy: String,
     pub notes: String,
+}
+
+pub fn validate_manifest_for_packaging(manifest: &NustarPackageManifest) -> Result<(), String> {
+    if manifest.abi_profiles.is_empty() {
+        return Err(format!(
+            "nustar package `{}` must declare at least one ABI profile in `abi_profiles`",
+            manifest.package_id
+        ));
+    }
+    if manifest.abi_capabilities.is_empty() {
+        return Err(format!(
+            "nustar package `{}` must declare ABI capability mappings in `abi_capabilities`",
+            manifest.package_id
+        ));
+    }
+
+    let profile_set = manifest
+        .abi_profiles
+        .iter()
+        .map(|value| value.trim().to_owned())
+        .collect::<BTreeSet<_>>();
+    if profile_set.len() != manifest.abi_profiles.len() {
+        return Err(format!(
+            "nustar package `{}` has duplicated ABI profile entries in `abi_profiles`",
+            manifest.package_id
+        ));
+    }
+
+    for profile in &manifest.abi_profiles {
+        crate::registry::validate_manifest_abi(manifest, profile)?;
+        crate::registry::validate_abi_capabilities(manifest, profile, &[], &[])?;
+    }
+
+    let mut capabilities_by_abi = BTreeMap::<String, Vec<(String, String)>>::new();
+    for raw in &manifest.abi_capabilities {
+        let Some((abi, _)) = raw.split_once(':') else {
+            return Err(format!(
+                "nustar package `{}` has invalid abi_capabilities entry `{}`; expected `abi:kind:value[|kind:value...]`",
+                manifest.package_id, raw
+            ));
+        };
+        let abi = abi.trim();
+        if !profile_set.contains(abi) {
+            return Err(format!(
+                "nustar package `{}` has abi_capabilities entry `{}` referencing undeclared ABI profile `{}`",
+                manifest.package_id, raw, abi
+            ));
+        }
+        let caps = raw
+            .split_once(':')
+            .map(|(_, caps)| caps)
+            .unwrap_or_default();
+        for cap in caps.split('|').map(str::trim).filter(|cap| !cap.is_empty()) {
+            if let Some(pattern) = cap.strip_prefix("surface:") {
+                capabilities_by_abi
+                    .entry(abi.to_owned())
+                    .or_default()
+                    .push(("surface".to_owned(), pattern.trim().to_owned()));
+            } else if let Some(pattern) = cap.strip_prefix("op:") {
+                capabilities_by_abi
+                    .entry(abi.to_owned())
+                    .or_default()
+                    .push(("op".to_owned(), pattern.trim().to_owned()));
+            }
+        }
+    }
+    validate_domain_capability_policy(manifest, &capabilities_by_abi)?;
+    Ok(())
+}
+
+fn validate_domain_capability_policy(
+    manifest: &NustarPackageManifest,
+    capabilities_by_abi: &BTreeMap<String, Vec<(String, String)>>,
+) -> Result<(), String> {
+    let op_prefix = format!("{}.", manifest.domain_family);
+    for profile in &manifest.abi_profiles {
+        let profile = profile.trim();
+        let caps = capabilities_by_abi
+            .get(profile)
+            .cloned()
+            .unwrap_or_default();
+        let mut has_op_capability = false;
+        let mut has_surface_capability = false;
+        for (kind, pattern) in caps {
+            if kind == "op" {
+                has_op_capability = true;
+                if !pattern.starts_with(&op_prefix) {
+                    return Err(format!(
+                        "nustar package `{}` ABI `{}` has cross-domain op capability pattern `{}`; expected prefix `{}`",
+                        manifest.package_id, profile, pattern, op_prefix
+                    ));
+                }
+            } else if kind == "surface" {
+                has_surface_capability = true;
+                validate_surface_pattern_for_domain(
+                    &manifest.package_id,
+                    &manifest.domain_family,
+                    profile,
+                    &pattern,
+                )?;
+            }
+        }
+        if !has_op_capability {
+            return Err(format!(
+                "nustar package `{}` ABI `{}` must declare at least one `op:` capability",
+                manifest.package_id, profile
+            ));
+        }
+        if !manifest.support_surface.is_empty()
+            && manifest.domain_family != "cpu"
+            && !has_surface_capability
+        {
+            return Err(format!(
+                "nustar package `{}` ABI `{}` must declare at least one `surface:` capability for domain `{}`",
+                manifest.package_id, profile, manifest.domain_family
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_surface_pattern_for_domain(
+    package_id: &str,
+    domain_family: &str,
+    abi: &str,
+    pattern: &str,
+) -> Result<(), String> {
+    let allowed = match domain_family {
+        "cpu" => false,
+        "data" => pattern.starts_with("data.profile."),
+        "kernel" => pattern.starts_with("kernel.profile."),
+        "shader" => pattern.starts_with("shader.profile.") || pattern == "shader.inline.wgsl.v1",
+        other => pattern.starts_with(&format!("{other}.")),
+    };
+    if allowed {
+        return Ok(());
+    }
+    Err(format!(
+        "nustar package `{}` ABI `{}` has invalid surface capability pattern `{}` for domain `{}`",
+        package_id, abi, pattern, domain_family
+    ))
 }
 
 pub fn encode(binary: &NustarBinary) -> Vec<u8> {
@@ -206,8 +351,16 @@ pub fn decode(bytes: &[u8], source: &Path) -> Result<NustarBinary, String> {
         ));
     }
 
+    let manifest = parse_manifest_text(manifest_source, source)?;
+    validate_manifest_for_packaging(&manifest).map_err(|error| {
+        format!(
+            "`{}` failed manifest ABI packaging validation: {error}",
+            source.display()
+        )
+    })?;
+
     Ok(NustarBinary {
-        manifest: parse_manifest_text(manifest_source, source)?,
+        manifest,
         format_version,
         abi_tag,
         machine_arch,
@@ -380,7 +533,7 @@ fn implementation_contract(binary: &NustarBinary, kind: &str) -> ImplementationC
 
 fn render_manifest(manifest: &NustarPackageManifest) -> String {
     format!(
-        "manifest_schema = \"{}\"\npackage_id = \"{}\"\ndomain_family = \"{}\"\nfrontend = \"{}\"\nentry_crate = \"{}\"\nast_entry = \"{}\"\nnir_entry = \"{}\"\nyir_lowering_entry = \"{}\"\npart_verify_entry = \"{}\"\nast_surface = {}\nnir_surface = {}\nyir_lowering = {}\npart_verify = {}\nbinary_extension = \"{}\"\npackage_layout = \"{}\"\nmachine_abi_policy = \"{}\"\nimplementation_kinds = {}\nloader_entry = \"{}\"\nloader_abi = \"{}\"\nhost_ffi_surface = {}\nhost_ffi_abis = {}\nhost_ffi_bridge = \"{}\"\nsupport_surface = {}\nsupport_profile_slots = {}\nprofiles = {}\nresource_families = {}\nunit_types = {}\nlowering_targets = {}\nops = {}\n",
+        "manifest_schema = \"{}\"\npackage_id = \"{}\"\ndomain_family = \"{}\"\nfrontend = \"{}\"\nentry_crate = \"{}\"\nast_entry = \"{}\"\nnir_entry = \"{}\"\nyir_lowering_entry = \"{}\"\npart_verify_entry = \"{}\"\nast_surface = {}\nnir_surface = {}\nyir_lowering = {}\npart_verify = {}\nbinary_extension = \"{}\"\npackage_layout = \"{}\"\nmachine_abi_policy = \"{}\"\nabi_profiles = {}\nabi_capabilities = {}\nimplementation_kinds = {}\nloader_entry = \"{}\"\nloader_abi = \"{}\"\nhost_ffi_surface = {}\nhost_ffi_abis = {}\nhost_ffi_bridge = \"{}\"\nsupport_surface = {}\nsupport_profile_slots = {}\nprofiles = {}\nresource_families = {}\nunit_types = {}\nlowering_targets = {}\nops = {}\n",
         manifest.manifest_schema,
         manifest.package_id,
         manifest.domain_family,
@@ -397,6 +550,8 @@ fn render_manifest(manifest: &NustarPackageManifest) -> String {
         manifest.binary_extension,
         manifest.package_layout,
         manifest.machine_abi_policy,
+        render_array(&manifest.abi_profiles),
+        render_array(&manifest.abi_capabilities),
         render_array(&manifest.implementation_kinds),
         manifest.loader_entry,
         manifest.loader_abi,
@@ -478,6 +633,9 @@ fn parse_manifest_text(source: &str, path: &Path) -> Result<NustarPackageManifes
         binary_extension: parse_required_string(source, "binary_extension", path)?,
         package_layout: parse_required_string(source, "package_layout", path)?,
         machine_abi_policy: parse_required_string(source, "machine_abi_policy", path)?,
+        abi_profiles: parse_optional_string_array(source, "abi_profiles").unwrap_or_default(),
+        abi_capabilities: parse_optional_string_array(source, "abi_capabilities")
+            .unwrap_or_default(),
         implementation_kinds: parse_string_array(source, "implementation_kinds", path)?,
         loader_entry: parse_required_string(source, "loader_entry", path)?,
         loader_abi: parse_required_string(source, "loader_abi", path)?,
@@ -577,4 +735,156 @@ fn parse_optional_string_array(source: &str, key: &str) -> Option<Vec<String>> {
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Debug)]
+    struct PolicyCase {
+        name: &'static str,
+        domain: &'static str,
+        support_surface: Vec<&'static str>,
+        abi_capabilities: Vec<&'static str>,
+        expect_ok: bool,
+        expect_error_contains: &'static str,
+    }
+
+    fn make_manifest(domain: &str) -> NustarPackageManifest {
+        NustarPackageManifest {
+            manifest_schema: "nustar-manifest-v1".to_owned(),
+            package_id: format!("test.{domain}"),
+            domain_family: domain.to_owned(),
+            frontend: format!("nustar-{domain}"),
+            entry_crate: format!("crates/yir-domain-{domain}"),
+            ast_entry: format!("{domain}.ast.bootstrap.v1"),
+            nir_entry: format!("{domain}.nir.bootstrap.v1"),
+            yir_lowering_entry: format!("{domain}.yir.lowering.v1"),
+            part_verify_entry: format!("{domain}.verify.partial.v1"),
+            ast_surface: vec![format!("{domain}.mod-ast.v1")],
+            nir_surface: vec![format!("nir.{domain}.surface.v1")],
+            yir_lowering: vec![format!("yir.{domain}.lowering.v1")],
+            part_verify: vec![format!("verify.{domain}.contract.v1")],
+            binary_extension: "nustar".to_owned(),
+            package_layout: "single-envelope".to_owned(),
+            machine_abi_policy: "exact-match".to_owned(),
+            abi_profiles: vec![format!("{domain}.abi.v1")],
+            abi_capabilities: Vec::new(),
+            implementation_kinds: vec!["native-stub".to_owned()],
+            loader_entry: "nustar.bootstrap.v1".to_owned(),
+            loader_abi: "nustar-loader-v1".to_owned(),
+            host_ffi_surface: Vec::new(),
+            host_ffi_abis: Vec::new(),
+            host_ffi_bridge: "none".to_owned(),
+            support_surface: Vec::new(),
+            support_profile_slots: Vec::new(),
+            profiles: vec!["aot".to_owned()],
+            resource_families: vec![domain.to_owned()],
+            unit_types: vec!["Main".to_owned()],
+            lowering_targets: vec!["native".to_owned()],
+            ops: vec![format!("{domain}.const")],
+        }
+    }
+
+    #[test]
+    fn capability_policy_table() {
+        let cases = vec![
+            PolicyCase {
+                name: "reject cross-domain op for shader",
+                domain: "shader",
+                support_surface: vec!["shader.profile.packet.v1"],
+                abi_capabilities: vec!["shader.abi.v1:surface:shader.profile.*|op:cpu.*"],
+                expect_ok: false,
+                expect_error_contains: "cross-domain op capability pattern",
+            },
+            PolicyCase {
+                name: "reject invalid data surface prefix",
+                domain: "data",
+                support_surface: vec!["data.profile.bind-core.v1"],
+                abi_capabilities: vec!["data.abi.v1:surface:shader.profile.*|op:data.*"],
+                expect_ok: false,
+                expect_error_contains: "invalid surface capability pattern",
+            },
+            PolicyCase {
+                name: "reject missing surface capability for kernel",
+                domain: "kernel",
+                support_surface: vec!["kernel.profile.bind-core.v1"],
+                abi_capabilities: vec!["kernel.abi.v1:op:kernel.*"],
+                expect_ok: false,
+                expect_error_contains: "must declare at least one `surface:` capability",
+            },
+            PolicyCase {
+                name: "reject surface capability in cpu domain",
+                domain: "cpu",
+                support_surface: vec![],
+                abi_capabilities: vec!["cpu.abi.v1:surface:cpu.profile.*|op:cpu.*"],
+                expect_ok: false,
+                expect_error_contains: "invalid surface capability pattern",
+            },
+            PolicyCase {
+                name: "accept valid shader capability policy",
+                domain: "shader",
+                support_surface: vec!["shader.profile.packet.v1", "shader.inline.wgsl.v1"],
+                abi_capabilities: vec![
+                    "shader.abi.v1:surface:shader.profile.*|surface:shader.inline.wgsl.v1|op:shader.*",
+                ],
+                expect_ok: true,
+                expect_error_contains: "",
+            },
+            PolicyCase {
+                name: "accept valid cpu capability policy",
+                domain: "cpu",
+                support_surface: vec![],
+                abi_capabilities: vec!["cpu.abi.v1:op:cpu.*"],
+                expect_ok: true,
+                expect_error_contains: "",
+            },
+        ];
+
+        for case in cases {
+            let mut manifest = make_manifest(case.domain);
+            manifest.support_surface = case
+                .support_surface
+                .into_iter()
+                .map(str::to_owned)
+                .collect::<Vec<_>>();
+            manifest.abi_capabilities = case
+                .abi_capabilities
+                .into_iter()
+                .map(str::to_owned)
+                .collect::<Vec<_>>();
+
+            let result = validate_manifest_for_packaging(&manifest);
+            if case.expect_ok {
+                assert!(
+                    result.is_ok(),
+                    "{}: unexpected error: {result:?}",
+                    case.name
+                );
+            } else {
+                let error = result.unwrap_err();
+                assert!(
+                    error.contains(case.expect_error_contains),
+                    "{}: unexpected error: {}",
+                    case.name,
+                    error
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn reject_missing_capability_mapping_for_one_profile() {
+        let mut manifest = make_manifest("data");
+        manifest.abi_profiles = vec!["data.abi.v1".to_owned(), "data.abi.alt.v1".to_owned()];
+        manifest.support_surface = vec!["data.profile.bind-core.v1".to_owned()];
+        manifest.abi_capabilities = vec!["data.abi.v1:surface:data.profile.*|op:data.*".to_owned()];
+
+        let error = validate_manifest_for_packaging(&manifest).unwrap_err();
+        assert!(
+            error.contains("has no abi_capabilities mapping"),
+            "unexpected error: {error}"
+        );
+    }
 }

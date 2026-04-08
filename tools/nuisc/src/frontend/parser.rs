@@ -562,10 +562,7 @@ impl Parser {
     fn expect_arrow(&mut self) -> Result<(), String> {
         match self.next() {
             Some(Token::Arrow) => Ok(()),
-            Some(other) => Err(format!(
-                "expected `->`, found {}",
-                describe_token(&other)
-            )),
+            Some(other) => Err(format!("expected `->`, found {}", describe_token(&other))),
             None => Err("expected `->`, found end of input".to_owned()),
         }
     }

@@ -143,7 +143,8 @@ fn verify_glm_protocol(module: &YirModule) -> Result<(), String> {
         .iter()
         .map(|node| (node.name.as_str(), node))
         .collect::<BTreeMap<_, _>>();
-    let mut consumers = BTreeMap::<String, Vec<(String, yir_core::GlmValueClass, GlmUseMode)>>::new();
+    let mut consumers =
+        BTreeMap::<String, Vec<(String, yir_core::GlmValueClass, GlmUseMode)>>::new();
 
     for node in &module.nodes {
         let profile = glm_profile_for_operation(&node.op);
@@ -151,10 +152,11 @@ fn verify_glm_protocol(module: &YirModule) -> Result<(), String> {
             if !nodes.contains_key(access.input.as_str()) {
                 continue;
             }
-            consumers
-                .entry(access.input.clone())
-                .or_default()
-                .push((node.name.clone(), access.class, access.mode));
+            consumers.entry(access.input.clone()).or_default().push((
+                node.name.clone(),
+                access.class,
+                access.mode,
+            ));
             let has_dep = module.edges.iter().any(|edge| {
                 edge.from == access.input
                     && edge.to == node.name

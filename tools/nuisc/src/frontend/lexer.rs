@@ -14,10 +14,8 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, String> {
     while let Some(ch) = chars.next() {
         match ch {
             c if c.is_whitespace() => {}
-            '{' | '}' | '(' | ')' | ';' | ',' | '=' | '+' | '*' | '/' | ':' | '.' | '<'
-            | '>' | '?' => {
-                tokens.push(Token::Symbol(ch))
-            }
+            '{' | '}' | '(' | ')' | ';' | ',' | '=' | '+' | '*' | '/' | ':' | '.' | '<' | '>'
+            | '?' => tokens.push(Token::Symbol(ch)),
             '-' => {
                 if chars.peek().copied() == Some('>') {
                     chars.next();
@@ -79,7 +77,12 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, String> {
                         break;
                     }
                 }
-                tokens.push(Token::Word(word));
+                if word == "wgsl" && next_non_whitespace_char(&chars) == Some('{') {
+                    let source = consume_wgsl_block(&mut chars)?;
+                    tokens.push(Token::String(source));
+                } else {
+                    tokens.push(Token::Word(word));
+                }
             }
             other => return Err(format!("unexpected character `{other}`")),
         }
@@ -104,4 +107,72 @@ fn is_ident_start(ch: char) -> bool {
 
 fn is_ident_continue(ch: char) -> bool {
     ch == '_' || ch.is_ascii_alphanumeric()
+}
+
+fn next_non_whitespace_char(chars: &std::iter::Peekable<std::str::Chars<'_>>) -> Option<char> {
+    let mut clone = chars.clone();
+    while let Some(ch) = clone.peek().copied() {
+        if ch.is_whitespace() {
+            clone.next();
+            continue;
+        }
+        return Some(ch);
+    }
+    None
+}
+
+fn consume_wgsl_block(
+    chars: &mut std::iter::Peekable<std::str::Chars<'_>>,
+) -> Result<String, String> {
+    while let Some(ch) = chars.peek().copied() {
+        if ch.is_whitespace() {
+            chars.next();
+            continue;
+        }
+        break;
+    }
+    if chars.next() != Some('{') {
+        return Err("wgsl block must start with `{`".to_owned());
+    }
+
+    let mut depth = 1usize;
+    let mut out = String::new();
+    let mut in_string = false;
+    let mut escape = false;
+    while let Some(ch) = chars.next() {
+        if in_string {
+            out.push(ch);
+            if escape {
+                escape = false;
+                continue;
+            }
+            match ch {
+                '\\' => escape = true,
+                '"' => in_string = false,
+                _ => {}
+            }
+            continue;
+        }
+
+        match ch {
+            '"' => {
+                in_string = true;
+                out.push(ch);
+            }
+            '{' => {
+                depth += 1;
+                out.push(ch);
+            }
+            '}' => {
+                depth = depth.saturating_sub(1);
+                if depth == 0 {
+                    return Ok(out.trim().to_owned());
+                }
+                out.push(ch);
+            }
+            other => out.push(other),
+        }
+    }
+
+    Err("unterminated wgsl block".to_owned())
 }

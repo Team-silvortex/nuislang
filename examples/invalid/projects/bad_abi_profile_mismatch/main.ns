@@ -1,0 +1,6 @@
+mod cpu Main {
+  fn main() {
+    const value: i64 = 1;
+    print(value);
+  }
+}

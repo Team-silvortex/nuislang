@@ -4,6 +4,10 @@ This folder contains multi-file `nuis` project examples driven by `nuis.toml`.
 Projects can now also declare a first project-level `links` list, so instance relations are not only implicit in file layout.
 Those links are now checked against final `YIR` as real `source -> data -> target`
 exchange structure, not only as loose metadata.
+Projects can also lock required Nustar ABI profiles per domain via
+`abi = ["cpu=...", "shader=...", "data=...", "kernel=..."]`.
+If `abi` is omitted, `nuisc/nuis` now auto-resolve a host-matching ABI set
+per involved domain and validate YIR against that effective ABI contract.
 
 Recommended starting point:
 
@@ -16,6 +20,8 @@ Recommended starting point:
   and per-mod `profile()` hooks in shader/data files that now also emit
   concrete `YIR` setup nodes during project compilation.
   `SurfaceShader` now contributes target/viewport/pipeline plus draw budget constants,
+  plus inline WGSL source blocks via:
+  `shader_inline_wgsl("entry", wgsl { ... })`
   while `FabricPlane` contributes bind-core, handle table, sync markers, and
   explicit uplink/downlink window policy nodes that are stitched into the final
   data-plane graph.

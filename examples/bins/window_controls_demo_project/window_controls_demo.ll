@@ -24,6 +24,7 @@ declare i64 @HostMath__speed_curve(i64)
 
 define i64 @nuis_yir_entry() {
   %1 = add i64 0, 4
+  ; deferred lowering for shader.inline_wgsl on shader0 (shader.render)
   ; deferred lowering for shader.viewport on shader0 (shader.render)
   ; deferred lowering for shader.target on shader0 (shader.render)
   ; deferred lowering for shader.pipeline on shader0 (shader.render)

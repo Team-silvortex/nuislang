@@ -50,7 +50,11 @@ pub fn lower_ast_to_nir(module: &AstModule) -> Result<NirModule, String> {
                     abi: function.abi.clone(),
                     interface: None,
                     symbol_name: function.name.clone(),
-                    params: function.params.iter().map(|param| lower_type_ref(&param.ty)).collect(),
+                    params: function
+                        .params
+                        .iter()
+                        .map(|param| lower_type_ref(&param.ty))
+                        .collect(),
                     return_type: Some(lower_type_ref(&function.return_type)),
                     is_extern: true,
                 },
@@ -82,7 +86,11 @@ pub fn lower_ast_to_nir(module: &AstModule) -> Result<NirModule, String> {
                     abi: "nuis".to_owned(),
                     interface: None,
                     symbol_name: function.name.clone(),
-                    params: function.params.iter().map(|param| lower_type_ref(&param.ty)).collect(),
+                    params: function
+                        .params
+                        .iter()
+                        .map(|param| lower_type_ref(&param.ty))
+                        .collect(),
                     return_type: function.return_type.as_ref().map(lower_type_ref),
                     is_extern: false,
                 },
@@ -226,10 +234,10 @@ fn lower_stmt(
             let final_type = resolve_declared_or_inferred(name, expected, inferred)?;
             bindings.insert(name.clone(), final_type.clone());
             NirStmt::Let {
-            name: name.clone(),
-            ty: Some(final_type),
-            value: lowered,
-        }
+                name: name.clone(),
+                ty: Some(final_type),
+                value: lowered,
+            }
         }
         AstStmt::Const { name, ty, value } => {
             let expected = lower_type_ref(ty);
@@ -245,21 +253,19 @@ fn lower_stmt(
             let final_type = resolve_declared_or_inferred(name, Some(expected), inferred)?;
             bindings.insert(name.clone(), final_type.clone());
             NirStmt::Const {
-            name: name.clone(),
-            ty: final_type,
-            value: lowered,
+                name: name.clone(),
+                ty: final_type,
+                value: lowered,
+            }
         }
-        }
-        AstStmt::Print(value) => {
-            NirStmt::Print(lower_expr(
-                value,
-                current_domain,
-                bindings,
-                signatures,
-                struct_table,
-                None,
-            )?)
-        }
+        AstStmt::Print(value) => NirStmt::Print(lower_expr(
+            value,
+            current_domain,
+            bindings,
+            signatures,
+            struct_table,
+            None,
+        )?),
         AstStmt::If {
             condition,
             then_body,
@@ -300,16 +306,14 @@ fn lower_stmt(
                 })
                 .collect::<Result<Vec<_>, _>>()?,
         },
-        AstStmt::Expr(expr) => {
-            NirStmt::Expr(lower_expr(
-                expr,
-                current_domain,
-                bindings,
-                signatures,
-                struct_table,
-                None,
-            )?)
-        }
+        AstStmt::Expr(expr) => NirStmt::Expr(lower_expr(
+            expr,
+            current_domain,
+            bindings,
+            signatures,
+            struct_table,
+            None,
+        )?),
         AstStmt::Return(value) => {
             let expected = return_type.map(lower_type_ref);
             NirStmt::Return(match value {
@@ -352,17 +356,15 @@ fn lower_expr(
                 unit: unit.clone(),
             }
         }
-        AstExpr::Call { callee, args } => {
-            lower_call_expr(
-                callee,
-                args,
-                current_domain,
-                bindings,
-                signatures,
-                struct_table,
-                expected,
-            )?
-        }
+        AstExpr::Call { callee, args } => lower_call_expr(
+            callee,
+            args,
+            current_domain,
+            bindings,
+            signatures,
+            struct_table,
+            expected,
+        )?,
         AstExpr::MethodCall {
             receiver,
             method,
@@ -419,15 +421,22 @@ fn lower_expr(
                 args: args
                     .iter()
                     .map(|arg| {
-                        lower_expr(arg, current_domain, bindings, signatures, struct_table, None)
+                        lower_expr(
+                            arg,
+                            current_domain,
+                            bindings,
+                            signatures,
+                            struct_table,
+                            None,
+                        )
                     })
                     .collect::<Result<Vec<_>, _>>()?,
             }
         }
         AstExpr::StructLiteral { type_name, fields } => {
-            let definition = struct_table.get(type_name).ok_or_else(|| {
-                format!("unknown struct type `{}`", type_name)
-            })?;
+            let definition = struct_table
+                .get(type_name)
+                .ok_or_else(|| format!("unknown struct type `{}`", type_name))?;
             let mut seen = BTreeSet::new();
             let mut lowered_fields = Vec::new();
             for (name, value) in fields {
@@ -442,17 +451,15 @@ fn lower_expr(
                         type_name, name
                     ));
                 }
-                let lowered =
-                    lower_expr(
-                        value,
-                        current_domain,
-                        bindings,
-                        signatures,
-                        struct_table,
-                        Some(&field.ty),
-                    )?;
-                let inferred =
-                    infer_nir_expr_type(&lowered, bindings, signatures, struct_table);
+                let lowered = lower_expr(
+                    value,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    Some(&field.ty),
+                )?;
+                let inferred = infer_nir_expr_type(&lowered, bindings, signatures, struct_table);
                 let _ = resolve_declared_or_inferred(name, Some(field.ty.clone()), inferred)?;
                 lowered_fields.push((name.clone(), lowered));
             }
@@ -477,15 +484,19 @@ fn lower_expr(
                 struct_table,
                 None,
             )?;
-            let base_ty =
-                infer_nir_expr_type(&lowered_base, bindings, signatures, struct_table)
-                    .ok_or_else(|| {
-                        format!("cannot infer base type for field access `.{} `", field)
-                    })?;
+            let base_ty = infer_nir_expr_type(&lowered_base, bindings, signatures, struct_table)
+                .ok_or_else(|| format!("cannot infer base type for field access `.{} `", field))?;
             let definition = struct_table.get(&base_ty.name).ok_or_else(|| {
-                format!("type `{}` has no known struct definition", render_type_name(&base_ty))
+                format!(
+                    "type `{}` has no known struct definition",
+                    render_type_name(&base_ty)
+                )
             })?;
-            if !definition.fields.iter().any(|candidate| candidate.name == *field) {
+            if !definition
+                .fields
+                .iter()
+                .any(|candidate| candidate.name == *field)
+            {
                 return Err(format!(
                     "struct `{}` has no field `{}`",
                     definition.name, field
@@ -605,19 +616,19 @@ fn lower_call_expr(
             };
             Ok(NirExpr::AllocBuffer {
                 len: Box::new(lower_expr(
-                len,
-                current_domain,
-                bindings,
-                signatures,
-                struct_table,
+                    len,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
                     Some(&i64_type()),
                 )?),
                 fill: Box::new(lower_expr(
-                fill,
-                current_domain,
-                bindings,
-                signatures,
-                struct_table,
+                    fill,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
                     Some(&i64_type()),
                 )?),
             })
@@ -921,46 +932,46 @@ fn lower_call_expr(
                 title: title.clone(),
             })
         }
-        "cpu_input_i64" => {
-            match args {
-                [channel, default] | [channel, default, ..] => {
-                    let AstExpr::Text(channel) = channel else {
-                        return Err("cpu_input_i64(...) channel must be a string literal".to_owned());
-                    };
-                    let AstExpr::Int(default) = default else {
-                        return Err("cpu_input_i64(...) default must be an integer literal".to_owned());
-                    };
-                    let (min, max, step) = match args {
-                        [_, _, min, max, step] => {
-                            let AstExpr::Int(min) = min else {
-                                return Err("cpu_input_i64(...) min must be an integer literal".to_owned());
-                            };
-                            let AstExpr::Int(max) = max else {
-                                return Err("cpu_input_i64(...) max must be an integer literal".to_owned());
-                            };
-                            let AstExpr::Int(step) = step else {
-                                return Err("cpu_input_i64(...) step must be an integer literal".to_owned());
-                            };
-                            (Some(*min), Some(*max), Some(*step))
-                        }
-                        [_, _] => (None, None, None),
-                        _ => {
+        "cpu_input_i64" => match args {
+            [channel, default] | [channel, default, ..] => {
+                let AstExpr::Text(channel) = channel else {
+                    return Err("cpu_input_i64(...) channel must be a string literal".to_owned());
+                };
+                let AstExpr::Int(default) = default else {
+                    return Err("cpu_input_i64(...) default must be an integer literal".to_owned());
+                };
+                let (min, max, step) = match args {
+                    [_, _, min, max, step] => {
+                        let AstExpr::Int(min) = min else {
                             return Err(
-                                "cpu_input_i64(...) expects 2 args or 5 args".to_owned()
-                            )
-                        }
-                    };
-                    Ok(NirExpr::CpuInputI64 {
-                        channel: channel.clone(),
-                        default: *default,
-                        min,
-                        max,
-                        step,
-                    })
-                }
-                _ => Err("cpu_input_i64(...) expects 2 args or 5 args".to_owned()),
+                                "cpu_input_i64(...) min must be an integer literal".to_owned()
+                            );
+                        };
+                        let AstExpr::Int(max) = max else {
+                            return Err(
+                                "cpu_input_i64(...) max must be an integer literal".to_owned()
+                            );
+                        };
+                        let AstExpr::Int(step) = step else {
+                            return Err(
+                                "cpu_input_i64(...) step must be an integer literal".to_owned()
+                            );
+                        };
+                        (Some(*min), Some(*max), Some(*step))
+                    }
+                    [_, _] => (None, None, None),
+                    _ => return Err("cpu_input_i64(...) expects 2 args or 5 args".to_owned()),
+                };
+                Ok(NirExpr::CpuInputI64 {
+                    channel: channel.clone(),
+                    default: *default,
+                    min,
+                    max,
+                    step,
+                })
             }
-        }
+            _ => Err("cpu_input_i64(...) expects 2 args or 5 args".to_owned()),
+        },
         "cpu_tick_i64" => {
             let [start, step] = args else {
                 return Err("cpu_tick_i64(...) expects 2 args".to_owned());
@@ -1000,7 +1011,9 @@ fn lower_call_expr(
                 );
             }
             let AstExpr::Text(unit) = unit else {
-                return Err("shader_profile_target(...) expects a string literal unit name".to_owned());
+                return Err(
+                    "shader_profile_target(...) expects a string literal unit name".to_owned(),
+                );
             };
             Ok(NirExpr::ShaderProfileTargetRef { unit: unit.clone() })
         }
@@ -1015,7 +1028,9 @@ fn lower_call_expr(
                 );
             }
             let AstExpr::Text(unit) = unit else {
-                return Err("shader_profile_viewport(...) expects a string literal unit name".to_owned());
+                return Err(
+                    "shader_profile_viewport(...) expects a string literal unit name".to_owned(),
+                );
             };
             Ok(NirExpr::ShaderProfileViewportRef { unit: unit.clone() })
         }
@@ -1030,7 +1045,9 @@ fn lower_call_expr(
                 );
             }
             let AstExpr::Text(unit) = unit else {
-                return Err("shader_profile_pipeline(...) expects a string literal unit name".to_owned());
+                return Err(
+                    "shader_profile_pipeline(...) expects a string literal unit name".to_owned(),
+                );
             };
             Ok(NirExpr::ShaderProfilePipelineRef { unit: unit.clone() })
         }
@@ -1046,8 +1063,7 @@ fn lower_call_expr(
             }
             let AstExpr::Text(unit) = unit else {
                 return Err(
-                    "shader_profile_begin_pass(...) expects a string literal unit name"
-                        .to_owned(),
+                    "shader_profile_begin_pass(...) expects a string literal unit name".to_owned(),
                 );
             };
             Ok(NirExpr::ShaderBeginPass {
@@ -1067,7 +1083,10 @@ fn lower_call_expr(
                 );
             }
             let AstExpr::Text(unit) = unit else {
-                return Err("shader_profile_vertex_count(...) expects a string literal unit name".to_owned());
+                return Err(
+                    "shader_profile_vertex_count(...) expects a string literal unit name"
+                        .to_owned(),
+                );
             };
             Ok(NirExpr::ShaderProfileVertexCountRef { unit: unit.clone() })
         }
@@ -1082,7 +1101,10 @@ fn lower_call_expr(
                 );
             }
             let AstExpr::Text(unit) = unit else {
-                return Err("shader_profile_instance_count(...) expects a string literal unit name".to_owned());
+                return Err(
+                    "shader_profile_instance_count(...) expects a string literal unit name"
+                        .to_owned(),
+                );
             };
             Ok(NirExpr::ShaderProfileInstanceCountRef { unit: unit.clone() })
         }
@@ -1098,8 +1120,7 @@ fn lower_call_expr(
             }
             let AstExpr::Text(unit) = unit else {
                 return Err(
-                    "shader_profile_color_seed(...) expects a string literal unit name"
-                        .to_owned(),
+                    "shader_profile_color_seed(...) expects a string literal unit name".to_owned(),
                 );
             };
             let base = lower_expr(
@@ -1136,8 +1157,7 @@ fn lower_call_expr(
             }
             let AstExpr::Text(unit) = unit else {
                 return Err(
-                    "shader_profile_speed_seed(...) expects a string literal unit name"
-                        .to_owned(),
+                    "shader_profile_speed_seed(...) expects a string literal unit name".to_owned(),
                 );
             };
             let delta = lower_expr(
@@ -1183,8 +1203,7 @@ fn lower_call_expr(
             }
             let AstExpr::Text(unit) = unit else {
                 return Err(
-                    "shader_profile_radius_seed(...) expects a string literal unit name"
-                        .to_owned(),
+                    "shader_profile_radius_seed(...) expects a string literal unit name".to_owned(),
                 );
             };
             let base = lower_expr(
@@ -1321,8 +1340,7 @@ fn lower_call_expr(
             }
             let AstExpr::Text(unit) = unit else {
                 return Err(
-                    "shader_profile_packet_tag(...) expects a string literal unit name"
-                        .to_owned(),
+                    "shader_profile_packet_tag(...) expects a string literal unit name".to_owned(),
                 );
             };
             Ok(NirExpr::ShaderProfilePacketTagRef { unit: unit.clone() })
@@ -1357,8 +1375,7 @@ fn lower_call_expr(
             }
             let AstExpr::Text(unit) = unit else {
                 return Err(
-                    "shader_profile_pass_kind(...) expects a string literal unit name"
-                        .to_owned(),
+                    "shader_profile_pass_kind(...) expects a string literal unit name".to_owned(),
                 );
             };
             Ok(NirExpr::ShaderProfilePassKindRef { unit: unit.clone() })
@@ -1392,7 +1409,9 @@ fn lower_call_expr(
                 );
             }
             let AstExpr::Text(unit) = unit else {
-                return Err("data_profile_bind_core(...) expects a string literal unit name".to_owned());
+                return Err(
+                    "data_profile_bind_core(...) expects a string literal unit name".to_owned(),
+                );
             };
             Ok(NirExpr::DataProfileBindCoreRef { unit: unit.clone() })
         }
@@ -1407,7 +1426,9 @@ fn lower_call_expr(
                 );
             }
             let AstExpr::Text(unit) = unit else {
-                return Err("data_profile_window_offset(...) expects a string literal unit name".to_owned());
+                return Err(
+                    "data_profile_window_offset(...) expects a string literal unit name".to_owned(),
+                );
             };
             Ok(NirExpr::DataProfileWindowOffsetRef { unit: unit.clone() })
         }
@@ -1422,7 +1443,9 @@ fn lower_call_expr(
                 );
             }
             let AstExpr::Text(unit) = unit else {
-                return Err("data_profile_uplink_len(...) expects a string literal unit name".to_owned());
+                return Err(
+                    "data_profile_uplink_len(...) expects a string literal unit name".to_owned(),
+                );
             };
             Ok(NirExpr::DataProfileUplinkLenRef { unit: unit.clone() })
         }
@@ -1437,7 +1460,9 @@ fn lower_call_expr(
                 );
             }
             let AstExpr::Text(unit) = unit else {
-                return Err("data_profile_downlink_len(...) expects a string literal unit name".to_owned());
+                return Err(
+                    "data_profile_downlink_len(...) expects a string literal unit name".to_owned(),
+                );
             };
             Ok(NirExpr::DataProfileDownlinkLenRef { unit: unit.clone() })
         }
@@ -1453,8 +1478,7 @@ fn lower_call_expr(
             }
             let AstExpr::Text(unit) = unit else {
                 return Err(
-                    "data_profile_uplink_window(...) expects a string literal unit name"
-                        .to_owned(),
+                    "data_profile_uplink_window(...) expects a string literal unit name".to_owned(),
                 );
             };
             Ok(NirExpr::DataImmutableWindow {
@@ -1482,8 +1506,7 @@ fn lower_call_expr(
             }
             let AstExpr::Text(unit) = unit else {
                 return Err(
-                    "data_profile_send_uplink(...) expects a string literal unit name"
-                        .to_owned(),
+                    "data_profile_send_uplink(...) expects a string literal unit name".to_owned(),
                 );
             };
             let lowered_input = lower_expr(
@@ -1540,8 +1563,7 @@ fn lower_call_expr(
             }
             let AstExpr::Text(unit) = unit else {
                 return Err(
-                    "data_profile_send_downlink(...) expects a string literal unit name"
-                        .to_owned(),
+                    "data_profile_send_downlink(...) expects a string literal unit name".to_owned(),
                 );
             };
             let lowered_input = lower_expr(
@@ -1568,7 +1590,9 @@ fn lower_call_expr(
                 );
             }
             let AstExpr::Text(unit) = unit else {
-                return Err("data_profile_handle_table(...) expects a string literal unit name".to_owned());
+                return Err(
+                    "data_profile_handle_table(...) expects a string literal unit name".to_owned(),
+                );
             };
             Ok(NirExpr::DataProfileHandleTableRef { unit: unit.clone() })
         }
@@ -1583,10 +1607,14 @@ fn lower_call_expr(
                 );
             }
             let AstExpr::Text(unit) = unit else {
-                return Err("data_profile_marker(...) expects a string literal unit name".to_owned());
+                return Err(
+                    "data_profile_marker(...) expects a string literal unit name".to_owned(),
+                );
             };
             let AstExpr::Text(tag) = tag else {
-                return Err("data_profile_marker(...) expects a string literal marker tag".to_owned());
+                return Err(
+                    "data_profile_marker(...) expects a string literal marker tag".to_owned(),
+                );
             };
             Ok(NirExpr::DataProfileMarkerRef {
                 unit: unit.clone(),
@@ -1605,7 +1633,7 @@ fn lower_call_expr(
             }
             let AstExpr::Text(unit) = unit else {
                 return Err(
-                    "kernel_profile_bind_core(...) expects a string literal unit name".to_owned()
+                    "kernel_profile_bind_core(...) expects a string literal unit name".to_owned(),
                 );
             };
             Ok(NirExpr::KernelProfileBindCoreRef { unit: unit.clone() })
@@ -1622,7 +1650,7 @@ fn lower_call_expr(
             }
             let AstExpr::Text(unit) = unit else {
                 return Err(
-                    "kernel_profile_queue_depth(...) expects a string literal unit name".to_owned()
+                    "kernel_profile_queue_depth(...) expects a string literal unit name".to_owned(),
                 );
             };
             Ok(NirExpr::KernelProfileQueueDepthRef { unit: unit.clone() })
@@ -1639,7 +1667,7 @@ fn lower_call_expr(
             }
             let AstExpr::Text(unit) = unit else {
                 return Err(
-                    "kernel_profile_batch_lanes(...) expects a string literal unit name".to_owned()
+                    "kernel_profile_batch_lanes(...) expects a string literal unit name".to_owned(),
                 );
             };
             Ok(NirExpr::KernelProfileBatchLanesRef { unit: unit.clone() })
@@ -1693,19 +1721,57 @@ fn lower_call_expr(
                 topology: topology.clone(),
             })
         }
+        "shader_inline_wgsl" => {
+            let [entry, source] = args else {
+                return Err("shader_inline_wgsl(...) expects 2 args".to_owned());
+            };
+            if current_domain != "shader" {
+                return Err(
+                    "shader_inline_wgsl(...) is currently only allowed inside `mod shader <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(entry) = entry else {
+                return Err("shader_inline_wgsl(...) entry must be a string literal".to_owned());
+            };
+            let AstExpr::Text(source) = source else {
+                return Err(
+                    "shader_inline_wgsl(...) source must be a string or wgsl block".to_owned(),
+                );
+            };
+            Ok(NirExpr::ShaderInlineWgsl {
+                entry: entry.clone(),
+                source: source.clone(),
+            })
+        }
         "shader_begin_pass" => {
             let [target, pipeline, viewport] = args else {
                 return Err("shader_begin_pass(...) expects 3 args".to_owned());
             };
             Ok(NirExpr::ShaderBeginPass {
                 target: Box::new(lower_expr(
-                    target, current_domain, bindings, signatures, struct_table, None,
+                    target,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    None,
                 )?),
                 pipeline: Box::new(lower_expr(
-                    pipeline, current_domain, bindings, signatures, struct_table, None,
+                    pipeline,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    None,
                 )?),
                 viewport: Box::new(lower_expr(
-                    viewport, current_domain, bindings, signatures, struct_table, None,
+                    viewport,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    None,
                 )?),
             })
         }
@@ -1715,10 +1781,20 @@ fn lower_call_expr(
             };
             Ok(NirExpr::ShaderDrawInstanced {
                 pass: Box::new(lower_expr(
-                    pass, current_domain, bindings, signatures, struct_table, None,
+                    pass,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    None,
                 )?),
                 packet: Box::new(lower_expr(
-                    packet, current_domain, bindings, signatures, struct_table, None,
+                    packet,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    None,
                 )?),
                 vertex_count: Box::new(lower_expr(
                     vertex_count,
@@ -1771,9 +1847,7 @@ fn lower_call_expr(
                     struct_table,
                     None,
                 )?),
-                vertex_count: Box::new(NirExpr::ShaderProfileVertexCountRef {
-                    unit: unit.clone(),
-                }),
+                vertex_count: Box::new(NirExpr::ShaderProfileVertexCountRef { unit: unit.clone() }),
                 instance_count: Box::new(NirExpr::ShaderProfileInstanceCountRef {
                     unit: unit.clone(),
                 }),
@@ -1791,8 +1865,7 @@ fn lower_call_expr(
             }
             let AstExpr::Text(unit) = unit else {
                 return Err(
-                    "shader_profile_render(...) expects a string literal unit name"
-                        .to_owned(),
+                    "shader_profile_render(...) expects a string literal unit name".to_owned(),
                 );
             };
             Ok(NirExpr::ShaderProfileRender {
@@ -1841,7 +1914,14 @@ fn lower_call_expr(
             let lowered_args = args
                 .iter()
                 .map(|arg| {
-                    lower_expr(arg, current_domain, bindings, signatures, struct_table, None)
+                    lower_expr(
+                        arg,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        None,
+                    )
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             if let Some(signature) = signatures.get(callee) {
@@ -1867,9 +1947,9 @@ fn lower_call_expr(
                 }
             }
             Ok(NirExpr::Call {
-            callee: callee.to_owned(),
-            args: lowered_args,
-        })
+                callee: callee.to_owned(),
+                args: lowered_args,
+            })
         }
     }
 }
@@ -1930,9 +2010,7 @@ fn infer_nir_expr_type(
         NirExpr::ShaderProfileColorSeed { .. } => Some(i64_type()),
         NirExpr::ShaderProfileSpeedSeed { .. } => Some(i64_type()),
         NirExpr::ShaderProfileRadiusSeed { .. } => Some(i64_type()),
-        NirExpr::ShaderProfilePacket { unit, .. } => {
-            Some(named_type(&format!("{unit}Packet")))
-        }
+        NirExpr::ShaderProfilePacket { unit, .. } => Some(named_type(&format!("{unit}Packet"))),
         NirExpr::DataProfileBindCoreRef { .. } => Some(named_type("Unit")),
         NirExpr::DataProfileWindowOffsetRef { .. } => Some(i64_type()),
         NirExpr::DataProfileUplinkLenRef { .. } => Some(i64_type()),
@@ -1947,14 +2025,15 @@ fn infer_nir_expr_type(
             let window_inner = infer_nir_expr_type(input, bindings, signatures, struct_table)?;
             Some(generic_named_type("Window", vec![window_inner]))
         }
-        NirExpr::CpuExternCall { callee, .. } => {
-            signatures.get(callee).and_then(|sig| sig.return_type.clone())
-        }
+        NirExpr::CpuExternCall { callee, .. } => signatures
+            .get(callee)
+            .and_then(|sig| sig.return_type.clone()),
         NirExpr::DataMarker(_) => Some(named_type("Marker")),
         NirExpr::DataHandleTable(_) => Some(named_type("HandleTable")),
         NirExpr::ShaderTarget { .. } => Some(named_type("Target")),
         NirExpr::ShaderViewport { .. } => Some(named_type("Viewport")),
         NirExpr::ShaderPipeline { .. } => Some(named_type("Pipeline")),
+        NirExpr::ShaderInlineWgsl { .. } => Some(named_type("ShaderModule")),
         NirExpr::ShaderBeginPass { .. } => Some(named_type("Pass")),
         NirExpr::ShaderDrawInstanced { .. } => Some(named_type("Frame")),
         NirExpr::ShaderProfileRender { .. } => Some(named_type("Frame")),
@@ -1972,12 +2051,13 @@ fn infer_nir_expr_type(
         }
         NirExpr::LoadValue(_) | NirExpr::LoadAt { .. } | NirExpr::BufferLen(_) => Some(i64_type()),
         NirExpr::LoadNext(_) => Some(ref_type("Node")),
-        NirExpr::StoreValue { .. } | NirExpr::StoreNext { .. } | NirExpr::StoreAt { .. } | NirExpr::Free(_) => {
-            Some(named_type("Unit"))
-        }
-        NirExpr::Call { callee, .. } => {
-            signatures.get(callee).and_then(|sig| sig.return_type.clone())
-        }
+        NirExpr::StoreValue { .. }
+        | NirExpr::StoreNext { .. }
+        | NirExpr::StoreAt { .. }
+        | NirExpr::Free(_) => Some(named_type("Unit")),
+        NirExpr::Call { callee, .. } => signatures
+            .get(callee)
+            .and_then(|sig| sig.return_type.clone()),
         NirExpr::MethodCall { .. } => None,
         NirExpr::StructLiteral { type_name, .. } => Some(named_type(type_name)),
         NirExpr::FieldAccess { base, field } => {

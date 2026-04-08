@@ -5,3 +5,8 @@ links = [
   "cpu.Main -> kernel.KernelUnit via data.FabricPlane",
   "kernel.KernelUnit -> cpu.Main via data.FabricPlane"
 ]
+abi = [
+  "cpu=cpu.arm64.apple_aapcs64",
+  "kernel=kernel.apple_ane.coreml.v1",
+  "data=data.fabric.macos.arm64.v1"
+]

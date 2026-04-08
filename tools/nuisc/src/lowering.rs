@@ -270,18 +270,12 @@ fn lower_expr(
                         lhs: Box::new((**base).clone()),
                         rhs: Box::new((**delta).clone()),
                     }),
-                    rhs: Box::new(NirExpr::ShaderProfilePacketColorSlotRef {
-                        unit: unit.clone(),
-                    }),
+                    rhs: Box::new(NirExpr::ShaderProfilePacketColorSlotRef { unit: unit.clone() }),
                 }),
                 rhs: Box::new(NirExpr::Binary {
                     op: NirBinaryOp::Add,
-                    lhs: Box::new(NirExpr::ShaderProfileMaterialModeRef {
-                        unit: unit.clone(),
-                    }),
-                    rhs: Box::new(NirExpr::ShaderProfilePassKindRef {
-                        unit: unit.clone(),
-                    }),
+                    lhs: Box::new(NirExpr::ShaderProfileMaterialModeRef { unit: unit.clone() }),
+                    rhs: Box::new(NirExpr::ShaderProfilePassKindRef { unit: unit.clone() }),
                 }),
             };
             lower_expr(&expanded, state, bindings)
@@ -311,13 +305,9 @@ fn lower_expr(
                             unit: unit.clone(),
                         }),
                     }),
-                    rhs: Box::new(NirExpr::ShaderProfilePacketSpeedSlotRef {
-                        unit: unit.clone(),
-                    }),
+                    rhs: Box::new(NirExpr::ShaderProfilePacketSpeedSlotRef { unit: unit.clone() }),
                 }),
-                rhs: Box::new(NirExpr::ShaderProfilePacketTagRef {
-                    unit: unit.clone(),
-                }),
+                rhs: Box::new(NirExpr::ShaderProfilePacketTagRef { unit: unit.clone() }),
             };
             lower_expr(&expanded, state, bindings)
         }
@@ -333,17 +323,11 @@ fn lower_expr(
                             lhs: Box::new((**base).clone()),
                             rhs: Box::new((**delta).clone()),
                         }),
-                        rhs: Box::new(NirExpr::ShaderProfileVertexCountRef {
-                            unit: unit.clone(),
-                        }),
+                        rhs: Box::new(NirExpr::ShaderProfileVertexCountRef { unit: unit.clone() }),
                     }),
-                    rhs: Box::new(NirExpr::ShaderProfilePacketRadiusSlotRef {
-                        unit: unit.clone(),
-                    }),
+                    rhs: Box::new(NirExpr::ShaderProfilePacketRadiusSlotRef { unit: unit.clone() }),
                 }),
-                rhs: Box::new(NirExpr::ShaderProfilePacketFieldCountRef {
-                    unit: unit.clone(),
-                }),
+                rhs: Box::new(NirExpr::ShaderProfilePacketFieldCountRef { unit: unit.clone() }),
             };
             lower_expr(&expanded, state, bindings)
         }
@@ -402,9 +386,7 @@ fn lower_expr(
                     viewport: Box::new(NirExpr::ShaderProfileViewportRef { unit: unit.clone() }),
                 }),
                 packet: Box::new((**packet).clone()),
-                vertex_count: Box::new(NirExpr::ShaderProfileVertexCountRef {
-                    unit: unit.clone(),
-                }),
+                vertex_count: Box::new(NirExpr::ShaderProfileVertexCountRef { unit: unit.clone() }),
                 instance_count: Box::new(NirExpr::ShaderProfileInstanceCountRef {
                     unit: unit.clone(),
                 }),
@@ -559,7 +541,11 @@ fn lower_expr(
             });
             Ok(name)
         }
-        NirExpr::CpuWindow { width, height, title } => {
+        NirExpr::CpuWindow {
+            width,
+            height,
+            title,
+        } => {
             let name = next_name(state, "cpu_window");
             state.yir.nodes.push(Node {
                 name: name.clone(),
@@ -752,7 +738,10 @@ fn lower_expr(
             });
             Ok(name)
         }
-        NirExpr::ShaderPipeline { name: pipe_name, topology } => {
+        NirExpr::ShaderPipeline {
+            name: pipe_name,
+            topology,
+        } => {
             ensure_shader_resource(state.yir);
             let name = next_name(state, "shader_pipeline");
             state.yir.nodes.push(Node {
@@ -762,6 +751,20 @@ fn lower_expr(
                     module: "shader".to_owned(),
                     instruction: "pipeline".to_owned(),
                     args: vec![pipe_name.clone(), topology.clone()],
+                },
+            });
+            Ok(name)
+        }
+        NirExpr::ShaderInlineWgsl { entry, source } => {
+            ensure_shader_resource(state.yir);
+            let name = next_name(state, "shader_inline_wgsl");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "shader0".to_owned(),
+                op: Operation {
+                    module: "shader".to_owned(),
+                    instruction: "inline_wgsl".to_owned(),
+                    args: vec![entry.clone(), source.clone()],
                 },
             });
             Ok(name)
@@ -1262,7 +1265,11 @@ fn lower_data_profile_send(
 }
 
 fn ensure_fabric_resource(yir: &mut YirModule) {
-    if yir.resources.iter().any(|resource| resource.name == "fabric0") {
+    if yir
+        .resources
+        .iter()
+        .any(|resource| resource.name == "fabric0")
+    {
         return;
     }
     yir.resources.push(Resource {
@@ -1272,7 +1279,11 @@ fn ensure_fabric_resource(yir: &mut YirModule) {
 }
 
 fn ensure_shader_resource(yir: &mut YirModule) {
-    if yir.resources.iter().any(|resource| resource.name == "shader0") {
+    if yir
+        .resources
+        .iter()
+        .any(|resource| resource.name == "shader0")
+    {
         return;
     }
     yir.resources.push(Resource {

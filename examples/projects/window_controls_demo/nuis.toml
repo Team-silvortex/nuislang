@@ -5,3 +5,8 @@ links = [
   "cpu.Main -> shader.SurfaceShader via data.FabricPlane",
   "shader.SurfaceShader -> cpu.Main via data.FabricPlane"
 ]
+abi = [
+  "cpu=cpu.arm64.apple_aapcs64",
+  "shader=shader.metal.msl2_4",
+  "data=data.fabric.macos.arm64.v1"
+]

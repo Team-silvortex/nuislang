@@ -81,7 +81,8 @@ fn parse_ppm_dimensions(ppm: &[u8]) -> Result<(usize, usize), String> {
         String::from_utf8(ppm[start..*index].to_vec()).ok()
     }
 
-    let magic = next_token(ppm, &mut index).ok_or_else(|| "generated invalid ppm header".to_owned())?;
+    let magic =
+        next_token(ppm, &mut index).ok_or_else(|| "generated invalid ppm header".to_owned())?;
     if magic != "P6" {
         return Err("generated invalid ppm magic".to_owned());
     }

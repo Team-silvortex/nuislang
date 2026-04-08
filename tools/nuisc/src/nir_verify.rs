@@ -1,6 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use nuis_semantics::model::{nir_glm_profile, NirExpr, NirFunction, NirGlmUseMode, NirModule, NirStmt};
+use nuis_semantics::model::{
+    nir_glm_profile, NirExpr, NirFunction, NirGlmUseMode, NirModule, NirStmt,
+};
 
 pub fn verify_nir_module(module: &NirModule) -> Result<(), String> {
     for function in &module.functions {
@@ -103,8 +105,7 @@ fn verify_expr(
                         }
                     }
                 }
-                NirExpr::StoreValue { target, .. }
-                | NirExpr::StoreNext { target, .. } => {
+                NirExpr::StoreValue { target, .. } | NirExpr::StoreNext { target, .. } => {
                     if let Some(source) = expr_resource_key(target) {
                         if borrows.get(&source).copied().unwrap_or(0) > 0 {
                             return Err(format!(
@@ -176,7 +177,8 @@ fn verify_expr(
         | NirExpr::KernelProfileBatchLanesRef { .. }
         | NirExpr::ShaderTarget { .. }
         | NirExpr::ShaderViewport { .. }
-        | NirExpr::ShaderPipeline { .. } => {}
+        | NirExpr::ShaderPipeline { .. }
+        | NirExpr::ShaderInlineWgsl { .. } => {}
         NirExpr::CpuPresentFrame(inner) => verify_expr(inner, moved, borrows)?,
         NirExpr::CpuExternCall { args, .. } => {
             for arg in args {
@@ -200,10 +202,7 @@ fn verify_expr(
             verify_expr(delta, moved, borrows)?;
         }
         NirExpr::ShaderProfileSpeedSeed {
-            delta,
-            scale,
-            base,
-            ..
+            delta, scale, base, ..
         } => {
             verify_expr(delta, moved, borrows)?;
             verify_expr(scale, moved, borrows)?;
@@ -349,7 +348,8 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
         | NirExpr::KernelProfileBatchLanesRef { .. }
         | NirExpr::ShaderTarget { .. }
         | NirExpr::ShaderViewport { .. }
-        | NirExpr::ShaderPipeline { .. } => {}
+        | NirExpr::ShaderPipeline { .. }
+        | NirExpr::ShaderInlineWgsl { .. } => {}
         NirExpr::CpuPresentFrame(inner) => verify_expr_uses(inner, moved)?,
         NirExpr::CpuExternCall { args, .. } => {
             for arg in args {
@@ -373,10 +373,7 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
             verify_expr_uses(delta, moved)?;
         }
         NirExpr::ShaderProfileSpeedSeed {
-            delta,
-            scale,
-            base,
-            ..
+            delta, scale, base, ..
         } => {
             verify_expr_uses(delta, moved)?;
             verify_expr_uses(scale, moved)?;

@@ -1,9 +1,4 @@
-use std::{
-    collections::BTreeMap,
-    fs,
-    path::Path,
-    process::Command,
-};
+use std::{collections::BTreeMap, fs, path::Path, process::Command};
 
 use nuis_semantics::model::{AstExternFunction, AstModule, AstTypeRef, NirModule};
 use yir_core::YirModule;
@@ -196,7 +191,10 @@ fn collect_host_ffi_symbols(ast: &AstModule) -> BTreeMap<String, AstExternFuncti
     }
     for interface in &ast.extern_interfaces {
         for method in &interface.methods {
-            out.insert(format!("{}__{}", interface.name, method.name), method.clone());
+            out.insert(
+                format!("{}__{}", interface.name, method.name),
+                method.clone(),
+            );
         }
     }
     out

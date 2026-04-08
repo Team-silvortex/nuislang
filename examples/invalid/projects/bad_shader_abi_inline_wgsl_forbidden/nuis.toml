@@ -1,0 +1,16 @@
+name = "bad_shader_abi_inline_wgsl_forbidden"
+entry = "../../../projects/window_controls_demo/main.ns"
+modules = [
+  "../../../projects/window_controls_demo/main.ns",
+  "../../../projects/window_controls_demo/surface_shader.ns",
+  "../../../projects/window_controls_demo/fabric_plane.ns"
+]
+links = [
+  "cpu.Main -> shader.SurfaceShader via data.FabricPlane",
+  "shader.SurfaceShader -> cpu.Main via data.FabricPlane"
+]
+abi = [
+  "cpu=cpu.arm64.apple_aapcs64",
+  "shader=shader.render.cpu-fallback.v1",
+  "data=data.fabric.macos.arm64.v1"
+]

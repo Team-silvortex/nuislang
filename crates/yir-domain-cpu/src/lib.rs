@@ -995,7 +995,10 @@ impl RegisteredMod for CpuMod {
                     .map(|arg| state.expect_int(arg))
                     .collect::<Result<Vec<_>, _>>()?;
                 let value = execute_extern_i64(abi, symbol, &args).map_err(|message| {
-                    format!("node `{}` extern call `{symbol}` failed: {message}", node.name)
+                    format!(
+                        "node `{}` extern call `{symbol}` failed: {message}",
+                        node.name
+                    )
                 })?;
                 state.push_resource_event(
                     resource,
@@ -1100,7 +1103,8 @@ impl RegisteredMod for CpuMod {
                 Ok(Value::Int(value))
             }
             "present_frame" => {
-                let frame = unwrap_present_frame_payload(state.expect_value(&node.op.args[0])?.clone());
+                let frame =
+                    unwrap_present_frame_payload(state.expect_value(&node.op.args[0])?.clone());
                 state.push_resource_event(
                     resource,
                     format!(

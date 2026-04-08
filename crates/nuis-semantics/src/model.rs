@@ -437,6 +437,10 @@ pub enum NirExpr {
         name: String,
         topology: String,
     },
+    ShaderInlineWgsl {
+        entry: String,
+        source: String,
+    },
     ShaderBeginPass {
         target: Box<NirExpr>,
         pipeline: Box<NirExpr>,
@@ -569,6 +573,7 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::ShaderTarget { .. }
         | NirExpr::ShaderViewport { .. }
         | NirExpr::ShaderPipeline { .. }
+        | NirExpr::ShaderInlineWgsl { .. }
         | NirExpr::ShaderBeginPass { .. }
         | NirExpr::ShaderDrawInstanced { .. }
         | NirExpr::ShaderProfileRender { .. } => None,
@@ -580,14 +585,16 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
             }],
             effect: NirGlmEffect::DomainMove,
         }),
-        NirExpr::DataCopyWindow { .. } | NirExpr::DataImmutableWindow { .. } => Some(NirGlmProfile {
-            result_class: NirGlmValueClass::Val,
-            accesses: vec![NirGlmAccess {
-                class: NirGlmValueClass::Val,
-                mode: NirGlmUseMode::Read,
-            }],
-            effect: NirGlmEffect::None,
-        }),
+        NirExpr::DataCopyWindow { .. } | NirExpr::DataImmutableWindow { .. } => {
+            Some(NirGlmProfile {
+                result_class: NirGlmValueClass::Val,
+                accesses: vec![NirGlmAccess {
+                    class: NirGlmValueClass::Val,
+                    mode: NirGlmUseMode::Read,
+                }],
+                effect: NirGlmEffect::None,
+            })
+        }
         NirExpr::DataInputPipe(_) => Some(NirGlmProfile {
             result_class: NirGlmValueClass::Val,
             accesses: vec![NirGlmAccess {
@@ -607,16 +614,16 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
             }],
             effect: NirGlmEffect::None,
         }),
-        NirExpr::StoreValue { .. }
-        | NirExpr::StoreNext { .. }
-        | NirExpr::StoreAt { .. } => Some(NirGlmProfile {
-            result_class: NirGlmValueClass::Val,
-            accesses: vec![NirGlmAccess {
-                class: NirGlmValueClass::Res,
-                mode: NirGlmUseMode::Write,
-            }],
-            effect: NirGlmEffect::None,
-        }),
+        NirExpr::StoreValue { .. } | NirExpr::StoreNext { .. } | NirExpr::StoreAt { .. } => {
+            Some(NirGlmProfile {
+                result_class: NirGlmValueClass::Val,
+                accesses: vec![NirGlmAccess {
+                    class: NirGlmValueClass::Res,
+                    mode: NirGlmUseMode::Write,
+                }],
+                effect: NirGlmEffect::None,
+            })
+        }
         NirExpr::Free(_) => Some(NirGlmProfile {
             result_class: NirGlmValueClass::Val,
             accesses: vec![NirGlmAccess {

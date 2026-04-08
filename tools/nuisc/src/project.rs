@@ -15,6 +15,7 @@ pub struct NuisProjectManifest {
     pub entry: String,
     pub modules: Vec<String>,
     pub links: Vec<ProjectLink>,
+    pub abi_requirements: Vec<ProjectAbiRequirement>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -22,6 +23,12 @@ pub struct ProjectLink {
     pub from: String,
     pub to: String,
     pub via: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectAbiRequirement {
+    pub domain: String,
+    pub abi: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,6 +53,13 @@ pub struct ProjectBuildMetadata {
     pub modules_index_path: String,
     pub links_index_path: String,
     pub host_ffi_index_path: String,
+    pub abi_index_path: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectAbiResolution {
+    pub requirements: Vec<ProjectAbiRequirement>,
+    pub explicit: bool,
 }
 
 pub fn is_project_input(path: &Path) -> bool {
@@ -60,7 +74,12 @@ pub fn load_project(input: &Path) -> Result<LoadedProject, String> {
     };
     let root = manifest_path
         .parent()
-        .ok_or_else(|| format!("project manifest `{}` has no parent directory", manifest_path.display()))?
+        .ok_or_else(|| {
+            format!(
+                "project manifest `{}` has no parent directory",
+                manifest_path.display()
+            )
+        })?
         .to_path_buf();
     let source = fs::read_to_string(&manifest_path)
         .map_err(|error| format!("failed to read `{}`: {error}", manifest_path.display()))?;
@@ -92,6 +111,7 @@ pub fn load_project(input: &Path) -> Result<LoadedProject, String> {
     validate_project_unit_bindings(&modules)?;
     validate_project_uses(&modules)?;
     validate_project_links(&manifest, &modules)?;
+    validate_project_abi_requirements(&manifest, &modules)?;
 
     Ok(LoadedProject {
         root,
@@ -138,9 +158,27 @@ pub fn describe_project(project: &LoadedProject) -> String {
             .collect::<Vec<_>>()
             .join(", ")
     };
+    let abi_summary = match resolve_project_abi(project) {
+        Ok(resolution) if resolution.requirements.is_empty() => "abi=<none>".to_owned(),
+        Ok(resolution) => {
+            let mode = if resolution.explicit {
+                "abi=locked"
+            } else {
+                "abi=auto"
+            };
+            let entries = resolution
+                .requirements
+                .iter()
+                .map(|item| format!("{}={}", item.domain, item.abi))
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("{mode}({entries})")
+        }
+        Err(_) => "abi=<unresolved>".to_owned(),
+    };
     format!(
-        "project={} entry={} modules={} links={}",
-        project.manifest.name, project.manifest.entry, modules, links
+        "project={} entry={} modules={} links={} {}",
+        project.manifest.name, project.manifest.entry, modules, links, abi_summary
     )
 }
 
@@ -154,6 +192,7 @@ pub fn write_project_metadata(
     let modules_index_path = output_dir.join("nuis.project.modules.txt");
     let links_index_path = output_dir.join("nuis.project.links.txt");
     let host_ffi_index_path = output_dir.join("nuis.project.host_ffi.txt");
+    let abi_index_path = output_dir.join("nuis.project.abi.txt");
     fs::copy(&project.manifest_path, &manifest_copy_path).map_err(|error| {
         format!(
             "failed to copy project manifest `{}` -> `{}`: {error}",
@@ -212,12 +251,39 @@ pub fn write_project_metadata(
             host_ffi_index_path.display()
         )
     })?;
+    let abi_index = render_project_abi_index(project)?;
+    fs::write(&abi_index_path, abi_index).map_err(|error| {
+        format!(
+            "failed to write project abi index `{}`: {error}",
+            abi_index_path.display()
+        )
+    })?;
     Ok(ProjectBuildMetadata {
         manifest_copy_path: manifest_copy_path.display().to_string(),
         modules_index_path: modules_index_path.display().to_string(),
         links_index_path: links_index_path.display().to_string(),
         host_ffi_index_path: host_ffi_index_path.display().to_string(),
+        abi_index_path: abi_index_path.display().to_string(),
     })
+}
+
+fn render_project_abi_index(project: &LoadedProject) -> Result<String, String> {
+    let resolution = resolve_project_abi(project)?;
+    if resolution.requirements.is_empty() {
+        return Ok(String::new());
+    }
+    let mut lines = resolution
+        .requirements
+        .iter()
+        .map(|item| format!("{}\t{}", item.domain, item.abi))
+        .collect::<Vec<_>>();
+    lines.sort();
+    let mode = if resolution.explicit {
+        "# mode=explicit"
+    } else {
+        "# mode=auto-recommended"
+    };
+    Ok(format!("{mode}\n{}\n", lines.join("\n")))
 }
 
 fn render_project_host_ffi_index(project: &LoadedProject) -> String {
@@ -447,6 +513,160 @@ pub fn validate_project_links_against_yir(
     Ok(())
 }
 
+pub fn validate_project_abi_against_yir(
+    project: &LoadedProject,
+    module: &YirModule,
+) -> Result<(), String> {
+    let resolution = resolve_project_abi(project)?;
+    if resolution.requirements.is_empty() {
+        return Ok(());
+    }
+    for requirement in &resolution.requirements {
+        let manifest = crate::registry::load_manifest_for_domain(
+            Path::new("nustar-packages"),
+            &requirement.domain,
+        )?;
+        crate::registry::validate_manifest_abi(&manifest, &requirement.abi)?;
+        let required_surfaces = required_abi_surfaces_for_domain(project, &requirement.domain)?;
+        let used_ops = crate::registry::used_ops_for_domain(module, &requirement.domain);
+        crate::registry::validate_abi_capabilities(
+            &manifest,
+            &requirement.abi,
+            &required_surfaces,
+            &used_ops,
+        )?;
+    }
+    Ok(())
+}
+
+pub fn resolve_project_abi(project: &LoadedProject) -> Result<ProjectAbiResolution, String> {
+    if !project.manifest.abi_requirements.is_empty() {
+        let mut requirements = project.manifest.abi_requirements.clone();
+        requirements.sort_by(|lhs, rhs| lhs.domain.cmp(&rhs.domain));
+        return Ok(ProjectAbiResolution {
+            requirements,
+            explicit: true,
+        });
+    }
+    let domains = collect_project_domains(&project.manifest, &project.modules)?;
+    let mut requirements = Vec::new();
+    for domain in domains {
+        let manifest =
+            crate::registry::load_manifest_for_domain(Path::new("nustar-packages"), &domain)?;
+        let abi = recommend_abi_profile_for_host(&manifest)
+            .ok_or_else(|| format!("domain `{domain}` has no ABI profiles to recommend"))?;
+        requirements.push(ProjectAbiRequirement { domain, abi });
+    }
+    requirements.sort_by(|lhs, rhs| lhs.domain.cmp(&rhs.domain));
+    Ok(ProjectAbiResolution {
+        requirements,
+        explicit: false,
+    })
+}
+
+fn recommend_abi_profile_for_host(
+    manifest: &crate::registry::NustarPackageManifest,
+) -> Option<String> {
+    if manifest.abi_profiles.is_empty() {
+        return None;
+    }
+    let arch = match std::env::consts::ARCH {
+        "aarch64" => "arm64",
+        other => other,
+    };
+    let os = match std::env::consts::OS {
+        "macos" => "darwin",
+        other => other,
+    };
+    let os_tokens: Vec<&str> = match os {
+        "darwin" => vec!["darwin", "macos", "apple"],
+        "linux" => vec!["linux"],
+        "windows" => vec!["windows", "win64", "win32"],
+        _ => vec![os],
+    };
+
+    let mut best = manifest.abi_profiles[0].clone();
+    let mut best_score = i32::MIN;
+    for profile in &manifest.abi_profiles {
+        let lower = profile.to_ascii_lowercase();
+        let mut score = 0i32;
+        if lower.contains(&arch.to_ascii_lowercase()) {
+            score += 40;
+        }
+        if os_tokens.iter().any(|token| lower.contains(token)) {
+            score += 30;
+        }
+        if manifest.domain_family == "shader" {
+            if os == "darwin" && lower.contains("metal") {
+                score += 60;
+            }
+            if os == "windows" && (lower.contains("dx12") || lower.contains("dxil")) {
+                score += 60;
+            }
+            if os == "linux" && (lower.contains("vulkan") || lower.contains("spv")) {
+                score += 60;
+            }
+            if lower.contains("cpu-fallback") {
+                score -= 10;
+            }
+        } else if manifest.domain_family == "kernel" {
+            if os == "darwin" && (lower.contains("apple_ane") || lower.contains("coreml")) {
+                score += 60;
+            }
+            if lower.contains("cpu-fallback") {
+                score += 10;
+            }
+        }
+        if score > best_score {
+            best_score = score;
+            best = profile.clone();
+        }
+    }
+    Some(best)
+}
+
+fn required_abi_surfaces_for_domain(
+    project: &LoadedProject,
+    domain: &str,
+) -> Result<Vec<String>, String> {
+    let mut surfaces = BTreeSet::new();
+    for link in &project.manifest.links {
+        let (from_domain, _) = split_domain_unit(&link.from)?;
+        let (to_domain, _) = split_domain_unit(&link.to)?;
+        let via_domain = link
+            .via
+            .as_ref()
+            .map(|via| split_domain_unit(via).map(|(d, _)| d))
+            .transpose()?;
+        let domain_is_in_link =
+            from_domain == domain || to_domain == domain || via_domain.as_deref() == Some(domain);
+        if !domain_is_in_link {
+            continue;
+        }
+        match domain {
+            "shader" => {
+                for surface in shader_support_surface_contract() {
+                    surfaces.insert((*surface).to_owned());
+                }
+            }
+            "kernel" => {
+                for surface in kernel_support_surface_contract() {
+                    surfaces.insert((*surface).to_owned());
+                }
+            }
+            "data" => {
+                for surface in data_support_surface_contract() {
+                    surfaces.insert((*surface).to_owned());
+                }
+                surfaces.insert("data.profile.send.uplink.v1".to_owned());
+                surfaces.insert("data.profile.send.downlink.v1".to_owned());
+            }
+            _ => {}
+        }
+    }
+    Ok(surfaces.into_iter().collect())
+}
+
 pub fn validate_project_links_against_nir(
     project: &LoadedProject,
     module: &NirModule,
@@ -616,9 +836,11 @@ fn support_surface_for_domain(
     if let Some(surface) = cache.get(domain) {
         return Ok(surface.clone());
     }
-    let manifest =
-        crate::registry::load_manifest_for_domain(Path::new("nustar-packages"), domain)?;
-    let surface = manifest.support_surface.into_iter().collect::<BTreeSet<_>>();
+    let manifest = crate::registry::load_manifest_for_domain(Path::new("nustar-packages"), domain)?;
+    let surface = manifest
+        .support_surface
+        .into_iter()
+        .collect::<BTreeSet<_>>();
     cache.insert(domain.to_owned(), surface.clone());
     Ok(surface)
 }
@@ -639,8 +861,7 @@ fn require_declared_support_surface(
 }
 
 fn support_profile_slots_for_domain(domain: &str) -> Result<BTreeSet<String>, String> {
-    let manifest =
-        crate::registry::load_manifest_for_domain(Path::new("nustar-packages"), domain)?;
+    let manifest = crate::registry::load_manifest_for_domain(Path::new("nustar-packages"), domain)?;
     Ok(manifest
         .support_profile_slots
         .into_iter()
@@ -723,87 +944,111 @@ fn validate_kernel_profile_for_link(module: &YirModule, endpoint: &str) -> Resul
 }
 
 fn nir_uses_shader_profile_render(module: &NirModule, unit: &str) -> bool {
-    module
-        .functions
-        .iter()
-        .any(|function| function.body.iter().any(|stmt| stmt_uses_shader_profile_render(stmt, unit)))
+    module.functions.iter().any(|function| {
+        function
+            .body
+            .iter()
+            .any(|stmt| stmt_uses_shader_profile_render(stmt, unit))
+    })
 }
 
 fn nir_uses_shader_profile_packet(module: &NirModule, unit: &str) -> bool {
-    module
-        .functions
-        .iter()
-        .any(|function| function.body.iter().any(|stmt| stmt_uses_shader_profile_packet(stmt, unit)))
+    module.functions.iter().any(|function| {
+        function
+            .body
+            .iter()
+            .any(|stmt| stmt_uses_shader_profile_packet(stmt, unit))
+    })
 }
 
 fn nir_uses_shader_profile_color_seed(module: &NirModule, unit: &str) -> bool {
-    module
-        .functions
-        .iter()
-        .any(|function| function.body.iter().any(|stmt| stmt_uses_shader_profile_color_seed(stmt, unit)))
+    module.functions.iter().any(|function| {
+        function
+            .body
+            .iter()
+            .any(|stmt| stmt_uses_shader_profile_color_seed(stmt, unit))
+    })
 }
 
 fn nir_uses_shader_profile_speed_seed(module: &NirModule, unit: &str) -> bool {
-    module
-        .functions
-        .iter()
-        .any(|function| function.body.iter().any(|stmt| stmt_uses_shader_profile_speed_seed(stmt, unit)))
+    module.functions.iter().any(|function| {
+        function
+            .body
+            .iter()
+            .any(|stmt| stmt_uses_shader_profile_speed_seed(stmt, unit))
+    })
 }
 
 fn nir_uses_shader_profile_radius_seed(module: &NirModule, unit: &str) -> bool {
-    module
-        .functions
-        .iter()
-        .any(|function| function.body.iter().any(|stmt| stmt_uses_shader_profile_radius_seed(stmt, unit)))
+    module.functions.iter().any(|function| {
+        function
+            .body
+            .iter()
+            .any(|stmt| stmt_uses_shader_profile_radius_seed(stmt, unit))
+    })
 }
 
 fn nir_uses_data_profile_bind_core(module: &NirModule, unit: &str) -> bool {
-    module
-        .functions
-        .iter()
-        .any(|function| function.body.iter().any(|stmt| stmt_uses_data_profile_bind_core(stmt, unit)))
+    module.functions.iter().any(|function| {
+        function
+            .body
+            .iter()
+            .any(|stmt| stmt_uses_data_profile_bind_core(stmt, unit))
+    })
 }
 
 fn nir_uses_data_profile_handle_table(module: &NirModule, unit: &str) -> bool {
-    module
-        .functions
-        .iter()
-        .any(|function| function.body.iter().any(|stmt| stmt_uses_data_profile_handle_table(stmt, unit)))
+    module.functions.iter().any(|function| {
+        function
+            .body
+            .iter()
+            .any(|stmt| stmt_uses_data_profile_handle_table(stmt, unit))
+    })
 }
 
 fn nir_uses_data_profile_send_uplink(module: &NirModule, unit: &str) -> bool {
-    module
-        .functions
-        .iter()
-        .any(|function| function.body.iter().any(|stmt| stmt_uses_data_profile_send_uplink(stmt, unit)))
+    module.functions.iter().any(|function| {
+        function
+            .body
+            .iter()
+            .any(|stmt| stmt_uses_data_profile_send_uplink(stmt, unit))
+    })
 }
 
 fn nir_uses_data_profile_send_downlink(module: &NirModule, unit: &str) -> bool {
-    module
-        .functions
-        .iter()
-        .any(|function| function.body.iter().any(|stmt| stmt_uses_data_profile_send_downlink(stmt, unit)))
+    module.functions.iter().any(|function| {
+        function
+            .body
+            .iter()
+            .any(|stmt| stmt_uses_data_profile_send_downlink(stmt, unit))
+    })
 }
 
 fn nir_uses_kernel_profile_bind_core(module: &NirModule, unit: &str) -> bool {
-    module
-        .functions
-        .iter()
-        .any(|function| function.body.iter().any(|stmt| stmt_uses_kernel_profile_bind_core(stmt, unit)))
+    module.functions.iter().any(|function| {
+        function
+            .body
+            .iter()
+            .any(|stmt| stmt_uses_kernel_profile_bind_core(stmt, unit))
+    })
 }
 
 fn nir_uses_kernel_profile_queue_depth(module: &NirModule, unit: &str) -> bool {
-    module
-        .functions
-        .iter()
-        .any(|function| function.body.iter().any(|stmt| stmt_uses_kernel_profile_queue_depth(stmt, unit)))
+    module.functions.iter().any(|function| {
+        function
+            .body
+            .iter()
+            .any(|stmt| stmt_uses_kernel_profile_queue_depth(stmt, unit))
+    })
 }
 
 fn nir_uses_kernel_profile_batch_lanes(module: &NirModule, unit: &str) -> bool {
-    module
-        .functions
-        .iter()
-        .any(|function| function.body.iter().any(|stmt| stmt_uses_kernel_profile_batch_lanes(stmt, unit)))
+    module.functions.iter().any(|function| {
+        function
+            .body
+            .iter()
+            .any(|stmt| stmt_uses_kernel_profile_batch_lanes(stmt, unit))
+    })
 }
 
 fn stmt_uses_shader_profile_render(stmt: &NirStmt, unit: &str) -> bool {
@@ -1164,10 +1409,7 @@ fn expr_uses_shader_profile_render(expr: &NirExpr, unit: &str) -> bool {
             expr_uses_shader_profile_render(input, unit)
         }
         NirExpr::ShaderProfileSpeedSeed {
-            delta,
-            scale,
-            base,
-            ..
+            delta, scale, base, ..
         } => {
             expr_uses_shader_profile_render(delta, unit)
                 || expr_uses_shader_profile_render(scale, unit)
@@ -1187,8 +1429,7 @@ fn expr_uses_shader_profile_render(expr: &NirExpr, unit: &str) -> bool {
             .any(|(_, value)| expr_uses_shader_profile_render(value, unit)),
         NirExpr::FieldAccess { base, .. } => expr_uses_shader_profile_render(base, unit),
         NirExpr::Binary { lhs, rhs, .. } => {
-            expr_uses_shader_profile_render(lhs, unit)
-                || expr_uses_shader_profile_render(rhs, unit)
+            expr_uses_shader_profile_render(lhs, unit) || expr_uses_shader_profile_render(rhs, unit)
         }
         NirExpr::ShaderBeginPass {
             target,
@@ -1216,29 +1457,43 @@ fn expr_uses_shader_profile_render(expr: &NirExpr, unit: &str) -> bool {
 
 fn expr_uses_shader_profile_packet(expr: &NirExpr, unit: &str) -> bool {
     match expr {
-        NirExpr::ShaderProfilePacket { unit: shader_unit, .. } => shader_unit == unit,
+        NirExpr::ShaderProfilePacket {
+            unit: shader_unit, ..
+        } => shader_unit == unit,
         _ => expr_walk_any(expr, &|inner| expr_uses_shader_profile_packet(inner, unit)),
     }
 }
 
 fn expr_uses_shader_profile_color_seed(expr: &NirExpr, unit: &str) -> bool {
     match expr {
-        NirExpr::ShaderProfileColorSeed { unit: shader_unit, .. } => shader_unit == unit,
-        _ => expr_walk_any(expr, &|inner| expr_uses_shader_profile_color_seed(inner, unit)),
+        NirExpr::ShaderProfileColorSeed {
+            unit: shader_unit, ..
+        } => shader_unit == unit,
+        _ => expr_walk_any(expr, &|inner| {
+            expr_uses_shader_profile_color_seed(inner, unit)
+        }),
     }
 }
 
 fn expr_uses_shader_profile_speed_seed(expr: &NirExpr, unit: &str) -> bool {
     match expr {
-        NirExpr::ShaderProfileSpeedSeed { unit: shader_unit, .. } => shader_unit == unit,
-        _ => expr_walk_any(expr, &|inner| expr_uses_shader_profile_speed_seed(inner, unit)),
+        NirExpr::ShaderProfileSpeedSeed {
+            unit: shader_unit, ..
+        } => shader_unit == unit,
+        _ => expr_walk_any(expr, &|inner| {
+            expr_uses_shader_profile_speed_seed(inner, unit)
+        }),
     }
 }
 
 fn expr_uses_shader_profile_radius_seed(expr: &NirExpr, unit: &str) -> bool {
     match expr {
-        NirExpr::ShaderProfileRadiusSeed { unit: shader_unit, .. } => shader_unit == unit,
-        _ => expr_walk_any(expr, &|inner| expr_uses_shader_profile_radius_seed(inner, unit)),
+        NirExpr::ShaderProfileRadiusSeed {
+            unit: shader_unit, ..
+        } => shader_unit == unit,
+        _ => expr_walk_any(expr, &|inner| {
+            expr_uses_shader_profile_radius_seed(inner, unit)
+        }),
     }
 }
 
@@ -1252,42 +1507,58 @@ fn expr_uses_data_profile_bind_core(expr: &NirExpr, unit: &str) -> bool {
 fn expr_uses_data_profile_handle_table(expr: &NirExpr, unit: &str) -> bool {
     match expr {
         NirExpr::DataProfileHandleTableRef { unit: data_unit } => data_unit == unit,
-        _ => expr_walk_any(expr, &|inner| expr_uses_data_profile_handle_table(inner, unit)),
+        _ => expr_walk_any(expr, &|inner| {
+            expr_uses_data_profile_handle_table(inner, unit)
+        }),
     }
 }
 
 fn expr_uses_data_profile_send_uplink(expr: &NirExpr, unit: &str) -> bool {
     match expr {
-        NirExpr::DataProfileSendUplink { unit: data_unit, .. } => data_unit == unit,
-        _ => expr_walk_any(expr, &|inner| expr_uses_data_profile_send_uplink(inner, unit)),
+        NirExpr::DataProfileSendUplink {
+            unit: data_unit, ..
+        } => data_unit == unit,
+        _ => expr_walk_any(expr, &|inner| {
+            expr_uses_data_profile_send_uplink(inner, unit)
+        }),
     }
 }
 
 fn expr_uses_data_profile_send_downlink(expr: &NirExpr, unit: &str) -> bool {
     match expr {
-        NirExpr::DataProfileSendDownlink { unit: data_unit, .. } => data_unit == unit,
-        _ => expr_walk_any(expr, &|inner| expr_uses_data_profile_send_downlink(inner, unit)),
+        NirExpr::DataProfileSendDownlink {
+            unit: data_unit, ..
+        } => data_unit == unit,
+        _ => expr_walk_any(expr, &|inner| {
+            expr_uses_data_profile_send_downlink(inner, unit)
+        }),
     }
 }
 
 fn expr_uses_kernel_profile_bind_core(expr: &NirExpr, unit: &str) -> bool {
     match expr {
         NirExpr::KernelProfileBindCoreRef { unit: kernel_unit } => kernel_unit == unit,
-        _ => expr_walk_any(expr, &|inner| expr_uses_kernel_profile_bind_core(inner, unit)),
+        _ => expr_walk_any(expr, &|inner| {
+            expr_uses_kernel_profile_bind_core(inner, unit)
+        }),
     }
 }
 
 fn expr_uses_kernel_profile_queue_depth(expr: &NirExpr, unit: &str) -> bool {
     match expr {
         NirExpr::KernelProfileQueueDepthRef { unit: kernel_unit } => kernel_unit == unit,
-        _ => expr_walk_any(expr, &|inner| expr_uses_kernel_profile_queue_depth(inner, unit)),
+        _ => expr_walk_any(expr, &|inner| {
+            expr_uses_kernel_profile_queue_depth(inner, unit)
+        }),
     }
 }
 
 fn expr_uses_kernel_profile_batch_lanes(expr: &NirExpr, unit: &str) -> bool {
     match expr {
         NirExpr::KernelProfileBatchLanesRef { unit: kernel_unit } => kernel_unit == unit,
-        _ => expr_walk_any(expr, &|inner| expr_uses_kernel_profile_batch_lanes(inner, unit)),
+        _ => expr_walk_any(expr, &|inner| {
+            expr_uses_kernel_profile_batch_lanes(inner, unit)
+        }),
     }
 }
 
@@ -1325,10 +1596,7 @@ fn expr_walk_any(expr: &NirExpr, predicate: &dyn Fn(&NirExpr) -> bool) -> bool {
             predicate(base) || predicate(delta)
         }
         NirExpr::ShaderProfileSpeedSeed {
-            delta,
-            scale,
-            base,
-            ..
+            delta, scale, base, ..
         } => predicate(delta) || predicate(scale) || predicate(base),
         NirExpr::ShaderProfilePacket {
             color,
@@ -1412,6 +1680,62 @@ fn validate_shader_profile_flow(module: &YirModule, unit: &str) -> Result<(), St
         ));
     }
 
+    let pipeline_models = module
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "shader" && node.op.instruction == "pipeline")
+        .filter_map(|node| node.op.args.first().cloned())
+        .collect::<BTreeSet<_>>();
+    let inline_entries = module
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "shader" && node.op.instruction == "inline_wgsl")
+        .map(|node| (node.name.as_str(), node.op.args.clone()))
+        .collect::<Vec<_>>();
+    if inline_entries.is_empty() {
+        return Err(format!(
+            "project shader unit `shader.{}` requires at least one shader_inline_wgsl(\"entry\", wgsl {{ ... }}) profile node",
+            unit
+        ));
+    }
+    let mut matched_pipeline_entry = false;
+    for (node_name, args) in inline_entries {
+        let Some(entry) = args.first() else {
+            return Err(format!(
+                "project shader unit `shader.{}` has malformed inline_wgsl node `{}` (missing entry)",
+                unit, node_name
+            ));
+        };
+        let Some(source) = args.get(1) else {
+            return Err(format!(
+                "project shader unit `shader.{}` has malformed inline_wgsl node `{}` (missing source)",
+                unit, node_name
+            ));
+        };
+        if !pipeline_models.is_empty() && pipeline_models.contains(entry) {
+            matched_pipeline_entry = true;
+        }
+        if source.trim().is_empty() {
+            return Err(format!(
+                "project shader unit `shader.{}` has empty inline WGSL source in node `{}`",
+                unit, node_name
+            ));
+        }
+        if !source.contains("@vertex") || !source.contains("@fragment") {
+            return Err(format!(
+                "project shader unit `shader.{}` inline WGSL node `{}` must contain both @vertex and @fragment stages",
+                unit, node_name
+            ));
+        }
+    }
+    if !pipeline_models.is_empty() && !matched_pipeline_entry {
+        return Err(format!(
+            "project shader unit `shader.{}` requires shader_inline_wgsl entry to match shader_pipeline shading model ({})",
+            unit,
+            pipeline_models.into_iter().collect::<Vec<_>>().join(", ")
+        ));
+    }
+
     Ok(())
 }
 
@@ -1440,28 +1764,41 @@ fn validate_data_profile_for_link(module: &YirModule, endpoint: &str) -> Result<
     let uplink_nodes = module
         .nodes
         .iter()
-        .filter(|node| node.op.module == "data" && matches!(node.op.instruction.as_str(), "output_pipe" | "input_pipe"))
+        .filter(|node| {
+            node.op.module == "data"
+                && matches!(node.op.instruction.as_str(), "output_pipe" | "input_pipe")
+        })
         .take(2)
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
     let downlink_nodes = module
         .nodes
         .iter()
-        .filter(|node| node.op.module == "data" && matches!(node.op.instruction.as_str(), "output_pipe" | "input_pipe"))
+        .filter(|node| {
+            node.op.module == "data"
+                && matches!(node.op.instruction.as_str(), "output_pipe" | "input_pipe")
+        })
         .skip(2)
         .take(2)
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
-    let uplink_payload = resolve_project_profile_target_name("data", &unit, "marker:uplink_payload_class");
-    let downlink_payload = resolve_project_profile_target_name("data", &unit, "marker:downlink_payload_class");
-    let uplink_shape = resolve_project_profile_target_name("data", &unit, "marker:uplink_payload_shape");
-    let downlink_shape = resolve_project_profile_target_name("data", &unit, "marker:downlink_payload_shape");
+    let uplink_payload =
+        resolve_project_profile_target_name("data", &unit, "marker:uplink_payload_class");
+    let downlink_payload =
+        resolve_project_profile_target_name("data", &unit, "marker:downlink_payload_class");
+    let uplink_shape =
+        resolve_project_profile_target_name("data", &unit, "marker:uplink_payload_shape");
+    let downlink_shape =
+        resolve_project_profile_target_name("data", &unit, "marker:downlink_payload_shape");
     let uplink_windows = module
         .nodes
         .iter()
         .filter(|node| {
             node.op.module == "data"
-                && matches!(node.op.instruction.as_str(), "copy_window" | "immutable_window")
+                && matches!(
+                    node.op.instruction.as_str(),
+                    "copy_window" | "immutable_window"
+                )
                 && node.name.contains("_uplink_window")
         })
         .map(|node| node.name.clone())
@@ -1471,43 +1808,64 @@ fn validate_data_profile_for_link(module: &YirModule, endpoint: &str) -> Result<
         .iter()
         .filter(|node| {
             node.op.module == "data"
-                && matches!(node.op.instruction.as_str(), "copy_window" | "immutable_window")
+                && matches!(
+                    node.op.instruction.as_str(),
+                    "copy_window" | "immutable_window"
+                )
                 && node.name.contains("_downlink_window")
         })
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
 
-    if !uplink_nodes.iter().all(|pipe| has_edge_to(module, &uplink_payload, pipe)) {
+    if !uplink_nodes
+        .iter()
+        .all(|pipe| has_edge_to(module, &uplink_payload, pipe))
+    {
         return Err(format!(
             "project data unit `data.{}` requires uplink payload class to feed all uplink pipe nodes",
             unit
         ));
     }
-    if !uplink_nodes.iter().all(|pipe| has_edge_to(module, &uplink_shape, pipe)) {
+    if !uplink_nodes
+        .iter()
+        .all(|pipe| has_edge_to(module, &uplink_shape, pipe))
+    {
         return Err(format!(
             "project data unit `data.{}` requires uplink payload shape to feed all uplink pipe nodes",
             unit
         ));
     }
-    if !uplink_windows.iter().all(|window| has_edge_to(module, &uplink_shape, window)) {
+    if !uplink_windows
+        .iter()
+        .all(|window| has_edge_to(module, &uplink_shape, window))
+    {
         return Err(format!(
             "project data unit `data.{}` requires uplink payload shape to feed all uplink window nodes",
             unit
         ));
     }
-    if !downlink_nodes.iter().all(|pipe| has_edge_to(module, &downlink_payload, pipe)) {
+    if !downlink_nodes
+        .iter()
+        .all(|pipe| has_edge_to(module, &downlink_payload, pipe))
+    {
         return Err(format!(
             "project data unit `data.{}` requires downlink payload class to feed all downlink pipe nodes",
             unit
         ));
     }
-    if !downlink_nodes.iter().all(|pipe| has_edge_to(module, &downlink_shape, pipe)) {
+    if !downlink_nodes
+        .iter()
+        .all(|pipe| has_edge_to(module, &downlink_shape, pipe))
+    {
         return Err(format!(
             "project data unit `data.{}` requires downlink payload shape to feed all downlink pipe nodes",
             unit
         ));
     }
-    if !downlink_windows.iter().all(|window| has_edge_to(module, &downlink_shape, window)) {
+    if !downlink_windows
+        .iter()
+        .all(|window| has_edge_to(module, &downlink_shape, window))
+    {
         return Err(format!(
             "project data unit `data.{}` requires downlink payload shape to feed all downlink window nodes",
             unit
@@ -1518,12 +1876,16 @@ fn validate_data_profile_for_link(module: &YirModule, endpoint: &str) -> Result<
 }
 
 fn has_edge_to(module: &YirModule, from: &str, to: &str) -> bool {
-    module.edges.iter().any(|edge| edge.from == from && edge.to == to)
+    module
+        .edges
+        .iter()
+        .any(|edge| edge.from == from && edge.to == to)
 }
 
 fn shader_support_surface_contract() -> &'static [&'static str] {
     &[
         "shader.profile.packet.v1",
+        "shader.inline.wgsl.v1",
         "shader.profile.target.v1",
         "shader.profile.viewport.v1",
         "shader.profile.pipeline.v1",
@@ -1561,7 +1923,10 @@ fn data_support_surface_contract() -> &'static [&'static str] {
 
 fn shader_profile_slot_targets(unit: &str) -> Vec<(&'static str, String)> {
     vec![
-        ("target", resolve_project_profile_target_name("shader", unit, "target")),
+        (
+            "target",
+            resolve_project_profile_target_name("shader", unit, "target"),
+        ),
         (
             "viewport",
             resolve_project_profile_target_name("shader", unit, "viewport"),
@@ -1628,12 +1993,18 @@ fn kernel_profile_slot_targets(unit: &str) -> Vec<(&'static str, String)> {
 
 fn data_profile_slot_targets(unit: &str) -> Vec<(&'static str, String)> {
     vec![
-        ("bind_core", resolve_project_profile_target_name("data", unit, "bind_core")),
+        (
+            "bind_core",
+            resolve_project_profile_target_name("data", unit, "bind_core"),
+        ),
         (
             "window_offset",
             resolve_project_profile_target_name("data", unit, "window_offset"),
         ),
-        ("uplink_len", resolve_project_profile_target_name("data", unit, "uplink_len")),
+        (
+            "uplink_len",
+            resolve_project_profile_target_name("data", unit, "uplink_len"),
+        ),
         (
             "downlink_len",
             resolve_project_profile_target_name("data", unit, "downlink_len"),
@@ -1726,7 +2097,12 @@ fn stitch_shader_profile_edges(module: &mut YirModule) {
     }
     for packet_field_count in &packet_field_count_nodes {
         for draw in &draw_nodes {
-            push_edge_if_missing(module, EdgeKind::CrossDomainExchange, packet_field_count, draw);
+            push_edge_if_missing(
+                module,
+                EdgeKind::CrossDomainExchange,
+                packet_field_count,
+                draw,
+            );
         }
     }
 }
@@ -1749,7 +2125,11 @@ fn node_family<'a>(node_families: &'a BTreeMap<&str, String>, node_name: &str) -
 }
 
 fn apply_support_module_profile(ast: &AstModule, module: &mut YirModule) -> Result<(), String> {
-    let Some(profile) = ast.functions.iter().find(|function| function.name == "profile") else {
+    let Some(profile) = ast
+        .functions
+        .iter()
+        .find(|function| function.name == "profile")
+    else {
         return Ok(());
     };
     let int_bindings = collect_profile_int_bindings(&profile.body);
@@ -1840,6 +2220,14 @@ fn apply_shader_profile_stmt(
                 expect_text_arg(args, 1, "shader_pipeline")?,
             ],
         },
+        "shader_inline_wgsl" => Operation {
+            module: "shader".to_owned(),
+            instruction: "inline_wgsl".to_owned(),
+            args: vec![
+                expect_text_arg(args, 0, "shader_inline_wgsl")?,
+                expect_text_arg(args, 1, "shader_inline_wgsl")?,
+            ],
+        },
         _ => return Ok(()),
     };
     push_profile_node(module, name, "shader0", op);
@@ -1885,7 +2273,9 @@ fn apply_data_profile_stmt(
         "data_bind_core" => Operation {
             module: "data".to_owned(),
             instruction: "bind_core".to_owned(),
-            args: vec![expect_profile_int_arg(args, 0, "data_bind_core", int_bindings)?.to_string()],
+            args: vec![
+                expect_profile_int_arg(args, 0, "data_bind_core", int_bindings)?.to_string(),
+            ],
         },
         "data_handle_table" => Operation {
             module: "data".to_owned(),
@@ -2018,7 +2408,10 @@ fn extract_profile_int_binding(stmt: &AstStmt) -> Option<(&str, i64)> {
 fn expect_text_arg(args: &[AstExpr], index: usize, callee: &str) -> Result<String, String> {
     match args.get(index) {
         Some(AstExpr::Text(value)) => Ok(value.clone()),
-        _ => Err(format!("{callee}(...) expects string literal arg {}", index + 1)),
+        _ => Err(format!(
+            "{callee}(...) expects string literal arg {}",
+            index + 1
+        )),
     }
 }
 
@@ -2065,7 +2458,11 @@ fn expect_profile_value_input_name(
 }
 
 fn ensure_project_resource(module: &mut YirModule, name: &str, kind: &str) {
-    if module.resources.iter().any(|resource| resource.name == name) {
+    if module
+        .resources
+        .iter()
+        .any(|resource| resource.name == name)
+    {
         return;
     }
     module.resources.push(Resource {
@@ -2152,11 +2549,16 @@ fn resolve_project_profile_refs(module: &mut YirModule) -> Result<(), String> {
             if !replacement_targets.contains(arg) {
                 continue;
             }
-            let edge_kind =
-                inferred_project_dependency_edge_kind(&resource_families, &node_resources, arg, &node.name);
-            let exists = module.edges.iter().any(|edge| {
-                edge.kind == edge_kind && edge.from == *arg && edge.to == node.name
-            });
+            let edge_kind = inferred_project_dependency_edge_kind(
+                &resource_families,
+                &node_resources,
+                arg,
+                &node.name,
+            );
+            let exists = module
+                .edges
+                .iter()
+                .any(|edge| edge.kind == edge_kind && edge.from == *arg && edge.to == node.name);
             if !exists {
                 extra_dep_edges.push(yir_core::Edge {
                     kind: edge_kind,
@@ -2228,26 +2630,23 @@ fn resolve_project_profile_target_name(domain: &str, unit: &str, slot: &str) -> 
             "project_profile_shader_{}_packet_radius_slot",
             sanitize_ident(unit)
         ),
-        ("shader", "packet_tag") => format!(
-            "project_profile_shader_{}_packet_tag",
-            sanitize_ident(unit)
-        ),
+        ("shader", "packet_tag") => {
+            format!("project_profile_shader_{}_packet_tag", sanitize_ident(unit))
+        }
         ("shader", "material_mode") => format!(
             "project_profile_shader_{}_material_mode",
             sanitize_ident(unit)
         ),
-        ("shader", "pass_kind") => format!(
-            "project_profile_shader_{}_pass_kind",
-            sanitize_ident(unit)
-        ),
+        ("shader", "pass_kind") => {
+            format!("project_profile_shader_{}_pass_kind", sanitize_ident(unit))
+        }
         ("shader", "packet_field_count") => format!(
             "project_profile_shader_{}_packet_field_count",
             sanitize_ident(unit)
         ),
-        ("kernel", "bind_core") => format!(
-            "project_profile_kernel_{}_bind_core",
-            sanitize_ident(unit)
-        ),
+        ("kernel", "bind_core") => {
+            format!("project_profile_kernel_{}_bind_core", sanitize_ident(unit))
+        }
         ("kernel", "queue_depth") => format!(
             "project_profile_kernel_{}_queue_depth",
             sanitize_ident(unit)
@@ -2264,14 +2663,12 @@ fn resolve_project_profile_target_name(domain: &str, unit: &str, slot: &str) -> 
             "project_profile_data_{}_window_offset",
             sanitize_ident(unit)
         ),
-        ("data", "uplink_len") => format!(
-            "project_profile_data_{}_uplink_len",
-            sanitize_ident(unit)
-        ),
-        ("data", "downlink_len") => format!(
-            "project_profile_data_{}_downlink_len",
-            sanitize_ident(unit)
-        ),
+        ("data", "uplink_len") => {
+            format!("project_profile_data_{}_uplink_len", sanitize_ident(unit))
+        }
+        ("data", "downlink_len") => {
+            format!("project_profile_data_{}_downlink_len", sanitize_ident(unit))
+        }
         ("data", "handle_table") => format!(
             "project_profile_data_{}_profile_handles",
             sanitize_ident(unit)
@@ -2467,7 +2864,10 @@ fn stitch_data_profile_edges(module: &mut YirModule) {
         .iter()
         .filter(|node| {
             node.op.module == "data"
-                && matches!(node.op.instruction.as_str(), "copy_window" | "immutable_window")
+                && matches!(
+                    node.op.instruction.as_str(),
+                    "copy_window" | "immutable_window"
+                )
                 && node.name.contains("_uplink_window")
         })
         .map(|node| node.name.clone())
@@ -2477,7 +2877,10 @@ fn stitch_data_profile_edges(module: &mut YirModule) {
         .iter()
         .filter(|node| {
             node.op.module == "data"
-                && matches!(node.op.instruction.as_str(), "copy_window" | "immutable_window")
+                && matches!(
+                    node.op.instruction.as_str(),
+                    "copy_window" | "immutable_window"
+                )
                 && node.name.contains("_downlink_window")
         })
         .map(|node| node.name.clone())
@@ -2794,7 +3197,10 @@ fn validate_project_links(
 
     for link in &manifest.links {
         let from_module = local_units.get(&link.from).ok_or_else(|| {
-            format!("project link references unknown source unit `{}`", link.from)
+            format!(
+                "project link references unknown source unit `{}`",
+                link.from
+            )
         })?;
         if !local_units.contains_key(&link.to) {
             validate_external_unit_ref(&link.to)?;
@@ -2835,6 +3241,83 @@ fn validate_project_links(
     Ok(())
 }
 
+fn validate_project_abi_requirements(
+    manifest: &NuisProjectManifest,
+    modules: &[ProjectModule],
+) -> Result<(), String> {
+    if manifest.abi_requirements.is_empty() {
+        return Ok(());
+    }
+
+    let project_domains = collect_project_domains(manifest, modules)?;
+
+    let mut required_domains = BTreeSet::new();
+    for requirement in &manifest.abi_requirements {
+        if !project_domains.contains(&requirement.domain) {
+            return Err(format!(
+                "project manifest ABI requirement `{}` targets domain `{}` which is not used by this project",
+                requirement.abi, requirement.domain
+            ));
+        }
+        let domain_manifest = crate::registry::load_manifest_for_domain(
+            Path::new("nustar-packages"),
+            &requirement.domain,
+        )?;
+        if !domain_manifest
+            .abi_profiles
+            .iter()
+            .any(|profile| profile == &requirement.abi)
+        {
+            return Err(format!(
+                "project requires ABI `{}` for domain `{}`, but nustar package `{}` declares [{}]",
+                requirement.abi,
+                requirement.domain,
+                domain_manifest.package_id,
+                if domain_manifest.abi_profiles.is_empty() {
+                    "<none>".to_owned()
+                } else {
+                    domain_manifest.abi_profiles.join(", ")
+                }
+            ));
+        }
+        required_domains.insert(requirement.domain.clone());
+    }
+
+    let missing_domains = project_domains
+        .difference(&required_domains)
+        .cloned()
+        .collect::<Vec<_>>();
+    if !missing_domains.is_empty() {
+        return Err(format!(
+            "project manifest declares ABI locking but is missing domain ABI entries for: {}",
+            missing_domains.join(", ")
+        ));
+    }
+
+    Ok(())
+}
+
+fn collect_project_domains(
+    manifest: &NuisProjectManifest,
+    modules: &[ProjectModule],
+) -> Result<BTreeSet<String>, String> {
+    let mut project_domains = modules
+        .iter()
+        .map(|module| module.ast.domain.clone())
+        .collect::<BTreeSet<_>>();
+    for link in &manifest.links {
+        let (from_domain, _) = split_domain_unit(&link.from)?;
+        let (to_domain, _) = split_domain_unit(&link.to)?;
+        project_domains.insert(from_domain);
+        project_domains.insert(to_domain);
+        if let Some(via) = &link.via {
+            let (via_domain, _) = split_domain_unit(via)?;
+            project_domains.insert(via_domain);
+        }
+    }
+    Ok(project_domains)
+}
+
 fn validate_external_unit_ref(reference: &str) -> Result<(), String> {
     let (domain, unit) = split_domain_unit(reference)?;
     let manifest =
@@ -2856,11 +3339,13 @@ fn parse_project_manifest(source: &str, path: &Path) -> Result<NuisProjectManife
     let entry = parse_required_string(source, "entry", path)?;
     let modules = parse_optional_string_array(source, "modules").unwrap_or_default();
     let links = parse_optional_link_array(source, "links").unwrap_or_default();
+    let abi_requirements = parse_optional_abi_array(source, "abi").unwrap_or_default();
     Ok(NuisProjectManifest {
         name,
         entry,
         modules,
         links,
+        abi_requirements,
     })
 }
 
@@ -2938,6 +3423,23 @@ fn parse_optional_link_array(source: &str, key: &str) -> Option<Vec<ProjectLink>
         links.push(ProjectLink { from, to, via });
     }
     Some(links)
+}
+
+fn parse_optional_abi_array(source: &str, key: &str) -> Option<Vec<ProjectAbiRequirement>> {
+    let values = parse_optional_string_array(source, key)?;
+    let mut items = Vec::new();
+    for value in values {
+        let Some((domain, abi)) = value.split_once('=') else {
+            return None;
+        };
+        let domain = domain.trim().to_owned();
+        let abi = abi.trim().to_owned();
+        if domain.is_empty() || abi.is_empty() {
+            return None;
+        }
+        items.push(ProjectAbiRequirement { domain, abi });
+    }
+    Some(items)
 }
 
 fn parse_quoted(raw: &str) -> Option<String> {

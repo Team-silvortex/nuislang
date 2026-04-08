@@ -14,5 +14,24 @@ mod shader SurfaceShader {
     let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
     let profile_view: Viewport = shader_viewport(160, 120);
     let profile_pipe: Pipeline = shader_pipeline("lit_sphere", "triangle_strip");
+    let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", wgsl {
+      struct VsOut {
+        @builtin(position) pos: vec4<f32>,
+      };
+
+      @vertex
+      fn vs_main(@builtin(vertex_index) vid: u32) -> VsOut {
+        var out: VsOut;
+        let x: f32 = f32((vid << 1u) & 2u);
+        let y: f32 = f32(vid & 2u);
+        out.pos = vec4<f32>(x * 2.0 - 1.0, y * -2.0 + 1.0, 0.0, 1.0);
+        return out;
+      }
+
+      @fragment
+      fn fs_main() -> @location(0) vec4<f32> {
+        return vec4<f32>(0.82, 0.88, 0.97, 1.0);
+      }
+    });
   }
 }

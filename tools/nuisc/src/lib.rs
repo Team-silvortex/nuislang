@@ -64,6 +64,15 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 println!("  binary_extension: {}", manifest.binary_extension);
                 println!("  package_layout: {}", manifest.package_layout);
                 println!("  machine_abi_policy: {}", manifest.machine_abi_policy);
+                if !manifest.abi_profiles.is_empty() {
+                    println!("  abi_profiles: {}", manifest.abi_profiles.join(", "));
+                }
+                if !manifest.abi_capabilities.is_empty() {
+                    println!(
+                        "  abi_capabilities: {}",
+                        manifest.abi_capabilities.join(", ")
+                    );
+                }
                 println!(
                     "  implementation_kinds: {}",
                     manifest.implementation_kinds.join(", ")
@@ -71,7 +80,10 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 println!("  loader_entry: {}", manifest.loader_entry);
                 println!("  loader_abi: {}", manifest.loader_abi);
                 if !manifest.host_ffi_surface.is_empty() {
-                    println!("  host_ffi_surface: {}", manifest.host_ffi_surface.join(", "));
+                    println!(
+                        "  host_ffi_surface: {}",
+                        manifest.host_ffi_surface.join(", ")
+                    );
                     println!("  host_ffi_abis: {}", manifest.host_ffi_abis.join(", "));
                     println!("  host_ffi_bridge: {}", manifest.host_ffi_bridge);
                 }
@@ -122,12 +134,20 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 .externs
                 .iter()
                 .map(|item| (item.abi.clone(), item.name.clone()))
-                .chain(artifacts.ast.extern_interfaces.iter().flat_map(|interface| {
-                    interface
-                        .methods
+                .chain(
+                    artifacts
+                        .ast
+                        .extern_interfaces
                         .iter()
-                        .map(move |method| (method.abi.clone(), format!("{}__{}", interface.name, method.name)))
-                }))
+                        .flat_map(|interface| {
+                            interface.methods.iter().map(move |method| {
+                                (
+                                    method.abi.clone(),
+                                    format!("{}__{}", interface.name, method.name),
+                                )
+                            })
+                        }),
+                )
                 .collect::<Vec<_>>();
             let plan = registry::plan_bindings(
                 Path::new("nustar-packages"),
@@ -151,6 +171,16 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 println!("  nir_entry: {}", binding.nir_entry);
                 println!("  yir_lowering_entry: {}", binding.yir_lowering_entry);
                 println!("  part_verify_entry: {}", binding.part_verify_entry);
+                println!("  machine_abi_policy: {}", binding.machine_abi_policy);
+                if !binding.abi_profiles.is_empty() {
+                    println!("  abi_profiles: {}", binding.abi_profiles.join(", "));
+                }
+                if !binding.abi_capabilities.is_empty() {
+                    println!(
+                        "  abi_capabilities: {}",
+                        binding.abi_capabilities.join(", ")
+                    );
+                }
                 println!("  ast_surface: {}", binding.ast_surface.join(", "));
                 println!("  nir_surface: {}", binding.nir_surface.join(", "));
                 println!("  yir_lowering: {}", binding.yir_lowering.join(", "));
@@ -243,6 +273,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
         }
         CommandKind::PackNustar { package_id, output } => {
             let manifest = registry::load_manifest(Path::new("nustar-packages"), &package_id)?;
+            nustar_binary::validate_manifest_for_packaging(&manifest)?;
             let blob = format!(
                 "nustar_impl_stub\npackage={}\nfrontend={}\nentry_crate={}\n",
                 manifest.package_id, manifest.frontend, manifest.entry_crate
@@ -261,6 +292,14 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             println!("  calling_abi: {}", binary.calling_abi);
             println!("  format: {}", binary.implementation_format);
             println!("  checksum: {}", binary.implementation_checksum);
+            println!(
+                "  abi_profiles: {}",
+                binary.manifest.abi_profiles.join(", ")
+            );
+            println!(
+                "  abi_capabilities: {}",
+                binary.manifest.abi_capabilities.join(", ")
+            );
             println!("  blob_bytes: {}", binary.implementation_blob.len());
         }
         CommandKind::InspectNustar { input } => {
@@ -272,10 +311,25 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             println!("  crate: {}", binary.manifest.entry_crate);
             println!("  ast_entry: {}", binary.manifest.ast_entry);
             println!("  nir_entry: {}", binary.manifest.nir_entry);
-            println!("  yir_lowering_entry: {}", binary.manifest.yir_lowering_entry);
+            println!(
+                "  yir_lowering_entry: {}",
+                binary.manifest.yir_lowering_entry
+            );
             println!("  part_verify_entry: {}", binary.manifest.part_verify_entry);
             println!("  loader_abi: {}", binary.manifest.loader_abi);
             println!("  loader_entry: {}", binary.manifest.loader_entry);
+            if !binary.manifest.abi_profiles.is_empty() {
+                println!(
+                    "  abi_profiles: {}",
+                    binary.manifest.abi_profiles.join(", ")
+                );
+            }
+            if !binary.manifest.abi_capabilities.is_empty() {
+                println!(
+                    "  abi_capabilities: {}",
+                    binary.manifest.abi_capabilities.join(", ")
+                );
+            }
             if !binary.manifest.host_ffi_surface.is_empty() {
                 println!(
                     "  host_ffi_surface: {}",
@@ -465,9 +519,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 None
             };
             let effective_input = if let Some(project) = &project {
-                project
-                    .root
-                    .join(format!("{}.ns", project.manifest.name))
+                project.root.join(format!("{}.ns", project.manifest.name))
             } else {
                 input.clone()
             };
@@ -509,6 +561,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 println!("project_modules: {}", metadata.modules_index_path);
                 println!("project_links: {}", metadata.links_index_path);
                 println!("project_host_ffi: {}", metadata.host_ffi_index_path);
+                println!("project_abi: {}", metadata.abi_index_path);
             }
         }
     }

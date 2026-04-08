@@ -304,17 +304,15 @@ pub fn glm_profile_for_operation(op: &Operation) -> GlmNodeProfile {
                 effect: GlmEffect::None,
             }
         }
-        ("data" | "fabric", "output_pipe") | ("data" | "fabric", "input_pipe") => {
-            GlmNodeProfile {
-                result_class: GlmValueClass::Res,
-                accesses: vec![GlmAccess {
-                    input: op.args[0].clone(),
-                    class: GlmValueClass::Res,
-                    mode: GlmUseMode::Read,
-                }],
-                effect: GlmEffect::None,
-            }
-        }
+        ("data" | "fabric", "output_pipe") | ("data" | "fabric", "input_pipe") => GlmNodeProfile {
+            result_class: GlmValueClass::Res,
+            accesses: vec![GlmAccess {
+                input: op.args[0].clone(),
+                class: GlmValueClass::Res,
+                mode: GlmUseMode::Read,
+            }],
+            effect: GlmEffect::None,
+        },
         _ => GlmNodeProfile {
             result_class: GlmValueClass::Val,
             accesses: op
