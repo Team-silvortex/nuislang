@@ -321,7 +321,10 @@ pub fn prune_compile_cache_summary(
         .map(|root| prune_compile_cache_root(&root, keep))
         .collect::<Result<Vec<_>, _>>()?;
     let kept_entries = pruned_roots.iter().map(|pruned| pruned.kept_entries).sum();
-    let removed_entries = pruned_roots.iter().map(|pruned| pruned.removed_entries).sum();
+    let removed_entries = pruned_roots
+        .iter()
+        .map(|pruned| pruned.removed_entries)
+        .sum();
     let removed_bytes = pruned_roots.iter().map(|pruned| pruned.removed_bytes).sum();
     Ok(PrunedCompileCacheSummary {
         workspace_root: workspace_root.to_path_buf(),
@@ -360,7 +363,11 @@ fn prune_compile_cache_root(root: &Path, keep: usize) -> Result<PrunedCompileCac
         });
     }
     let mut entries = collect_cache_entry_stats(root)?;
-    entries.sort_by(|lhs, rhs| rhs.modified.cmp(&lhs.modified).then_with(|| lhs.key.cmp(&rhs.key)));
+    entries.sort_by(|lhs, rhs| {
+        rhs.modified
+            .cmp(&lhs.modified)
+            .then_with(|| lhs.key.cmp(&rhs.key))
+    });
     let kept_entries = entries.len().min(keep);
     let mut removed_entries = 0usize;
     let mut removed_bytes = 0u64;
@@ -370,13 +377,19 @@ fn prune_compile_cache_root(root: &Path, keep: usize) -> Result<PrunedCompileCac
         removed_entries += 1;
         removed_bytes += entry.total_bytes;
     }
-    if keep == 0 && root.is_dir() && fs::read_dir(root)
-        .map_err(|error| format!("failed to read `{}`: {error}", root.display()))?
-        .next()
-        .is_none()
+    if keep == 0
+        && root.is_dir()
+        && fs::read_dir(root)
+            .map_err(|error| format!("failed to read `{}`: {error}", root.display()))?
+            .next()
+            .is_none()
     {
-        fs::remove_dir(root)
-            .map_err(|error| format!("failed to remove empty cache root `{}`: {error}", root.display()))?;
+        fs::remove_dir(root).map_err(|error| {
+            format!(
+                "failed to remove empty cache root `{}`: {error}",
+                root.display()
+            )
+        })?;
     }
     Ok(PrunedCompileCache {
         root: root.to_path_buf(),
@@ -561,8 +574,8 @@ fn collect_cache_entry_stats(root: &Path) -> Result<Vec<CacheEntryStats>, String
     if !root.is_dir() {
         return Ok(entries);
     }
-    for entry in
-        fs::read_dir(root).map_err(|error| format!("failed to read `{}`: {error}", root.display()))?
+    for entry in fs::read_dir(root)
+        .map_err(|error| format!("failed to read `{}`: {error}", root.display()))?
     {
         let entry =
             entry.map_err(|error| format!("failed to enumerate `{}`: {error}", root.display()))?;
@@ -639,8 +652,8 @@ fn discover_project_cache_roots(root: &Path, out: &mut Vec<PathBuf>) -> Result<(
     if !root.is_dir() {
         return Ok(());
     }
-    for entry in
-        fs::read_dir(root).map_err(|error| format!("failed to read `{}`: {error}", root.display()))?
+    for entry in fs::read_dir(root)
+        .map_err(|error| format!("failed to read `{}`: {error}", root.display()))?
     {
         let entry =
             entry.map_err(|error| format!("failed to enumerate `{}`: {error}", root.display()))?;

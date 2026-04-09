@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use yir_core::{
     glm_profile_for_operation, DataMod, EdgeKind, GlmEffect, GlmUseMode, LegacyFabricMod,
-    ModRegistry, Node, Resource, ResourceKind, YirModule,
+    ModRegistry, Node, Resource, ResourceKind, SemanticOp, YirModule,
 };
 
 pub fn default_registry() -> ModRegistry {
@@ -334,9 +334,9 @@ fn verify_data_fabric_protocol(
             .copied()
             .ok_or_else(|| format!("verification order references unknown node `{node_name}`"))?;
 
-        let kind = if node.op.module == "data" || node.op.module == "fabric" {
-            match node.op.instruction.as_str() {
-                "move" => {
+        let kind = if node.op.is_data_domain_family() {
+            match node.op.semantic_op() {
+                SemanticOp::DataMove => {
                     let source = infer_data_value_kind(&value_kinds, &nodes, &node.op.args[0]);
                     if source != DataValueKind::Other {
                         return Err(format!(
@@ -346,7 +346,7 @@ fn verify_data_fabric_protocol(
                     }
                     DataValueKind::Other
                 }
-                "output_pipe" => {
+                SemanticOp::DataOutputPipe => {
                     let source = infer_data_value_kind(&value_kinds, &nodes, &node.op.args[0]);
                     if source == DataValueKind::PipeOutput || source == DataValueKind::PipeInput {
                         return Err(format!(
@@ -356,7 +356,7 @@ fn verify_data_fabric_protocol(
                     }
                     DataValueKind::PipeOutput
                 }
-                "input_pipe" => {
+                SemanticOp::DataInputPipe => {
                     let source = infer_data_value_kind(&value_kinds, &nodes, &node.op.args[0]);
                     if source != DataValueKind::PipeOutput {
                         return Err(format!(
@@ -366,7 +366,7 @@ fn verify_data_fabric_protocol(
                     }
                     DataValueKind::Other
                 }
-                "copy_window" | "immutable_window" => {
+                SemanticOp::DataCopyWindow | SemanticOp::DataImmutableWindow => {
                     let source = infer_data_value_kind(&value_kinds, &nodes, &node.op.args[0]);
                     if matches!(
                         source,
@@ -382,8 +382,8 @@ fn verify_data_fabric_protocol(
                     }
                     DataValueKind::Window
                 }
-                "marker" => DataValueKind::Marker,
-                "handle_table" => {
+                SemanticOp::DataMarker => DataValueKind::Marker,
+                SemanticOp::DataHandleTable => {
                     let mut seen_slots = BTreeSet::new();
                     for entry in &node.op.args {
                         let Some((slot, resource_name)) = entry.split_once('=') else {
@@ -415,7 +415,7 @@ fn verify_data_fabric_protocol(
                     }
                     DataValueKind::HandleTable
                 }
-                "bind_core" => {
+                SemanticOp::DataBindCore => {
                     if node.op.args[0].parse::<usize>().is_err() {
                         return Err(format!(
                             "node `{}` has invalid fabric core index `{}`",
@@ -444,19 +444,17 @@ fn infer_data_value_kind(
     value_kinds.get(name).copied().unwrap_or_else(|| {
         nodes
             .get(name)
-            .map(
-                |node| match (node.op.module.as_str(), node.op.instruction.as_str()) {
-                    ("data" | "fabric", "marker") => DataValueKind::Marker,
-                    ("data" | "fabric", "handle_table") => DataValueKind::HandleTable,
-                    ("data" | "fabric", "bind_core") => DataValueKind::CoreBinding,
-                    ("data" | "fabric", "output_pipe") => DataValueKind::PipeOutput,
-                    ("data" | "fabric", "input_pipe") => DataValueKind::Other,
-                    ("data" | "fabric", "copy_window" | "immutable_window") => {
-                        DataValueKind::Window
-                    }
-                    _ => DataValueKind::Other,
-                },
-            )
+            .map(|node| match node.op.semantic_op() {
+                SemanticOp::DataMarker => DataValueKind::Marker,
+                SemanticOp::DataHandleTable => DataValueKind::HandleTable,
+                SemanticOp::DataBindCore => DataValueKind::CoreBinding,
+                SemanticOp::DataOutputPipe => DataValueKind::PipeOutput,
+                SemanticOp::DataInputPipe | SemanticOp::DataMove => DataValueKind::Other,
+                SemanticOp::DataCopyWindow | SemanticOp::DataImmutableWindow => {
+                    DataValueKind::Window
+                }
+                _ => DataValueKind::Other,
+            })
             .unwrap_or(DataValueKind::Other)
     })
 }

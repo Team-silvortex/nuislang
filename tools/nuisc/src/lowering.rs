@@ -12,6 +12,11 @@ pub fn lower_nir_to_yir(
     dispatch_nustar_lowering(module, nustar_manifest)
 }
 
+trait BootstrapLoweringProvider {
+    fn lowering_entry(&self) -> &'static str;
+    fn lower(&self, module: &NirModule) -> Result<YirModule, String>;
+}
+
 fn dispatch_nustar_lowering(
     module: &NirModule,
     nustar_manifest: &NustarPackageManifest,
@@ -22,11 +27,32 @@ fn dispatch_nustar_lowering(
             nustar_manifest.package_id, module.domain
         ));
     }
-    match nustar_manifest.yir_lowering_entry.as_str() {
-        "cpu.yir.lowering.v1" => lower_nir_to_yir_builtin_cpu(module),
-        other => Err(format!(
-            "nuisc scheduler has no bootstrap compatibility shim for lowering entry `{other}`; this must be provided by the loaded nustar implementation"
-        )),
+    let provider = bootstrap_lowering_provider(nustar_manifest.yir_lowering_entry.as_str())
+        .ok_or_else(|| {
+            format!(
+                "nuisc scheduler has no bootstrap compatibility shim for lowering entry `{}`; this must be provided by the loaded nustar implementation",
+                nustar_manifest.yir_lowering_entry
+            )
+        })?;
+    provider.lower(module)
+}
+
+fn bootstrap_lowering_provider(entry: &str) -> Option<&'static dyn BootstrapLoweringProvider> {
+    static CPU_PROVIDER: CpuBootstrapLoweringProvider = CpuBootstrapLoweringProvider;
+    [(&CPU_PROVIDER as &dyn BootstrapLoweringProvider)]
+        .into_iter()
+        .find(|provider| provider.lowering_entry() == entry)
+}
+
+struct CpuBootstrapLoweringProvider;
+
+impl BootstrapLoweringProvider for CpuBootstrapLoweringProvider {
+    fn lowering_entry(&self) -> &'static str {
+        "cpu.yir.lowering.v1"
+    }
+
+    fn lower(&self, module: &NirModule) -> Result<YirModule, String> {
+        lower_nir_to_yir_builtin_cpu(module)
     }
 }
 

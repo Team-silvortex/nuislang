@@ -33,11 +33,13 @@ pub enum CommandKind {
     CleanCache {
         input: Option<PathBuf>,
         all: bool,
+        json: bool,
     },
     PruneCache {
         input: Option<PathBuf>,
         all: bool,
         keep: usize,
+        json: bool,
     },
     ReleaseCheck {
         input: PathBuf,
@@ -204,15 +206,18 @@ where
         }
         "clean-cache" => {
             let mut all = false;
+            let mut json = false;
             let mut input = None;
             for arg in args.by_ref() {
                 if arg == "--all" {
                     all = true;
+                } else if arg == "--json" {
+                    json = true;
                 } else if input.is_none() {
                     input = Some(PathBuf::from(arg));
                 } else {
                     return Err(
-                        "usage: nuis clean-cache [--all] [input.ns|project-dir|nuis.toml]"
+                        "usage: nuis clean-cache [--all] [--json] [input.ns|project-dir|nuis.toml]"
                             .to_owned(),
                     );
                 }
@@ -224,18 +229,22 @@ where
                     Some(input.unwrap_or_else(|| PathBuf::from(".")))
                 },
                 all,
+                json,
             })
         }
         "cache-prune" => {
             let mut all = false;
             let mut input = None;
             let mut keep = 4usize;
+            let mut json = false;
             while let Some(arg) = args.next() {
                 if arg == "--all" {
                     all = true;
+                } else if arg == "--json" {
+                    json = true;
                 } else if arg == "--keep" {
                     let raw = args.next().ok_or_else(|| {
-                        "usage: nuis cache-prune [--all] [--keep N] [input.ns|project-dir|nuis.toml]"
+                        "usage: nuis cache-prune [--all] [--keep N] [--json] [input.ns|project-dir|nuis.toml]"
                             .to_owned()
                     })?;
                     keep = raw.parse::<usize>().map_err(|_| {
@@ -245,7 +254,7 @@ where
                     input = Some(PathBuf::from(arg));
                 } else {
                     return Err(
-                        "usage: nuis cache-prune [--all] [--keep N] [input.ns|project-dir|nuis.toml]"
+                        "usage: nuis cache-prune [--all] [--keep N] [--json] [input.ns|project-dir|nuis.toml]"
                             .to_owned(),
                     );
                 }
@@ -258,6 +267,7 @@ where
                 },
                 all,
                 keep,
+                json,
             })
         }
         "release-check" => {

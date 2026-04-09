@@ -139,9 +139,14 @@ fn run() -> Result<(), String> {
         manifest.push("shader_requires_prerender_fallback=false".to_owned());
     }
 
-    let frame_bundle = maybe_emit_prerendered_frame(&module, &output_dir, stem, frame_scale)?;
     let runtime_frame_support =
         maybe_prepare_embedded_runtime_support(&module, &source, frame_scale)?;
+    let shader_requires_prerender_fallback = shader_contract.requires_prerender_fallback();
+    let frame_bundle = if runtime_frame_support.is_some() && !shader_requires_prerender_fallback {
+        None
+    } else {
+        maybe_emit_prerendered_frame(&module, &output_dir, stem, frame_scale)?
+    };
     let window_spec = extract_cpu_window_spec(
         &module,
         primary_fabric_binding
@@ -149,14 +154,26 @@ fn run() -> Result<(), String> {
             .map(|binding| binding.host_resource.as_str()),
     );
 
-    if let Some(frame_bundle) = &frame_bundle {
+    if runtime_frame_support.is_some() {
+        manifest.push("render_mode=runtime_tick".to_owned());
+        if let Some(frame_bundle) = &frame_bundle {
+            manifest.push(format!(
+                "fallback_frame_asset={}",
+                frame_bundle.asset_path.display()
+            ));
+            manifest.push("fallback_frame_mode=prerendered".to_owned());
+        }
+    } else if let Some(frame_bundle) = &frame_bundle {
+        manifest.push("render_mode=prerendered".to_owned());
         manifest.push(format!("frame_asset={}", frame_bundle.asset_path.display()));
-        manifest.push("frame_mode=prerendered".to_owned());
     } else {
-        manifest.push("frame_mode=none".to_owned());
+        manifest.push("render_mode=none".to_owned());
     }
 
-    if let Some(frame_bundle) = &frame_bundle {
+    let use_window_host =
+        runtime_frame_support.is_some() || frame_bundle.is_some() || window_spec.is_some();
+
+    if use_window_host {
         let fabric_boot_plan = extract_fabric_boot_plan(
             &module,
             primary_fabric_binding.as_ref(),
@@ -189,7 +206,7 @@ fn run() -> Result<(), String> {
                     .map(|binding| binding.render_resource.as_str()),
                 &render_fabric_boot_plan(&fabric_boot_plan),
                 fabric_boot_plan.len(),
-                &frame_bundle.embedded_ppm_bytes,
+                frame_bundle.as_ref().map(|bundle| bundle.embedded_ppm_bytes.as_str()),
                 runtime_frame_support.as_ref(),
                 &host_ffi_stub_source,
             ),
@@ -207,14 +224,14 @@ fn run() -> Result<(), String> {
         manifest.push("binary_mode=llvm_objc_appkit".to_owned());
         manifest.push(format!("host_stub={}", host_path.display()));
         if let Some(runtime_support) = &runtime_frame_support {
-            manifest.push("frame_runtime_mode=embedded_runtime_tick".to_owned());
+            manifest.push("runtime_bootstrap_mode=embedded_yir_tick".to_owned());
             manifest.push(format!(
                 "runtime_host_staticlib={}",
                 runtime_support.staticlib_path.display()
             ));
             manifest.push("single_binary=true".to_owned());
         } else {
-            manifest.push("frame_runtime_mode=embedded_prerendered".to_owned());
+            manifest.push("runtime_bootstrap_mode=embedded_prerendered_fallback".to_owned());
             manifest.push("single_binary=true".to_owned());
         }
         manifest.push(format!(
@@ -774,7 +791,7 @@ fn objc_host_source(
     fabric_render_resource: Option<&str>,
     fabric_boot_plan: &str,
     fabric_boot_plan_len: usize,
-    embedded_ppm_bytes: &str,
+    embedded_fallback_ppm_bytes: Option<&str>,
     runtime_frame_support: Option<&RuntimeFrameSupport>,
     host_ffi_stubs: &str,
 ) -> String {
@@ -866,7 +883,7 @@ static NSData *nuisGenerateRuntimeFrame(NSUInteger tick) {{
     };
     let runtime_bootstrap = if runtime_mode {
         r#"
-    self.tick = 0;
+    self.tick = 1;
 "#
         .to_owned()
     } else {
@@ -1003,6 +1020,37 @@ static NSImage *nuisImageFromPpmData(NSData *ppmData) {
     return image;
 }
 "#;
+    let initial_image_bootstrap = if runtime_mode {
+        r#"
+    NSData *frameData = nuisGenerateRuntimeFrame(0);
+    if (frameData == nil) {
+        fprintf(stderr, "failed to generate initial runtime frame\n");
+        [NSApp terminate:nil];
+        return;
+    }
+    NSImage *image = nuisImageFromPpmData(frameData);
+    if (image == nil) {
+        fprintf(stderr, "failed to decode initial runtime frame image\n");
+        [NSApp terminate:nil];
+        return;
+    }
+"#
+        .to_owned()
+    } else {
+        let embedded_fallback_ppm_bytes = embedded_fallback_ppm_bytes.unwrap_or("");
+        format!(
+            r#"
+    static const unsigned char kNuisFallbackFrameBytes[] = {{{embedded_fallback_ppm_bytes}}};
+    NSData *ppmData = [NSData dataWithBytes:kNuisFallbackFrameBytes length:sizeof(kNuisFallbackFrameBytes)];
+    NSImage *image = nuisImageFromPpmData(ppmData);
+    if (image == nil) {{
+        fprintf(stderr, "failed to load embedded fallback frame image\n");
+        [NSApp terminate:nil];
+        return;
+    }}
+"#
+        )
+    };
     format!(
         r###"#import <AppKit/AppKit.h>
 #import <Foundation/Foundation.h>
@@ -1319,15 +1367,7 @@ static void nuis_stop_fabric_worker(void) {{
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {{
     (void)notification;
     nuis_dispatch_host_signal("window_boot", "{fabric_table_id}", "{fabric_host_resource}", "{fabric_render_resource}");
-
-    static const unsigned char kNuisFrameBytes[] = {{{embedded_ppm_bytes}}};
-    NSData *ppmData = [NSData dataWithBytes:kNuisFrameBytes length:sizeof(kNuisFrameBytes)];
-    NSImage *image = nuisImageFromPpmData(ppmData);
-    if (image == nil) {{
-        fprintf(stderr, "failed to load embedded frame image\n");
-        [NSApp terminate:nil];
-        return;
-    }}
+{initial_image_bootstrap}
 
     NSSize imageSize = [image size];
     CGFloat width = MAX(imageSize.width, {window_width}.0);

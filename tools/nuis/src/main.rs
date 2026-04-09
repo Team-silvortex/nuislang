@@ -62,11 +62,21 @@ fn run() -> Result<(), String> {
                 json,
             })?;
         }
-        cli::CommandKind::CleanCache { input, all } => {
-            nuisc::run(nuisc::CommandKind::CleanCache { input, all })?;
+        cli::CommandKind::CleanCache { input, all, json } => {
+            nuisc::run(nuisc::CommandKind::CleanCache { input, all, json })?;
         }
-        cli::CommandKind::PruneCache { input, all, keep } => {
-            nuisc::run(nuisc::CommandKind::PruneCache { input, all, keep })?;
+        cli::CommandKind::PruneCache {
+            input,
+            all,
+            keep,
+            json,
+        } => {
+            nuisc::run(nuisc::CommandKind::PruneCache {
+                input,
+                all,
+                keep,
+                json,
+            })?;
         }
         cli::CommandKind::ReleaseCheck { input, output_dir } => {
             println!("release-check: check");
@@ -457,9 +467,11 @@ fn print_help() {
     println!("  nuis inspect-nustar <input.nustar>");
     println!("  nuis loader-contract <package-id>");
     println!("  nuis verify-build-manifest <nuis.build.manifest.toml>");
-    println!("  nuis cache-status [--all] [--verbose-cache] [--json] [input.ns|project-dir|nuis.toml]");
-    println!("  nuis clean-cache [--all] [input.ns|project-dir|nuis.toml]");
-    println!("  nuis cache-prune [--all] [--keep N] [input.ns|project-dir|nuis.toml]");
+    println!(
+        "  nuis cache-status [--all] [--verbose-cache] [--json] [input.ns|project-dir|nuis.toml]"
+    );
+    println!("  nuis clean-cache [--all] [--json] [input.ns|project-dir|nuis.toml]");
+    println!("  nuis cache-prune [--all] [--keep N] [--json] [input.ns|project-dir|nuis.toml]");
     println!("  nuis release-check [input.ns|project-dir|nuis.toml] [output-dir]");
     println!("  nuis rc <status|start|stop|track|projects|versions> [...]");
     println!("  nuis project-status [project-dir|nuis.toml]");

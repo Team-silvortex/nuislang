@@ -113,9 +113,9 @@ Generated build outputs live under:
 
 Use the bundle folder whose name matches the source path you care about:
 
-* [window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/bins/window_controls_demo/window_controls_demo)
-  handwritten `YIR` route
-* [window_controls_demo_ns](/Users/Shared/chroot/dev/nuislang/examples/bins/window_controls_demo_ns/window_controls_demo)
-  single-file `.ns` route
 * [window_controls_demo_project](/Users/Shared/chroot/dev/nuislang/examples/bins/window_controls_demo_project/window_controls_demo)
-  multi-file project route
+  canonical multi-file project route
+* [window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/bins/window_controls_demo/window_controls_demo)
+  handwritten `YIR` route kept as a direct backend reference
+* [window_controls_demo_ns](/Users/Shared/chroot/dev/nuislang/examples/bins/window_controls_demo_ns/window_controls_demo)
+  single-file `.ns` route kept as a parser/lowering reference

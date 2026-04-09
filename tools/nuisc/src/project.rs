@@ -7,7 +7,9 @@ use std::{
 use nuis_semantics::model::{
     AstExpr, AstExternFunction, AstModule, AstStmt, AstTypeRef, NirExpr, NirModule, NirStmt,
 };
-use yir_core::{EdgeKind, Node, Operation, Resource, ResourceKind, YirModule};
+use yir_core::{
+    EdgeKind, Node, Operation, OperationDomainFamily, Resource, ResourceKind, SemanticOp, YirModule,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NuisProjectManifest {
@@ -409,8 +411,7 @@ pub fn apply_project_links_to_yir(
 
     for (domain, unit) in required {
         let exists = module.nodes.iter().any(|node| {
-            node.op.module == "cpu"
-                && node.op.instruction == "instantiate_unit"
+            node.op.is_cpu_semantic_op(SemanticOp::CpuInstantiateUnit)
                 && node.op.args.first().map(String::as_str) == Some(domain.as_str())
                 && node.op.args.get(1).map(String::as_str) == Some(unit.as_str())
         });
@@ -487,7 +488,10 @@ pub fn validate_project_links_against_yir(
                         link.from, link.to, via
                     ));
                 }
-                let has_data_plane = module.nodes.iter().any(|node| node.op.module == "data");
+                let has_data_plane = module
+                    .nodes
+                    .iter()
+                    .any(|node| node.op.is_domain_family(OperationDomainFamily::Data));
                 if !has_data_plane {
                     return Err(format!(
                         "project link `{}` -> `{}` via `{}` requires at least one `data.*` node in YIR",
@@ -951,7 +955,10 @@ fn validate_kernel_profile_for_link(module: &YirModule, endpoint: &str) -> Resul
         }
     }
 
-    let has_kernel_work = module.nodes.iter().any(|node| node.op.module == "kernel");
+    let has_kernel_work = module
+        .nodes
+        .iter()
+        .any(|node| node.op.is_domain_family(OperationDomainFamily::Kernel));
     if !has_kernel_work {
         return Err(format!(
             "project kernel unit `kernel.{}` requires at least one kernel.* node in YIR",
@@ -1665,7 +1672,7 @@ fn validate_shader_profile_flow(module: &YirModule, unit: &str) -> Result<(), St
     let begin_passes = module
         .nodes
         .iter()
-        .filter(|node| node.op.module == "shader" && node.op.instruction == "begin_pass")
+        .filter(|node| node.op.is_shader_semantic_op(SemanticOp::ShaderBeginPass))
         .map(|node| node.name.as_str())
         .collect::<Vec<_>>();
     let begin_pass_wired = begin_passes.iter().any(|pass| {
@@ -1684,7 +1691,10 @@ fn validate_shader_profile_flow(module: &YirModule, unit: &str) -> Result<(), St
     let draws = module
         .nodes
         .iter()
-        .filter(|node| node.op.module == "shader" && node.op.instruction == "draw_instanced")
+        .filter(|node| {
+            node.op
+                .is_shader_semantic_op(SemanticOp::ShaderDrawInstanced)
+        })
         .map(|node| node.name.as_str())
         .collect::<Vec<_>>();
     let draw_wired = draws.iter().any(|draw| {
@@ -1702,13 +1712,13 @@ fn validate_shader_profile_flow(module: &YirModule, unit: &str) -> Result<(), St
     let pipeline_models = module
         .nodes
         .iter()
-        .filter(|node| node.op.module == "shader" && node.op.instruction == "pipeline")
+        .filter(|node| node.op.is_shader_semantic_op(SemanticOp::ShaderPipeline))
         .filter_map(|node| node.op.args.first().cloned())
         .collect::<BTreeSet<_>>();
     let inline_entries = module
         .nodes
         .iter()
-        .filter(|node| node.op.module == "shader" && node.op.instruction == "inline_wgsl")
+        .filter(|node| node.op.is_shader_semantic_op(SemanticOp::ShaderInlineWgsl))
         .map(|node| (node.name.as_str(), node.op.args.clone()))
         .collect::<Vec<_>>();
     if inline_entries.is_empty() {
@@ -1783,20 +1793,14 @@ fn validate_data_profile_for_link(module: &YirModule, endpoint: &str) -> Result<
     let uplink_nodes = module
         .nodes
         .iter()
-        .filter(|node| {
-            node.op.module == "data"
-                && matches!(node.op.instruction.as_str(), "output_pipe" | "input_pipe")
-        })
+        .filter(|node| node.op.is_data_pipe_semantic_op())
         .take(2)
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
     let downlink_nodes = module
         .nodes
         .iter()
-        .filter(|node| {
-            node.op.module == "data"
-                && matches!(node.op.instruction.as_str(), "output_pipe" | "input_pipe")
-        })
+        .filter(|node| node.op.is_data_pipe_semantic_op())
         .skip(2)
         .take(2)
         .map(|node| node.name.clone())
@@ -1812,26 +1816,14 @@ fn validate_data_profile_for_link(module: &YirModule, endpoint: &str) -> Result<
     let uplink_windows = module
         .nodes
         .iter()
-        .filter(|node| {
-            node.op.module == "data"
-                && matches!(
-                    node.op.instruction.as_str(),
-                    "copy_window" | "immutable_window"
-                )
-                && node.name.contains("_uplink_window")
-        })
+        .filter(|node| node.op.is_data_window_semantic_op() && node.name.contains("_uplink_window"))
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
     let downlink_windows = module
         .nodes
         .iter()
         .filter(|node| {
-            node.op.module == "data"
-                && matches!(
-                    node.op.instruction.as_str(),
-                    "copy_window" | "immutable_window"
-                )
-                && node.name.contains("_downlink_window")
+            node.op.is_data_window_semantic_op() && node.name.contains("_downlink_window")
         })
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
@@ -2099,13 +2091,16 @@ fn stitch_shader_profile_edges(module: &mut YirModule) {
     let begin_pass_nodes = module
         .nodes
         .iter()
-        .filter(|node| node.op.module == "shader" && node.op.instruction == "begin_pass")
+        .filter(|node| node.op.is_shader_semantic_op(SemanticOp::ShaderBeginPass))
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
     let draw_nodes = module
         .nodes
         .iter()
-        .filter(|node| node.op.module == "shader" && node.op.instruction == "draw_instanced")
+        .filter(|node| {
+            node.op
+                .is_shader_semantic_op(SemanticOp::ShaderDrawInstanced)
+        })
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
 
@@ -2505,9 +2500,7 @@ fn resolve_project_profile_refs(module: &mut YirModule) -> Result<(), String> {
     let replacements = module
         .nodes
         .iter()
-        .filter_map(|node| {
-            (node.op.module == "cpu" && node.op.instruction == "project_profile_ref").then_some(node)
-        })
+        .filter(|node| node.op.is_cpu_semantic_op(SemanticOp::CpuProjectProfileRef))
         .map(|node| {
             let [domain, unit, slot] = node.op.args.as_slice() else {
                 return Err(format!(
@@ -2531,7 +2524,7 @@ fn resolve_project_profile_refs(module: &mut YirModule) -> Result<(), String> {
     }
 
     for node in &mut module.nodes {
-        if node.op.module == "cpu" && node.op.instruction == "project_profile_ref" {
+        if node.op.is_cpu_semantic_op(SemanticOp::CpuProjectProfileRef) {
             continue;
         }
         for arg in &mut node.op.args {
@@ -2561,7 +2554,7 @@ fn resolve_project_profile_refs(module: &mut YirModule) -> Result<(), String> {
         .collect::<BTreeMap<_, _>>();
     let mut extra_dep_edges = Vec::new();
     for node in &module.nodes {
-        if node.op.module == "cpu" && node.op.instruction == "project_profile_ref" {
+        if node.op.is_cpu_semantic_op(SemanticOp::CpuProjectProfileRef) {
             continue;
         }
         for arg in &node.op.args {
@@ -2589,7 +2582,7 @@ fn resolve_project_profile_refs(module: &mut YirModule) -> Result<(), String> {
     }
     module
         .nodes
-        .retain(|node| !(node.op.module == "cpu" && node.op.instruction == "project_profile_ref"));
+        .retain(|node| !node.op.is_cpu_semantic_op(SemanticOp::CpuProjectProfileRef));
     module.edges.extend(extra_dep_edges);
     Ok(())
 }
@@ -2720,187 +2713,116 @@ fn stitch_data_profile_edges(module: &mut YirModule) {
     let handle_tables = module
         .nodes
         .iter()
-        .filter(|node| node.op.module == "data" && node.op.instruction == "handle_table")
+        .filter(|node| node.op.semantic_op() == SemanticOp::DataHandleTable)
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
     let cpu_to_shader_markers = module
         .nodes
         .iter()
-        .filter(|node| {
-            node.op.module == "data"
-                && node.op.instruction == "marker"
-                && node.op.args.first().map(String::as_str) == Some("cpu_to_shader")
-        })
+        .filter(|node| node.op.is_data_marker_tag("cpu_to_shader"))
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
     let cpu_to_kernel_markers = module
         .nodes
         .iter()
-        .filter(|node| {
-            node.op.module == "data"
-                && node.op.instruction == "marker"
-                && node.op.args.first().map(String::as_str) == Some("cpu_to_kernel")
-        })
+        .filter(|node| node.op.is_data_marker_tag("cpu_to_kernel"))
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
     let uplink_pipe_markers = module
         .nodes
         .iter()
-        .filter(|node| {
-            node.op.module == "data"
-                && node.op.instruction == "marker"
-                && node.op.args.first().map(String::as_str) == Some("uplink_pipe")
-        })
+        .filter(|node| node.op.is_data_marker_tag("uplink_pipe"))
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
     let uplink_pipe_class_markers = module
         .nodes
         .iter()
-        .filter(|node| {
-            node.op.module == "data"
-                && node.op.instruction == "marker"
-                && node.op.args.first().map(String::as_str) == Some("uplink_pipe_class")
-        })
+        .filter(|node| node.op.is_data_marker_tag("uplink_pipe_class"))
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
     let uplink_payload_class_markers = module
         .nodes
         .iter()
-        .filter(|node| {
-            node.op.module == "data"
-                && node.op.instruction == "marker"
-                && node.op.args.first().map(String::as_str) == Some("uplink_payload_class")
-        })
+        .filter(|node| node.op.is_data_marker_tag("uplink_payload_class"))
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
     let uplink_payload_shape_markers = module
         .nodes
         .iter()
-        .filter(|node| {
-            node.op.module == "data"
-                && node.op.instruction == "marker"
-                && node.op.args.first().map(String::as_str) == Some("uplink_payload_shape")
-        })
+        .filter(|node| node.op.is_data_marker_tag("uplink_payload_shape"))
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
     let downlink_pipe_markers = module
         .nodes
         .iter()
-        .filter(|node| {
-            node.op.module == "data"
-                && node.op.instruction == "marker"
-                && node.op.args.first().map(String::as_str) == Some("downlink_pipe")
-        })
+        .filter(|node| node.op.is_data_marker_tag("downlink_pipe"))
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
     let downlink_payload_class_markers = module
         .nodes
         .iter()
-        .filter(|node| {
-            node.op.module == "data"
-                && node.op.instruction == "marker"
-                && node.op.args.first().map(String::as_str) == Some("downlink_payload_class")
-        })
+        .filter(|node| node.op.is_data_marker_tag("downlink_payload_class"))
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
     let downlink_payload_shape_markers = module
         .nodes
         .iter()
-        .filter(|node| {
-            node.op.module == "data"
-                && node.op.instruction == "marker"
-                && node.op.args.first().map(String::as_str) == Some("downlink_payload_shape")
-        })
+        .filter(|node| node.op.is_data_marker_tag("downlink_payload_shape"))
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
     let downlink_pipe_class_markers = module
         .nodes
         .iter()
-        .filter(|node| {
-            node.op.module == "data"
-                && node.op.instruction == "marker"
-                && node.op.args.first().map(String::as_str) == Some("downlink_pipe_class")
-        })
+        .filter(|node| node.op.is_data_marker_tag("downlink_pipe_class"))
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
     let uplink_window_policy_markers = module
         .nodes
         .iter()
-        .filter(|node| {
-            node.op.module == "data"
-                && node.op.instruction == "marker"
-                && node.op.args.first().map(String::as_str) == Some("uplink_window_policy")
-        })
+        .filter(|node| node.op.is_data_marker_tag("uplink_window_policy"))
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
     let downlink_window_policy_markers = module
         .nodes
         .iter()
-        .filter(|node| {
-            node.op.module == "data"
-                && node.op.instruction == "marker"
-                && node.op.args.first().map(String::as_str) == Some("downlink_window_policy")
-        })
+        .filter(|node| node.op.is_data_marker_tag("downlink_window_policy"))
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
     let shader_to_cpu_markers = module
         .nodes
         .iter()
-        .filter(|node| {
-            node.op.module == "data"
-                && node.op.instruction == "marker"
-                && node.op.args.first().map(String::as_str) == Some("shader_to_cpu")
-        })
+        .filter(|node| node.op.is_data_marker_tag("shader_to_cpu"))
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
     let kernel_to_cpu_markers = module
         .nodes
         .iter()
-        .filter(|node| {
-            node.op.module == "data"
-                && node.op.instruction == "marker"
-                && node.op.args.first().map(String::as_str) == Some("kernel_to_cpu")
-        })
+        .filter(|node| node.op.is_data_marker_tag("kernel_to_cpu"))
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
     let kernel_nodes = module
         .nodes
         .iter()
-        .filter(|node| node.op.module == "kernel")
+        .filter(|node| node.op.is_domain_family(OperationDomainFamily::Kernel))
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
     let data_pipe_nodes = module
         .nodes
         .iter()
-        .filter(|node| {
-            node.op.module == "data"
-                && matches!(node.op.instruction.as_str(), "output_pipe" | "input_pipe")
-        })
+        .filter(|node| node.op.is_data_pipe_semantic_op())
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
     let uplink_windows = module
         .nodes
         .iter()
-        .filter(|node| {
-            node.op.module == "data"
-                && matches!(
-                    node.op.instruction.as_str(),
-                    "copy_window" | "immutable_window"
-                )
-                && node.name.contains("_uplink_window")
-        })
+        .filter(|node| node.op.is_data_window_semantic_op() && node.name.contains("_uplink_window"))
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
     let downlink_windows = module
         .nodes
         .iter()
         .filter(|node| {
-            node.op.module == "data"
-                && matches!(
-                    node.op.instruction.as_str(),
-                    "copy_window" | "immutable_window"
-                )
-                && node.name.contains("_downlink_window")
+            node.op.is_data_window_semantic_op() && node.name.contains("_downlink_window")
         })
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();

@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use yir_core::{EdgeKind, Resource, YirModule};
+use yir_core::{CpuLlvmLoweringClass, EdgeKind, Node, Resource, YirModule};
 use yir_verify::verify_module;
 
 #[derive(Clone)]
@@ -22,6 +22,189 @@ struct StructLlvmValueRef {
     fields: Vec<(String, LlvmValueRef)>,
 }
 
+struct LlvmLoweringState {
+    body: Vec<String>,
+    globals: Vec<String>,
+    registers: BTreeMap<String, LlvmValueRef>,
+    buffer_lengths: BTreeMap<String, String>,
+    next_reg: usize,
+    next_global: usize,
+    last_cpu_value: Option<String>,
+}
+
+fn lower_cpu_literal_node(node: &Node, state: &mut LlvmLoweringState) -> bool {
+    match node.op.instruction.as_str() {
+        "text" => {
+            let label = fresh_global(&mut state.next_global);
+            let (bytes, len) = llvm_c_string_bytes(&node.op.args[0]);
+            state.globals.push(format!(
+                "{label} = private unnamed_addr constant [{len} x i8] c\"{bytes}\""
+            ));
+            let ptr = fresh_reg(&mut state.next_reg);
+            state.body.push(format!(
+                "  {ptr} = getelementptr inbounds [{len} x i8], ptr {label}, i64 0, i64 0"
+            ));
+            state
+                .registers
+                .insert(node.name.clone(), LlvmValueRef::CStr(ptr));
+            true
+        }
+        "const_bool" => {
+            let value = match node.op.args[0].as_str() {
+                "true" => "true",
+                "false" => "false",
+                _ => {
+                    state.body.push(format!(
+                        "  ; deferred lowering for cpu.const_bool `{}` because literal `{}` is invalid",
+                        node.name, node.op.args[0]
+                    ));
+                    return true;
+                }
+            };
+            state
+                .registers
+                .insert(node.name.clone(), LlvmValueRef::Bool(value.to_owned()));
+            let widened = fresh_reg(&mut state.next_reg);
+            state.body.push(format!("  {widened} = zext i1 {value} to i64"));
+            state.last_cpu_value = Some(widened);
+            true
+        }
+        "const_i32" => {
+            let reg = fresh_reg(&mut state.next_reg);
+            state.body.push(format!("  {reg} = add i32 0, {}", node.op.args[0]));
+            state
+                .registers
+                .insert(node.name.clone(), LlvmValueRef::I32(reg.clone()));
+            let widened = fresh_reg(&mut state.next_reg);
+            state.body.push(format!("  {widened} = sext i32 {reg} to i64"));
+            state.last_cpu_value = Some(widened);
+            true
+        }
+        "const" | "const_i64" => {
+            let reg = fresh_reg(&mut state.next_reg);
+            state.body.push(format!("  {reg} = add i64 0, {}", node.op.args[0]));
+            state
+                .registers
+                .insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+            state.last_cpu_value = Some(reg);
+            true
+        }
+        "const_f32" => {
+            let reg = fresh_reg(&mut state.next_reg);
+            state.body.push(format!("  {reg} = fadd float 0.0, {}", node.op.args[0]));
+            state
+                .registers
+                .insert(node.name.clone(), LlvmValueRef::F32(reg.clone()));
+            let widened = fresh_reg(&mut state.next_reg);
+            state.body.push(format!("  {widened} = fptosi float {reg} to i64"));
+            state.last_cpu_value = Some(widened);
+            true
+        }
+        "const_f64" => {
+            let reg = fresh_reg(&mut state.next_reg);
+            state.body.push(format!("  {reg} = fadd double 0.0, {}", node.op.args[0]));
+            state
+                .registers
+                .insert(node.name.clone(), LlvmValueRef::F64(reg.clone()));
+            let widened = fresh_reg(&mut state.next_reg);
+            state.body.push(format!("  {widened} = fptosi double {reg} to i64"));
+            state.last_cpu_value = Some(widened);
+            true
+        }
+        "null" => {
+            state
+                .registers
+                .insert(node.name.clone(), LlvmValueRef::Ptr("null".to_owned()));
+            true
+        }
+        _ => false,
+    }
+}
+
+fn lower_cpu_aggregate_node(node: &Node, state: &mut LlvmLoweringState) -> bool {
+    match node.op.instruction.as_str() {
+        "struct" => {
+            let mut fields = Vec::new();
+            let type_name = node.op.args[0].clone();
+            for entry in &node.op.args[1..] {
+                let Some((field_name, value_name)) = entry.split_once('=') else {
+                    state.body.push(format!(
+                        "  ; deferred lowering for cpu.struct `{}` because field binding `{}` is invalid",
+                        node.name, entry
+                    ));
+                    return true;
+                };
+                let Some(value_ref) = state.registers.get(value_name.trim()).cloned() else {
+                    state.body.push(format!(
+                        "  ; deferred lowering for cpu.struct `{}` because field `{}` comes from outside the current CPU LLVM slice",
+                        node.name, field_name
+                    ));
+                    return true;
+                };
+                fields.push((field_name.trim().to_owned(), value_ref));
+            }
+            state.registers.insert(
+                node.name.clone(),
+                LlvmValueRef::Struct(StructLlvmValueRef { type_name, fields }),
+            );
+            true
+        }
+        "field" => {
+            let Some(struct_value) = get_struct(&state.registers, &node.op.args[0]) else {
+                state.body.push(format!(
+                    "  ; deferred lowering for cpu.field `{}` because its source struct is outside the current CPU LLVM slice",
+                    node.name
+                ));
+                return true;
+            };
+            let field_name = &node.op.args[1];
+            let Some((_, field_value)) = struct_value
+                .fields
+                .iter()
+                .find(|(name, _)| name == field_name)
+            else {
+                state.body.push(format!(
+                    "  ; deferred lowering for cpu.field `{}` because field `{}` does not exist on `{}`",
+                    node.name, field_name, struct_value.type_name
+                ));
+                return true;
+            };
+            let field_value = field_value.clone();
+            state
+                .registers
+                .insert(node.name.clone(), field_value.clone());
+            if let Some(as_i64) = coerce_to_i64(&field_value, &mut state.body, &mut state.next_reg) {
+                state.last_cpu_value = Some(as_i64);
+            }
+            true
+        }
+        _ => false,
+    }
+}
+
+fn lower_cpu_pointer_node(node: &Node, state: &mut LlvmLoweringState) -> bool {
+    match node.op.instruction.as_str() {
+        "borrow" | "move_ptr" => {
+            let Some(ptr) = get_ptr(&state.registers, &node.op.args[0]) else {
+                state.body.push(format!(
+                    "  ; deferred lowering for {} `{}` because its input is outside the current CPU LLVM slice",
+                    node.op.full_name(),
+                    node.name
+                ));
+                return true;
+            };
+            state
+                .registers
+                .insert(node.name.clone(), LlvmValueRef::Ptr(ptr.to_owned()));
+            if let Some(len) = state.buffer_lengths.get(&node.op.args[0]).cloned() {
+                state.buffer_lengths.insert(node.name.clone(), len);
+            }
+            true
+        }
+        _ => false,
+    }
+}
+
 pub fn emit_module(module: &YirModule) -> Result<String, String> {
     verify_module(module)?;
 
@@ -31,13 +214,15 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
         .map(|resource| (resource.name.clone(), resource))
         .collect::<BTreeMap<String, &Resource>>();
 
-    let mut body = Vec::new();
-    let mut globals = Vec::new();
-    let mut registers = BTreeMap::<String, LlvmValueRef>::new();
-    let mut buffer_lengths = BTreeMap::<String, String>::new();
-    let mut next_reg = 0usize;
-    let mut next_global = 0usize;
-    let mut last_cpu_value = None::<String>;
+    let mut state = LlvmLoweringState {
+        body: Vec::new(),
+        globals: Vec::new(),
+        registers: BTreeMap::new(),
+        buffer_lengths: BTreeMap::new(),
+        next_reg: 0,
+        next_global: 0,
+        last_cpu_value: None,
+    };
 
     for node_name in topological_order(module)? {
         let node = module
@@ -51,7 +236,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
             .ok_or_else(|| format!("unknown resource `{}`", node.resource))?;
 
         if !resource.kind.is_family("cpu") {
-            body.push(format!(
+            state.body.push(format!(
                 "  ; deferred lowering for {} on {} ({})",
                 node.op.full_name(),
                 node.resource,
@@ -60,159 +245,49 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
             continue;
         }
 
+        match node.op.cpu_llvm_lowering_class() {
+            CpuLlvmLoweringClass::Literal => {
+                if lower_cpu_literal_node(node, &mut state) {
+                    continue;
+                }
+            }
+            CpuLlvmLoweringClass::Aggregate => {
+                if lower_cpu_aggregate_node(node, &mut state) {
+                    continue;
+                }
+            }
+            CpuLlvmLoweringClass::Pointer => {
+                if lower_cpu_pointer_node(node, &mut state) {
+                    continue;
+                }
+            }
+            _ => {}
+        }
+
+        let mut body = &mut state.body;
+        let _globals = &mut state.globals;
+        let registers = &mut state.registers;
+        let buffer_lengths = &mut state.buffer_lengths;
+        let mut next_reg = &mut state.next_reg;
+        let _next_global = &mut state.next_global;
+        let last_cpu_value = &mut state.last_cpu_value;
+
         match (node.op.module.as_str(), node.op.instruction.as_str()) {
-            ("cpu", "text") => {
-                let label = fresh_global(&mut next_global);
-                let (bytes, len) = llvm_c_string_bytes(&node.op.args[0]);
-                globals.push(format!(
-                    "{label} = private unnamed_addr constant [{len} x i8] c\"{bytes}\""
-                ));
-                let ptr = fresh_reg(&mut next_reg);
-                body.push(format!(
-                    "  {ptr} = getelementptr inbounds [{len} x i8], ptr {label}, i64 0, i64 0"
-                ));
-                registers.insert(node.name.clone(), LlvmValueRef::CStr(ptr));
-            }
-            ("cpu", "const_bool") => {
-                let value = match node.op.args[0].as_str() {
-                    "true" => "true",
-                    "false" => "false",
-                    _ => {
-                        body.push(format!(
-                            "  ; deferred lowering for cpu.const_bool `{}` because literal `{}` is invalid",
-                            node.name, node.op.args[0]
-                        ));
-                        continue;
-                    }
-                };
-                registers.insert(node.name.clone(), LlvmValueRef::Bool(value.to_owned()));
-                let widened = fresh_reg(&mut next_reg);
-                body.push(format!("  {widened} = zext i1 {value} to i64"));
-                last_cpu_value = Some(widened);
-            }
-            ("cpu", "const_i32") => {
-                let reg = fresh_reg(&mut next_reg);
-                body.push(format!("  {reg} = add i32 0, {}", node.op.args[0]));
-                registers.insert(node.name.clone(), LlvmValueRef::I32(reg.clone()));
-                let widened = fresh_reg(&mut next_reg);
-                body.push(format!("  {widened} = sext i32 {reg} to i64"));
-                last_cpu_value = Some(widened);
-            }
-            ("cpu", "const") => {
-                let reg = fresh_reg(&mut next_reg);
-                body.push(format!("  {reg} = add i64 0, {}", node.op.args[0]));
-                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                last_cpu_value = Some(reg);
-            }
-            ("cpu", "const_i64") => {
-                let reg = fresh_reg(&mut next_reg);
-                body.push(format!("  {reg} = add i64 0, {}", node.op.args[0]));
-                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                last_cpu_value = Some(reg);
-            }
-            ("cpu", "const_f32") => {
-                let reg = fresh_reg(&mut next_reg);
-                body.push(format!("  {reg} = fadd float 0.0, {}", node.op.args[0]));
-                registers.insert(node.name.clone(), LlvmValueRef::F32(reg.clone()));
-                let widened = fresh_reg(&mut next_reg);
-                body.push(format!("  {widened} = fptosi float {reg} to i64"));
-                last_cpu_value = Some(widened);
-            }
-            ("cpu", "const_f64") => {
-                let reg = fresh_reg(&mut next_reg);
-                body.push(format!("  {reg} = fadd double 0.0, {}", node.op.args[0]));
-                registers.insert(node.name.clone(), LlvmValueRef::F64(reg.clone()));
-                let widened = fresh_reg(&mut next_reg);
-                body.push(format!("  {widened} = fptosi double {reg} to i64"));
-                last_cpu_value = Some(widened);
-            }
-            ("cpu", "struct") => {
-                let mut fields = Vec::new();
-                let type_name = node.op.args[0].clone();
-                let mut deferred = false;
-                for entry in &node.op.args[1..] {
-                    let Some((field_name, value_name)) = entry.split_once('=') else {
-                        body.push(format!(
-                            "  ; deferred lowering for cpu.struct `{}` because field binding `{}` is invalid",
-                            node.name, entry
-                        ));
-                        deferred = true;
-                        break;
-                    };
-                    let Some(value_ref) = registers.get(value_name.trim()).cloned() else {
-                        body.push(format!(
-                            "  ; deferred lowering for cpu.struct `{}` because field `{}` comes from outside the current CPU LLVM slice",
-                            node.name, field_name
-                        ));
-                        deferred = true;
-                        break;
-                    };
-                    fields.push((field_name.trim().to_owned(), value_ref));
-                }
-                if deferred {
-                    continue;
-                }
-                registers.insert(
-                    node.name.clone(),
-                    LlvmValueRef::Struct(StructLlvmValueRef { type_name, fields }),
-                );
-            }
-            ("cpu", "field") => {
-                let Some(struct_value) = get_struct(&registers, &node.op.args[0]) else {
-                    body.push(format!(
-                        "  ; deferred lowering for cpu.field `{}` because its source struct is outside the current CPU LLVM slice",
-                        node.name
-                    ));
-                    continue;
-                };
-                let field_name = &node.op.args[1];
-                let Some((_, field_value)) = struct_value
-                    .fields
-                    .iter()
-                    .find(|(name, _)| name == field_name)
-                else {
-                    body.push(format!(
-                        "  ; deferred lowering for cpu.field `{}` because field `{}` does not exist on `{}`",
-                        node.name, field_name, struct_value.type_name
-                    ));
-                    continue;
-                };
-                let field_value = field_value.clone();
-                registers.insert(node.name.clone(), field_value.clone());
-                if let Some(as_i64) = coerce_to_i64(&field_value, &mut body, &mut next_reg) {
-                    last_cpu_value = Some(as_i64);
-                }
-            }
-            ("cpu", "null") => {
-                registers.insert(node.name.clone(), LlvmValueRef::Ptr("null".to_owned()));
-            }
-            ("cpu", "borrow") | ("cpu", "move_ptr") => {
-                let Some(ptr) = get_ptr(&registers, &node.op.args[0]) else {
-                    body.push(format!(
-                        "  ; deferred lowering for {} `{}` because its input is outside the current CPU LLVM slice",
-                        node.op.full_name(),
-                        node.name
-                    ));
-                    continue;
-                };
-                registers.insert(node.name.clone(), LlvmValueRef::Ptr(ptr.to_owned()));
-                if let Some(len) = buffer_lengths.get(&node.op.args[0]).cloned() {
-                    buffer_lengths.insert(node.name.clone(), len);
-                }
-            }
-            ("cpu", "neg") => {
-                let Some(input) = get_i64(&registers, &node.op.args[0]) else {
-                    body.push(format!(
-                        "  ; deferred lowering for cpu.neg `{}` because its input is outside the current CPU LLVM slice",
-                        node.name
-                    ));
-                    continue;
-                };
-                let reg = fresh_reg(&mut next_reg);
-                body.push(format!("  {reg} = sub i64 0, {input}"));
-                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                last_cpu_value = Some(reg);
-            }
+            ("cpu", "text")
+            | ("cpu", "const_bool")
+            | ("cpu", "const_i32")
+            | ("cpu", "const")
+            | ("cpu", "const_i64")
+            | ("cpu", "const_f32")
+            | ("cpu", "const_f64")
+            | ("cpu", "struct")
+            | ("cpu", "field")
+            | ("cpu", "null")
+            | ("cpu", "borrow")
+            | ("cpu", "move_ptr") => unreachable!(
+                "preclassified CPU LLVM lowering op `{}` should have been handled earlier",
+                node.op.full_name()
+            ),
             ("cpu", "not") => {
                 let Some(input) = get_i64(&registers, &node.op.args[0]) else {
                     body.push(format!(
@@ -224,7 +299,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 let reg = fresh_reg(&mut next_reg);
                 body.push(format!("  {reg} = xor i64 {input}, -1"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                last_cpu_value = Some(reg);
+                *last_cpu_value = Some(reg);
             }
             ("cpu", "add") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -240,7 +315,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 let reg = fresh_reg(&mut next_reg);
                 body.push(format!("  {reg} = add i64 {lhs}, {rhs}"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                last_cpu_value = Some(reg);
+                *last_cpu_value = Some(reg);
             }
             ("cpu", "add_i32") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -258,7 +333,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 registers.insert(node.name.clone(), LlvmValueRef::I32(reg.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = sext i32 {reg} to i64"));
-                last_cpu_value = Some(widened);
+                *last_cpu_value = Some(widened);
             }
             ("cpu", "add_f32") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -276,7 +351,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 registers.insert(node.name.clone(), LlvmValueRef::F32(reg.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = fptosi float {reg} to i64"));
-                last_cpu_value = Some(widened);
+                *last_cpu_value = Some(widened);
             }
             ("cpu", "add_f64") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -294,7 +369,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 registers.insert(node.name.clone(), LlvmValueRef::F64(reg.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = fptosi double {reg} to i64"));
-                last_cpu_value = Some(widened);
+                *last_cpu_value = Some(widened);
             }
             ("cpu", "eq") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -312,7 +387,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 let reg = fresh_reg(&mut next_reg);
                 body.push(format!("  {reg} = zext i1 {cmp} to i64"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                last_cpu_value = Some(reg);
+                *last_cpu_value = Some(reg);
             }
             ("cpu", "eq_i32") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -330,7 +405,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 registers.insert(node.name.clone(), LlvmValueRef::Bool(cmp.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = zext i1 {cmp} to i64"));
-                last_cpu_value = Some(widened);
+                *last_cpu_value = Some(widened);
             }
             ("cpu", "eq_f32") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -348,7 +423,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 registers.insert(node.name.clone(), LlvmValueRef::Bool(cmp.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = zext i1 {cmp} to i64"));
-                last_cpu_value = Some(widened);
+                *last_cpu_value = Some(widened);
             }
             ("cpu", "eq_f64") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -366,7 +441,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 registers.insert(node.name.clone(), LlvmValueRef::Bool(cmp.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = zext i1 {cmp} to i64"));
-                last_cpu_value = Some(widened);
+                *last_cpu_value = Some(widened);
             }
             ("cpu", "ne") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -384,7 +459,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 let reg = fresh_reg(&mut next_reg);
                 body.push(format!("  {reg} = zext i1 {cmp} to i64"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                last_cpu_value = Some(reg);
+                *last_cpu_value = Some(reg);
             }
             ("cpu", "lt") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -402,7 +477,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 let reg = fresh_reg(&mut next_reg);
                 body.push(format!("  {reg} = zext i1 {cmp} to i64"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                last_cpu_value = Some(reg);
+                *last_cpu_value = Some(reg);
             }
             ("cpu", "lt_i32") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -420,7 +495,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 registers.insert(node.name.clone(), LlvmValueRef::Bool(cmp.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = zext i1 {cmp} to i64"));
-                last_cpu_value = Some(widened);
+                *last_cpu_value = Some(widened);
             }
             ("cpu", "lt_f32") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -438,7 +513,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 registers.insert(node.name.clone(), LlvmValueRef::Bool(cmp.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = zext i1 {cmp} to i64"));
-                last_cpu_value = Some(widened);
+                *last_cpu_value = Some(widened);
             }
             ("cpu", "lt_f64") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -456,7 +531,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 registers.insert(node.name.clone(), LlvmValueRef::Bool(cmp.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = zext i1 {cmp} to i64"));
-                last_cpu_value = Some(widened);
+                *last_cpu_value = Some(widened);
             }
             ("cpu", "gt") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -474,7 +549,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 let reg = fresh_reg(&mut next_reg);
                 body.push(format!("  {reg} = zext i1 {cmp} to i64"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                last_cpu_value = Some(reg);
+                *last_cpu_value = Some(reg);
             }
             ("cpu", "gt_i32") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -492,7 +567,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 registers.insert(node.name.clone(), LlvmValueRef::Bool(cmp.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = zext i1 {cmp} to i64"));
-                last_cpu_value = Some(widened);
+                *last_cpu_value = Some(widened);
             }
             ("cpu", "gt_f32") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -510,7 +585,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 registers.insert(node.name.clone(), LlvmValueRef::Bool(cmp.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = zext i1 {cmp} to i64"));
-                last_cpu_value = Some(widened);
+                *last_cpu_value = Some(widened);
             }
             ("cpu", "gt_f64") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -528,7 +603,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 registers.insert(node.name.clone(), LlvmValueRef::Bool(cmp.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = zext i1 {cmp} to i64"));
-                last_cpu_value = Some(widened);
+                *last_cpu_value = Some(widened);
             }
             ("cpu", "le") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -546,7 +621,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 let reg = fresh_reg(&mut next_reg);
                 body.push(format!("  {reg} = zext i1 {cmp} to i64"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                last_cpu_value = Some(reg);
+                *last_cpu_value = Some(reg);
             }
             ("cpu", "ge") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -564,7 +639,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 let reg = fresh_reg(&mut next_reg);
                 body.push(format!("  {reg} = zext i1 {cmp} to i64"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                last_cpu_value = Some(reg);
+                *last_cpu_value = Some(reg);
             }
             ("cpu", "sub") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -580,7 +655,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 let reg = fresh_reg(&mut next_reg);
                 body.push(format!("  {reg} = sub i64 {lhs}, {rhs}"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                last_cpu_value = Some(reg);
+                *last_cpu_value = Some(reg);
             }
             ("cpu", "sub_i32") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -598,7 +673,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 registers.insert(node.name.clone(), LlvmValueRef::I32(reg.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = sext i32 {reg} to i64"));
-                last_cpu_value = Some(widened);
+                *last_cpu_value = Some(widened);
             }
             ("cpu", "sub_f32") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -616,7 +691,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 registers.insert(node.name.clone(), LlvmValueRef::F32(reg.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = fptosi float {reg} to i64"));
-                last_cpu_value = Some(widened);
+                *last_cpu_value = Some(widened);
             }
             ("cpu", "sub_f64") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -634,7 +709,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 registers.insert(node.name.clone(), LlvmValueRef::F64(reg.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = fptosi double {reg} to i64"));
-                last_cpu_value = Some(widened);
+                *last_cpu_value = Some(widened);
             }
             ("cpu", "mul") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -650,7 +725,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 let reg = fresh_reg(&mut next_reg);
                 body.push(format!("  {reg} = mul i64 {lhs}, {rhs}"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                last_cpu_value = Some(reg);
+                *last_cpu_value = Some(reg);
             }
             ("cpu", "mul_i32") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -668,7 +743,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 registers.insert(node.name.clone(), LlvmValueRef::I32(reg.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = sext i32 {reg} to i64"));
-                last_cpu_value = Some(widened);
+                *last_cpu_value = Some(widened);
             }
             ("cpu", "mul_f32") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -686,7 +761,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 registers.insert(node.name.clone(), LlvmValueRef::F32(reg.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = fptosi float {reg} to i64"));
-                last_cpu_value = Some(widened);
+                *last_cpu_value = Some(widened);
             }
             ("cpu", "mul_f64") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -704,7 +779,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 registers.insert(node.name.clone(), LlvmValueRef::F64(reg.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = fptosi double {reg} to i64"));
-                last_cpu_value = Some(widened);
+                *last_cpu_value = Some(widened);
             }
             ("cpu", "div") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -720,7 +795,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 let reg = fresh_reg(&mut next_reg);
                 body.push(format!("  {reg} = sdiv i64 {lhs}, {rhs}"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                last_cpu_value = Some(reg);
+                *last_cpu_value = Some(reg);
             }
             ("cpu", "div_i32") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -738,7 +813,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 registers.insert(node.name.clone(), LlvmValueRef::I32(reg.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = sext i32 {reg} to i64"));
-                last_cpu_value = Some(widened);
+                *last_cpu_value = Some(widened);
             }
             ("cpu", "div_f32") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -756,7 +831,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 registers.insert(node.name.clone(), LlvmValueRef::F32(reg.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = fptosi float {reg} to i64"));
-                last_cpu_value = Some(widened);
+                *last_cpu_value = Some(widened);
             }
             ("cpu", "div_f64") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -774,7 +849,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 registers.insert(node.name.clone(), LlvmValueRef::F64(reg.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = fptosi double {reg} to i64"));
-                last_cpu_value = Some(widened);
+                *last_cpu_value = Some(widened);
             }
             ("cpu", "rem") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -790,7 +865,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 let reg = fresh_reg(&mut next_reg);
                 body.push(format!("  {reg} = srem i64 {lhs}, {rhs}"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                last_cpu_value = Some(reg);
+                *last_cpu_value = Some(reg);
             }
             ("cpu", "and") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -806,7 +881,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 let reg = fresh_reg(&mut next_reg);
                 body.push(format!("  {reg} = and i64 {lhs}, {rhs}"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                last_cpu_value = Some(reg);
+                *last_cpu_value = Some(reg);
             }
             ("cpu", "or") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -822,7 +897,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 let reg = fresh_reg(&mut next_reg);
                 body.push(format!("  {reg} = or i64 {lhs}, {rhs}"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                last_cpu_value = Some(reg);
+                *last_cpu_value = Some(reg);
             }
             ("cpu", "xor") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -838,7 +913,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 let reg = fresh_reg(&mut next_reg);
                 body.push(format!("  {reg} = xor i64 {lhs}, {rhs}"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                last_cpu_value = Some(reg);
+                *last_cpu_value = Some(reg);
             }
             ("cpu", "shl") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -854,7 +929,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 let reg = fresh_reg(&mut next_reg);
                 body.push(format!("  {reg} = shl i64 {lhs}, {rhs}"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                last_cpu_value = Some(reg);
+                *last_cpu_value = Some(reg);
             }
             ("cpu", "shr") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -870,7 +945,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 let reg = fresh_reg(&mut next_reg);
                 body.push(format!("  {reg} = ashr i64 {lhs}, {rhs}"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                last_cpu_value = Some(reg);
+                *last_cpu_value = Some(reg);
             }
             ("cpu", "madd") => {
                 let (Some(lhs), Some(rhs), Some(acc)) = (
@@ -889,7 +964,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 let reg = fresh_reg(&mut next_reg);
                 body.push(format!("  {reg} = add i64 {mul}, {acc}"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                last_cpu_value = Some(reg);
+                *last_cpu_value = Some(reg);
             }
             ("cpu", "select") => {
                 let cond_value = registers.get(&node.op.args[0]).cloned();
@@ -932,7 +1007,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                     "  {reg} = select i1 {cond_bool}, i64 {then_value}, i64 {else_value}"
                 ));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                last_cpu_value = Some(reg);
+                *last_cpu_value = Some(reg);
             }
             ("cpu", "cast_i32_to_i64") => {
                 let Some(input) = get_i32(&registers, &node.op.args[0]) else {
@@ -945,7 +1020,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 let reg = fresh_reg(&mut next_reg);
                 body.push(format!("  {reg} = sext i32 {input} to i64"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                last_cpu_value = Some(reg);
+                *last_cpu_value = Some(reg);
             }
             ("cpu", "cast_i64_to_i32") => {
                 let Some(input) = get_i64(&registers, &node.op.args[0]) else {
@@ -960,7 +1035,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 registers.insert(node.name.clone(), LlvmValueRef::I32(reg.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = sext i32 {reg} to i64"));
-                last_cpu_value = Some(widened);
+                *last_cpu_value = Some(widened);
             }
             ("cpu", "cast_i32_to_f32") => {
                 let Some(input) = get_i32(&registers, &node.op.args[0]) else {
@@ -975,7 +1050,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 registers.insert(node.name.clone(), LlvmValueRef::F32(reg.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = fptosi float {reg} to i64"));
-                last_cpu_value = Some(widened);
+                *last_cpu_value = Some(widened);
             }
             ("cpu", "cast_i32_to_f64") => {
                 let Some(input) = get_i32(&registers, &node.op.args[0]) else {
@@ -990,7 +1065,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 registers.insert(node.name.clone(), LlvmValueRef::F64(reg.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = fptosi double {reg} to i64"));
-                last_cpu_value = Some(widened);
+                *last_cpu_value = Some(widened);
             }
             ("cpu", "cast_f32_to_f64") => {
                 let Some(input) = get_f32(&registers, &node.op.args[0]) else {
@@ -1005,7 +1080,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 registers.insert(node.name.clone(), LlvmValueRef::F64(reg.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = fptosi double {reg} to i64"));
-                last_cpu_value = Some(widened);
+                *last_cpu_value = Some(widened);
             }
             ("cpu", "cast_f64_to_f32") => {
                 let Some(input) = get_f64(&registers, &node.op.args[0]) else {
@@ -1020,7 +1095,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 registers.insert(node.name.clone(), LlvmValueRef::F32(reg.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = fptosi float {reg} to i64"));
-                last_cpu_value = Some(widened);
+                *last_cpu_value = Some(widened);
             }
             ("cpu", "alloc_node") => {
                 let (Some(value), Some(next_ptr)) = (
@@ -1089,7 +1164,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 let reg = fresh_reg(&mut next_reg);
                 body.push(format!("  {reg} = load i64, ptr {slot}"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                last_cpu_value = Some(reg);
+                *last_cpu_value = Some(reg);
             }
             ("cpu", "load_next") => {
                 let Some(ptr) = get_ptr(&registers, &node.op.args[0]) else {
@@ -1119,7 +1194,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                     continue;
                 };
                 registers.insert(node.name.clone(), LlvmValueRef::I64(len.clone()));
-                last_cpu_value = Some(len);
+                *last_cpu_value = Some(len);
             }
             ("cpu", "load_at") => {
                 let (Some(ptr), Some(index)) = (
@@ -1139,7 +1214,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 let reg = fresh_reg(&mut next_reg);
                 body.push(format!("  {reg} = load i64, ptr {slot}"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                last_cpu_value = Some(reg);
+                *last_cpu_value = Some(reg);
             }
             ("cpu", "store_value") => {
                 let (Some(ptr), Some(value)) = (
@@ -1209,7 +1284,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 let reg = fresh_reg(&mut next_reg);
                 body.push(format!("  {reg} = zext i1 {cmp} to i64"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                last_cpu_value = Some(reg);
+                *last_cpu_value = Some(reg);
             }
             ("cpu", "free") => {
                 let Some(ptr) = get_ptr(&registers, &node.op.args[0]) else {
@@ -1230,7 +1305,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 ));
                 body.push(format!("  {reg} = add i64 0, {}", node.op.args[1]));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                last_cpu_value = Some(reg);
+                *last_cpu_value = Some(reg);
             }
             ("cpu", "extern_call_i64") => {
                 let abi = &node.op.args[0];
@@ -1269,39 +1344,39 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 };
                 body.push(format!("  {reg} = {call}"));
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                last_cpu_value = Some(reg);
+                *last_cpu_value = Some(reg);
             }
             ("cpu", "print") => {
                 if let Some(input) = get_i64(&registers, &node.op.args[0]) {
                     body.push(format!("  call void @nuis_debug_print_i64(i64 {input})"));
-                    last_cpu_value = Some(input.to_owned());
+                    *last_cpu_value = Some(input.to_owned());
                 } else if let Some(input) = get_i32(&registers, &node.op.args[0]) {
                     body.push(format!("  call void @nuis_debug_print_i32(i32 {input})"));
                     let widened = fresh_reg(&mut next_reg);
                     body.push(format!("  {widened} = sext i32 {input} to i64"));
-                    last_cpu_value = Some(widened);
+                    *last_cpu_value = Some(widened);
                 } else if let Some(input) = get_bool(&registers, &node.op.args[0]) {
                     let widened = fresh_reg(&mut next_reg);
                     body.push(format!("  {widened} = zext i1 {input} to i32"));
                     body.push(format!("  call void @nuis_debug_print_bool(i32 {widened})"));
                     let widened64 = fresh_reg(&mut next_reg);
                     body.push(format!("  {widened64} = zext i1 {input} to i64"));
-                    last_cpu_value = Some(widened64);
+                    *last_cpu_value = Some(widened64);
                 } else if let Some(input) = get_f32(&registers, &node.op.args[0]) {
                     body.push(format!("  call void @nuis_debug_print_f32(float {input})"));
                     let widened = fresh_reg(&mut next_reg);
                     body.push(format!("  {widened} = fptosi float {input} to i64"));
-                    last_cpu_value = Some(widened);
+                    *last_cpu_value = Some(widened);
                 } else if let Some(input) = get_f64(&registers, &node.op.args[0]) {
                     body.push(format!("  call void @nuis_debug_print_f64(double {input})"));
                     let widened = fresh_reg(&mut next_reg);
                     body.push(format!("  {widened} = fptosi double {input} to i64"));
-                    last_cpu_value = Some(widened);
+                    *last_cpu_value = Some(widened);
                 } else if let Some(input) = get_cstr(&registers, &node.op.args[0]) {
                     body.push(format!(
                         "  %print_str_{next_reg} = call i32 @puts(ptr {input})"
                     ));
-                    last_cpu_value = Some("0".to_owned());
+                    *last_cpu_value = Some("0".to_owned());
                 } else {
                     body.push(format!(
                         "  ; deferred lowering for cpu.print `{}` because its input is produced outside the current CPU LLVM slice",
@@ -1320,7 +1395,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
         }
     }
 
-    let ret = last_cpu_value.unwrap_or_else(|| "0".to_owned());
+    let ret = state.last_cpu_value.unwrap_or_else(|| "0".to_owned());
 
     Ok(format!(
         "; yir version: {}\n\
@@ -1345,8 +1420,8 @@ declare i64 @HostRenderCurves__mix_tick(i64, i64)\n\
 declare i64 @HostMath__speed_curve(i64)\n\n\
 define i64 @nuis_yir_entry() {{\n{}\n  ret i64 {}\n}}\n",
         module.version,
-        globals.join("\n"),
-        body.join("\n"),
+        state.globals.join("\n"),
+        state.body.join("\n"),
         ret
     ))
 }

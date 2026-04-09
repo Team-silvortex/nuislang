@@ -615,20 +615,42 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 }
             }
         }
-        CommandKind::CleanCache { input, all } => {
+        CommandKind::CleanCache { input, all, json } => {
             if all {
                 let workspace_root = std::env::current_dir()
                     .map_err(|error| format!("failed to resolve current directory: {error}"))?;
                 let cleaned = cache::clean_compile_cache_summary(&workspace_root)?;
-                println!("compile cache cleaned");
-                println!("  workspace_root: {}", cleaned.workspace_root.display());
-                println!("  cleaned_roots: {}", cleaned.cleaned_roots.len());
-                println!("  removed_entries: {}", cleaned.removed_entries);
-                println!("  removed_bytes: {}", cleaned.removed_bytes);
-                for root in cleaned.cleaned_roots {
-                    println!("  root: {}", root.root.display());
-                    println!("    removed_entries: {}", root.removed_entries);
-                    println!("    removed_bytes: {}", root.removed_bytes);
+                if json {
+                    print!(
+                        "{{\"kind\":\"compile_cache_cleaned\",\"workspace_root\":\"{}\",\"cleaned_roots\":{},\"removed_entries\":{},\"removed_bytes\":{},\"roots\":[",
+                        json_escape(&cleaned.workspace_root.display().to_string()),
+                        cleaned.cleaned_roots.len(),
+                        cleaned.removed_entries,
+                        cleaned.removed_bytes
+                    );
+                    for (index, root) in cleaned.cleaned_roots.iter().enumerate() {
+                        if index > 0 {
+                            print!(",");
+                        }
+                        print!(
+                            "{{\"root\":\"{}\",\"removed_entries\":{},\"removed_bytes\":{}}}",
+                            json_escape(&root.root.display().to_string()),
+                            root.removed_entries,
+                            root.removed_bytes
+                        );
+                    }
+                    println!("]}}");
+                } else {
+                    println!("compile cache cleaned");
+                    println!("  workspace_root: {}", cleaned.workspace_root.display());
+                    println!("  cleaned_roots: {}", cleaned.cleaned_roots.len());
+                    println!("  removed_entries: {}", cleaned.removed_entries);
+                    println!("  removed_bytes: {}", cleaned.removed_bytes);
+                    for root in cleaned.cleaned_roots {
+                        println!("  root: {}", root.root.display());
+                        println!("    removed_entries: {}", root.removed_entries);
+                        println!("    removed_bytes: {}", root.removed_bytes);
+                    }
                 }
             } else {
                 let input = input.expect("clean-cache input must exist when --all is not set");
@@ -638,29 +660,69 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     None
                 };
                 let cleaned = cache::clean_compile_cache(&input, project.as_ref())?;
-                println!("compile cache cleaned: {}", input.display());
-                println!("  root: {}", cleaned.root.display());
-                println!("  removed_entries: {}", cleaned.removed_entries);
-                println!("  removed_bytes: {}", cleaned.removed_bytes);
+                if json {
+                    println!(
+                        "{{\"kind\":\"compile_cache_cleaned\",\"input\":\"{}\",\"root\":\"{}\",\"removed_entries\":{},\"removed_bytes\":{}}}",
+                        json_escape(&input.display().to_string()),
+                        json_escape(&cleaned.root.display().to_string()),
+                        cleaned.removed_entries,
+                        cleaned.removed_bytes
+                    );
+                } else {
+                    println!("compile cache cleaned: {}", input.display());
+                    println!("  root: {}", cleaned.root.display());
+                    println!("  removed_entries: {}", cleaned.removed_entries);
+                    println!("  removed_bytes: {}", cleaned.removed_bytes);
+                }
             }
         }
-        CommandKind::PruneCache { input, all, keep } => {
+        CommandKind::PruneCache {
+            input,
+            all,
+            keep,
+            json,
+        } => {
             if all {
                 let workspace_root = std::env::current_dir()
                     .map_err(|error| format!("failed to resolve current directory: {error}"))?;
                 let pruned = cache::prune_compile_cache_summary(&workspace_root, keep)?;
-                println!("compile cache pruned");
-                println!("  workspace_root: {}", pruned.workspace_root.display());
-                println!("  keep: {}", keep);
-                println!("  pruned_roots: {}", pruned.pruned_roots.len());
-                println!("  kept_entries: {}", pruned.kept_entries);
-                println!("  removed_entries: {}", pruned.removed_entries);
-                println!("  removed_bytes: {}", pruned.removed_bytes);
-                for root in pruned.pruned_roots {
-                    println!("  root: {}", root.root.display());
-                    println!("    kept_entries: {}", root.kept_entries);
-                    println!("    removed_entries: {}", root.removed_entries);
-                    println!("    removed_bytes: {}", root.removed_bytes);
+                if json {
+                    print!(
+                        "{{\"kind\":\"compile_cache_pruned\",\"workspace_root\":\"{}\",\"keep\":{},\"pruned_roots\":{},\"kept_entries\":{},\"removed_entries\":{},\"removed_bytes\":{},\"roots\":[",
+                        json_escape(&pruned.workspace_root.display().to_string()),
+                        keep,
+                        pruned.pruned_roots.len(),
+                        pruned.kept_entries,
+                        pruned.removed_entries,
+                        pruned.removed_bytes
+                    );
+                    for (index, root) in pruned.pruned_roots.iter().enumerate() {
+                        if index > 0 {
+                            print!(",");
+                        }
+                        print!(
+                            "{{\"root\":\"{}\",\"kept_entries\":{},\"removed_entries\":{},\"removed_bytes\":{}}}",
+                            json_escape(&root.root.display().to_string()),
+                            root.kept_entries,
+                            root.removed_entries,
+                            root.removed_bytes
+                        );
+                    }
+                    println!("]}}");
+                } else {
+                    println!("compile cache pruned");
+                    println!("  workspace_root: {}", pruned.workspace_root.display());
+                    println!("  keep: {}", keep);
+                    println!("  pruned_roots: {}", pruned.pruned_roots.len());
+                    println!("  kept_entries: {}", pruned.kept_entries);
+                    println!("  removed_entries: {}", pruned.removed_entries);
+                    println!("  removed_bytes: {}", pruned.removed_bytes);
+                    for root in pruned.pruned_roots {
+                        println!("  root: {}", root.root.display());
+                        println!("    kept_entries: {}", root.kept_entries);
+                        println!("    removed_entries: {}", root.removed_entries);
+                        println!("    removed_bytes: {}", root.removed_bytes);
+                    }
                 }
             } else {
                 let input = input.expect("cache-prune input must exist when --all is not set");
@@ -670,12 +732,24 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     None
                 };
                 let pruned = cache::prune_compile_cache(&input, project.as_ref(), keep)?;
-                println!("compile cache pruned: {}", input.display());
-                println!("  root: {}", pruned.root.display());
-                println!("  keep: {}", keep);
-                println!("  kept_entries: {}", pruned.kept_entries);
-                println!("  removed_entries: {}", pruned.removed_entries);
-                println!("  removed_bytes: {}", pruned.removed_bytes);
+                if json {
+                    println!(
+                        "{{\"kind\":\"compile_cache_pruned\",\"input\":\"{}\",\"root\":\"{}\",\"keep\":{},\"kept_entries\":{},\"removed_entries\":{},\"removed_bytes\":{}}}",
+                        json_escape(&input.display().to_string()),
+                        json_escape(&pruned.root.display().to_string()),
+                        keep,
+                        pruned.kept_entries,
+                        pruned.removed_entries,
+                        pruned.removed_bytes
+                    );
+                } else {
+                    println!("compile cache pruned: {}", input.display());
+                    println!("  root: {}", pruned.root.display());
+                    println!("  keep: {}", keep);
+                    println!("  kept_entries: {}", pruned.kept_entries);
+                    println!("  removed_entries: {}", pruned.removed_entries);
+                    println!("  removed_bytes: {}", pruned.removed_bytes);
+                }
             }
         }
         CommandKind::DumpAst { input } => {

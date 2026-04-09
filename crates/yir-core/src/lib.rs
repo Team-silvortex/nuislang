@@ -94,6 +94,63 @@ pub struct Operation {
     pub args: Vec<String>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OperationDomainFamily {
+    Cpu,
+    Data,
+    Shader,
+    Kernel,
+    Npu,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SemanticOp {
+    CpuAllocNode,
+    CpuAllocBuffer,
+    CpuBorrow,
+    CpuMovePtr,
+    CpuInstantiateUnit,
+    CpuProjectProfileRef,
+    CpuLoadValue,
+    CpuLoadNext,
+    CpuBufferLen,
+    CpuLoadAt,
+    CpuStoreValue,
+    CpuStoreNext,
+    CpuStoreAt,
+    CpuFree,
+    DataMove,
+    DataCopyWindow,
+    DataImmutableWindow,
+    DataOutputPipe,
+    DataInputPipe,
+    DataMarker,
+    DataHandleTable,
+    DataBindCore,
+    ShaderBeginPass,
+    ShaderDrawInstanced,
+    ShaderPipeline,
+    ShaderInlineWgsl,
+    Other,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CpuLlvmLoweringClass {
+    NonCpu,
+    Literal,
+    Aggregate,
+    Pointer,
+    Arithmetic,
+    Compare,
+    Bitwise,
+    Cast,
+    Memory,
+    Runtime,
+    Effect,
+    Other,
+}
+
 impl Operation {
     pub fn parse(raw: &str, args: Vec<String>) -> Result<Self, String> {
         let (module, instruction) = raw
@@ -115,6 +172,115 @@ impl Operation {
 
     pub fn full_name(&self) -> String {
         format!("{}.{}", self.module, self.instruction)
+    }
+
+    pub fn domain_family(&self) -> OperationDomainFamily {
+        match self.module.as_str() {
+            "cpu" => OperationDomainFamily::Cpu,
+            "data" | "fabric" => OperationDomainFamily::Data,
+            "shader" => OperationDomainFamily::Shader,
+            "kernel" => OperationDomainFamily::Kernel,
+            "npu" => OperationDomainFamily::Npu,
+            _ => OperationDomainFamily::Unknown,
+        }
+    }
+
+    pub fn is_data_domain_family(&self) -> bool {
+        self.domain_family() == OperationDomainFamily::Data
+    }
+
+    pub fn semantic_op(&self) -> SemanticOp {
+        match (self.domain_family(), self.instruction.as_str()) {
+            (OperationDomainFamily::Cpu, "alloc_node") => SemanticOp::CpuAllocNode,
+            (OperationDomainFamily::Cpu, "alloc_buffer") => SemanticOp::CpuAllocBuffer,
+            (OperationDomainFamily::Cpu, "borrow") => SemanticOp::CpuBorrow,
+            (OperationDomainFamily::Cpu, "move_ptr") => SemanticOp::CpuMovePtr,
+            (OperationDomainFamily::Cpu, "instantiate_unit") => SemanticOp::CpuInstantiateUnit,
+            (OperationDomainFamily::Cpu, "project_profile_ref") => SemanticOp::CpuProjectProfileRef,
+            (OperationDomainFamily::Cpu, "load_value") => SemanticOp::CpuLoadValue,
+            (OperationDomainFamily::Cpu, "load_next") => SemanticOp::CpuLoadNext,
+            (OperationDomainFamily::Cpu, "buffer_len") => SemanticOp::CpuBufferLen,
+            (OperationDomainFamily::Cpu, "load_at") => SemanticOp::CpuLoadAt,
+            (OperationDomainFamily::Cpu, "store_value") => SemanticOp::CpuStoreValue,
+            (OperationDomainFamily::Cpu, "store_next") => SemanticOp::CpuStoreNext,
+            (OperationDomainFamily::Cpu, "store_at") => SemanticOp::CpuStoreAt,
+            (OperationDomainFamily::Cpu, "free") => SemanticOp::CpuFree,
+            (OperationDomainFamily::Data, "move") => SemanticOp::DataMove,
+            (OperationDomainFamily::Data, "copy_window") => SemanticOp::DataCopyWindow,
+            (OperationDomainFamily::Data, "immutable_window") => SemanticOp::DataImmutableWindow,
+            (OperationDomainFamily::Data, "output_pipe") => SemanticOp::DataOutputPipe,
+            (OperationDomainFamily::Data, "input_pipe") => SemanticOp::DataInputPipe,
+            (OperationDomainFamily::Data, "marker") => SemanticOp::DataMarker,
+            (OperationDomainFamily::Data, "handle_table") => SemanticOp::DataHandleTable,
+            (OperationDomainFamily::Data, "bind_core") => SemanticOp::DataBindCore,
+            (OperationDomainFamily::Shader, "begin_pass") => SemanticOp::ShaderBeginPass,
+            (OperationDomainFamily::Shader, "draw_instanced") => SemanticOp::ShaderDrawInstanced,
+            (OperationDomainFamily::Shader, "pipeline") => SemanticOp::ShaderPipeline,
+            (OperationDomainFamily::Shader, "inline_wgsl") => SemanticOp::ShaderInlineWgsl,
+            _ => SemanticOp::Other,
+        }
+    }
+
+    pub fn is_shader_semantic_op(&self, expected: SemanticOp) -> bool {
+        self.semantic_op() == expected
+    }
+
+    pub fn is_cpu_semantic_op(&self, expected: SemanticOp) -> bool {
+        self.semantic_op() == expected
+    }
+
+    pub fn is_domain_family(&self, expected: OperationDomainFamily) -> bool {
+        self.domain_family() == expected
+    }
+
+    pub fn is_data_marker_tag(&self, expected: &str) -> bool {
+        self.semantic_op() == SemanticOp::DataMarker
+            && self.args.first().map(String::as_str) == Some(expected)
+    }
+
+    pub fn is_data_pipe_semantic_op(&self) -> bool {
+        matches!(
+            self.semantic_op(),
+            SemanticOp::DataOutputPipe | SemanticOp::DataInputPipe
+        )
+    }
+
+    pub fn is_data_window_semantic_op(&self) -> bool {
+        matches!(
+            self.semantic_op(),
+            SemanticOp::DataCopyWindow | SemanticOp::DataImmutableWindow
+        )
+    }
+
+    pub fn cpu_llvm_lowering_class(&self) -> CpuLlvmLoweringClass {
+        if self.domain_family() != OperationDomainFamily::Cpu {
+            return CpuLlvmLoweringClass::NonCpu;
+        }
+        match self.instruction.as_str() {
+            "text" | "const_bool" | "const_i32" | "const" | "const_i64" | "const_f32"
+            | "const_f64" | "null" => CpuLlvmLoweringClass::Literal,
+            "struct" | "field" => CpuLlvmLoweringClass::Aggregate,
+            "borrow" | "move_ptr" => CpuLlvmLoweringClass::Pointer,
+            "neg" | "add" | "add_i32" | "add_f32" | "add_f64" | "sub" | "sub_i32"
+            | "sub_f32" | "sub_f64" | "mul" | "mul_i32" | "mul_f32" | "mul_f64"
+            | "div" | "div_i32" | "div_f32" | "div_f64" | "rem" | "madd"
+            | "select" => CpuLlvmLoweringClass::Arithmetic,
+            "eq" | "eq_i32" | "eq_f32" | "eq_f64" | "ne" | "lt" | "lt_i32"
+            | "lt_f32" | "lt_f64" | "gt" | "gt_i32" | "gt_f32" | "gt_f64" | "le"
+            | "ge" => CpuLlvmLoweringClass::Compare,
+            "not" | "and" | "or" | "xor" | "shl" | "shr" => CpuLlvmLoweringClass::Bitwise,
+            "cast_i32_to_i64" | "cast_i64_to_i32" | "cast_i32_to_f32"
+            | "cast_i32_to_f64" | "cast_f32_to_f64" | "cast_f64_to_f32" => {
+                CpuLlvmLoweringClass::Cast
+            }
+            "alloc_node" | "alloc_buffer" | "load_value" | "load_next" | "buffer_len"
+            | "load_at" | "store_value" | "store_next" | "store_at" | "is_null" | "free" => {
+                CpuLlvmLoweringClass::Memory
+            }
+            "input_i64" | "extern_call_i64" => CpuLlvmLoweringClass::Runtime,
+            "print" => CpuLlvmLoweringClass::Effect,
+            _ => CpuLlvmLoweringClass::Other,
+        }
     }
 }
 
@@ -222,8 +388,8 @@ pub enum Value {
 }
 
 pub fn glm_profile_for_operation(op: &Operation) -> GlmNodeProfile {
-    match (op.module.as_str(), op.instruction.as_str()) {
-        ("cpu", "alloc_node") | ("cpu", "alloc_buffer") => GlmNodeProfile {
+    match op.semantic_op() {
+        SemanticOp::CpuAllocNode | SemanticOp::CpuAllocBuffer => GlmNodeProfile {
             result_class: GlmValueClass::Res,
             accesses: op
                 .args
@@ -236,7 +402,7 @@ pub fn glm_profile_for_operation(op: &Operation) -> GlmNodeProfile {
                 .collect(),
             effect: GlmEffect::None,
         },
-        ("cpu", "borrow") => GlmNodeProfile {
+        SemanticOp::CpuBorrow => GlmNodeProfile {
             result_class: GlmValueClass::Res,
             accesses: vec![GlmAccess {
                 input: op.args[0].clone(),
@@ -245,7 +411,7 @@ pub fn glm_profile_for_operation(op: &Operation) -> GlmNodeProfile {
             }],
             effect: GlmEffect::None,
         },
-        ("cpu", "move_ptr") => GlmNodeProfile {
+        SemanticOp::CpuMovePtr => GlmNodeProfile {
             result_class: GlmValueClass::Res,
             accesses: vec![GlmAccess {
                 input: op.args[0].clone(),
@@ -254,10 +420,10 @@ pub fn glm_profile_for_operation(op: &Operation) -> GlmNodeProfile {
             }],
             effect: GlmEffect::DomainMove,
         },
-        ("cpu", "load_value")
-        | ("cpu", "load_next")
-        | ("cpu", "buffer_len")
-        | ("cpu", "load_at") => GlmNodeProfile {
+        SemanticOp::CpuLoadValue
+        | SemanticOp::CpuLoadNext
+        | SemanticOp::CpuBufferLen
+        | SemanticOp::CpuLoadAt => GlmNodeProfile {
             result_class: GlmValueClass::Val,
             accesses: vec![GlmAccess {
                 input: op.args[0].clone(),
@@ -266,16 +432,18 @@ pub fn glm_profile_for_operation(op: &Operation) -> GlmNodeProfile {
             }],
             effect: GlmEffect::None,
         },
-        ("cpu", "store_value") | ("cpu", "store_next") | ("cpu", "store_at") => GlmNodeProfile {
-            result_class: GlmValueClass::Val,
-            accesses: vec![GlmAccess {
-                input: op.args[0].clone(),
-                class: GlmValueClass::Res,
-                mode: GlmUseMode::Write,
-            }],
-            effect: GlmEffect::None,
-        },
-        ("cpu", "free") => GlmNodeProfile {
+        SemanticOp::CpuStoreValue | SemanticOp::CpuStoreNext | SemanticOp::CpuStoreAt => {
+            GlmNodeProfile {
+                result_class: GlmValueClass::Val,
+                accesses: vec![GlmAccess {
+                    input: op.args[0].clone(),
+                    class: GlmValueClass::Res,
+                    mode: GlmUseMode::Write,
+                }],
+                effect: GlmEffect::None,
+            }
+        }
+        SemanticOp::CpuFree => GlmNodeProfile {
             result_class: GlmValueClass::Val,
             accesses: vec![GlmAccess {
                 input: op.args[0].clone(),
@@ -284,7 +452,7 @@ pub fn glm_profile_for_operation(op: &Operation) -> GlmNodeProfile {
             }],
             effect: GlmEffect::LifetimeEnd,
         },
-        ("data" | "fabric", "move") => GlmNodeProfile {
+        SemanticOp::DataMove => GlmNodeProfile {
             result_class: GlmValueClass::Res,
             accesses: vec![GlmAccess {
                 input: op.args[0].clone(),
@@ -293,18 +461,16 @@ pub fn glm_profile_for_operation(op: &Operation) -> GlmNodeProfile {
             }],
             effect: GlmEffect::DomainMove,
         },
-        ("data" | "fabric", "copy_window") | ("data" | "fabric", "immutable_window") => {
-            GlmNodeProfile {
-                result_class: GlmValueClass::Res,
-                accesses: vec![GlmAccess {
-                    input: op.args[0].clone(),
-                    class: GlmValueClass::Res,
-                    mode: GlmUseMode::Read,
-                }],
-                effect: GlmEffect::None,
-            }
-        }
-        ("data" | "fabric", "output_pipe") | ("data" | "fabric", "input_pipe") => GlmNodeProfile {
+        SemanticOp::DataCopyWindow | SemanticOp::DataImmutableWindow => GlmNodeProfile {
+            result_class: GlmValueClass::Res,
+            accesses: vec![GlmAccess {
+                input: op.args[0].clone(),
+                class: GlmValueClass::Res,
+                mode: GlmUseMode::Read,
+            }],
+            effect: GlmEffect::None,
+        },
+        SemanticOp::DataOutputPipe | SemanticOp::DataInputPipe => GlmNodeProfile {
             result_class: GlmValueClass::Res,
             accesses: vec![GlmAccess {
                 input: op.args[0].clone(),
@@ -326,6 +492,29 @@ pub fn glm_profile_for_operation(op: &Operation) -> GlmNodeProfile {
                 .collect(),
             effect: GlmEffect::None,
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        GlmEffect, GlmUseMode, GlmValueClass, Operation, OperationDomainFamily, SemanticOp,
+    };
+
+    #[test]
+    fn fabric_ops_fold_into_data_domain_family() {
+        let op = Operation::parse("fabric.output_pipe", vec!["frame".to_owned()]).unwrap();
+        assert_eq!(op.domain_family(), OperationDomainFamily::Data);
+        assert_eq!(op.semantic_op(), SemanticOp::DataOutputPipe);
+    }
+
+    #[test]
+    fn glm_profile_uses_semantic_op_classification() {
+        let op = Operation::parse("cpu.move_ptr", vec!["ptr0".to_owned()]).unwrap();
+        let profile = super::glm_profile_for_operation(&op);
+        assert_eq!(profile.result_class, GlmValueClass::Res);
+        assert_eq!(profile.accesses[0].mode, GlmUseMode::Own);
+        assert_eq!(profile.effect, GlmEffect::DomainMove);
     }
 }
 
