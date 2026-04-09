@@ -1,4 +1,5 @@
 mod cli;
+mod galaxy;
 
 use std::{collections::BTreeSet, fs};
 
@@ -164,6 +165,107 @@ fn run() -> Result<(), String> {
                 println!("  abi: {}={}", item.domain, item.abi);
             }
         }
+        cli::CommandKind::Galaxy(command) => match command {
+            cli::GalaxyCommand::Init { input } => {
+                let manifest_path = galaxy::init(&input)?;
+                println!("initialized galaxy package");
+                println!("  manifest: {}", manifest_path.display());
+                println!("  local_index: {}", galaxy::local_index_root().display());
+            }
+            cli::GalaxyCommand::Check { input } => {
+                let checked = galaxy::check(&input)?;
+                println!("checked galaxy package: {}", checked.manifest.name);
+                println!("  root: {}", checked.root.display());
+                println!("  manifest: {}", checked.manifest_path.display());
+                println!("  version: {}", checked.manifest.version);
+                println!("  package_kind: {}", checked.manifest.package_kind);
+                println!("  project: {}", checked.manifest.project);
+                println!("  include_files: {}", checked.include_files.len());
+                println!("  local_index: {}", galaxy::local_index_root().display());
+                for (domain, abi) in checked.abi_entries {
+                    println!("  abi: {}={}", domain, abi);
+                }
+            }
+            cli::GalaxyCommand::Pack { input, output } => {
+                let bundle = galaxy::pack(&input, &output)?;
+                println!("packed galaxy bundle");
+                println!("  bundle: {}", bundle.display());
+                println!("  local_index: {}", galaxy::local_index_root().display());
+                println!(
+                    "  local_packages: {}",
+                    galaxy::local_packages_root().display()
+                );
+            }
+            cli::GalaxyCommand::Inspect { input } => {
+                let inspected = galaxy::inspect_bundle(&input)?;
+                println!("inspected galaxy bundle: {}", input.display());
+                println!("  name: {}", inspected.manifest.name);
+                println!("  version: {}", inspected.manifest.version);
+                println!("  package_kind: {}", inspected.manifest.package_kind);
+                println!("  project: {}", inspected.manifest.project);
+                println!("  summary: {}", inspected.manifest.summary);
+                println!("  entries: {}", inspected.entries.len());
+                for entry in inspected.entries {
+                    println!("  file: {} ({} bytes)", entry.path, entry.bytes);
+                }
+            }
+            cli::GalaxyCommand::PublishLocal { input, output } => {
+                let bundle = galaxy::publish_local(&input, output.as_deref())?;
+                println!("published galaxy bundle locally");
+                println!("  bundle: {}", bundle.display());
+                println!("  local_index: {}", galaxy::local_index_root().display());
+                println!(
+                    "  local_packages: {}",
+                    galaxy::local_packages_root().display()
+                );
+            }
+            cli::GalaxyCommand::List => {
+                let entries = galaxy::list_local()?;
+                if entries.is_empty() {
+                    println!("no local galaxy packages");
+                } else {
+                    for entry in entries {
+                        println!("package: {}", entry.name);
+                        println!("  version: {}", entry.version);
+                        println!("  bundle: {}", entry.package);
+                        println!("  project: {}", entry.project);
+                        if let Some(bytes) = entry.bundle_bytes {
+                            println!("  bundle_bytes: {}", bytes);
+                        }
+                        if let Some(hash) = &entry.bundle_fnv1a64 {
+                            println!("  bundle_fnv1a64: {}", hash);
+                        }
+                        if !entry.abi.is_empty() {
+                            println!("  abi: {}", entry.abi.join(", "));
+                        }
+                    }
+                }
+            }
+            cli::GalaxyCommand::InstallLocal {
+                name,
+                version,
+                output,
+            } => {
+                let project_path = galaxy::install_local(&name, version.as_deref(), &output)?;
+                println!("installed local galaxy package");
+                println!("  name: {}", name);
+                if let Some(version) = version {
+                    println!("  version: {}", version);
+                }
+                println!("  output: {}", output.display());
+                println!("  project: {}", project_path.display());
+            }
+            cli::GalaxyCommand::VerifyLocal { name, version } => {
+                let verified = galaxy::verify_local(&name, version.as_deref())?;
+                println!("verified local galaxy package");
+                println!("  name: {}", verified.name);
+                println!("  version: {}", verified.version);
+                println!("  bundle: {}", verified.package.display());
+                println!("  bundle_bytes: {}", verified.bundle_bytes);
+                println!("  bundle_fnv1a64: {}", verified.bundle_fnv1a64);
+                println!("  entries: {}", verified.entries);
+            }
+        },
     }
 
     Ok(())
@@ -189,6 +291,14 @@ fn print_help() {
     println!("  nuis rc <status|start|stop|track|projects|versions> [...]");
     println!("  nuis project-status [project-dir|nuis.toml]");
     println!("  nuis project-lock-abi [project-dir|nuis.toml]");
+    println!("  nuis galaxy init [project-dir]");
+    println!("  nuis galaxy check [project-dir|galaxy.toml]");
+    println!("  nuis galaxy pack [project-dir|galaxy.toml] [output.galaxy]");
+    println!("  nuis galaxy inspect <input.galaxy>");
+    println!("  nuis galaxy publish-local [project-dir|galaxy.toml] [output.galaxy]");
+    println!("  nuis galaxy list");
+    println!("  nuis galaxy install-local <name> [version] [output-dir]");
+    println!("  nuis galaxy verify-local <name> [version]");
 }
 
 fn run_nuis_rc(args: &[String]) -> Result<(), String> {
