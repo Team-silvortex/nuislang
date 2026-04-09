@@ -49,6 +49,12 @@ fn run() -> Result<(), String> {
         cli::CommandKind::VerifyBuildManifest { manifest } => {
             nuisc::run(nuisc::CommandKind::VerifyBuildManifest { manifest })?;
         }
+        cli::CommandKind::CacheStatus { input } => {
+            nuisc::run(nuisc::CommandKind::CacheStatus { input })?;
+        }
+        cli::CommandKind::CleanCache { input } => {
+            nuisc::run(nuisc::CommandKind::CleanCache { input })?;
+        }
         cli::CommandKind::ReleaseCheck { input, output_dir } => {
             println!("release-check: check");
             nuisc::run(nuisc::CommandKind::Check {
@@ -429,6 +435,8 @@ fn print_help() {
     println!("  nuis inspect-nustar <input.nustar>");
     println!("  nuis loader-contract <package-id>");
     println!("  nuis verify-build-manifest <nuis.build.manifest.toml>");
+    println!("  nuis cache-status [input.ns|project-dir|nuis.toml]");
+    println!("  nuis clean-cache [input.ns|project-dir|nuis.toml]");
     println!("  nuis release-check [input.ns|project-dir|nuis.toml] [output-dir]");
     println!("  nuis rc <status|start|stop|track|projects|versions> [...]");
     println!("  nuis project-status [project-dir|nuis.toml]");

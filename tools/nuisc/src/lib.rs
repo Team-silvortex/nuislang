@@ -1,4 +1,5 @@
 pub mod aot;
+pub mod cache;
 pub mod cli;
 pub mod codegen_wasm;
 pub mod engine;
@@ -458,7 +459,50 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             println!("  input: {}", report.input);
             println!("  output_dir: {}", report.output_dir);
             println!("  packaging_mode: {}", report.packaging_mode);
+            if let Some(status) = report.compile_cache_status {
+                println!("  compile_cache_status: {}", status);
+            }
+            if let Some(key) = report.compile_cache_key {
+                println!("  compile_cache_key: {}", key);
+            }
+            if let Some(root) = report.compile_cache_root {
+                println!("  compile_cache_root: {}", root);
+            }
             println!("  artifacts_checked: {}", report.artifacts_checked);
+        }
+        CommandKind::CacheStatus { input } => {
+            let project = if project::is_project_input(&input) {
+                Some(project::load_project(&input)?)
+            } else {
+                None
+            };
+            let status = cache::compile_cache_status(&input, project.as_ref())?;
+            println!("compile cache status: {}", input.display());
+            println!("  root: {}", status.root.display());
+            println!("  key: {}", status.key);
+            println!(
+                "  state: {}",
+                if status.entry_exists {
+                    "present"
+                } else {
+                    "missing"
+                }
+            );
+            println!("  entry_dir: {}", status.entry_dir.display());
+            println!("  files: {}", status.file_count);
+            println!("  bytes: {}", status.total_bytes);
+        }
+        CommandKind::CleanCache { input } => {
+            let project = if project::is_project_input(&input) {
+                Some(project::load_project(&input)?)
+            } else {
+                None
+            };
+            let cleaned = cache::clean_compile_cache(&input, project.as_ref())?;
+            println!("compile cache cleaned: {}", input.display());
+            println!("  root: {}", cleaned.root.display());
+            println!("  removed_entries: {}", cleaned.removed_entries);
+            println!("  removed_bytes: {}", cleaned.removed_bytes);
         }
         CommandKind::DumpAst { input } => {
             if project::is_project_input(&input) {
@@ -542,15 +586,28 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             } else {
                 input.clone()
             };
+            let cache_key = cache::compute_compile_cache_key(&input, project.as_ref())?;
+            let cache_hit = cache::lookup_compile_cache(&cache_key)?;
             let artifacts = pipeline::compile_source_path(&input)?;
-            let written = aot::write_and_link(
-                &effective_input,
-                &output_dir,
-                &artifacts.ast,
-                &artifacts.nir,
-                &artifacts.yir,
-                &artifacts.llvm_ir,
-            )?;
+            let written = if let Some(entry) = &cache_hit {
+                cache::restore_compile_cache(entry, &output_dir)?;
+                aot::compile_artifacts_for_output_dir(
+                    &effective_input,
+                    &output_dir,
+                    &artifacts.yir,
+                )?
+            } else {
+                let written = aot::write_and_link(
+                    &effective_input,
+                    &output_dir,
+                    &artifacts.ast,
+                    &artifacts.nir,
+                    &artifacts.yir,
+                    &artifacts.llvm_ir,
+                )?;
+                let _ = cache::store_compile_cache(&cache_key, &output_dir)?;
+                written
+            };
             let project_metadata = if let Some(project) = &project {
                 Some(project::write_project_metadata(&output_dir, project)?)
             } else {
@@ -568,6 +625,15 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     input_path: input.display().to_string(),
                     output_dir: output_dir.display().to_string(),
                     loaded_nustar: artifacts.loaded_nustar.clone(),
+                    compile_cache: Some(aot::BuildManifestCacheInfo {
+                        status: if cache_hit.is_some() {
+                            "hit".to_owned()
+                        } else {
+                            "miss".to_owned()
+                        },
+                        key: cache_key.key.clone(),
+                        root: cache_key.root.display().to_string(),
+                    }),
                     project: project
                         .as_ref()
                         .map(|project| aot::BuildManifestProjectInfo {
@@ -611,6 +677,11 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 },
             )?;
             println!("compiled nuis source: {}", input.display());
+            println!(
+                "compile_cache: {} ({})",
+                if cache_hit.is_some() { "hit" } else { "miss" },
+                cache_key.key
+            );
             if let Some(project) = &project {
                 println!("project: {}", project::describe_project(project));
             }

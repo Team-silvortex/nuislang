@@ -10,6 +10,8 @@ pub enum CommandKind {
     InspectNustar { input: PathBuf },
     LoaderContract { package_id: String },
     VerifyBuildManifest { manifest: PathBuf },
+    CacheStatus { input: PathBuf },
+    CleanCache { input: PathBuf },
     DumpAst { input: PathBuf },
     DumpNir { input: PathBuf },
     DumpYir { input: PathBuf },
@@ -60,6 +62,18 @@ where
                 "usage: nuisc verify-build-manifest <nuis.build.manifest.toml>".to_owned()
             })?),
         }),
+        "cache-status" => Ok(CommandKind::CacheStatus {
+            input: PathBuf::from(
+                args.next()
+                    .ok_or_else(|| "usage: nuisc cache-status <input.ns|project-dir|nuis.toml>".to_owned())?,
+            ),
+        }),
+        "clean-cache" => Ok(CommandKind::CleanCache {
+            input: PathBuf::from(
+                args.next()
+                    .ok_or_else(|| "usage: nuisc clean-cache <input.ns|project-dir|nuis.toml>".to_owned())?,
+            ),
+        }),
         "dump-ast" => Ok(CommandKind::DumpAst {
             input: PathBuf::from(
                 args.next()
@@ -95,7 +109,7 @@ where
             ),
         }),
         other => Err(format!(
-            "unknown nuisc command `{other}`; expected `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `verify-build-manifest`, `dump-ast`, `dump-nir`, `dump-yir`, `check`, or `compile`"
+            "unknown nuisc command `{other}`; expected `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `verify-build-manifest`, `cache-status`, `clean-cache`, `dump-ast`, `dump-nir`, `dump-yir`, `check`, or `compile`"
         )),
     }
 }

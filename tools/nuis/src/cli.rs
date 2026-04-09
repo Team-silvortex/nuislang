@@ -11,6 +11,8 @@ pub enum CommandKind {
     InspectNustar { input: PathBuf },
     LoaderContract { package_id: String },
     VerifyBuildManifest { manifest: PathBuf },
+    CacheStatus { input: PathBuf },
+    CleanCache { input: PathBuf },
     ReleaseCheck { input: PathBuf, output_dir: PathBuf },
     Check { input: PathBuf },
     Build { input: PathBuf, output_dir: PathBuf },
@@ -121,6 +123,12 @@ where
                 "usage: nuis verify-build-manifest <nuis.build.manifest.toml>".to_owned()
             })?),
         }),
+        "cache-status" => Ok(CommandKind::CacheStatus {
+            input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
+        }),
+        "clean-cache" => Ok(CommandKind::CleanCache {
+            input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
+        }),
         "release-check" => {
             let input = PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned()));
             let output_dir = PathBuf::from(args.next().unwrap_or_else(|| {
@@ -172,7 +180,7 @@ where
         }),
         "galaxy" => parse_galaxy_args(args),
         other => Err(format!(
-            "unknown nuis command `{other}`; expected `help`, `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `verify-build-manifest`, `release-check`, `check`, `build`, `dump-ast`, `dump-nir`, `dump-yir`, `rc`, `project-status`, `project-lock-abi`, or `galaxy`"
+            "unknown nuis command `{other}`; expected `help`, `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `verify-build-manifest`, `cache-status`, `clean-cache`, `release-check`, `check`, `build`, `dump-ast`, `dump-nir`, `dump-yir`, `rc`, `project-status`, `project-lock-abi`, or `galaxy`"
         )),
     }
 }

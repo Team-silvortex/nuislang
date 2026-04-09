@@ -35,7 +35,14 @@ pub struct BuildManifestContext {
     pub input_path: String,
     pub output_dir: String,
     pub loaded_nustar: Vec<String>,
+    pub compile_cache: Option<BuildManifestCacheInfo>,
     pub project: Option<BuildManifestProjectInfo>,
+}
+
+pub struct BuildManifestCacheInfo {
+    pub status: String,
+    pub key: String,
+    pub root: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -59,16 +66,13 @@ pub fn write_and_link(
     fs::create_dir_all(output_dir)
         .map_err(|error| format!("failed to create `{}`: {error}", output_dir.display()))?;
 
-    let stem = input
-        .file_stem()
-        .and_then(|stem| stem.to_str())
-        .unwrap_or("nuis_module");
-    let ast_path = output_dir.join(format!("{stem}.ast.txt"));
-    let nir_path = output_dir.join(format!("{stem}.nir.txt"));
-    let yir_path = output_dir.join(format!("{stem}.yir"));
-    let ll_path = output_dir.join(format!("{stem}.ll"));
-    let shim_path = output_dir.join(format!("{stem}_shim.c"));
-    let exe_path = output_dir.join(stem);
+    let layout = output_layout(input, output_dir);
+    let ast_path = layout.ast_path;
+    let nir_path = layout.nir_path;
+    let yir_path = layout.yir_path;
+    let ll_path = layout.llvm_ir_path;
+    let shim_path = layout.shim_path;
+    let exe_path = layout.binary_stub_path;
 
     fs::write(&ast_path, render::render_ast(ast))
         .map_err(|error| format!("failed to write `{}`: {error}", ast_path.display()))?;
@@ -96,6 +100,57 @@ pub fn write_and_link(
         binary_path,
         packaging_mode,
     })
+}
+
+pub fn compile_artifacts_for_output_dir(
+    input: &Path,
+    output_dir: &Path,
+    yir: &YirModule,
+) -> Result<CompileArtifacts, String> {
+    let layout = output_layout(input, output_dir);
+    let (binary_path, packaging_mode) = if requires_window_bundle(yir) {
+        (
+            layout.binary_stub_path.display().to_string(),
+            "window-aot-bundle".to_owned(),
+        )
+    } else {
+        (
+            layout.binary_stub_path.display().to_string(),
+            "native-cpu-llvm".to_owned(),
+        )
+    };
+    Ok(CompileArtifacts {
+        ast_path: layout.ast_path.display().to_string(),
+        nir_path: layout.nir_path.display().to_string(),
+        yir_path: layout.yir_path.display().to_string(),
+        llvm_ir_path: layout.llvm_ir_path.display().to_string(),
+        binary_path,
+        packaging_mode,
+    })
+}
+
+struct OutputLayout {
+    ast_path: PathBuf,
+    nir_path: PathBuf,
+    yir_path: PathBuf,
+    llvm_ir_path: PathBuf,
+    shim_path: PathBuf,
+    binary_stub_path: PathBuf,
+}
+
+fn output_layout(input: &Path, output_dir: &Path) -> OutputLayout {
+    let stem = input
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .unwrap_or("nuis_module");
+    OutputLayout {
+        ast_path: output_dir.join(format!("{stem}.ast.txt")),
+        nir_path: output_dir.join(format!("{stem}.nir.txt")),
+        yir_path: output_dir.join(format!("{stem}.yir")),
+        llvm_ir_path: output_dir.join(format!("{stem}.ll")),
+        shim_path: output_dir.join(format!("{stem}_shim.c")),
+        binary_stub_path: output_dir.join(stem),
+    }
 }
 
 pub fn write_build_manifest(
@@ -168,6 +223,20 @@ pub fn write_build_manifest(
         "loaded_nustar = {}\n",
         render_string_array(&loaded_nustar)
     ));
+    if let Some(cache) = &context.compile_cache {
+        out.push_str(&format!(
+            "compile_cache_status = \"{}\"\n",
+            escape_toml_string(&cache.status)
+        ));
+        out.push_str(&format!(
+            "compile_cache_key = \"{}\"\n",
+            escape_toml_string(&cache.key)
+        ));
+        out.push_str(&format!(
+            "compile_cache_root = \"{}\"\n",
+            escape_toml_string(&cache.root)
+        ));
+    }
     out.push('\n');
     out.push_str("[artifacts]\n");
     for (kind, artifact_path) in &artifacts {
@@ -351,6 +420,9 @@ pub struct BuildManifestVerifyReport {
     pub input: String,
     pub output_dir: String,
     pub packaging_mode: String,
+    pub compile_cache_status: Option<String>,
+    pub compile_cache_key: Option<String>,
+    pub compile_cache_root: Option<String>,
     pub artifacts_checked: usize,
 }
 
@@ -368,6 +440,9 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
     let input = parse_required_toml_string(&source, "input", path)?;
     let output_dir = parse_required_toml_string(&source, "output_dir", path)?;
     let packaging_mode = parse_required_toml_string(&source, "packaging_mode", path)?;
+    let compile_cache_status = parse_optional_toml_string(&source, "compile_cache_status");
+    let compile_cache_key = parse_optional_toml_string(&source, "compile_cache_key");
+    let compile_cache_root = parse_optional_toml_string(&source, "compile_cache_root");
 
     let artifacts = parse_artifact_hash_blocks(&source, path)?;
     if artifacts.is_empty() {
@@ -403,6 +478,9 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
         input,
         output_dir,
         packaging_mode,
+        compile_cache_status,
+        compile_cache_key,
+        compile_cache_root,
         artifacts_checked: artifacts.len(),
     })
 }
@@ -469,24 +547,23 @@ fn parse_artifact_hash_row(
 }
 
 fn parse_required_toml_string(source: &str, key: &str, path: &Path) -> Result<String, String> {
+    parse_optional_toml_string(source, key)
+        .ok_or_else(|| format!("`{}` is missing required key `{key}`", path.display()))
+}
+
+fn parse_optional_toml_string(source: &str, key: &str) -> Option<String> {
     let prefix = format!("{key} = ");
     for raw in source.lines() {
         let line = raw.trim();
         if let Some(rest) = line.strip_prefix(&prefix) {
             let value = rest.trim();
             if value.starts_with('"') && value.ends_with('"') && value.len() >= 2 {
-                return Ok(value[1..value.len() - 1].to_owned());
+                return Some(value[1..value.len() - 1].to_owned());
             }
-            return Err(format!(
-                "`{}` has invalid string value for `{key}`",
-                path.display()
-            ));
+            return None;
         }
     }
-    Err(format!(
-        "`{}` is missing required key `{key}`",
-        path.display()
-    ))
+    None
 }
 
 fn parse_required_map_string(
