@@ -4,19 +4,57 @@ use std::path::PathBuf;
 pub enum CommandKind {
     Status,
     Registry,
-    Fmt { input: PathBuf },
-    Bindings { input: PathBuf },
-    PackNustar { package_id: String, output: PathBuf },
-    InspectNustar { input: PathBuf },
-    LoaderContract { package_id: String },
-    VerifyBuildManifest { manifest: PathBuf },
-    CacheStatus { input: PathBuf },
-    CleanCache { input: PathBuf },
-    DumpAst { input: PathBuf },
-    DumpNir { input: PathBuf },
-    DumpYir { input: PathBuf },
-    Check { input: PathBuf },
-    Compile { input: PathBuf, output_dir: PathBuf },
+    Fmt {
+        input: PathBuf,
+    },
+    Bindings {
+        input: PathBuf,
+    },
+    PackNustar {
+        package_id: String,
+        output: PathBuf,
+    },
+    InspectNustar {
+        input: PathBuf,
+    },
+    LoaderContract {
+        package_id: String,
+    },
+    VerifyBuildManifest {
+        manifest: PathBuf,
+    },
+    CacheStatus {
+        input: Option<PathBuf>,
+        all: bool,
+        verbose_cache: bool,
+        json: bool,
+    },
+    CleanCache {
+        input: Option<PathBuf>,
+        all: bool,
+    },
+    PruneCache {
+        input: Option<PathBuf>,
+        all: bool,
+        keep: usize,
+    },
+    DumpAst {
+        input: PathBuf,
+    },
+    DumpNir {
+        input: PathBuf,
+    },
+    DumpYir {
+        input: PathBuf,
+    },
+    Check {
+        input: PathBuf,
+    },
+    Compile {
+        input: PathBuf,
+        output_dir: PathBuf,
+        verbose_cache: bool,
+    },
 }
 
 pub fn parse_args<I>(mut args: I) -> Result<CommandKind, String>
@@ -62,18 +100,105 @@ where
                 "usage: nuisc verify-build-manifest <nuis.build.manifest.toml>".to_owned()
             })?),
         }),
-        "cache-status" => Ok(CommandKind::CacheStatus {
-            input: PathBuf::from(
-                args.next()
-                    .ok_or_else(|| "usage: nuisc cache-status <input.ns|project-dir|nuis.toml>".to_owned())?,
-            ),
-        }),
-        "clean-cache" => Ok(CommandKind::CleanCache {
-            input: PathBuf::from(
-                args.next()
-                    .ok_or_else(|| "usage: nuisc clean-cache <input.ns|project-dir|nuis.toml>".to_owned())?,
-            ),
-        }),
+        "cache-status" => {
+            let mut verbose_cache = false;
+            let mut all = false;
+            let mut json = false;
+            let mut input = None;
+            for arg in args.by_ref() {
+                if arg == "--verbose-cache" {
+                    verbose_cache = true;
+                } else if arg == "--all" {
+                    all = true;
+                } else if arg == "--json" {
+                    json = true;
+                } else if input.is_none() {
+                    input = Some(PathBuf::from(arg));
+                } else {
+                    return Err(
+                        "usage: nuisc cache-status [--all] [--verbose-cache] [--json] [input.ns|project-dir|nuis.toml]"
+                            .to_owned(),
+                    );
+                }
+            }
+            Ok(CommandKind::CacheStatus {
+                input: if all {
+                    input
+                } else {
+                    Some(input.ok_or_else(|| {
+                        "usage: nuisc cache-status [--all] [--verbose-cache] [--json] [input.ns|project-dir|nuis.toml]"
+                            .to_owned()
+                    })?)
+                },
+                all,
+                verbose_cache,
+                json,
+            })
+        }
+        "clean-cache" => {
+            let mut all = false;
+            let mut input = None;
+            for arg in args.by_ref() {
+                if arg == "--all" {
+                    all = true;
+                } else if input.is_none() {
+                    input = Some(PathBuf::from(arg));
+                } else {
+                    return Err(
+                        "usage: nuisc clean-cache [--all] [input.ns|project-dir|nuis.toml]"
+                            .to_owned(),
+                    );
+                }
+            }
+            Ok(CommandKind::CleanCache {
+                input: if all {
+                    input
+                } else {
+                    Some(input.ok_or_else(|| {
+                        "usage: nuisc clean-cache [--all] [input.ns|project-dir|nuis.toml]"
+                            .to_owned()
+                    })?)
+                },
+                all,
+            })
+        }
+        "cache-prune" => {
+            let mut all = false;
+            let mut input = None;
+            let mut keep = 4usize;
+            while let Some(arg) = args.next() {
+                if arg == "--all" {
+                    all = true;
+                } else if arg == "--keep" {
+                    let raw = args.next().ok_or_else(|| {
+                        "usage: nuisc cache-prune [--all] [--keep N] [input.ns|project-dir|nuis.toml]"
+                            .to_owned()
+                    })?;
+                    keep = raw.parse::<usize>().map_err(|_| {
+                        format!("invalid value for `--keep`: `{raw}`; expected non-negative integer")
+                    })?;
+                } else if input.is_none() {
+                    input = Some(PathBuf::from(arg));
+                } else {
+                    return Err(
+                        "usage: nuisc cache-prune [--all] [--keep N] [input.ns|project-dir|nuis.toml]"
+                            .to_owned(),
+                    );
+                }
+            }
+            Ok(CommandKind::PruneCache {
+                input: if all {
+                    input
+                } else {
+                    Some(input.ok_or_else(|| {
+                        "usage: nuisc cache-prune [--all] [--keep N] [input.ns|project-dir|nuis.toml]"
+                            .to_owned()
+                    })?)
+                },
+                all,
+                keep,
+            })
+        }
         "dump-ast" => Ok(CommandKind::DumpAst {
             input: PathBuf::from(
                 args.next()
@@ -98,18 +223,30 @@ where
                     .ok_or_else(|| "usage: nuisc check <input.ns|project-dir|nuis.toml>".to_owned())?,
             ),
         }),
-        "compile" => Ok(CommandKind::Compile {
-            input: PathBuf::from(
-                args.next()
-                    .ok_or_else(|| "usage: nuisc compile <input.ns|project-dir|nuis.toml> <output-dir>".to_owned())?,
-            ),
-            output_dir: PathBuf::from(
-                args.next()
-                    .ok_or_else(|| "usage: nuisc compile <input.ns|project-dir|nuis.toml> <output-dir>".to_owned())?,
-            ),
-        }),
+        "compile" => {
+            let mut verbose_cache = false;
+            let mut positional = Vec::new();
+            for arg in args.by_ref() {
+                if arg == "--verbose-cache" {
+                    verbose_cache = true;
+                } else {
+                    positional.push(arg);
+                }
+            }
+            if positional.len() != 2 {
+                return Err(
+                    "usage: nuisc compile [--verbose-cache] <input.ns|project-dir|nuis.toml> <output-dir>"
+                        .to_owned(),
+                );
+            }
+            Ok(CommandKind::Compile {
+                input: PathBuf::from(&positional[0]),
+                output_dir: PathBuf::from(&positional[1]),
+                verbose_cache,
+            })
+        }
         other => Err(format!(
-            "unknown nuisc command `{other}`; expected `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `verify-build-manifest`, `cache-status`, `clean-cache`, `dump-ast`, `dump-nir`, `dump-yir`, `check`, or `compile`"
+            "unknown nuisc command `{other}`; expected `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `dump-ast`, `dump-nir`, `dump-yir`, `check`, or `compile`"
         )),
     }
 }

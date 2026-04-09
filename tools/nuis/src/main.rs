@@ -49,11 +49,24 @@ fn run() -> Result<(), String> {
         cli::CommandKind::VerifyBuildManifest { manifest } => {
             nuisc::run(nuisc::CommandKind::VerifyBuildManifest { manifest })?;
         }
-        cli::CommandKind::CacheStatus { input } => {
-            nuisc::run(nuisc::CommandKind::CacheStatus { input })?;
+        cli::CommandKind::CacheStatus {
+            input,
+            all,
+            verbose_cache,
+            json,
+        } => {
+            nuisc::run(nuisc::CommandKind::CacheStatus {
+                input,
+                all,
+                verbose_cache,
+                json,
+            })?;
         }
-        cli::CommandKind::CleanCache { input } => {
-            nuisc::run(nuisc::CommandKind::CleanCache { input })?;
+        cli::CommandKind::CleanCache { input, all } => {
+            nuisc::run(nuisc::CommandKind::CleanCache { input, all })?;
+        }
+        cli::CommandKind::PruneCache { input, all, keep } => {
+            nuisc::run(nuisc::CommandKind::PruneCache { input, all, keep })?;
         }
         cli::CommandKind::ReleaseCheck { input, output_dir } => {
             println!("release-check: check");
@@ -64,6 +77,7 @@ fn run() -> Result<(), String> {
             nuisc::run(nuisc::CommandKind::Compile {
                 input: input.clone(),
                 output_dir: output_dir.clone(),
+                verbose_cache: false,
             })?;
             println!("release-check: verify-build-manifest");
             let manifest = output_dir.join("nuis.build.manifest.toml");
@@ -77,8 +91,16 @@ fn run() -> Result<(), String> {
         cli::CommandKind::Check { input } => {
             nuisc::run(nuisc::CommandKind::Check { input })?;
         }
-        cli::CommandKind::Build { input, output_dir } => {
-            nuisc::run(nuisc::CommandKind::Compile { input, output_dir })?;
+        cli::CommandKind::Build {
+            input,
+            output_dir,
+            verbose_cache,
+        } => {
+            nuisc::run(nuisc::CommandKind::Compile {
+                input,
+                output_dir,
+                verbose_cache,
+            })?;
         }
         cli::CommandKind::DumpAst { input } => {
             nuisc::run(nuisc::CommandKind::DumpAst { input })?;
@@ -427,7 +449,7 @@ fn print_help() {
     println!("  nuis fmt [input.ns|project-dir|nuis.toml]");
     println!("  nuis bindings <input.ns|project-dir|nuis.toml>");
     println!("  nuis check [input.ns|project-dir|nuis.toml]");
-    println!("  nuis build [input.ns|project-dir|nuis.toml] <output-dir>");
+    println!("  nuis build [--verbose-cache] [input.ns|project-dir|nuis.toml] <output-dir>");
     println!("  nuis dump-ast [input.ns|project-dir|nuis.toml]");
     println!("  nuis dump-nir [input.ns|project-dir|nuis.toml]");
     println!("  nuis dump-yir [input.ns|project-dir|nuis.toml]");
@@ -435,8 +457,9 @@ fn print_help() {
     println!("  nuis inspect-nustar <input.nustar>");
     println!("  nuis loader-contract <package-id>");
     println!("  nuis verify-build-manifest <nuis.build.manifest.toml>");
-    println!("  nuis cache-status [input.ns|project-dir|nuis.toml]");
-    println!("  nuis clean-cache [input.ns|project-dir|nuis.toml]");
+    println!("  nuis cache-status [--all] [--verbose-cache] [--json] [input.ns|project-dir|nuis.toml]");
+    println!("  nuis clean-cache [--all] [input.ns|project-dir|nuis.toml]");
+    println!("  nuis cache-prune [--all] [--keep N] [input.ns|project-dir|nuis.toml]");
     println!("  nuis release-check [input.ns|project-dir|nuis.toml] [output-dir]");
     println!("  nuis rc <status|start|stop|track|projects|versions> [...]");
     println!("  nuis project-status [project-dir|nuis.toml]");

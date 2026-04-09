@@ -1,6 +1,7 @@
 use std::{
     fs,
     path::{Path, PathBuf},
+    time::SystemTime,
 };
 
 use crate::project::LoadedProject;
@@ -9,6 +10,7 @@ use crate::project::LoadedProject;
 pub struct CompileCacheKey {
     pub root: PathBuf,
     pub key: String,
+    pub input_labels: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -22,6 +24,7 @@ pub struct CompileCacheEntry {
 pub struct CompileCacheStatus {
     pub root: PathBuf,
     pub key: String,
+    pub input_labels: Vec<String>,
     pub entry_exists: bool,
     pub entry_dir: PathBuf,
     pub file_count: usize,
@@ -29,8 +32,59 @@ pub struct CompileCacheStatus {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompileCacheInventoryEntry {
+    pub key: String,
+    pub entry_dir: PathBuf,
+    pub file_count: usize,
+    pub total_bytes: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompileCacheInventory {
+    pub root: PathBuf,
+    pub entry_count: usize,
+    pub total_files: usize,
+    pub total_bytes: u64,
+    pub entries: Vec<CompileCacheInventoryEntry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompileCacheInventorySummary {
+    pub workspace_root: PathBuf,
+    pub roots: Vec<CompileCacheInventory>,
+    pub total_entries: usize,
+    pub total_files: usize,
+    pub total_bytes: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CleanedCompileCache {
     pub root: PathBuf,
+    pub removed_entries: usize,
+    pub removed_bytes: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CleanedCompileCacheSummary {
+    pub workspace_root: PathBuf,
+    pub cleaned_roots: Vec<CleanedCompileCache>,
+    pub removed_entries: usize,
+    pub removed_bytes: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PrunedCompileCache {
+    pub root: PathBuf,
+    pub kept_entries: usize,
+    pub removed_entries: usize,
+    pub removed_bytes: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PrunedCompileCacheSummary {
+    pub workspace_root: PathBuf,
+    pub pruned_roots: Vec<PrunedCompileCache>,
+    pub kept_entries: usize,
     pub removed_entries: usize,
     pub removed_bytes: u64,
 }
@@ -120,8 +174,13 @@ pub fn compute_compile_cache_key(
     }
 
     records.sort_by(|lhs, rhs| lhs.0.cmp(&rhs.0));
+    let input_labels = records.iter().map(|(label, _)| label.clone()).collect();
     let key = fingerprint_records(&records);
-    Ok(CompileCacheKey { root, key })
+    Ok(CompileCacheKey {
+        root,
+        key,
+        input_labels,
+    })
 }
 
 pub fn lookup_compile_cache(key: &CompileCacheKey) -> Result<Option<CompileCacheEntry>, String> {
@@ -205,6 +264,7 @@ pub fn compile_cache_status(
     Ok(CompileCacheStatus {
         root: key.root,
         key: key.key,
+        input_labels: key.input_labels,
         entry_exists: entry_dir.is_dir(),
         entry_dir,
         file_count,
@@ -217,20 +277,166 @@ pub fn clean_compile_cache(
     project: Option<&LoadedProject>,
 ) -> Result<CleanedCompileCache, String> {
     let root = cache_root(input, project);
+    clean_compile_cache_root(&root)
+}
+
+pub fn clean_compile_cache_summary(
+    workspace_root: &Path,
+) -> Result<CleanedCompileCacheSummary, String> {
+    let cleaned_roots = discover_compile_cache_roots(workspace_root)?
+        .into_iter()
+        .map(|root| clean_compile_cache_root(&root))
+        .collect::<Result<Vec<_>, _>>()?;
+    let removed_entries = cleaned_roots
+        .iter()
+        .map(|cleaned| cleaned.removed_entries)
+        .sum();
+    let removed_bytes = cleaned_roots
+        .iter()
+        .map(|cleaned| cleaned.removed_bytes)
+        .sum();
+    Ok(CleanedCompileCacheSummary {
+        workspace_root: workspace_root.to_path_buf(),
+        cleaned_roots,
+        removed_entries,
+        removed_bytes,
+    })
+}
+
+pub fn prune_compile_cache(
+    input: &Path,
+    project: Option<&LoadedProject>,
+    keep: usize,
+) -> Result<PrunedCompileCache, String> {
+    let root = cache_root(input, project);
+    prune_compile_cache_root(&root, keep)
+}
+
+pub fn prune_compile_cache_summary(
+    workspace_root: &Path,
+    keep: usize,
+) -> Result<PrunedCompileCacheSummary, String> {
+    let pruned_roots = discover_compile_cache_roots(workspace_root)?
+        .into_iter()
+        .map(|root| prune_compile_cache_root(&root, keep))
+        .collect::<Result<Vec<_>, _>>()?;
+    let kept_entries = pruned_roots.iter().map(|pruned| pruned.kept_entries).sum();
+    let removed_entries = pruned_roots.iter().map(|pruned| pruned.removed_entries).sum();
+    let removed_bytes = pruned_roots.iter().map(|pruned| pruned.removed_bytes).sum();
+    Ok(PrunedCompileCacheSummary {
+        workspace_root: workspace_root.to_path_buf(),
+        pruned_roots,
+        kept_entries,
+        removed_entries,
+        removed_bytes,
+    })
+}
+
+fn clean_compile_cache_root(root: &Path) -> Result<CleanedCompileCache, String> {
     if !root.exists() {
         return Ok(CleanedCompileCache {
-            root,
+            root: root.to_path_buf(),
             removed_entries: 0,
             removed_bytes: 0,
         });
     }
-    let (removed_entries, removed_bytes) = summarize_cache_entries(&root)?;
-    fs::remove_dir_all(&root)
+    let (removed_entries, removed_bytes) = summarize_cache_entries(root)?;
+    fs::remove_dir_all(root)
         .map_err(|error| format!("failed to remove `{}`: {error}", root.display()))?;
     Ok(CleanedCompileCache {
-        root,
+        root: root.to_path_buf(),
         removed_entries,
         removed_bytes,
+    })
+}
+
+fn prune_compile_cache_root(root: &Path, keep: usize) -> Result<PrunedCompileCache, String> {
+    if !root.exists() {
+        return Ok(PrunedCompileCache {
+            root: root.to_path_buf(),
+            kept_entries: 0,
+            removed_entries: 0,
+            removed_bytes: 0,
+        });
+    }
+    let mut entries = collect_cache_entry_stats(root)?;
+    entries.sort_by(|lhs, rhs| rhs.modified.cmp(&lhs.modified).then_with(|| lhs.key.cmp(&rhs.key)));
+    let kept_entries = entries.len().min(keep);
+    let mut removed_entries = 0usize;
+    let mut removed_bytes = 0u64;
+    for entry in entries.into_iter().skip(keep) {
+        fs::remove_dir_all(&entry.entry_dir)
+            .map_err(|error| format!("failed to prune `{}`: {error}", entry.entry_dir.display()))?;
+        removed_entries += 1;
+        removed_bytes += entry.total_bytes;
+    }
+    if keep == 0 && root.is_dir() && fs::read_dir(root)
+        .map_err(|error| format!("failed to read `{}`: {error}", root.display()))?
+        .next()
+        .is_none()
+    {
+        fs::remove_dir(root)
+            .map_err(|error| format!("failed to remove empty cache root `{}`: {error}", root.display()))?;
+    }
+    Ok(PrunedCompileCache {
+        root: root.to_path_buf(),
+        kept_entries,
+        removed_entries,
+        removed_bytes,
+    })
+}
+
+pub fn compile_cache_inventory(root: &Path) -> Result<CompileCacheInventory, String> {
+    let mut entries = Vec::new();
+    if root.is_dir() {
+        for entry in fs::read_dir(root)
+            .map_err(|error| format!("failed to read `{}`: {error}", root.display()))?
+        {
+            let entry = entry
+                .map_err(|error| format!("failed to enumerate `{}`: {error}", root.display()))?;
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+            let key = entry.file_name().to_string_lossy().to_string();
+            let (file_count, total_bytes) = summarize_directory(&path)?;
+            entries.push(CompileCacheInventoryEntry {
+                key,
+                entry_dir: path,
+                file_count,
+                total_bytes,
+            });
+        }
+    }
+    entries.sort_by(|lhs, rhs| lhs.key.cmp(&rhs.key));
+    let entry_count = entries.len();
+    let total_files = entries.iter().map(|entry| entry.file_count).sum();
+    let total_bytes = entries.iter().map(|entry| entry.total_bytes).sum();
+    Ok(CompileCacheInventory {
+        root: root.to_path_buf(),
+        entry_count,
+        total_files,
+        total_bytes,
+        entries,
+    })
+}
+
+pub fn compile_cache_inventory_summary(
+    workspace_root: &Path,
+) -> Result<CompileCacheInventorySummary, String> {
+    let roots = discover_compile_cache_roots(workspace_root)?
+        .into_iter()
+        .map(|root| compile_cache_inventory(&root))
+        .collect::<Result<Vec<_>, _>>()?;
+    let total_entries = roots.iter().map(|inventory| inventory.entry_count).sum();
+    let total_files = roots.iter().map(|inventory| inventory.total_files).sum();
+    let total_bytes = roots.iter().map(|inventory| inventory.total_bytes).sum();
+    Ok(CompileCacheInventorySummary {
+        workspace_root: workspace_root.to_path_buf(),
+        roots,
+        total_entries,
+        total_files,
+        total_bytes,
     })
 }
 
@@ -342,6 +548,42 @@ fn summarize_cache_entries(root: &Path) -> Result<(usize, u64), String> {
     Ok((entries, bytes))
 }
 
+#[derive(Debug, Clone)]
+struct CacheEntryStats {
+    key: String,
+    entry_dir: PathBuf,
+    total_bytes: u64,
+    modified: SystemTime,
+}
+
+fn collect_cache_entry_stats(root: &Path) -> Result<Vec<CacheEntryStats>, String> {
+    let mut entries = Vec::new();
+    if !root.is_dir() {
+        return Ok(entries);
+    }
+    for entry in
+        fs::read_dir(root).map_err(|error| format!("failed to read `{}`: {error}", root.display()))?
+    {
+        let entry =
+            entry.map_err(|error| format!("failed to enumerate `{}`: {error}", root.display()))?;
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let (_, total_bytes) = summarize_directory(&path)?;
+        let modified = fs::metadata(&path)
+            .and_then(|metadata| metadata.modified())
+            .unwrap_or(SystemTime::UNIX_EPOCH);
+        entries.push(CacheEntryStats {
+            key: entry.file_name().to_string_lossy().to_string(),
+            entry_dir: path,
+            total_bytes,
+            modified,
+        });
+    }
+    Ok(entries)
+}
+
 fn summarize_directory(root: &Path) -> Result<(usize, u64), String> {
     let mut file_count = 0usize;
     let mut total_bytes = 0u64;
@@ -379,4 +621,44 @@ fn sanitize_path_label(raw: &str) -> String {
     } else {
         out
     }
+}
+
+fn discover_compile_cache_roots(workspace_root: &Path) -> Result<Vec<PathBuf>, String> {
+    let mut roots = Vec::new();
+    let single_file_root = workspace_root.join("target").join("nuisc-cache");
+    if single_file_root.is_dir() {
+        roots.push(single_file_root);
+    }
+    discover_project_cache_roots(workspace_root, &mut roots)?;
+    roots.sort();
+    roots.dedup();
+    Ok(roots)
+}
+
+fn discover_project_cache_roots(root: &Path, out: &mut Vec<PathBuf>) -> Result<(), String> {
+    if !root.is_dir() {
+        return Ok(());
+    }
+    for entry in
+        fs::read_dir(root).map_err(|error| format!("failed to read `{}`: {error}", root.display()))?
+    {
+        let entry =
+            entry.map_err(|error| format!("failed to enumerate `{}`: {error}", root.display()))?;
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        if entry.file_name() == ".git" {
+            continue;
+        }
+        if entry.file_name() == ".nuis" {
+            let compile_root = path.join("cache").join("compile");
+            if compile_root.is_dir() {
+                out.push(compile_root);
+            }
+            continue;
+        }
+        discover_project_cache_roots(&path, out)?;
+    }
+    Ok(())
 }

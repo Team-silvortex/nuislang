@@ -1,0 +1,66 @@
+manifest_version = 1
+package_kind = "shader_package"
+stage_count = 1
+fabric_handle_table_count = 1
+fabric_core_binding_count = 1
+backend_eligible = true
+requires_prerender_fallback = false
+
+[[fabric_handle_table]]
+id = "project_profile_data_FabricPlane_profile_handles"
+
+[[fabric_handle_table.entry]]
+slot = "host"
+resource = "cpu0"
+
+[[fabric_handle_table.entry]]
+slot = "render"
+resource = "shader0"
+
+[[fabric_core_binding]]
+id = "project_profile_data_FabricPlane_data_bind_core"
+resource = "fabric0"
+core_index = 1
+
+[[stage]]
+id = "shader_draw_instanced_52"
+op = "shader.draw_instanced"
+resource = "shader0"
+lowering = "backend_eligible"
+reason = "stage fits the current Metal/Vulkan common lowering subset"
+fabric_handle_table = "project_profile_data_FabricPlane_profile_handles"
+pipeline = "lit_sphere"
+target_format = "rgba8_unorm"
+topology = "triangle_strip"
+
+[[stage.variant]]
+backend = "metal"
+kind = "library"
+status = "planned"
+entry = "shader_draw_instanced_52"
+artifact = "metal/shader_draw_instanced_52.metallib"
+notes = "Apple GPU backend artifact"
+
+[[stage.variant]]
+backend = "vulkan"
+kind = "spirv"
+status = "planned"
+entry = "shader_draw_instanced_52"
+artifact = "vulkan/shader_draw_instanced_52.spv"
+notes = "Portable Vulkan/SPIR-V artifact"
+
+[[stage.variant]]
+backend = "directx"
+kind = "dxil"
+status = "planned"
+entry = "shader_draw_instanced_52"
+artifact = "directx/shader_draw_instanced_52.dxil"
+notes = "Windows DirectX backend artifact"
+
+[[stage.variant]]
+backend = "opengl"
+kind = "glsl"
+status = "planned"
+entry = "shader_draw_instanced_52"
+artifact = "opengl/shader_draw_instanced_52.glsl"
+notes = "Legacy OpenGL fallback artifact"

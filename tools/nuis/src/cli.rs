@@ -5,23 +5,70 @@ pub enum CommandKind {
     Help,
     Status,
     Registry,
-    Fmt { input: PathBuf },
-    Bindings { input: PathBuf },
-    PackNustar { package_id: String, output: PathBuf },
-    InspectNustar { input: PathBuf },
-    LoaderContract { package_id: String },
-    VerifyBuildManifest { manifest: PathBuf },
-    CacheStatus { input: PathBuf },
-    CleanCache { input: PathBuf },
-    ReleaseCheck { input: PathBuf, output_dir: PathBuf },
-    Check { input: PathBuf },
-    Build { input: PathBuf, output_dir: PathBuf },
-    DumpAst { input: PathBuf },
-    DumpNir { input: PathBuf },
-    DumpYir { input: PathBuf },
-    Rc { args: Vec<String> },
-    ProjectStatus { input: PathBuf },
-    ProjectLockAbi { input: PathBuf },
+    Fmt {
+        input: PathBuf,
+    },
+    Bindings {
+        input: PathBuf,
+    },
+    PackNustar {
+        package_id: String,
+        output: PathBuf,
+    },
+    InspectNustar {
+        input: PathBuf,
+    },
+    LoaderContract {
+        package_id: String,
+    },
+    VerifyBuildManifest {
+        manifest: PathBuf,
+    },
+    CacheStatus {
+        input: Option<PathBuf>,
+        all: bool,
+        verbose_cache: bool,
+        json: bool,
+    },
+    CleanCache {
+        input: Option<PathBuf>,
+        all: bool,
+    },
+    PruneCache {
+        input: Option<PathBuf>,
+        all: bool,
+        keep: usize,
+    },
+    ReleaseCheck {
+        input: PathBuf,
+        output_dir: PathBuf,
+    },
+    Check {
+        input: PathBuf,
+    },
+    Build {
+        input: PathBuf,
+        output_dir: PathBuf,
+        verbose_cache: bool,
+    },
+    DumpAst {
+        input: PathBuf,
+    },
+    DumpNir {
+        input: PathBuf,
+    },
+    DumpYir {
+        input: PathBuf,
+    },
+    Rc {
+        args: Vec<String>,
+    },
+    ProjectStatus {
+        input: PathBuf,
+    },
+    ProjectLockAbi {
+        input: PathBuf,
+    },
     Galaxy(GalaxyCommand),
 }
 
@@ -123,12 +170,96 @@ where
                 "usage: nuis verify-build-manifest <nuis.build.manifest.toml>".to_owned()
             })?),
         }),
-        "cache-status" => Ok(CommandKind::CacheStatus {
-            input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
-        }),
-        "clean-cache" => Ok(CommandKind::CleanCache {
-            input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
-        }),
+        "cache-status" => {
+            let mut verbose_cache = false;
+            let mut all = false;
+            let mut json = false;
+            let mut input = None;
+            for arg in args.by_ref() {
+                if arg == "--verbose-cache" {
+                    verbose_cache = true;
+                } else if arg == "--all" {
+                    all = true;
+                } else if arg == "--json" {
+                    json = true;
+                } else if input.is_none() {
+                    input = Some(PathBuf::from(arg));
+                } else {
+                    return Err(
+                        "usage: nuis cache-status [--all] [--verbose-cache] [--json] [input.ns|project-dir|nuis.toml]"
+                            .to_owned(),
+                    );
+                }
+            }
+            Ok(CommandKind::CacheStatus {
+                input: if all {
+                    input
+                } else {
+                    Some(input.unwrap_or_else(|| PathBuf::from(".")))
+                },
+                all,
+                verbose_cache,
+                json,
+            })
+        }
+        "clean-cache" => {
+            let mut all = false;
+            let mut input = None;
+            for arg in args.by_ref() {
+                if arg == "--all" {
+                    all = true;
+                } else if input.is_none() {
+                    input = Some(PathBuf::from(arg));
+                } else {
+                    return Err(
+                        "usage: nuis clean-cache [--all] [input.ns|project-dir|nuis.toml]"
+                            .to_owned(),
+                    );
+                }
+            }
+            Ok(CommandKind::CleanCache {
+                input: if all {
+                    input
+                } else {
+                    Some(input.unwrap_or_else(|| PathBuf::from(".")))
+                },
+                all,
+            })
+        }
+        "cache-prune" => {
+            let mut all = false;
+            let mut input = None;
+            let mut keep = 4usize;
+            while let Some(arg) = args.next() {
+                if arg == "--all" {
+                    all = true;
+                } else if arg == "--keep" {
+                    let raw = args.next().ok_or_else(|| {
+                        "usage: nuis cache-prune [--all] [--keep N] [input.ns|project-dir|nuis.toml]"
+                            .to_owned()
+                    })?;
+                    keep = raw.parse::<usize>().map_err(|_| {
+                        format!("invalid value for `--keep`: `{raw}`; expected non-negative integer")
+                    })?;
+                } else if input.is_none() {
+                    input = Some(PathBuf::from(arg));
+                } else {
+                    return Err(
+                        "usage: nuis cache-prune [--all] [--keep N] [input.ns|project-dir|nuis.toml]"
+                            .to_owned(),
+                    );
+                }
+            }
+            Ok(CommandKind::PruneCache {
+                input: if all {
+                    input
+                } else {
+                    Some(input.unwrap_or_else(|| PathBuf::from(".")))
+                },
+                all,
+                keep,
+            })
+        }
         "release-check" => {
             let input = PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned()));
             let output_dir = PathBuf::from(args.next().unwrap_or_else(|| {
@@ -149,16 +280,30 @@ where
             input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
         }),
         "build" => {
-            let first = args.next().ok_or_else(|| {
-                "usage: nuis build [input.ns|project-dir|nuis.toml] <output-dir>".to_owned()
-            })?;
-            let second = args.next();
-            let (input, output_dir) = if let Some(output_dir) = second {
-                (PathBuf::from(first), PathBuf::from(output_dir))
-            } else {
-                (PathBuf::from("."), PathBuf::from(first))
+            let mut verbose_cache = false;
+            let mut positional = Vec::new();
+            for arg in args.by_ref() {
+                if arg == "--verbose-cache" {
+                    verbose_cache = true;
+                } else {
+                    positional.push(arg);
+                }
+            }
+            let (input, output_dir) = match positional.len() {
+                1 => (PathBuf::from("."), PathBuf::from(&positional[0])),
+                2 => (PathBuf::from(&positional[0]), PathBuf::from(&positional[1])),
+                _ => {
+                    return Err(
+                        "usage: nuis build [--verbose-cache] [input.ns|project-dir|nuis.toml] <output-dir>"
+                            .to_owned(),
+                    )
+                }
             };
-            Ok(CommandKind::Build { input, output_dir })
+            Ok(CommandKind::Build {
+                input,
+                output_dir,
+                verbose_cache,
+            })
         }
         "dump-ast" => Ok(CommandKind::DumpAst {
             input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
@@ -180,7 +325,7 @@ where
         }),
         "galaxy" => parse_galaxy_args(args),
         other => Err(format!(
-            "unknown nuis command `{other}`; expected `help`, `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `verify-build-manifest`, `cache-status`, `clean-cache`, `release-check`, `check`, `build`, `dump-ast`, `dump-nir`, `dump-yir`, `rc`, `project-status`, `project-lock-abi`, or `galaxy`"
+            "unknown nuis command `{other}`; expected `help`, `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `release-check`, `check`, `build`, `dump-ast`, `dump-nir`, `dump-yir`, `rc`, `project-status`, `project-lock-abi`, or `galaxy`"
         )),
     }
 }

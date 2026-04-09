@@ -1,0 +1,34 @@
+use data FabricPlane
+use shader SurfaceShader
+ast mod cpu unit Main
+  extern "nurs" interface HostRenderCurves
+    fn color_bias(value: i64) -> i64
+    fn speed_curve(value: i64) -> i64
+    fn radius_curve(value: i64) -> i64
+    fn mix_tick(base: i64, tick: i64) -> i64
+  fn main()
+    expr cpu_bind_core(0)
+    expr cpu_window(720, 520, "control_panel_demo")
+    let color_delta: i64 = cpu_input_i64("color_knob", 24, 0, 96, 4)
+    let speed_delta: i64 = cpu_input_i64("speed_knob", 6, 0, 30, 2)
+    let radius_delta: i64 = cpu_input_i64("radius_knob", 18, 0, 48, 3)
+    let frame_tick: i64 = cpu_tick_i64(0, 1)
+    const base_color: i64 = 104
+    const base_speed: i64 = 10
+    const base_radius: i64 = 96
+    const speed_scale: i64 = 2
+    let panel_color_seed: i64 = shader_profile_color_seed("SurfaceShader", base_color, color_delta)
+    let panel_color: i64 = HostRenderCurves.color_bias(panel_color_seed)
+    let base_panel_speed: i64 = shader_profile_speed_seed("SurfaceShader", speed_delta, speed_scale, base_speed)
+    let curved_panel_speed: i64 = HostRenderCurves.speed_curve(base_panel_speed)
+    let panel_speed: i64 = HostRenderCurves.mix_tick(curved_panel_speed, frame_tick)
+    let base_panel_radius: i64 = shader_profile_radius_seed("SurfaceShader", base_radius, radius_delta)
+    let curved_panel_radius: i64 = HostRenderCurves.radius_curve(base_panel_radius)
+    let panel_radius: i64 = HostRenderCurves.mix_tick(curved_panel_radius, frame_tick)
+    let render_controls = shader_profile_packet("SurfaceShader", panel_color, panel_speed, panel_radius)
+    expr data_profile_bind_core("FabricPlane")
+    let fabric_handles: HandleTable = data_profile_handle_table("FabricPlane")
+    let gpu_packet: Window = data_profile_send_uplink("FabricPlane", render_controls)
+    let frame: Frame = shader_profile_render("SurfaceShader", gpu_packet)
+    let host_frame: Window = data_profile_send_downlink("FabricPlane", frame)
+    expr cpu_present_frame(host_frame)
