@@ -89,6 +89,7 @@ fn run() -> Result<(), String> {
         cli::CommandKind::ProjectStatus { input } => {
             let project = nuisc::project::load_project(&input)?;
             let resolution = nuisc::project::resolve_project_abi(&project)?;
+            let galaxy_lock_status = galaxy::verify_project_lock(&input);
             let mut domains = project
                 .modules
                 .iter()
@@ -127,6 +128,47 @@ fn run() -> Result<(), String> {
             );
             for item in resolution.requirements {
                 println!("  abi: {}={}", item.domain, item.abi);
+            }
+            for item in &project.manifest.galaxy_dependencies {
+                println!("  galaxy: {}={}", item.name, item.version);
+            }
+            let lock_path = project.root.join("nuis.galaxy.lock");
+            match galaxy_lock_status {
+                Ok(lock) => {
+                    println!("  galaxy_lock: ok");
+                    println!("  galaxy_lock_path: {}", lock.path.display());
+                    println!("  galaxy_lock_dependencies: {}", lock.entries.len());
+                    let declared = project
+                        .manifest
+                        .galaxy_dependencies
+                        .iter()
+                        .map(|item| format!("{}={}", item.name, item.version))
+                        .collect::<BTreeSet<_>>();
+                    let locked = lock
+                        .entries
+                        .iter()
+                        .map(|item| format!("{}={}", item.name, item.version))
+                        .collect::<BTreeSet<_>>();
+                    println!(
+                        "  galaxy_lock_matches_manifest: {}",
+                        if declared == locked { "yes" } else { "no" }
+                    );
+                    for item in lock.entries {
+                        println!(
+                            "  galaxy_lock_entry: {}={} {}",
+                            item.name, item.version, item.bundle_fnv1a64
+                        );
+                    }
+                }
+                Err(error) if lock_path.exists() => {
+                    println!("  galaxy_lock: invalid");
+                    println!("  galaxy_lock_path: {}", lock_path.display());
+                    println!("  galaxy_lock_error: {}", error);
+                }
+                Err(_) => {
+                    println!("  galaxy_lock: missing");
+                    println!("  galaxy_lock_path: {}", lock_path.display());
+                }
             }
         }
         cli::CommandKind::ProjectLockAbi { input } => {
@@ -255,6 +297,98 @@ fn run() -> Result<(), String> {
                 println!("  output: {}", output.display());
                 println!("  project: {}", project_path.display());
             }
+            cli::GalaxyCommand::InstallDeps { input } => {
+                let installed = galaxy::install_project_deps(&input)?;
+                if installed.installed.is_empty() {
+                    println!("project has no galaxy dependencies");
+                } else {
+                    println!("installed galaxy dependencies");
+                    for item in installed.installed {
+                        println!("  dep: {}={}", item.name, item.version);
+                        println!("  output: {}", item.output.display());
+                        println!("  project: {}", item.project.display());
+                        println!("  bundle: {}", item.bundle.display());
+                        println!("  bundle_fnv1a64: {}", item.bundle_fnv1a64);
+                    }
+                    println!("  lock: {}", installed.lock.path.display());
+                }
+            }
+            cli::GalaxyCommand::Doctor { input } => {
+                let report = galaxy::doctor_project(&input)?;
+                println!("galaxy doctor");
+                println!("  project_root: {}", report.project_root.display());
+                println!("  deps_root: {}", report.deps_root.display());
+                println!(
+                    "  local_registry_root: {}",
+                    report.local_registry_root.display()
+                );
+                println!("  lock_path: {}", report.lock_path.display());
+                println!("  lock_status: {}", report.lock_status);
+                if let Some(error) = report.lock_error {
+                    println!("  lock_error: {}", error);
+                }
+                println!("  dependencies: {}", report.dependencies.len());
+                for item in report.dependencies {
+                    println!(
+                        "  dep: {}={} local={} lock={} installed={}",
+                        item.name,
+                        item.version,
+                        yes_no(item.local_available),
+                        yes_no(item.locked),
+                        yes_no(item.installed)
+                    );
+                }
+            }
+            cli::GalaxyCommand::SyncDeps { input } => {
+                let synced = galaxy::sync_project_deps(&input)?;
+                if synced.entries.is_empty() {
+                    println!("galaxy lock has no dependencies");
+                } else {
+                    println!("synced galaxy dependencies");
+                    println!("  root: {}", synced.root.display());
+                    println!("  dependencies: {}", synced.entries.len());
+                    for entry in synced.entries {
+                        println!("  dep: {}={}", entry.name, entry.version);
+                        println!("  bundle: {}", entry.bundle.display());
+                        println!("  bundle_fnv1a64: {}", entry.bundle_fnv1a64);
+                    }
+                }
+            }
+            cli::GalaxyCommand::LockDeps { input } => {
+                let lock = galaxy::lock_project_deps(&input)?;
+                println!("locked galaxy dependencies");
+                println!("  lock: {}", lock.path.display());
+                println!("  dependencies: {}", lock.entries.len());
+                for entry in lock.entries {
+                    println!("  dep: {}={}", entry.name, entry.version);
+                    println!("  bundle: {}", entry.bundle.display());
+                    println!("  bundle_fnv1a64: {}", entry.bundle_fnv1a64);
+                }
+            }
+            cli::GalaxyCommand::VerifyLock { input } => {
+                let lock = galaxy::verify_project_lock(&input)?;
+                println!("verified galaxy lock");
+                println!("  lock: {}", lock.path.display());
+                println!("  dependencies: {}", lock.entries.len());
+                for entry in lock.entries {
+                    println!("  dep: {}={}", entry.name, entry.version);
+                    println!("  bundle: {}", entry.bundle.display());
+                    println!("  bundle_fnv1a64: {}", entry.bundle_fnv1a64);
+                }
+            }
+            cli::GalaxyCommand::InspectLocal { name, version } => {
+                let inspected = galaxy::inspect_local(&name, version.as_deref())?;
+                println!("inspected local galaxy package");
+                println!("  name: {}", inspected.manifest.name);
+                println!("  version: {}", inspected.manifest.version);
+                println!("  package_kind: {}", inspected.manifest.package_kind);
+                println!("  project: {}", inspected.manifest.project);
+                println!("  summary: {}", inspected.manifest.summary);
+                println!("  entries: {}", inspected.entries.len());
+                for entry in inspected.entries {
+                    println!("  file: {} ({} bytes)", entry.path, entry.bytes);
+                }
+            }
             cli::GalaxyCommand::VerifyLocal { name, version } => {
                 let verified = galaxy::verify_local(&name, version.as_deref())?;
                 println!("verified local galaxy package");
@@ -264,6 +398,14 @@ fn run() -> Result<(), String> {
                 println!("  bundle_bytes: {}", verified.bundle_bytes);
                 println!("  bundle_fnv1a64: {}", verified.bundle_fnv1a64);
                 println!("  entries: {}", verified.entries);
+            }
+            cli::GalaxyCommand::RemoveLocal { name, version } => {
+                let removed = galaxy::remove_local(&name, version.as_deref())?;
+                println!("removed local galaxy package");
+                println!("  name: {}", removed.name);
+                println!("  version: {}", removed.version);
+                println!("  bundle: {}", removed.package.display());
+                println!("  index_entry: {}", removed.index_entry.display());
             }
         },
     }
@@ -298,7 +440,14 @@ fn print_help() {
     println!("  nuis galaxy publish-local [project-dir|galaxy.toml] [output.galaxy]");
     println!("  nuis galaxy list");
     println!("  nuis galaxy install-local <name> [version] [output-dir]");
+    println!("  nuis galaxy install-deps [project-dir|nuis.toml]");
+    println!("  nuis galaxy doctor [project-dir|nuis.toml]");
+    println!("  nuis galaxy sync-deps [project-dir|nuis.toml]");
+    println!("  nuis galaxy lock-deps [project-dir|nuis.toml]");
+    println!("  nuis galaxy verify-lock [project-dir|nuis.toml]");
+    println!("  nuis galaxy inspect-local <name> [version]");
     println!("  nuis galaxy verify-local <name> [version]");
+    println!("  nuis galaxy remove-local <name> [version]");
 }
 
 fn run_nuis_rc(args: &[String]) -> Result<(), String> {
@@ -337,6 +486,14 @@ fn run_nuis_rc(args: &[String]) -> Result<(), String> {
             }
         }
         Err(error) => Err(format!("failed to run nuis-rc: {error}")),
+    }
+}
+
+fn yes_no(value: bool) -> &'static str {
+    if value {
+        "yes"
+    } else {
+        "no"
     }
 }
 

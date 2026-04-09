@@ -16,6 +16,7 @@ pub struct NuisProjectManifest {
     pub modules: Vec<String>,
     pub links: Vec<ProjectLink>,
     pub abi_requirements: Vec<ProjectAbiRequirement>,
+    pub galaxy_dependencies: Vec<ProjectGalaxyDependency>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -29,6 +30,12 @@ pub struct ProjectLink {
 pub struct ProjectAbiRequirement {
     pub domain: String,
     pub abi: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectGalaxyDependency {
+    pub name: String,
+    pub version: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -176,9 +183,21 @@ pub fn describe_project(project: &LoadedProject) -> String {
         }
         Err(_) => "abi=<unresolved>".to_owned(),
     };
+    let galaxy_summary = if project.manifest.galaxy_dependencies.is_empty() {
+        "galaxy=<none>".to_owned()
+    } else {
+        let deps = project
+            .manifest
+            .galaxy_dependencies
+            .iter()
+            .map(|item| format!("{}={}", item.name, item.version))
+            .collect::<Vec<_>>()
+            .join(", ");
+        format!("galaxy=[{deps}]")
+    };
     format!(
-        "project={} entry={} modules={} links={} {}",
-        project.manifest.name, project.manifest.entry, modules, links, abi_summary
+        "project={} entry={} modules={} links={} {} {}",
+        project.manifest.name, project.manifest.entry, modules, links, abi_summary, galaxy_summary
     )
 }
 
@@ -3340,12 +3359,15 @@ fn parse_project_manifest(source: &str, path: &Path) -> Result<NuisProjectManife
     let modules = parse_optional_string_array(source, "modules").unwrap_or_default();
     let links = parse_optional_link_array(source, "links").unwrap_or_default();
     let abi_requirements = parse_optional_abi_array(source, "abi").unwrap_or_default();
+    let galaxy_dependencies =
+        parse_optional_galaxy_dependency_array(source, "galaxy").unwrap_or_default();
     Ok(NuisProjectManifest {
         name,
         entry,
         modules,
         links,
         abi_requirements,
+        galaxy_dependencies,
     })
 }
 
@@ -3438,6 +3460,26 @@ fn parse_optional_abi_array(source: &str, key: &str) -> Option<Vec<ProjectAbiReq
             return None;
         }
         items.push(ProjectAbiRequirement { domain, abi });
+    }
+    Some(items)
+}
+
+fn parse_optional_galaxy_dependency_array(
+    source: &str,
+    key: &str,
+) -> Option<Vec<ProjectGalaxyDependency>> {
+    let values = parse_optional_string_array(source, key)?;
+    let mut items = Vec::new();
+    for value in values {
+        let Some((name, version)) = value.split_once('=') else {
+            return None;
+        };
+        let name = name.trim().to_owned();
+        let version = version.trim().to_owned();
+        if name.is_empty() || version.is_empty() {
+            return None;
+        }
+        items.push(ProjectGalaxyDependency { name, version });
     }
     Some(items)
 }

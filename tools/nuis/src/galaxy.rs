@@ -64,6 +64,78 @@ pub struct VerifiedLocalGalaxy {
     pub entries: usize,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RemovedLocalGalaxy {
+    pub name: String,
+    pub version: String,
+    pub package: PathBuf,
+    pub index_entry: PathBuf,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InstalledGalaxyDependency {
+    pub name: String,
+    pub version: String,
+    pub output: PathBuf,
+    pub project: PathBuf,
+    pub bundle: PathBuf,
+    pub bundle_bytes: u64,
+    pub bundle_fnv1a64: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GalaxyLockEntry {
+    pub name: String,
+    pub version: String,
+    pub bundle: PathBuf,
+    pub bundle_bytes: u64,
+    pub bundle_fnv1a64: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WroteGalaxyLock {
+    pub path: PathBuf,
+    pub entries: Vec<GalaxyLockEntry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InstalledProjectDeps {
+    pub installed: Vec<InstalledGalaxyDependency>,
+    pub lock: WroteGalaxyLock,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerifiedGalaxyLock {
+    pub path: PathBuf,
+    pub entries: Vec<GalaxyLockEntry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SyncedProjectDeps {
+    pub root: PathBuf,
+    pub entries: Vec<GalaxyLockEntry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GalaxyDoctorDependency {
+    pub name: String,
+    pub version: String,
+    pub local_available: bool,
+    pub locked: bool,
+    pub installed: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GalaxyDoctorReport {
+    pub project_root: PathBuf,
+    pub deps_root: PathBuf,
+    pub local_registry_root: PathBuf,
+    pub lock_path: PathBuf,
+    pub lock_status: String,
+    pub lock_error: Option<String>,
+    pub dependencies: Vec<GalaxyDoctorDependency>,
+}
+
 pub fn init(input: &Path) -> Result<PathBuf, String> {
     ensure_local_layout()?;
     let project = nuisc::project::load_project(input)?;
@@ -285,6 +357,234 @@ pub fn verify_local(name: &str, version: Option<&str>) -> Result<VerifiedLocalGa
         bundle_bytes: actual_bytes,
         bundle_fnv1a64: actual_hash,
         entries: inspected.entries.len(),
+    })
+}
+
+pub fn inspect_local(name: &str, version: Option<&str>) -> Result<InspectedGalaxyBundle, String> {
+    ensure_local_layout()?;
+    let chosen = select_local_entry(name, version)?;
+    inspect_bundle(Path::new(&chosen.package))
+}
+
+pub fn remove_local(name: &str, version: Option<&str>) -> Result<RemovedLocalGalaxy, String> {
+    ensure_local_layout()?;
+    let chosen = select_local_entry(name, version)?;
+    let package_path = PathBuf::from(&chosen.package);
+    let index_entry = local_index_root()
+        .join(&chosen.name)
+        .join(format!("{}.toml", chosen.version));
+
+    if index_entry.exists() {
+        fs::remove_file(&index_entry).map_err(|error| {
+            format!(
+                "failed to remove local galaxy index `{}`: {error}",
+                index_entry.display()
+            )
+        })?;
+    }
+    if package_path.exists() {
+        fs::remove_file(&package_path).map_err(|error| {
+            format!(
+                "failed to remove local galaxy bundle `{}`: {error}",
+                package_path.display()
+            )
+        })?;
+    }
+
+    remove_dir_if_empty(index_entry.parent())?;
+    remove_dir_if_empty(index_entry.parent().and_then(Path::parent))?;
+    remove_dir_if_empty(package_path.parent())?;
+    remove_dir_if_empty(package_path.parent().and_then(Path::parent))?;
+    remove_dir_if_empty(
+        package_path
+            .parent()
+            .and_then(Path::parent)
+            .and_then(Path::parent),
+    )?;
+
+    Ok(RemovedLocalGalaxy {
+        name: chosen.name,
+        version: chosen.version,
+        package: package_path,
+        index_entry,
+    })
+}
+
+pub fn install_project_deps(input: &Path) -> Result<InstalledProjectDeps, String> {
+    ensure_local_layout()?;
+    let project = nuisc::project::load_project(input)?;
+    let deps_root = project.root.join(".nuis").join("deps").join("galaxy");
+    fs::create_dir_all(&deps_root)
+        .map_err(|error| format!("failed to create `{}`: {error}", deps_root.display()))?;
+    let mut installed = Vec::new();
+    for dependency in &project.manifest.galaxy_dependencies {
+        let resolved = select_local_entry(&dependency.name, Some(&dependency.version))?;
+        let output = deps_root.join(&dependency.name).join(&dependency.version);
+        fs::create_dir_all(&output)
+            .map_err(|error| format!("failed to create `{}`: {error}", output.display()))?;
+        let project_path = install_local(&dependency.name, Some(&dependency.version), &output)?;
+        installed.push(InstalledGalaxyDependency {
+            name: dependency.name.clone(),
+            version: dependency.version.clone(),
+            output,
+            project: project_path,
+            bundle: PathBuf::from(&resolved.package),
+            bundle_bytes: resolved.bundle_bytes.unwrap_or(0),
+            bundle_fnv1a64: resolved.bundle_fnv1a64.unwrap_or_default(),
+        });
+    }
+    let lock = write_project_lock_from_installed(&project.root, &installed)?;
+    Ok(InstalledProjectDeps { installed, lock })
+}
+
+pub fn lock_project_deps(input: &Path) -> Result<WroteGalaxyLock, String> {
+    ensure_local_layout()?;
+    let project = nuisc::project::load_project(input)?;
+    let mut entries = Vec::new();
+    for dependency in &project.manifest.galaxy_dependencies {
+        let resolved = select_local_entry(&dependency.name, Some(&dependency.version))?;
+        let verified = verify_local(&dependency.name, Some(&dependency.version))?;
+        entries.push(GalaxyLockEntry {
+            name: resolved.name,
+            version: resolved.version,
+            bundle: verified.package,
+            bundle_bytes: verified.bundle_bytes,
+            bundle_fnv1a64: verified.bundle_fnv1a64,
+        });
+    }
+    write_project_lock(&project.root, &entries)
+}
+
+pub fn verify_project_lock(input: &Path) -> Result<VerifiedGalaxyLock, String> {
+    ensure_local_layout()?;
+    let project = nuisc::project::load_project(input)?;
+    let path = project.root.join("nuis.galaxy.lock");
+    let source = fs::read_to_string(&path)
+        .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
+    let entries = parse_lock_entries(&source, &path)?;
+    for entry in &entries {
+        let bytes = fs::read(&entry.bundle).map_err(|error| {
+            format!(
+                "failed to read locked galaxy bundle `{}`: {error}",
+                entry.bundle.display()
+            )
+        })?;
+        let actual_bytes = bytes.len() as u64;
+        if actual_bytes != entry.bundle_bytes {
+            return Err(format!(
+                "locked galaxy dependency `{}` version `{}` byte size mismatch: lock={}, actual={}",
+                entry.name, entry.version, entry.bundle_bytes, actual_bytes
+            ));
+        }
+        let actual_hash = fnv1a64_hex(&bytes);
+        if actual_hash != entry.bundle_fnv1a64 {
+            return Err(format!(
+                "locked galaxy dependency `{}` version `{}` hash mismatch: lock={}, actual={}",
+                entry.name, entry.version, entry.bundle_fnv1a64, actual_hash
+            ));
+        }
+        let inspected = decode_bundle(&bytes, &entry.bundle)?;
+        if inspected.manifest.name != entry.name {
+            return Err(format!(
+                "locked galaxy dependency bundle `{}` resolved to package `{}`, expected `{}`",
+                entry.bundle.display(),
+                inspected.manifest.name,
+                entry.name
+            ));
+        }
+        if inspected.manifest.version != entry.version {
+            return Err(format!(
+                "locked galaxy dependency bundle `{}` resolved to version `{}`, expected `{}`",
+                entry.bundle.display(),
+                inspected.manifest.version,
+                entry.version
+            ));
+        }
+    }
+    Ok(VerifiedGalaxyLock { path, entries })
+}
+
+pub fn sync_project_deps(input: &Path) -> Result<SyncedProjectDeps, String> {
+    ensure_local_layout()?;
+    let project = nuisc::project::load_project(input)?;
+    let verified = verify_project_lock(input)?;
+    let deps_root = project.root.join(".nuis").join("deps").join("galaxy");
+
+    if deps_root.exists() {
+        fs::remove_dir_all(&deps_root)
+            .map_err(|error| format!("failed to reset `{}`: {error}", deps_root.display()))?;
+    }
+    fs::create_dir_all(&deps_root)
+        .map_err(|error| format!("failed to create `{}`: {error}", deps_root.display()))?;
+
+    for entry in &verified.entries {
+        let output = deps_root.join(&entry.name).join(&entry.version);
+        fs::create_dir_all(&output)
+            .map_err(|error| format!("failed to create `{}`: {error}", output.display()))?;
+        let bytes = fs::read(&entry.bundle).map_err(|error| {
+            format!(
+                "failed to read locked galaxy bundle `{}`: {error}",
+                entry.bundle.display()
+            )
+        })?;
+        extract_bundle(&bytes, &entry.bundle, &output)?;
+    }
+
+    Ok(SyncedProjectDeps {
+        root: deps_root,
+        entries: verified.entries,
+    })
+}
+
+pub fn doctor_project(input: &Path) -> Result<GalaxyDoctorReport, String> {
+    ensure_local_layout()?;
+    let project = nuisc::project::load_project(input)?;
+    let deps_root = project.root.join(".nuis").join("deps").join("galaxy");
+    let lock_path = project.root.join("nuis.galaxy.lock");
+    let local_entries = list_local()?;
+    let available = local_entries
+        .into_iter()
+        .map(|entry| format!("{}={}", entry.name, entry.version))
+        .collect::<BTreeSet<_>>();
+    let installed = collect_installed_project_deps(&deps_root)?;
+
+    let (lock_status, lock_error, locked) = match verify_project_lock(input) {
+        Ok(lock) => (
+            "ok".to_owned(),
+            None,
+            lock.entries
+                .into_iter()
+                .map(|entry| format!("{}={}", entry.name, entry.version))
+                .collect::<BTreeSet<_>>(),
+        ),
+        Err(error) if lock_path.exists() => ("invalid".to_owned(), Some(error), BTreeSet::new()),
+        Err(_) => ("missing".to_owned(), None, BTreeSet::new()),
+    };
+
+    let dependencies = project
+        .manifest
+        .galaxy_dependencies
+        .iter()
+        .map(|item| {
+            let key = format!("{}={}", item.name, item.version);
+            GalaxyDoctorDependency {
+                name: item.name.clone(),
+                version: item.version.clone(),
+                local_available: available.contains(&key),
+                locked: locked.contains(&key),
+                installed: installed.contains(&key),
+            }
+        })
+        .collect::<Vec<_>>();
+
+    Ok(GalaxyDoctorReport {
+        project_root: project.root,
+        deps_root,
+        local_registry_root: local_root(),
+        lock_path,
+        lock_status,
+        lock_error,
+        dependencies,
     })
 }
 
@@ -699,4 +999,173 @@ fn fnv1a64_hex(bytes: &[u8]) -> String {
         hash = hash.wrapping_mul(PRIME);
     }
     format!("{hash:016x}")
+}
+
+fn write_project_lock_from_installed(
+    project_root: &Path,
+    installed: &[InstalledGalaxyDependency],
+) -> Result<WroteGalaxyLock, String> {
+    let entries = installed
+        .iter()
+        .map(|item| GalaxyLockEntry {
+            name: item.name.clone(),
+            version: item.version.clone(),
+            bundle: item.bundle.clone(),
+            bundle_bytes: item.bundle_bytes,
+            bundle_fnv1a64: item.bundle_fnv1a64.clone(),
+        })
+        .collect::<Vec<_>>();
+    write_project_lock(project_root, &entries)
+}
+
+fn write_project_lock(
+    project_root: &Path,
+    entries: &[GalaxyLockEntry],
+) -> Result<WroteGalaxyLock, String> {
+    let path = project_root.join("nuis.galaxy.lock");
+    let mut sorted = entries.to_vec();
+    sorted.sort_by(|lhs, rhs| {
+        lhs.name
+            .cmp(&rhs.name)
+            .then(compare_version(&lhs.version, &rhs.version))
+    });
+    let mut source = String::new();
+    source.push_str("lock_schema = \"nuis-galaxy-lock-v1\"\n");
+    for entry in &sorted {
+        source.push_str("\n[[dependency]]\n");
+        source.push_str(&format!("name = \"{}\"\n", escape(&entry.name)));
+        source.push_str(&format!("version = \"{}\"\n", escape(&entry.version)));
+        source.push_str(&format!(
+            "bundle = \"{}\"\n",
+            escape(&entry.bundle.display().to_string())
+        ));
+        source.push_str(&format!("bundle_bytes = {}\n", entry.bundle_bytes));
+        source.push_str(&format!(
+            "bundle_fnv1a64 = \"{}\"\n",
+            escape(&entry.bundle_fnv1a64)
+        ));
+    }
+    fs::write(&path, source)
+        .map_err(|error| format!("failed to write `{}`: {error}", path.display()))?;
+    Ok(WroteGalaxyLock {
+        path,
+        entries: sorted,
+    })
+}
+
+fn parse_lock_entries(source: &str, path: &Path) -> Result<Vec<GalaxyLockEntry>, String> {
+    let schema = parse_optional_string(source, "lock_schema").ok_or_else(|| {
+        format!(
+            "galaxy lock `{}` is missing required key `lock_schema`",
+            path.display()
+        )
+    })?;
+    if schema != "nuis-galaxy-lock-v1" {
+        return Err(format!(
+            "galaxy lock `{}` has unsupported schema `{}`",
+            path.display(),
+            schema
+        ));
+    }
+
+    let mut rows = Vec::<Vec<String>>::new();
+    let mut current = Vec::<String>::new();
+    for raw_line in source.lines() {
+        let line = raw_line.trim();
+        if line == "[[dependency]]" {
+            if !current.is_empty() {
+                rows.push(current);
+                current = Vec::new();
+            }
+            continue;
+        }
+        if line.is_empty() {
+            continue;
+        }
+        current.push(line.to_owned());
+    }
+    if !current.is_empty() {
+        rows.push(current);
+    }
+
+    let mut entries = Vec::new();
+    for row in rows {
+        if row.iter().any(|line| line.starts_with("lock_schema = ")) {
+            continue;
+        }
+        let block = row.join("\n");
+        let name = parse_required_string(&block, "name", path)?;
+        let version = parse_required_string(&block, "version", path)?;
+        let bundle = PathBuf::from(parse_required_string(&block, "bundle", path)?);
+        let bundle_bytes = parse_optional_u64(&block, "bundle_bytes").ok_or_else(|| {
+            format!(
+                "galaxy lock `{}` dependency `{}` is missing required key `bundle_bytes`",
+                path.display(),
+                name
+            )
+        })?;
+        let bundle_fnv1a64 = parse_required_string(&block, "bundle_fnv1a64", path)?;
+        entries.push(GalaxyLockEntry {
+            name,
+            version,
+            bundle,
+            bundle_bytes,
+            bundle_fnv1a64,
+        });
+    }
+    Ok(entries)
+}
+
+fn collect_installed_project_deps(root: &Path) -> Result<BTreeSet<String>, String> {
+    let mut installed = BTreeSet::new();
+    if !root.exists() {
+        return Ok(installed);
+    }
+    for package_dir in fs::read_dir(root)
+        .map_err(|error| format!("failed to read `{}`: {error}", root.display()))?
+    {
+        let package_dir = package_dir
+            .map_err(|error| format!("failed to enumerate `{}`: {error}", root.display()))?;
+        let package_path = package_dir.path();
+        if !package_path.is_dir() {
+            continue;
+        }
+        let Some(name) = package_path.file_name().and_then(|item| item.to_str()) else {
+            continue;
+        };
+        for version_dir in fs::read_dir(&package_path)
+            .map_err(|error| format!("failed to read `{}`: {error}", package_path.display()))?
+        {
+            let version_dir = version_dir.map_err(|error| {
+                format!("failed to enumerate `{}`: {error}", package_path.display())
+            })?;
+            let version_path = version_dir.path();
+            if !version_path.is_dir() {
+                continue;
+            }
+            let Some(version) = version_path.file_name().and_then(|item| item.to_str()) else {
+                continue;
+            };
+            if version_path.join("nuis.toml").exists() {
+                installed.insert(format!("{name}={version}"));
+            }
+        }
+    }
+    Ok(installed)
+}
+
+fn remove_dir_if_empty(path: Option<&Path>) -> Result<(), String> {
+    let Some(path) = path else {
+        return Ok(());
+    };
+    if !path.exists() {
+        return Ok(());
+    }
+    let mut items = fs::read_dir(path)
+        .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
+    if items.next().is_none() {
+        fs::remove_dir(path)
+            .map_err(|error| format!("failed to remove `{}`: {error}", path.display()))?;
+    }
+    Ok(())
 }

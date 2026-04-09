@@ -48,7 +48,30 @@ pub enum GalaxyCommand {
         version: Option<String>,
         output: PathBuf,
     },
+    InstallDeps {
+        input: PathBuf,
+    },
+    Doctor {
+        input: PathBuf,
+    },
+    SyncDeps {
+        input: PathBuf,
+    },
+    LockDeps {
+        input: PathBuf,
+    },
+    VerifyLock {
+        input: PathBuf,
+    },
+    InspectLocal {
+        name: String,
+        version: Option<String>,
+    },
     VerifyLocal {
+        name: String,
+        version: Option<String>,
+    },
+    RemoveLocal {
         name: String,
         version: Option<String>,
     },
@@ -199,14 +222,41 @@ where
             version: args.next(),
             output: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
         })),
+        "install-deps" => Ok(CommandKind::Galaxy(GalaxyCommand::InstallDeps {
+            input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
+        })),
+        "doctor" => Ok(CommandKind::Galaxy(GalaxyCommand::Doctor {
+            input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
+        })),
+        "sync-deps" => Ok(CommandKind::Galaxy(GalaxyCommand::SyncDeps {
+            input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
+        })),
+        "lock-deps" => Ok(CommandKind::Galaxy(GalaxyCommand::LockDeps {
+            input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
+        })),
+        "verify-lock" => Ok(CommandKind::Galaxy(GalaxyCommand::VerifyLock {
+            input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
+        })),
+        "inspect-local" => Ok(CommandKind::Galaxy(GalaxyCommand::InspectLocal {
+            name: args.next().ok_or_else(|| {
+                "usage: nuis galaxy inspect-local <name> [version]".to_owned()
+            })?,
+            version: args.next(),
+        })),
         "verify-local" => Ok(CommandKind::Galaxy(GalaxyCommand::VerifyLocal {
             name: args.next().ok_or_else(|| {
                 "usage: nuis galaxy verify-local <name> [version]".to_owned()
             })?,
             version: args.next(),
         })),
+        "remove-local" => Ok(CommandKind::Galaxy(GalaxyCommand::RemoveLocal {
+            name: args.next().ok_or_else(|| {
+                "usage: nuis galaxy remove-local <name> [version]".to_owned()
+            })?,
+            version: args.next(),
+        })),
         other => Err(format!(
-            "unknown nuis galaxy command `{other}`; expected `init`, `check`, `pack`, `inspect`, `publish-local`, `list`, `install-local`, or `verify-local`"
+            "unknown nuis galaxy command `{other}`; expected `init`, `check`, `pack`, `inspect`, `publish-local`, `list`, `install-local`, `install-deps`, `doctor`, `sync-deps`, `lock-deps`, `verify-lock`, `inspect-local`, `verify-local`, or `remove-local`"
         )),
     }
 }
