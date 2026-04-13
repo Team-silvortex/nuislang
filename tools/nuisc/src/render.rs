@@ -328,6 +328,7 @@ fn render_nir_expr(value: &NirExpr) -> String {
         NirExpr::Instantiate { domain, unit } => format!("instantiate {} {}", domain, unit),
         NirExpr::Null => "null()".to_owned(),
         NirExpr::Borrow(value) => format!("borrow({})", render_nir_expr(value)),
+        NirExpr::BorrowEnd(value) => format!("borrow_end({})", render_nir_expr(value)),
         NirExpr::Move(value) => format!("move({})", render_nir_expr(value)),
         NirExpr::AllocNode { value, next } => {
             format!(

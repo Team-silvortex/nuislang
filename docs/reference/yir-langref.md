@@ -246,6 +246,7 @@ The current controlled heap-node prototype is:
 ```text
 cpu.null
 cpu.borrow
+cpu.borrow_end
 cpu.move_ptr
 cpu.alloc_node
 cpu.alloc_buffer
@@ -274,6 +275,7 @@ Current model:
 The current verifier treats this surface as an early Rust-like ownership model:
 
 * `cpu.borrow` creates a readable borrowed pointer
+* `cpu.borrow_end` explicitly closes a previously created borrow scope
 * borrowed pointers may be read through
 * borrowed pointers may not be written through
 * borrowed pointers may not be freed
@@ -281,8 +283,10 @@ The current verifier treats this surface as an early Rust-like ownership model:
 * after `cpu.move_ptr`, the source name may not be used again
 * after `cpu.free`, the owned name is consumed
 * reading through a borrow after the owned object has been freed is rejected
-* current reference verifier also treats borrows conservatively: while a borrow
-  is active, moving, freeing, or mutating the owned object is rejected
+* while a borrow is active, moving, freeing, or mutating the owned object is rejected
+* that ownership-sensitive path becomes legal again once the last borrow use is
+  ordered before the owner mutation/free, or when an explicit `cpu.borrow_end`
+  node ends the named borrow earlier
 
 ## Current GLM Minimum Surface
 

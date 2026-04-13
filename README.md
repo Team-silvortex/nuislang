@@ -687,8 +687,8 @@ nuisc 具有最终否决权：
 * 上述窗口/UI/present 仅是当前 reference preview adapter 消费的 `cpu`-mod 能力，**不是 `YIR` core 对 UI 框架的内建依赖**
 * 当前 `cpu` mod 已开始覆盖 `arm64-family` 的抽象能力面（如 `target_config` / `bind_core` / `madd`）
 * 当前 `cpu` mod 也已有最小条件数据流、位运算与整数基础算子原型（如 `eq / ne / lt / gt / select / and / or / xor / shl / shr / div / rem / neg / not`），用于在保持静态图结构的前提下表达更强的 CPU 语义
-* 当前 `cpu` mod 也已有最小可寻址对象/指针原型（`null / borrow / move_ptr / alloc_node / alloc_buffer / load_* / store_* / free`），用于验证链表和 buffer 这类动态结构
-* 当前 `cpu` verifier 已开始按 Rust 风格收紧所有权边界：借用指针可读不可写，所有权移动后原名不可再用，释放后借用再读会被拒绝
+* 当前 `cpu` mod 也已有最小可寻址对象/指针原型（`null / borrow / borrow_end / move_ptr / alloc_node / alloc_buffer / load_* / store_* / free`），用于验证链表和 buffer 这类动态结构
+* 当前 `cpu` verifier 已开始按 Rust 风格收紧所有权边界：借用指针可读不可写，所有权移动后原名不可再用，释放后借用再读会被拒绝，并支持显式 `borrow_end` 收束借用生命周期
 * 当前 `YIR` verifier 也已接入最小 `GLM` 约束：`res` 的 `Own / Write` 访问需要显式 `lifetime` 图边，`cpu.move_ptr / cpu.free / store_*` 等节点开始进入显式生命周期排序
 * 当前 `kernel` mod 已补最小张量计算原型（如 `tensor` / `matmul` / `add_bias` / `relu`），用于 macOS 上先行验证 `cpu <-> kernel/npu` 的异构图
 * 当前 `shader` mod 已开始覆盖 `Metal/Vulkan` 共有的渲染抽象面（如 `target` / `viewport` / `pipeline` / `begin_pass` / `draw_instanced`）

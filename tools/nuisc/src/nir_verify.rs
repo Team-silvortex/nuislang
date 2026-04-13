@@ -14,9 +14,10 @@ pub fn verify_nir_module(module: &NirModule) -> Result<(), String> {
 fn verify_function(function: &NirFunction) -> Result<(), String> {
     let mut moved = BTreeSet::<String>::new();
     let mut borrows = BTreeMap::<String, usize>::new();
+    let mut borrow_bindings = BTreeMap::<String, String>::new();
 
     for stmt in &function.body {
-        verify_stmt(stmt, &mut moved, &mut borrows)?;
+        verify_stmt(stmt, &mut moved, &mut borrows, &mut borrow_bindings)?;
     }
 
     Ok(())
@@ -26,36 +27,53 @@ fn verify_stmt(
     stmt: &NirStmt,
     moved: &mut BTreeSet<String>,
     borrows: &mut BTreeMap<String, usize>,
+    borrow_bindings: &mut BTreeMap<String, String>,
 ) -> Result<(), String> {
     match stmt {
         NirStmt::Let { name, value, .. } | NirStmt::Const { name, value, .. } => {
-            verify_expr(value, moved, borrows)?;
-            note_binding_effects(value, moved, borrows);
             borrows.remove(name);
+            borrow_bindings.remove(name);
+            verify_expr(value, moved, borrows, borrow_bindings)?;
+            note_binding_effects(value, name, moved, borrows, borrow_bindings);
         }
         NirStmt::Print(value) | NirStmt::Expr(value) => {
-            verify_expr(value, moved, borrows)?;
+            verify_expr(value, moved, borrows, borrow_bindings)?;
+            if let NirExpr::BorrowEnd(_) = value {
+                note_binding_effects(value, "_", moved, borrows, borrow_bindings);
+            }
         }
         NirStmt::If {
             condition,
             then_body,
             else_body,
         } => {
-            verify_expr(condition, moved, borrows)?;
+            verify_expr(condition, moved, borrows, borrow_bindings)?;
             let mut then_moved = moved.clone();
             let mut then_borrows = borrows.clone();
+            let mut then_borrow_bindings = borrow_bindings.clone();
             for stmt in then_body {
-                verify_stmt(stmt, &mut then_moved, &mut then_borrows)?;
+                verify_stmt(
+                    stmt,
+                    &mut then_moved,
+                    &mut then_borrows,
+                    &mut then_borrow_bindings,
+                )?;
             }
             let mut else_moved = moved.clone();
             let mut else_borrows = borrows.clone();
+            let mut else_borrow_bindings = borrow_bindings.clone();
             for stmt in else_body {
-                verify_stmt(stmt, &mut else_moved, &mut else_borrows)?;
+                verify_stmt(
+                    stmt,
+                    &mut else_moved,
+                    &mut else_borrows,
+                    &mut else_borrow_bindings,
+                )?;
             }
         }
         NirStmt::Return(value) => {
             if let Some(value) = value {
-                verify_expr(value, moved, borrows)?;
+                verify_expr(value, moved, borrows, borrow_bindings)?;
             }
         }
     }
@@ -64,8 +82,10 @@ fn verify_stmt(
 
 fn note_binding_effects(
     expr: &NirExpr,
+    binding_name: &str,
     moved: &mut BTreeSet<String>,
     borrows: &mut BTreeMap<String, usize>,
+    borrow_bindings: &mut BTreeMap<String, String>,
 ) {
     match expr {
         NirExpr::Move(inner) => {
@@ -76,7 +96,25 @@ fn note_binding_effects(
         }
         NirExpr::Borrow(inner) => {
             if let Some(source) = expr_resource_key(inner) {
-                *borrows.entry(source).or_insert(0) += 1;
+                *borrows.entry(source.clone()).or_insert(0) += 1;
+                if binding_name != "_" {
+                    borrow_bindings.insert(binding_name.to_owned(), source);
+                }
+            }
+        }
+        NirExpr::BorrowEnd(inner) => {
+            let source = expr_resource_key(inner)
+                .and_then(|name| borrow_bindings.get(&name).cloned().or(Some(name)));
+            if let Some(source) = source {
+                let next = borrows.get(&source).copied().unwrap_or(0).saturating_sub(1);
+                if next == 0 {
+                    borrows.remove(&source);
+                } else {
+                    borrows.insert(source.clone(), next);
+                }
+                if binding_name != "_" {
+                    borrow_bindings.remove(binding_name);
+                }
             }
         }
         _ => {}
@@ -87,6 +125,7 @@ fn verify_expr(
     expr: &NirExpr,
     moved: &BTreeSet<String>,
     borrows: &BTreeMap<String, usize>,
+    borrow_bindings: &BTreeMap<String, String>,
 ) -> Result<(), String> {
     verify_expr_uses(expr, moved)?;
 
@@ -130,6 +169,18 @@ fn verify_expr(
                         if moved.contains(&source) {
                             return Err(format!(
                                 "nir verify: cannot borrow moved value `{}`",
+                                source
+                            ));
+                        }
+                    }
+                }
+                NirExpr::BorrowEnd(inner) => {
+                    let source = expr_resource_key(inner)
+                        .and_then(|name| borrow_bindings.get(&name).cloned().or(Some(name)));
+                    if let Some(source) = source {
+                        if borrows.get(&source).copied().unwrap_or(0) == 0 {
+                            return Err(format!(
+                                "nir verify: cannot end borrow for `{}` with no active borrow",
                                 source
                             ));
                         }
@@ -179,10 +230,10 @@ fn verify_expr(
         | NirExpr::ShaderViewport { .. }
         | NirExpr::ShaderPipeline { .. }
         | NirExpr::ShaderInlineWgsl { .. } => {}
-        NirExpr::CpuPresentFrame(inner) => verify_expr(inner, moved, borrows)?,
+        NirExpr::CpuPresentFrame(inner) => verify_expr(inner, moved, borrows, borrow_bindings)?,
         NirExpr::CpuExternCall { args, .. } => {
             for arg in args {
-                verify_expr(arg, moved, borrows)?;
+                verify_expr(arg, moved, borrows, borrow_bindings)?;
             }
         }
         NirExpr::ShaderBeginPass {
@@ -190,27 +241,27 @@ fn verify_expr(
             pipeline,
             viewport,
         } => {
-            verify_expr(target, moved, borrows)?;
-            verify_expr(pipeline, moved, borrows)?;
-            verify_expr(viewport, moved, borrows)?;
+            verify_expr(target, moved, borrows, borrow_bindings)?;
+            verify_expr(pipeline, moved, borrows, borrow_bindings)?;
+            verify_expr(viewport, moved, borrows, borrow_bindings)?;
         }
         NirExpr::ShaderProfileRender { packet, .. } => {
-            verify_expr(packet, moved, borrows)?;
+            verify_expr(packet, moved, borrows, borrow_bindings)?;
         }
         NirExpr::ShaderProfileColorSeed { base, delta, .. } => {
-            verify_expr(base, moved, borrows)?;
-            verify_expr(delta, moved, borrows)?;
+            verify_expr(base, moved, borrows, borrow_bindings)?;
+            verify_expr(delta, moved, borrows, borrow_bindings)?;
         }
         NirExpr::ShaderProfileSpeedSeed {
             delta, scale, base, ..
         } => {
-            verify_expr(delta, moved, borrows)?;
-            verify_expr(scale, moved, borrows)?;
-            verify_expr(base, moved, borrows)?;
+            verify_expr(delta, moved, borrows, borrow_bindings)?;
+            verify_expr(scale, moved, borrows, borrow_bindings)?;
+            verify_expr(base, moved, borrows, borrow_bindings)?;
         }
         NirExpr::ShaderProfileRadiusSeed { base, delta, .. } => {
-            verify_expr(base, moved, borrows)?;
-            verify_expr(delta, moved, borrows)?;
+            verify_expr(base, moved, borrows, borrow_bindings)?;
+            verify_expr(delta, moved, borrows, borrow_bindings)?;
         }
         NirExpr::ShaderProfilePacket {
             color,
@@ -218,90 +269,95 @@ fn verify_expr(
             radius,
             ..
         } => {
-            verify_expr(color, moved, borrows)?;
-            verify_expr(speed, moved, borrows)?;
-            verify_expr(radius, moved, borrows)?;
+            verify_expr(color, moved, borrows, borrow_bindings)?;
+            verify_expr(speed, moved, borrows, borrow_bindings)?;
+            verify_expr(radius, moved, borrows, borrow_bindings)?;
         }
         NirExpr::ShaderDrawInstanced { pass, packet, .. } => {
-            verify_expr(pass, moved, borrows)?;
-            verify_expr(packet, moved, borrows)?;
+            verify_expr(pass, moved, borrows, borrow_bindings)?;
+            verify_expr(packet, moved, borrows, borrow_bindings)?;
             if let NirExpr::ShaderDrawInstanced {
                 vertex_count,
                 instance_count,
                 ..
             } = expr
             {
-                verify_expr(vertex_count, moved, borrows)?;
-                verify_expr(instance_count, moved, borrows)?;
+                verify_expr(vertex_count, moved, borrows, borrow_bindings)?;
+                verify_expr(instance_count, moved, borrows, borrow_bindings)?;
             }
         }
         NirExpr::DataOutputPipe(inner) | NirExpr::DataInputPipe(inner) => {
-            verify_expr(inner, moved, borrows)?
+            verify_expr(inner, moved, borrows, borrow_bindings)?
         }
         NirExpr::DataProfileSendUplink { input, .. }
-        | NirExpr::DataProfileSendDownlink { input, .. } => verify_expr(input, moved, borrows)?,
+        | NirExpr::DataProfileSendDownlink { input, .. } => {
+            verify_expr(input, moved, borrows, borrow_bindings)?
+        }
         NirExpr::DataCopyWindow { input, offset, len }
         | NirExpr::DataImmutableWindow { input, offset, len } => {
-            verify_expr(input, moved, borrows)?;
-            verify_expr(offset, moved, borrows)?;
-            verify_expr(len, moved, borrows)?;
+            verify_expr(input, moved, borrows, borrow_bindings)?;
+            verify_expr(offset, moved, borrows, borrow_bindings)?;
+            verify_expr(len, moved, borrows, borrow_bindings)?;
         }
         NirExpr::Borrow(inner)
+        | NirExpr::BorrowEnd(inner)
         | NirExpr::Move(inner)
         | NirExpr::LoadValue(inner)
         | NirExpr::LoadNext(inner)
         | NirExpr::BufferLen(inner)
         | NirExpr::Free(inner)
-        | NirExpr::IsNull(inner) => verify_expr(inner, moved, borrows)?,
+        | NirExpr::IsNull(inner) => verify_expr(inner, moved, borrows, borrow_bindings)?,
         NirExpr::AllocNode { value, next } => {
-            verify_expr(value, moved, borrows)?;
-            verify_expr(next, moved, borrows)?;
+            verify_expr(value, moved, borrows, borrow_bindings)?;
+            verify_expr(next, moved, borrows, borrow_bindings)?;
         }
         NirExpr::AllocBuffer { len, fill } => {
-            verify_expr(len, moved, borrows)?;
-            verify_expr(fill, moved, borrows)?;
+            verify_expr(len, moved, borrows, borrow_bindings)?;
+            verify_expr(fill, moved, borrows, borrow_bindings)?;
         }
         NirExpr::LoadAt { buffer, index } => {
-            verify_expr(buffer, moved, borrows)?;
-            verify_expr(index, moved, borrows)?;
+            verify_expr(buffer, moved, borrows, borrow_bindings)?;
+            verify_expr(index, moved, borrows, borrow_bindings)?;
         }
         NirExpr::StoreValue { target, value } => {
-            verify_expr(target, moved, borrows)?;
-            verify_expr(value, moved, borrows)?;
+            verify_expr(target, moved, borrows, borrow_bindings)?;
+            verify_expr(value, moved, borrows, borrow_bindings)?;
         }
         NirExpr::StoreNext { target, next } => {
-            verify_expr(target, moved, borrows)?;
-            verify_expr(next, moved, borrows)?;
+            verify_expr(target, moved, borrows, borrow_bindings)?;
+            verify_expr(next, moved, borrows, borrow_bindings)?;
         }
         NirExpr::StoreAt {
             buffer,
             index,
             value,
         } => {
-            verify_expr(buffer, moved, borrows)?;
-            verify_expr(index, moved, borrows)?;
-            verify_expr(value, moved, borrows)?;
+            verify_expr(buffer, moved, borrows, borrow_bindings)?;
+            verify_expr(index, moved, borrows, borrow_bindings)?;
+            verify_expr(value, moved, borrows, borrow_bindings)?;
         }
         NirExpr::Call { args, .. } => {
             for arg in args {
-                verify_expr(arg, moved, borrows)?;
+                verify_expr(arg, moved, borrows, borrow_bindings)?;
             }
         }
         NirExpr::MethodCall { receiver, args, .. } => {
-            verify_expr(receiver, moved, borrows)?;
+            verify_expr(receiver, moved, borrows, borrow_bindings)?;
             for arg in args {
-                verify_expr(arg, moved, borrows)?;
+                verify_expr(arg, moved, borrows, borrow_bindings)?;
             }
         }
         NirExpr::StructLiteral { fields, .. } => {
             for (_, value) in fields {
-                verify_expr(value, moved, borrows)?;
+                verify_expr(value, moved, borrows, borrow_bindings)?;
             }
         }
-        NirExpr::FieldAccess { base, .. } => verify_expr(base, moved, borrows)?,
+        NirExpr::FieldAccess { base, .. } => {
+            verify_expr(base, moved, borrows, borrow_bindings)?
+        }
         NirExpr::Binary { lhs, rhs, .. } => {
-            verify_expr(lhs, moved, borrows)?;
-            verify_expr(rhs, moved, borrows)?;
+            verify_expr(lhs, moved, borrows, borrow_bindings)?;
+            verify_expr(rhs, moved, borrows, borrow_bindings)?;
         }
     }
 
@@ -418,6 +474,7 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
             verify_expr_uses(len, moved)?;
         }
         NirExpr::Borrow(inner)
+        | NirExpr::BorrowEnd(inner)
         | NirExpr::Move(inner)
         | NirExpr::LoadValue(inner)
         | NirExpr::LoadNext(inner)
@@ -486,5 +543,102 @@ fn expr_resource_key(expr: &NirExpr) -> Option<String> {
             Some(format!("{base}.{field}"))
         }
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::verify_nir_module;
+    use nuis_semantics::model::{NirExpr, NirFunction, NirModule, NirStmt};
+
+    fn module_with_body(body: Vec<NirStmt>) -> NirModule {
+        NirModule {
+            uses: vec![],
+            domain: "cpu".to_owned(),
+            unit: "Main".to_owned(),
+            externs: vec![],
+            extern_interfaces: vec![],
+            structs: vec![],
+            functions: vec![NirFunction {
+                name: "main".to_owned(),
+                params: vec![],
+                return_type: None,
+                body,
+            }],
+        }
+    }
+
+    #[test]
+    fn explicit_borrow_end_allows_owner_write() {
+        let module = module_with_body(vec![
+            NirStmt::Let {
+                name: "head".to_owned(),
+                ty: None,
+                value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                    value: Box::new(NirExpr::Int(10)),
+                    next: Box::new(NirExpr::Null),
+                })),
+            },
+            NirStmt::Let {
+                name: "head_ref".to_owned(),
+                ty: None,
+                value: NirExpr::Borrow(Box::new(NirExpr::Var("head".to_owned()))),
+            },
+            NirStmt::Expr(NirExpr::BorrowEnd(Box::new(NirExpr::Var(
+                "head_ref".to_owned(),
+            )))),
+            NirStmt::Expr(NirExpr::StoreValue {
+                target: Box::new(NirExpr::Var("head".to_owned())),
+                value: Box::new(NirExpr::Int(77)),
+            }),
+        ]);
+
+        verify_nir_module(&module).unwrap();
+    }
+
+    #[test]
+    fn owner_write_while_borrowed_is_rejected() {
+        let module = module_with_body(vec![
+            NirStmt::Let {
+                name: "head".to_owned(),
+                ty: None,
+                value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                    value: Box::new(NirExpr::Int(10)),
+                    next: Box::new(NirExpr::Null),
+                })),
+            },
+            NirStmt::Let {
+                name: "head_ref".to_owned(),
+                ty: None,
+                value: NirExpr::Borrow(Box::new(NirExpr::Var("head".to_owned()))),
+            },
+            NirStmt::Expr(NirExpr::StoreValue {
+                target: Box::new(NirExpr::Var("head".to_owned())),
+                value: Box::new(NirExpr::Int(77)),
+            }),
+        ]);
+
+        let error = verify_nir_module(&module).unwrap_err();
+        assert!(error.contains("cannot write `head` while borrow(s) are active"));
+    }
+
+    #[test]
+    fn borrow_end_without_active_borrow_is_rejected() {
+        let module = module_with_body(vec![
+            NirStmt::Let {
+                name: "head".to_owned(),
+                ty: None,
+                value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                    value: Box::new(NirExpr::Int(10)),
+                    next: Box::new(NirExpr::Null),
+                })),
+            },
+            NirStmt::Expr(NirExpr::BorrowEnd(Box::new(NirExpr::Var(
+                "head".to_owned(),
+            )))),
+        ]);
+
+        let error = verify_nir_module(&module).unwrap_err();
+        assert!(error.contains("cannot end borrow"));
     }
 }

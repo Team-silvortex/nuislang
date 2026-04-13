@@ -570,6 +570,21 @@ fn lower_call_expr(
             ensure_ref_like("borrow", &lowered, bindings, signatures, struct_table)?;
             Ok(NirExpr::Borrow(Box::new(lowered)))
         }
+        "borrow_end" => {
+            let [value] = args else {
+                return Err("borrow_end(...) expects 1 arg".to_owned());
+            };
+            let lowered = lower_expr(
+                value,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            ensure_ref_like("borrow_end", &lowered, bindings, signatures, struct_table)?;
+            Ok(NirExpr::BorrowEnd(Box::new(lowered)))
+        }
         "move" => {
             let [value] = args else {
                 return Err("move(...) expects 1 arg".to_owned());
@@ -1989,6 +2004,7 @@ fn infer_nir_expr_type(
         NirExpr::Borrow(value) | NirExpr::Move(value) => {
             infer_nir_expr_type(value, bindings, signatures, struct_table)
         }
+        NirExpr::BorrowEnd(_) => Some(named_type("Unit")),
         NirExpr::AllocNode { .. } => Some(ref_type("Node")),
         NirExpr::AllocBuffer { .. } => Some(ref_type("Buffer")),
         NirExpr::DataBindCore(_) | NirExpr::CpuBindCore(_) => Some(named_type("Unit")),

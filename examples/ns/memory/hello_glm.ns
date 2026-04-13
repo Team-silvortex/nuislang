@@ -9,6 +9,8 @@ mod cpu Main {
     let tail_ref: ref Node = borrow(next_ptr);
     let head_value = load_value(head_ref);
     let tail_value = load_value(tail_ref);
+    borrow_end(tail_ref);
+    borrow_end(head_ref);
     print(head_value + tail_value);
   }
 }

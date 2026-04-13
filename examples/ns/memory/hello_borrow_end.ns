@@ -1,0 +1,12 @@
+mod cpu Main {
+  fn main() {
+    let head = move(alloc_node(10, null()));
+    let head_ref = borrow(head);
+    let before = load_value(head_ref);
+    borrow_end(head_ref);
+    store_value(head, 77);
+    let after = load_value(head);
+    print(before);
+    print(after);
+  }
+}

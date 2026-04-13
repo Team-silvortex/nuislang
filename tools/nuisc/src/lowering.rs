@@ -236,6 +236,7 @@ fn lower_expr(
             Ok(name)
         }
         NirExpr::Borrow(value) => lower_unary_cpu_expr("borrow", value, state, bindings),
+        NirExpr::BorrowEnd(value) => lower_unary_cpu_expr("borrow_end", value, state, bindings),
         NirExpr::Move(value) => {
             let ptr = lower_expr(value, state, bindings)?;
             let name = next_name(state, "move");

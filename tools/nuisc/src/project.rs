@@ -1384,6 +1384,7 @@ fn expr_uses_shader_profile_render(expr: &NirExpr, unit: &str) -> bool {
             packet,
         } => shader_unit == unit || expr_uses_shader_profile_render(packet, unit),
         NirExpr::Borrow(inner)
+        | NirExpr::BorrowEnd(inner)
         | NirExpr::Move(inner)
         | NirExpr::LoadValue(inner)
         | NirExpr::LoadNext(inner)
@@ -1591,6 +1592,7 @@ fn expr_uses_kernel_profile_batch_lanes(expr: &NirExpr, unit: &str) -> bool {
 fn expr_walk_any(expr: &NirExpr, predicate: &dyn Fn(&NirExpr) -> bool) -> bool {
     match expr {
         NirExpr::Borrow(inner)
+        | NirExpr::BorrowEnd(inner)
         | NirExpr::Move(inner)
         | NirExpr::LoadValue(inner)
         | NirExpr::LoadNext(inner)
