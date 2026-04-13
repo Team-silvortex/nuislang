@@ -201,6 +201,10 @@ fn lower_cpu_pointer_node(node: &Node, state: &mut LlvmLoweringState) -> bool {
             }
             true
         }
+        "borrow_end" => {
+            state.registers.insert(node.name.clone(), LlvmValueRef::Void);
+            true
+        }
         _ => false,
     }
 }
@@ -284,6 +288,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
             | ("cpu", "field")
             | ("cpu", "null")
             | ("cpu", "borrow")
+            | ("cpu", "borrow_end")
             | ("cpu", "move_ptr") => unreachable!(
                 "preclassified CPU LLVM lowering op `{}` should have been handled earlier",
                 node.op.full_name()

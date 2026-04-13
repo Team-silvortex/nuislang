@@ -43,6 +43,7 @@ Start here:
 * [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
 * [examples/yir/README.md](/Users/Shared/chroot/dev/nuislang/examples/yir/README.md)
 * [examples/bins/README.md](/Users/Shared/chroot/dev/nuislang/examples/bins/README.md)
+* [stdlib/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/README.md)
 
 Current high-signal examples:
 
@@ -101,6 +102,8 @@ Current high-signal examples:
 * The `kernel` family now also has `argmin / sort / topk`, so basic selection and ranking workflows can start to live inside the same YIR kernel surface instead of immediately falling out to another layer
 * `kernel.add / mul / add_bias` now also auto-broadcast compatible tensor shapes, so common row-bias/column-scale style graphs no longer need to spell every expansion out manually
 * `kernel.topk_axis rows|cols` is now in too, so the selection surface is no longer just flat-global; it can already express per-row and per-column ranking in the current reference path
+* The repository-level `nuis` standard library is now explicitly split into three layers under `stdlib/`: `core`, `std`, and `ns-nova`
+* `core` is the minimal semantics-first foundation, `std` is the practical systems layer, and `ns-nova` is the GPU-first rendering/application framework layer
 
 ---
 
@@ -692,7 +695,7 @@ nuisc 具有最终否决权：
 * 当前已补 `shader lowering contract` 分析：`draw_instanced + begin_pass + target + pipeline` 会被标注为未来 backend lowering 子集；其余 shader reference op 目前明确走 prerender fallback
 * 当前 `shader package` 也已有最小清单骨架：同一 stage 会预留 `metal / vulkan / directx / opengl` 变体槽位，以便未来按 backend cooked/package 模式加载
 * 当前标准能力面已开始收敛为 `cpu / shader / kernel / data`，并以 `nustar` 注册包形态存在，manifest 位于 `nustar-packages/*.toml`
-* 当前 demo 直接由 `shader mod` 驱动；`ns-nova` 未来应作为独立项目在其上封装
+* 当前 demo 直接由 `shader mod` 驱动；后续应逐步被标准库第三层 `ns-nova` 吸收为更完整的 GPU-native 应用/渲染框架入口
 * GPU lane 产出的 `FrameSurface` 已可导出为实际图像文件（PPM）以验证异构执行结果
 * macOS 下已补最小系统窗口预览器骨架：CPU 侧创建窗口并展示 GPU framebuffer 导出的图像；它属于工具层 adapter，不代表 `nuis` 对 Swift/AppKit 的语义依赖
 * 当前已补最小 `AOT bundle` 入口：`tools/yir-pack-aot` 会优先把 CPU slice 走 `YIR -> LLVM IR -> clang` 编成本地二进制；若模块包含异构渲染结果，则会输出 `shader_contract.txt`、`shader_package.toml`，并按当前能力额外打包预渲染 frame 资产

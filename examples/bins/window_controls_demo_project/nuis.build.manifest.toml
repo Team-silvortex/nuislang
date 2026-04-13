@@ -1,5 +1,5 @@
 manifest_schema = "nuis-build-manifest-v1"
-generated_at_unix = 1775645833
+generated_at_unix = 1776063020
 input = "examples/projects/window_controls_demo"
 output_dir = "examples/bins/window_controls_demo_project"
 packaging_mode = "window-aot-bundle"
@@ -8,9 +8,12 @@ engine_version = "0.44.b-draft"
 engine_profile = "aot"
 vcs = "git"
 vcs_dirty = true
-vcs_head = "157afecab83231c1f584e733fb1d4c8a4b9be342"
+vcs_head = "807d1d8f6d94d86b995de4c95572e2707a2ab400"
 vcs_root = "/Users/Shared/chroot/dev/nuislang"
 loaded_nustar = ["official.cpu", "official.data", "official.shader"]
+compile_cache_status = "miss"
+compile_cache_key = "5ef243a56085d368"
+compile_cache_root = "examples/projects/window_controls_demo/.nuis/cache/compile"
 
 [artifacts]
 ast = "examples/bins/window_controls_demo_project/window_controls_demo.ast.txt"
@@ -46,8 +49,8 @@ fnv1a64 = "0x028a4ed77e9bd0e3"
 [[artifact_hash]]
 kind = "binary"
 path = "examples/bins/window_controls_demo_project/window_controls_demo"
-bytes = 5603352
-fnv1a64 = "0xd7fd22cbc777ea8b"
+bytes = 4681800
+fnv1a64 = "0x1b2b4fef1e32b8b9"
 
 [project]
 name = "window_controls_demo"

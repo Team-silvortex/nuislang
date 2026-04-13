@@ -1,0 +1,14 @@
+module_schema = "nuis-stdlib-module-v1"
+name = "std"
+package_id = "nuis.std"
+tier = "systems"
+depends_on = ["core"]
+summary = "Practical systems layer built on core."
+
+surfaces = [
+  "collections",
+  "host-ffi-helpers",
+  "data-plane-helpers",
+  "project-utility-surfaces"
+]
+

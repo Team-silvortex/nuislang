@@ -109,6 +109,7 @@ pub enum SemanticOp {
     CpuAllocNode,
     CpuAllocBuffer,
     CpuBorrow,
+    CpuBorrowEnd,
     CpuMovePtr,
     CpuInstantiateUnit,
     CpuProjectProfileRef,
@@ -194,6 +195,7 @@ impl Operation {
             (OperationDomainFamily::Cpu, "alloc_node") => SemanticOp::CpuAllocNode,
             (OperationDomainFamily::Cpu, "alloc_buffer") => SemanticOp::CpuAllocBuffer,
             (OperationDomainFamily::Cpu, "borrow") => SemanticOp::CpuBorrow,
+            (OperationDomainFamily::Cpu, "borrow_end") => SemanticOp::CpuBorrowEnd,
             (OperationDomainFamily::Cpu, "move_ptr") => SemanticOp::CpuMovePtr,
             (OperationDomainFamily::Cpu, "instantiate_unit") => SemanticOp::CpuInstantiateUnit,
             (OperationDomainFamily::Cpu, "project_profile_ref") => SemanticOp::CpuProjectProfileRef,
@@ -260,7 +262,7 @@ impl Operation {
             "text" | "const_bool" | "const_i32" | "const" | "const_i64" | "const_f32"
             | "const_f64" | "null" => CpuLlvmLoweringClass::Literal,
             "struct" | "field" => CpuLlvmLoweringClass::Aggregate,
-            "borrow" | "move_ptr" => CpuLlvmLoweringClass::Pointer,
+            "borrow" | "borrow_end" | "move_ptr" => CpuLlvmLoweringClass::Pointer,
             "neg" | "add" | "add_i32" | "add_f32" | "add_f64" | "sub" | "sub_i32"
             | "sub_f32" | "sub_f64" | "mul" | "mul_i32" | "mul_f32" | "mul_f64"
             | "div" | "div_i32" | "div_f32" | "div_f64" | "rem" | "madd"
@@ -404,6 +406,15 @@ pub fn glm_profile_for_operation(op: &Operation) -> GlmNodeProfile {
         },
         SemanticOp::CpuBorrow => GlmNodeProfile {
             result_class: GlmValueClass::Res,
+            accesses: vec![GlmAccess {
+                input: op.args[0].clone(),
+                class: GlmValueClass::Res,
+                mode: GlmUseMode::Read,
+            }],
+            effect: GlmEffect::None,
+        },
+        SemanticOp::CpuBorrowEnd => GlmNodeProfile {
+            result_class: GlmValueClass::Val,
             accesses: vec![GlmAccess {
                 input: op.args[0].clone(),
                 class: GlmValueClass::Res,

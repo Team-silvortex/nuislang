@@ -1,0 +1,38 @@
+yir 0.1
+
+resource cpu0 cpu.arm64
+
+cpu.null nil cpu0
+cpu.const v1 cpu0 10
+cpu.const v2 cpu0 77
+cpu.alloc_node head_raw cpu0 v1 nil
+cpu.move_ptr head cpu0 head_raw
+
+cpu.borrow head_ref cpu0 head
+cpu.load_value head_before cpu0 head_ref
+cpu.borrow_end end_ref cpu0 head_ref
+
+cpu.store_value head_write cpu0 head v2
+cpu.load_value head_after cpu0 head
+cpu.print out cpu0 head_after
+
+edge dep v1 head_raw
+edge dep nil head_raw
+edge dep head_raw head
+edge lifetime head_raw head
+
+edge dep head head_ref
+edge dep head_ref head_before
+edge effect head_ref head_before
+edge dep head_ref end_ref
+edge effect head_ref end_ref
+
+edge dep head head_write
+edge dep v2 head_write
+edge effect end_ref head_write
+edge lifetime head head_write
+
+edge dep head head_after
+edge effect head_write head_after
+edge dep head_after out
+edge effect head_after out

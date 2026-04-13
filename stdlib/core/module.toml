@@ -1,0 +1,14 @@
+module_schema = "nuis-stdlib-module-v1"
+name = "core"
+package_id = "nuis.core"
+tier = "foundation"
+depends_on = []
+summary = "Minimal semantics-first foundation."
+
+surfaces = [
+  "prelude.primitive-values",
+  "prelude.ref-ownership-conventions",
+  "prelude.basic-math-contracts",
+  "prelude.structural-source-contracts"
+]
+

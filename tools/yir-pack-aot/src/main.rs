@@ -147,6 +147,9 @@ fn run() -> Result<(), String> {
     } else {
         maybe_emit_prerendered_frame(&module, &output_dir, stem, frame_scale)?
     };
+    if runtime_frame_support.is_some() && frame_bundle.is_none() {
+        cleanup_stale_fallback_frame(&output_dir, stem)?;
+    }
     let window_spec = extract_cpu_window_spec(
         &module,
         primary_fabric_binding
@@ -532,6 +535,15 @@ fn maybe_emit_prerendered_frame(
         asset_path: ppm_path,
         embedded_ppm_bytes: bytes_to_c_array(&ppm_bytes),
     }))
+}
+
+fn cleanup_stale_fallback_frame(output_dir: &Path, stem: &str) -> Result<(), String> {
+    let stale_path = output_dir.join("assets").join(format!("{stem}.ppm"));
+    if stale_path.exists() {
+        fs::remove_file(&stale_path)
+            .map_err(|error| format!("failed to remove `{}`: {error}", stale_path.display()))?;
+    }
+    Ok(())
 }
 
 struct FrameBundle {

@@ -466,14 +466,21 @@ fn verify_cpu_heap_protocol(module: &YirModule) -> Result<(), String> {
         .iter()
         .map(|node| (node.name.as_str(), node))
         .collect::<BTreeMap<_, _>>();
+    let order_index = order
+        .iter()
+        .enumerate()
+        .map(|(index, name)| (name.clone(), index))
+        .collect::<BTreeMap<_, _>>();
+    let borrow_scope_ends = infer_borrow_scope_ends(module, &order_index);
 
     let mut values = BTreeMap::<String, PointerState>::new();
     let mut heap = BTreeMap::<usize, HeapBinding>::new();
     let mut borrow_counts = BTreeMap::<usize, usize>::new();
+    let mut borrow_owner = BTreeMap::<String, usize>::new();
     let mut next_id = 1usize;
     let mut moved_names = BTreeSet::<String>::new();
 
-    for node_name in order {
+    for (current_index, node_name) in order.into_iter().enumerate() {
         let node = nodes
             .get(node_name.as_str())
             .copied()
@@ -532,12 +539,29 @@ fn verify_cpu_heap_protocol(module: &YirModule) -> Result<(), String> {
                         ensure_live_heap(&heap, id, node)?;
                         *borrow_counts.entry(id).or_insert(0) += 1;
                         values.insert(node.name.clone(), PointerState::Borrowed(id));
+                        borrow_owner.insert(node.name.clone(), id);
                     }
                     PointerState::Null => {
                         values.insert(node.name.clone(), PointerState::Null);
                     }
                     PointerState::Unknown => {
                         values.insert(node.name.clone(), PointerState::Unknown);
+                    }
+                }
+            }
+            "borrow_end" => {
+                let borrow_name = &node.op.args[0];
+                match pointer_arg(&values, borrow_name) {
+                    PointerState::Borrowed(id) => {
+                        ensure_live_heap(&heap, id, node)?;
+                        release_named_borrow(borrow_name, id, &borrow_owner, &mut borrow_counts)?;
+                    }
+                    PointerState::Null | PointerState::Unknown => {}
+                    PointerState::Owned(_) => {
+                        return Err(format!(
+                            "node `{}` expects borrowed pointer `{}` for cpu.borrow_end",
+                            node.name, borrow_name
+                        ));
                     }
                 }
             }
@@ -668,8 +692,92 @@ fn verify_cpu_heap_protocol(module: &YirModule) -> Result<(), String> {
             }
             _ => {}
         }
+
+        release_completed_borrows(
+            current_index,
+            &borrow_scope_ends,
+            &borrow_owner,
+            &mut borrow_counts,
+        );
     }
 
+    Ok(())
+}
+
+fn infer_borrow_scope_ends(
+    module: &YirModule,
+    order_index: &BTreeMap<String, usize>,
+) -> BTreeMap<String, usize> {
+    let mut scope_ends = BTreeMap::<String, usize>::new();
+    for node in &module.nodes {
+        if node.op.instruction != "borrow" || node.op.module != "cpu" {
+            continue;
+        }
+        let Some(start_index) = order_index.get(&node.name).copied() else {
+            continue;
+        };
+        let mut end_index = start_index;
+        for consumer in &module.nodes {
+            if consumer.name == node.name {
+                continue;
+            }
+            if consumer.op.args.iter().any(|arg| arg == &node.name) {
+                if let Some(index) = order_index.get(&consumer.name).copied() {
+                    end_index = end_index.max(index);
+                }
+            }
+        }
+        scope_ends.insert(node.name.clone(), end_index);
+    }
+    scope_ends
+}
+
+fn release_completed_borrows(
+    current_index: usize,
+    borrow_scope_ends: &BTreeMap<String, usize>,
+    borrow_owner: &BTreeMap<String, usize>,
+    borrow_counts: &mut BTreeMap<usize, usize>,
+) {
+    for (borrow_name, end_index) in borrow_scope_ends {
+        if *end_index != current_index {
+            continue;
+        }
+        let Some(owner_id) = borrow_owner.get(borrow_name).copied() else {
+            continue;
+        };
+        if let Some(count) = borrow_counts.get_mut(&owner_id) {
+            *count = count.saturating_sub(1);
+            if *count == 0 {
+                borrow_counts.remove(&owner_id);
+            }
+        }
+    }
+}
+
+fn release_named_borrow(
+    borrow_name: &str,
+    owner_id: usize,
+    borrow_owner: &BTreeMap<String, usize>,
+    borrow_counts: &mut BTreeMap<usize, usize>,
+) -> Result<(), String> {
+    let Some(recorded_owner) = borrow_owner.get(borrow_name).copied() else {
+        return Err(format!(
+            "borrow `{}` has no active owner record for release",
+            borrow_name
+        ));
+    };
+    if recorded_owner != owner_id {
+        return Err(format!(
+            "borrow `{}` release owner mismatch: expected `&{}`, got `&{}`",
+            borrow_name, recorded_owner, owner_id
+        ));
+    }
+    if let Some(count) = borrow_counts.get_mut(&owner_id) {
+        *count = count.saturating_sub(1);
+        if *count == 0 {
+            borrow_counts.remove(&owner_id);
+        }
+    }
     Ok(())
 }
 
@@ -986,4 +1094,150 @@ fn path_exists(module: &YirModule, from: &str, to: &str) -> bool {
     }
 
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::verify_module;
+    use yir_core::{Edge, EdgeKind, Node, Operation, Resource, ResourceKind, YirModule};
+
+    fn node(name: &str, resource: &str, op: &str, args: &[&str]) -> Node {
+        Node {
+            name: name.to_owned(),
+            resource: resource.to_owned(),
+            op: Operation::parse(op, args.iter().map(|item| (*item).to_owned()).collect()).unwrap(),
+        }
+    }
+
+    fn dep(from: &str, to: &str) -> Edge {
+        Edge {
+            kind: EdgeKind::Dep,
+            from: from.to_owned(),
+            to: to.to_owned(),
+        }
+    }
+
+    fn effect(from: &str, to: &str) -> Edge {
+        Edge {
+            kind: EdgeKind::Effect,
+            from: from.to_owned(),
+            to: to.to_owned(),
+        }
+    }
+
+    fn lifetime(from: &str, to: &str) -> Edge {
+        Edge {
+            kind: EdgeKind::Lifetime,
+            from: from.to_owned(),
+            to: to.to_owned(),
+        }
+    }
+
+    #[test]
+    fn owner_write_after_last_borrow_use_is_allowed() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![Resource {
+                name: "cpu0".to_owned(),
+                kind: ResourceKind::parse("cpu.arm64"),
+            }],
+            nodes: vec![
+                node("nil", "cpu0", "cpu.null", &[]),
+                node("v1", "cpu0", "cpu.const", &["10"]),
+                node("v2", "cpu0", "cpu.const", &["99"]),
+                node("head_raw", "cpu0", "cpu.alloc_node", &["v1", "nil"]),
+                node("head", "cpu0", "cpu.move_ptr", &["head_raw"]),
+                node("head_ref", "cpu0", "cpu.borrow", &["head"]),
+                node("read_head", "cpu0", "cpu.load_value", &["head_ref"]),
+                node("write_head", "cpu0", "cpu.store_value", &["head", "v2"]),
+            ],
+            edges: vec![
+                dep("v1", "head_raw"),
+                dep("nil", "head_raw"),
+                dep("head_raw", "head"),
+                lifetime("head_raw", "head"),
+                dep("head", "head_ref"),
+                dep("head_ref", "read_head"),
+                effect("head_ref", "read_head"),
+                dep("head", "write_head"),
+                dep("v2", "write_head"),
+                effect("read_head", "write_head"),
+                lifetime("head", "write_head"),
+            ],
+        };
+
+        verify_module(&module).unwrap();
+    }
+
+    #[test]
+    fn owner_free_after_last_borrow_use_is_allowed() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![Resource {
+                name: "cpu0".to_owned(),
+                kind: ResourceKind::parse("cpu.arm64"),
+            }],
+            nodes: vec![
+                node("len", "cpu0", "cpu.const", &["4"]),
+                node("fill", "cpu0", "cpu.const", &["7"]),
+                node("idx1", "cpu0", "cpu.const", &["1"]),
+                node("buf_raw", "cpu0", "cpu.alloc_buffer", &["len", "fill"]),
+                node("buf", "cpu0", "cpu.move_ptr", &["buf_raw"]),
+                node("buf_ref", "cpu0", "cpu.borrow", &["buf"]),
+                node("read_slot", "cpu0", "cpu.load_at", &["buf_ref", "idx1"]),
+                node("drop_buf", "cpu0", "cpu.free", &["buf"]),
+            ],
+            edges: vec![
+                dep("len", "buf_raw"),
+                dep("fill", "buf_raw"),
+                dep("buf_raw", "buf"),
+                lifetime("buf_raw", "buf"),
+                dep("buf", "buf_ref"),
+                dep("buf_ref", "read_slot"),
+                dep("idx1", "read_slot"),
+                effect("buf_ref", "read_slot"),
+                dep("buf", "drop_buf"),
+                effect("read_slot", "drop_buf"),
+                lifetime("buf", "drop_buf"),
+            ],
+        };
+
+        verify_module(&module).unwrap();
+    }
+
+    #[test]
+    fn explicit_borrow_end_allows_owner_write() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![Resource {
+                name: "cpu0".to_owned(),
+                kind: ResourceKind::parse("cpu.arm64"),
+            }],
+            nodes: vec![
+                node("nil", "cpu0", "cpu.null", &[]),
+                node("v1", "cpu0", "cpu.const", &["10"]),
+                node("v2", "cpu0", "cpu.const", &["99"]),
+                node("head_raw", "cpu0", "cpu.alloc_node", &["v1", "nil"]),
+                node("head", "cpu0", "cpu.move_ptr", &["head_raw"]),
+                node("head_ref", "cpu0", "cpu.borrow", &["head"]),
+                node("end_ref", "cpu0", "cpu.borrow_end", &["head_ref"]),
+                node("write_head", "cpu0", "cpu.store_value", &["head", "v2"]),
+            ],
+            edges: vec![
+                dep("v1", "head_raw"),
+                dep("nil", "head_raw"),
+                dep("head_raw", "head"),
+                lifetime("head_raw", "head"),
+                dep("head", "head_ref"),
+                dep("head_ref", "end_ref"),
+                effect("head_ref", "end_ref"),
+                dep("head", "write_head"),
+                dep("v2", "write_head"),
+                effect("end_ref", "write_head"),
+                lifetime("head", "write_head"),
+            ],
+        };
+
+        verify_module(&module).unwrap();
+    }
 }
