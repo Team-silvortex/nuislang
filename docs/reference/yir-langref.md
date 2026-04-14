@@ -99,10 +99,14 @@ For handwritten `YIR`, plain argument flow is now the default dependency model.
 Current parser behavior:
 
 * `node <instr> <name> <resource> ...` is accepted as a compact form
+* node resources may carry an optional execution-lane suffix such as
+  `cpu0@main` or `fabric0@uplink`
 * ordinary argument references to earlier node names synthesize implicit
   dependency edges
 * if the referenced source and target live in different domain families, that
   implicit dependency becomes an `xfer`
+* nodes that share the same `<resource>@<lane>` queue synthesize implicit
+  `effect` edges in handwritten order
 * `effect`, `lifetime`, and explicit `xfer` edges are still written by hand
   because they carry real asynchronous hardware semantics that should stay
   visible
@@ -112,16 +116,33 @@ Current shorthand examples:
 ```text
 resource cpu0 cpu.arm64
 
-node const tail_value cpu0 30
-node alloc tail cpu0 tail_value nil
-node borrow tail_ref cpu0 tail
-node load tail_val cpu0 tail_ref
-node print out cpu0 tail_val
+node const.i64 tail_value cpu0@mem 30
+node alloc.node tail cpu0@mem tail_value nil
+node borrow tail_ref cpu0@mem tail
+node load.value tail_val cpu0@mem tail_ref
+node print out cpu0@main tail_val
 ```
 
 This compact layer is only a handwritten syntax convenience. Internally, the
 module still resolves to canonical domain ops such as `cpu.const_i64`,
 `cpu.alloc_node`, and explicit dependency edges inside `YirModule`.
+
+Preferred stable shorthand spellings for new handwritten CPU examples:
+
+* `const.i64`, `const.f32`, `const.bool`
+* `alloc.node`, `alloc.buffer`
+* `load.value`, `load.next`, `load.len`
+* `store.value`, `store.next`
+
+The shorter forms like `const`, `alloc`, and `load` still exist as convenience
+aliases, but they are best treated as authoring sugar rather than the most
+stable long-term handwritten surface.
+
+Lane suffixes are queue-local scheduling metadata for the async handwritten
+layer. They do not change resource ownership, but they let traces and future
+schedulers distinguish flows such as host-main, memory, uplink, or render
+queues on the same underlying resource. The queue identity is scoped as
+`<resource>@<lane>`.
 
 ---
 

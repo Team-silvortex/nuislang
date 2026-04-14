@@ -434,6 +434,7 @@ pub fn apply_project_links_to_yir(
         });
     }
 
+    crate::lowering::assign_default_lanes(module);
     Ok(())
 }
 
@@ -450,6 +451,7 @@ pub fn apply_project_support_modules_to_yir(
     resolve_project_profile_refs(module)?;
     stitch_shader_profile_edges(module);
     stitch_data_profile_edges(module);
+    crate::lowering::assign_default_lanes(module);
     Ok(())
 }
 

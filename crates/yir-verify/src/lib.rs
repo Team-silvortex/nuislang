@@ -1164,6 +1164,7 @@ mod tests {
                 effect("read_head", "write_head"),
                 lifetime("head", "write_head"),
             ],
+            node_lanes: BTreeMap::new(),
         };
 
         verify_module(&module).unwrap();
@@ -1200,6 +1201,7 @@ mod tests {
                 effect("read_slot", "drop_buf"),
                 lifetime("buf", "drop_buf"),
             ],
+            node_lanes: BTreeMap::new(),
         };
 
         verify_module(&module).unwrap();
@@ -1236,6 +1238,7 @@ mod tests {
                 effect("end_ref", "write_head"),
                 lifetime("head", "write_head"),
             ],
+            node_lanes: BTreeMap::new(),
         };
 
         verify_module(&module).unwrap();

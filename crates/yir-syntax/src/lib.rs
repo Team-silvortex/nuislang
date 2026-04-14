@@ -26,6 +26,7 @@ pub fn parse_module(input: &str) -> Result<YirModule, String> {
 
     ensure_implicit_cpu_nil_node(&mut module);
     synthesize_dependency_edges(&mut module);
+    synthesize_lane_effect_edges(&mut module);
 
     Ok(module)
 }
@@ -63,6 +64,7 @@ fn parse_node(
         ));
     }
 
+    let (resource_name, lane) = split_resource_lane(tokens[2]);
     let op = Operation::parse(
         opcode,
         tokens[3..]
@@ -74,9 +76,14 @@ fn parse_node(
 
     module.nodes.push(Node {
         name: tokens[1].to_owned(),
-        resource: tokens[2].to_owned(),
+        resource: resource_name.to_owned(),
         op,
     });
+    if let Some(lane) = lane {
+        module
+            .node_lanes
+            .insert(tokens[1].to_owned(), lane.to_owned());
+    }
     Ok(())
 }
 
@@ -98,15 +105,19 @@ fn parse_shorthand_node(
         .iter()
         .map(|token| (*token).to_owned())
         .collect::<Vec<_>>();
+    let (resource_name, lane) = split_resource_lane(resource);
     let opcode = canonicalize_shorthand_opcode(module, instruction, name, resource, &args)
         .map_err(|error| format!("line {line_no}: {error}"))?;
 
     let op = Operation::parse(&opcode, args).map_err(|error| format!("line {line_no}: {error}"))?;
     module.nodes.push(Node {
         name: name.to_owned(),
-        resource: resource.to_owned(),
+        resource: resource_name.to_owned(),
         op,
     });
+    if let Some(lane) = lane {
+        module.node_lanes.insert(name.to_owned(), lane.to_owned());
+    }
     Ok(())
 }
 
@@ -193,7 +204,7 @@ fn canonicalize_shorthand_opcode(
     let family = module
         .resources
         .iter()
-        .find(|candidate| candidate.name == resource)
+        .find(|candidate| candidate.name == split_resource_lane(resource).0)
         .map(|resource| resource.kind.family().to_owned())
         .ok_or_else(|| format!("shorthand node references unknown resource `{resource}`"))?;
 
@@ -214,10 +225,18 @@ fn canonicalize_cpu_shorthand(
 ) -> Result<String, String> {
     let opcode = match instruction {
         "const" => cpu_const_opcode(args),
+        "const.bool" => "cpu.const_bool".to_owned(),
+        "const.i32" => "cpu.const_i32".to_owned(),
+        "const.i64" => "cpu.const_i64".to_owned(),
+        "const.f32" => "cpu.const_f32".to_owned(),
+        "const.f64" => "cpu.const_f64".to_owned(),
         "alloc" => "cpu.alloc_node".to_owned(),
+        "alloc.node" => "cpu.alloc_node".to_owned(),
+        "alloc.buffer" => "cpu.alloc_buffer".to_owned(),
         "borrow" => "cpu.borrow".to_owned(),
         "borrow_end" => "cpu.borrow_end".to_owned(),
         "move" => "cpu.move_ptr".to_owned(),
+        "move.ptr" => "cpu.move_ptr".to_owned(),
         "load" => {
             if name.eq_ignore_ascii_case("next") || name.contains("next") {
                 "cpu.load_next".to_owned()
@@ -225,8 +244,13 @@ fn canonicalize_cpu_shorthand(
                 "cpu.load_value".to_owned()
             }
         }
+        "load.value" => "cpu.load_value".to_owned(),
+        "load.next" => "cpu.load_next".to_owned(),
+        "load.len" => "cpu.buffer_len".to_owned(),
         "load_at" => "cpu.load_at".to_owned(),
         "store" => "cpu.store_value".to_owned(),
+        "store.value" => "cpu.store_value".to_owned(),
+        "store.next" => "cpu.store_next".to_owned(),
         "store_at" => "cpu.store_at".to_owned(),
         "free" => "cpu.free".to_owned(),
         "print" => "cpu.print".to_owned(),
@@ -314,6 +338,30 @@ fn synthesize_dependency_edges(module: &mut YirModule) {
     }
 }
 
+fn synthesize_lane_effect_edges(module: &mut YirModule) {
+    let mut previous_by_queue = BTreeMap::<String, String>::new();
+
+    for node in &module.nodes {
+        let Some(lane) = module.node_lanes.get(&node.name) else {
+            continue;
+        };
+        let queue = format!("{}@{}", node.resource, lane);
+        if let Some(previous) = previous_by_queue.get(&queue) {
+            let exists = module.edges.iter().any(|edge| {
+                edge.kind == EdgeKind::Effect && edge.from == *previous && edge.to == node.name
+            });
+            if !exists {
+                module.edges.push(Edge {
+                    kind: EdgeKind::Effect,
+                    from: previous.clone(),
+                    to: node.name.clone(),
+                });
+            }
+        }
+        previous_by_queue.insert(queue, node.name.clone());
+    }
+}
+
 fn ensure_implicit_cpu_nil_node(module: &mut YirModule) {
     if module.nodes.iter().any(|node| node.name == "nil") {
         return;
@@ -337,6 +385,13 @@ fn ensure_implicit_cpu_nil_node(module: &mut YirModule) {
         resource: resource.name.clone(),
         op: Operation::parse("cpu.null", Vec::new()).expect("cpu.null is valid"),
     });
+}
+
+fn split_resource_lane(raw: &str) -> (&str, Option<&str>) {
+    match raw.split_once('@') {
+        Some((resource, lane)) if !resource.is_empty() && !lane.is_empty() => (resource, Some(lane)),
+        _ => (raw, None),
+    }
 }
 
 #[cfg(test)]
@@ -421,6 +476,99 @@ node output_pipe packet fabric0 seed
                 .any(|edge| edge.kind == EdgeKind::CrossDomainExchange
                     && edge.from == "seed"
                     && edge.to == "packet")
+        );
+    }
+
+    #[test]
+    fn parses_stable_typed_shorthand_without_heuristics() {
+        let module = parse_module(
+            r#"
+resource cpu0 cpu.arm64
+
+node const.i64 tail_value cpu0 30
+node alloc.node tail cpu0 tail_value nil
+node const.i64 head_value cpu0 10
+node alloc.node head cpu0 head_value tail
+node borrow head_ref cpu0 head
+node load.value head_val cpu0 head_ref
+node load.next next_ptr cpu0 head_ref
+node borrow tail_ref cpu0 next_ptr
+node load.value tail_val cpu0 tail_ref
+node add sum cpu0 head_val tail_val
+node print out cpu0 sum
+"#,
+        )
+        .unwrap();
+
+        assert!(
+            module
+                .nodes
+                .iter()
+                .any(|node| node.name == "tail_value" && node.op.full_name() == "cpu.const_i64")
+        );
+        assert!(
+            module
+                .nodes
+                .iter()
+                .any(|node| node.name == "tail" && node.op.full_name() == "cpu.alloc_node")
+        );
+        assert!(
+            module
+                .nodes
+                .iter()
+                .any(|node| node.name == "next_ptr" && node.op.full_name() == "cpu.load_next")
+        );
+    }
+
+    #[test]
+    fn parses_optional_lane_suffix_on_resource_token() {
+        let module = parse_module(
+            r#"
+resource cpu0 cpu.arm64
+
+node const.i64 seed cpu0@mem 7
+node print out cpu0@main seed
+"#,
+        )
+        .unwrap();
+
+        assert_eq!(module.node_lanes.get("seed").map(String::as_str), Some("mem"));
+        assert_eq!(module.node_lanes.get("out").map(String::as_str), Some("main"));
+        assert!(
+            module
+                .edges
+                .iter()
+                .any(|edge| edge.kind == EdgeKind::Dep && edge.from == "seed" && edge.to == "out")
+        );
+    }
+
+    #[test]
+    fn synthesizes_serial_effect_edges_within_same_resource_lane() {
+        let module = parse_module(
+            r#"
+resource cpu0 cpu.arm64
+
+node const.i64 a cpu0@mem 1
+node const.i64 b cpu0@mem 2
+node add sum cpu0@main a b
+node print out cpu0@main sum
+"#,
+        )
+        .unwrap();
+
+        assert!(
+            module
+                .edges
+                .iter()
+                .any(|edge| edge.kind == EdgeKind::Effect && edge.from == "a" && edge.to == "b")
+        );
+        assert!(
+            module
+                .edges
+                .iter()
+                .any(|edge| edge.kind == EdgeKind::Effect
+                    && edge.from == "sum"
+                    && edge.to == "out")
         );
     }
 }

@@ -209,9 +209,14 @@ pub fn render_yir(module: &YirModule) -> String {
         out.push('\n');
     }
     for node in &module.nodes {
+        let lane_suffix = module
+            .node_lanes
+            .get(&node.name)
+            .map(|lane| format!("@{lane}"))
+            .unwrap_or_default();
         out.push_str(&format!(
-            "{}.{} {} {}",
-            node.op.module, node.op.instruction, node.name, node.resource
+            "{}.{} {} {}{}",
+            node.op.module, node.op.instruction, node.name, node.resource, lane_suffix
         ));
         for arg in &node.op.args {
             if arg.chars().any(char::is_whitespace) {

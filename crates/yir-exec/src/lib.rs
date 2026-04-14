@@ -44,9 +44,15 @@ pub fn execute_module(module: &YirModule) -> Result<ExecutionTrace, String> {
                 node.name, node.op.module
             )
         })?;
+        let lane_name = module
+            .node_lanes
+            .get(&node.name)
+            .map(|lane| format!("{}@{}", node.resource, lane))
+            .unwrap_or_else(|| resource.kind.family().to_owned());
+        state.current_lane = Some(lane_name.clone());
 
         lane_steps
-            .entry(resource.kind.family().to_owned())
+            .entry(lane_name.clone())
             .or_default()
             .push(format!(
                 "{} @{} -> {}",

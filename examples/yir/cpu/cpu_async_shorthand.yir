@@ -1,17 +1,17 @@
 resource cpu0 cpu.arm64
 
-node const tail_value cpu0 30
-node alloc tail cpu0 tail_value nil
+node const.i64 tail_value cpu0@mem 30
+node alloc.node tail cpu0@mem tail_value nil
 
-node const head_value cpu0 10
-node alloc head cpu0 head_value tail
+node const.i64 head_value cpu0@mem 10
+node alloc.node head cpu0@mem head_value tail
 
-node borrow head_ref cpu0 head
-node load head_val cpu0 head_ref
-node load next cpu0 head_ref
+node borrow head_ref cpu0@mem head
+node load.value head_val cpu0@mem head_ref
+node load.next next_ptr cpu0@mem head_ref
 
-node borrow tail_ref cpu0 next
-node load tail_val cpu0 tail_ref
+node borrow tail_ref cpu0@mem next_ptr
+node load.value tail_val cpu0@mem tail_ref
 
-node add sum cpu0 head_val tail_val
-node print out cpu0 sum
+node add sum cpu0@main head_val tail_val
+node print out cpu0@main sum

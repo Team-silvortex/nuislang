@@ -6,6 +6,7 @@ pub struct YirModule {
     pub resources: Vec<Resource>,
     pub nodes: Vec<Node>,
     pub edges: Vec<Edge>,
+    pub node_lanes: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -49,6 +50,7 @@ impl YirModule {
             resources: Vec::new(),
             nodes: Vec::new(),
             edges: Vec::new(),
+            node_lanes: BTreeMap::new(),
         }
     }
 }
@@ -1045,6 +1047,7 @@ pub struct ExecutionState {
     pub heap: BTreeMap<usize, HeapNode>,
     pub buffers: BTreeMap<usize, HeapBuffer>,
     pub next_heap_address: usize,
+    pub current_lane: Option<String>,
 }
 
 impl ExecutionState {
@@ -1160,7 +1163,11 @@ impl ExecutionState {
         let event = event.into();
         self.events.push(event.clone());
         self.lane_events
-            .entry(resource.kind.family().to_owned())
+            .entry(
+                self.current_lane
+                    .clone()
+                    .unwrap_or_else(|| resource.kind.family().to_owned()),
+            )
             .or_default()
             .push(event);
     }

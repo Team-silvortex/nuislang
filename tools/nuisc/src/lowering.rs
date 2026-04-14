@@ -1,7 +1,9 @@
 use std::collections::BTreeMap;
 
 use nuis_semantics::model::{NirBinaryOp, NirExpr, NirFunction, NirModule, NirStmt};
-use yir_core::{Edge, EdgeKind, Node, Operation, Resource, ResourceKind, YirModule};
+use yir_core::{
+    Edge, EdgeKind, Node, Operation, Resource, ResourceKind, SemanticOp, YirModule,
+};
 
 use crate::registry::NustarPackageManifest;
 
@@ -92,8 +94,71 @@ fn lower_nir_to_yir_builtin_cpu(module: &NirModule) -> Result<YirModule, String>
 
     let mut bindings = BTreeMap::<String, String>::new();
     lower_function_body(main, &mut state, &mut bindings, true)?;
+    assign_default_lanes(&mut yir);
 
     Ok(yir)
+}
+
+pub fn assign_default_lanes(module: &mut YirModule) {
+    let resource_families = module
+        .resources
+        .iter()
+        .map(|resource| (resource.name.as_str(), resource.kind.family()))
+        .collect::<BTreeMap<_, _>>();
+
+    module.node_lanes.clear();
+    for node in &module.nodes {
+        let family = resource_families
+            .get(node.resource.as_str())
+            .copied()
+            .unwrap_or("unknown");
+        let lane = default_lane_for_node(family, node);
+        module.node_lanes.insert(node.name.clone(), lane.to_owned());
+    }
+}
+
+fn default_lane_for_node<'a>(family: &str, node: &'a Node) -> &'a str {
+    if node.name.starts_with("project_profile_") {
+        return "profile";
+    }
+    match family {
+        "cpu" => match node.op.semantic_op() {
+            SemanticOp::CpuAllocNode
+            | SemanticOp::CpuAllocBuffer
+            | SemanticOp::CpuBorrow
+            | SemanticOp::CpuBorrowEnd
+            | SemanticOp::CpuMovePtr
+            | SemanticOp::CpuLoadValue
+            | SemanticOp::CpuLoadNext
+            | SemanticOp::CpuBufferLen
+            | SemanticOp::CpuLoadAt
+            | SemanticOp::CpuStoreValue
+            | SemanticOp::CpuStoreNext
+            | SemanticOp::CpuStoreAt
+            | SemanticOp::CpuFree => "mem",
+            _ => match node.op.instruction.as_str() {
+                "window" | "input_i64" | "tick_i64" | "extern_call_i64" | "present_frame"
+                | "print" | "bind_core" | "instantiate_unit" => "main",
+                _ => "main",
+            },
+        },
+        "data" => match node.op.semantic_op() {
+            SemanticOp::DataImmutableWindow | SemanticOp::DataOutputPipe => "uplink",
+            SemanticOp::DataCopyWindow | SemanticOp::DataInputPipe => "downlink",
+            SemanticOp::DataHandleTable | SemanticOp::DataBindCore | SemanticOp::DataMarker => {
+                "control"
+            }
+            SemanticOp::DataMove => "fabric",
+            _ => "fabric",
+        },
+        "shader" => match node.op.semantic_op() {
+            SemanticOp::ShaderBeginPass | SemanticOp::ShaderDrawInstanced => "render",
+            SemanticOp::ShaderPipeline | SemanticOp::ShaderInlineWgsl => "setup",
+            _ => "setup",
+        },
+        "kernel" | "npu" => "compute",
+        _ => "main",
+    }
 }
 
 struct LoweringState<'a> {
