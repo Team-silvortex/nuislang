@@ -24,7 +24,8 @@ Recommended starting point:
   `shader_inline_wgsl("entry", wgsl { ... })`
   while `FabricPlane` contributes bind-core, handle table, sync markers, and
   explicit uplink/downlink window policy nodes that are stitched into the final
-  data-plane graph.
+  data-plane graph. The data profile markers are now validated per link
+  direction, so a `cpu <-> shader` fabric only needs its own sync pair.
 
 Also included:
 
@@ -36,6 +37,8 @@ Also included:
   `kernel.KernelUnit -> cpu.Main via data.FabricPlane`
   and kernel profile slots consumed from CPU via
   `kernel_profile_bind_core/kernel_profile_queue_depth/kernel_profile_batch_lanes`.
+  Its `FabricPlane` now only declares the `cpu_to_kernel/kernel_to_cpu` sync
+  markers required by that route.
 
 Use:
 

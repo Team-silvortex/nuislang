@@ -52,6 +52,14 @@ resource <name> <kind>
 edge <dep|effect|lifetime|xfer> <from> <to>
 ```
 
+The handwritten parser now also accepts a compact async-first form:
+
+```text
+resource <name> <kind>
+node <instr> <name> <resource> [args...]
+edge <effect|lifetime|xfer> <from> <to>
+```
+
 Semantically:
 
 * `resource` declares an execution resource or domain instance
@@ -71,6 +79,8 @@ consistent style:
   `kernel.apple`, `data.fabric`
 * keep `data.*` nodes on `data.fabric` resources instead of attaching them to
   compute resources directly
+* prefer compact handwritten `node <instr> ...` form for new examples when the
+  domain/resource already makes the instruction family obvious
 * prefer typed scalar constructors such as `cpu.const_i64`,
   `shader.const_i64`, `kernel.const_f32` when the scalar type is known
 * prefer canonical ops over compatibility aliases in examples; for example,
@@ -78,6 +88,40 @@ consistent style:
   aliases
 * group examples in this order: `resource` declarations, configuration nodes,
   value/material/tensor setup, compute or render nodes, then `edge` clauses
+* treat handwritten `YIR` as default-async: ordinary data dependencies should
+  flow through node arguments, while `effect`, `lifetime`, and `xfer` remain
+  the explicit edges for visibility, ownership, and heterogeneous exchange
+
+## Async-First Handwritten Form
+
+For handwritten `YIR`, plain argument flow is now the default dependency model.
+
+Current parser behavior:
+
+* `node <instr> <name> <resource> ...` is accepted as a compact form
+* ordinary argument references to earlier node names synthesize implicit
+  dependency edges
+* if the referenced source and target live in different domain families, that
+  implicit dependency becomes an `xfer`
+* `effect`, `lifetime`, and explicit `xfer` edges are still written by hand
+  because they carry real asynchronous hardware semantics that should stay
+  visible
+
+Current shorthand examples:
+
+```text
+resource cpu0 cpu.arm64
+
+node const tail_value cpu0 30
+node alloc tail cpu0 tail_value nil
+node borrow tail_ref cpu0 tail
+node load tail_val cpu0 tail_ref
+node print out cpu0 tail_val
+```
+
+This compact layer is only a handwritten syntax convenience. Internally, the
+module still resolves to canonical domain ops such as `cpu.const_i64`,
+`cpu.alloc_node`, and explicit dependency edges inside `YirModule`.
 
 ---
 

@@ -524,7 +524,7 @@ pub fn validate_project_links_against_yir(
                         link.from, link.to, via, to_domain
                     ));
                 }
-                validate_data_profile_for_link(module, via)?;
+                validate_data_profile_for_link(module, &link.from, &link.to, via)?;
             }
         }
 
@@ -1770,19 +1770,27 @@ fn validate_shader_profile_flow(module: &YirModule, unit: &str) -> Result<(), St
     Ok(())
 }
 
-fn validate_data_profile_for_link(module: &YirModule, endpoint: &str) -> Result<(), String> {
+fn validate_data_profile_for_link(
+    module: &YirModule,
+    from_endpoint: &str,
+    to_endpoint: &str,
+    endpoint: &str,
+) -> Result<(), String> {
     let (domain, unit) = split_domain_unit(endpoint)?;
     if domain != "data" {
         return Ok(());
     }
+    let (from_domain, _) = split_domain_unit(from_endpoint)?;
+    let (to_domain, _) = split_domain_unit(to_endpoint)?;
     let declared_support = support_surface_for_domain(&mut BTreeMap::new(), "data")?;
     let declared_slots = support_profile_slots_for_domain("data")?;
     for required_surface in data_support_surface_contract() {
         require_declared_support_surface(&declared_support, "data", &unit, required_surface)?;
     }
 
-    for (slot, node_name) in data_profile_slot_targets(&unit) {
+    for slot in data_profile_required_slots_for_link(&from_domain, &to_domain) {
         require_declared_profile_slot(&declared_slots, "data", &unit, slot)?;
+        let node_name = resolve_project_profile_target_name("data", &unit, slot);
         let exists = module.nodes.iter().any(|node| node.name == node_name);
         if !exists {
             return Err(format!(
@@ -2004,77 +2012,35 @@ fn kernel_profile_slot_targets(unit: &str) -> Vec<(&'static str, String)> {
     ]
 }
 
-fn data_profile_slot_targets(unit: &str) -> Vec<(&'static str, String)> {
-    vec![
-        (
-            "bind_core",
-            resolve_project_profile_target_name("data", unit, "bind_core"),
-        ),
-        (
-            "window_offset",
-            resolve_project_profile_target_name("data", unit, "window_offset"),
-        ),
-        (
-            "uplink_len",
-            resolve_project_profile_target_name("data", unit, "uplink_len"),
-        ),
-        (
-            "downlink_len",
-            resolve_project_profile_target_name("data", unit, "downlink_len"),
-        ),
-        (
-            "handle_table",
-            resolve_project_profile_target_name("data", unit, "handle_table"),
-        ),
-        (
-            "marker:cpu_to_shader",
-            resolve_project_profile_target_name("data", unit, "marker:cpu_to_shader"),
-        ),
-        (
-            "marker:shader_to_cpu",
-            resolve_project_profile_target_name("data", unit, "marker:shader_to_cpu"),
-        ),
-        (
-            "marker:uplink_pipe",
-            resolve_project_profile_target_name("data", unit, "marker:uplink_pipe"),
-        ),
-        (
-            "marker:downlink_pipe",
-            resolve_project_profile_target_name("data", unit, "marker:downlink_pipe"),
-        ),
-        (
-            "marker:uplink_pipe_class",
-            resolve_project_profile_target_name("data", unit, "marker:uplink_pipe_class"),
-        ),
-        (
-            "marker:downlink_pipe_class",
-            resolve_project_profile_target_name("data", unit, "marker:downlink_pipe_class"),
-        ),
-        (
-            "marker:uplink_payload_class",
-            resolve_project_profile_target_name("data", unit, "marker:uplink_payload_class"),
-        ),
-        (
-            "marker:downlink_payload_class",
-            resolve_project_profile_target_name("data", unit, "marker:downlink_payload_class"),
-        ),
-        (
-            "marker:uplink_payload_shape",
-            resolve_project_profile_target_name("data", unit, "marker:uplink_payload_shape"),
-        ),
-        (
-            "marker:downlink_payload_shape",
-            resolve_project_profile_target_name("data", unit, "marker:downlink_payload_shape"),
-        ),
-        (
-            "marker:uplink_window_policy",
-            resolve_project_profile_target_name("data", unit, "marker:uplink_window_policy"),
-        ),
-        (
-            "marker:downlink_window_policy",
-            resolve_project_profile_target_name("data", unit, "marker:downlink_window_policy"),
-        ),
-    ]
+fn data_profile_required_slots_for_link(
+    from_domain: &str,
+    to_domain: &str,
+) -> Vec<&'static str> {
+    let mut slots = vec![
+        "bind_core",
+        "window_offset",
+        "uplink_len",
+        "downlink_len",
+        "handle_table",
+        "marker:uplink_pipe",
+        "marker:downlink_pipe",
+        "marker:uplink_pipe_class",
+        "marker:downlink_pipe_class",
+        "marker:uplink_payload_class",
+        "marker:downlink_payload_class",
+        "marker:uplink_payload_shape",
+        "marker:downlink_payload_shape",
+        "marker:uplink_window_policy",
+        "marker:downlink_window_policy",
+    ];
+    match (from_domain, to_domain) {
+        ("cpu", "shader") => slots.push("marker:cpu_to_shader"),
+        ("shader", "cpu") => slots.push("marker:shader_to_cpu"),
+        ("cpu", "kernel") => slots.push("marker:cpu_to_kernel"),
+        ("kernel", "cpu") => slots.push("marker:kernel_to_cpu"),
+        _ => {}
+    }
+    slots
 }
 
 fn stitch_shader_profile_edges(module: &mut YirModule) {
