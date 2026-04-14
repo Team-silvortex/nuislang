@@ -114,6 +114,9 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                         manifest.support_profile_slots.join(", ")
                     );
                 }
+                if !manifest.default_lanes.is_empty() {
+                    println!("  default_lanes: {}", manifest.default_lanes.join(", "));
+                }
                 println!("  profiles: {}", manifest.profiles.join(", "));
                 println!(
                     "  resource_families: {}",
@@ -220,6 +223,9 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                         "  support_profile_slots: {}",
                         binding.support_profile_slots.join(", ")
                     );
+                }
+                if !binding.default_lanes.is_empty() {
+                    println!("  default_lanes: {}", binding.default_lanes.join(", "));
                 }
                 if !binding.matched_support_surface.is_empty() {
                     println!(
@@ -378,6 +384,12 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 println!(
                     "  support_profile_slots: {}",
                     binary.manifest.support_profile_slots.join(", ")
+                );
+            }
+            if !binary.manifest.default_lanes.is_empty() {
+                println!(
+                    "  default_lanes: {}",
+                    binary.manifest.default_lanes.join(", ")
                 );
             }
             println!("  format_version: {}", binary.format_version);

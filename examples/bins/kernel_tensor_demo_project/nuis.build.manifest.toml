@@ -1,0 +1,63 @@
+manifest_schema = "nuis-build-manifest-v1"
+generated_at_unix = 1776177107
+input = "examples/projects/kernel_tensor_demo"
+output_dir = "examples/bins/kernel_tensor_demo_project"
+packaging_mode = "native-cpu-llvm"
+tool_nuisc = "0.1.0"
+engine_version = "0.44.b-draft"
+engine_profile = "aot"
+vcs = "git"
+vcs_dirty = true
+vcs_head = "770fe72dcb79b72e6044076ddf2d84566f6bd5e4"
+vcs_root = "/Users/Shared/chroot/dev/nuislang"
+loaded_nustar = ["official.cpu", "official.data", "official.kernel"]
+compile_cache_status = "miss"
+compile_cache_key = "f44336182b242e2d"
+compile_cache_root = "examples/projects/kernel_tensor_demo/.nuis/cache/compile"
+
+[artifacts]
+ast = "examples/bins/kernel_tensor_demo_project/kernel_tensor_demo.ast.txt"
+nir = "examples/bins/kernel_tensor_demo_project/kernel_tensor_demo.nir.txt"
+yir = "examples/bins/kernel_tensor_demo_project/kernel_tensor_demo.yir"
+llvm_ir = "examples/bins/kernel_tensor_demo_project/kernel_tensor_demo.ll"
+binary = "examples/bins/kernel_tensor_demo_project/kernel_tensor_demo"
+
+[[artifact_hash]]
+kind = "ast"
+path = "examples/bins/kernel_tensor_demo_project/kernel_tensor_demo.ast.txt"
+bytes = 686
+fnv1a64 = "0x7fbdf8662d303c0d"
+
+[[artifact_hash]]
+kind = "nir"
+path = "examples/bins/kernel_tensor_demo_project/kernel_tensor_demo.nir.txt"
+bytes = 686
+fnv1a64 = "0x6badc196e644890c"
+
+[[artifact_hash]]
+kind = "yir"
+path = "examples/bins/kernel_tensor_demo_project/kernel_tensor_demo.yir"
+bytes = 8385
+fnv1a64 = "0x70b94574c3a9a5c6"
+
+[[artifact_hash]]
+kind = "llvm_ir"
+path = "examples/bins/kernel_tensor_demo_project/kernel_tensor_demo.ll"
+bytes = 2795
+fnv1a64 = "0xb6b08f4ebc78e26e"
+
+[[artifact_hash]]
+kind = "binary"
+path = "examples/bins/kernel_tensor_demo_project/kernel_tensor_demo"
+bytes = 34016
+fnv1a64 = "0x184d23a9f025aedb"
+
+[project]
+name = "kernel_tensor_demo"
+abi_mode = "explicit"
+abi = ["cpu=cpu.arm64.apple_aapcs64", "data=data.fabric.macos.arm64.v1", "kernel=kernel.apple_ane.coreml.v1"]
+manifest_copy = "examples/bins/kernel_tensor_demo_project/nuis.project.toml"
+modules_index = "examples/bins/kernel_tensor_demo_project/nuis.project.modules.txt"
+links_index = "examples/bins/kernel_tensor_demo_project/nuis.project.links.txt"
+host_ffi_index = "examples/bins/kernel_tensor_demo_project/nuis.project.host_ffi.txt"
+abi_index = "examples/bins/kernel_tensor_demo_project/nuis.project.abi.txt"

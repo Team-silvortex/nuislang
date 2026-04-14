@@ -43,10 +43,11 @@ mod cpu Main {
 
     data_profile_bind_core("FabricPlane");
     let fabric_handles: HandleTable = data_profile_handle_table("FabricPlane");
-    let gpu_packet: Window = data_profile_send_uplink("FabricPlane", render_controls);
+    let gpu_packet: Window<SurfaceShaderPacket> =
+      data_profile_send_uplink("FabricPlane", render_controls);
     let frame: Frame = shader_profile_render("SurfaceShader", gpu_packet);
 
-    let host_frame: Window = data_profile_send_downlink("FabricPlane", frame);
+    let host_frame: Window<Frame> = data_profile_send_downlink("FabricPlane", frame);
 
     cpu_present_frame(host_frame);
   }

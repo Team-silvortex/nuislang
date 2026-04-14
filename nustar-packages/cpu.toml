@@ -22,6 +22,7 @@ loader_abi = "nustar-loader-v1"
 host_ffi_surface = ["cpu.host-ffi.nurs.v1", "cpu.host-ffi.c-bridge.v1"]
 host_ffi_abis = ["nurs", "c"]
 host_ffi_bridge = "c-abi-bridge"
+default_lanes = ["cpu.alloc_node=mem", "cpu.alloc_buffer=mem", "cpu.borrow=mem", "cpu.borrow_end=mem", "cpu.move_ptr=mem", "cpu.load_value=mem", "cpu.load_next=mem", "cpu.buffer_len=mem", "cpu.load_at=mem", "cpu.store_value=mem", "cpu.store_next=mem", "cpu.store_at=mem", "cpu.free=mem", "cpu.window=main", "cpu.input_i64=main", "cpu.tick_i64=main", "cpu.present_frame=main", "cpu.extern_call_i64=main", "cpu.print=main", "cpu.bind_core=main", "cpu.instantiate_unit=main"]
 profiles = ["aot"]
 resource_families = ["cpu", "cpu.arm64"]
 unit_types = ["Main", "HostWindow", "CpuWorker"]

@@ -13,6 +13,7 @@ yir_lowering = ["yir.kernel.lowering.v1", "yir.tensor-lowering.v1"]
 part_verify = ["verify.kernel.shape.v1", "verify.kernel.broadcast.v1"]
 support_surface = ["kernel.profile.bind-core.v1", "kernel.profile.queue-depth.v1", "kernel.profile.batch-lanes.v1", "kernel.profile.entry.v1"]
 support_profile_slots = ["bind_core", "queue_depth", "batch_lanes"]
+default_lanes = ["kernel.target_config=compute", "kernel.tensor=compute", "kernel.fill=compute", "kernel.splat=compute", "kernel.add=compute", "kernel.mul=compute", "kernel.add_scalar=compute", "kernel.mul_scalar=compute", "kernel.matmul=compute", "kernel.add_bias=compute", "kernel.relu=compute", "kernel.reshape=compute", "kernel.slice=compute", "kernel.row=compute", "kernel.col=compute", "kernel.shape=compute", "kernel.rows=compute", "kernel.cols=compute", "kernel.element_at=compute", "kernel.broadcast=compute", "kernel.reduce_sum=compute", "kernel.reduce_sum_axis=compute", "kernel.reduce_max=compute", "kernel.reduce_max_axis=compute", "kernel.reduce_mean=compute", "kernel.reduce_mean_axis=compute", "kernel.reduce_min=compute", "kernel.reduce_min_axis=compute", "kernel.argmax=compute", "kernel.argmax_axis=compute", "kernel.argmin=compute", "kernel.argmin_axis=compute", "kernel.sort=compute", "kernel.topk=compute", "kernel.topk_axis=compute", "kernel.print=compute"]
 binary_extension = "nustar"
 package_layout = "single-envelope"
 machine_abi_policy = "exact-match"

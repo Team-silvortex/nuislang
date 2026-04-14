@@ -1,3 +1,4 @@
+# mode=explicit
 cpu	cpu.arm64.apple_aapcs64
 data	data.fabric.macos.arm64.v1
 kernel	kernel.apple_ane.coreml.v1

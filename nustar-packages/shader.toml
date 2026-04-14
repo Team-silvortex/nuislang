@@ -21,6 +21,7 @@ loader_entry = "nustar.bootstrap.v1"
 loader_abi = "nustar-loader-v1"
 support_surface = ["shader.profile.packet.v1", "shader.profile.render.v1", "shader.profile.seed.color.v1", "shader.profile.seed.speed.v1", "shader.profile.seed.radius.v1", "shader.profile.target.v1", "shader.profile.viewport.v1", "shader.profile.pipeline.v1", "shader.profile.draw-budget.v1", "shader.profile.packet-slots.v1", "shader.profile.packet-tag.v1", "shader.profile.material-mode.v1", "shader.profile.pass-kind.v1", "shader.profile.packet-field-count.v1", "shader.inline.wgsl.v1"]
 support_profile_slots = ["target", "viewport", "pipeline", "vertex_count", "instance_count", "packet_color_slot", "packet_speed_slot", "packet_radius_slot", "packet_tag", "material_mode", "pass_kind", "packet_field_count"]
+default_lanes = ["shader.target=setup", "shader.viewport=setup", "shader.pipeline=setup", "shader.inline_wgsl=setup", "shader.begin_pass=render", "shader.draw_instanced=render"]
 profiles = ["aot"]
 resource_families = ["shader", "shader.render"]
 unit_types = ["Material", "RenderPass", "SpriteShader", "SurfaceShader"]

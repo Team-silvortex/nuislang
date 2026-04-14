@@ -44,6 +44,7 @@ pub struct NustarPackageManifest {
     pub host_ffi_bridge: String,
     pub support_surface: Vec<String>,
     pub support_profile_slots: Vec<String>,
+    pub default_lanes: Vec<String>,
     pub profiles: Vec<String>,
     pub resource_families: Vec<String>,
     pub unit_types: Vec<String>,
@@ -68,6 +69,7 @@ pub struct NustarBinding {
     pub part_verify: Vec<String>,
     pub support_surface: Vec<String>,
     pub support_profile_slots: Vec<String>,
+    pub default_lanes: Vec<String>,
     pub matched_support_surface: Vec<String>,
     pub matched_support_profile_slots: Vec<String>,
     pub covered_support_profile_slots: Vec<String>,
@@ -299,6 +301,7 @@ pub fn plan_bindings(
             part_verify: manifest.part_verify,
             support_surface: manifest.support_surface,
             support_profile_slots: manifest.support_profile_slots,
+            default_lanes: manifest.default_lanes,
             matched_support_surface,
             matched_support_profile_slots,
             covered_support_profile_slots,
@@ -997,6 +1000,7 @@ fn parse_manifest(source: &str, path: &Path) -> Result<NustarPackageManifest, St
         parse_optional_string_array(source, "support_surface").unwrap_or_default();
     let support_profile_slots =
         parse_optional_string_array(source, "support_profile_slots").unwrap_or_default();
+    let default_lanes = parse_optional_string_array(source, "default_lanes").unwrap_or_default();
     let profiles = parse_string_array(source, "profiles", path)?;
     let resource_families = parse_string_array(source, "resource_families", path)?;
     let unit_types = parse_optional_string_array(source, "unit_types").unwrap_or_default();
@@ -1030,6 +1034,7 @@ fn parse_manifest(source: &str, path: &Path) -> Result<NustarPackageManifest, St
         host_ffi_bridge,
         support_surface,
         support_profile_slots,
+        default_lanes,
         profiles,
         resource_families,
         unit_types,

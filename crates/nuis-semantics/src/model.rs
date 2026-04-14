@@ -179,12 +179,123 @@ pub struct NirStructDef {
     pub fields: Vec<NirStructField>,
 }
 
+impl NirStructDef {
+    pub fn field(&self, name: &str) -> Option<&NirStructField> {
+        self.fields.iter().find(|field| field.name == name)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NirTypeRef {
     pub name: String,
     pub generic_args: Vec<NirTypeRef>,
     pub is_optional: bool,
     pub is_ref: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NirScalarKind {
+    Bool,
+    I32,
+    I64,
+    F32,
+    F64,
+    Text,
+    Unit,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NirTypeShape {
+    Scalar(NirScalarKind),
+    Ref,
+    Generic,
+    Nominal,
+}
+
+impl NirTypeRef {
+    pub fn scalar_kind(&self) -> Option<NirScalarKind> {
+        if self.is_ref || !self.generic_args.is_empty() {
+            return None;
+        }
+        match self.name.as_str() {
+            "bool" => Some(NirScalarKind::Bool),
+            "i32" => Some(NirScalarKind::I32),
+            "i64" => Some(NirScalarKind::I64),
+            "f32" => Some(NirScalarKind::F32),
+            "f64" => Some(NirScalarKind::F64),
+            "String" => Some(NirScalarKind::Text),
+            "Unit" => Some(NirScalarKind::Unit),
+            _ => None,
+        }
+    }
+
+    pub fn shape(&self) -> NirTypeShape {
+        if let Some(kind) = self.scalar_kind() {
+            NirTypeShape::Scalar(kind)
+        } else if self.is_ref {
+            NirTypeShape::Ref
+        } else if !self.generic_args.is_empty() {
+            NirTypeShape::Generic
+        } else {
+            NirTypeShape::Nominal
+        }
+    }
+
+    pub fn is_integer_scalar(&self) -> bool {
+        matches!(
+            self.scalar_kind(),
+            Some(NirScalarKind::I32 | NirScalarKind::I64)
+        )
+    }
+
+    pub fn is_float_scalar(&self) -> bool {
+        matches!(
+            self.scalar_kind(),
+            Some(NirScalarKind::F32 | NirScalarKind::F64)
+        )
+    }
+
+    pub fn is_numeric_scalar(&self) -> bool {
+        self.is_integer_scalar() || self.is_float_scalar()
+    }
+
+    pub fn is_bool_scalar(&self) -> bool {
+        self.scalar_kind() == Some(NirScalarKind::Bool)
+    }
+
+    pub fn is_text_scalar(&self) -> bool {
+        self.scalar_kind() == Some(NirScalarKind::Text)
+    }
+
+    pub fn is_unit_scalar(&self) -> bool {
+        self.scalar_kind() == Some(NirScalarKind::Unit)
+    }
+
+    pub fn is_generic_named(&self, expected: &str, arity: usize) -> bool {
+        self.name == expected && self.generic_args.len() == arity && !self.is_ref
+    }
+
+    pub fn render(&self) -> String {
+        let mut out = String::new();
+        if self.is_ref {
+            out.push_str("ref ");
+        }
+        out.push_str(&self.name);
+        if !self.generic_args.is_empty() {
+            out.push('<');
+            for (index, arg) in self.generic_args.iter().enumerate() {
+                if index > 0 {
+                    out.push_str(", ");
+                }
+                out.push_str(&arg.render());
+            }
+            out.push('>');
+        }
+        if self.is_optional {
+            out.push('?');
+        }
+        out
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -486,20 +486,11 @@ fn lower_expr(
             )?;
             let base_ty = infer_nir_expr_type(&lowered_base, bindings, signatures, struct_table)
                 .ok_or_else(|| format!("cannot infer base type for field access `.{} `", field))?;
-            let definition = struct_table.get(&base_ty.name).ok_or_else(|| {
-                format!(
-                    "type `{}` has no known struct definition",
-                    render_type_name(&base_ty)
-                )
-            })?;
-            if !definition
-                .fields
-                .iter()
-                .any(|candidate| candidate.name == *field)
-            {
+            if struct_field_type(&base_ty, field, struct_table).is_none() {
                 return Err(format!(
-                    "struct `{}` has no field `{}`",
-                    definition.name, field
+                    "type `{}` has no field `{}`",
+                    render_type_name(&base_ty),
+                    field
                 ));
             }
             NirExpr::FieldAccess {
@@ -507,31 +498,98 @@ fn lower_expr(
                 field: field.clone(),
             }
         }
-        AstExpr::Binary { op, lhs, rhs } => NirExpr::Binary {
-            op: match op {
-                AstBinaryOp::Add => NirBinaryOp::Add,
-                AstBinaryOp::Sub => NirBinaryOp::Sub,
-                AstBinaryOp::Mul => NirBinaryOp::Mul,
-                AstBinaryOp::Div => NirBinaryOp::Div,
-            },
-            lhs: Box::new(lower_expr(
-                lhs,
-                current_domain,
-                bindings,
-                signatures,
-                struct_table,
-                None,
-            )?),
-            rhs: Box::new(lower_expr(
-                rhs,
-                current_domain,
-                bindings,
-                signatures,
-                struct_table,
-                None,
-            )?),
-        },
+        AstExpr::Binary { op, lhs, rhs } => lower_binary_expr(
+            op,
+            lhs,
+            rhs,
+            current_domain,
+            bindings,
+            signatures,
+            struct_table,
+        )?,
     })
+}
+
+fn lower_binary_expr(
+    op: &AstBinaryOp,
+    lhs: &AstExpr,
+    rhs: &AstExpr,
+    current_domain: &str,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> Result<NirExpr, String> {
+    let lowered_lhs = lower_expr(
+        lhs,
+        current_domain,
+        bindings,
+        signatures,
+        struct_table,
+        None,
+    )?;
+    let lowered_rhs = lower_expr(
+        rhs,
+        current_domain,
+        bindings,
+        signatures,
+        struct_table,
+        None,
+    )?;
+    let lhs_ty = infer_nir_expr_type(&lowered_lhs, bindings, signatures, struct_table)
+        .ok_or_else(|| "cannot infer binary lhs type".to_owned())?;
+    let rhs_ty = infer_nir_expr_type(&lowered_rhs, bindings, signatures, struct_table)
+        .ok_or_else(|| "cannot infer binary rhs type".to_owned())?;
+    let result_ty = binary_result_type(*op, &lhs_ty, &rhs_ty)?;
+    if !compatible_types(&lhs_ty, &result_ty) || !compatible_types(&rhs_ty, &result_ty) {
+        return Err(format!(
+            "binary operands must agree on type, found `{}` and `{}`",
+            lhs_ty.render(),
+            rhs_ty.render()
+        ));
+    }
+    Ok(NirExpr::Binary {
+        op: match op {
+            AstBinaryOp::Add => NirBinaryOp::Add,
+            AstBinaryOp::Sub => NirBinaryOp::Sub,
+            AstBinaryOp::Mul => NirBinaryOp::Mul,
+            AstBinaryOp::Div => NirBinaryOp::Div,
+        },
+        lhs: Box::new(lowered_lhs),
+        rhs: Box::new(lowered_rhs),
+    })
+}
+
+fn binary_result_type(
+    op: AstBinaryOp,
+    lhs: &NirTypeRef,
+    rhs: &NirTypeRef,
+) -> Result<NirTypeRef, String> {
+    if !compatible_types(lhs, rhs) {
+        return Err(format!(
+            "binary `{}` expects matching operand types, found `{}` and `{}`",
+            render_binary_op(op),
+            lhs.render(),
+            rhs.render()
+        ));
+    }
+    if !lhs.is_numeric_scalar() || !rhs.is_numeric_scalar() {
+        return Err(format!(
+            "binary `{}` currently expects numeric scalar operands, found `{}` and `{}`",
+            render_binary_op(op),
+            lhs.render(),
+            rhs.render()
+        ));
+    }
+    Ok(lhs.clone())
+}
+
+fn render_binary_op(op: AstBinaryOp) -> &'static str {
+    match op {
+        AstBinaryOp::Add => "+",
+        AstBinaryOp::Sub => "-",
+        AstBinaryOp::Mul => "*",
+        AstBinaryOp::Div => "/",
+    }
 }
 
 fn lower_call_expr(
@@ -1994,7 +2052,7 @@ fn infer_nir_expr_type(
 ) -> Option<NirTypeRef> {
     match expr {
         NirExpr::Bool(_) | NirExpr::IsNull(_) => Some(bool_type()),
-        NirExpr::Text(_) => Some(named_type("String")),
+        NirExpr::Text(_) => Some(string_type()),
         NirExpr::Int(_) => Some(i64_type()),
         NirExpr::Var(name) => bindings.get(name).cloned(),
         NirExpr::Instantiate { unit, .. } => {
@@ -2004,13 +2062,13 @@ fn infer_nir_expr_type(
         NirExpr::Borrow(value) | NirExpr::Move(value) => {
             infer_nir_expr_type(value, bindings, signatures, struct_table)
         }
-        NirExpr::BorrowEnd(_) => Some(named_type("Unit")),
+        NirExpr::BorrowEnd(_) => Some(unit_type()),
         NirExpr::AllocNode { .. } => Some(ref_type("Node")),
         NirExpr::AllocBuffer { .. } => Some(ref_type("Buffer")),
-        NirExpr::DataBindCore(_) | NirExpr::CpuBindCore(_) => Some(named_type("Unit")),
+        NirExpr::DataBindCore(_) | NirExpr::CpuBindCore(_) => Some(unit_type()),
         NirExpr::CpuWindow { .. } => Some(named_type("Window")),
         NirExpr::CpuInputI64 { .. } | NirExpr::CpuTickI64 { .. } => Some(i64_type()),
-        NirExpr::CpuPresentFrame(_) => Some(named_type("Unit")),
+        NirExpr::CpuPresentFrame(_) => Some(unit_type()),
         NirExpr::ShaderProfileTargetRef { .. } => Some(named_type("Target")),
         NirExpr::ShaderProfileViewportRef { .. } => Some(named_type("Viewport")),
         NirExpr::ShaderProfilePipelineRef { .. } => Some(named_type("Pipeline")),
@@ -2070,7 +2128,7 @@ fn infer_nir_expr_type(
         NirExpr::StoreValue { .. }
         | NirExpr::StoreNext { .. }
         | NirExpr::StoreAt { .. }
-        | NirExpr::Free(_) => Some(named_type("Unit")),
+        | NirExpr::Free(_) => Some(unit_type()),
         NirExpr::Call { callee, .. } => signatures
             .get(callee)
             .and_then(|sig| sig.return_type.clone()),
@@ -2078,14 +2136,17 @@ fn infer_nir_expr_type(
         NirExpr::StructLiteral { type_name, .. } => Some(named_type(type_name)),
         NirExpr::FieldAccess { base, field } => {
             let base_ty = infer_nir_expr_type(base, bindings, signatures, struct_table)?;
-            let definition = struct_table.get(&base_ty.name)?;
-            definition
-                .fields
-                .iter()
-                .find(|candidate| candidate.name == *field)
-                .map(|field| field.ty.clone())
+            struct_field_type(&base_ty, field, struct_table)
         }
-        NirExpr::Binary { .. } => Some(i64_type()),
+        NirExpr::Binary { lhs, rhs, .. } => {
+            let lhs_ty = infer_nir_expr_type(lhs, bindings, signatures, struct_table)?;
+            let rhs_ty = infer_nir_expr_type(rhs, bindings, signatures, struct_table)?;
+            if compatible_types(&lhs_ty, &rhs_ty) && lhs_ty.is_numeric_scalar() {
+                Some(lhs_ty)
+            } else {
+                None
+            }
+        }
     }
 }
 
@@ -2115,13 +2176,18 @@ fn resolve_declared_or_inferred(
 }
 
 fn compatible_types(expected: &NirTypeRef, actual: &NirTypeRef) -> bool {
-    if expected.name == actual.name
-        && expected.is_ref == actual.is_ref
-        && expected.is_optional == actual.is_optional
+    if expected.name != actual.name
+        || expected.is_ref != actual.is_ref
+        || expected.is_optional != actual.is_optional
+        || expected.generic_args.len() != actual.generic_args.len()
     {
-        return true;
+        return expected.is_ref && actual.is_ref && expected.generic_args.is_empty();
     }
-    expected.is_ref && actual.is_ref
+    expected
+        .generic_args
+        .iter()
+        .zip(&actual.generic_args)
+        .all(|(lhs, rhs)| compatible_types(lhs, rhs))
 }
 
 fn named_type(name: &str) -> NirTypeRef {
@@ -2159,14 +2225,105 @@ fn bool_type() -> NirTypeRef {
     named_type("bool")
 }
 
+fn string_type() -> NirTypeRef {
+    named_type("String")
+}
+
+fn unit_type() -> NirTypeRef {
+    named_type("Unit")
+}
+
+fn struct_field_type(
+    base_ty: &NirTypeRef,
+    field: &str,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> Option<NirTypeRef> {
+    struct_table
+        .get(&base_ty.name)?
+        .field(field)
+        .map(|field| field.ty.clone())
+}
+
 fn render_type_name(ty: &NirTypeRef) -> String {
-    let mut out = String::new();
-    if ty.is_ref {
-        out.push_str("ref ");
+    ty.render()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_nuis_module;
+    use nuis_semantics::model::NirStmt;
+
+    #[test]
+    fn infers_struct_field_type_from_shared_type_helper() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              struct Packet {
+                count: i32,
+                label: String,
+              }
+
+              fn pick(packet: Packet) -> i32 {
+                return packet.count;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "pick")
+            .unwrap();
+        let return_type = function.return_type.as_ref().unwrap();
+        assert_eq!(return_type.render(), "i32");
     }
-    out.push_str(&ty.name);
-    if ty.is_optional {
-        out.push('?');
+
+    #[test]
+    fn infers_binary_result_from_operand_scalar_type() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn add(lhs: i32, rhs: i32) -> i32 {
+                let sum: i32 = lhs + rhs;
+                return sum;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "add")
+            .unwrap();
+        let sum_stmt = function
+            .body
+            .iter()
+            .find_map(|stmt| match stmt {
+                NirStmt::Let { name, ty, .. } if name == "sum" => ty.as_ref(),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(sum_stmt.render(), "i32");
     }
-    out
+
+    #[test]
+    fn rejects_non_numeric_binary_operands() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn join(lhs: String, rhs: String) -> String {
+                let out: String = lhs + rhs;
+                return out;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("numeric scalar operands"));
+    }
 }

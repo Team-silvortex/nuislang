@@ -34,7 +34,6 @@ define i64 @nuis_yir_entry() {
   ; deferred lowering for data.marker on fabric0 (data.fabric)
   %5 = add i64 0, 1
   ; deferred lowering for data.immutable_window on fabric0 (data.fabric)
-  ; deferred lowering for data.marker on fabric0 (data.fabric)
   ; deferred lowering for data.handle_table on fabric0 (data.fabric)
   ; deferred lowering for data.marker on fabric0 (data.fabric)
   ; deferred lowering for data.marker on fabric0 (data.fabric)
@@ -45,7 +44,6 @@ define i64 @nuis_yir_entry() {
   %6 = add i64 0, 1
   ; deferred lowering for data.copy_window on fabric0 (data.fabric)
   ; deferred lowering for data.bind_core on fabric0 (data.fabric)
-  ; deferred lowering for data.marker on fabric0 (data.fabric)
   ; deferred lowering for data.marker on fabric0 (data.fabric)
   ; deferred lowering for cpu.instantiate_unit on cpu0 (cpu.arm64)
   ; deferred lowering for cpu.instantiate_unit on cpu0 (cpu.arm64)

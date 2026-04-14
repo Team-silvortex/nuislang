@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, path::Path};
 
 use nuis_semantics::model::{NirBinaryOp, NirExpr, NirFunction, NirModule, NirStmt};
 use yir_core::{
@@ -100,6 +100,7 @@ fn lower_nir_to_yir_builtin_cpu(module: &NirModule) -> Result<YirModule, String>
 }
 
 pub fn assign_default_lanes(module: &mut YirModule) {
+    let lane_policy = load_declared_lane_policy(module);
     let resource_families = module
         .resources
         .iter()
@@ -112,14 +113,46 @@ pub fn assign_default_lanes(module: &mut YirModule) {
             .get(node.resource.as_str())
             .copied()
             .unwrap_or("unknown");
-        let lane = default_lane_for_node(family, node);
+        let lane = default_lane_for_node(&lane_policy, family, node);
         module.node_lanes.insert(node.name.clone(), lane.to_owned());
     }
 }
 
-fn default_lane_for_node<'a>(family: &str, node: &'a Node) -> &'a str {
+fn load_declared_lane_policy(module: &YirModule) -> BTreeMap<String, String> {
+    let mut policy = BTreeMap::<String, String>::new();
+    for family in module
+        .resources
+        .iter()
+        .map(|resource| resource.kind.family().to_owned())
+        .collect::<std::collections::BTreeSet<_>>()
+    {
+        let Ok(manifest) =
+            crate::registry::load_manifest_for_domain(Path::new("nustar-packages"), &family)
+        else {
+            continue;
+        };
+        for entry in manifest.default_lanes {
+            let Some((pattern, lane)) = entry.split_once('=') else {
+                continue;
+            };
+            if !pattern.is_empty() && !lane.is_empty() {
+                policy.insert(pattern.trim().to_owned(), lane.trim().to_owned());
+            }
+        }
+    }
+    policy
+}
+
+fn default_lane_for_node<'a>(
+    lane_policy: &'a BTreeMap<String, String>,
+    family: &str,
+    node: &'a Node,
+) -> &'a str {
     if node.name.starts_with("project_profile_") {
         return "profile";
+    }
+    if let Some(lane) = lane_policy.get(&node.op.full_name()) {
+        return lane.as_str();
     }
     match family {
         "cpu" => match node.op.semantic_op() {

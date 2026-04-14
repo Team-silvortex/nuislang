@@ -8,6 +8,10 @@ Projects can also lock required Nustar ABI profiles per domain via
 `abi = ["cpu=...", "shader=...", "data=...", "kernel=..."]`.
 If `abi` is omitted, `nuisc/nuis` now auto-resolve a host-matching ABI set
 per involved domain and validate YIR against that effective ABI contract.
+Per-domain lane defaults are now also declared by each Nustar package via
+`default_lanes = ["op.name=lane"]`, so project/profile lowering stays
+mod-owned and `nuisc` only applies the declared policy plus narrow fallback
+rules when a package has not specified one yet.
 
 Recommended starting point:
 

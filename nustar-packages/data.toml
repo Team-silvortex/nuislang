@@ -21,6 +21,7 @@ loader_entry = "nustar.bootstrap.v1"
 loader_abi = "nustar-loader-v1"
 support_surface = ["data.profile.bind-core.v1", "data.profile.send.uplink.v1", "data.profile.send.downlink.v1", "data.profile.handle-table.v1", "data.profile.window-layout.v1", "data.profile.sync-markers.v1", "data.profile.pipe-markers.v1", "data.profile.pipe-class.v1", "data.profile.payload-class.v1", "data.profile.payload-shape.v1", "data.profile.window-policy.v1"]
 support_profile_slots = ["bind_core", "window_offset", "uplink_len", "downlink_len", "handle_table", "marker:cpu_to_shader", "marker:shader_to_cpu", "marker:cpu_to_kernel", "marker:kernel_to_cpu", "marker:uplink_pipe", "marker:downlink_pipe", "marker:uplink_pipe_class", "marker:downlink_pipe_class", "marker:uplink_payload_class", "marker:downlink_payload_class", "marker:uplink_payload_shape", "marker:downlink_payload_shape", "marker:uplink_window_policy", "marker:downlink_window_policy"]
+default_lanes = ["data.bind_core=control", "data.handle_table=control", "data.marker=control", "data.immutable_window=uplink", "data.output_pipe=uplink", "data.copy_window=downlink", "data.input_pipe=downlink", "data.move=fabric"]
 profiles = ["aot"]
 resource_families = ["cpu", "shader", "kernel", "npu", "data"]
 unit_types = ["FabricPlane", "PipePlane", "DataWorker"]

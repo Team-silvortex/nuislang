@@ -533,7 +533,7 @@ fn implementation_contract(binary: &NustarBinary, kind: &str) -> ImplementationC
 
 fn render_manifest(manifest: &NustarPackageManifest) -> String {
     format!(
-        "manifest_schema = \"{}\"\npackage_id = \"{}\"\ndomain_family = \"{}\"\nfrontend = \"{}\"\nentry_crate = \"{}\"\nast_entry = \"{}\"\nnir_entry = \"{}\"\nyir_lowering_entry = \"{}\"\npart_verify_entry = \"{}\"\nast_surface = {}\nnir_surface = {}\nyir_lowering = {}\npart_verify = {}\nbinary_extension = \"{}\"\npackage_layout = \"{}\"\nmachine_abi_policy = \"{}\"\nabi_profiles = {}\nabi_capabilities = {}\nimplementation_kinds = {}\nloader_entry = \"{}\"\nloader_abi = \"{}\"\nhost_ffi_surface = {}\nhost_ffi_abis = {}\nhost_ffi_bridge = \"{}\"\nsupport_surface = {}\nsupport_profile_slots = {}\nprofiles = {}\nresource_families = {}\nunit_types = {}\nlowering_targets = {}\nops = {}\n",
+        "manifest_schema = \"{}\"\npackage_id = \"{}\"\ndomain_family = \"{}\"\nfrontend = \"{}\"\nentry_crate = \"{}\"\nast_entry = \"{}\"\nnir_entry = \"{}\"\nyir_lowering_entry = \"{}\"\npart_verify_entry = \"{}\"\nast_surface = {}\nnir_surface = {}\nyir_lowering = {}\npart_verify = {}\nbinary_extension = \"{}\"\npackage_layout = \"{}\"\nmachine_abi_policy = \"{}\"\nabi_profiles = {}\nabi_capabilities = {}\nimplementation_kinds = {}\nloader_entry = \"{}\"\nloader_abi = \"{}\"\nhost_ffi_surface = {}\nhost_ffi_abis = {}\nhost_ffi_bridge = \"{}\"\nsupport_surface = {}\nsupport_profile_slots = {}\ndefault_lanes = {}\nprofiles = {}\nresource_families = {}\nunit_types = {}\nlowering_targets = {}\nops = {}\n",
         manifest.manifest_schema,
         manifest.package_id,
         manifest.domain_family,
@@ -560,6 +560,7 @@ fn render_manifest(manifest: &NustarPackageManifest) -> String {
         manifest.host_ffi_bridge,
         render_array(&manifest.support_surface),
         render_array(&manifest.support_profile_slots),
+        render_array(&manifest.default_lanes),
         render_array(&manifest.profiles),
         render_array(&manifest.resource_families),
         render_array(&manifest.unit_types),
@@ -645,6 +646,7 @@ fn parse_manifest_text(source: &str, path: &Path) -> Result<NustarPackageManifes
         support_surface: parse_optional_string_array(source, "support_surface").unwrap_or_default(),
         support_profile_slots: parse_optional_string_array(source, "support_profile_slots")
             .unwrap_or_default(),
+        default_lanes: parse_optional_string_array(source, "default_lanes").unwrap_or_default(),
         profiles: parse_string_array(source, "profiles", path)?,
         resource_families: parse_string_array(source, "resource_families", path)?,
         unit_types: parse_string_array(source, "unit_types", path)?,
@@ -779,6 +781,7 @@ mod tests {
             host_ffi_bridge: "none".to_owned(),
             support_surface: Vec::new(),
             support_profile_slots: Vec::new(),
+            default_lanes: Vec::new(),
             profiles: vec!["aot".to_owned()],
             resource_families: vec![domain.to_owned()],
             unit_types: vec!["Main".to_owned()],
