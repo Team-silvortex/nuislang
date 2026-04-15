@@ -526,6 +526,7 @@ pub fn validate_project_links_against_yir(
                         link.from, link.to, via, to_domain
                     ));
                 }
+                validate_data_profile_token_types(project, &link.from, &link.to, via)?;
                 validate_data_profile_for_link(module, &link.from, &link.to, via)?;
             }
         }
@@ -1896,6 +1897,169 @@ fn validate_data_profile_for_link(
     }
 
     Ok(())
+}
+
+fn validate_data_profile_token_types(
+    project: &LoadedProject,
+    from_endpoint: &str,
+    to_endpoint: &str,
+    endpoint: &str,
+) -> Result<(), String> {
+    let (domain, unit) = split_domain_unit(endpoint)?;
+    if domain != "data" {
+        return Ok(());
+    }
+    let profile_module = project
+        .modules
+        .iter()
+        .find(|module| module.ast.domain == domain && module.ast.unit == unit)
+        .ok_or_else(|| format!("project is missing support module `{endpoint}`"))?;
+    let Some(profile_fn) = profile_module
+        .ast
+        .functions
+        .iter()
+        .find(|function| function.name == "profile")
+    else {
+        return Ok(());
+    };
+    let (from_domain, _) = split_domain_unit(from_endpoint)?;
+    let (to_domain, _) = split_domain_unit(to_endpoint)?;
+
+    let handle_table_ty = find_profile_call_declared_type(&profile_fn.body, "data_handle_table", None)
+        .ok_or_else(|| {
+            format!(
+                "project data unit `data.{}` requires typed `HandleTable<Schema>` on its data_handle_table binding",
+                unit
+            )
+        })?;
+    require_profile_semantic_type(&handle_table_ty, "HandleTable", true, &unit, "handle_table")?;
+
+    for slot in data_profile_required_slots_for_link(&from_domain, &to_domain) {
+        if !slot.starts_with("marker:") {
+            continue;
+        }
+        let tag = slot.trim_start_matches("marker:");
+        let marker_ty = find_profile_call_declared_type(&profile_fn.body, "data_marker", Some(tag))
+            .ok_or_else(|| {
+                format!(
+                    "project data unit `data.{}` requires typed `Marker<Tag>` binding for marker `{}`",
+                    unit, tag
+                )
+            })?;
+        require_profile_semantic_type(&marker_ty, "Marker", true, &unit, tag)?;
+    }
+
+    for tag in [
+        "uplink_pipe",
+        "downlink_pipe",
+        "uplink_pipe_class",
+        "downlink_pipe_class",
+        "uplink_payload_class",
+        "downlink_payload_class",
+        "uplink_payload_shape",
+        "downlink_payload_shape",
+        "uplink_window_policy",
+        "downlink_window_policy",
+    ] {
+        let marker_ty = find_profile_call_declared_type(&profile_fn.body, "data_marker", Some(tag))
+            .ok_or_else(|| {
+                format!(
+                    "project data unit `data.{}` requires typed `Marker<Tag>` binding for marker `{}`",
+                    unit, tag
+                )
+            })?;
+        require_profile_semantic_type(&marker_ty, "Marker", true, &unit, tag)?;
+    }
+
+    Ok(())
+}
+
+fn find_profile_call_declared_type(
+    body: &[AstStmt],
+    callee: &str,
+    marker_tag: Option<&str>,
+) -> Option<AstTypeRef> {
+    for stmt in body {
+        match stmt {
+            AstStmt::Let {
+                ty: Some(ty),
+                value: AstExpr::Call {
+                    callee: stmt_callee,
+                    args,
+                },
+                ..
+            }
+            | AstStmt::Const {
+                ty,
+                value: AstExpr::Call {
+                    callee: stmt_callee,
+                    args,
+                },
+                ..
+            } if stmt_callee == callee => {
+                if let Some(expected_tag) = marker_tag {
+                    let Some(AstExpr::Text(actual_tag)) = args.first() else {
+                        continue;
+                    };
+                    if actual_tag != expected_tag {
+                        continue;
+                    }
+                }
+                return Some(ty.clone());
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+fn require_profile_semantic_type(
+    ty: &AstTypeRef,
+    family: &str,
+    require_generic: bool,
+    unit: &str,
+    slot: &str,
+) -> Result<(), String> {
+    if ty.name != family || ty.is_ref || ty.is_optional {
+        return Err(format!(
+            "project data unit `data.{}` requires `{}` binding `{}` to use `{}` type, found `{}`",
+            unit,
+            family,
+            slot,
+            family,
+            render_ast_type_name(ty)
+        ));
+    }
+    if require_generic && ty.generic_args.len() != 1 {
+        return Err(format!(
+            "project data unit `data.{}` requires `{}` binding `{}` to use typed form `{}<...>`",
+            unit, family, slot, family
+        ));
+    }
+    Ok(())
+}
+
+fn render_ast_type_name(ty: &AstTypeRef) -> String {
+    let mut out = String::new();
+    if ty.is_ref {
+        out.push_str("ref ");
+    }
+    out.push_str(&ty.name);
+    if !ty.generic_args.is_empty() {
+        out.push('<');
+        out.push_str(
+            &ty.generic_args
+                .iter()
+                .map(render_ast_type_name)
+                .collect::<Vec<_>>()
+                .join(", "),
+        );
+        out.push('>');
+    }
+    if ty.is_optional {
+        out.push('?');
+    }
+    out
 }
 
 fn has_edge_to(module: &YirModule, from: &str, to: &str) -> bool {
@@ -3386,4 +3550,105 @@ fn sanitize_ident(raw: &str) -> String {
     raw.chars()
         .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '_' })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn project_with_modules(modules: Vec<(&str, &str)>) -> LoadedProject {
+        LoadedProject {
+            root: PathBuf::from("."),
+            manifest_path: PathBuf::from("nuis.toml"),
+            manifest: NuisProjectManifest {
+                name: "test".to_owned(),
+                entry: "main.ns".to_owned(),
+                modules: vec![],
+                links: vec![],
+                abi_requirements: vec![],
+                galaxy_dependencies: vec![],
+            },
+            entry_path: PathBuf::from("main.ns"),
+            entry_source: String::new(),
+            modules: modules
+                .into_iter()
+                .map(|(path, source)| ProjectModule {
+                    path: PathBuf::from(path),
+                    ast: crate::frontend::parse_nuis_ast(source).unwrap(),
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn accepts_typed_data_profile_tokens_for_project_link() {
+        let project = project_with_modules(vec![(
+            "fabric_plane.ns",
+            r#"
+            mod data FabricPlane {
+              fn profile() {
+                let profile_handles: HandleTable<FabricBindings> =
+                  data_handle_table("host=cpu0", "render=shader0");
+                let cpu_to_shader: Marker<CpuToShader> = data_marker("cpu_to_shader");
+                let shader_to_cpu: Marker<ShaderToCpu> = data_marker("shader_to_cpu");
+                let uplink_pipe: Marker<UplinkPipe> = data_marker("uplink_pipe");
+                let downlink_pipe: Marker<DownlinkPipe> = data_marker("downlink_pipe");
+                let uplink_pipe_class: Marker<UplinkPipeClass> = data_marker("uplink_pipe_class");
+                let downlink_pipe_class: Marker<DownlinkPipeClass> = data_marker("downlink_pipe_class");
+                let uplink_payload_class: Marker<UplinkPayloadClass> = data_marker("uplink_payload_class");
+                let downlink_payload_class: Marker<DownlinkPayloadClass> = data_marker("downlink_payload_class");
+                let uplink_payload_shape: Marker<UplinkPayloadShape> = data_marker("uplink_payload_shape");
+                let downlink_payload_shape: Marker<DownlinkPayloadShape> = data_marker("downlink_payload_shape");
+                let uplink_window_policy: Marker<UplinkWindowPolicy> = data_marker("uplink_window_policy");
+                let downlink_window_policy: Marker<DownlinkWindowPolicy> = data_marker("downlink_window_policy");
+              }
+            }
+            "#,
+        )]);
+
+        validate_data_profile_token_types(
+            &project,
+            "cpu.Main",
+            "shader.SurfaceShader",
+            "data.FabricPlane",
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn rejects_untyped_data_profile_marker_for_project_link() {
+        let project = project_with_modules(vec![(
+            "fabric_plane.ns",
+            r#"
+            mod data FabricPlane {
+              fn profile() {
+                let profile_handles: HandleTable<FabricBindings> =
+                  data_handle_table("host=cpu0", "render=shader0");
+                let cpu_to_shader: Marker = data_marker("cpu_to_shader");
+                let shader_to_cpu: Marker<ShaderToCpu> = data_marker("shader_to_cpu");
+                let uplink_pipe: Marker<UplinkPipe> = data_marker("uplink_pipe");
+                let downlink_pipe: Marker<DownlinkPipe> = data_marker("downlink_pipe");
+                let uplink_pipe_class: Marker<UplinkPipeClass> = data_marker("uplink_pipe_class");
+                let downlink_pipe_class: Marker<DownlinkPipeClass> = data_marker("downlink_pipe_class");
+                let uplink_payload_class: Marker<UplinkPayloadClass> = data_marker("uplink_payload_class");
+                let downlink_payload_class: Marker<DownlinkPayloadClass> = data_marker("downlink_payload_class");
+                let uplink_payload_shape: Marker<UplinkPayloadShape> = data_marker("uplink_payload_shape");
+                let downlink_payload_shape: Marker<DownlinkPayloadShape> = data_marker("downlink_payload_shape");
+                let uplink_window_policy: Marker<UplinkWindowPolicy> = data_marker("uplink_window_policy");
+                let downlink_window_policy: Marker<DownlinkWindowPolicy> = data_marker("downlink_window_policy");
+              }
+            }
+            "#,
+        )]);
+
+        let error = validate_data_profile_token_types(
+            &project,
+            "cpu.Main",
+            "shader.SurfaceShader",
+            "data.FabricPlane",
+        )
+        .unwrap_err();
+
+        assert!(error.contains("typed form `Marker<...>`"));
+    }
 }
