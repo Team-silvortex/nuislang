@@ -212,6 +212,13 @@ pub enum NirTypeShape {
     Nominal,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NirContainerKind {
+    Window,
+    Pipe,
+    Instance,
+}
+
 impl NirTypeRef {
     pub fn scalar_kind(&self) -> Option<NirScalarKind> {
         if self.is_ref || !self.generic_args.is_empty() {
@@ -273,6 +280,164 @@ impl NirTypeRef {
 
     pub fn is_generic_named(&self, expected: &str, arity: usize) -> bool {
         self.name == expected && self.generic_args.len() == arity && !self.is_ref
+    }
+
+    pub fn container_kind(&self) -> Option<NirContainerKind> {
+        match self.name.as_str() {
+            "Window" if !self.is_ref => Some(NirContainerKind::Window),
+            "Pipe" if !self.is_ref => Some(NirContainerKind::Pipe),
+            "Instance" if !self.is_ref => Some(NirContainerKind::Instance),
+            _ => None,
+        }
+    }
+
+    pub fn container_payload(&self) -> Option<&NirTypeRef> {
+        if matches!(
+            self.container_kind(),
+            Some(NirContainerKind::Window | NirContainerKind::Pipe | NirContainerKind::Instance)
+        ) {
+            self.generic_args.first()
+        } else {
+            None
+        }
+    }
+
+    pub fn is_marker_type(&self) -> bool {
+        self.name == "Marker" && !self.is_ref && self.generic_args.is_empty()
+    }
+
+    pub fn is_handle_table_type(&self) -> bool {
+        self.name == "HandleTable" && !self.is_ref && self.generic_args.is_empty()
+    }
+
+    pub fn is_marker_family(&self) -> bool {
+        self.name == "Marker" && !self.is_ref
+    }
+
+    pub fn is_handle_table_family(&self) -> bool {
+        self.name == "HandleTable" && !self.is_ref
+    }
+
+    pub fn marker_tag(&self) -> Option<&NirTypeRef> {
+        if self.is_marker_family() {
+            self.generic_args.first()
+        } else {
+            None
+        }
+    }
+
+    pub fn handle_table_schema(&self) -> Option<&NirTypeRef> {
+        if self.is_handle_table_family() {
+            self.generic_args.first()
+        } else {
+            None
+        }
+    }
+
+    fn is_nominal_semantic_payload(&self) -> bool {
+        !self.is_ref
+            && !self.is_optional
+            && self.scalar_kind().is_none()
+            && self.container_kind().is_none()
+            && !self.is_marker_family()
+            && !self.is_handle_table_family()
+    }
+
+    pub fn validate_container_contract(&self) -> Result<(), String> {
+        for arg in &self.generic_args {
+            arg.validate_container_contract()?;
+        }
+
+        match self.container_kind() {
+            Some(NirContainerKind::Window) => {
+                if self.generic_args.len() != 1 {
+                    return Err(format!(
+                        "`{}` must carry exactly one payload type argument",
+                        self.name
+                    ));
+                }
+                let payload = self.container_payload().expect("window payload");
+                if payload.is_marker_type() || payload.is_handle_table_type() {
+                    return Err(format!(
+                        "`Window<...>` cannot carry control-plane payload `{}`",
+                        payload.render()
+                    ));
+                }
+                if payload.container_kind() == Some(NirContainerKind::Pipe) {
+                    return Err("`Window<Pipe<...>>` is not a valid memory payload".to_owned());
+                }
+            }
+            Some(NirContainerKind::Pipe) => {
+                if self.generic_args.len() != 1 {
+                    return Err(format!(
+                        "`{}` must carry exactly one payload type argument",
+                        self.name
+                    ));
+                }
+                let payload = self.container_payload().expect("pipe payload");
+                if payload.is_marker_type() || payload.is_handle_table_type() {
+                    return Err(format!(
+                        "`Pipe<...>` cannot carry control-plane payload `{}`",
+                        payload.render()
+                    ));
+                }
+                if payload.container_kind() == Some(NirContainerKind::Pipe) {
+                    return Err("`Pipe<Pipe<...>>` is not a legal fabric primitive".to_owned());
+                }
+            }
+            Some(NirContainerKind::Instance) => {
+                if self.generic_args.len() != 1 {
+                    return Err(format!(
+                        "`{}` must carry exactly one payload type argument",
+                        self.name
+                    ));
+                }
+                let payload = self.container_payload().expect("instance payload");
+                if payload.is_ref
+                    || payload.is_optional
+                    || payload.scalar_kind().is_some()
+                    || payload.is_marker_type()
+                    || payload.is_handle_table_type()
+                    || payload.container_kind().is_some()
+                {
+                    return Err(format!(
+                        "`Instance<...>` expects a nominal unit type, found `{}`",
+                        payload.render()
+                    ));
+                }
+            }
+            None => {
+                if self.is_marker_family() {
+                    if self.generic_args.len() > 1 {
+                        return Err("`Marker<...>` accepts at most one tag type".to_owned());
+                    }
+                    if let Some(tag) = self.marker_tag() {
+                        if !tag.is_nominal_semantic_payload() {
+                            return Err(format!(
+                                "`Marker<...>` expects a nominal tag type, found `{}`",
+                                tag.render()
+                            ));
+                        }
+                    }
+                }
+                if self.is_handle_table_family() {
+                    if self.generic_args.len() > 1 {
+                        return Err(
+                            "`HandleTable<...>` accepts at most one schema type".to_owned()
+                        );
+                    }
+                    if let Some(schema) = self.handle_table_schema() {
+                        if !schema.is_nominal_semantic_payload() {
+                            return Err(format!(
+                                "`HandleTable<...>` expects a nominal schema type, found `{}`",
+                                schema.render()
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 
     pub fn render(&self) -> String {

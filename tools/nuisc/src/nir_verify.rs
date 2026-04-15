@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{
-    nir_glm_profile, NirExpr, NirFunction, NirGlmUseMode, NirModule, NirStmt,
+    nir_glm_profile, NirExpr, NirFunction, NirGlmUseMode, NirModule, NirStmt, NirTypeRef,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -15,10 +15,59 @@ enum NirDataKind {
 }
 
 pub fn verify_nir_module(module: &NirModule) -> Result<(), String> {
+    verify_declared_types(module)?;
     for function in &module.functions {
         verify_function(function)?;
     }
     Ok(())
+}
+
+fn verify_declared_types(module: &NirModule) -> Result<(), String> {
+    for function in &module.externs {
+        for param in &function.params {
+            verify_type_ref(&param.ty)?;
+        }
+        verify_type_ref(&function.return_type)?;
+    }
+    for interface in &module.extern_interfaces {
+        for method in &interface.methods {
+            for param in &method.params {
+                verify_type_ref(&param.ty)?;
+            }
+            verify_type_ref(&method.return_type)?;
+        }
+    }
+    for definition in &module.structs {
+        for field in &definition.fields {
+            verify_type_ref(&field.ty)?;
+        }
+    }
+    for function in &module.functions {
+        for param in &function.params {
+            verify_type_ref(&param.ty)?;
+        }
+        if let Some(return_type) = &function.return_type {
+            verify_type_ref(return_type)?;
+        }
+        for stmt in &function.body {
+            match stmt {
+                NirStmt::Let { ty, .. } => {
+                    if let Some(ty) = ty {
+                        verify_type_ref(ty)?;
+                    }
+                }
+                NirStmt::Const { ty, .. } => verify_type_ref(ty)?,
+                NirStmt::Print(_) | NirStmt::Expr(_) | NirStmt::Return(_) | NirStmt::If { .. } => {
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn verify_type_ref(ty: &NirTypeRef) -> Result<(), String> {
+    ty.validate_container_contract()
+        .map_err(|error| format!("nir verify: invalid type `{}`: {error}", ty.render()))
 }
 
 fn verify_function(function: &NirFunction) -> Result<(), String> {

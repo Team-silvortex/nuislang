@@ -98,7 +98,7 @@ pub fn lower_ast_to_nir(module: &AstModule) -> Result<NirModule, String> {
         }))
         .collect::<BTreeMap<_, _>>();
 
-    Ok(NirModule {
+    let nir = NirModule {
         uses: module
             .uses
             .iter()
@@ -145,7 +145,9 @@ pub fn lower_ast_to_nir(module: &AstModule) -> Result<NirModule, String> {
             .iter()
             .map(|function| lower_function(function, &module.domain, &signatures, &struct_table))
             .collect::<Result<Vec<_>, _>>()?,
-    })
+    };
+    validate_declared_nir_types(&nir)?;
+    Ok(nir)
 }
 
 pub fn parse_nuis_module(input: &str) -> Result<NirModule, String> {
@@ -222,6 +224,9 @@ fn lower_stmt(
     Ok(match stmt {
         AstStmt::Let { name, ty, value } => {
             let expected = ty.as_ref().map(lower_type_ref);
+            if let Some(expected_ty) = expected.as_ref() {
+                validate_type_ref(expected_ty)?;
+            }
             let lowered = lower_expr(
                 value,
                 current_domain,
@@ -241,6 +246,7 @@ fn lower_stmt(
         }
         AstStmt::Const { name, ty, value } => {
             let expected = lower_type_ref(ty);
+            validate_type_ref(&expected)?;
             let lowered = lower_expr(
                 value,
                 current_domain,
@@ -316,6 +322,9 @@ fn lower_stmt(
         )?),
         AstStmt::Return(value) => {
             let expected = return_type.map(lower_type_ref);
+            if let Some(expected_ty) = expected.as_ref() {
+                validate_type_ref(expected_ty)?;
+            }
             NirStmt::Return(match value {
                 Some(value) => Some(lower_expr(
                     value,
@@ -864,6 +873,8 @@ fn lower_call_expr(
             let AstExpr::Text(tag) = tag else {
                 return Err("data_marker(...) currently expects a string literal".to_owned());
             };
+            let marker_type = select_expected_semantic_token_type(expected, "Marker");
+            validate_type_ref(&marker_type)?;
             Ok(NirExpr::DataMarker(tag.clone()))
         }
         "data_output_pipe" => {
@@ -975,6 +986,8 @@ fn lower_call_expr(
                 };
                 entries.push((slot.trim().to_owned(), resource.trim().to_owned()));
             }
+            let handle_table_type = select_expected_semantic_token_type(expected, "HandleTable");
+            validate_type_ref(&handle_table_type)?;
             Ok(NirExpr::DataHandleTable(entries))
         }
         "cpu_bind_core" => {
@@ -1667,6 +1680,8 @@ fn lower_call_expr(
                     "data_profile_handle_table(...) expects a string literal unit name".to_owned(),
                 );
             };
+            let handle_table_type = select_expected_semantic_token_type(expected, "HandleTable");
+            validate_type_ref(&handle_table_type)?;
             Ok(NirExpr::DataProfileHandleTableRef { unit: unit.clone() })
         }
         "data_profile_marker" => {
@@ -1689,6 +1704,8 @@ fn lower_call_expr(
                     "data_profile_marker(...) expects a string literal marker tag".to_owned(),
                 );
             };
+            let marker_type = select_expected_semantic_token_type(expected, "Marker");
+            validate_type_ref(&marker_type)?;
             Ok(NirExpr::DataProfileMarkerRef {
                 unit: unit.clone(),
                 tag: tag.clone(),
@@ -2176,6 +2193,22 @@ fn resolve_declared_or_inferred(
 }
 
 fn compatible_types(expected: &NirTypeRef, actual: &NirTypeRef) -> bool {
+    if expected.name == actual.name
+        && !expected.is_ref
+        && !actual.is_ref
+        && !expected.is_optional
+        && !actual.is_optional
+        && matches!(expected.name.as_str(), "Marker" | "HandleTable")
+    {
+        return expected.generic_args.is_empty()
+            || actual.generic_args.is_empty()
+            || (expected.generic_args.len() == actual.generic_args.len()
+                && expected
+                    .generic_args
+                    .iter()
+                    .zip(&actual.generic_args)
+                    .all(|(lhs, rhs)| compatible_types(lhs, rhs)));
+    }
     if expected.name != actual.name
         || expected.is_ref != actual.is_ref
         || expected.is_optional != actual.is_optional
@@ -2242,6 +2275,71 @@ fn struct_field_type(
         .get(&base_ty.name)?
         .field(field)
         .map(|field| field.ty.clone())
+}
+
+fn validate_declared_nir_types(module: &NirModule) -> Result<(), String> {
+    for function in &module.externs {
+        for param in &function.params {
+            validate_type_ref(&param.ty)?;
+        }
+        validate_type_ref(&function.return_type)?;
+    }
+    for interface in &module.extern_interfaces {
+        for method in &interface.methods {
+            for param in &method.params {
+                validate_type_ref(&param.ty)?;
+            }
+            validate_type_ref(&method.return_type)?;
+        }
+    }
+    for definition in &module.structs {
+        for field in &definition.fields {
+            validate_type_ref(&field.ty)?;
+        }
+    }
+    for function in &module.functions {
+        for param in &function.params {
+            validate_type_ref(&param.ty)?;
+        }
+        if let Some(return_type) = &function.return_type {
+            validate_type_ref(return_type)?;
+        }
+        for stmt in &function.body {
+            match stmt {
+                NirStmt::Let { ty, .. } => {
+                    if let Some(ty) = ty {
+                        validate_type_ref(ty)?;
+                    }
+                }
+                NirStmt::Const { ty, .. } => validate_type_ref(ty)?,
+                NirStmt::Print(_) | NirStmt::Expr(_) | NirStmt::Return(_) | NirStmt::If { .. } => {
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_type_ref(ty: &NirTypeRef) -> Result<(), String> {
+    ty.validate_container_contract()
+        .map_err(|error| format!("invalid type `{}`: {error}", ty.render()))
+}
+
+fn select_expected_semantic_token_type(
+    expected: Option<&NirTypeRef>,
+    token_name: &str,
+) -> NirTypeRef {
+    match expected {
+        Some(expected)
+            if expected.name == token_name
+                && !expected.is_ref
+                && !expected.is_optional
+                && expected.generic_args.len() <= 1 =>
+        {
+            expected.clone()
+        }
+        _ => named_type(token_name),
+    }
 }
 
 fn render_type_name(ty: &NirTypeRef) -> String {
@@ -2325,5 +2423,103 @@ mod tests {
         .unwrap_err();
 
         assert!(error.contains("numeric scalar operands"));
+    }
+
+    #[test]
+    fn rejects_bare_window_type_without_payload() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() {
+                let packet: Window = data_profile_send_uplink("FabricPlane", 7);
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("Window"));
+        assert!(error.contains("payload type argument"));
+    }
+
+    #[test]
+    fn rejects_nested_pipe_payload_type() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() {
+                let pipe: Pipe<Pipe<i64>> = data_output_pipe(7);
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("Pipe<Pipe"));
+    }
+
+    #[test]
+    fn rejects_instance_of_scalar_type() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() {
+                let wrong: Instance<i64> = instantiate shader SurfaceShader;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("nominal unit type"));
+    }
+
+    #[test]
+    fn accepts_typed_marker_and_handle_table_annotations() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() {
+                let handles: HandleTable<FabricBindings> =
+                  data_profile_handle_table("FabricPlane");
+                let ready: Marker<CpuToShader> =
+                  data_profile_marker("FabricPlane", "cpu_to_shader");
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        let declared_types = function
+            .body
+            .iter()
+            .filter_map(|stmt| match stmt {
+                NirStmt::Let { ty: Some(ty), .. } => Some(ty.render()),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert!(declared_types.contains(&"HandleTable<FabricBindings>".to_owned()));
+        assert!(declared_types.contains(&"Marker<CpuToShader>".to_owned()));
+    }
+
+    #[test]
+    fn rejects_marker_with_non_nominal_tag_type() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() {
+                let ready: Marker<i64> = data_marker("cpu_to_shader");
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("nominal tag type"));
     }
 }

@@ -12,7 +12,8 @@ mod cpu Main {
     let mixed: i64 = seed + bind_core + queue_depth + batch_lanes;
 
     data_profile_bind_core("FabricPlane");
-    let handles: HandleTable = data_profile_handle_table("FabricPlane");
+    let handles: HandleTable<FabricPlaneBindings> =
+      data_profile_handle_table("FabricPlane");
     let uplink: Window<i64> = data_profile_send_uplink("FabricPlane", mixed);
     let downlink: Window<Window<i64>> = data_profile_send_downlink("FabricPlane", uplink);
 

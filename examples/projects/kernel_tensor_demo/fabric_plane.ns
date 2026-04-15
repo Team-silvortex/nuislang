@@ -4,19 +4,23 @@ mod data FabricPlane {
     const uplink_len: i64 = 1;
     const downlink_len: i64 = 1;
     data_bind_core(1);
-    let profile_handles: HandleTable = data_handle_table("host=cpu0", "render=kernel0");
-    let cpu_to_kernel: Marker = data_marker("cpu_to_kernel");
-    let kernel_to_cpu: Marker = data_marker("kernel_to_cpu");
-    let uplink_pipe: Marker = data_marker("uplink_pipe");
-    let downlink_pipe: Marker = data_marker("downlink_pipe");
-    let uplink_pipe_class: Marker = data_marker("uplink_pipe_class");
-    let downlink_pipe_class: Marker = data_marker("downlink_pipe_class");
-    let uplink_payload_class: Marker = data_marker("uplink_payload_class");
-    let downlink_payload_class: Marker = data_marker("downlink_payload_class");
-    let uplink_payload_shape: Marker = data_marker("uplink_payload_shape");
-    let downlink_payload_shape: Marker = data_marker("downlink_payload_shape");
-    let uplink_window_policy: Marker = data_marker("uplink_window_policy");
-    let downlink_window_policy: Marker = data_marker("downlink_window_policy");
+    let profile_handles: HandleTable<FabricPlaneBindings> =
+      data_handle_table("host=cpu0", "render=kernel0");
+    let cpu_to_kernel: Marker<CpuToKernel> = data_marker("cpu_to_kernel");
+    let kernel_to_cpu: Marker<KernelToCpu> = data_marker("kernel_to_cpu");
+    let uplink_pipe: Marker<UplinkPipe> = data_marker("uplink_pipe");
+    let downlink_pipe: Marker<DownlinkPipe> = data_marker("downlink_pipe");
+    let uplink_pipe_class: Marker<UplinkPipeClass> = data_marker("uplink_pipe_class");
+    let downlink_pipe_class: Marker<DownlinkPipeClass> = data_marker("downlink_pipe_class");
+    let uplink_payload_class: Marker<UplinkPayloadClass> = data_marker("uplink_payload_class");
+    let downlink_payload_class: Marker<DownlinkPayloadClass> =
+      data_marker("downlink_payload_class");
+    let uplink_payload_shape: Marker<UplinkPayloadShape> = data_marker("uplink_payload_shape");
+    let downlink_payload_shape: Marker<DownlinkPayloadShape> =
+      data_marker("downlink_payload_shape");
+    let uplink_window_policy: Marker<UplinkWindowPolicy> = data_marker("uplink_window_policy");
+    let downlink_window_policy: Marker<DownlinkWindowPolicy> =
+      data_marker("downlink_window_policy");
     let uplink_window: Window<i64> =
       data_immutable_window(window_offset, window_offset, uplink_len);
     let downlink_window: Window<i64> =
