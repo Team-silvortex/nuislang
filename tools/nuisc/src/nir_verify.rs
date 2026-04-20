@@ -57,8 +57,7 @@ fn verify_declared_types(module: &NirModule) -> Result<(), String> {
                     }
                 }
                 NirStmt::Const { ty, .. } => verify_type_ref(ty)?,
-                NirStmt::Print(_) | NirStmt::Expr(_) | NirStmt::Return(_) | NirStmt::If { .. } => {
-                }
+                NirStmt::Print(_) | NirStmt::Expr(_) | NirStmt::Return(_) | NirStmt::If { .. } => {}
             }
         }
     }
@@ -410,13 +409,7 @@ fn verify_expr(
                 ..
             } = expr
             {
-                verify_expr(
-                    vertex_count,
-                    moved,
-                    borrows,
-                    borrow_bindings,
-                    data_bindings,
-                )?;
+                verify_expr(vertex_count, moved, borrows, borrow_bindings, data_bindings)?;
                 verify_expr(
                     instance_count,
                     moved,

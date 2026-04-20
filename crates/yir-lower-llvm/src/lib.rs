@@ -65,24 +65,32 @@ fn lower_cpu_literal_node(node: &Node, state: &mut LlvmLoweringState) -> bool {
                 .registers
                 .insert(node.name.clone(), LlvmValueRef::Bool(value.to_owned()));
             let widened = fresh_reg(&mut state.next_reg);
-            state.body.push(format!("  {widened} = zext i1 {value} to i64"));
+            state
+                .body
+                .push(format!("  {widened} = zext i1 {value} to i64"));
             state.last_cpu_value = Some(widened);
             true
         }
         "const_i32" => {
             let reg = fresh_reg(&mut state.next_reg);
-            state.body.push(format!("  {reg} = add i32 0, {}", node.op.args[0]));
+            state
+                .body
+                .push(format!("  {reg} = add i32 0, {}", node.op.args[0]));
             state
                 .registers
                 .insert(node.name.clone(), LlvmValueRef::I32(reg.clone()));
             let widened = fresh_reg(&mut state.next_reg);
-            state.body.push(format!("  {widened} = sext i32 {reg} to i64"));
+            state
+                .body
+                .push(format!("  {widened} = sext i32 {reg} to i64"));
             state.last_cpu_value = Some(widened);
             true
         }
         "const" | "const_i64" => {
             let reg = fresh_reg(&mut state.next_reg);
-            state.body.push(format!("  {reg} = add i64 0, {}", node.op.args[0]));
+            state
+                .body
+                .push(format!("  {reg} = add i64 0, {}", node.op.args[0]));
             state
                 .registers
                 .insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
@@ -91,23 +99,31 @@ fn lower_cpu_literal_node(node: &Node, state: &mut LlvmLoweringState) -> bool {
         }
         "const_f32" => {
             let reg = fresh_reg(&mut state.next_reg);
-            state.body.push(format!("  {reg} = fadd float 0.0, {}", node.op.args[0]));
+            state
+                .body
+                .push(format!("  {reg} = fadd float 0.0, {}", node.op.args[0]));
             state
                 .registers
                 .insert(node.name.clone(), LlvmValueRef::F32(reg.clone()));
             let widened = fresh_reg(&mut state.next_reg);
-            state.body.push(format!("  {widened} = fptosi float {reg} to i64"));
+            state
+                .body
+                .push(format!("  {widened} = fptosi float {reg} to i64"));
             state.last_cpu_value = Some(widened);
             true
         }
         "const_f64" => {
             let reg = fresh_reg(&mut state.next_reg);
-            state.body.push(format!("  {reg} = fadd double 0.0, {}", node.op.args[0]));
+            state
+                .body
+                .push(format!("  {reg} = fadd double 0.0, {}", node.op.args[0]));
             state
                 .registers
                 .insert(node.name.clone(), LlvmValueRef::F64(reg.clone()));
             let widened = fresh_reg(&mut state.next_reg);
-            state.body.push(format!("  {widened} = fptosi double {reg} to i64"));
+            state
+                .body
+                .push(format!("  {widened} = fptosi double {reg} to i64"));
             state.last_cpu_value = Some(widened);
             true
         }
@@ -173,7 +189,8 @@ fn lower_cpu_aggregate_node(node: &Node, state: &mut LlvmLoweringState) -> bool 
             state
                 .registers
                 .insert(node.name.clone(), field_value.clone());
-            if let Some(as_i64) = coerce_to_i64(&field_value, &mut state.body, &mut state.next_reg) {
+            if let Some(as_i64) = coerce_to_i64(&field_value, &mut state.body, &mut state.next_reg)
+            {
                 state.last_cpu_value = Some(as_i64);
             }
             true
@@ -202,7 +219,9 @@ fn lower_cpu_pointer_node(node: &Node, state: &mut LlvmLoweringState) -> bool {
             true
         }
         "borrow_end" => {
-            state.registers.insert(node.name.clone(), LlvmValueRef::Void);
+            state
+                .registers
+                .insert(node.name.clone(), LlvmValueRef::Void);
             true
         }
         _ => false,

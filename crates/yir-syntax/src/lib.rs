@@ -255,8 +255,8 @@ fn canonicalize_cpu_shorthand(
         "free" => "cpu.free".to_owned(),
         "print" => "cpu.print".to_owned(),
         "null" => "cpu.null".to_owned(),
-        "add" | "sub" | "mul" | "div" | "rem" | "eq" | "ne" | "lt" | "gt" | "le" | "ge"
-        | "and" | "or" | "xor" | "shl" | "shr" | "neg" | "not" | "select" => {
+        "add" | "sub" | "mul" | "div" | "rem" | "eq" | "ne" | "lt" | "gt" | "le" | "ge" | "and"
+        | "or" | "xor" | "shl" | "shr" | "neg" | "not" | "select" => {
             format!("cpu.{instruction}")
         }
         other => return Ok(format!("cpu.{other}")),
@@ -389,7 +389,9 @@ fn ensure_implicit_cpu_nil_node(module: &mut YirModule) {
 
 fn split_resource_lane(raw: &str) -> (&str, Option<&str>) {
     match raw.split_once('@') {
-        Some((resource, lane)) if !resource.is_empty() && !lane.is_empty() => (resource, Some(lane)),
+        Some((resource, lane)) if !resource.is_empty() && !lane.is_empty() => {
+            (resource, Some(lane))
+        }
         _ => (raw, None),
     }
 }
@@ -420,40 +422,24 @@ node print out cpu0 sum
         )
         .unwrap();
 
-        assert!(
-            module
-                .nodes
-                .iter()
-                .any(|node| node.name == "tail_value" && node.op.full_name() == "cpu.const_i64")
-        );
-        assert!(
-            module
-                .nodes
-                .iter()
-                .any(|node| node.name == "tail" && node.op.full_name() == "cpu.alloc_node")
-        );
-        assert!(
-            module
-                .nodes
-                .iter()
-                .any(|node| node.name == "next" && node.op.full_name() == "cpu.load_next")
-        );
-        assert!(
-            module
-                .edges
-                .iter()
-                .any(|edge| edge.kind == EdgeKind::Dep
-                    && edge.from == "tail_value"
-                    && edge.to == "tail")
-        );
-        assert!(
-            module
-                .edges
-                .iter()
-                .any(|edge| edge.kind == EdgeKind::Dep
-                    && edge.from == "tail_ref"
-                    && edge.to == "tail_val")
-        );
+        assert!(module
+            .nodes
+            .iter()
+            .any(|node| node.name == "tail_value" && node.op.full_name() == "cpu.const_i64"));
+        assert!(module
+            .nodes
+            .iter()
+            .any(|node| node.name == "tail" && node.op.full_name() == "cpu.alloc_node"));
+        assert!(module
+            .nodes
+            .iter()
+            .any(|node| node.name == "next" && node.op.full_name() == "cpu.load_next"));
+        assert!(module.edges.iter().any(|edge| edge.kind == EdgeKind::Dep
+            && edge.from == "tail_value"
+            && edge.to == "tail"));
+        assert!(module.edges.iter().any(|edge| edge.kind == EdgeKind::Dep
+            && edge.from == "tail_ref"
+            && edge.to == "tail_val"));
     }
 
     #[test]
@@ -469,14 +455,12 @@ node output_pipe packet fabric0 seed
         )
         .unwrap();
 
-        assert!(
-            module
-                .edges
-                .iter()
-                .any(|edge| edge.kind == EdgeKind::CrossDomainExchange
-                    && edge.from == "seed"
-                    && edge.to == "packet")
-        );
+        assert!(module
+            .edges
+            .iter()
+            .any(|edge| edge.kind == EdgeKind::CrossDomainExchange
+                && edge.from == "seed"
+                && edge.to == "packet"));
     }
 
     #[test]
@@ -500,24 +484,18 @@ node print out cpu0 sum
         )
         .unwrap();
 
-        assert!(
-            module
-                .nodes
-                .iter()
-                .any(|node| node.name == "tail_value" && node.op.full_name() == "cpu.const_i64")
-        );
-        assert!(
-            module
-                .nodes
-                .iter()
-                .any(|node| node.name == "tail" && node.op.full_name() == "cpu.alloc_node")
-        );
-        assert!(
-            module
-                .nodes
-                .iter()
-                .any(|node| node.name == "next_ptr" && node.op.full_name() == "cpu.load_next")
-        );
+        assert!(module
+            .nodes
+            .iter()
+            .any(|node| node.name == "tail_value" && node.op.full_name() == "cpu.const_i64"));
+        assert!(module
+            .nodes
+            .iter()
+            .any(|node| node.name == "tail" && node.op.full_name() == "cpu.alloc_node"));
+        assert!(module
+            .nodes
+            .iter()
+            .any(|node| node.name == "next_ptr" && node.op.full_name() == "cpu.load_next"));
     }
 
     #[test]
@@ -532,14 +510,18 @@ node print out cpu0@main seed
         )
         .unwrap();
 
-        assert_eq!(module.node_lanes.get("seed").map(String::as_str), Some("mem"));
-        assert_eq!(module.node_lanes.get("out").map(String::as_str), Some("main"));
-        assert!(
-            module
-                .edges
-                .iter()
-                .any(|edge| edge.kind == EdgeKind::Dep && edge.from == "seed" && edge.to == "out")
+        assert_eq!(
+            module.node_lanes.get("seed").map(String::as_str),
+            Some("mem")
         );
+        assert_eq!(
+            module.node_lanes.get("out").map(String::as_str),
+            Some("main")
+        );
+        assert!(module
+            .edges
+            .iter()
+            .any(|edge| edge.kind == EdgeKind::Dep && edge.from == "seed" && edge.to == "out"));
     }
 
     #[test]
@@ -556,19 +538,13 @@ node print out cpu0@main sum
         )
         .unwrap();
 
-        assert!(
-            module
-                .edges
-                .iter()
-                .any(|edge| edge.kind == EdgeKind::Effect && edge.from == "a" && edge.to == "b")
-        );
-        assert!(
-            module
-                .edges
-                .iter()
-                .any(|edge| edge.kind == EdgeKind::Effect
-                    && edge.from == "sum"
-                    && edge.to == "out")
-        );
+        assert!(module
+            .edges
+            .iter()
+            .any(|edge| edge.kind == EdgeKind::Effect && edge.from == "a" && edge.to == "b"));
+        assert!(module
+            .edges
+            .iter()
+            .any(|edge| edge.kind == EdgeKind::Effect && edge.from == "sum" && edge.to == "out"));
     }
 }

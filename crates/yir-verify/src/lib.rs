@@ -133,6 +133,7 @@ pub fn verify_module_with_registry(
     ensure_acyclic(module)?;
     verify_glm_protocol(module)?;
     verify_data_fabric_protocol(module, &resources)?;
+    verify_project_type_contract_nodes(module)?;
     verify_cpu_heap_protocol(module)?;
     Ok(())
 }
@@ -431,6 +432,283 @@ fn verify_data_fabric_protocol(
         };
 
         value_kinds.insert(node.name.clone(), kind);
+    }
+
+    Ok(())
+}
+
+fn verify_project_type_contract_nodes(module: &YirModule) -> Result<(), String> {
+    let nodes = module
+        .nodes
+        .iter()
+        .map(|node| (node.name.as_str(), node))
+        .collect::<BTreeMap<_, _>>();
+
+    for node in &module.nodes {
+        if node.op.module != "cpu" || node.op.instruction != "text" {
+            continue;
+        }
+
+        let Some(contract) = classify_project_contract_node(node.name.as_str()) else {
+            continue;
+        };
+        let value = node
+            .op
+            .args
+            .first()
+            .map(|value| value.trim())
+            .ok_or_else(|| {
+                format!(
+                    "project contract node `{}` must carry a canonical type payload",
+                    node.name
+                )
+            })?;
+        if value.is_empty() {
+            return Err(format!(
+                "project contract node `{}` must carry a non-empty canonical type payload",
+                node.name
+            ));
+        }
+
+        let target = nodes
+            .get(contract.target.as_str())
+            .copied()
+            .ok_or_else(|| {
+                format!(
+                    "project contract node `{}` references unknown target `{}`",
+                    node.name, contract.target
+                )
+            })?;
+        let has_link = module.edges.iter().any(|edge| {
+            edge.from == node.name
+                && edge.to == contract.target
+                && matches!(edge.kind, EdgeKind::Dep | EdgeKind::CrossDomainExchange)
+        });
+        if !has_link {
+            return Err(format!(
+                "project contract node `{}` requires dep/xfer edge into `{}`",
+                node.name, contract.target
+            ));
+        }
+
+        match contract.kind {
+            ProjectContractKind::DataPayloadClass | ProjectContractKind::ShaderPacketClass => {
+                require_prefixed_contract_value(node.name.as_str(), value, "PayloadClass")?;
+            }
+            ProjectContractKind::DataPayloadShape | ProjectContractKind::ShaderPacketShape => {
+                require_prefixed_contract_value(node.name.as_str(), value, "PayloadShape")?;
+            }
+            ProjectContractKind::DataHandleTableSchema | ProjectContractKind::ShaderPacketType => {}
+            ProjectContractKind::KernelSlotContract => {
+                verify_kernel_slot_contract_text(node.name.as_str(), value, target)?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+#[derive(Clone, Copy)]
+enum ProjectContractKind {
+    DataPayloadClass,
+    DataPayloadShape,
+    DataHandleTableSchema,
+    ShaderPacketType,
+    ShaderPacketClass,
+    ShaderPacketShape,
+    KernelSlotContract,
+}
+
+struct ProjectContract<'a> {
+    kind: ProjectContractKind,
+    target: String,
+    _unit: &'a str,
+}
+
+fn classify_project_contract_node(name: &str) -> Option<ProjectContract<'_>> {
+    if let Some(unit) = name
+        .strip_prefix("project_profile_data_")
+        .and_then(|suffix| suffix.strip_suffix("_uplink_payload_class_type"))
+    {
+        return Some(ProjectContract {
+            kind: ProjectContractKind::DataPayloadClass,
+            target: format!("project_profile_data_{unit}_uplink_payload_class"),
+            _unit: unit,
+        });
+    }
+    if let Some(unit) = name
+        .strip_prefix("project_profile_data_")
+        .and_then(|suffix| suffix.strip_suffix("_uplink_payload_shape_type"))
+    {
+        return Some(ProjectContract {
+            kind: ProjectContractKind::DataPayloadShape,
+            target: format!("project_profile_data_{unit}_uplink_payload_shape"),
+            _unit: unit,
+        });
+    }
+    if let Some(unit) = name
+        .strip_prefix("project_profile_data_")
+        .and_then(|suffix| suffix.strip_suffix("_downlink_payload_class_type"))
+    {
+        return Some(ProjectContract {
+            kind: ProjectContractKind::DataPayloadClass,
+            target: format!("project_profile_data_{unit}_downlink_payload_class"),
+            _unit: unit,
+        });
+    }
+    if let Some(unit) = name
+        .strip_prefix("project_profile_data_")
+        .and_then(|suffix| suffix.strip_suffix("_downlink_payload_shape_type"))
+    {
+        return Some(ProjectContract {
+            kind: ProjectContractKind::DataPayloadShape,
+            target: format!("project_profile_data_{unit}_downlink_payload_shape"),
+            _unit: unit,
+        });
+    }
+    if let Some(unit) = name
+        .strip_prefix("project_profile_data_")
+        .and_then(|suffix| suffix.strip_suffix("_handle_table_schema_type"))
+    {
+        return Some(ProjectContract {
+            kind: ProjectContractKind::DataHandleTableSchema,
+            target: format!("project_profile_data_{unit}_profile_handles"),
+            _unit: unit,
+        });
+    }
+    if let Some(unit) = name
+        .strip_prefix("project_profile_shader_")
+        .and_then(|suffix| suffix.strip_suffix("_packet_type"))
+    {
+        return Some(ProjectContract {
+            kind: ProjectContractKind::ShaderPacketType,
+            target: format!("project_profile_shader_{unit}_packet_field_count"),
+            _unit: unit,
+        });
+    }
+    if let Some(unit) = name
+        .strip_prefix("project_profile_shader_")
+        .and_then(|suffix| suffix.strip_suffix("_packet_class_type"))
+    {
+        return Some(ProjectContract {
+            kind: ProjectContractKind::ShaderPacketClass,
+            target: format!("project_profile_shader_{unit}_packet_field_count"),
+            _unit: unit,
+        });
+    }
+    if let Some(unit) = name
+        .strip_prefix("project_profile_shader_")
+        .and_then(|suffix| suffix.strip_suffix("_packet_shape_type"))
+    {
+        return Some(ProjectContract {
+            kind: ProjectContractKind::ShaderPacketShape,
+            target: format!("project_profile_shader_{unit}_packet_field_count"),
+            _unit: unit,
+        });
+    }
+    if let Some(unit) = name
+        .strip_prefix("project_profile_kernel_")
+        .and_then(|suffix| suffix.strip_suffix("_slot_contract_type"))
+    {
+        return Some(ProjectContract {
+            kind: ProjectContractKind::KernelSlotContract,
+            target: format!("project_profile_kernel_{unit}_profile_entry"),
+            _unit: unit,
+        });
+    }
+    None
+}
+
+fn require_prefixed_contract_value(
+    node_name: &str,
+    value: &str,
+    prefix: &str,
+) -> Result<(), String> {
+    if !value.starts_with(prefix) {
+        return Err(format!(
+            "project contract node `{node_name}` must use `{prefix}...`, got `{value}`"
+        ));
+    }
+    Ok(())
+}
+
+fn verify_kernel_slot_contract_text(
+    node_name: &str,
+    value: &str,
+    target: &Node,
+) -> Result<(), String> {
+    let fields = value
+        .split(';')
+        .filter(|entry| !entry.trim().is_empty())
+        .map(|entry| {
+            let (key, raw) = entry.split_once('=').ok_or_else(|| {
+                format!(
+                    "project contract node `{node_name}` has invalid kernel slot field `{entry}`"
+                )
+            })?;
+            let raw = raw.strip_prefix("i64:").ok_or_else(|| {
+                format!(
+                    "project contract node `{node_name}` expects i64-encoded kernel slot value in `{entry}`"
+                )
+            })?;
+            let parsed = raw.parse::<i64>().map_err(|_| {
+                format!(
+                    "project contract node `{node_name}` has non-integer kernel slot value `{entry}`"
+                )
+            })?;
+            Ok((key.trim(), parsed))
+        })
+        .collect::<Result<BTreeMap<_, _>, String>>()?;
+
+    let bind_core = *fields.get("bind_core").ok_or_else(|| {
+        format!("project contract node `{node_name}` is missing `bind_core` field")
+    })?;
+    let queue_depth = *fields.get("queue_depth").ok_or_else(|| {
+        format!("project contract node `{node_name}` is missing `queue_depth` field")
+    })?;
+    let batch_lanes = *fields.get("batch_lanes").ok_or_else(|| {
+        format!("project contract node `{node_name}` is missing `batch_lanes` field")
+    })?;
+
+    if bind_core < 0 {
+        return Err(format!(
+            "project contract node `{node_name}` requires `bind_core >= 0`, got `{bind_core}`"
+        ));
+    }
+    if queue_depth <= 0 {
+        return Err(format!(
+            "project contract node `{node_name}` requires `queue_depth > 0`, got `{queue_depth}`"
+        ));
+    }
+    if batch_lanes <= 0 {
+        return Err(format!(
+            "project contract node `{node_name}` requires `batch_lanes > 0`, got `{batch_lanes}`"
+        ));
+    }
+
+    let target_batch_lanes = target
+        .op
+        .args
+        .last()
+        .ok_or_else(|| {
+            format!(
+                "project contract node `{node_name}` references kernel profile `{}` without target_config args",
+                target.name
+            )
+        })?
+        .parse::<i64>()
+        .map_err(|_| {
+            format!(
+                "project contract node `{node_name}` references kernel profile `{}` with non-integer batch lanes",
+                target.name
+            )
+        })?;
+
+    if target_batch_lanes != batch_lanes {
+        return Err(format!(
+            "project contract node `{node_name}` encodes `batch_lanes={batch_lanes}`, but `{}` uses `{target_batch_lanes}`",
+            target.name
+        ));
     }
 
     Ok(())
@@ -1098,6 +1376,8 @@ fn path_exists(module: &YirModule, from: &str, to: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use super::verify_module;
     use yir_core::{Edge, EdgeKind, Node, Operation, Resource, ResourceKind, YirModule};
 
@@ -1128,6 +1408,14 @@ mod tests {
     fn lifetime(from: &str, to: &str) -> Edge {
         Edge {
             kind: EdgeKind::Lifetime,
+            from: from.to_owned(),
+            to: to.to_owned(),
+        }
+    }
+
+    fn xfer(from: &str, to: &str) -> Edge {
+        Edge {
+            kind: EdgeKind::CrossDomainExchange,
             from: from.to_owned(),
             to: to.to_owned(),
         }
@@ -1242,5 +1530,196 @@ mod tests {
         };
 
         verify_module(&module).unwrap();
+    }
+
+    #[test]
+    fn project_contract_nodes_validate_data_shader_and_kernel_links() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![
+                Resource {
+                    name: "cpu0".to_owned(),
+                    kind: ResourceKind::parse("cpu.arm64"),
+                },
+                Resource {
+                    name: "fabric0".to_owned(),
+                    kind: ResourceKind::parse("data.fabric"),
+                },
+                Resource {
+                    name: "shader0".to_owned(),
+                    kind: ResourceKind::parse("shader.metal"),
+                },
+                Resource {
+                    name: "kernel0".to_owned(),
+                    kind: ResourceKind::parse("kernel.apple"),
+                },
+            ],
+            nodes: vec![
+                node(
+                    "project_profile_data_FabricPlane_uplink_payload_class_type",
+                    "cpu0",
+                    "cpu.text",
+                    &["PayloadClassWindow"],
+                ),
+                node(
+                    "project_profile_data_FabricPlane_uplink_payload_class",
+                    "fabric0",
+                    "data.marker",
+                    &["uplink_payload_class"],
+                ),
+                node(
+                    "project_profile_data_FabricPlane_handle_table_schema_type",
+                    "cpu0",
+                    "cpu.text",
+                    &["FabricPlaneBindings"],
+                ),
+                node(
+                    "project_profile_data_FabricPlane_profile_handles",
+                    "fabric0",
+                    "data.handle_table",
+                    &["color=shader0"],
+                ),
+                node(
+                    "project_profile_shader_SurfaceShader_packet_type",
+                    "cpu0",
+                    "cpu.text",
+                    &["SurfaceShaderPacket"],
+                ),
+                node(
+                    "project_profile_shader_SurfaceShader_packet_class_type",
+                    "cpu0",
+                    "cpu.text",
+                    &["PayloadClassValue"],
+                ),
+                node(
+                    "project_profile_shader_SurfaceShader_packet_shape_type",
+                    "cpu0",
+                    "cpu.text",
+                    &["PayloadShapeSurfaceShaderPacket"],
+                ),
+                node(
+                    "project_profile_shader_SurfaceShader_packet_field_count",
+                    "cpu0",
+                    "cpu.const_i64",
+                    &["3"],
+                ),
+                node(
+                    "project_profile_kernel_KernelUnit_slot_contract_type",
+                    "cpu0",
+                    "cpu.text",
+                    &["bind_core=i64:2;queue_depth=i64:8;batch_lanes=i64:16"],
+                ),
+                node(
+                    "project_profile_kernel_KernelUnit_profile_entry",
+                    "kernel0",
+                    "kernel.target_config",
+                    &["apple_ane", "coreml", "16"],
+                ),
+            ],
+            edges: vec![
+                xfer(
+                    "project_profile_data_FabricPlane_uplink_payload_class_type",
+                    "project_profile_data_FabricPlane_uplink_payload_class",
+                ),
+                xfer(
+                    "project_profile_data_FabricPlane_handle_table_schema_type",
+                    "project_profile_data_FabricPlane_profile_handles",
+                ),
+                dep(
+                    "project_profile_shader_SurfaceShader_packet_type",
+                    "project_profile_shader_SurfaceShader_packet_field_count",
+                ),
+                dep(
+                    "project_profile_shader_SurfaceShader_packet_class_type",
+                    "project_profile_shader_SurfaceShader_packet_field_count",
+                ),
+                dep(
+                    "project_profile_shader_SurfaceShader_packet_shape_type",
+                    "project_profile_shader_SurfaceShader_packet_field_count",
+                ),
+                xfer(
+                    "project_profile_kernel_KernelUnit_slot_contract_type",
+                    "project_profile_kernel_KernelUnit_profile_entry",
+                ),
+            ],
+            node_lanes: BTreeMap::new(),
+        };
+
+        verify_module(&module).unwrap();
+    }
+
+    #[test]
+    fn project_contract_nodes_require_contract_edge() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![
+                Resource {
+                    name: "cpu0".to_owned(),
+                    kind: ResourceKind::parse("cpu.arm64"),
+                },
+                Resource {
+                    name: "fabric0".to_owned(),
+                    kind: ResourceKind::parse("data.fabric"),
+                },
+            ],
+            nodes: vec![
+                node(
+                    "project_profile_data_FabricPlane_uplink_payload_shape_type",
+                    "cpu0",
+                    "cpu.text",
+                    &["PayloadShapeWindowFrame"],
+                ),
+                node(
+                    "project_profile_data_FabricPlane_uplink_payload_shape",
+                    "fabric0",
+                    "data.marker",
+                    &["uplink_payload_shape"],
+                ),
+            ],
+            edges: vec![],
+            node_lanes: BTreeMap::new(),
+        };
+
+        let error = verify_module(&module).unwrap_err();
+        assert!(error.contains("requires dep/xfer edge"));
+    }
+
+    #[test]
+    fn project_contract_nodes_reject_kernel_slot_mismatch() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![
+                Resource {
+                    name: "cpu0".to_owned(),
+                    kind: ResourceKind::parse("cpu.arm64"),
+                },
+                Resource {
+                    name: "kernel0".to_owned(),
+                    kind: ResourceKind::parse("kernel.apple"),
+                },
+            ],
+            nodes: vec![
+                node(
+                    "project_profile_kernel_KernelUnit_slot_contract_type",
+                    "cpu0",
+                    "cpu.text",
+                    &["bind_core=i64:2;queue_depth=i64:8;batch_lanes=i64:12"],
+                ),
+                node(
+                    "project_profile_kernel_KernelUnit_profile_entry",
+                    "kernel0",
+                    "kernel.target_config",
+                    &["apple_ane", "coreml", "16"],
+                ),
+            ],
+            edges: vec![xfer(
+                "project_profile_kernel_KernelUnit_slot_contract_type",
+                "project_profile_kernel_KernelUnit_profile_entry",
+            )],
+            node_lanes: BTreeMap::new(),
+        };
+
+        let error = verify_module(&module).unwrap_err();
+        assert!(error.contains("encodes `batch_lanes=12`"));
     }
 }

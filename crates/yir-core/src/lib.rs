@@ -265,18 +265,16 @@ impl Operation {
             | "const_f64" | "null" => CpuLlvmLoweringClass::Literal,
             "struct" | "field" => CpuLlvmLoweringClass::Aggregate,
             "borrow" | "borrow_end" | "move_ptr" => CpuLlvmLoweringClass::Pointer,
-            "neg" | "add" | "add_i32" | "add_f32" | "add_f64" | "sub" | "sub_i32"
-            | "sub_f32" | "sub_f64" | "mul" | "mul_i32" | "mul_f32" | "mul_f64"
-            | "div" | "div_i32" | "div_f32" | "div_f64" | "rem" | "madd"
-            | "select" => CpuLlvmLoweringClass::Arithmetic,
-            "eq" | "eq_i32" | "eq_f32" | "eq_f64" | "ne" | "lt" | "lt_i32"
-            | "lt_f32" | "lt_f64" | "gt" | "gt_i32" | "gt_f32" | "gt_f64" | "le"
-            | "ge" => CpuLlvmLoweringClass::Compare,
-            "not" | "and" | "or" | "xor" | "shl" | "shr" => CpuLlvmLoweringClass::Bitwise,
-            "cast_i32_to_i64" | "cast_i64_to_i32" | "cast_i32_to_f32"
-            | "cast_i32_to_f64" | "cast_f32_to_f64" | "cast_f64_to_f32" => {
-                CpuLlvmLoweringClass::Cast
+            "neg" | "add" | "add_i32" | "add_f32" | "add_f64" | "sub" | "sub_i32" | "sub_f32"
+            | "sub_f64" | "mul" | "mul_i32" | "mul_f32" | "mul_f64" | "div" | "div_i32"
+            | "div_f32" | "div_f64" | "rem" | "madd" | "select" => CpuLlvmLoweringClass::Arithmetic,
+            "eq" | "eq_i32" | "eq_f32" | "eq_f64" | "ne" | "lt" | "lt_i32" | "lt_f32"
+            | "lt_f64" | "gt" | "gt_i32" | "gt_f32" | "gt_f64" | "le" | "ge" => {
+                CpuLlvmLoweringClass::Compare
             }
+            "not" | "and" | "or" | "xor" | "shl" | "shr" => CpuLlvmLoweringClass::Bitwise,
+            "cast_i32_to_i64" | "cast_i64_to_i32" | "cast_i32_to_f32" | "cast_i32_to_f64"
+            | "cast_f32_to_f64" | "cast_f64_to_f32" => CpuLlvmLoweringClass::Cast,
             "alloc_node" | "alloc_buffer" | "load_value" | "load_next" | "buffer_len"
             | "load_at" | "store_value" | "store_next" | "store_at" | "is_null" | "free" => {
                 CpuLlvmLoweringClass::Memory

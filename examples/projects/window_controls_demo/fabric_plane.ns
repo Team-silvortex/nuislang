@@ -12,11 +12,12 @@ mod data FabricPlane {
     let downlink_pipe: Marker<DownlinkPipe> = data_marker("downlink_pipe");
     let uplink_pipe_class: Marker<UplinkPipeClass> = data_marker("uplink_pipe_class");
     let downlink_pipe_class: Marker<DownlinkPipeClass> = data_marker("downlink_pipe_class");
-    let uplink_payload_class: Marker<UplinkPayloadClass> = data_marker("uplink_payload_class");
-    let downlink_payload_class: Marker<DownlinkPayloadClass> =
+    let uplink_payload_class: Marker<PayloadClassWindow> = data_marker("uplink_payload_class");
+    let downlink_payload_class: Marker<PayloadClassWindow> =
       data_marker("downlink_payload_class");
-    let uplink_payload_shape: Marker<UplinkPayloadShape> = data_marker("uplink_payload_shape");
-    let downlink_payload_shape: Marker<DownlinkPayloadShape> =
+    let uplink_payload_shape: Marker<PayloadShapeWindowSurfaceShaderPacket> =
+      data_marker("uplink_payload_shape");
+    let downlink_payload_shape: Marker<PayloadShapeWindowFrame> =
       data_marker("downlink_payload_shape");
     let uplink_window_policy: Marker<UplinkWindowPolicy> = data_marker("uplink_window_policy");
     let downlink_window_policy: Marker<DownlinkWindowPolicy> =

@@ -422,9 +422,7 @@ impl NirTypeRef {
                 }
                 if self.is_handle_table_family() {
                     if self.generic_args.len() > 1 {
-                        return Err(
-                            "`HandleTable<...>` accepts at most one schema type".to_owned()
-                        );
+                        return Err("`HandleTable<...>` accepts at most one schema type".to_owned());
                     }
                     if let Some(schema) = self.handle_table_schema() {
                         if !schema.is_nominal_semantic_payload() {

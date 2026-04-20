@@ -2312,8 +2312,7 @@ fn validate_declared_nir_types(module: &NirModule) -> Result<(), String> {
                     }
                 }
                 NirStmt::Const { ty, .. } => validate_type_ref(ty)?,
-                NirStmt::Print(_) | NirStmt::Expr(_) | NirStmt::Return(_) | NirStmt::If { .. } => {
-                }
+                NirStmt::Print(_) | NirStmt::Expr(_) | NirStmt::Return(_) | NirStmt::If { .. } => {}
             }
         }
     }

@@ -1,9 +1,7 @@
 use std::{collections::BTreeMap, path::Path};
 
 use nuis_semantics::model::{NirBinaryOp, NirExpr, NirFunction, NirModule, NirStmt};
-use yir_core::{
-    Edge, EdgeKind, Node, Operation, Resource, ResourceKind, SemanticOp, YirModule,
-};
+use yir_core::{Edge, EdgeKind, Node, Operation, Resource, ResourceKind, SemanticOp, YirModule};
 
 use crate::registry::NustarPackageManifest;
 

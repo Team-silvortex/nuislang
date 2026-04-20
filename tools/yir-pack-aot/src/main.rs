@@ -209,7 +209,9 @@ fn run() -> Result<(), String> {
                     .map(|binding| binding.render_resource.as_str()),
                 &render_fabric_boot_plan(&fabric_boot_plan),
                 fabric_boot_plan.len(),
-                frame_bundle.as_ref().map(|bundle| bundle.embedded_ppm_bytes.as_str()),
+                frame_bundle
+                    .as_ref()
+                    .map(|bundle| bundle.embedded_ppm_bytes.as_str()),
                 runtime_frame_support.as_ref(),
                 &host_ffi_stub_source,
             ),

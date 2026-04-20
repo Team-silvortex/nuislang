@@ -6,6 +6,7 @@ use std::{
 
 use nuis_semantics::model::{
     AstExpr, AstExternFunction, AstModule, AstStmt, AstTypeRef, NirExpr, NirModule, NirStmt,
+    NirTypeRef,
 };
 use yir_core::{
     EdgeKind, Node, Operation, OperationDomainFamily, Resource, ResourceKind, SemanticOp, YirModule,
@@ -448,6 +449,7 @@ pub fn apply_project_support_modules_to_yir(
         }
         apply_support_module_profile(&project_module.ast, module)?;
     }
+    materialize_project_type_contract_nodes(project, module)?;
     resolve_project_profile_refs(module)?;
     stitch_shader_profile_edges(module);
     stitch_data_profile_edges(module);
@@ -531,10 +533,10 @@ pub fn validate_project_links_against_yir(
             }
         }
 
-        validate_shader_profile_for_link(module, &link.from)?;
-        validate_shader_profile_for_link(module, &link.to)?;
-        validate_kernel_profile_for_link(module, &link.from)?;
-        validate_kernel_profile_for_link(module, &link.to)?;
+        validate_shader_profile_for_link(project, module, &link.from)?;
+        validate_shader_profile_for_link(project, module, &link.to)?;
+        validate_kernel_profile_for_link(project, module, &link.from)?;
+        validate_kernel_profile_for_link(project, module, &link.to)?;
     }
     Ok(())
 }
@@ -909,7 +911,11 @@ fn require_declared_profile_slot(
     ))
 }
 
-fn validate_shader_profile_for_link(module: &YirModule, endpoint: &str) -> Result<(), String> {
+fn validate_shader_profile_for_link(
+    project: &LoadedProject,
+    module: &YirModule,
+    endpoint: &str,
+) -> Result<(), String> {
     let (domain, unit) = split_domain_unit(endpoint)?;
     if domain != "shader" {
         return Ok(());
@@ -932,11 +938,16 @@ fn validate_shader_profile_for_link(module: &YirModule, endpoint: &str) -> Resul
     }
 
     validate_shader_profile_flow(module, &unit)?;
+    validate_shader_packet_contract(project, &unit)?;
 
     Ok(())
 }
 
-fn validate_kernel_profile_for_link(module: &YirModule, endpoint: &str) -> Result<(), String> {
+fn validate_kernel_profile_for_link(
+    project: &LoadedProject,
+    module: &YirModule,
+    endpoint: &str,
+) -> Result<(), String> {
     let (domain, unit) = split_domain_unit(endpoint)?;
     if domain != "kernel" {
         return Ok(());
@@ -968,6 +979,8 @@ fn validate_kernel_profile_for_link(module: &YirModule, endpoint: &str) -> Resul
             unit
         ));
     }
+
+    validate_kernel_profile_slot_contract(project, &unit)?;
 
     Ok(())
 }
@@ -1773,6 +1786,230 @@ fn validate_shader_profile_flow(module: &YirModule, unit: &str) -> Result<(), St
     Ok(())
 }
 
+fn validate_shader_packet_contract(project: &LoadedProject, unit: &str) -> Result<(), String> {
+    let profile_module = project
+        .modules
+        .iter()
+        .find(|module| module.ast.domain == "shader" && module.ast.unit == unit)
+        .ok_or_else(|| format!("project is missing support module `shader.{unit}`"))?;
+    let profile_fn = profile_module
+        .ast
+        .functions
+        .iter()
+        .find(|function| function.name == "profile")
+        .ok_or_else(|| {
+            format!(
+                "project shader unit `shader.{}` requires a `profile()` function",
+                unit
+            )
+        })?;
+    let int_bindings = collect_profile_int_bindings(&profile_fn.body);
+    let Some(contract) = infer_shader_packet_contract(project, unit)? else {
+        return Ok(());
+    };
+
+    let packet_field_count = int_bindings
+        .get("packet_field_count")
+        .copied()
+        .ok_or_else(|| {
+            format!(
+                "project shader unit `shader.{}` requires `packet_field_count` profile const",
+                unit
+            )
+        })?;
+    if packet_field_count != contract.field_count as i64 {
+        return Err(format!(
+            "project shader unit `shader.{}` requires `packet_field_count = {}` to match inferred packet `{}`",
+            unit, contract.field_count, contract.type_name
+        ));
+    }
+
+    let slot_names = [
+        "packet_color_slot",
+        "packet_speed_slot",
+        "packet_radius_slot",
+    ];
+    let mut seen = BTreeSet::new();
+    for slot in slot_names {
+        let value = int_bindings.get(slot).copied().ok_or_else(|| {
+            format!(
+                "project shader unit `shader.{}` requires `{}` profile const",
+                unit, slot
+            )
+        })?;
+        if value < 0 || value >= contract.field_count as i64 {
+            return Err(format!(
+                "project shader unit `shader.{}` requires `{}` to be within packet field range 0..{}",
+                unit, slot, contract.field_count
+            ));
+        }
+        if !seen.insert(value) {
+            return Err(format!(
+                "project shader unit `shader.{}` requires packet slot indices to be unique",
+                unit
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ShaderPacketContract {
+    type_name: String,
+    field_count: usize,
+}
+
+fn infer_shader_packet_contract(
+    project: &LoadedProject,
+    unit: &str,
+) -> Result<Option<ShaderPacketContract>, String> {
+    let mut discovered = Vec::new();
+    for project_module in &project.modules {
+        let nir = crate::frontend::lower_ast_to_nir(&project_module.ast)?;
+        collect_shader_packet_contracts_from_stmts(&nir.functions, unit, &mut discovered);
+    }
+    if discovered.is_empty() {
+        return Ok(None);
+    }
+    let first = discovered[0].clone();
+    if discovered.iter().any(|contract| contract != &first) {
+        return Err(format!(
+            "project shader unit `shader.{}` has inconsistent CPU-side packet contracts",
+            unit
+        ));
+    }
+    Ok(Some(first))
+}
+
+fn collect_shader_packet_contracts_from_stmts(
+    functions: &[nuis_semantics::model::NirFunction],
+    unit: &str,
+    discovered: &mut Vec<ShaderPacketContract>,
+) {
+    for function in functions {
+        collect_shader_packet_contracts_in_body(&function.body, unit, discovered);
+    }
+}
+
+fn collect_shader_packet_contracts_in_body(
+    body: &[NirStmt],
+    unit: &str,
+    discovered: &mut Vec<ShaderPacketContract>,
+) {
+    for stmt in body {
+        match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value:
+                    NirExpr::ShaderProfilePacket {
+                        unit: shader_unit, ..
+                    },
+                ..
+            }
+            | NirStmt::Const {
+                ty,
+                value:
+                    NirExpr::ShaderProfilePacket {
+                        unit: shader_unit, ..
+                    },
+                ..
+            } if shader_unit == unit => {
+                discovered.push(ShaderPacketContract {
+                    type_name: ty.render(),
+                    field_count: 3,
+                });
+            }
+            NirStmt::If {
+                then_body,
+                else_body,
+                ..
+            } => {
+                collect_shader_packet_contracts_in_body(then_body, unit, discovered);
+                collect_shader_packet_contracts_in_body(else_body, unit, discovered);
+            }
+            _ => {}
+        }
+    }
+}
+
+fn validate_kernel_profile_slot_contract(
+    project: &LoadedProject,
+    unit: &str,
+) -> Result<(), String> {
+    let profile_module = project
+        .modules
+        .iter()
+        .find(|module| module.ast.domain == "kernel" && module.ast.unit == unit)
+        .ok_or_else(|| format!("project is missing support module `kernel.{unit}`"))?;
+    let profile_fn = profile_module
+        .ast
+        .functions
+        .iter()
+        .find(|function| function.name == "profile")
+        .ok_or_else(|| {
+            format!(
+                "project kernel unit `kernel.{}` requires a `profile()` function",
+                unit
+            )
+        })?;
+    let int_bindings = collect_profile_int_bindings(&profile_fn.body);
+
+    let bind_core = int_bindings.get("bind_core").copied().ok_or_else(|| {
+        format!(
+            "project kernel unit `kernel.{}` requires `bind_core` profile const",
+            unit
+        )
+    })?;
+    let queue_depth = int_bindings.get("queue_depth").copied().ok_or_else(|| {
+        format!(
+            "project kernel unit `kernel.{}` requires `queue_depth` profile const",
+            unit
+        )
+    })?;
+    let batch_lanes = int_bindings.get("batch_lanes").copied().ok_or_else(|| {
+        format!(
+            "project kernel unit `kernel.{}` requires `batch_lanes` profile const",
+            unit
+        )
+    })?;
+
+    if bind_core < 0 {
+        return Err(format!(
+            "project kernel unit `kernel.{}` requires `bind_core >= 0`",
+            unit
+        ));
+    }
+    if queue_depth <= 0 {
+        return Err(format!(
+            "project kernel unit `kernel.{}` requires `queue_depth > 0`",
+            unit
+        ));
+    }
+    if batch_lanes <= 0 {
+        return Err(format!(
+            "project kernel unit `kernel.{}` requires `batch_lanes > 0`",
+            unit
+        ));
+    }
+
+    let target_config_uses_batch_lanes = profile_fn.body.iter().any(|stmt| {
+        matches!(
+            extract_profile_call(stmt),
+            Some((_name, "kernel_target_config", args))
+                if matches!(args.get(2), Some(AstExpr::Var(name)) if name == "batch_lanes")
+        )
+    });
+    if !target_config_uses_batch_lanes {
+        return Err(format!(
+            "project kernel unit `kernel.{}` requires kernel_target_config(..., batch_lanes) to consume the `batch_lanes` profile slot",
+            unit
+        ));
+    }
+
+    Ok(())
+}
+
 fn validate_data_profile_for_link(
     module: &YirModule,
     from_endpoint: &str,
@@ -1971,6 +2208,72 @@ fn validate_data_profile_token_types(
         require_profile_semantic_type(&marker_ty, "Marker", true, &unit, tag)?;
     }
 
+    if let Some(uplink_ty) = infer_project_route_payload_type(project, from_endpoint, &unit, true)?
+    {
+        let marker_ty =
+            find_profile_call_declared_type(&profile_fn.body, "data_marker", Some("uplink_payload_class"))
+                .ok_or_else(|| {
+                    format!(
+                        "project data unit `data.{}` requires typed `Marker<Tag>` binding for marker `uplink_payload_class`",
+                        unit
+                    )
+                })?;
+        require_marker_semantic_payload_name(
+            &marker_ty,
+            &payload_class_marker_name(&uplink_ty),
+            &unit,
+            "uplink_payload_class",
+        )?;
+
+        let marker_ty =
+            find_profile_call_declared_type(&profile_fn.body, "data_marker", Some("uplink_payload_shape"))
+                .ok_or_else(|| {
+                    format!(
+                        "project data unit `data.{}` requires typed `Marker<Tag>` binding for marker `uplink_payload_shape`",
+                        unit
+                    )
+                })?;
+        require_marker_semantic_payload_name(
+            &marker_ty,
+            &payload_shape_marker_name(&uplink_ty),
+            &unit,
+            "uplink_payload_shape",
+        )?;
+    }
+
+    if let Some(downlink_ty) = infer_project_route_payload_type(project, to_endpoint, &unit, false)?
+    {
+        let marker_ty =
+            find_profile_call_declared_type(&profile_fn.body, "data_marker", Some("downlink_payload_class"))
+                .ok_or_else(|| {
+                    format!(
+                        "project data unit `data.{}` requires typed `Marker<Tag>` binding for marker `downlink_payload_class`",
+                        unit
+                    )
+                })?;
+        require_marker_semantic_payload_name(
+            &marker_ty,
+            &payload_class_marker_name(&downlink_ty),
+            &unit,
+            "downlink_payload_class",
+        )?;
+
+        let marker_ty =
+            find_profile_call_declared_type(&profile_fn.body, "data_marker", Some("downlink_payload_shape"))
+                .ok_or_else(|| {
+                    format!(
+                        "project data unit `data.{}` requires typed `Marker<Tag>` binding for marker `downlink_payload_shape`",
+                        unit
+                    )
+                })?;
+        require_marker_semantic_payload_name(
+            &marker_ty,
+            &payload_shape_marker_name(&downlink_ty),
+            &unit,
+            "downlink_payload_shape",
+        )?;
+    }
+
     Ok(())
 }
 
@@ -1983,18 +2286,20 @@ fn find_profile_call_declared_type(
         match stmt {
             AstStmt::Let {
                 ty: Some(ty),
-                value: AstExpr::Call {
-                    callee: stmt_callee,
-                    args,
-                },
+                value:
+                    AstExpr::Call {
+                        callee: stmt_callee,
+                        args,
+                    },
                 ..
             }
             | AstStmt::Const {
                 ty,
-                value: AstExpr::Call {
-                    callee: stmt_callee,
-                    args,
-                },
+                value:
+                    AstExpr::Call {
+                        callee: stmt_callee,
+                        args,
+                    },
                 ..
             } if stmt_callee == callee => {
                 if let Some(expected_tag) = marker_tag {
@@ -2037,6 +2342,441 @@ fn require_profile_semantic_type(
         ));
     }
     Ok(())
+}
+
+fn require_marker_semantic_payload_name(
+    marker_ty: &AstTypeRef,
+    expected: &str,
+    unit: &str,
+    slot: &str,
+) -> Result<(), String> {
+    require_profile_semantic_type(marker_ty, "Marker", true, unit, slot)?;
+    let actual = marker_ty
+        .generic_args
+        .first()
+        .map(render_ast_type_name)
+        .unwrap_or_default();
+    if actual != expected {
+        return Err(format!(
+            "project data unit `data.{}` requires marker `{}` to use `Marker<{}>`, found `Marker<{}>`",
+            unit, slot, expected, actual
+        ));
+    }
+    Ok(())
+}
+
+fn infer_project_route_payload_type(
+    project: &LoadedProject,
+    endpoint: &str,
+    data_unit: &str,
+    uplink: bool,
+) -> Result<Option<NirTypeRef>, String> {
+    let (domain, unit) = split_domain_unit(endpoint)?;
+    let Some(project_module) = project
+        .modules
+        .iter()
+        .find(|module| module.ast.domain == domain && module.ast.unit == unit)
+    else {
+        return Ok(None);
+    };
+    let nir = crate::frontend::lower_ast_to_nir(&project_module.ast)?;
+    Ok(find_route_payload_type_in_nir(&nir, data_unit, uplink))
+}
+
+fn find_route_payload_type_in_nir(
+    module: &NirModule,
+    data_unit: &str,
+    uplink: bool,
+) -> Option<NirTypeRef> {
+    let function = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")?;
+    find_route_payload_type_in_stmts(&function.body, data_unit, uplink)
+}
+
+fn find_route_payload_type_in_stmts(
+    body: &[NirStmt],
+    data_unit: &str,
+    uplink: bool,
+) -> Option<NirTypeRef> {
+    for stmt in body {
+        match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value,
+                ..
+            }
+            | NirStmt::Const { ty, value, .. } => {
+                if route_payload_expr_matches(value, data_unit, uplink) {
+                    return Some(ty.clone());
+                }
+            }
+            NirStmt::If {
+                then_body,
+                else_body,
+                ..
+            } => {
+                if let Some(ty) = find_route_payload_type_in_stmts(then_body, data_unit, uplink) {
+                    return Some(ty);
+                }
+                if let Some(ty) = find_route_payload_type_in_stmts(else_body, data_unit, uplink) {
+                    return Some(ty);
+                }
+            }
+            NirStmt::Print(_) | NirStmt::Expr(_) | NirStmt::Return(_) => {}
+            NirStmt::Let { ty: None, .. } => {}
+        }
+    }
+    None
+}
+
+fn route_payload_expr_matches(expr: &NirExpr, data_unit: &str, uplink: bool) -> bool {
+    match (uplink, expr) {
+        (true, NirExpr::DataProfileSendUplink { unit, .. }) => unit == data_unit,
+        (false, NirExpr::DataProfileSendDownlink { unit, .. }) => unit == data_unit,
+        _ => false,
+    }
+}
+
+fn payload_class_marker_name(ty: &NirTypeRef) -> String {
+    let suffix = if ty.container_kind().is_some() {
+        "Window"
+    } else if ty.is_marker_family() {
+        "Marker"
+    } else if ty.is_handle_table_family() {
+        "HandleTable"
+    } else {
+        "Value"
+    };
+    format!("PayloadClass{suffix}")
+}
+
+fn payload_shape_marker_name(ty: &NirTypeRef) -> String {
+    format!("PayloadShape{}", payload_shape_type_suffix(ty))
+}
+
+fn payload_shape_type_suffix(ty: &NirTypeRef) -> String {
+    if let Some(kind) = ty.container_kind() {
+        let prefix = match kind {
+            nuis_semantics::model::NirContainerKind::Window => "Window",
+            nuis_semantics::model::NirContainerKind::Pipe => "Pipe",
+            nuis_semantics::model::NirContainerKind::Instance => "Instance",
+        };
+        let inner = ty
+            .container_payload()
+            .map(payload_shape_type_suffix)
+            .unwrap_or_else(|| "Unknown".to_owned());
+        return format!("{prefix}{inner}");
+    }
+    sanitize_ident(&ty.name)
+}
+
+fn materialize_project_type_contract_nodes(
+    project: &LoadedProject,
+    module: &mut YirModule,
+) -> Result<(), String> {
+    ensure_project_resource(module, "cpu0", "cpu.arm64");
+
+    for project_module in &project.modules {
+        match project_module.ast.domain.as_str() {
+            "data" => {
+                materialize_data_type_contract_nodes(project, &project_module.ast.unit, module)?
+            }
+            "shader" => {
+                materialize_shader_type_contract_nodes(project, &project_module.ast.unit, module)?
+            }
+            "kernel" => {
+                materialize_kernel_type_contract_nodes(project, &project_module.ast.unit, module)?
+            }
+            _ => {}
+        }
+    }
+
+    Ok(())
+}
+
+fn materialize_data_type_contract_nodes(
+    project: &LoadedProject,
+    unit: &str,
+    module: &mut YirModule,
+) -> Result<(), String> {
+    let mut uplink_payload: Option<NirTypeRef> = None;
+    let mut downlink_payload: Option<NirTypeRef> = None;
+    for link in &project.manifest.links {
+        let Some(via) = &link.via else {
+            continue;
+        };
+        let (via_domain, via_unit) = split_domain_unit(via)?;
+        if via_domain != "data" || via_unit != unit {
+            continue;
+        }
+        if let Some(ty) = infer_project_route_payload_type(project, &link.from, unit, true)? {
+            uplink_payload = Some(merge_project_payload_contract(
+                uplink_payload.take(),
+                ty,
+                "data",
+                unit,
+                "uplink",
+            )?);
+        }
+        if let Some(ty) = infer_project_route_payload_type(project, &link.to, unit, false)? {
+            downlink_payload = Some(merge_project_payload_contract(
+                downlink_payload.take(),
+                ty,
+                "data",
+                unit,
+                "downlink",
+            )?);
+        }
+    }
+
+    if let Some(ty) = uplink_payload.as_ref() {
+        let class_node = format!(
+            "project_profile_data_{}_uplink_payload_class_type",
+            sanitize_ident(unit)
+        );
+        let shape_node = format!(
+            "project_profile_data_{}_uplink_payload_shape_type",
+            sanitize_ident(unit)
+        );
+        push_profile_text_node(module, class_node.clone(), payload_class_marker_name(ty));
+        push_profile_text_node(module, shape_node.clone(), payload_shape_marker_name(ty));
+        connect_project_contract_node(
+            module,
+            &class_node,
+            &resolve_project_profile_target_name("data", unit, "marker:uplink_payload_class"),
+        );
+        connect_project_contract_node(
+            module,
+            &shape_node,
+            &resolve_project_profile_target_name("data", unit, "marker:uplink_payload_shape"),
+        );
+    }
+    if let Some(ty) = downlink_payload.as_ref() {
+        let class_node = format!(
+            "project_profile_data_{}_downlink_payload_class_type",
+            sanitize_ident(unit)
+        );
+        let shape_node = format!(
+            "project_profile_data_{}_downlink_payload_shape_type",
+            sanitize_ident(unit)
+        );
+        push_profile_text_node(module, class_node.clone(), payload_class_marker_name(ty));
+        push_profile_text_node(module, shape_node.clone(), payload_shape_marker_name(ty));
+        connect_project_contract_node(
+            module,
+            &class_node,
+            &resolve_project_profile_target_name("data", unit, "marker:downlink_payload_class"),
+        );
+        connect_project_contract_node(
+            module,
+            &shape_node,
+            &resolve_project_profile_target_name("data", unit, "marker:downlink_payload_shape"),
+        );
+    }
+
+    if let Some(schema) = infer_data_handle_table_schema(project, unit)? {
+        let schema_node = format!(
+            "project_profile_data_{}_handle_table_schema_type",
+            sanitize_ident(unit)
+        );
+        push_profile_text_node(module, schema_node.clone(), schema);
+        connect_project_contract_node(
+            module,
+            &schema_node,
+            &resolve_project_profile_target_name("data", unit, "handle_table"),
+        );
+    }
+
+    Ok(())
+}
+
+fn materialize_shader_type_contract_nodes(
+    project: &LoadedProject,
+    unit: &str,
+    module: &mut YirModule,
+) -> Result<(), String> {
+    let Some(contract) = infer_shader_packet_contract(project, unit)? else {
+        return Ok(());
+    };
+    let packet_type = NirTypeRef {
+        name: contract.type_name.clone(),
+        generic_args: Vec::new(),
+        is_optional: false,
+        is_ref: false,
+    };
+    let type_node = format!(
+        "project_profile_shader_{}_packet_type",
+        sanitize_ident(unit)
+    );
+    let class_node = format!(
+        "project_profile_shader_{}_packet_class_type",
+        sanitize_ident(unit)
+    );
+    let shape_node = format!(
+        "project_profile_shader_{}_packet_shape_type",
+        sanitize_ident(unit)
+    );
+    push_profile_text_node(module, type_node.clone(), contract.type_name);
+    push_profile_text_node(
+        module,
+        class_node.clone(),
+        payload_class_marker_name(&packet_type),
+    );
+    push_profile_text_node(
+        module,
+        shape_node.clone(),
+        payload_shape_marker_name(&packet_type),
+    );
+    connect_project_contract_node(
+        module,
+        &type_node,
+        &resolve_project_profile_target_name("shader", unit, "packet_field_count"),
+    );
+    connect_project_contract_node(
+        module,
+        &class_node,
+        &resolve_project_profile_target_name("shader", unit, "packet_field_count"),
+    );
+    connect_project_contract_node(
+        module,
+        &shape_node,
+        &resolve_project_profile_target_name("shader", unit, "packet_field_count"),
+    );
+    Ok(())
+}
+
+fn materialize_kernel_type_contract_nodes(
+    project: &LoadedProject,
+    unit: &str,
+    module: &mut YirModule,
+) -> Result<(), String> {
+    let Some(summary) = infer_kernel_slot_contract_summary(project, unit)? else {
+        return Ok(());
+    };
+    let summary_node = format!(
+        "project_profile_kernel_{}_slot_contract_type",
+        sanitize_ident(unit)
+    );
+    push_profile_text_node(module, summary_node.clone(), summary);
+    connect_project_contract_node(
+        module,
+        &summary_node,
+        &format!(
+            "project_profile_kernel_{}_profile_entry",
+            sanitize_ident(unit)
+        ),
+    );
+    Ok(())
+}
+
+fn merge_project_payload_contract(
+    existing: Option<NirTypeRef>,
+    next: NirTypeRef,
+    domain: &str,
+    unit: &str,
+    direction: &str,
+) -> Result<NirTypeRef, String> {
+    match existing {
+        Some(existing) if existing != next => Err(format!(
+            "project {} unit `{}.{}` has inconsistent {} payload contracts: `{}` vs `{}`",
+            domain,
+            domain,
+            unit,
+            direction,
+            existing.render(),
+            next.render()
+        )),
+        Some(existing) => Ok(existing),
+        None => Ok(next),
+    }
+}
+
+fn infer_data_handle_table_schema(
+    project: &LoadedProject,
+    unit: &str,
+) -> Result<Option<String>, String> {
+    let Some(project_module) = project
+        .modules
+        .iter()
+        .find(|module| module.ast.domain == "data" && module.ast.unit == unit)
+    else {
+        return Ok(None);
+    };
+    let Some(profile_fn) = project_module
+        .ast
+        .functions
+        .iter()
+        .find(|function| function.name == "profile")
+    else {
+        return Ok(None);
+    };
+    Ok(
+        find_profile_call_declared_type(&profile_fn.body, "data_handle_table", None)
+            .and_then(|ty| ty.generic_args.first().map(render_ast_type_name)),
+    )
+}
+
+fn infer_kernel_slot_contract_summary(
+    project: &LoadedProject,
+    unit: &str,
+) -> Result<Option<String>, String> {
+    let Some(project_module) = project
+        .modules
+        .iter()
+        .find(|module| module.ast.domain == "kernel" && module.ast.unit == unit)
+    else {
+        return Ok(None);
+    };
+    let Some(profile_fn) = project_module
+        .ast
+        .functions
+        .iter()
+        .find(|function| function.name == "profile")
+    else {
+        return Ok(None);
+    };
+    let int_bindings = collect_profile_int_bindings(&profile_fn.body);
+    let Some(bind_core) = int_bindings.get("bind_core") else {
+        return Ok(None);
+    };
+    let Some(queue_depth) = int_bindings.get("queue_depth") else {
+        return Ok(None);
+    };
+    let Some(batch_lanes) = int_bindings.get("batch_lanes") else {
+        return Ok(None);
+    };
+    Ok(Some(format!(
+        "bind_core=i64:{bind_core};queue_depth=i64:{queue_depth};batch_lanes=i64:{batch_lanes}"
+    )))
+}
+
+fn push_profile_text_node(module: &mut YirModule, name: String, value: String) {
+    push_profile_node(
+        module,
+        name,
+        "cpu0",
+        Operation {
+            module: "cpu".to_owned(),
+            instruction: "text".to_owned(),
+            args: vec![value],
+        },
+    );
+}
+
+fn connect_project_contract_node(module: &mut YirModule, from: &str, to: &str) {
+    let resource_families = module
+        .resources
+        .iter()
+        .map(|resource| (resource.name.clone(), resource.kind.family().to_owned()))
+        .collect::<BTreeMap<_, _>>();
+    let node_resources = module
+        .nodes
+        .iter()
+        .map(|node| (node.name.clone(), node.resource.clone()))
+        .collect::<BTreeMap<_, _>>();
+    push_project_dependency_edge_if_missing(module, &resource_families, &node_resources, from, to);
 }
 
 fn render_ast_type_name(ty: &AstTypeRef) -> String {
@@ -2178,10 +2918,7 @@ fn kernel_profile_slot_targets(unit: &str) -> Vec<(&'static str, String)> {
     ]
 }
 
-fn data_profile_required_slots_for_link(
-    from_domain: &str,
-    to_domain: &str,
-) -> Vec<&'static str> {
+fn data_profile_required_slots_for_link(from_domain: &str, to_domain: &str) -> Vec<&'static str> {
     let mut slots = vec![
         "bind_core",
         "window_offset",
@@ -3595,10 +4332,10 @@ mod tests {
                 let downlink_pipe: Marker<DownlinkPipe> = data_marker("downlink_pipe");
                 let uplink_pipe_class: Marker<UplinkPipeClass> = data_marker("uplink_pipe_class");
                 let downlink_pipe_class: Marker<DownlinkPipeClass> = data_marker("downlink_pipe_class");
-                let uplink_payload_class: Marker<UplinkPayloadClass> = data_marker("uplink_payload_class");
-                let downlink_payload_class: Marker<DownlinkPayloadClass> = data_marker("downlink_payload_class");
-                let uplink_payload_shape: Marker<UplinkPayloadShape> = data_marker("uplink_payload_shape");
-                let downlink_payload_shape: Marker<DownlinkPayloadShape> = data_marker("downlink_payload_shape");
+                let uplink_payload_class: Marker<PayloadClassWindow> = data_marker("uplink_payload_class");
+                let downlink_payload_class: Marker<PayloadClassWindow> = data_marker("downlink_payload_class");
+                let uplink_payload_shape: Marker<PayloadShapeWindowSurfaceShaderPacket> = data_marker("uplink_payload_shape");
+                let downlink_payload_shape: Marker<PayloadShapeWindowFrame> = data_marker("downlink_payload_shape");
                 let uplink_window_policy: Marker<UplinkWindowPolicy> = data_marker("uplink_window_policy");
                 let downlink_window_policy: Marker<DownlinkWindowPolicy> = data_marker("downlink_window_policy");
               }
@@ -3630,10 +4367,10 @@ mod tests {
                 let downlink_pipe: Marker<DownlinkPipe> = data_marker("downlink_pipe");
                 let uplink_pipe_class: Marker<UplinkPipeClass> = data_marker("uplink_pipe_class");
                 let downlink_pipe_class: Marker<DownlinkPipeClass> = data_marker("downlink_pipe_class");
-                let uplink_payload_class: Marker<UplinkPayloadClass> = data_marker("uplink_payload_class");
-                let downlink_payload_class: Marker<DownlinkPayloadClass> = data_marker("downlink_payload_class");
-                let uplink_payload_shape: Marker<UplinkPayloadShape> = data_marker("uplink_payload_shape");
-                let downlink_payload_shape: Marker<DownlinkPayloadShape> = data_marker("downlink_payload_shape");
+                let uplink_payload_class: Marker<PayloadClassWindow> = data_marker("uplink_payload_class");
+                let downlink_payload_class: Marker<PayloadClassWindow> = data_marker("downlink_payload_class");
+                let uplink_payload_shape: Marker<PayloadShapeWindowSurfaceShaderPacket> = data_marker("uplink_payload_shape");
+                let downlink_payload_shape: Marker<PayloadShapeWindowFrame> = data_marker("downlink_payload_shape");
                 let uplink_window_policy: Marker<UplinkWindowPolicy> = data_marker("uplink_window_policy");
                 let downlink_window_policy: Marker<DownlinkWindowPolicy> = data_marker("downlink_window_policy");
               }
@@ -3650,5 +4387,251 @@ mod tests {
         .unwrap_err();
 
         assert!(error.contains("typed form `Marker<...>`"));
+    }
+
+    #[test]
+    fn validates_shader_packet_contract_from_cpu_usage() {
+        let project = project_with_modules(vec![
+            (
+                "main.ns",
+                r#"
+                mod cpu Main {
+                  fn main() {
+                    let packet: SurfaceShaderPacket =
+                      shader_profile_packet("SurfaceShader", 1, 2, 3);
+                  }
+                }
+                "#,
+            ),
+            (
+                "surface_shader.ns",
+                r#"
+                mod shader SurfaceShader {
+                  fn profile() {
+                    const vertex_count: i64 = 4;
+                    const instance_count: i64 = 1;
+                    const packet_color_slot: i64 = 0;
+                    const packet_speed_slot: i64 = 1;
+                    const packet_radius_slot: i64 = 2;
+                    const packet_tag: i64 = 17;
+                    const material_mode: i64 = 2;
+                    const pass_kind: i64 = 1;
+                    const packet_field_count: i64 = 3;
+                    let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
+                    let profile_view: Viewport = shader_viewport(160, 120);
+                    let profile_pipe: Pipeline = shader_pipeline("lit_sphere", "triangle_strip");
+                    let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", "stub");
+                  }
+                }
+                "#,
+            ),
+        ]);
+
+        validate_shader_packet_contract(&project, "SurfaceShader").unwrap();
+    }
+
+    #[test]
+    fn rejects_shader_packet_field_count_mismatch() {
+        let project = project_with_modules(vec![
+            (
+                "main.ns",
+                r#"
+                mod cpu Main {
+                  fn main() {
+                    let packet: SurfaceShaderPacket =
+                      shader_profile_packet("SurfaceShader", 1, 2, 3);
+                  }
+                }
+                "#,
+            ),
+            (
+                "surface_shader.ns",
+                r#"
+                mod shader SurfaceShader {
+                  fn profile() {
+                    const vertex_count: i64 = 4;
+                    const instance_count: i64 = 1;
+                    const packet_color_slot: i64 = 0;
+                    const packet_speed_slot: i64 = 1;
+                    const packet_radius_slot: i64 = 2;
+                    const packet_tag: i64 = 17;
+                    const material_mode: i64 = 2;
+                    const pass_kind: i64 = 1;
+                    const packet_field_count: i64 = 4;
+                    let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
+                    let profile_view: Viewport = shader_viewport(160, 120);
+                    let profile_pipe: Pipeline = shader_pipeline("lit_sphere", "triangle_strip");
+                    let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", "stub");
+                  }
+                }
+                "#,
+            ),
+        ]);
+
+        let error = validate_shader_packet_contract(&project, "SurfaceShader").unwrap_err();
+        assert!(error.contains("packet_field_count = 3"));
+    }
+
+    #[test]
+    fn validates_kernel_profile_slot_contract() {
+        let project = project_with_modules(vec![(
+            "kernel_unit.ns",
+            r#"
+            mod kernel KernelUnit {
+              fn profile() {
+                const bind_core: i64 = 2;
+                const queue_depth: i64 = 8;
+                const batch_lanes: i64 = 16;
+                let profile_entry: Unit =
+                  kernel_target_config("apple_ane", "coreml", batch_lanes);
+              }
+            }
+            "#,
+        )]);
+
+        validate_kernel_profile_slot_contract(&project, "KernelUnit").unwrap();
+    }
+
+    #[test]
+    fn rejects_kernel_profile_without_batch_lanes_wiring() {
+        let project = project_with_modules(vec![(
+            "kernel_unit.ns",
+            r#"
+            mod kernel KernelUnit {
+              fn profile() {
+                const bind_core: i64 = 2;
+                const queue_depth: i64 = 8;
+                const batch_lanes: i64 = 16;
+                let profile_entry: Unit =
+                  kernel_target_config("apple_ane", "coreml", queue_depth);
+              }
+            }
+            "#,
+        )]);
+
+        let error = validate_kernel_profile_slot_contract(&project, "KernelUnit").unwrap_err();
+        assert!(error.contains("kernel_target_config(..., batch_lanes)"));
+    }
+
+    #[test]
+    fn materializes_shader_and_data_type_contract_nodes_into_yir() {
+        let project = project_with_modules(vec![
+            (
+                "main.ns",
+                r#"
+                use data FabricPlane;
+                use shader SurfaceShader;
+
+                mod cpu Main {
+                  fn main() {
+                    let packet: SurfaceShaderPacket =
+                      shader_profile_packet("SurfaceShader", 1, 2, 3);
+                    let gpu_packet: Window<SurfaceShaderPacket> =
+                      data_profile_send_uplink("FabricPlane", packet);
+                    let frame: Frame = shader_profile_render("SurfaceShader", gpu_packet);
+                    let host_frame: Window<Frame> =
+                      data_profile_send_downlink("FabricPlane", frame);
+                    print(host_frame);
+                  }
+                }
+                "#,
+            ),
+            (
+                "surface_shader.ns",
+                r#"
+                mod shader SurfaceShader {
+                  fn profile() {
+                    const vertex_count: i64 = 4;
+                    const instance_count: i64 = 1;
+                    const packet_color_slot: i64 = 0;
+                    const packet_speed_slot: i64 = 1;
+                    const packet_radius_slot: i64 = 2;
+                    const packet_tag: i64 = 17;
+                    const material_mode: i64 = 2;
+                    const pass_kind: i64 = 1;
+                    const packet_field_count: i64 = 3;
+                    let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
+                    let profile_view: Viewport = shader_viewport(160, 120);
+                    let profile_pipe: Pipeline = shader_pipeline("lit_sphere", "triangle_strip");
+                    let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", "stub");
+                  }
+                }
+                "#,
+            ),
+            (
+                "fabric_plane.ns",
+                r#"
+                mod data FabricPlane {
+                  fn profile() {
+                    const window_offset: i64 = 0;
+                    const uplink_len: i64 = 1;
+                    const downlink_len: i64 = 1;
+                    data_bind_core(1);
+                    let profile_handles: HandleTable<FabricBindings> =
+                      data_handle_table("host=cpu0", "render=shader0");
+                    let cpu_to_shader: Marker<CpuToShader> = data_marker("cpu_to_shader");
+                    let shader_to_cpu: Marker<ShaderToCpu> = data_marker("shader_to_cpu");
+                    let uplink_pipe: Marker<UplinkPipe> = data_marker("uplink_pipe");
+                    let downlink_pipe: Marker<DownlinkPipe> = data_marker("downlink_pipe");
+                    let uplink_pipe_class: Marker<UplinkPipeClass> = data_marker("uplink_pipe_class");
+                    let downlink_pipe_class: Marker<DownlinkPipeClass> = data_marker("downlink_pipe_class");
+                    let uplink_payload_class: Marker<PayloadClassWindow> = data_marker("uplink_payload_class");
+                    let downlink_payload_class: Marker<PayloadClassWindow> = data_marker("downlink_payload_class");
+                    let uplink_payload_shape: Marker<PayloadShapeWindowSurfaceShaderPacket> = data_marker("uplink_payload_shape");
+                    let downlink_payload_shape: Marker<PayloadShapeWindowFrame> = data_marker("downlink_payload_shape");
+                    let uplink_window_policy: Marker<UplinkWindowPolicy> = data_marker("uplink_window_policy");
+                    let downlink_window_policy: Marker<DownlinkWindowPolicy> = data_marker("downlink_window_policy");
+                    let uplink_window: Window<i64> =
+                      data_immutable_window(window_offset, window_offset, uplink_len);
+                    let downlink_window: Window<i64> =
+                      data_copy_window(window_offset, window_offset, downlink_len);
+                  }
+                }
+                "#,
+            ),
+        ]);
+        let mut project = project;
+        project.manifest.links = vec![ProjectLink {
+            from: "cpu.Main".to_owned(),
+            to: "shader.SurfaceShader".to_owned(),
+            via: Some("data.FabricPlane".to_owned()),
+        }];
+
+        let mut yir = YirModule::new("0.1");
+        apply_project_support_modules_to_yir(&project, &mut yir).unwrap();
+
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.name == "project_profile_shader_SurfaceShader_packet_type"));
+        assert!(yir.nodes.iter().any(|node| {
+            node.name == "project_profile_data_FabricPlane_uplink_payload_shape_type"
+        }));
+    }
+
+    #[test]
+    fn materializes_kernel_slot_contract_node_into_yir() {
+        let project = project_with_modules(vec![(
+            "kernel_unit.ns",
+            r#"
+            mod kernel KernelUnit {
+              fn profile() {
+                const bind_core: i64 = 2;
+                const queue_depth: i64 = 8;
+                const batch_lanes: i64 = 16;
+                let profile_entry: Unit =
+                  kernel_target_config("apple_ane", "coreml", batch_lanes);
+              }
+            }
+            "#,
+        )]);
+
+        let mut yir = YirModule::new("0.1");
+        apply_project_support_modules_to_yir(&project, &mut yir).unwrap();
+
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.name == "project_profile_kernel_KernelUnit_slot_contract_type"));
     }
 }
