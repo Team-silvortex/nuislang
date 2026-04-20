@@ -168,7 +168,7 @@ impl RegisteredMod for CpuMod {
 
                 Ok(InstructionSemantics::pure(Vec::new()))
             }
-            "borrow" | "borrow_end" | "move_ptr" | "neg" | "not" => {
+            "borrow" | "borrow_end" | "move_ptr" | "neg" | "not" | "await" => {
                 if node.op.args.len() != 1 {
                     return Err(format!(
                         "node `{}` expects `cpu.{} <name> <resource> <input>`",
@@ -564,6 +564,17 @@ impl RegisteredMod for CpuMod {
             }
             "null" => Ok(Value::Pointer(None)),
             "borrow" | "move_ptr" => Ok(Value::Pointer(state.expect_pointer(&node.op.args[0])?)),
+            "await" => {
+                let value = state.expect_value(&node.op.args[0])?.clone();
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.await @{} [{}]: {}",
+                        node.resource, resource.kind.raw, value
+                    ),
+                );
+                Ok(value)
+            }
             "borrow_end" => {
                 let pointer = state.expect_pointer(&node.op.args[0])?;
                 state.push_resource_event(

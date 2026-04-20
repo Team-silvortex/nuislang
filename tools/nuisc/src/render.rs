@@ -43,9 +43,10 @@ pub fn render_ast(module: &AstModule) -> String {
             .as_ref()
             .map(|ty| format!(" -> {}", render_ast_type(ty)))
             .unwrap_or_default();
+        let async_prefix = if function.is_async { "async " } else { "" };
         out.push_str(&format!(
-            "  fn {}({}){}\n",
-            function.name, params, return_suffix
+            "  {}fn {}({}){}\n",
+            async_prefix, function.name, params, return_suffix
         ));
         for stmt in &function.body {
             match stmt {
@@ -71,6 +72,9 @@ pub fn render_ast(module: &AstModule) -> String {
                 }
                 AstStmt::Print(value) => {
                     out.push_str(&format!("    print {}\n", render_ast_expr(value)));
+                }
+                AstStmt::Await(value) => {
+                    out.push_str(&format!("    await {}\n", render_ast_expr(value)));
                 }
                 AstStmt::If {
                     condition,
@@ -139,9 +143,10 @@ pub fn render_nir(module: &NirModule) -> String {
             .as_ref()
             .map(|ty| format!(" -> {}", render_nir_type(ty)))
             .unwrap_or_default();
+        let async_prefix = if function.is_async { "async " } else { "" };
         out.push_str(&format!(
-            "  fn {}({}){}\n",
-            function.name, params, return_suffix
+            "  {}fn {}({}){}\n",
+            async_prefix, function.name, params, return_suffix
         ));
         for stmt in &function.body {
             match stmt {
@@ -167,6 +172,9 @@ pub fn render_nir(module: &NirModule) -> String {
                 }
                 NirStmt::Print(value) => {
                     out.push_str(&format!("    print {}\n", render_nir_expr(value)));
+                }
+                NirStmt::Await(value) => {
+                    out.push_str(&format!("    await {}\n", render_nir_expr(value)));
                 }
                 NirStmt::If {
                     condition,
@@ -796,6 +804,7 @@ fn render_ast_stmt_inline(stmt: &AstStmt) -> String {
             )
         }
         AstStmt::Print(value) => format!("print {}", render_ast_expr(value)),
+        AstStmt::Await(value) => format!("await {}", render_ast_expr(value)),
         AstStmt::Expr(expr) => render_ast_expr(expr),
         AstStmt::If { .. } => "if ...".to_owned(),
         AstStmt::Return(value) => match value {
@@ -823,6 +832,7 @@ fn render_nir_stmt_inline(stmt: &NirStmt) -> String {
             )
         }
         NirStmt::Print(value) => format!("print {}", render_nir_expr(value)),
+        NirStmt::Await(value) => format!("await {}", render_nir_expr(value)),
         NirStmt::Expr(expr) => render_nir_expr(expr),
         NirStmt::If { .. } => "if ...".to_owned(),
         NirStmt::Return(value) => match value {

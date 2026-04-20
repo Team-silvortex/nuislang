@@ -1098,6 +1098,7 @@ fn stmt_uses_shader_profile_render(stmt: &NirStmt, unit: &str) -> bool {
         NirStmt::Let { value, .. }
         | NirStmt::Const { value, .. }
         | NirStmt::Print(value)
+        | NirStmt::Await(value)
         | NirStmt::Expr(value) => expr_uses_shader_profile_render(value, unit),
         NirStmt::If {
             condition,
@@ -1123,6 +1124,7 @@ fn stmt_uses_shader_profile_packet(stmt: &NirStmt, unit: &str) -> bool {
         NirStmt::Let { value, .. }
         | NirStmt::Const { value, .. }
         | NirStmt::Print(value)
+        | NirStmt::Await(value)
         | NirStmt::Expr(value) => expr_uses_shader_profile_packet(value, unit),
         NirStmt::If {
             condition,
@@ -1148,6 +1150,7 @@ fn stmt_uses_shader_profile_color_seed(stmt: &NirStmt, unit: &str) -> bool {
         NirStmt::Let { value, .. }
         | NirStmt::Const { value, .. }
         | NirStmt::Print(value)
+        | NirStmt::Await(value)
         | NirStmt::Expr(value) => expr_uses_shader_profile_color_seed(value, unit),
         NirStmt::If {
             condition,
@@ -1173,6 +1176,7 @@ fn stmt_uses_shader_profile_speed_seed(stmt: &NirStmt, unit: &str) -> bool {
         NirStmt::Let { value, .. }
         | NirStmt::Const { value, .. }
         | NirStmt::Print(value)
+        | NirStmt::Await(value)
         | NirStmt::Expr(value) => expr_uses_shader_profile_speed_seed(value, unit),
         NirStmt::If {
             condition,
@@ -1198,6 +1202,7 @@ fn stmt_uses_shader_profile_radius_seed(stmt: &NirStmt, unit: &str) -> bool {
         NirStmt::Let { value, .. }
         | NirStmt::Const { value, .. }
         | NirStmt::Print(value)
+        | NirStmt::Await(value)
         | NirStmt::Expr(value) => expr_uses_shader_profile_radius_seed(value, unit),
         NirStmt::If {
             condition,
@@ -1223,6 +1228,7 @@ fn stmt_uses_data_profile_bind_core(stmt: &NirStmt, unit: &str) -> bool {
         NirStmt::Let { value, .. }
         | NirStmt::Const { value, .. }
         | NirStmt::Print(value)
+        | NirStmt::Await(value)
         | NirStmt::Expr(value) => expr_uses_data_profile_bind_core(value, unit),
         NirStmt::If {
             condition,
@@ -1248,6 +1254,7 @@ fn stmt_uses_data_profile_handle_table(stmt: &NirStmt, unit: &str) -> bool {
         NirStmt::Let { value, .. }
         | NirStmt::Const { value, .. }
         | NirStmt::Print(value)
+        | NirStmt::Await(value)
         | NirStmt::Expr(value) => expr_uses_data_profile_handle_table(value, unit),
         NirStmt::If {
             condition,
@@ -1273,6 +1280,7 @@ fn stmt_uses_data_profile_send_uplink(stmt: &NirStmt, unit: &str) -> bool {
         NirStmt::Let { value, .. }
         | NirStmt::Const { value, .. }
         | NirStmt::Print(value)
+        | NirStmt::Await(value)
         | NirStmt::Expr(value) => expr_uses_data_profile_send_uplink(value, unit),
         NirStmt::If {
             condition,
@@ -1298,6 +1306,7 @@ fn stmt_uses_data_profile_send_downlink(stmt: &NirStmt, unit: &str) -> bool {
         NirStmt::Let { value, .. }
         | NirStmt::Const { value, .. }
         | NirStmt::Print(value)
+        | NirStmt::Await(value)
         | NirStmt::Expr(value) => expr_uses_data_profile_send_downlink(value, unit),
         NirStmt::If {
             condition,
@@ -1323,6 +1332,7 @@ fn stmt_uses_kernel_profile_bind_core(stmt: &NirStmt, unit: &str) -> bool {
         NirStmt::Let { value, .. }
         | NirStmt::Const { value, .. }
         | NirStmt::Print(value)
+        | NirStmt::Await(value)
         | NirStmt::Expr(value) => expr_uses_kernel_profile_bind_core(value, unit),
         NirStmt::If {
             condition,
@@ -1348,6 +1358,7 @@ fn stmt_uses_kernel_profile_queue_depth(stmt: &NirStmt, unit: &str) -> bool {
         NirStmt::Let { value, .. }
         | NirStmt::Const { value, .. }
         | NirStmt::Print(value)
+        | NirStmt::Await(value)
         | NirStmt::Expr(value) => expr_uses_kernel_profile_queue_depth(value, unit),
         NirStmt::If {
             condition,
@@ -1373,6 +1384,7 @@ fn stmt_uses_kernel_profile_batch_lanes(stmt: &NirStmt, unit: &str) -> bool {
         NirStmt::Let { value, .. }
         | NirStmt::Const { value, .. }
         | NirStmt::Print(value)
+        | NirStmt::Await(value)
         | NirStmt::Expr(value) => expr_uses_kernel_profile_batch_lanes(value, unit),
         NirStmt::If {
             condition,
@@ -2424,7 +2436,7 @@ fn find_route_payload_type_in_stmts(
                     return Some(ty);
                 }
             }
-            NirStmt::Print(_) | NirStmt::Expr(_) | NirStmt::Return(_) => {}
+            NirStmt::Print(_) | NirStmt::Await(_) | NirStmt::Expr(_) | NirStmt::Return(_) => {}
             NirStmt::Let { ty: None, .. } => {}
         }
     }

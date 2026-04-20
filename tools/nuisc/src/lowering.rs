@@ -87,6 +87,7 @@ fn lower_nir_to_yir_builtin_cpu(module: &NirModule) -> Result<YirModule, String>
         function_map,
         value_counter: 0,
         print_counter: 0,
+        await_counter: 0,
         call_stack: Vec::new(),
     };
 
@@ -197,6 +198,7 @@ struct LoweringState<'a> {
     function_map: BTreeMap<&'a str, &'a NirFunction>,
     value_counter: usize,
     print_counter: usize,
+    await_counter: usize,
     call_stack: Vec<String>,
 }
 
@@ -234,6 +236,26 @@ fn lower_function_body(
                     kind: EdgeKind::Effect,
                     from: lowered,
                     to: print_name,
+                });
+            }
+            NirStmt::Await(value) => {
+                let awaited = lower_expr(value, state, bindings)?;
+                let await_name = format!("await_{}", state.await_counter);
+                state.await_counter += 1;
+                state.yir.nodes.push(Node {
+                    name: await_name.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "await".to_owned(),
+                        args: vec![awaited.clone()],
+                    },
+                });
+                push_dep_edges(state, &awaited, &await_name);
+                state.yir.edges.push(Edge {
+                    kind: EdgeKind::Effect,
+                    from: awaited,
+                    to: await_name,
                 });
             }
             NirStmt::If {
@@ -1476,4 +1498,36 @@ fn lower_unary_cpu_expr(
     });
     push_dep_edges(state, &lowered, &name);
     Ok(name)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::lower_nir_to_yir_builtin_cpu;
+    use crate::frontend::parse_nuis_module;
+    use yir_core::EdgeKind;
+
+    #[test]
+    fn lowers_await_stmt_into_cpu_await_node() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              async fn main() {
+                await data_profile_bind_core("FabricPlane");
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+        let await_node = yir
+            .nodes
+            .iter()
+            .find(|node| node.op.module == "cpu" && node.op.instruction == "await")
+            .unwrap();
+        let awaited = await_node.op.args.first().unwrap();
+        assert!(yir.edges.iter().any(|edge| edge.from == *awaited
+            && edge.to == await_node.name
+            && matches!(edge.kind, EdgeKind::Effect)));
+    }
 }

@@ -450,6 +450,7 @@ fn collect_support_usage_stmt(
         NirStmt::Let { value, .. }
         | NirStmt::Const { value, .. }
         | NirStmt::Print(value)
+        | NirStmt::Await(value)
         | NirStmt::Expr(value) => collect_support_usage_expr(value, domain_family, surfaces, slots),
         NirStmt::If {
             condition,

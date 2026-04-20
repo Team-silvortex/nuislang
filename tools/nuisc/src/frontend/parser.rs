@@ -151,6 +151,12 @@ impl Parser {
     }
 
     fn parse_function(&mut self) -> Result<AstFunction, String> {
+        let is_async = if self.peek_word("async") {
+            self.expect_word("async")?;
+            true
+        } else {
+            false
+        };
         self.expect_word("fn")?;
         let name = self.expect_ident()?;
         self.expect_symbol('(')?;
@@ -177,6 +183,7 @@ impl Parser {
 
         Ok(AstFunction {
             name,
+            is_async,
             params,
             return_type,
             body,
@@ -253,6 +260,9 @@ impl Parser {
         if self.peek_word("return") {
             return self.parse_return_stmt();
         }
+        if self.peek_word("await") {
+            return self.parse_await_stmt();
+        }
         if self.peek_word("mod") {
             return Err("nested mod definitions are not allowed".to_owned());
         }
@@ -280,6 +290,13 @@ impl Parser {
         let value = self.parse_expr()?;
         self.expect_symbol(';')?;
         Ok(AstStmt::Return(Some(value)))
+    }
+
+    fn parse_await_stmt(&mut self) -> Result<AstStmt, String> {
+        self.expect_word("await")?;
+        let value = self.parse_expr()?;
+        self.expect_symbol(';')?;
+        Ok(AstStmt::Await(value))
     }
 
     fn parse_let_stmt(&mut self) -> Result<AstStmt, String> {

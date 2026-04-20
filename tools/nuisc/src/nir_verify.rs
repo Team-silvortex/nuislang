@@ -57,7 +57,11 @@ fn verify_declared_types(module: &NirModule) -> Result<(), String> {
                     }
                 }
                 NirStmt::Const { ty, .. } => verify_type_ref(ty)?,
-                NirStmt::Print(_) | NirStmt::Expr(_) | NirStmt::Return(_) | NirStmt::If { .. } => {}
+                NirStmt::Print(_)
+                | NirStmt::Await(_)
+                | NirStmt::Expr(_)
+                | NirStmt::Return(_)
+                | NirStmt::If { .. } => {}
             }
         }
     }
@@ -104,7 +108,7 @@ fn verify_stmt(
             note_binding_effects(value, name, moved, borrows, borrow_bindings);
             data_bindings.insert(name.clone(), infer_data_kind(value, data_bindings));
         }
-        NirStmt::Print(value) | NirStmt::Expr(value) => {
+        NirStmt::Print(value) | NirStmt::Await(value) | NirStmt::Expr(value) => {
             verify_expr(value, moved, borrows, borrow_bindings, data_bindings)?;
             if let NirExpr::BorrowEnd(_) = value {
                 note_binding_effects(value, "_", moved, borrows, borrow_bindings);
@@ -731,6 +735,7 @@ mod tests {
             structs: vec![],
             functions: vec![NirFunction {
                 name: "main".to_owned(),
+                is_async: false,
                 params: vec![],
                 return_type: None,
                 body,

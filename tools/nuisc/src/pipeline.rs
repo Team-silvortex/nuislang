@@ -172,6 +172,7 @@ fn collect_instantiated_units_stmt(stmt: &NirStmt, units: &mut Vec<(String, Stri
         NirStmt::Let { value, .. }
         | NirStmt::Const { value, .. }
         | NirStmt::Print(value)
+        | NirStmt::Await(value)
         | NirStmt::Expr(value) => collect_instantiated_units_expr(value, units),
         NirStmt::If {
             condition,

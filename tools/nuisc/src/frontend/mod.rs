@@ -57,6 +57,7 @@ pub fn lower_ast_to_nir(module: &AstModule) -> Result<NirModule, String> {
                         .collect(),
                     return_type: Some(lower_type_ref(&function.return_type)),
                     is_extern: true,
+                    is_async: false,
                 },
             )
         })
@@ -75,6 +76,7 @@ pub fn lower_ast_to_nir(module: &AstModule) -> Result<NirModule, String> {
                             .collect(),
                         return_type: Some(lower_type_ref(&function.return_type)),
                         is_extern: true,
+                        is_async: false,
                     },
                 )
             })
@@ -93,6 +95,7 @@ pub fn lower_ast_to_nir(module: &AstModule) -> Result<NirModule, String> {
                         .collect(),
                     return_type: function.return_type.as_ref().map(lower_type_ref),
                     is_extern: false,
+                    is_async: function.is_async,
                 },
             )
         }))
@@ -163,6 +166,7 @@ struct FunctionSignature {
     params: Vec<NirTypeRef>,
     return_type: Option<NirTypeRef>,
     is_extern: bool,
+    is_async: bool,
 }
 
 fn lower_function(
@@ -178,15 +182,17 @@ fn lower_function(
 
     Ok(NirFunction {
         name: function.name.clone(),
+        is_async: function.is_async,
         params: function.params.iter().map(lower_param).collect(),
         return_type: function.return_type.as_ref().map(lower_type_ref),
         body: function
             .body
             .iter()
             .map(|stmt| {
-                lower_stmt(
+                lower_stmt_with_async(
                     stmt,
                     current_domain,
+                    function.is_async,
                     &mut bindings,
                     function.return_type.as_ref(),
                     signatures,
@@ -213,9 +219,30 @@ fn lower_type_ref(ty: &AstTypeRef) -> NirTypeRef {
     }
 }
 
+#[allow(dead_code)]
 fn lower_stmt(
     stmt: &AstStmt,
     current_domain: &str,
+    bindings: &mut BTreeMap<String, NirTypeRef>,
+    return_type: Option<&AstTypeRef>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> Result<NirStmt, String> {
+    lower_stmt_with_async(
+        stmt,
+        current_domain,
+        false,
+        bindings,
+        return_type,
+        signatures,
+        struct_table,
+    )
+}
+
+fn lower_stmt_with_async(
+    stmt: &AstStmt,
+    current_domain: &str,
+    current_function_is_async: bool,
     bindings: &mut BTreeMap<String, NirTypeRef>,
     return_type: Option<&AstTypeRef>,
     signatures: &BTreeMap<String, FunctionSignature>,
@@ -227,13 +254,15 @@ fn lower_stmt(
             if let Some(expected_ty) = expected.as_ref() {
                 validate_type_ref(expected_ty)?;
             }
-            let lowered = lower_expr(
+            let lowered = lower_expr_with_async(
                 value,
                 current_domain,
+                current_function_is_async,
                 bindings,
                 signatures,
                 struct_table,
                 expected.as_ref(),
+                false,
             )?;
             let inferred = infer_nir_expr_type(&lowered, bindings, signatures, struct_table);
             let final_type = resolve_declared_or_inferred(name, expected, inferred)?;
@@ -247,13 +276,15 @@ fn lower_stmt(
         AstStmt::Const { name, ty, value } => {
             let expected = lower_type_ref(ty);
             validate_type_ref(&expected)?;
-            let lowered = lower_expr(
+            let lowered = lower_expr_with_async(
                 value,
                 current_domain,
+                current_function_is_async,
                 bindings,
                 signatures,
                 struct_table,
                 Some(&expected),
+                false,
             )?;
             let inferred = infer_nir_expr_type(&lowered, bindings, signatures, struct_table);
             let final_type = resolve_declared_or_inferred(name, Some(expected), inferred)?;
@@ -264,33 +295,53 @@ fn lower_stmt(
                 value: lowered,
             }
         }
-        AstStmt::Print(value) => NirStmt::Print(lower_expr(
+        AstStmt::Print(value) => NirStmt::Print(lower_expr_with_async(
             value,
             current_domain,
+            current_function_is_async,
             bindings,
             signatures,
             struct_table,
             None,
+            false,
         )?),
+        AstStmt::Await(value) => {
+            if !current_function_is_async {
+                return Err("`await` is only allowed inside `async fn`".to_owned());
+            }
+            NirStmt::Await(lower_expr_with_async(
+                value,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+                true,
+            )?)
+        }
         AstStmt::If {
             condition,
             then_body,
             else_body,
         } => NirStmt::If {
-            condition: lower_expr(
+            condition: lower_expr_with_async(
                 condition,
                 current_domain,
+                current_function_is_async,
                 bindings,
                 signatures,
                 struct_table,
                 Some(&bool_type()),
+                false,
             )?,
             then_body: then_body
                 .iter()
                 .map(|stmt| {
-                    lower_stmt(
+                    lower_stmt_with_async(
                         stmt,
                         current_domain,
+                        current_function_is_async,
                         &mut bindings.clone(),
                         return_type,
                         signatures,
@@ -301,9 +352,10 @@ fn lower_stmt(
             else_body: else_body
                 .iter()
                 .map(|stmt| {
-                    lower_stmt(
+                    lower_stmt_with_async(
                         stmt,
                         current_domain,
+                        current_function_is_async,
                         &mut bindings.clone(),
                         return_type,
                         signatures,
@@ -312,13 +364,15 @@ fn lower_stmt(
                 })
                 .collect::<Result<Vec<_>, _>>()?,
         },
-        AstStmt::Expr(expr) => NirStmt::Expr(lower_expr(
+        AstStmt::Expr(expr) => NirStmt::Expr(lower_expr_with_async(
             expr,
             current_domain,
+            current_function_is_async,
             bindings,
             signatures,
             struct_table,
             None,
+            false,
         )?),
         AstStmt::Return(value) => {
             let expected = return_type.map(lower_type_ref);
@@ -326,13 +380,15 @@ fn lower_stmt(
                 validate_type_ref(expected_ty)?;
             }
             NirStmt::Return(match value {
-                Some(value) => Some(lower_expr(
+                Some(value) => Some(lower_expr_with_async(
                     value,
                     current_domain,
+                    current_function_is_async,
                     bindings,
                     signatures,
                     struct_table,
                     expected.as_ref(),
+                    false,
                 )?),
                 None => None,
             })
@@ -347,6 +403,28 @@ fn lower_expr(
     signatures: &BTreeMap<String, FunctionSignature>,
     struct_table: &BTreeMap<String, NirStructDef>,
     expected: Option<&NirTypeRef>,
+) -> Result<NirExpr, String> {
+    lower_expr_with_async(
+        expr,
+        current_domain,
+        false,
+        bindings,
+        signatures,
+        struct_table,
+        expected,
+        false,
+    )
+}
+
+fn lower_expr_with_async(
+    expr: &AstExpr,
+    current_domain: &str,
+    current_function_is_async: bool,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+    expected: Option<&NirTypeRef>,
+    allow_async_calls: bool,
 ) -> Result<NirExpr, String> {
     Ok(match expr {
         AstExpr::Bool(value) => NirExpr::Bool(*value),
@@ -365,14 +443,16 @@ fn lower_expr(
                 unit: unit.clone(),
             }
         }
-        AstExpr::Call { callee, args } => lower_call_expr(
+        AstExpr::Call { callee, args } => lower_call_expr_with_async(
             callee,
             args,
             current_domain,
+            current_function_is_async,
             bindings,
             signatures,
             struct_table,
             expected,
+            allow_async_calls,
         )?,
         AstExpr::MethodCall {
             receiver,
@@ -507,11 +587,12 @@ fn lower_expr(
                 field: field.clone(),
             }
         }
-        AstExpr::Binary { op, lhs, rhs } => lower_binary_expr(
+        AstExpr::Binary { op, lhs, rhs } => lower_binary_expr_with_async(
             op,
             lhs,
             rhs,
             current_domain,
+            current_function_is_async,
             bindings,
             signatures,
             struct_table,
@@ -519,11 +600,34 @@ fn lower_expr(
     })
 }
 
+#[allow(dead_code)]
 fn lower_binary_expr(
     op: &AstBinaryOp,
     lhs: &AstExpr,
     rhs: &AstExpr,
     current_domain: &str,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> Result<NirExpr, String> {
+    lower_binary_expr_with_async(
+        op,
+        lhs,
+        rhs,
+        current_domain,
+        false,
+        bindings,
+        signatures,
+        struct_table,
+    )
+}
+
+fn lower_binary_expr_with_async(
+    op: &AstBinaryOp,
+    lhs: &AstExpr,
+    rhs: &AstExpr,
+    current_domain: &str,
+    _current_function_is_async: bool,
     bindings: &BTreeMap<String, NirTypeRef>,
     signatures: &BTreeMap<String, FunctionSignature>,
     struct_table: &BTreeMap<String, NirStructDef>,
@@ -601,6 +705,7 @@ fn render_binary_op(op: AstBinaryOp) -> &'static str {
     }
 }
 
+#[allow(dead_code)]
 fn lower_call_expr(
     callee: &str,
     args: &[AstExpr],
@@ -609,6 +714,30 @@ fn lower_call_expr(
     signatures: &BTreeMap<String, FunctionSignature>,
     struct_table: &BTreeMap<String, NirStructDef>,
     expected: Option<&NirTypeRef>,
+) -> Result<NirExpr, String> {
+    lower_call_expr_with_async(
+        callee,
+        args,
+        current_domain,
+        false,
+        bindings,
+        signatures,
+        struct_table,
+        expected,
+        false,
+    )
+}
+
+fn lower_call_expr_with_async(
+    callee: &str,
+    args: &[AstExpr],
+    current_domain: &str,
+    current_function_is_async: bool,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+    expected: Option<&NirTypeRef>,
+    allow_async_calls: bool,
 ) -> Result<NirExpr, String> {
     match callee {
         "null" => {
@@ -2022,6 +2151,18 @@ fn lower_call_expr(
                         lowered_args.len()
                     ));
                 }
+                if signature.is_async {
+                    if !current_function_is_async {
+                        return Err(format!(
+                            "async function `{callee}` can only be called inside `async fn`"
+                        ));
+                    }
+                    if !allow_async_calls {
+                        return Err(format!(
+                            "async function `{callee}` must be used under `await ...;`"
+                        ));
+                    }
+                }
                 if signature.is_extern {
                     if current_domain != "cpu" {
                         return Err(format!(
@@ -2312,7 +2453,11 @@ fn validate_declared_nir_types(module: &NirModule) -> Result<(), String> {
                     }
                 }
                 NirStmt::Const { ty, .. } => validate_type_ref(ty)?,
-                NirStmt::Print(_) | NirStmt::Expr(_) | NirStmt::Return(_) | NirStmt::If { .. } => {}
+                NirStmt::Print(_)
+                | NirStmt::Await(_)
+                | NirStmt::Expr(_)
+                | NirStmt::Return(_)
+                | NirStmt::If { .. } => {}
             }
         }
     }
@@ -2520,5 +2665,72 @@ mod tests {
         .unwrap_err();
 
         assert!(error.contains("nominal tag type"));
+    }
+
+    #[test]
+    fn lowers_async_fn_and_await_stmt_into_nir() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              async fn ping() -> i64 {
+                return 7;
+              }
+
+              async fn main() {
+                await ping();
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.is_async);
+        assert!(matches!(function.body.first(), Some(NirStmt::Await(_))));
+    }
+
+    #[test]
+    fn rejects_await_inside_sync_function() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn ping() -> i64 {
+                return 7;
+              }
+
+              fn main() {
+                await ping();
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("`await`"));
+        assert!(error.contains("async fn"));
+    }
+
+    #[test]
+    fn rejects_async_call_without_await() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              async fn ping() -> i64 {
+                return 7;
+              }
+
+              async fn main() -> i64 {
+                return ping();
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("must be used under `await ...;`"));
     }
 }

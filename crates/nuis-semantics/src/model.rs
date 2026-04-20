@@ -65,6 +65,7 @@ pub struct AstParam {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AstFunction {
     pub name: String,
+    pub is_async: bool,
     pub params: Vec<AstParam>,
     pub return_type: Option<AstTypeRef>,
     pub body: Vec<AstStmt>,
@@ -83,6 +84,7 @@ pub enum AstStmt {
         value: AstExpr,
     },
     Print(AstExpr),
+    Await(AstExpr),
     If {
         condition: AstExpr,
         then_body: Vec<AstStmt>,
@@ -470,6 +472,7 @@ pub struct NirParam {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NirFunction {
     pub name: String,
+    pub is_async: bool,
     pub params: Vec<NirParam>,
     pub return_type: Option<NirTypeRef>,
     pub body: Vec<NirStmt>,
@@ -488,6 +491,7 @@ pub enum NirStmt {
         value: NirExpr,
     },
     Print(NirExpr),
+    Await(NirExpr),
     If {
         condition: NirExpr,
         then_body: Vec<NirStmt>,

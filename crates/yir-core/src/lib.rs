@@ -280,7 +280,7 @@ impl Operation {
                 CpuLlvmLoweringClass::Memory
             }
             "input_i64" | "extern_call_i64" => CpuLlvmLoweringClass::Runtime,
-            "print" => CpuLlvmLoweringClass::Effect,
+            "print" | "await" => CpuLlvmLoweringClass::Effect,
             _ => CpuLlvmLoweringClass::Other,
         }
     }
