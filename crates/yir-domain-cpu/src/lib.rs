@@ -198,11 +198,21 @@ impl RegisteredMod for CpuMod {
                 }
                 Ok(InstructionSemantics::effect(vec![node.op.args[1].clone()]))
             }
-            "join" | "cancel" => {
+            "join" | "cancel" | "join_result" | "task_completed" | "task_timed_out"
+            | "task_cancelled" | "task_value" => {
                 if node.op.args.len() != 1 {
                     return Err(format!(
                         "node `{}` expects `cpu.{} <name> <resource> <task>`",
                         node.name, node.op.instruction
+                    ));
+                }
+                Ok(InstructionSemantics::effect(node.op.args.clone()))
+            }
+            "timeout" => {
+                if node.op.args.len() != 2 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.timeout <name> <resource> <task> <limit>`",
+                        node.name
                     ));
                 }
                 Ok(InstructionSemantics::effect(node.op.args.clone()))
@@ -624,12 +634,22 @@ impl RegisteredMod for CpuMod {
                 Ok(Value::Task(yir_core::TaskHandle {
                     label: format!("{callee}@{}", node.name),
                     result: Box::new(result),
+                    limit: None,
+                    cancelled: false,
                 }))
             }
             "join" => {
                 let task = state.expect_task(&node.op.args[0])?;
                 let label = task.label.clone();
                 let result = (*task.result).clone();
+                let cancelled = task.cancelled;
+                let limit = task.limit;
+                if cancelled {
+                    return Err(format!("task `{label}` was cancelled before join"));
+                }
+                if matches!(limit, Some(limit) if limit <= 0) {
+                    return Err(format!("task `{label}` timed out before join"));
+                }
                 state.push_resource_event(
                     resource,
                     format!(
@@ -642,6 +662,8 @@ impl RegisteredMod for CpuMod {
             "cancel" => {
                 let task = state.expect_task(&node.op.args[0])?;
                 let label = task.label.clone();
+                let result = (*task.result).clone();
+                let limit = task.limit;
                 state.push_resource_event(
                     resource,
                     format!(
@@ -649,7 +671,83 @@ impl RegisteredMod for CpuMod {
                         node.resource, resource.kind.raw, label
                     ),
                 );
-                Ok(Value::Unit)
+                Ok(Value::Task(yir_core::TaskHandle {
+                    label,
+                    result: Box::new(result),
+                    limit,
+                    cancelled: true,
+                }))
+            }
+            "join_result" => {
+                let task = state.expect_task(&node.op.args[0])?;
+                let label = task.label.clone();
+                let cancelled = task.cancelled;
+                let limit = task.limit;
+                let state_name = if cancelled {
+                    "cancelled"
+                } else if matches!(limit, Some(limit) if limit <= 0) {
+                    "timed_out"
+                } else {
+                    "completed"
+                };
+                let result = if state_name == "completed" {
+                    Some(task.result.clone())
+                } else {
+                    None
+                };
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.join_result @{} [{}]: {} => {}",
+                        node.resource, resource.kind.raw, label, state_name
+                    ),
+                );
+                Ok(Value::TaskResult(yir_core::TaskResultHandle {
+                    label,
+                    state: state_name.to_owned(),
+                    result,
+                }))
+            }
+            "task_completed" => {
+                let result = state.expect_task_result(&node.op.args[0])?;
+                Ok(Value::Bool(result.state == "completed"))
+            }
+            "task_timed_out" => {
+                let result = state.expect_task_result(&node.op.args[0])?;
+                Ok(Value::Bool(result.state == "timed_out"))
+            }
+            "task_cancelled" => {
+                let result = state.expect_task_result(&node.op.args[0])?;
+                Ok(Value::Bool(result.state == "cancelled"))
+            }
+            "task_value" => {
+                let result = state.expect_task_result(&node.op.args[0])?;
+                result.result.as_deref().cloned().ok_or_else(|| {
+                    format!(
+                        "task result `{}` has no value in state `{}`",
+                        result.label, result.state
+                    )
+                })
+            }
+            "timeout" => {
+                let task = state.expect_task(&node.op.args[0])?;
+                let label = task.label.clone();
+                let result = (*task.result).clone();
+                let limit = state.expect_int(&node.op.args[1])?;
+                let cancelled = task.cancelled;
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.timeout @{} [{}]: {} <= {}",
+                        node.resource, resource.kind.raw, label, limit
+                    ),
+                );
+                Ok(Value::Task(yir_core::TaskHandle {
+                    label,
+                    result: Box::new(result),
+                    limit: Some(limit),
+                    cancelled,
+                }))
             }
             "await" => {
                 let value = state.expect_value(&node.op.args[0])?.clone();

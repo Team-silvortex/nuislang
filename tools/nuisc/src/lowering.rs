@@ -810,6 +810,81 @@ fn lower_expr(
             });
             Ok(name)
         }
+        NirExpr::CpuJoinResult(task) => {
+            let task_name = lower_expr(task, state, bindings)?;
+            let name = next_name(state, "cpu_join_result");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "cpu0".to_owned(),
+                op: Operation {
+                    module: "cpu".to_owned(),
+                    instruction: "join_result".to_owned(),
+                    args: vec![task_name.clone()],
+                },
+            });
+            push_dep_edges(state, &task_name, &name);
+            state.yir.edges.push(Edge {
+                kind: EdgeKind::Effect,
+                from: task_name,
+                to: name.clone(),
+            });
+            Ok(name)
+        }
+        NirExpr::CpuTaskCompleted(result) => lower_cpu_unary_value_effect(
+            state,
+            bindings,
+            result,
+            "cpu_task_completed",
+            "task_completed",
+        ),
+        NirExpr::CpuTaskTimedOut(result) => lower_cpu_unary_value_effect(
+            state,
+            bindings,
+            result,
+            "cpu_task_timed_out",
+            "task_timed_out",
+        ),
+        NirExpr::CpuTaskCancelled(result) => lower_cpu_unary_value_effect(
+            state,
+            bindings,
+            result,
+            "cpu_task_cancelled",
+            "task_cancelled",
+        ),
+        NirExpr::CpuTaskValue(result) => lower_cpu_unary_value_effect(
+            state,
+            bindings,
+            result,
+            "cpu_task_value",
+            "task_value",
+        ),
+        NirExpr::CpuTimeout { task, limit } => {
+            let task_name = lower_expr(task, state, bindings)?;
+            let limit_name = lower_expr(limit, state, bindings)?;
+            let name = next_name(state, "cpu_timeout");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "cpu0".to_owned(),
+                op: Operation {
+                    module: "cpu".to_owned(),
+                    instruction: "timeout".to_owned(),
+                    args: vec![task_name.clone(), limit_name.clone()],
+                },
+            });
+            push_dep_edges(state, &task_name, &name);
+            push_dep_edges(state, &limit_name, &name);
+            state.yir.edges.push(Edge {
+                kind: EdgeKind::Effect,
+                from: task_name,
+                to: name.clone(),
+            });
+            state.yir.edges.push(Edge {
+                kind: EdgeKind::Effect,
+                from: limit_name,
+                to: name.clone(),
+            });
+            Ok(name)
+        }
         NirExpr::CpuPresentFrame(frame) => {
             let frame_name = lower_expr(frame, state, bindings)?;
             let name = next_name(state, "cpu_present_frame");
@@ -1467,6 +1542,33 @@ fn push_await_node(state: &mut LoweringState<'_>, awaited: &str) -> String {
     await_name
 }
 
+fn lower_cpu_unary_value_effect(
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+    input: &NirExpr,
+    prefix: &str,
+    instruction: &str,
+) -> Result<String, String> {
+    let input_name = lower_expr(input, state, bindings)?;
+    let name = next_name(state, prefix);
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: instruction.to_owned(),
+            args: vec![input_name.clone()],
+        },
+    });
+    push_dep_edges(state, &input_name, &name);
+    state.yir.edges.push(Edge {
+        kind: EdgeKind::Effect,
+        from: input_name,
+        to: name.clone(),
+    });
+    Ok(name)
+}
+
 fn next_name(state: &mut LoweringState<'_>, prefix: &str) -> String {
     let name = format!("{prefix}_{}", state.value_counter);
     state.value_counter += 1;
@@ -1783,5 +1885,66 @@ mod tests {
             .nodes
             .iter()
             .any(|node| node.op.module == "cpu" && node.op.instruction == "cancel"));
+    }
+
+    #[test]
+    fn lowers_explicit_timeout_primitive_into_cpu_effect_node() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              async fn ping() -> i64 {
+                return 7;
+              }
+
+              fn main() -> i64 {
+                let task: Task<i64> = timeout(spawn(ping()), 16);
+                return join(task);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "cpu" && node.op.instruction == "timeout"));
+    }
+
+    #[test]
+    fn lowers_join_result_and_task_state_primitives_into_cpu_nodes() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              async fn ping() -> i64 {
+                return 7;
+              }
+
+              fn main() -> i64 {
+                let task: Task<i64> = timeout(spawn(ping()), 16);
+                let result: TaskResult<i64> = join_result(task);
+                let done: bool = task_completed(result);
+                let value: i64 = task_value(result);
+                return value;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "cpu" && node.op.instruction == "join_result"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "cpu" && node.op.instruction == "task_completed"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "cpu" && node.op.instruction == "task_value"));
     }
 }

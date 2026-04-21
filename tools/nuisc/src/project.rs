@@ -1628,6 +1628,11 @@ fn expr_walk_any(expr: &NirExpr, predicate: &dyn Fn(&NirExpr) -> bool) -> bool {
         | NirExpr::BufferLen(inner)
         | NirExpr::CpuJoin(inner)
         | NirExpr::CpuCancel(inner)
+        | NirExpr::CpuJoinResult(inner)
+        | NirExpr::CpuTaskCompleted(inner)
+        | NirExpr::CpuTaskTimedOut(inner)
+        | NirExpr::CpuTaskCancelled(inner)
+        | NirExpr::CpuTaskValue(inner)
         | NirExpr::DataOutputPipe(inner)
         | NirExpr::DataInputPipe(inner)
         | NirExpr::CpuPresentFrame(inner)
@@ -1666,6 +1671,7 @@ fn expr_walk_any(expr: &NirExpr, predicate: &dyn Fn(&NirExpr) -> bool) -> bool {
         NirExpr::CpuSpawn { args, .. } | NirExpr::CpuExternCall { args, .. } | NirExpr::Call { args, .. } => {
             args.iter().any(predicate)
         }
+        NirExpr::CpuTimeout { task, limit } => predicate(task) || predicate(limit),
         NirExpr::MethodCall { receiver, args, .. } => {
             predicate(receiver) || args.iter().any(predicate)
         }

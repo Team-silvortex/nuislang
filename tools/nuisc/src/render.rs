@@ -426,6 +426,22 @@ fn render_nir_expr(value: &NirExpr) -> String {
         ),
         NirExpr::CpuJoin(task) => format!("join({})", render_nir_expr(task)),
         NirExpr::CpuCancel(task) => format!("cancel({})", render_nir_expr(task)),
+        NirExpr::CpuJoinResult(task) => format!("join_result({})", render_nir_expr(task)),
+        NirExpr::CpuTaskCompleted(result) => {
+            format!("task_completed({})", render_nir_expr(result))
+        }
+        NirExpr::CpuTaskTimedOut(result) => {
+            format!("task_timed_out({})", render_nir_expr(result))
+        }
+        NirExpr::CpuTaskCancelled(result) => {
+            format!("task_cancelled({})", render_nir_expr(result))
+        }
+        NirExpr::CpuTaskValue(result) => format!("task_value({})", render_nir_expr(result)),
+        NirExpr::CpuTimeout { task, limit } => format!(
+            "timeout({}, {})",
+            render_nir_expr(task),
+            render_nir_expr(limit)
+        ),
         NirExpr::CpuPresentFrame(value) => {
             format!("cpu_present_frame({})", render_nir_expr(value))
         }

@@ -359,13 +359,24 @@ fn verify_expr(
         | NirExpr::ShaderViewport { .. }
         | NirExpr::ShaderPipeline { .. }
         | NirExpr::ShaderInlineWgsl { .. } => {}
-        NirExpr::CpuPresentFrame(inner) | NirExpr::CpuJoin(inner) | NirExpr::CpuCancel(inner) => {
+        NirExpr::CpuPresentFrame(inner)
+        | NirExpr::CpuJoin(inner)
+        | NirExpr::CpuCancel(inner)
+        | NirExpr::CpuJoinResult(inner)
+        | NirExpr::CpuTaskCompleted(inner)
+        | NirExpr::CpuTaskTimedOut(inner)
+        | NirExpr::CpuTaskCancelled(inner)
+        | NirExpr::CpuTaskValue(inner) => {
             verify_expr(inner, moved, borrows, borrow_bindings, data_bindings)?
         }
         NirExpr::CpuSpawn { args, .. } | NirExpr::CpuExternCall { args, .. } => {
             for arg in args {
                 verify_expr(arg, moved, borrows, borrow_bindings, data_bindings)?;
             }
+        }
+        NirExpr::CpuTimeout { task, limit } => {
+            verify_expr(task, moved, borrows, borrow_bindings, data_bindings)?;
+            verify_expr(limit, moved, borrows, borrow_bindings, data_bindings)?;
         }
         NirExpr::ShaderBeginPass {
             target,
@@ -546,13 +557,24 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
         | NirExpr::ShaderViewport { .. }
         | NirExpr::ShaderPipeline { .. }
         | NirExpr::ShaderInlineWgsl { .. } => {}
-        NirExpr::CpuPresentFrame(inner) | NirExpr::CpuJoin(inner) | NirExpr::CpuCancel(inner) => {
+        NirExpr::CpuPresentFrame(inner)
+        | NirExpr::CpuJoin(inner)
+        | NirExpr::CpuCancel(inner)
+        | NirExpr::CpuJoinResult(inner)
+        | NirExpr::CpuTaskCompleted(inner)
+        | NirExpr::CpuTaskTimedOut(inner)
+        | NirExpr::CpuTaskCancelled(inner)
+        | NirExpr::CpuTaskValue(inner) => {
             verify_expr_uses(inner, moved)?
         }
         NirExpr::CpuSpawn { args, .. } | NirExpr::CpuExternCall { args, .. } => {
             for arg in args {
                 verify_expr_uses(arg, moved)?;
             }
+        }
+        NirExpr::CpuTimeout { task, limit } => {
+            verify_expr_uses(task, moved)?;
+            verify_expr_uses(limit, moved)?;
         }
         NirExpr::ShaderBeginPass {
             target,

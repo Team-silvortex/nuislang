@@ -280,7 +280,8 @@ impl Operation {
                 CpuLlvmLoweringClass::Memory
             }
             "input_i64" | "extern_call_i64" => CpuLlvmLoweringClass::Runtime,
-            "print" | "await" | "async_call" | "spawn_task" | "join" | "cancel" => {
+            "print" | "await" | "async_call" | "spawn_task" | "join" | "cancel"
+            | "timeout" | "join_result" => {
                 CpuLlvmLoweringClass::Effect
             }
             _ => CpuLlvmLoweringClass::Other,
@@ -389,6 +390,7 @@ pub enum Value {
     RenderPass(RenderPass),
     Frame(FrameSurface),
     Task(TaskHandle),
+    TaskResult(TaskResultHandle),
     Unit,
 }
 
@@ -703,6 +705,15 @@ pub struct HeapBuffer {
 pub struct TaskHandle {
     pub label: String,
     pub result: Box<Value>,
+    pub limit: Option<i64>,
+    pub cancelled: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TaskResultHandle {
+    pub label: String,
+    pub state: String,
+    pub result: Option<Box<Value>>,
 }
 
 impl fmt::Display for Value {
@@ -751,7 +762,18 @@ impl fmt::Display for Value {
             Self::BindingSet(binding_set) => write!(f, "{binding_set}"),
             Self::RenderPass(pass) => write!(f, "{pass}"),
             Self::Frame(frame) => write!(f, "{frame}"),
-            Self::Task(task) => write!(f, "task<{}>", task.label),
+            Self::Task(task) => match task.limit {
+                Some(limit) => {
+                    if task.cancelled {
+                        write!(f, "task<{}; cancelled; limit={limit}>", task.label)
+                    } else {
+                        write!(f, "task<{}; limit={limit}>", task.label)
+                    }
+                }
+                None if task.cancelled => write!(f, "task<cancelled; {}>", task.label),
+                None => write!(f, "task<{}>", task.label),
+            },
+            Self::TaskResult(result) => write!(f, "task_result<{}:{}>", result.label, result.state),
             Self::Unit => write!(f, "()"),
         }
     }
@@ -1097,6 +1119,7 @@ impl ExecutionState {
             Some(Value::RenderPass(_)) => Err(format!("`{name}` is render-pass, expected int")),
             Some(Value::Frame(_)) => Err(format!("`{name}` is frame, expected int")),
             Some(Value::Task(_)) => Err(format!("`{name}` is task, expected int")),
+            Some(Value::TaskResult(_)) => Err(format!("`{name}` is task-result, expected int")),
             Some(Value::Unit) => Err(format!("`{name}` is unit, expected int")),
             None => Err(format!("missing value for `{name}`")),
         }
@@ -1168,6 +1191,14 @@ impl ExecutionState {
         match self.values.get(name) {
             Some(Value::Task(task)) => Ok(task),
             Some(other) => Err(format!("`{name}` is {other}, expected task")),
+            None => Err(format!("missing value for `{name}`")),
+        }
+    }
+
+    pub fn expect_task_result(&self, name: &str) -> Result<&TaskResultHandle, String> {
+        match self.values.get(name) {
+            Some(Value::TaskResult(result)) => Ok(result),
+            Some(other) => Err(format!("`{name}` is {other}, expected task-result")),
             None => Err(format!("missing value for `{name}`")),
         }
     }

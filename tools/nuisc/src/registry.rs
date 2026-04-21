@@ -628,6 +628,11 @@ fn walk_child_exprs(expr: &NirExpr, f: &mut dyn FnMut(&NirExpr)) {
         | NirExpr::BufferLen(inner)
         | NirExpr::CpuJoin(inner)
         | NirExpr::CpuCancel(inner)
+        | NirExpr::CpuJoinResult(inner)
+        | NirExpr::CpuTaskCompleted(inner)
+        | NirExpr::CpuTaskTimedOut(inner)
+        | NirExpr::CpuTaskCancelled(inner)
+        | NirExpr::CpuTaskValue(inner)
         | NirExpr::DataOutputPipe(inner)
         | NirExpr::DataInputPipe(inner)
         | NirExpr::CpuPresentFrame(inner)
@@ -698,6 +703,10 @@ fn walk_child_exprs(expr: &NirExpr, f: &mut dyn FnMut(&NirExpr)) {
             for arg in args {
                 f(arg);
             }
+        }
+        NirExpr::CpuTimeout { task, limit } => {
+            f(task);
+            f(limit);
         }
         NirExpr::MethodCall { receiver, args, .. } => {
             f(receiver);

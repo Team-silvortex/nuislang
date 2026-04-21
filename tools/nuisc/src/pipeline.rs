@@ -261,6 +261,11 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         | NirExpr::BufferLen(inner)
         | NirExpr::CpuJoin(inner)
         | NirExpr::CpuCancel(inner)
+        | NirExpr::CpuJoinResult(inner)
+        | NirExpr::CpuTaskCompleted(inner)
+        | NirExpr::CpuTaskTimedOut(inner)
+        | NirExpr::CpuTaskCancelled(inner)
+        | NirExpr::CpuTaskValue(inner)
         | NirExpr::DataOutputPipe(inner)
         | NirExpr::DataInputPipe(inner)
         | NirExpr::CpuPresentFrame(inner)
@@ -270,6 +275,10 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
             for arg in args {
                 collect_instantiated_units_expr(arg, units);
             }
+        }
+        NirExpr::CpuTimeout { task, limit } => {
+            collect_instantiated_units_expr(task, units);
+            collect_instantiated_units_expr(limit, units);
         }
         NirExpr::ShaderBeginPass {
             target,

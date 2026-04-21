@@ -654,6 +654,15 @@ pub enum NirExpr {
     },
     CpuJoin(Box<NirExpr>),
     CpuCancel(Box<NirExpr>),
+    CpuJoinResult(Box<NirExpr>),
+    CpuTaskCompleted(Box<NirExpr>),
+    CpuTaskTimedOut(Box<NirExpr>),
+    CpuTaskCancelled(Box<NirExpr>),
+    CpuTaskValue(Box<NirExpr>),
+    CpuTimeout {
+        task: Box<NirExpr>,
+        limit: Box<NirExpr>,
+    },
     CpuPresentFrame(Box<NirExpr>),
     ShaderProfileTargetRef {
         unit: String,
@@ -878,6 +887,12 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::CpuSpawn { .. }
         | NirExpr::CpuJoin(_)
         | NirExpr::CpuCancel(_)
+        | NirExpr::CpuJoinResult(_)
+        | NirExpr::CpuTaskCompleted(_)
+        | NirExpr::CpuTaskTimedOut(_)
+        | NirExpr::CpuTaskCancelled(_)
+        | NirExpr::CpuTaskValue(_)
+        | NirExpr::CpuTimeout { .. }
         | NirExpr::CpuPresentFrame(_)
         | NirExpr::ShaderProfileTargetRef { .. }
         | NirExpr::ShaderProfileViewportRef { .. }

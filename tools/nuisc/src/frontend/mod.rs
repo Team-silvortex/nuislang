@@ -868,6 +868,128 @@ fn lower_call_expr_with_async(
             ensure_task_like("cancel", &lowered, bindings, signatures, struct_table)?;
             Ok(NirExpr::CpuCancel(Box::new(lowered)))
         }
+        "join_result" => {
+            if current_domain != "cpu" {
+                return Err("join_result(...) is currently only allowed inside `mod cpu <unit>`".to_owned());
+            }
+            let [task] = args else {
+                return Err("join_result(...) expects exactly one task handle".to_owned());
+            };
+            let lowered = lower_nested_expr_with_async(
+                task,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            ensure_task_like("join_result", &lowered, bindings, signatures, struct_table)?;
+            Ok(NirExpr::CpuJoinResult(Box::new(lowered)))
+        }
+        "task_completed" => {
+            let [result] = args else {
+                return Err("task_completed(...) expects exactly one task result".to_owned());
+            };
+            let lowered = lower_nested_expr_with_async(
+                result,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            ensure_task_result_like("task_completed", &lowered, bindings, signatures, struct_table)?;
+            Ok(NirExpr::CpuTaskCompleted(Box::new(lowered)))
+        }
+        "task_timed_out" => {
+            let [result] = args else {
+                return Err("task_timed_out(...) expects exactly one task result".to_owned());
+            };
+            let lowered = lower_nested_expr_with_async(
+                result,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            ensure_task_result_like("task_timed_out", &lowered, bindings, signatures, struct_table)?;
+            Ok(NirExpr::CpuTaskTimedOut(Box::new(lowered)))
+        }
+        "task_cancelled" => {
+            let [result] = args else {
+                return Err("task_cancelled(...) expects exactly one task result".to_owned());
+            };
+            let lowered = lower_nested_expr_with_async(
+                result,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            ensure_task_result_like("task_cancelled", &lowered, bindings, signatures, struct_table)?;
+            Ok(NirExpr::CpuTaskCancelled(Box::new(lowered)))
+        }
+        "task_value" => {
+            let [result] = args else {
+                return Err("task_value(...) expects exactly one task result".to_owned());
+            };
+            let lowered = lower_nested_expr_with_async(
+                result,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            ensure_task_result_like("task_value", &lowered, bindings, signatures, struct_table)?;
+            Ok(NirExpr::CpuTaskValue(Box::new(lowered)))
+        }
+        "timeout" => {
+            if current_domain != "cpu" {
+                return Err("timeout(...) is currently only allowed inside `mod cpu <unit>`".to_owned());
+            }
+            let [task, limit] = args else {
+                return Err("timeout(...) expects exactly two arguments: task and limit".to_owned());
+            };
+            let lowered_task = lower_nested_expr_with_async(
+                task,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            ensure_task_like("timeout", &lowered_task, bindings, signatures, struct_table)?;
+            let lowered_limit = lower_nested_expr_with_async(
+                limit,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let limit_ty = infer_nir_expr_type(&lowered_limit, bindings, signatures, struct_table)
+                .ok_or_else(|| "timeout(...) limit requires an explicit integer type".to_owned())?;
+            if !limit_ty.is_integer_scalar() {
+                return Err(format!(
+                    "timeout(...) expects integer limit, found `{}`",
+                    limit_ty.render()
+                ));
+            }
+            Ok(NirExpr::CpuTimeout {
+                task: Box::new(lowered_task),
+                limit: Box::new(lowered_limit),
+            })
+        }
         "null" => {
             if !args.is_empty() {
                 return Err("null() expects 0 args".to_owned());
@@ -2354,6 +2476,25 @@ fn ensure_task_like(
     }
 }
 
+fn ensure_task_result_like(
+    name: &str,
+    expr: &NirExpr,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> Result<(), String> {
+    match infer_nir_expr_type(expr, bindings, signatures, struct_table) {
+        Some(ty) if ty.is_generic_named("TaskResult", 1) => Ok(()),
+        Some(ty) => Err(format!(
+            "{name}(...) expects `TaskResult<...>`, found `{}`",
+            render_type_name(&ty)
+        )),
+        None => Err(format!(
+            "{name}(...) requires a typed task result in the current frontend"
+        )),
+    }
+}
+
 fn infer_nir_expr_type(
     expr: &NirExpr,
     bindings: &BTreeMap<String, NirTypeRef>,
@@ -2385,7 +2526,20 @@ fn infer_nir_expr_type(
             .map(|ty| generic_named_type("Task", vec![ty])),
         NirExpr::CpuJoin(task) => infer_nir_expr_type(task, bindings, signatures, struct_table)
             .and_then(|ty| ty.generic_args.first().cloned()),
-        NirExpr::CpuCancel(_) => Some(unit_type()),
+        NirExpr::CpuCancel(task) => infer_nir_expr_type(task, bindings, signatures, struct_table),
+        NirExpr::CpuJoinResult(task) => infer_nir_expr_type(task, bindings, signatures, struct_table)
+            .and_then(|ty| ty.generic_args.first().cloned())
+            .map(|ty| generic_named_type("TaskResult", vec![ty])),
+        NirExpr::CpuTaskCompleted(_)
+        | NirExpr::CpuTaskTimedOut(_)
+        | NirExpr::CpuTaskCancelled(_) => Some(bool_type()),
+        NirExpr::CpuTaskValue(result) => {
+            infer_nir_expr_type(result, bindings, signatures, struct_table)
+                .and_then(|ty| ty.generic_args.first().cloned())
+        }
+        NirExpr::CpuTimeout { task, .. } => {
+            infer_nir_expr_type(task, bindings, signatures, struct_table)
+        }
         NirExpr::CpuPresentFrame(_) => Some(unit_type()),
         NirExpr::ShaderProfileTargetRef { .. } => Some(named_type("Target")),
         NirExpr::ShaderProfileViewportRef { .. } => Some(named_type("Viewport")),
@@ -3036,6 +3190,97 @@ mod tests {
         .unwrap_err();
 
         assert!(error.contains("expects `Task<...>`"));
+    }
+
+    #[test]
+    fn lowers_explicit_timeout_on_task_handle() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              async fn ping() -> i64 {
+                return 7;
+              }
+
+              fn main() -> i64 {
+                let task: Task<i64> = timeout(spawn(ping()), 16);
+                return join(task);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            function.body.first(),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::CpuTimeout { .. },
+                ..
+            }) if ty.render() == "Task<i64>"
+        ));
+    }
+
+    #[test]
+    fn lowers_explicit_join_result_and_task_state_helpers() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              async fn ping() -> i64 {
+                return 7;
+              }
+
+              fn main() -> i64 {
+                let task: Task<i64> = timeout(spawn(ping()), 16);
+                let result: TaskResult<i64> = join_result(task);
+                if task_completed(result) {
+                  return task_value(result);
+                }
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            function.body.get(1),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::CpuJoinResult(_),
+                ..
+            }) if ty.render() == "TaskResult<i64>"
+        ));
+    }
+
+    #[test]
+    fn rejects_timeout_with_non_integer_limit() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              async fn ping() -> i64 {
+                return 7;
+              }
+
+              fn main() -> i64 {
+                let task: Task<i64> = timeout(spawn(ping()), "slow");
+                return join(task);
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("expects integer limit"));
     }
 
     #[test]
