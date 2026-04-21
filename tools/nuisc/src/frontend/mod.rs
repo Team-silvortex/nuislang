@@ -416,6 +416,27 @@ fn lower_expr(
     )
 }
 
+fn lower_nested_expr_with_async(
+    expr: &AstExpr,
+    current_domain: &str,
+    current_function_is_async: bool,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+    expected: Option<&NirTypeRef>,
+) -> Result<NirExpr, String> {
+    lower_expr_with_async(
+        expr,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        signatures,
+        struct_table,
+        expected,
+        false,
+    )
+}
+
 fn lower_expr_with_async(
     expr: &AstExpr,
     current_domain: &str,
@@ -480,9 +501,10 @@ fn lower_expr_with_async(
                     let lowered_args = args
                         .iter()
                         .map(|arg| {
-                            lower_expr(
+                            lower_nested_expr_with_async(
                                 arg,
                                 current_domain,
+                                current_function_is_async,
                                 bindings,
                                 signatures,
                                 struct_table,
@@ -513,9 +535,10 @@ fn lower_expr_with_async(
                 }
             }
             NirExpr::MethodCall {
-                receiver: Box::new(lower_expr(
+                receiver: Box::new(lower_nested_expr_with_async(
                     receiver,
                     current_domain,
+                    current_function_is_async,
                     bindings,
                     signatures,
                     struct_table,
@@ -525,9 +548,10 @@ fn lower_expr_with_async(
                 args: args
                     .iter()
                     .map(|arg| {
-                        lower_expr(
+                        lower_nested_expr_with_async(
                             arg,
                             current_domain,
+                            current_function_is_async,
                             bindings,
                             signatures,
                             struct_table,
@@ -555,9 +579,10 @@ fn lower_expr_with_async(
                         type_name, name
                     ));
                 }
-                let lowered = lower_expr(
+                let lowered = lower_nested_expr_with_async(
                     value,
                     current_domain,
+                    current_function_is_async,
                     bindings,
                     signatures,
                     struct_table,
@@ -580,9 +605,10 @@ fn lower_expr_with_async(
             }
         }
         AstExpr::FieldAccess { base, field } => {
-            let lowered_base = lower_expr(
+            let lowered_base = lower_nested_expr_with_async(
                 base,
                 current_domain,
+                current_function_is_async,
                 bindings,
                 signatures,
                 struct_table,
@@ -642,22 +668,24 @@ fn lower_binary_expr_with_async(
     lhs: &AstExpr,
     rhs: &AstExpr,
     current_domain: &str,
-    _current_function_is_async: bool,
+    current_function_is_async: bool,
     bindings: &BTreeMap<String, NirTypeRef>,
     signatures: &BTreeMap<String, FunctionSignature>,
     struct_table: &BTreeMap<String, NirStructDef>,
 ) -> Result<NirExpr, String> {
-    let lowered_lhs = lower_expr(
+    let lowered_lhs = lower_nested_expr_with_async(
         lhs,
         current_domain,
+        current_function_is_async,
         bindings,
         signatures,
         struct_table,
         None,
     )?;
-    let lowered_rhs = lower_expr(
+    let lowered_rhs = lower_nested_expr_with_async(
         rhs,
         current_domain,
+        current_function_is_async,
         bindings,
         signatures,
         struct_table,
@@ -755,6 +783,91 @@ fn lower_call_expr_with_async(
     allow_async_calls: bool,
 ) -> Result<NirExpr, String> {
     match callee {
+        "spawn" => {
+            if current_domain != "cpu" {
+                return Err("spawn(...) is currently only allowed inside `mod cpu <unit>`".to_owned());
+            }
+            let [call] = args else {
+                return Err("spawn(...) expects exactly one async function call".to_owned());
+            };
+            let AstExpr::Call {
+                callee: spawned_callee,
+                args: spawned_args,
+            } = call
+            else {
+                return Err("spawn(...) expects an async function call like `spawn(task())`".to_owned());
+            };
+            let signature = signatures.get(spawned_callee).ok_or_else(|| {
+                format!("spawn(...) references unknown function `{spawned_callee}`")
+            })?;
+            if !signature.is_async {
+                return Err(format!(
+                    "spawn(...) expects async function call, found sync function `{spawned_callee}`"
+                ));
+            }
+            if signature.params.len() != spawned_args.len() {
+                return Err(format!(
+                    "function `{spawned_callee}` expects {} args, found {}",
+                    signature.params.len(),
+                    spawned_args.len()
+                ));
+            }
+            Ok(NirExpr::CpuSpawn {
+                callee: spawned_callee.clone(),
+                args: spawned_args
+                    .iter()
+                    .map(|arg| {
+                        lower_nested_expr_with_async(
+                            arg,
+                            current_domain,
+                            current_function_is_async,
+                            bindings,
+                            signatures,
+                            struct_table,
+                            None,
+                        )
+                    })
+                    .collect::<Result<Vec<_>, _>>()?,
+            })
+        }
+        "join" => {
+            if current_domain != "cpu" {
+                return Err("join(...) is currently only allowed inside `mod cpu <unit>`".to_owned());
+            }
+            let [task] = args else {
+                return Err("join(...) expects exactly one task handle".to_owned());
+            };
+            let lowered = lower_nested_expr_with_async(
+                task,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            ensure_task_like("join", &lowered, bindings, signatures, struct_table)?;
+            Ok(NirExpr::CpuJoin(Box::new(lowered)))
+        }
+        "cancel" => {
+            if current_domain != "cpu" {
+                return Err("cancel(...) is currently only allowed inside `mod cpu <unit>`".to_owned());
+            }
+            let [task] = args else {
+                return Err("cancel(...) expects exactly one task handle".to_owned());
+            };
+            let lowered = lower_nested_expr_with_async(
+                task,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            ensure_task_like("cancel", &lowered, bindings, signatures, struct_table)?;
+            Ok(NirExpr::CpuCancel(Box::new(lowered)))
+        }
         "null" => {
             if !args.is_empty() {
                 return Err("null() expects 0 args".to_owned());
@@ -2148,9 +2261,10 @@ fn lower_call_expr_with_async(
             let lowered_args = args
                 .iter()
                 .map(|arg| {
-                    lower_expr(
+                    lower_nested_expr_with_async(
                         arg,
                         current_domain,
+                        current_function_is_async,
                         bindings,
                         signatures,
                         struct_table,
@@ -2217,6 +2331,29 @@ fn ensure_ref_like(
     }
 }
 
+fn ensure_task_like(
+    name: &str,
+    expr: &NirExpr,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> Result<(), String> {
+    match infer_nir_expr_type(expr, bindings, signatures, struct_table) {
+        Some(ty)
+            if ty.container_kind() == Some(nuis_semantics::model::NirContainerKind::Task) =>
+        {
+            Ok(())
+        }
+        Some(ty) => Err(format!(
+            "{name}(...) expects `Task<...>`, found `{}`",
+            render_type_name(&ty)
+        )),
+        None => Err(format!(
+            "{name}(...) requires a typed task handle in the current frontend"
+        )),
+    }
+}
+
 fn infer_nir_expr_type(
     expr: &NirExpr,
     bindings: &BTreeMap<String, NirTypeRef>,
@@ -2242,6 +2379,13 @@ fn infer_nir_expr_type(
         NirExpr::DataBindCore(_) | NirExpr::CpuBindCore(_) => Some(unit_type()),
         NirExpr::CpuWindow { .. } => Some(named_type("Window")),
         NirExpr::CpuInputI64 { .. } | NirExpr::CpuTickI64 { .. } => Some(i64_type()),
+        NirExpr::CpuSpawn { callee, .. } => signatures
+            .get(callee)
+            .and_then(|sig| sig.return_type.clone())
+            .map(|ty| generic_named_type("Task", vec![ty])),
+        NirExpr::CpuJoin(task) => infer_nir_expr_type(task, bindings, signatures, struct_table)
+            .and_then(|ty| ty.generic_args.first().cloned()),
+        NirExpr::CpuCancel(_) => Some(unit_type()),
         NirExpr::CpuPresentFrame(_) => Some(unit_type()),
         NirExpr::ShaderProfileTargetRef { .. } => Some(named_type("Target")),
         NirExpr::ShaderProfileViewportRef { .. } => Some(named_type("Viewport")),
@@ -2455,11 +2599,41 @@ fn validate_declared_nir_types(module: &NirModule) -> Result<(), String> {
         }
     }
     for function in &module.functions {
+        if function.is_async && module.domain != "cpu" {
+            return Err(format!(
+                "mod {} {} cannot declare `async fn {}` yet; async entry is currently only supported in `mod cpu` while {} logic must stay AOT/synchronous and interact through explicit profile/data contracts",
+                module.domain,
+                module.unit,
+                function.name,
+                module.domain
+            ));
+        }
+        if function.is_async && module.domain == "cpu" && function.name == "main" && !function.params.is_empty() {
+            return Err(format!(
+                "async entry `mod cpu {}::main` cannot take parameters in the current scheduler; pass data through explicit data/profile contracts or call async helpers from `main` instead",
+                module.unit
+            ));
+        }
         for param in &function.params {
             validate_type_ref(&param.ty)?;
+            if function.is_async && !param.ty.is_async_boundary_safe() {
+                return Err(format!(
+                    "async function `{}` parameter `{}` cannot cross async boundary with type `{}`; async parameters currently forbid `ref`, `?`, and `Instance<...>`",
+                    function.name,
+                    param.name,
+                    param.ty.render()
+                ));
+            }
         }
         if let Some(return_type) = &function.return_type {
             validate_type_ref(return_type)?;
+            if function.is_async && !return_type.is_async_boundary_safe() {
+                return Err(format!(
+                    "async function `{}` cannot return `{}` across async boundary; async returns currently forbid `ref`, `?`, and `Instance<...>`",
+                    function.name,
+                    return_type.render()
+                ));
+            }
         }
         for stmt in &function.body {
             match stmt {
@@ -2746,6 +2920,125 @@ mod tests {
     }
 
     #[test]
+    fn lowers_await_expression_inside_call_args_and_binary_expr() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              async fn ping() -> i64 {
+                return 7;
+              }
+
+              fn add_one(value: i64) -> i64 {
+                return value + 1;
+              }
+
+              async fn main() -> i64 {
+                let value: i64 = add_one(await ping());
+                return await ping() + value;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            function.body.first(),
+            Some(NirStmt::Let {
+                value: NirExpr::Call { args, .. },
+                ..
+            }) if matches!(args.first(), Some(NirExpr::Await(_)))
+        ));
+        assert!(matches!(
+            function.body.get(1),
+            Some(NirStmt::Return(Some(NirExpr::Binary { lhs, .. })))
+                if matches!(lhs.as_ref(), NirExpr::Await(_))
+        ));
+    }
+
+    #[test]
+    fn lowers_explicit_spawn_join_and_cancel() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              async fn ping() -> i64 {
+                return 7;
+              }
+
+              fn main() -> i64 {
+                let task: Task<i64> = spawn(ping());
+                cancel(task);
+                return join(task);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            function.body.first(),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::CpuSpawn { .. },
+                ..
+            }) if ty.render() == "Task<i64>"
+        ));
+        assert!(matches!(
+            function.body.get(1),
+            Some(NirStmt::Expr(NirExpr::CpuCancel(_)))
+        ));
+        assert!(matches!(
+            function.body.get(2),
+            Some(NirStmt::Return(Some(NirExpr::CpuJoin(_))))
+        ));
+    }
+
+    #[test]
+    fn rejects_spawn_of_sync_function() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn ping() -> i64 {
+                return 7;
+              }
+
+              fn main() {
+                let task: Task<i64> = spawn(ping());
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("spawn(...) expects async function call"));
+    }
+
+    #[test]
+    fn rejects_join_of_non_task_value() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                return join(7);
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("expects `Task<...>`"));
+    }
+
+    #[test]
     fn rejects_await_inside_sync_function() {
         let error = parse_nuis_module(
             r#"
@@ -2764,6 +3057,112 @@ mod tests {
 
         assert!(error.contains("`await`"));
         assert!(error.contains("async fn"));
+    }
+
+    #[test]
+    fn rejects_async_function_returning_ref_type() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              async fn head() -> ref Node {
+                return null();
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("cannot return"));
+        assert!(error.contains("ref Node"));
+        assert!(error.contains("async boundary"));
+    }
+
+    #[test]
+    fn rejects_async_function_taking_instance_param() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              async fn render(shader: Instance<SurfaceShader>) {
+                return;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("parameter `shader`"));
+        assert!(error.contains("Instance<SurfaceShader>"));
+        assert!(error.contains("async boundary"));
+    }
+
+    #[test]
+    fn rejects_async_shader_function_for_now() {
+        let error = parse_nuis_module(
+            r#"
+            mod shader SurfaceShader {
+              async fn profile() {
+                return;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("mod shader SurfaceShader"));
+        assert!(error.contains("async fn profile"));
+        assert!(error.contains("only supported in `mod cpu`"));
+    }
+
+    #[test]
+    fn rejects_async_data_function_for_now() {
+        let error = parse_nuis_module(
+            r#"
+            mod data FabricPlane {
+              async fn profile() {
+                return;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("mod data FabricPlane"));
+        assert!(error.contains("only supported in `mod cpu`"));
+    }
+
+    #[test]
+    fn rejects_async_kernel_function_for_now() {
+        let error = parse_nuis_module(
+            r#"
+            mod kernel KernelUnit {
+              async fn profile() {
+                return;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("mod kernel KernelUnit"));
+        assert!(error.contains("only supported in `mod cpu`"));
+    }
+
+    #[test]
+    fn rejects_async_main_with_parameters() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              async fn main(seed: i64) {
+                print(seed);
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("async entry"));
+        assert!(error.contains("Main::main"));
+        assert!(error.contains("cannot take parameters"));
     }
 
     #[test]

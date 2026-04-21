@@ -359,10 +359,10 @@ fn verify_expr(
         | NirExpr::ShaderViewport { .. }
         | NirExpr::ShaderPipeline { .. }
         | NirExpr::ShaderInlineWgsl { .. } => {}
-        NirExpr::CpuPresentFrame(inner) => {
+        NirExpr::CpuPresentFrame(inner) | NirExpr::CpuJoin(inner) | NirExpr::CpuCancel(inner) => {
             verify_expr(inner, moved, borrows, borrow_bindings, data_bindings)?
         }
-        NirExpr::CpuExternCall { args, .. } => {
+        NirExpr::CpuSpawn { args, .. } | NirExpr::CpuExternCall { args, .. } => {
             for arg in args {
                 verify_expr(arg, moved, borrows, borrow_bindings, data_bindings)?;
             }
@@ -546,8 +546,10 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
         | NirExpr::ShaderViewport { .. }
         | NirExpr::ShaderPipeline { .. }
         | NirExpr::ShaderInlineWgsl { .. } => {}
-        NirExpr::CpuPresentFrame(inner) => verify_expr_uses(inner, moved)?,
-        NirExpr::CpuExternCall { args, .. } => {
+        NirExpr::CpuPresentFrame(inner) | NirExpr::CpuJoin(inner) | NirExpr::CpuCancel(inner) => {
+            verify_expr_uses(inner, moved)?
+        }
+        NirExpr::CpuSpawn { args, .. } | NirExpr::CpuExternCall { args, .. } => {
             for arg in args {
                 verify_expr_uses(arg, moved)?;
             }

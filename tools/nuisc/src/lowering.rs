@@ -750,6 +750,66 @@ fn lower_expr(
             });
             Ok(name)
         }
+        NirExpr::CpuSpawn { callee, args } => {
+            let returned = lower_async_call_boundary(callee, args, state, bindings)?;
+            let name = next_name(state, "cpu_spawn_task");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "cpu0".to_owned(),
+                op: Operation {
+                    module: "cpu".to_owned(),
+                    instruction: "spawn_task".to_owned(),
+                    args: vec![callee.clone(), returned.clone()],
+                },
+            });
+            push_dep_edges(state, &returned, &name);
+            state.yir.edges.push(Edge {
+                kind: EdgeKind::Effect,
+                from: returned,
+                to: name.clone(),
+            });
+            Ok(name)
+        }
+        NirExpr::CpuJoin(task) => {
+            let task_name = lower_expr(task, state, bindings)?;
+            let name = next_name(state, "cpu_join");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "cpu0".to_owned(),
+                op: Operation {
+                    module: "cpu".to_owned(),
+                    instruction: "join".to_owned(),
+                    args: vec![task_name.clone()],
+                },
+            });
+            push_dep_edges(state, &task_name, &name);
+            state.yir.edges.push(Edge {
+                kind: EdgeKind::Effect,
+                from: task_name,
+                to: name.clone(),
+            });
+            Ok(name)
+        }
+        NirExpr::CpuCancel(task) => {
+            let task_name = lower_expr(task, state, bindings)?;
+            let name = next_name(state, "cpu_cancel");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "cpu0".to_owned(),
+                op: Operation {
+                    module: "cpu".to_owned(),
+                    instruction: "cancel".to_owned(),
+                    args: vec![task_name.clone()],
+                },
+            });
+            push_dep_edges(state, &task_name, &name);
+            state.yir.edges.push(Edge {
+                kind: EdgeKind::Effect,
+                from: task_name,
+                to: name.clone(),
+            });
+            Ok(name)
+        }
         NirExpr::CpuPresentFrame(frame) => {
             let frame_name = lower_expr(frame, state, bindings)?;
             let name = next_name(state, "cpu_present_frame");
@@ -1689,5 +1749,39 @@ mod tests {
                 && matches!(edge.kind, EdgeKind::Effect)
         }));
         assert_eq!(await_node.op.args.len(), 1);
+    }
+
+    #[test]
+    fn lowers_explicit_task_primitives_into_cpu_effect_nodes() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              async fn ping() -> i64 {
+                return 7;
+              }
+
+              fn main() -> i64 {
+                let task: Task<i64> = spawn(ping());
+                cancel(task);
+                return join(task);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "cpu" && node.op.instruction == "join"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "cpu" && node.op.instruction == "cancel"));
     }
 }

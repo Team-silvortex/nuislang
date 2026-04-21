@@ -220,6 +220,7 @@ pub enum NirContainerKind {
     Window,
     Pipe,
     Instance,
+    Task,
 }
 
 impl NirTypeRef {
@@ -290,6 +291,7 @@ impl NirTypeRef {
             "Window" if !self.is_ref => Some(NirContainerKind::Window),
             "Pipe" if !self.is_ref => Some(NirContainerKind::Pipe),
             "Instance" if !self.is_ref => Some(NirContainerKind::Instance),
+            "Task" if !self.is_ref => Some(NirContainerKind::Task),
             _ => None,
         }
     }
@@ -297,7 +299,12 @@ impl NirTypeRef {
     pub fn container_payload(&self) -> Option<&NirTypeRef> {
         if matches!(
             self.container_kind(),
-            Some(NirContainerKind::Window | NirContainerKind::Pipe | NirContainerKind::Instance)
+            Some(
+                NirContainerKind::Window
+                    | NirContainerKind::Pipe
+                    | NirContainerKind::Instance
+                    | NirContainerKind::Task
+            )
         ) {
             self.generic_args.first()
         } else {
@@ -335,6 +342,19 @@ impl NirTypeRef {
         } else {
             None
         }
+    }
+
+    pub fn is_async_boundary_safe(&self) -> bool {
+        if self.is_ref || self.is_optional {
+            return false;
+        }
+        if matches!(
+            self.container_kind(),
+            Some(NirContainerKind::Instance | NirContainerKind::Task)
+        ) {
+            return false;
+        }
+        self.generic_args.iter().all(NirTypeRef::is_async_boundary_safe)
     }
 
     fn is_nominal_semantic_payload(&self) -> bool {
@@ -407,6 +427,24 @@ impl NirTypeRef {
                         "`Instance<...>` expects a nominal unit type, found `{}`",
                         payload.render()
                     ));
+                }
+            }
+            Some(NirContainerKind::Task) => {
+                if self.generic_args.len() != 1 {
+                    return Err(format!(
+                        "`{}` must carry exactly one payload type argument",
+                        self.name
+                    ));
+                }
+                let payload = self.container_payload().expect("task payload");
+                if !payload.is_async_boundary_safe() {
+                    return Err(format!(
+                        "`Task<...>` expects an async-boundary-safe payload, found `{}`",
+                        payload.render()
+                    ));
+                }
+                if payload.container_kind() == Some(NirContainerKind::Task) {
+                    return Err("`Task<Task<...>>` is not a supported explicit async primitive".to_owned());
                 }
             }
             None => {
@@ -610,6 +648,12 @@ pub enum NirExpr {
         start: i64,
         step: i64,
     },
+    CpuSpawn {
+        callee: String,
+        args: Vec<NirExpr>,
+    },
+    CpuJoin(Box<NirExpr>),
+    CpuCancel(Box<NirExpr>),
     CpuPresentFrame(Box<NirExpr>),
     ShaderProfileTargetRef {
         unit: String,
@@ -831,6 +875,9 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::CpuWindow { .. }
         | NirExpr::CpuInputI64 { .. }
         | NirExpr::CpuTickI64 { .. }
+        | NirExpr::CpuSpawn { .. }
+        | NirExpr::CpuJoin(_)
+        | NirExpr::CpuCancel(_)
         | NirExpr::CpuPresentFrame(_)
         | NirExpr::ShaderProfileTargetRef { .. }
         | NirExpr::ShaderProfileViewportRef { .. }

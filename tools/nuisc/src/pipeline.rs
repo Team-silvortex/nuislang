@@ -259,11 +259,18 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         | NirExpr::LoadValue(inner)
         | NirExpr::LoadNext(inner)
         | NirExpr::BufferLen(inner)
+        | NirExpr::CpuJoin(inner)
+        | NirExpr::CpuCancel(inner)
         | NirExpr::DataOutputPipe(inner)
         | NirExpr::DataInputPipe(inner)
         | NirExpr::CpuPresentFrame(inner)
         | NirExpr::Free(inner)
         | NirExpr::IsNull(inner) => collect_instantiated_units_expr(inner, units),
+        NirExpr::CpuSpawn { args, .. } => {
+            for arg in args {
+                collect_instantiated_units_expr(arg, units);
+            }
+        }
         NirExpr::ShaderBeginPass {
             target,
             pipeline,

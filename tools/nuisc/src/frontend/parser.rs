@@ -414,11 +414,11 @@ impl Parser {
     }
 
     fn parse_multiplicative(&mut self) -> Result<AstExpr, String> {
-        let mut expr = self.parse_postfix()?;
+        let mut expr = self.parse_unary()?;
         loop {
             if self.peek_symbol('*') {
                 self.expect_symbol('*')?;
-                let rhs = self.parse_postfix()?;
+                let rhs = self.parse_unary()?;
                 expr = AstExpr::Binary {
                     op: AstBinaryOp::Mul,
                     lhs: Box::new(expr),
@@ -426,7 +426,7 @@ impl Parser {
                 };
             } else if self.peek_symbol('/') {
                 self.expect_symbol('/')?;
-                let rhs = self.parse_postfix()?;
+                let rhs = self.parse_unary()?;
                 expr = AstExpr::Binary {
                     op: AstBinaryOp::Div,
                     lhs: Box::new(expr),
@@ -437,6 +437,15 @@ impl Parser {
             }
         }
         Ok(expr)
+    }
+
+    fn parse_unary(&mut self) -> Result<AstExpr, String> {
+        if self.peek_word("await") {
+            self.expect_word("await")?;
+            let value = self.parse_unary()?;
+            return Ok(AstExpr::Await(Box::new(value)));
+        }
+        self.parse_postfix()
     }
 
     fn parse_postfix(&mut self) -> Result<AstExpr, String> {
@@ -469,10 +478,6 @@ impl Parser {
 
     fn parse_primary(&mut self) -> Result<AstExpr, String> {
         match self.next() {
-            Some(Token::Word(word)) if word == "await" => {
-                let value = self.parse_expr()?;
-                Ok(AstExpr::Await(Box::new(value)))
-            }
             Some(Token::Word(word)) if word == "instantiate" => {
                 let domain = self.expect_ident()?;
                 let unit = self.expect_ident()?;

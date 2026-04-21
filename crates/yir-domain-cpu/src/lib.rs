@@ -189,6 +189,24 @@ impl RegisteredMod for CpuMod {
                     node.op.args.iter().skip(1).cloned().collect(),
                 ))
             }
+            "spawn_task" => {
+                if node.op.args.len() != 2 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.spawn_task <name> <resource> <callee> <result>`",
+                        node.name
+                    ));
+                }
+                Ok(InstructionSemantics::effect(vec![node.op.args[1].clone()]))
+            }
+            "join" | "cancel" => {
+                if node.op.args.len() != 1 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.{} <name> <resource> <task>`",
+                        node.name, node.op.instruction
+                    ));
+                }
+                Ok(InstructionSemantics::effect(node.op.args.clone()))
+            }
             "add" | "sub" | "mul" | "div" | "rem" | "eq" | "ne" | "lt" | "gt" | "le" | "ge"
             | "and" | "or" | "xor" | "shl" | "shr" | "add_i32" | "sub_i32" | "mul_i32"
             | "div_i32" | "add_f32" | "sub_f32" | "mul_f32" | "div_f32" | "add_f64" | "sub_f64"
@@ -589,6 +607,46 @@ impl RegisteredMod for CpuMod {
                         resource.kind.raw,
                         callee,
                         args.join(", ")
+                    ),
+                );
+                Ok(Value::Unit)
+            }
+            "spawn_task" => {
+                let callee = &node.op.args[0];
+                let result = state.expect_value(&node.op.args[1])?.clone();
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.spawn_task @{} [{}] {} => {}",
+                        node.resource, resource.kind.raw, callee, node.name
+                    ),
+                );
+                Ok(Value::Task(yir_core::TaskHandle {
+                    label: format!("{callee}@{}", node.name),
+                    result: Box::new(result),
+                }))
+            }
+            "join" => {
+                let task = state.expect_task(&node.op.args[0])?;
+                let label = task.label.clone();
+                let result = (*task.result).clone();
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.join @{} [{}]: {}",
+                        node.resource, resource.kind.raw, label
+                    ),
+                );
+                Ok(result)
+            }
+            "cancel" => {
+                let task = state.expect_task(&node.op.args[0])?;
+                let label = task.label.clone();
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.cancel @{} [{}]: {}",
+                        node.resource, resource.kind.raw, label
                     ),
                 );
                 Ok(Value::Unit)

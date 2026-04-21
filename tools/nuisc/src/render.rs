@@ -416,6 +416,16 @@ fn render_nir_expr(value: &NirExpr) -> String {
             _ => format!("cpu_input_i64(\"{}\", {})", escape_debug(channel), default),
         },
         NirExpr::CpuTickI64 { start, step } => format!("cpu_tick_i64({}, {})", start, step),
+        NirExpr::CpuSpawn { callee, args } => format!(
+            "spawn({}({}))",
+            callee,
+            args.iter()
+                .map(render_nir_expr)
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        NirExpr::CpuJoin(task) => format!("join({})", render_nir_expr(task)),
+        NirExpr::CpuCancel(task) => format!("cancel({})", render_nir_expr(task)),
         NirExpr::CpuPresentFrame(value) => {
             format!("cpu_present_frame({})", render_nir_expr(value))
         }

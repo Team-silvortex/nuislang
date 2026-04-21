@@ -280,7 +280,9 @@ impl Operation {
                 CpuLlvmLoweringClass::Memory
             }
             "input_i64" | "extern_call_i64" => CpuLlvmLoweringClass::Runtime,
-            "print" | "await" | "async_call" => CpuLlvmLoweringClass::Effect,
+            "print" | "await" | "async_call" | "spawn_task" | "join" | "cancel" => {
+                CpuLlvmLoweringClass::Effect
+            }
             _ => CpuLlvmLoweringClass::Other,
         }
     }
@@ -386,6 +388,7 @@ pub enum Value {
     BindingSet(ShaderBindingSet),
     RenderPass(RenderPass),
     Frame(FrameSurface),
+    Task(TaskHandle),
     Unit,
 }
 
@@ -696,6 +699,12 @@ pub struct HeapBuffer {
     pub elements: Vec<i64>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TaskHandle {
+    pub label: String,
+    pub result: Box<Value>,
+}
+
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -742,6 +751,7 @@ impl fmt::Display for Value {
             Self::BindingSet(binding_set) => write!(f, "{binding_set}"),
             Self::RenderPass(pass) => write!(f, "{pass}"),
             Self::Frame(frame) => write!(f, "{frame}"),
+            Self::Task(task) => write!(f, "task<{}>", task.label),
             Self::Unit => write!(f, "()"),
         }
     }
@@ -1086,6 +1096,7 @@ impl ExecutionState {
             Some(Value::BindingSet(_)) => Err(format!("`{name}` is binding-set, expected int")),
             Some(Value::RenderPass(_)) => Err(format!("`{name}` is render-pass, expected int")),
             Some(Value::Frame(_)) => Err(format!("`{name}` is frame, expected int")),
+            Some(Value::Task(_)) => Err(format!("`{name}` is task, expected int")),
             Some(Value::Unit) => Err(format!("`{name}` is unit, expected int")),
             None => Err(format!("missing value for `{name}`")),
         }
@@ -1149,6 +1160,14 @@ impl ExecutionState {
         match self.values.get(name) {
             Some(Value::Tensor(tensor)) => Ok(tensor),
             Some(other) => Err(format!("`{name}` is {other}, expected tensor")),
+            None => Err(format!("missing value for `{name}`")),
+        }
+    }
+
+    pub fn expect_task(&self, name: &str) -> Result<&TaskHandle, String> {
+        match self.values.get(name) {
+            Some(Value::Task(task)) => Ok(task),
+            Some(other) => Err(format!("`{name}` is {other}, expected task")),
             None => Err(format!("missing value for `{name}`")),
         }
     }

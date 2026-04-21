@@ -626,6 +626,8 @@ fn walk_child_exprs(expr: &NirExpr, f: &mut dyn FnMut(&NirExpr)) {
         | NirExpr::LoadValue(inner)
         | NirExpr::LoadNext(inner)
         | NirExpr::BufferLen(inner)
+        | NirExpr::CpuJoin(inner)
+        | NirExpr::CpuCancel(inner)
         | NirExpr::DataOutputPipe(inner)
         | NirExpr::DataInputPipe(inner)
         | NirExpr::CpuPresentFrame(inner)
@@ -692,7 +694,7 @@ fn walk_child_exprs(expr: &NirExpr, f: &mut dyn FnMut(&NirExpr)) {
         | NirExpr::DataProfileSendDownlink { input, .. }
         | NirExpr::ShaderProfileRender { packet: input, .. }
         | NirExpr::FieldAccess { base: input, .. } => f(input),
-        NirExpr::CpuExternCall { args, .. } | NirExpr::Call { args, .. } => {
+        NirExpr::CpuSpawn { args, .. } | NirExpr::CpuExternCall { args, .. } | NirExpr::Call { args, .. } => {
             for arg in args {
                 f(arg);
             }

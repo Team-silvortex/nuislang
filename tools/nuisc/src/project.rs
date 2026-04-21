@@ -1626,6 +1626,8 @@ fn expr_walk_any(expr: &NirExpr, predicate: &dyn Fn(&NirExpr) -> bool) -> bool {
         | NirExpr::LoadValue(inner)
         | NirExpr::LoadNext(inner)
         | NirExpr::BufferLen(inner)
+        | NirExpr::CpuJoin(inner)
+        | NirExpr::CpuCancel(inner)
         | NirExpr::DataOutputPipe(inner)
         | NirExpr::DataInputPipe(inner)
         | NirExpr::CpuPresentFrame(inner)
@@ -1661,7 +1663,7 @@ fn expr_walk_any(expr: &NirExpr, predicate: &dyn Fn(&NirExpr) -> bool) -> bool {
             radius,
             ..
         } => predicate(color) || predicate(speed) || predicate(radius),
-        NirExpr::CpuExternCall { args, .. } | NirExpr::Call { args, .. } => {
+        NirExpr::CpuSpawn { args, .. } | NirExpr::CpuExternCall { args, .. } | NirExpr::Call { args, .. } => {
             args.iter().any(predicate)
         }
         NirExpr::MethodCall { receiver, args, .. } => {
@@ -2475,6 +2477,7 @@ fn payload_shape_type_suffix(ty: &NirTypeRef) -> String {
             nuis_semantics::model::NirContainerKind::Window => "Window",
             nuis_semantics::model::NirContainerKind::Pipe => "Pipe",
             nuis_semantics::model::NirContainerKind::Instance => "Instance",
+            nuis_semantics::model::NirContainerKind::Task => "Task",
         };
         let inner = ty
             .container_payload()
