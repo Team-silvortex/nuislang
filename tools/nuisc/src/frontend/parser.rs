@@ -469,6 +469,10 @@ impl Parser {
 
     fn parse_primary(&mut self) -> Result<AstExpr, String> {
         match self.next() {
+            Some(Token::Word(word)) if word == "await" => {
+                let value = self.parse_expr()?;
+                Ok(AstExpr::Await(Box::new(value)))
+            }
             Some(Token::Word(word)) if word == "instantiate" => {
                 let domain = self.expect_ident()?;
                 let unit = self.expect_ident()?;

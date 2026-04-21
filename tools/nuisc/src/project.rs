@@ -1619,7 +1619,8 @@ fn expr_uses_kernel_profile_batch_lanes(expr: &NirExpr, unit: &str) -> bool {
 
 fn expr_walk_any(expr: &NirExpr, predicate: &dyn Fn(&NirExpr) -> bool) -> bool {
     match expr {
-        NirExpr::Borrow(inner)
+        NirExpr::Await(inner)
+        | NirExpr::Borrow(inner)
         | NirExpr::BorrowEnd(inner)
         | NirExpr::Move(inner)
         | NirExpr::LoadValue(inner)

@@ -619,7 +619,8 @@ fn collect_support_usage_expr(
 
 fn walk_child_exprs(expr: &NirExpr, f: &mut dyn FnMut(&NirExpr)) {
     match expr {
-        NirExpr::Borrow(inner)
+        NirExpr::Await(inner)
+        | NirExpr::Borrow(inner)
         | NirExpr::BorrowEnd(inner)
         | NirExpr::Move(inner)
         | NirExpr::LoadValue(inner)

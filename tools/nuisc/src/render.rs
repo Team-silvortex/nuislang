@@ -255,6 +255,7 @@ fn render_ast_expr(value: &AstExpr) -> String {
         AstExpr::Text(text) => format!("\"{}\"", escape_debug(text)),
         AstExpr::Int(value) => value.to_string(),
         AstExpr::Var(name) => name.clone(),
+        AstExpr::Await(value) => format!("await {}", render_ast_expr(value)),
         AstExpr::Instantiate { domain, unit } => format!("instantiate {} {}", domain, unit),
         AstExpr::Call { callee, args } => format!(
             "{}({})",
@@ -338,6 +339,7 @@ fn render_nir_expr(value: &NirExpr) -> String {
         NirExpr::Text(text) => format!("\"{}\"", escape_debug(text)),
         NirExpr::Int(value) => value.to_string(),
         NirExpr::Var(name) => name.clone(),
+        NirExpr::Await(value) => format!("await {}", render_nir_expr(value)),
         NirExpr::Instantiate { domain, unit } => format!("instantiate {} {}", domain, unit),
         NirExpr::Null => "null()".to_owned(),
         NirExpr::Borrow(value) => format!("borrow({})", render_nir_expr(value)),

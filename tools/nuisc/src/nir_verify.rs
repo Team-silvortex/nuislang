@@ -436,7 +436,8 @@ fn verify_expr(
             verify_expr(offset, moved, borrows, borrow_bindings, data_bindings)?;
             verify_expr(len, moved, borrows, borrow_bindings, data_bindings)?;
         }
-        NirExpr::Borrow(inner)
+        NirExpr::Await(inner)
+        | NirExpr::Borrow(inner)
         | NirExpr::BorrowEnd(inner)
         | NirExpr::Move(inner)
         | NirExpr::LoadValue(inner)
@@ -612,7 +613,8 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
             verify_expr_uses(offset, moved)?;
             verify_expr_uses(len, moved)?;
         }
-        NirExpr::Borrow(inner)
+        NirExpr::Await(inner)
+        | NirExpr::Borrow(inner)
         | NirExpr::BorrowEnd(inner)
         | NirExpr::Move(inner)
         | NirExpr::LoadValue(inner)
@@ -687,6 +689,7 @@ fn expr_resource_key(expr: &NirExpr) -> Option<String> {
 
 fn infer_data_kind(expr: &NirExpr, data_bindings: &BTreeMap<String, NirDataKind>) -> NirDataKind {
     match expr {
+        NirExpr::Await(inner) => infer_data_kind(inner, data_bindings),
         NirExpr::Var(name) => data_bindings
             .get(name)
             .copied()
@@ -707,6 +710,7 @@ fn infer_data_kind(expr: &NirExpr, data_bindings: &BTreeMap<String, NirDataKind>
 
 fn render_data_expr_name(expr: &NirExpr) -> String {
     match expr {
+        NirExpr::Await(inner) => render_data_expr_name(inner),
         NirExpr::Var(name) => name.clone(),
         NirExpr::DataMarker(tag) => format!("marker:{tag}"),
         NirExpr::DataProfileMarkerRef { unit, tag } => format!("{unit}.marker:{tag}"),

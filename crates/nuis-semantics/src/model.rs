@@ -100,6 +100,7 @@ pub enum AstExpr {
     Text(String),
     Int(i64),
     Var(String),
+    Await(Box<AstExpr>),
     Instantiate {
         domain: String,
         unit: String,
@@ -540,6 +541,7 @@ pub enum NirExpr {
     Text(String),
     Int(i64),
     Var(String),
+    Await(Box<NirExpr>),
     Instantiate {
         domain: String,
         unit: String,
@@ -782,6 +784,7 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::Text(_)
         | NirExpr::Int(_)
         | NirExpr::Var(_)
+        | NirExpr::Await(_)
         | NirExpr::Instantiate { .. }
         | NirExpr::Call { .. }
         | NirExpr::MethodCall { .. }

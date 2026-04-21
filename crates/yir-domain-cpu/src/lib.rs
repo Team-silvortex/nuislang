@@ -178,6 +178,17 @@ impl RegisteredMod for CpuMod {
 
                 Ok(InstructionSemantics::pure(node.op.args.clone()))
             }
+            "async_call" => {
+                if node.op.args.is_empty() {
+                    return Err(format!(
+                        "node `{}` expects `cpu.async_call <name> <resource> <callee> [arg...]`",
+                        node.name
+                    ));
+                }
+                Ok(InstructionSemantics::effect(
+                    node.op.args.iter().skip(1).cloned().collect(),
+                ))
+            }
             "add" | "sub" | "mul" | "div" | "rem" | "eq" | "ne" | "lt" | "gt" | "le" | "ge"
             | "and" | "or" | "xor" | "shl" | "shr" | "add_i32" | "sub_i32" | "mul_i32"
             | "div_i32" | "add_f32" | "sub_f32" | "mul_f32" | "div_f32" | "add_f64" | "sub_f64"
@@ -564,6 +575,24 @@ impl RegisteredMod for CpuMod {
             }
             "null" => Ok(Value::Pointer(None)),
             "borrow" | "move_ptr" => Ok(Value::Pointer(state.expect_pointer(&node.op.args[0])?)),
+            "async_call" => {
+                let callee = &node.op.args[0];
+                let args = node.op.args[1..]
+                    .iter()
+                    .map(|arg| state.expect_value(arg).map(|value| value.to_string()))
+                    .collect::<Result<Vec<_>, _>>()?;
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.async_call @{} [{}] {}({})",
+                        node.resource,
+                        resource.kind.raw,
+                        callee,
+                        args.join(", ")
+                    ),
+                );
+                Ok(Value::Unit)
+            }
             "await" => {
                 let value = state.expect_value(&node.op.args[0])?.clone();
                 state.push_resource_event(

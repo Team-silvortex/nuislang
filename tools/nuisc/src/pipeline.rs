@@ -253,6 +253,7 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
             collect_instantiated_units_expr(radius, units);
         }
         NirExpr::Borrow(inner)
+        | NirExpr::Await(inner)
         | NirExpr::BorrowEnd(inner)
         | NirExpr::Move(inner)
         | NirExpr::LoadValue(inner)

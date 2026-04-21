@@ -239,19 +239,13 @@ fn lower_function_body(
                 });
             }
             NirStmt::Await(value) => {
-                let awaited = lower_expr(value, state, bindings)?;
-                let await_name = format!("await_{}", state.await_counter);
-                state.await_counter += 1;
-                state.yir.nodes.push(Node {
-                    name: await_name.clone(),
-                    resource: "cpu0".to_owned(),
-                    op: Operation {
-                        module: "cpu".to_owned(),
-                        instruction: "await".to_owned(),
-                        args: vec![awaited.clone()],
-                    },
-                });
-                push_dep_edges(state, &awaited, &await_name);
+                let awaited = match value {
+                    NirExpr::Call { callee, args } => {
+                        lower_async_call_boundary(callee, args, state, bindings)?
+                    }
+                    _ => lower_expr(value, state, bindings)?,
+                };
+                let await_name = push_await_node(state, &awaited);
                 state.yir.edges.push(Edge {
                     kind: EdgeKind::Effect,
                     from: awaited,
@@ -322,6 +316,21 @@ fn lower_expr(
                 },
             });
             Ok(name)
+        }
+        NirExpr::Await(value) => {
+            let awaited = match value.as_ref() {
+                NirExpr::Call { callee, args } => {
+                    lower_async_call_boundary(callee, args, state, bindings)?
+                }
+                _ => lower_expr(value, state, bindings)?,
+            };
+            let await_name = push_await_node(state, &awaited);
+            state.yir.edges.push(Edge {
+                kind: EdgeKind::Effect,
+                from: awaited,
+                to: await_name.clone(),
+            });
+            Ok(await_name)
         }
         NirExpr::Int(value) => {
             let name = next_name(state, "int");
@@ -1319,6 +1328,85 @@ fn lower_call_expr(
     returned.ok_or_else(|| format!("function `{callee}` did not return a value"))
 }
 
+fn lower_async_call_boundary(
+    callee: &str,
+    args: &[NirExpr],
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<String, String> {
+    let function = state
+        .function_map
+        .get(callee)
+        .copied()
+        .ok_or_else(|| format!("unknown function `{callee}`"))?;
+    if !function.is_async {
+        return lower_call_expr(callee, args, state, bindings);
+    }
+    if state.call_stack.iter().any(|active| active == callee) {
+        return Err(format!(
+            "recursive async function call `{callee}` is not yet supported by minimal nuisc lowering"
+        ));
+    }
+    if function.params.len() != args.len() {
+        return Err(format!(
+            "function `{callee}` expects {} args, found {}",
+            function.params.len(),
+            args.len()
+        ));
+    }
+
+    let mut local_bindings = BTreeMap::new();
+    let mut lowered_args = Vec::new();
+    for (param, arg) in function.params.iter().zip(args.iter()) {
+        let lowered = lower_expr(arg, state, bindings)?;
+        lowered_args.push(lowered.clone());
+        local_bindings.insert(param.name.clone(), lowered);
+    }
+
+    let call_name = next_name(state, "async_call");
+    let mut op_args = vec![callee.to_owned()];
+    op_args.extend(lowered_args.clone());
+    state.yir.nodes.push(Node {
+        name: call_name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "async_call".to_owned(),
+            args: op_args,
+        },
+    });
+    for arg in &lowered_args {
+        push_dep_edges(state, arg, &call_name);
+    }
+
+    state.call_stack.push(callee.to_owned());
+    let returned = lower_function_body(function, state, &mut local_bindings, false)?;
+    state.call_stack.pop();
+    let returned = returned.ok_or_else(|| format!("function `{callee}` did not return a value"))?;
+    state.yir.edges.push(Edge {
+        kind: EdgeKind::Effect,
+        from: call_name,
+        to: returned.clone(),
+    });
+    Ok(returned)
+}
+
+fn push_await_node(state: &mut LoweringState<'_>, awaited: &str) -> String {
+    let await_name = format!("await_{}", state.await_counter);
+    state.await_counter += 1;
+    state.yir.nodes.push(Node {
+        name: await_name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "await".to_owned(),
+            args: vec![awaited.to_owned()],
+        },
+    });
+    push_dep_edges(state, awaited, &await_name);
+    await_name
+}
+
 fn next_name(state: &mut LoweringState<'_>, prefix: &str) -> String {
     let name = format!("{prefix}_{}", state.value_counter);
     state.value_counter += 1;
@@ -1529,5 +1617,77 @@ mod tests {
         assert!(yir.edges.iter().any(|edge| edge.from == *awaited
             && edge.to == await_node.name
             && matches!(edge.kind, EdgeKind::Effect)));
+    }
+
+    #[test]
+    fn lowers_async_call_with_explicit_schedule_boundary() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              async fn ping() -> i64 {
+                return 7;
+              }
+
+              async fn main() {
+                await ping();
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+        let async_call = yir
+            .nodes
+            .iter()
+            .find(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+            .unwrap();
+        let await_node = yir
+            .nodes
+            .iter()
+            .find(|node| node.op.module == "cpu" && node.op.instruction == "await")
+            .unwrap();
+        assert!(yir.edges.iter().any(|edge| {
+            edge.from == async_call.name
+                && edge.to == await_node.op.args[0]
+                && matches!(edge.kind, EdgeKind::Effect)
+        }));
+    }
+
+    #[test]
+    fn lowers_await_expression_into_value_producing_boundary() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              async fn ping() -> i64 {
+                return 7;
+              }
+
+              async fn main() -> i64 {
+                let value: i64 = await ping();
+                return value;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+        let async_call = yir
+            .nodes
+            .iter()
+            .find(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+            .unwrap();
+        let await_node = yir
+            .nodes
+            .iter()
+            .find(|node| node.op.module == "cpu" && node.op.instruction == "await")
+            .unwrap();
+        assert!(yir.edges.iter().any(|edge| {
+            edge.from == async_call.name
+                && edge.to == await_node.op.args[0]
+                && matches!(edge.kind, EdgeKind::Effect)
+        }));
+        assert_eq!(await_node.op.args.len(), 1);
     }
 }

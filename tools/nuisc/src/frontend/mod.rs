@@ -431,6 +431,21 @@ fn lower_expr_with_async(
         AstExpr::Text(text) => NirExpr::Text(text.clone()),
         AstExpr::Int(value) => NirExpr::Int(*value),
         AstExpr::Var(name) => NirExpr::Var(name.clone()),
+        AstExpr::Await(value) => {
+            if !current_function_is_async {
+                return Err("`await` is only allowed inside `async fn`".to_owned());
+            }
+            NirExpr::Await(Box::new(lower_expr_with_async(
+                value,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                signatures,
+                struct_table,
+                expected,
+                true,
+            )?))
+        }
         AstExpr::Instantiate { domain, unit } => {
             if current_domain != "cpu" {
                 return Err(format!(
@@ -2159,7 +2174,7 @@ fn lower_call_expr_with_async(
                     }
                     if !allow_async_calls {
                         return Err(format!(
-                            "async function `{callee}` must be used under `await ...;`"
+                            "async function `{callee}` must be used under `await`"
                         ));
                     }
                 }
@@ -2213,6 +2228,7 @@ fn infer_nir_expr_type(
         NirExpr::Text(_) => Some(string_type()),
         NirExpr::Int(_) => Some(i64_type()),
         NirExpr::Var(name) => bindings.get(name).cloned(),
+        NirExpr::Await(value) => infer_nir_expr_type(value, bindings, signatures, struct_table),
         NirExpr::Instantiate { unit, .. } => {
             Some(generic_named_type("Instance", vec![named_type(unit)]))
         }
@@ -2493,7 +2509,7 @@ fn render_type_name(ty: &NirTypeRef) -> String {
 #[cfg(test)]
 mod tests {
     use super::parse_nuis_module;
-    use nuis_semantics::model::NirStmt;
+    use nuis_semantics::model::{NirExpr, NirStmt};
 
     #[test]
     fn infers_struct_field_type_from_shared_type_helper() {
@@ -2694,6 +2710,42 @@ mod tests {
     }
 
     #[test]
+    fn lowers_await_expression_in_let_and_return() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              async fn ping() -> i64 {
+                return 7;
+              }
+
+              async fn main() -> i64 {
+                let value: i64 = await ping();
+                return await ping();
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            function.body.first(),
+            Some(NirStmt::Let {
+                value: NirExpr::Await(_),
+                ..
+            })
+        ));
+        assert!(matches!(
+            function.body.get(1),
+            Some(NirStmt::Return(Some(NirExpr::Await(_))))
+        ));
+    }
+
+    #[test]
     fn rejects_await_inside_sync_function() {
         let error = parse_nuis_module(
             r#"
@@ -2731,6 +2783,6 @@ mod tests {
         )
         .unwrap_err();
 
-        assert!(error.contains("must be used under `await ...;`"));
+        assert!(error.contains("must be used under `await`"));
     }
 }
