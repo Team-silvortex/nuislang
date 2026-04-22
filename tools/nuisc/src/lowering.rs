@@ -1023,6 +1023,32 @@ fn lower_expr(
         NirExpr::KernelProfileBatchLanesRef { unit } => {
             lower_project_profile_ref(state, "kernel", unit, "batch_lanes")
         }
+        NirExpr::KernelResult { value, state: flow } => {
+            ensure_kernel_resource(state.yir);
+            let value_name = lower_expr(value, state, bindings)?;
+            let name = next_name(state, "kernel_result");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "kernel0".to_owned(),
+                op: Operation {
+                    module: "kernel".to_owned(),
+                    instruction: "observe".to_owned(),
+                    args: vec![value_name.clone(), flow.render().to_owned()],
+                },
+            });
+            push_dep_edges(state, &value_name, &name);
+            Ok(name)
+        }
+        NirExpr::KernelConfigReady(result) => lower_kernel_unary_value_effect(
+            state,
+            bindings,
+            result,
+            "kernel_config_ready",
+            "is_config_ready",
+        ),
+        NirExpr::KernelValue(result) => {
+            lower_kernel_unary_value_effect(state, bindings, result, "kernel_value", "value")
+        }
         NirExpr::ShaderTarget {
             format,
             width,
@@ -1085,6 +1111,39 @@ fn lower_expr(
                 },
             });
             Ok(name)
+        }
+        NirExpr::ShaderResult { value, state: flow } => {
+            ensure_shader_resource(state.yir);
+            let value_name = lower_expr(value, state, bindings)?;
+            let name = next_name(state, "shader_result");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "shader0".to_owned(),
+                op: Operation {
+                    module: "shader".to_owned(),
+                    instruction: "observe".to_owned(),
+                    args: vec![value_name.clone(), flow.render().to_owned()],
+                },
+            });
+            push_dep_edges(state, &value_name, &name);
+            Ok(name)
+        }
+        NirExpr::ShaderPassReady(result) => lower_shader_unary_value_effect(
+            state,
+            bindings,
+            result,
+            "shader_pass_ready",
+            "is_pass_ready",
+        ),
+        NirExpr::ShaderFrameReady(result) => lower_shader_unary_value_effect(
+            state,
+            bindings,
+            result,
+            "shader_frame_ready",
+            "is_frame_ready",
+        ),
+        NirExpr::ShaderValue(result) => {
+            lower_shader_unary_value_effect(state, bindings, result, "shader_value", "value")
         }
         NirExpr::ShaderBeginPass {
             target,
@@ -1620,6 +1679,52 @@ fn lower_data_unary_value_effect(
     Ok(name)
 }
 
+fn lower_shader_unary_value_effect(
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+    input: &NirExpr,
+    prefix: &str,
+    instruction: &str,
+) -> Result<String, String> {
+    ensure_shader_resource(state.yir);
+    let input_name = lower_expr(input, state, bindings)?;
+    let name = next_name(state, prefix);
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "shader0".to_owned(),
+        op: Operation {
+            module: "shader".to_owned(),
+            instruction: instruction.to_owned(),
+            args: vec![input_name.clone()],
+        },
+    });
+    push_dep_edges(state, &input_name, &name);
+    Ok(name)
+}
+
+fn lower_kernel_unary_value_effect(
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+    input: &NirExpr,
+    prefix: &str,
+    instruction: &str,
+) -> Result<String, String> {
+    ensure_kernel_resource(state.yir);
+    let input_name = lower_expr(input, state, bindings)?;
+    let name = next_name(state, prefix);
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "kernel0".to_owned(),
+        op: Operation {
+            module: "kernel".to_owned(),
+            instruction: instruction.to_owned(),
+            args: vec![input_name.clone()],
+        },
+    });
+    push_dep_edges(state, &input_name, &name);
+    Ok(name)
+}
+
 fn next_name(state: &mut LoweringState<'_>, prefix: &str) -> String {
     let name = format!("{prefix}_{}", state.value_counter);
     state.value_counter += 1;
@@ -1735,6 +1840,20 @@ fn ensure_shader_resource(yir: &mut YirModule) {
     yir.resources.push(Resource {
         name: "shader0".to_owned(),
         kind: ResourceKind::parse("shader.render"),
+    });
+}
+
+fn ensure_kernel_resource(yir: &mut YirModule) {
+    if yir
+        .resources
+        .iter()
+        .any(|resource| resource.name == "kernel0")
+    {
+        return;
+    }
+    yir.resources.push(Resource {
+        name: "kernel0".to_owned(),
+        kind: ResourceKind::parse("kernel.compute"),
     });
 }
 
@@ -1991,6 +2110,66 @@ mod tests {
             .nodes
             .iter()
             .any(|node| node.op.module == "data" && node.op.instruction == "value"));
+    }
+
+    #[test]
+    fn lowers_shader_result_primitives_into_shader_nodes() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let result: ShaderResult<Pass> = shader_result(shader_begin_pass(
+                  shader_target("rgba8", 8, 8),
+                  shader_pipeline("flat", "triangle"),
+                  shader_viewport(8, 8)
+                ));
+                let ready: bool = shader_pass_ready(result);
+                return 1;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "shader" && node.op.instruction == "observe"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "shader" && node.op.instruction == "is_pass_ready"));
+    }
+
+    #[test]
+    fn lowers_kernel_result_primitives_into_kernel_nodes() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let result: KernelResult<i64> = kernel_result(kernel_profile_queue_depth("KernelUnit"));
+                let ready: bool = kernel_config_ready(result);
+                return kernel_value(result);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "observe"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "is_config_ready"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "value"));
     }
 
     #[test]

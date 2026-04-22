@@ -6,7 +6,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use nuis_semantics::model::{
     AstBinaryOp, AstExpr, AstFunction, AstModule, AstParam, AstStmt, AstTypeRef, NirBinaryOp,
     NirDataFlowState, NirExpr, NirExternFunction, NirExternInterface, NirFunction, NirModule,
-    NirParam, NirStmt, NirStructDef, NirStructField, NirTypeRef, NirUse,
+    NirKernelFlowState, NirParam, NirShaderFlowState, NirStmt, NirStructDef, NirStructField,
+    NirTypeRef, NirUse,
 };
 
 pub fn frontend_name() -> &'static str {
@@ -1372,6 +1373,98 @@ fn lower_call_expr_with_async(
             ensure_data_result_like("data_value", &lowered, bindings, signatures, struct_table)?;
             Ok(NirExpr::DataValue(Box::new(lowered)))
         }
+        "shader_result" => {
+            let [value] = args else {
+                return Err(
+                    "shader_result(...) expects exactly one shader-domain expression".to_owned()
+                );
+            };
+            let lowered = lower_nested_expr_with_async(
+                value,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            let Some(state) = infer_shader_result_state(&lowered) else {
+                return Err(
+                    "shader_result(...) expects a direct shader operation like begin_pass/render"
+                        .to_owned(),
+                );
+            };
+            Ok(NirExpr::ShaderResult {
+                value: Box::new(lowered),
+                state,
+            })
+        }
+        "shader_pass_ready" => {
+            let [result] = args else {
+                return Err("shader_pass_ready(...) expects exactly one shader result".to_owned());
+            };
+            let lowered = lower_nested_expr_with_async(
+                result,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            ensure_shader_result_like(
+                "shader_pass_ready",
+                &lowered,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            Ok(NirExpr::ShaderPassReady(Box::new(lowered)))
+        }
+        "shader_frame_ready" => {
+            let [result] = args else {
+                return Err("shader_frame_ready(...) expects exactly one shader result".to_owned());
+            };
+            let lowered = lower_nested_expr_with_async(
+                result,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            ensure_shader_result_like(
+                "shader_frame_ready",
+                &lowered,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            Ok(NirExpr::ShaderFrameReady(Box::new(lowered)))
+        }
+        "shader_value" => {
+            let [result] = args else {
+                return Err("shader_value(...) expects exactly one shader result".to_owned());
+            };
+            let lowered = lower_nested_expr_with_async(
+                result,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            ensure_shader_result_like(
+                "shader_value",
+                &lowered,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            Ok(NirExpr::ShaderValue(Box::new(lowered)))
+        }
         "data_copy_window" => {
             let [input, offset, len] = args else {
                 return Err("data_copy_window(...) expects 3 args".to_owned());
@@ -2229,6 +2322,74 @@ fn lower_call_expr_with_async(
             };
             Ok(NirExpr::KernelProfileBatchLanesRef { unit: unit.clone() })
         }
+        "kernel_result" => {
+            let [value] = args else {
+                return Err("kernel_result(...) expects exactly one kernel expression".to_owned());
+            };
+            let lowered = lower_nested_expr_with_async(
+                value,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            let Some(state) = infer_kernel_result_state(&lowered) else {
+                return Err(
+                    "kernel_result(...) expects a direct kernel profile/config expression"
+                        .to_owned(),
+                );
+            };
+            Ok(NirExpr::KernelResult {
+                value: Box::new(lowered),
+                state,
+            })
+        }
+        "kernel_config_ready" => {
+            let [result] = args else {
+                return Err("kernel_config_ready(...) expects exactly one kernel result".to_owned());
+            };
+            let lowered = lower_nested_expr_with_async(
+                result,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            ensure_kernel_result_like(
+                "kernel_config_ready",
+                &lowered,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            Ok(NirExpr::KernelConfigReady(Box::new(lowered)))
+        }
+        "kernel_value" => {
+            let [result] = args else {
+                return Err("kernel_value(...) expects exactly one kernel result".to_owned());
+            };
+            let lowered = lower_nested_expr_with_async(
+                result,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            ensure_kernel_result_like(
+                "kernel_value",
+                &lowered,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            Ok(NirExpr::KernelValue(Box::new(lowered)))
+        }
         "shader_target" => {
             let [format, width, height] = args else {
                 return Err("shader_target(...) expects 3 args".to_owned());
@@ -2617,6 +2778,63 @@ fn infer_data_result_state(expr: &NirExpr) -> Option<NirDataFlowState> {
     }
 }
 
+fn ensure_shader_result_like(
+    name: &str,
+    expr: &NirExpr,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> Result<(), String> {
+    match infer_nir_expr_type(expr, bindings, signatures, struct_table) {
+        Some(ty) if ty.is_generic_named("ShaderResult", 1) => Ok(()),
+        Some(ty) => Err(format!(
+            "{name}(...) expects `ShaderResult<...>`, found `{}`",
+            render_type_name(&ty)
+        )),
+        None => Err(format!(
+            "{name}(...) requires a typed shader result in the current frontend"
+        )),
+    }
+}
+
+fn infer_shader_result_state(expr: &NirExpr) -> Option<NirShaderFlowState> {
+    match expr {
+        NirExpr::ShaderBeginPass { .. } => Some(NirShaderFlowState::PassReady),
+        NirExpr::ShaderDrawInstanced { .. } | NirExpr::ShaderProfileRender { .. } => {
+            Some(NirShaderFlowState::FrameReady)
+        }
+        _ => None,
+    }
+}
+
+fn ensure_kernel_result_like(
+    name: &str,
+    expr: &NirExpr,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> Result<(), String> {
+    match infer_nir_expr_type(expr, bindings, signatures, struct_table) {
+        Some(ty) if ty.is_generic_named("KernelResult", 1) => Ok(()),
+        Some(ty) => Err(format!(
+            "{name}(...) expects `KernelResult<...>`, found `{}`",
+            render_type_name(&ty)
+        )),
+        None => Err(format!(
+            "{name}(...) requires a typed kernel result in the current frontend"
+        )),
+    }
+}
+
+fn infer_kernel_result_state(expr: &NirExpr) -> Option<NirKernelFlowState> {
+    match expr {
+        NirExpr::KernelProfileBindCoreRef { .. }
+        | NirExpr::KernelProfileQueueDepthRef { .. }
+        | NirExpr::KernelProfileBatchLanesRef { .. } => Some(NirKernelFlowState::ConfigReady),
+        _ => None,
+    }
+}
+
 fn infer_nir_expr_type(
     expr: &NirExpr,
     bindings: &BTreeMap<String, NirTypeRef>,
@@ -2688,6 +2906,13 @@ fn infer_nir_expr_type(
         NirExpr::KernelProfileBindCoreRef { .. } => Some(i64_type()),
         NirExpr::KernelProfileQueueDepthRef { .. } => Some(i64_type()),
         NirExpr::KernelProfileBatchLanesRef { .. } => Some(i64_type()),
+        NirExpr::KernelResult { value, .. } => {
+            let inner = infer_nir_expr_type(value, bindings, signatures, struct_table)?;
+            Some(generic_named_type("KernelResult", vec![inner]))
+        }
+        NirExpr::KernelConfigReady(_) => Some(bool_type()),
+        NirExpr::KernelValue(result) => infer_nir_expr_type(result, bindings, signatures, struct_table)
+            .and_then(|ty| ty.generic_args.first().cloned()),
         NirExpr::DataProfileSendUplink { input, .. }
         | NirExpr::DataProfileSendDownlink { input, .. } => {
             let window_inner = infer_nir_expr_type(input, bindings, signatures, struct_table)?;
@@ -2711,6 +2936,13 @@ fn infer_nir_expr_type(
         NirExpr::ShaderViewport { .. } => Some(named_type("Viewport")),
         NirExpr::ShaderPipeline { .. } => Some(named_type("Pipeline")),
         NirExpr::ShaderInlineWgsl { .. } => Some(named_type("ShaderModule")),
+        NirExpr::ShaderResult { value, .. } => {
+            let inner = infer_nir_expr_type(value, bindings, signatures, struct_table)?;
+            Some(generic_named_type("ShaderResult", vec![inner]))
+        }
+        NirExpr::ShaderPassReady(_) | NirExpr::ShaderFrameReady(_) => Some(bool_type()),
+        NirExpr::ShaderValue(result) => infer_nir_expr_type(result, bindings, signatures, struct_table)
+            .and_then(|ty| ty.generic_args.first().cloned()),
         NirExpr::ShaderBeginPass { .. } => Some(named_type("Pass")),
         NirExpr::ShaderDrawInstanced { .. } => Some(named_type("Frame")),
         NirExpr::ShaderProfileRender { .. } => Some(named_type("Frame")),
@@ -2968,7 +3200,9 @@ fn render_type_name(ty: &NirTypeRef) -> String {
 #[cfg(test)]
 mod tests {
     use super::parse_nuis_module;
-    use nuis_semantics::model::{NirDataFlowState, NirExpr, NirStmt};
+    use nuis_semantics::model::{
+        NirDataFlowState, NirExpr, NirKernelFlowState, NirShaderFlowState, NirStmt,
+    };
 
     #[test]
     fn infers_struct_field_type_from_shared_type_helper() {
@@ -3397,6 +3631,119 @@ mod tests {
         .unwrap_err();
 
         assert!(error.contains("data_result(...) expects a direct data operation"));
+    }
+
+    #[test]
+    fn lowers_explicit_shader_result_helpers() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let pass_result: ShaderResult<Pass> = shader_result(shader_begin_pass(
+                  shader_target("rgba8", 16, 16),
+                  shader_pipeline("flat", "triangle"),
+                  shader_viewport(16, 16)
+                ));
+                let frame_result: ShaderResult<Frame> = shader_result(shader_profile_render(
+                  "SurfaceShader",
+                  shader_profile_packet("SurfaceShader", 1, 2, 3)
+                ));
+                let ready: bool = shader_frame_ready(frame_result);
+                let frame: Frame = shader_value(frame_result);
+                return 1;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            function.body.first(),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::ShaderResult { state, .. },
+                ..
+            }) if ty.render() == "ShaderResult<Pass>"
+                && matches!(state, NirShaderFlowState::PassReady)
+        ));
+        assert!(matches!(
+            function.body.get(1),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::ShaderResult { state, .. },
+                ..
+            }) if ty.render() == "ShaderResult<Frame>"
+                && matches!(state, NirShaderFlowState::FrameReady)
+        ));
+        assert!(matches!(
+            function.body.get(2),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::ShaderFrameReady(_),
+                ..
+            }) if ty.render() == "bool"
+        ));
+        assert!(matches!(
+            function.body.get(3),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::ShaderValue(_),
+                ..
+            }) if ty.render() == "Frame"
+        ));
+    }
+
+    #[test]
+    fn lowers_explicit_kernel_result_helpers() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let lanes: KernelResult<i64> = kernel_result(kernel_profile_batch_lanes("KernelUnit"));
+                let ready: bool = kernel_config_ready(lanes);
+                let value: i64 = kernel_value(lanes);
+                return value;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            function.body.first(),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::KernelResult { state, .. },
+                ..
+            }) if ty.render() == "KernelResult<i64>"
+                && matches!(state, NirKernelFlowState::ConfigReady)
+        ));
+        assert!(matches!(
+            function.body.get(1),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::KernelConfigReady(_),
+                ..
+            }) if ty.render() == "bool"
+        ));
+        assert!(matches!(
+            function.body.get(2),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::KernelValue(_),
+                ..
+            }) if ty.render() == "i64"
+        ));
     }
 
     #[test]

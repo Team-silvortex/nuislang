@@ -370,7 +370,12 @@ fn verify_expr(
         | NirExpr::DataReady(inner)
         | NirExpr::DataMoved(inner)
         | NirExpr::DataWindowed(inner)
-        | NirExpr::DataValue(inner) => {
+        | NirExpr::DataValue(inner)
+        | NirExpr::ShaderPassReady(inner)
+        | NirExpr::ShaderFrameReady(inner)
+        | NirExpr::ShaderValue(inner)
+        | NirExpr::KernelConfigReady(inner)
+        | NirExpr::KernelValue(inner) => {
             verify_expr(inner, moved, borrows, borrow_bindings, data_bindings)?
         }
         NirExpr::CpuSpawn { args, .. } | NirExpr::CpuExternCall { args, .. } => {
@@ -441,7 +446,9 @@ fn verify_expr(
         NirExpr::DataOutputPipe(inner) | NirExpr::DataInputPipe(inner) => {
             verify_expr(inner, moved, borrows, borrow_bindings, data_bindings)?
         }
-        NirExpr::DataResult { value: inner, .. } => {
+        NirExpr::DataResult { value: inner, .. }
+        | NirExpr::ShaderResult { value: inner, .. }
+        | NirExpr::KernelResult { value: inner, .. } => {
             verify_expr(inner, moved, borrows, borrow_bindings, data_bindings)?
         }
         NirExpr::DataProfileSendUplink { input, .. }
@@ -575,7 +582,12 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
         | NirExpr::DataReady(inner)
         | NirExpr::DataMoved(inner)
         | NirExpr::DataWindowed(inner)
-        | NirExpr::DataValue(inner) => {
+        | NirExpr::DataValue(inner)
+        | NirExpr::ShaderPassReady(inner)
+        | NirExpr::ShaderFrameReady(inner)
+        | NirExpr::ShaderValue(inner)
+        | NirExpr::KernelConfigReady(inner)
+        | NirExpr::KernelValue(inner) => {
             verify_expr_uses(inner, moved)?
         }
         NirExpr::CpuSpawn { args, .. } | NirExpr::CpuExternCall { args, .. } => {
@@ -640,7 +652,11 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
         NirExpr::DataOutputPipe(inner) | NirExpr::DataInputPipe(inner) => {
             verify_expr_uses(inner, moved)?
         }
-        NirExpr::DataResult { value: inner, .. } => verify_expr_uses(inner, moved)?,
+        NirExpr::DataResult { value: inner, .. }
+        | NirExpr::ShaderResult { value: inner, .. }
+        | NirExpr::KernelResult { value: inner, .. } => {
+            verify_expr_uses(inner, moved)?
+        }
         NirExpr::DataProfileSendUplink { input, .. }
         | NirExpr::DataProfileSendDownlink { input, .. } => verify_expr_uses(input, moved)?,
         NirExpr::DataCopyWindow { input, offset, len }

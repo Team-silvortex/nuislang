@@ -1,8 +1,8 @@
 use yir_core::{
     BlendState, DepthState, ExecutionState, FrameSurface, IndexBuffer, InstructionSemantics, Node,
     RasterState, RegisteredMod, RenderPass, RenderPipeline, RenderStateSet, Resource, SamplerState,
-    ShaderBinding, ShaderBindingSet, StructValue, SurfaceTarget, Texture2D, Value, VertexBuffer,
-    VertexLayout, Viewport,
+    ShaderBinding, ShaderBindingSet, ShaderFlowState, ShaderResultHandle, StructValue,
+    SurfaceTarget, Texture2D, Value, VertexBuffer, VertexLayout, Viewport,
 };
 
 pub struct ShaderMod;
@@ -345,6 +345,27 @@ impl RegisteredMod for ShaderMod {
                 }
 
                 Ok(InstructionSemantics::pure(node.op.args.clone()))
+            }
+            "observe" => {
+                if node.op.args.len() != 2 {
+                    return Err(format!(
+                        "node `{}` expects `shader.observe <name> <resource> <input> <state>`",
+                        node.name
+                    ));
+                }
+                parse_shader_flow_state(&node.op.args[1]).map_err(|error| {
+                    format!("node `{}` has invalid shader observe state: {error}", node.name)
+                })?;
+                Ok(InstructionSemantics::pure(vec![node.op.args[0].clone()]))
+            }
+            "is_pass_ready" | "is_frame_ready" | "value" => {
+                if node.op.args.len() != 1 {
+                    return Err(format!(
+                        "node `{}` expects `shader.{} <name> <resource> <result>`",
+                        node.name, node.op.instruction
+                    ));
+                }
+                Ok(InstructionSemantics::pure(vec![node.op.args[0].clone()]))
             }
             "uniform"
             | "storage"
@@ -841,6 +862,26 @@ impl RegisteredMod for ShaderMod {
                     pipeline,
                     viewport,
                 }))
+            }
+            "observe" => {
+                let value = state.expect_value(&node.op.args[0])?.clone();
+                let flow = parse_shader_flow_state(&node.op.args[1])?;
+                Ok(Value::ShaderResult(ShaderResultHandle {
+                    state: flow,
+                    value: Box::new(value),
+                }))
+            }
+            "is_pass_ready" => {
+                let result = state.expect_shader_result(&node.op.args[0])?;
+                Ok(Value::Bool(matches!(result.state, ShaderFlowState::PassReady)))
+            }
+            "is_frame_ready" => {
+                let result = state.expect_shader_result(&node.op.args[0])?;
+                Ok(Value::Bool(matches!(result.state, ShaderFlowState::FrameReady)))
+            }
+            "value" => {
+                let result = state.expect_shader_result(&node.op.args[0])?;
+                Ok((*result.value).clone())
             }
             "clear" => {
                 let target = match state.expect_value(&node.op.args[0])?.clone() {
@@ -1954,6 +1995,14 @@ fn stamp_triangle_fill(
 
 fn edge_function(ax: f32, ay: f32, bx: f32, by: f32, px: f32, py: f32) -> f32 {
     (px - ax) * (by - ay) - (py - ay) * (bx - ax)
+}
+
+fn parse_shader_flow_state(raw: &str) -> Result<ShaderFlowState, String> {
+    match raw {
+        "pass_ready" => Ok(ShaderFlowState::PassReady),
+        "frame_ready" => Ok(ShaderFlowState::FrameReady),
+        other => Err(format!("unknown shader flow state `{other}`")),
+    }
 }
 
 fn unwrap_data_window(value: Value) -> Value {

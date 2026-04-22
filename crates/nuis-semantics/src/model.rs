@@ -758,6 +758,12 @@ pub enum NirExpr {
     KernelProfileBatchLanesRef {
         unit: String,
     },
+    KernelResult {
+        value: Box<NirExpr>,
+        state: NirKernelFlowState,
+    },
+    KernelConfigReady(Box<NirExpr>),
+    KernelValue(Box<NirExpr>),
     DataProfileSendUplink {
         unit: String,
         input: Box<NirExpr>,
@@ -783,6 +789,13 @@ pub enum NirExpr {
         entry: String,
         source: String,
     },
+    ShaderResult {
+        value: Box<NirExpr>,
+        state: NirShaderFlowState,
+    },
+    ShaderPassReady(Box<NirExpr>),
+    ShaderFrameReady(Box<NirExpr>),
+    ShaderValue(Box<NirExpr>),
     ShaderBeginPass {
         target: Box<NirExpr>,
         pipeline: Box<NirExpr>,
@@ -851,6 +864,34 @@ impl NirDataFlowState {
             Self::Ready => "ready",
             Self::Moved => "moved",
             Self::Windowed => "windowed",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NirShaderFlowState {
+    PassReady,
+    FrameReady,
+}
+
+impl NirShaderFlowState {
+    pub fn render(self) -> &'static str {
+        match self {
+            Self::PassReady => "pass_ready",
+            Self::FrameReady => "frame_ready",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NirKernelFlowState {
+    ConfigReady,
+}
+
+impl NirKernelFlowState {
+    pub fn render(self) -> &'static str {
+        match self {
+            Self::ConfigReady => "config_ready",
         }
     }
 }
@@ -949,6 +990,9 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::KernelProfileBindCoreRef { .. }
         | NirExpr::KernelProfileQueueDepthRef { .. }
         | NirExpr::KernelProfileBatchLanesRef { .. }
+        | NirExpr::KernelResult { .. }
+        | NirExpr::KernelConfigReady(_)
+        | NirExpr::KernelValue(_)
         | NirExpr::DataProfileSendUplink { .. }
         | NirExpr::DataProfileSendDownlink { .. }
         | NirExpr::CpuExternCall { .. }
@@ -956,6 +1000,10 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::ShaderViewport { .. }
         | NirExpr::ShaderPipeline { .. }
         | NirExpr::ShaderInlineWgsl { .. }
+        | NirExpr::ShaderResult { .. }
+        | NirExpr::ShaderPassReady(_)
+        | NirExpr::ShaderFrameReady(_)
+        | NirExpr::ShaderValue(_)
         | NirExpr::ShaderBeginPass { .. }
         | NirExpr::ShaderDrawInstanced { .. }
         | NirExpr::ShaderProfileRender { .. } => None,

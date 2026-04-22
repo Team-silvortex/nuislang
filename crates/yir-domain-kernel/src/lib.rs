@@ -1,5 +1,6 @@
 use yir_core::{
-    ExecutionState, InstructionSemantics, Node, RegisteredMod, Resource, TensorValue, Value,
+    ExecutionState, InstructionSemantics, KernelFlowState, KernelResultHandle, Node,
+    RegisteredMod, Resource, TensorValue, Value,
 };
 
 pub struct KernelMod;
@@ -137,6 +138,27 @@ fn describe_kernel_node(node: &Node, resource: &Resource) -> Result<InstructionS
                 )
             })?;
             Ok(InstructionSemantics::pure(Vec::new()))
+        }
+        "observe" => {
+            if node.op.args.len() != 2 {
+                return Err(format!(
+                    "node `{}` expects `kernel.observe <name> <resource> <input> <state>`",
+                    node.name
+                ));
+            }
+            parse_kernel_flow_state(&node.op.args[1]).map_err(|error| {
+                format!("node `{}` has invalid kernel observe state: {error}", node.name)
+            })?;
+            Ok(InstructionSemantics::pure(vec![node.op.args[0].clone()]))
+        }
+        "is_config_ready" | "value" => {
+            if node.op.args.len() != 1 {
+                return Err(format!(
+                    "node `{}` expects `kernel.{} <name> <resource> <result>`",
+                    node.name, node.op.instruction
+                ));
+            }
+            Ok(InstructionSemantics::pure(vec![node.op.args[0].clone()]))
         }
         "tensor" => {
             if node.op.args.len() != 3 {
@@ -418,6 +440,22 @@ fn execute_kernel_node(
                 )
             })?),
         ])),
+        "observe" => {
+            let value = state.expect_value(&node.op.args[0])?.clone();
+            let flow = parse_kernel_flow_state(&node.op.args[1])?;
+            Ok(Value::KernelResult(KernelResultHandle {
+                state: flow,
+                value: Box::new(value),
+            }))
+        }
+        "is_config_ready" => {
+            let result = state.expect_kernel_result(&node.op.args[0])?;
+            Ok(Value::Bool(matches!(result.state, KernelFlowState::ConfigReady)))
+        }
+        "value" => {
+            let result = state.expect_kernel_result(&node.op.args[0])?;
+            Ok((*result.value).clone())
+        }
         "tensor" => Ok(Value::Tensor(parse_tensor_literal(node)?)),
         "fill" => {
             let (rows, cols) = parse_shape(node)?;
@@ -797,6 +835,13 @@ fn require_kernel_resource(node: &Node, resource: &Resource) -> Result<(), Strin
             "node `{}` uses kernel mod on non-kernel resource `{}` ({})",
             node.name, resource.name, resource.kind.raw
         ))
+    }
+}
+
+fn parse_kernel_flow_state(raw: &str) -> Result<KernelFlowState, String> {
+    match raw {
+        "config_ready" => Ok(KernelFlowState::ConfigReady),
+        other => Err(format!("unknown kernel flow state `{other}`")),
     }
 }
 

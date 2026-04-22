@@ -565,6 +565,13 @@ fn render_nir_expr(value: &NirExpr) -> String {
         NirExpr::KernelProfileBatchLanesRef { unit } => {
             format!("kernel_profile_batch_lanes(\"{}\")", escape_debug(unit))
         }
+        NirExpr::KernelResult { value, .. } => {
+            format!("kernel_result({})", render_nir_expr(value))
+        }
+        NirExpr::KernelConfigReady(result) => {
+            format!("kernel_config_ready({})", render_nir_expr(result))
+        }
+        NirExpr::KernelValue(result) => format!("kernel_value({})", render_nir_expr(result)),
         NirExpr::DataProfileSendUplink { unit, input } => format!(
             "data_profile_send_uplink(\"{}\", {})",
             escape_debug(unit),
@@ -616,6 +623,16 @@ fn render_nir_expr(value: &NirExpr) -> String {
             escape_debug(entry),
             escape_debug(source)
         ),
+        NirExpr::ShaderResult { value, .. } => {
+            format!("shader_result({})", render_nir_expr(value))
+        }
+        NirExpr::ShaderPassReady(result) => {
+            format!("shader_pass_ready({})", render_nir_expr(result))
+        }
+        NirExpr::ShaderFrameReady(result) => {
+            format!("shader_frame_ready({})", render_nir_expr(result))
+        }
+        NirExpr::ShaderValue(result) => format!("shader_value({})", render_nir_expr(result)),
         NirExpr::ShaderBeginPass {
             target,
             pipeline,

@@ -1421,12 +1421,20 @@ fn expr_uses_shader_profile_render(expr: &NirExpr, unit: &str) -> bool {
         | NirExpr::DataMoved(inner)
         | NirExpr::DataWindowed(inner)
         | NirExpr::DataValue(inner)
+        | NirExpr::ShaderPassReady(inner)
+        | NirExpr::ShaderFrameReady(inner)
+        | NirExpr::ShaderValue(inner)
+        | NirExpr::KernelConfigReady(inner)
+        | NirExpr::KernelValue(inner)
         | NirExpr::DataOutputPipe(inner)
         | NirExpr::DataInputPipe(inner)
         | NirExpr::CpuPresentFrame(inner)
         | NirExpr::Free(inner)
         | NirExpr::IsNull(inner) => expr_uses_shader_profile_render(inner, unit),
-        NirExpr::DataResult { value: input, .. } => expr_uses_shader_profile_render(input, unit),
+        NirExpr::DataResult { value: input, .. } | NirExpr::ShaderResult { value: input, .. } => {
+            expr_uses_shader_profile_render(input, unit)
+        }
+        NirExpr::KernelResult { value: input, .. } => expr_uses_shader_profile_render(input, unit),
         NirExpr::AllocNode { value, next } => {
             expr_uses_shader_profile_render(value, unit)
                 || expr_uses_shader_profile_render(next, unit)
@@ -1642,13 +1650,21 @@ fn expr_walk_any(expr: &NirExpr, predicate: &dyn Fn(&NirExpr) -> bool) -> bool {
         | NirExpr::DataMoved(inner)
         | NirExpr::DataWindowed(inner)
         | NirExpr::DataValue(inner)
+        | NirExpr::ShaderPassReady(inner)
+        | NirExpr::ShaderFrameReady(inner)
+        | NirExpr::ShaderValue(inner)
+        | NirExpr::KernelConfigReady(inner)
+        | NirExpr::KernelValue(inner)
         | NirExpr::DataOutputPipe(inner)
         | NirExpr::DataInputPipe(inner)
         | NirExpr::CpuPresentFrame(inner)
         | NirExpr::Free(inner)
         | NirExpr::IsNull(inner)
         | NirExpr::FieldAccess { base: inner, .. } => predicate(inner),
-        NirExpr::DataResult { value: inner, .. } => predicate(inner),
+        NirExpr::DataResult { value: inner, .. } | NirExpr::ShaderResult { value: inner, .. } => {
+            predicate(inner)
+        }
+        NirExpr::KernelResult { value: inner, .. } => predicate(inner),
         NirExpr::AllocNode { value, next } => predicate(value) || predicate(next),
         NirExpr::AllocBuffer { len, fill } => predicate(len) || predicate(fill),
         NirExpr::LoadAt { buffer, index } => predicate(buffer) || predicate(index),

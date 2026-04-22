@@ -136,6 +136,13 @@ pub enum SemanticOp {
     DataMarker,
     DataHandleTable,
     DataBindCore,
+    ShaderObserve,
+    ShaderIsPassReady,
+    ShaderIsFrameReady,
+    ShaderValue,
+    KernelObserve,
+    KernelIsConfigReady,
+    KernelValue,
     ShaderBeginPass,
     ShaderDrawInstanced,
     ShaderPipeline,
@@ -227,10 +234,17 @@ impl Operation {
             (OperationDomainFamily::Data, "marker") => SemanticOp::DataMarker,
             (OperationDomainFamily::Data, "handle_table") => SemanticOp::DataHandleTable,
             (OperationDomainFamily::Data, "bind_core") => SemanticOp::DataBindCore,
+            (OperationDomainFamily::Shader, "observe") => SemanticOp::ShaderObserve,
+            (OperationDomainFamily::Shader, "is_pass_ready") => SemanticOp::ShaderIsPassReady,
+            (OperationDomainFamily::Shader, "is_frame_ready") => SemanticOp::ShaderIsFrameReady,
+            (OperationDomainFamily::Shader, "value") => SemanticOp::ShaderValue,
             (OperationDomainFamily::Shader, "begin_pass") => SemanticOp::ShaderBeginPass,
             (OperationDomainFamily::Shader, "draw_instanced") => SemanticOp::ShaderDrawInstanced,
             (OperationDomainFamily::Shader, "pipeline") => SemanticOp::ShaderPipeline,
             (OperationDomainFamily::Shader, "inline_wgsl") => SemanticOp::ShaderInlineWgsl,
+            (OperationDomainFamily::Kernel, "observe") => SemanticOp::KernelObserve,
+            (OperationDomainFamily::Kernel, "is_config_ready") => SemanticOp::KernelIsConfigReady,
+            (OperationDomainFamily::Kernel, "value") => SemanticOp::KernelValue,
             _ => SemanticOp::Other,
         }
     }
@@ -384,6 +398,8 @@ pub enum Value {
     DataMarker(DataMarker),
     DataHandleTable(DataHandleTable),
     DataCoreBinding(DataCoreBinding),
+    ShaderResult(ShaderResultHandle),
+    KernelResult(KernelResultHandle),
     Target(SurfaceTarget),
     Viewport(Viewport),
     Pipeline(RenderPipeline),
@@ -611,6 +627,29 @@ pub enum DataFlowState {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShaderResultHandle {
+    pub state: ShaderFlowState,
+    pub value: Box<Value>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ShaderFlowState {
+    PassReady,
+    FrameReady,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KernelResultHandle {
+    pub state: KernelFlowState,
+    pub value: Box<Value>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KernelFlowState {
+    ConfigReady,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SurfaceTarget {
     pub format: String,
     pub width: usize,
@@ -779,6 +818,8 @@ impl fmt::Display for Value {
             Self::DataMarker(marker) => write!(f, "{marker}"),
             Self::DataHandleTable(table) => write!(f, "{table}"),
             Self::DataCoreBinding(binding) => write!(f, "{binding}"),
+            Self::ShaderResult(result) => write!(f, "{result}"),
+            Self::KernelResult(result) => write!(f, "{result}"),
             Self::Target(target) => write!(f, "{target}"),
             Self::Viewport(viewport) => write!(f, "{viewport}"),
             Self::Pipeline(pipeline) => write!(f, "{pipeline}"),
@@ -837,6 +878,35 @@ impl fmt::Display for DataFlowState {
             Self::Ready => f.write_str("ready"),
             Self::Moved => f.write_str("moved"),
             Self::Windowed => f.write_str("windowed"),
+        }
+    }
+}
+
+impl fmt::Display for ShaderResultHandle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "shader_result<{}:{}>", self.state, self.value)
+    }
+}
+
+impl fmt::Display for ShaderFlowState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::PassReady => f.write_str("pass_ready"),
+            Self::FrameReady => f.write_str("frame_ready"),
+        }
+    }
+}
+
+impl fmt::Display for KernelResultHandle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "kernel_result<{}:{}>", self.state, self.value)
+    }
+}
+
+impl fmt::Display for KernelFlowState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ConfigReady => f.write_str("config_ready"),
         }
     }
 }
@@ -1165,6 +1235,8 @@ impl ExecutionState {
             Some(Value::DataCoreBinding(_)) => {
                 Err(format!("`{name}` is core-binding, expected int"))
             }
+            Some(Value::ShaderResult(_)) => Err(format!("`{name}` is shader-result, expected int")),
+            Some(Value::KernelResult(_)) => Err(format!("`{name}` is kernel-result, expected int")),
             Some(Value::Target(_)) => Err(format!("`{name}` is target, expected int")),
             Some(Value::Viewport(_)) => Err(format!("`{name}` is viewport, expected int")),
             Some(Value::Pipeline(_)) => Err(format!("`{name}` is pipeline, expected int")),
@@ -1270,6 +1342,22 @@ impl ExecutionState {
         match self.values.get(name) {
             Some(Value::DataResult(result)) => Ok(result),
             Some(other) => Err(format!("`{name}` is {other}, expected data-result")),
+            None => Err(format!("missing value for `{name}`")),
+        }
+    }
+
+    pub fn expect_shader_result(&self, name: &str) -> Result<&ShaderResultHandle, String> {
+        match self.values.get(name) {
+            Some(Value::ShaderResult(result)) => Ok(result),
+            Some(other) => Err(format!("`{name}` is {other}, expected shader-result")),
+            None => Err(format!("missing value for `{name}`")),
+        }
+    }
+
+    pub fn expect_kernel_result(&self, name: &str) -> Result<&KernelResultHandle, String> {
+        match self.values.get(name) {
+            Some(Value::KernelResult(result)) => Ok(result),
+            Some(other) => Err(format!("`{name}` is {other}, expected kernel-result")),
             None => Err(format!("missing value for `{name}`")),
         }
     }
