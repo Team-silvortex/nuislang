@@ -1,7 +1,8 @@
 use std::env;
 
 use yir_core::{
-    ExecutionState, InstructionSemantics, Node, RegisteredMod, Resource, StructValue, Value,
+    ExecutionState, InstructionSemantics, Node, RegisteredMod, Resource, StructValue,
+    TaskLifecycleState, Value,
 };
 
 pub struct CpuMod;
@@ -635,19 +636,18 @@ impl RegisteredMod for CpuMod {
                     label: format!("{callee}@{}", node.name),
                     result: Box::new(result),
                     limit: None,
-                    cancelled: false,
+                    state: TaskLifecycleState::Pending,
                 }))
             }
             "join" => {
                 let task = state.expect_task(&node.op.args[0])?;
                 let label = task.label.clone();
                 let result = (*task.result).clone();
-                let cancelled = task.cancelled;
-                let limit = task.limit;
-                if cancelled {
+                let lifecycle = task_lifecycle_state(task);
+                if lifecycle == TaskLifecycleState::Cancelled {
                     return Err(format!("task `{label}` was cancelled before join"));
                 }
-                if matches!(limit, Some(limit) if limit <= 0) {
+                if lifecycle == TaskLifecycleState::TimedOut {
                     return Err(format!("task `{label}` timed out before join"));
                 }
                 state.push_resource_event(
@@ -675,22 +675,14 @@ impl RegisteredMod for CpuMod {
                     label,
                     result: Box::new(result),
                     limit,
-                    cancelled: true,
+                    state: TaskLifecycleState::Cancelled,
                 }))
             }
             "join_result" => {
                 let task = state.expect_task(&node.op.args[0])?;
                 let label = task.label.clone();
-                let cancelled = task.cancelled;
-                let limit = task.limit;
-                let state_name = if cancelled {
-                    "cancelled"
-                } else if matches!(limit, Some(limit) if limit <= 0) {
-                    "timed_out"
-                } else {
-                    "completed"
-                };
-                let result = if state_name == "completed" {
+                let lifecycle = task_lifecycle_state(task);
+                let result = if lifecycle == TaskLifecycleState::Completed {
                     Some(task.result.clone())
                 } else {
                     None
@@ -699,26 +691,26 @@ impl RegisteredMod for CpuMod {
                     resource,
                     format!(
                         "effect cpu.join_result @{} [{}]: {} => {}",
-                        node.resource, resource.kind.raw, label, state_name
+                        node.resource, resource.kind.raw, label, lifecycle
                     ),
                 );
                 Ok(Value::TaskResult(yir_core::TaskResultHandle {
                     label,
-                    state: state_name.to_owned(),
+                    state: lifecycle,
                     result,
                 }))
             }
             "task_completed" => {
                 let result = state.expect_task_result(&node.op.args[0])?;
-                Ok(Value::Bool(result.state == "completed"))
+                Ok(Value::Bool(result.state == TaskLifecycleState::Completed))
             }
             "task_timed_out" => {
                 let result = state.expect_task_result(&node.op.args[0])?;
-                Ok(Value::Bool(result.state == "timed_out"))
+                Ok(Value::Bool(result.state == TaskLifecycleState::TimedOut))
             }
             "task_cancelled" => {
                 let result = state.expect_task_result(&node.op.args[0])?;
-                Ok(Value::Bool(result.state == "cancelled"))
+                Ok(Value::Bool(result.state == TaskLifecycleState::Cancelled))
             }
             "task_value" => {
                 let result = state.expect_task_result(&node.op.args[0])?;
@@ -734,7 +726,7 @@ impl RegisteredMod for CpuMod {
                 let label = task.label.clone();
                 let result = (*task.result).clone();
                 let limit = state.expect_int(&node.op.args[1])?;
-                let cancelled = task.cancelled;
+                let lifecycle = task_lifecycle_state(task);
                 state.push_resource_event(
                     resource,
                     format!(
@@ -746,7 +738,7 @@ impl RegisteredMod for CpuMod {
                     label,
                     result: Box::new(result),
                     limit: Some(limit),
-                    cancelled,
+                    state: lifecycle,
                 }))
             }
             "await" => {
@@ -1345,6 +1337,21 @@ fn unwrap_present_frame_payload(value: Value) -> Value {
     match value {
         Value::DataWindow(window) => (*window.base).clone(),
         other => other,
+    }
+}
+
+fn task_lifecycle_state(task: &yir_core::TaskHandle) -> TaskLifecycleState {
+    match task.state {
+        TaskLifecycleState::Cancelled => TaskLifecycleState::Cancelled,
+        TaskLifecycleState::TimedOut => TaskLifecycleState::TimedOut,
+        TaskLifecycleState::Completed => TaskLifecycleState::Completed,
+        TaskLifecycleState::Pending => {
+            if matches!(task.limit, Some(limit) if limit <= 0) {
+                TaskLifecycleState::TimedOut
+            } else {
+                TaskLifecycleState::Completed
+            }
+        }
     }
 }
 

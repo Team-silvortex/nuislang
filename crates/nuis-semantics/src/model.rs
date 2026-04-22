@@ -620,6 +620,14 @@ pub enum NirExpr {
     DataMarker(String),
     DataOutputPipe(Box<NirExpr>),
     DataInputPipe(Box<NirExpr>),
+    DataResult {
+        value: Box<NirExpr>,
+        state: NirDataFlowState,
+    },
+    DataReady(Box<NirExpr>),
+    DataMoved(Box<NirExpr>),
+    DataWindowed(Box<NirExpr>),
+    DataValue(Box<NirExpr>),
     DataCopyWindow {
         input: Box<NirExpr>,
         offset: Box<NirExpr>,
@@ -830,6 +838,23 @@ pub enum NirBinaryOp {
     Div,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NirDataFlowState {
+    Ready,
+    Moved,
+    Windowed,
+}
+
+impl NirDataFlowState {
+    pub fn render(self) -> &'static str {
+        match self {
+            Self::Ready => "ready",
+            Self::Moved => "moved",
+            Self::Windowed => "windowed",
+        }
+    }
+}
+
 pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
     match expr {
         NirExpr::Null
@@ -880,6 +905,11 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         NirExpr::DataBindCore(_)
         | NirExpr::DataMarker(_)
         | NirExpr::DataHandleTable(_)
+        | NirExpr::DataResult { .. }
+        | NirExpr::DataReady(_)
+        | NirExpr::DataMoved(_)
+        | NirExpr::DataWindowed(_)
+        | NirExpr::DataValue(_)
         | NirExpr::CpuBindCore(_)
         | NirExpr::CpuWindow { .. }
         | NirExpr::CpuInputI64 { .. }

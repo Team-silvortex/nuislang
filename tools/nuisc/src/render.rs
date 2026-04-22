@@ -363,6 +363,11 @@ fn render_nir_expr(value: &NirExpr) -> String {
         NirExpr::DataMarker(tag) => format!("data_marker(\"{}\")", escape_debug(tag)),
         NirExpr::DataOutputPipe(value) => format!("data_output_pipe({})", render_nir_expr(value)),
         NirExpr::DataInputPipe(value) => format!("data_input_pipe({})", render_nir_expr(value)),
+        NirExpr::DataResult { value, .. } => format!("data_result({})", render_nir_expr(value)),
+        NirExpr::DataReady(result) => format!("data_ready({})", render_nir_expr(result)),
+        NirExpr::DataMoved(result) => format!("data_moved({})", render_nir_expr(result)),
+        NirExpr::DataWindowed(result) => format!("data_windowed({})", render_nir_expr(result)),
+        NirExpr::DataValue(result) => format!("data_value({})", render_nir_expr(result)),
         NirExpr::DataCopyWindow { input, offset, len } => format!(
             "data_copy_window({}, {}, {})",
             render_nir_expr(input),

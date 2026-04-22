@@ -625,6 +625,34 @@ fn lower_expr(
             });
             Ok(name)
         }
+        NirExpr::DataResult { value, state: flow } => {
+            ensure_fabric_resource(state.yir);
+            let value_name = lower_expr(value, state, bindings)?;
+            let name = next_name(state, "data_result");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "fabric0".to_owned(),
+                op: Operation {
+                    module: "data".to_owned(),
+                    instruction: "observe".to_owned(),
+                    args: vec![value_name.clone(), flow.render().to_owned()],
+                },
+            });
+            push_dep_edges(state, &value_name, &name);
+            Ok(name)
+        }
+        NirExpr::DataReady(result) => {
+            lower_data_unary_value_effect(state, bindings, result, "data_ready", "is_ready")
+        }
+        NirExpr::DataMoved(result) => {
+            lower_data_unary_value_effect(state, bindings, result, "data_moved", "is_moved")
+        }
+        NirExpr::DataWindowed(result) => {
+            lower_data_unary_value_effect(state, bindings, result, "data_windowed", "is_windowed")
+        }
+        NirExpr::DataValue(result) => {
+            lower_data_unary_value_effect(state, bindings, result, "data_value", "value")
+        }
         NirExpr::DataCopyWindow { input, offset, len } => {
             ensure_fabric_resource(state.yir);
             let input_name = lower_expr(input, state, bindings)?;
@@ -1569,6 +1597,29 @@ fn lower_cpu_unary_value_effect(
     Ok(name)
 }
 
+fn lower_data_unary_value_effect(
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+    input: &NirExpr,
+    prefix: &str,
+    instruction: &str,
+) -> Result<String, String> {
+    ensure_fabric_resource(state.yir);
+    let input_name = lower_expr(input, state, bindings)?;
+    let name = next_name(state, prefix);
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "fabric0".to_owned(),
+        op: Operation {
+            module: "data".to_owned(),
+            instruction: instruction.to_owned(),
+            args: vec![input_name.clone()],
+        },
+    });
+    push_dep_edges(state, &input_name, &name);
+    Ok(name)
+}
+
 fn next_name(state: &mut LoweringState<'_>, prefix: &str) -> String {
     let name = format!("{prefix}_{}", state.value_counter);
     state.value_counter += 1;
@@ -1910,6 +1961,36 @@ mod tests {
             .nodes
             .iter()
             .any(|node| node.op.module == "cpu" && node.op.instruction == "timeout"));
+    }
+
+    #[test]
+    fn lowers_data_result_primitives_into_data_nodes() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let result: DataResult<Pipe<i64>> = data_result(data_output_pipe(7));
+                let moved: bool = data_moved(result);
+                return data_value(result);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "data" && node.op.instruction == "observe"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "data" && node.op.instruction == "is_moved"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "data" && node.op.instruction == "value"));
     }
 
     #[test]

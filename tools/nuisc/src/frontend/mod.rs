@@ -5,8 +5,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{
     AstBinaryOp, AstExpr, AstFunction, AstModule, AstParam, AstStmt, AstTypeRef, NirBinaryOp,
-    NirExpr, NirExternFunction, NirExternInterface, NirFunction, NirModule, NirParam, NirStmt,
-    NirStructDef, NirStructField, NirTypeRef, NirUse,
+    NirDataFlowState, NirExpr, NirExternFunction, NirExternInterface, NirFunction, NirModule,
+    NirParam, NirStmt, NirStructDef, NirStructField, NirTypeRef, NirUse,
 };
 
 pub fn frontend_name() -> &'static str {
@@ -1284,6 +1284,94 @@ fn lower_call_expr_with_async(
             )?;
             Ok(NirExpr::DataInputPipe(Box::new(lowered)))
         }
+        "data_result" => {
+            let [value] = args else {
+                return Err("data_result(...) expects exactly one data-domain expression".to_owned());
+            };
+            let lowered = lower_nested_expr_with_async(
+                value,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            let Some(state) = infer_data_result_state(&lowered) else {
+                return Err(
+                    "data_result(...) expects a direct data operation like pipe/window/profile send"
+                        .to_owned(),
+                );
+            };
+            Ok(NirExpr::DataResult {
+                value: Box::new(lowered),
+                state,
+            })
+        }
+        "data_ready" => {
+            let [result] = args else {
+                return Err("data_ready(...) expects exactly one data result".to_owned());
+            };
+            let lowered = lower_nested_expr_with_async(
+                result,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            ensure_data_result_like("data_ready", &lowered, bindings, signatures, struct_table)?;
+            Ok(NirExpr::DataReady(Box::new(lowered)))
+        }
+        "data_moved" => {
+            let [result] = args else {
+                return Err("data_moved(...) expects exactly one data result".to_owned());
+            };
+            let lowered = lower_nested_expr_with_async(
+                result,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            ensure_data_result_like("data_moved", &lowered, bindings, signatures, struct_table)?;
+            Ok(NirExpr::DataMoved(Box::new(lowered)))
+        }
+        "data_windowed" => {
+            let [result] = args else {
+                return Err("data_windowed(...) expects exactly one data result".to_owned());
+            };
+            let lowered = lower_nested_expr_with_async(
+                result,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            ensure_data_result_like("data_windowed", &lowered, bindings, signatures, struct_table)?;
+            Ok(NirExpr::DataWindowed(Box::new(lowered)))
+        }
+        "data_value" => {
+            let [result] = args else {
+                return Err("data_value(...) expects exactly one data result".to_owned());
+            };
+            let lowered = lower_nested_expr_with_async(
+                result,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            ensure_data_result_like("data_value", &lowered, bindings, signatures, struct_table)?;
+            Ok(NirExpr::DataValue(Box::new(lowered)))
+        }
         "data_copy_window" => {
             let [input, offset, len] = args else {
                 return Err("data_copy_window(...) expects 3 args".to_owned());
@@ -2495,6 +2583,40 @@ fn ensure_task_result_like(
     }
 }
 
+fn ensure_data_result_like(
+    name: &str,
+    expr: &NirExpr,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> Result<(), String> {
+    match infer_nir_expr_type(expr, bindings, signatures, struct_table) {
+        Some(ty) if ty.is_generic_named("DataResult", 1) => Ok(()),
+        Some(ty) => Err(format!(
+            "{name}(...) expects `DataResult<...>`, found `{}`",
+            render_type_name(&ty)
+        )),
+        None => Err(format!(
+            "{name}(...) requires a typed data result in the current frontend"
+        )),
+    }
+}
+
+fn infer_data_result_state(expr: &NirExpr) -> Option<NirDataFlowState> {
+    match expr {
+        NirExpr::DataBindCore(_)
+        | NirExpr::DataMarker(_)
+        | NirExpr::DataHandleTable(_)
+        | NirExpr::DataInputPipe(_) => Some(NirDataFlowState::Ready),
+        NirExpr::DataOutputPipe(_) => Some(NirDataFlowState::Moved),
+        NirExpr::DataCopyWindow { .. }
+        | NirExpr::DataImmutableWindow { .. }
+        | NirExpr::DataProfileSendUplink { .. }
+        | NirExpr::DataProfileSendDownlink { .. } => Some(NirDataFlowState::Windowed),
+        _ => None,
+    }
+}
+
 fn infer_nir_expr_type(
     expr: &NirExpr,
     bindings: &BTreeMap<String, NirTypeRef>,
@@ -2571,6 +2693,15 @@ fn infer_nir_expr_type(
             let window_inner = infer_nir_expr_type(input, bindings, signatures, struct_table)?;
             Some(generic_named_type("Window", vec![window_inner]))
         }
+        NirExpr::DataResult { value, .. } => {
+            let inner = infer_nir_expr_type(value, bindings, signatures, struct_table)?;
+            Some(generic_named_type("DataResult", vec![inner]))
+        }
+        NirExpr::DataReady(_) | NirExpr::DataMoved(_) | NirExpr::DataWindowed(_) => {
+            Some(bool_type())
+        }
+        NirExpr::DataValue(result) => infer_nir_expr_type(result, bindings, signatures, struct_table)
+            .and_then(|ty| ty.generic_args.first().cloned()),
         NirExpr::CpuExternCall { callee, .. } => signatures
             .get(callee)
             .and_then(|sig| sig.return_type.clone()),
@@ -2837,7 +2968,7 @@ fn render_type_name(ty: &NirTypeRef) -> String {
 #[cfg(test)]
 mod tests {
     use super::parse_nuis_module;
-    use nuis_semantics::model::{NirExpr, NirStmt};
+    use nuis_semantics::model::{NirDataFlowState, NirExpr, NirStmt};
 
     #[test]
     fn infers_struct_field_type_from_shared_type_helper() {
@@ -3190,6 +3321,82 @@ mod tests {
         .unwrap_err();
 
         assert!(error.contains("expects `Task<...>`"));
+    }
+
+    #[test]
+    fn lowers_explicit_data_result_helpers() {
+        let module = parse_nuis_module(
+            r#"
+            mod data FabricPlane {
+              fn main() -> i64 {
+                let pipe_result: DataResult<Pipe<i64>> = data_result(data_output_pipe(7));
+                let moved: bool = data_moved(pipe_result);
+                let intake: DataResult<i64> = data_result(data_input_pipe(data_output_pipe(9)));
+                let ready: bool = data_ready(intake);
+                let value: i64 = data_value(intake);
+                return value;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            function.body.first(),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::DataResult { state, .. },
+                ..
+            }) if ty.render() == "DataResult<Pipe<i64>>"
+                && matches!(state, NirDataFlowState::Moved)
+        ));
+        assert!(matches!(
+            function.body.get(1),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::DataMoved(_),
+                ..
+            }) if ty.render() == "bool"
+        ));
+        assert!(matches!(
+            function.body.get(2),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::DataResult { state, .. },
+                ..
+            }) if ty.render() == "DataResult<i64>"
+                && matches!(state, NirDataFlowState::Ready)
+        ));
+        assert!(matches!(
+            function.body.get(4),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::DataValue(_),
+                ..
+            }) if ty.render() == "i64"
+        ));
+    }
+
+    #[test]
+    fn rejects_data_result_of_non_data_operation() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let result: DataResult<i64> = data_result(7);
+                return data_value(result);
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("data_result(...) expects a direct data operation"));
     }
 
     #[test]

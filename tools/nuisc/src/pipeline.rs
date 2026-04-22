@@ -266,6 +266,10 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         | NirExpr::CpuTaskTimedOut(inner)
         | NirExpr::CpuTaskCancelled(inner)
         | NirExpr::CpuTaskValue(inner)
+        | NirExpr::DataReady(inner)
+        | NirExpr::DataMoved(inner)
+        | NirExpr::DataWindowed(inner)
+        | NirExpr::DataValue(inner)
         | NirExpr::DataOutputPipe(inner)
         | NirExpr::DataInputPipe(inner)
         | NirExpr::CpuPresentFrame(inner)
@@ -330,6 +334,7 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
             collect_instantiated_units_expr(index, units);
             collect_instantiated_units_expr(value, units);
         }
+        NirExpr::DataResult { value: input, .. } => collect_instantiated_units_expr(input, units),
         NirExpr::DataCopyWindow { input, offset, len }
         | NirExpr::DataImmutableWindow { input, offset, len } => {
             collect_instantiated_units_expr(input, units);

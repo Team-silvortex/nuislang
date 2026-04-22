@@ -633,6 +633,10 @@ fn walk_child_exprs(expr: &NirExpr, f: &mut dyn FnMut(&NirExpr)) {
         | NirExpr::CpuTaskTimedOut(inner)
         | NirExpr::CpuTaskCancelled(inner)
         | NirExpr::CpuTaskValue(inner)
+        | NirExpr::DataReady(inner)
+        | NirExpr::DataMoved(inner)
+        | NirExpr::DataWindowed(inner)
+        | NirExpr::DataValue(inner)
         | NirExpr::DataOutputPipe(inner)
         | NirExpr::DataInputPipe(inner)
         | NirExpr::CpuPresentFrame(inner)
@@ -667,6 +671,7 @@ fn walk_child_exprs(expr: &NirExpr, f: &mut dyn FnMut(&NirExpr)) {
             f(index);
             f(value);
         }
+        NirExpr::DataResult { value: input, .. } => f(input),
         NirExpr::DataCopyWindow { input, offset, len }
         | NirExpr::DataImmutableWindow { input, offset, len } => {
             f(input);

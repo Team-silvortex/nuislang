@@ -128,6 +128,11 @@ pub enum SemanticOp {
     DataImmutableWindow,
     DataOutputPipe,
     DataInputPipe,
+    DataObserve,
+    DataIsReady,
+    DataIsMoved,
+    DataIsWindowed,
+    DataValue,
     DataMarker,
     DataHandleTable,
     DataBindCore,
@@ -214,6 +219,11 @@ impl Operation {
             (OperationDomainFamily::Data, "immutable_window") => SemanticOp::DataImmutableWindow,
             (OperationDomainFamily::Data, "output_pipe") => SemanticOp::DataOutputPipe,
             (OperationDomainFamily::Data, "input_pipe") => SemanticOp::DataInputPipe,
+            (OperationDomainFamily::Data, "observe") => SemanticOp::DataObserve,
+            (OperationDomainFamily::Data, "is_ready") => SemanticOp::DataIsReady,
+            (OperationDomainFamily::Data, "is_moved") => SemanticOp::DataIsMoved,
+            (OperationDomainFamily::Data, "is_windowed") => SemanticOp::DataIsWindowed,
+            (OperationDomainFamily::Data, "value") => SemanticOp::DataValue,
             (OperationDomainFamily::Data, "marker") => SemanticOp::DataMarker,
             (OperationDomainFamily::Data, "handle_table") => SemanticOp::DataHandleTable,
             (OperationDomainFamily::Data, "bind_core") => SemanticOp::DataBindCore,
@@ -370,6 +380,7 @@ pub enum Value {
     Struct(StructValue),
     DataWindow(DataWindow),
     DataPipe(DataPipe),
+    DataResult(DataResultHandle),
     DataMarker(DataMarker),
     DataHandleTable(DataHandleTable),
     DataCoreBinding(DataCoreBinding),
@@ -587,6 +598,19 @@ pub struct DataCoreBinding {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DataResultHandle {
+    pub state: DataFlowState,
+    pub value: Box<Value>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DataFlowState {
+    Ready,
+    Moved,
+    Windowed,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SurfaceTarget {
     pub format: String,
     pub width: usize,
@@ -706,14 +730,22 @@ pub struct TaskHandle {
     pub label: String,
     pub result: Box<Value>,
     pub limit: Option<i64>,
-    pub cancelled: bool,
+    pub state: TaskLifecycleState,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TaskResultHandle {
     pub label: String,
-    pub state: String,
+    pub state: TaskLifecycleState,
     pub result: Option<Box<Value>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TaskLifecycleState {
+    Pending,
+    Completed,
+    TimedOut,
+    Cancelled,
 }
 
 impl fmt::Display for Value {
@@ -743,6 +775,7 @@ impl fmt::Display for Value {
             Self::Struct(value) => write!(f, "{value}"),
             Self::DataWindow(window) => write!(f, "{window}"),
             Self::DataPipe(pipe) => write!(f, "{pipe}"),
+            Self::DataResult(result) => write!(f, "{result}"),
             Self::DataMarker(marker) => write!(f, "{marker}"),
             Self::DataHandleTable(table) => write!(f, "{table}"),
             Self::DataCoreBinding(binding) => write!(f, "{binding}"),
@@ -764,17 +797,46 @@ impl fmt::Display for Value {
             Self::Frame(frame) => write!(f, "{frame}"),
             Self::Task(task) => match task.limit {
                 Some(limit) => {
-                    if task.cancelled {
+                    if matches!(task.state, TaskLifecycleState::Cancelled) {
                         write!(f, "task<{}; cancelled; limit={limit}>", task.label)
                     } else {
                         write!(f, "task<{}; limit={limit}>", task.label)
                     }
                 }
-                None if task.cancelled => write!(f, "task<cancelled; {}>", task.label),
+                None if matches!(task.state, TaskLifecycleState::Cancelled) => {
+                    write!(f, "task<cancelled; {}>", task.label)
+                }
                 None => write!(f, "task<{}>", task.label),
             },
             Self::TaskResult(result) => write!(f, "task_result<{}:{}>", result.label, result.state),
             Self::Unit => write!(f, "()"),
+        }
+    }
+}
+
+impl fmt::Display for TaskLifecycleState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Pending => f.write_str("pending"),
+            Self::Completed => f.write_str("completed"),
+            Self::TimedOut => f.write_str("timed_out"),
+            Self::Cancelled => f.write_str("cancelled"),
+        }
+    }
+}
+
+impl fmt::Display for DataResultHandle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "data_result<{}:{}>", self.state, self.value)
+    }
+}
+
+impl fmt::Display for DataFlowState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Ready => f.write_str("ready"),
+            Self::Moved => f.write_str("moved"),
+            Self::Windowed => f.write_str("windowed"),
         }
     }
 }
@@ -1095,6 +1157,7 @@ impl ExecutionState {
             Some(Value::Struct(_)) => Err(format!("`{name}` is struct, expected int")),
             Some(Value::DataWindow(_)) => Err(format!("`{name}` is window, expected int")),
             Some(Value::DataPipe(_)) => Err(format!("`{name}` is pipe, expected int")),
+            Some(Value::DataResult(_)) => Err(format!("`{name}` is data-result, expected int")),
             Some(Value::DataMarker(_)) => Err(format!("`{name}` is marker, expected int")),
             Some(Value::DataHandleTable(_)) => {
                 Err(format!("`{name}` is handle-table, expected int"))
@@ -1199,6 +1262,14 @@ impl ExecutionState {
         match self.values.get(name) {
             Some(Value::TaskResult(result)) => Ok(result),
             Some(other) => Err(format!("`{name}` is {other}, expected task-result")),
+            None => Err(format!("missing value for `{name}`")),
+        }
+    }
+
+    pub fn expect_data_result(&self, name: &str) -> Result<&DataResultHandle, String> {
+        match self.values.get(name) {
+            Some(Value::DataResult(result)) => Ok(result),
+            Some(other) => Err(format!("`{name}` is {other}, expected data-result")),
             None => Err(format!("missing value for `{name}`")),
         }
     }
@@ -1411,6 +1482,27 @@ impl RegisteredMod for DataMod {
                 }
                 Ok(InstructionSemantics::effect(vec![node.op.args[0].clone()]))
             }
+            "observe" => {
+                if node.op.args.len() != 2 {
+                    return Err(format!(
+                        "node `{}` expects `data.observe <name> <resource> <input> <state>`",
+                        node.name
+                    ));
+                }
+                parse_data_flow_state(&node.op.args[1]).map_err(|error| {
+                    format!("node `{}` has invalid data observe state: {error}", node.name)
+                })?;
+                Ok(InstructionSemantics::pure(vec![node.op.args[0].clone()]))
+            }
+            "is_ready" | "is_moved" | "is_windowed" | "value" => {
+                if node.op.args.len() != 1 {
+                    return Err(format!(
+                        "node `{}` expects `data.{} <name> <resource> <result>`",
+                        node.name, node.op.instruction
+                    ));
+                }
+                Ok(InstructionSemantics::pure(vec![node.op.args[0].clone()]))
+            }
             "handle_table" => {
                 if node.op.args.is_empty() {
                     return Err(format!(
@@ -1541,6 +1633,30 @@ impl RegisteredMod for DataMod {
                     )),
                 }
             }
+            "observe" => {
+                let value = state.expect_value(&node.op.args[0])?.clone();
+                let flow = parse_data_flow_state(&node.op.args[1])?;
+                Ok(Value::DataResult(DataResultHandle {
+                    state: flow,
+                    value: Box::new(value),
+                }))
+            }
+            "is_ready" => {
+                let result = state.expect_data_result(&node.op.args[0])?;
+                Ok(Value::Bool(matches!(result.state, DataFlowState::Ready)))
+            }
+            "is_moved" => {
+                let result = state.expect_data_result(&node.op.args[0])?;
+                Ok(Value::Bool(matches!(result.state, DataFlowState::Moved)))
+            }
+            "is_windowed" => {
+                let result = state.expect_data_result(&node.op.args[0])?;
+                Ok(Value::Bool(matches!(result.state, DataFlowState::Windowed)))
+            }
+            "value" => {
+                let result = state.expect_data_result(&node.op.args[0])?;
+                Ok((*result.value).clone())
+            }
             "handle_table" => {
                 let mut entries = Vec::with_capacity(node.op.args.len());
                 for entry in &node.op.args {
@@ -1595,10 +1711,20 @@ fn require_data_resource(node: &Node, resource: &Resource) -> Result<(), String>
     }
 }
 
+fn parse_data_flow_state(raw: &str) -> Result<DataFlowState, String> {
+    match raw {
+        "ready" => Ok(DataFlowState::Ready),
+        "moved" => Ok(DataFlowState::Moved),
+        "windowed" => Ok(DataFlowState::Windowed),
+        other => Err(format!("unknown data flow state `{other}`")),
+    }
+}
+
 fn is_move_value_legal(value: &Value) -> bool {
     match value {
         Value::DataWindow(_)
         | Value::DataPipe(_)
+        | Value::DataResult(_)
         | Value::DataMarker(_)
         | Value::DataHandleTable(_) => false,
         Value::Tuple(items) => items.iter().all(is_move_value_legal),
@@ -1612,7 +1738,10 @@ fn is_move_value_legal(value: &Value) -> bool {
 
 fn is_window_base_legal(value: &Value) -> bool {
     match value {
-        Value::DataHandleTable(_) | Value::DataMarker(_) | Value::DataPipe(_) => false,
+        Value::DataHandleTable(_)
+        | Value::DataMarker(_)
+        | Value::DataPipe(_)
+        | Value::DataResult(_) => false,
         Value::Tuple(items) => items.iter().all(is_move_value_legal),
         Value::Struct(value) => value
             .fields
@@ -1624,7 +1753,7 @@ fn is_window_base_legal(value: &Value) -> bool {
 
 fn is_pipe_payload_legal(value: &Value) -> bool {
     match value {
-        Value::DataPipe(_) => false,
+        Value::DataPipe(_) | Value::DataResult(_) => false,
         Value::Tuple(items) => items.iter().all(is_move_value_legal),
         Value::Struct(value) => value
             .fields
