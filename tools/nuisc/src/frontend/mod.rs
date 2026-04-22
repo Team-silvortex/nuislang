@@ -6,8 +6,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use nuis_semantics::model::{
     AstBinaryOp, AstExpr, AstFunction, AstModule, AstParam, AstStmt, AstTypeRef, NirBinaryOp,
     NirDataFlowState, NirExpr, NirExternFunction, NirExternInterface, NirFunction, NirModule,
-    NirKernelFlowState, NirParam, NirShaderFlowState, NirStmt, NirStructDef, NirStructField,
-    NirTypeRef, NirUse,
+    NirKernelFlowState, NirParam, NirResultFamily, NirShaderFlowState, NirStmt, NirStructDef,
+    NirStructField, NirTypeRef, NirUse,
 };
 
 pub fn frontend_name() -> &'static str {
@@ -2732,16 +2732,14 @@ fn ensure_task_result_like(
     signatures: &BTreeMap<String, FunctionSignature>,
     struct_table: &BTreeMap<String, NirStructDef>,
 ) -> Result<(), String> {
-    match infer_nir_expr_type(expr, bindings, signatures, struct_table) {
-        Some(ty) if ty.is_generic_named("TaskResult", 1) => Ok(()),
-        Some(ty) => Err(format!(
-            "{name}(...) expects `TaskResult<...>`, found `{}`",
-            render_type_name(&ty)
-        )),
-        None => Err(format!(
-            "{name}(...) requires a typed task result in the current frontend"
-        )),
-    }
+    ensure_result_like(
+        name,
+        expr,
+        NirResultFamily::Task,
+        bindings,
+        signatures,
+        struct_table,
+    )
 }
 
 fn ensure_data_result_like(
@@ -2751,16 +2749,14 @@ fn ensure_data_result_like(
     signatures: &BTreeMap<String, FunctionSignature>,
     struct_table: &BTreeMap<String, NirStructDef>,
 ) -> Result<(), String> {
-    match infer_nir_expr_type(expr, bindings, signatures, struct_table) {
-        Some(ty) if ty.is_generic_named("DataResult", 1) => Ok(()),
-        Some(ty) => Err(format!(
-            "{name}(...) expects `DataResult<...>`, found `{}`",
-            render_type_name(&ty)
-        )),
-        None => Err(format!(
-            "{name}(...) requires a typed data result in the current frontend"
-        )),
-    }
+    ensure_result_like(
+        name,
+        expr,
+        NirResultFamily::Data,
+        bindings,
+        signatures,
+        struct_table,
+    )
 }
 
 fn infer_data_result_state(expr: &NirExpr) -> Option<NirDataFlowState> {
@@ -2785,16 +2781,14 @@ fn ensure_shader_result_like(
     signatures: &BTreeMap<String, FunctionSignature>,
     struct_table: &BTreeMap<String, NirStructDef>,
 ) -> Result<(), String> {
-    match infer_nir_expr_type(expr, bindings, signatures, struct_table) {
-        Some(ty) if ty.is_generic_named("ShaderResult", 1) => Ok(()),
-        Some(ty) => Err(format!(
-            "{name}(...) expects `ShaderResult<...>`, found `{}`",
-            render_type_name(&ty)
-        )),
-        None => Err(format!(
-            "{name}(...) requires a typed shader result in the current frontend"
-        )),
-    }
+    ensure_result_like(
+        name,
+        expr,
+        NirResultFamily::Shader,
+        bindings,
+        signatures,
+        struct_table,
+    )
 }
 
 fn infer_shader_result_state(expr: &NirExpr) -> Option<NirShaderFlowState> {
@@ -2814,14 +2808,34 @@ fn ensure_kernel_result_like(
     signatures: &BTreeMap<String, FunctionSignature>,
     struct_table: &BTreeMap<String, NirStructDef>,
 ) -> Result<(), String> {
+    ensure_result_like(
+        name,
+        expr,
+        NirResultFamily::Kernel,
+        bindings,
+        signatures,
+        struct_table,
+    )
+}
+
+fn ensure_result_like(
+    name: &str,
+    expr: &NirExpr,
+    family: NirResultFamily,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> Result<(), String> {
     match infer_nir_expr_type(expr, bindings, signatures, struct_table) {
-        Some(ty) if ty.is_generic_named("KernelResult", 1) => Ok(()),
+        Some(ty) if ty.result_family() == Some(family) => Ok(()),
         Some(ty) => Err(format!(
-            "{name}(...) expects `KernelResult<...>`, found `{}`",
+            "{name}(...) expects `{}<...>`, found `{}`",
+            family.type_name(),
             render_type_name(&ty)
         )),
         None => Err(format!(
-            "{name}(...) requires a typed kernel result in the current frontend"
+            "{name}(...) requires a typed {} in the current frontend",
+            family.type_name().to_ascii_lowercase()
         )),
     }
 }
@@ -3877,6 +3891,23 @@ mod tests {
     }
 
     #[test]
+    fn rejects_async_function_returning_result_family() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              async fn main() -> DataResult<i64> {
+                return data_result(data_input_pipe(data_output_pipe(7)));
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("DataResult<i64>"));
+        assert!(error.contains("async boundary"));
+    }
+
+    #[test]
     fn rejects_async_function_taking_instance_param() {
         let error = parse_nuis_module(
             r#"
@@ -3891,6 +3922,27 @@ mod tests {
 
         assert!(error.contains("parameter `shader`"));
         assert!(error.contains("Instance<SurfaceShader>"));
+        assert!(error.contains("async boundary"));
+    }
+
+    #[test]
+    fn rejects_async_function_taking_result_family_param() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              async fn consume(result: ShaderResult<Frame>) -> i64 {
+                if shader_frame_ready(result) {
+                  return 1;
+                }
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("parameter `result`"));
+        assert!(error.contains("ShaderResult<Frame>"));
         assert!(error.contains("async boundary"));
     }
 

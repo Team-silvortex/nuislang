@@ -1,8 +1,8 @@
 use std::env;
 
 use yir_core::{
-    ExecutionState, InstructionSemantics, Node, RegisteredMod, Resource, StructValue,
-    TaskLifecycleState, Value,
+    DataHandleTable, DataMarker, ExecutionState, InstructionSemantics, Node, RegisteredMod,
+    RenderPipeline, Resource, StructValue, SurfaceTarget, TaskLifecycleState, Value, Viewport,
 };
 
 pub struct CpuMod;
@@ -40,6 +40,16 @@ impl RegisteredMod for CpuMod {
                         node.name, node.op.args[0]
                     )
                 })?;
+
+                Ok(InstructionSemantics::pure(Vec::new()))
+            }
+            "project_profile_ref" => {
+                if node.op.args.len() != 3 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.project_profile_ref <name> <resource> <domain> <unit> <slot>`",
+                        node.name
+                    ));
+                }
 
                 Ok(InstructionSemantics::pure(Vec::new()))
             }
@@ -530,6 +540,7 @@ impl RegisteredMod for CpuMod {
                     )
                 },
             )?)),
+            "project_profile_ref" => resolve_project_profile_ref(node),
             "const_bool" => Ok(Value::Bool(match node.op.args[0].as_str() {
                 "true" => true,
                 "false" => false,
@@ -1377,6 +1388,49 @@ fn normalize_channel(channel: &str) -> String {
             }
         })
         .collect()
+}
+
+fn resolve_project_profile_ref(node: &Node) -> Result<Value, String> {
+    let domain = node.op.args[0].as_str();
+    let _unit = node.op.args[1].as_str();
+    let slot = node.op.args[2].as_str();
+    match (domain, slot) {
+        ("kernel", "bind_core") => Ok(Value::Int(0)),
+        ("kernel", "queue_depth") => Ok(Value::Int(8)),
+        ("kernel", "batch_lanes") => Ok(Value::Int(16)),
+        ("data", "bind_core") => Ok(Value::Int(0)),
+        ("data", "window_offset") => Ok(Value::Int(0)),
+        ("data", "uplink_len") | ("data", "downlink_len") => Ok(Value::Int(1)),
+        ("data", "handle_table") => Ok(Value::DataHandleTable(DataHandleTable {
+            entries: Vec::new(),
+        })),
+        ("data", marker) if marker.starts_with("marker:") => Ok(Value::DataMarker(DataMarker {
+            tag: marker.trim_start_matches("marker:").to_owned(),
+        })),
+        ("shader", "target") => Ok(Value::Target(SurfaceTarget {
+            format: "rgba8".to_owned(),
+            width: 64,
+            height: 64,
+        })),
+        ("shader", "viewport") => Ok(Value::Viewport(Viewport {
+            width: 64,
+            height: 64,
+        })),
+        ("shader", "pipeline") => Ok(Value::Pipeline(RenderPipeline {
+            shading_model: "flat".to_owned(),
+            topology: "triangle".to_owned(),
+        })),
+        ("shader", "vertex_count")
+        | ("shader", "instance_count")
+        | ("shader", "packet_color_slot")
+        | ("shader", "packet_speed_slot")
+        | ("shader", "packet_radius_slot")
+        | ("shader", "packet_tag")
+        | ("shader", "material_mode")
+        | ("shader", "pass_kind")
+        | ("shader", "packet_field_count") => Ok(Value::Int(1)),
+        _ => Ok(Value::Symbol(format!("{domain}.{}", slot))),
+    }
 }
 
 fn execute_extern_i64(abi: &str, symbol: &str, args: &[i64]) -> Result<i64, String> {

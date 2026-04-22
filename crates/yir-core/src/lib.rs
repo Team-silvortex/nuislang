@@ -454,6 +454,11 @@ pub fn glm_profile_for_operation(op: &Operation) -> GlmNodeProfile {
             }],
             effect: GlmEffect::None,
         },
+        SemanticOp::CpuProjectProfileRef | SemanticOp::CpuInstantiateUnit => GlmNodeProfile {
+            result_class: GlmValueClass::Val,
+            accesses: Vec::new(),
+            effect: GlmEffect::None,
+        },
         SemanticOp::CpuMovePtr => GlmNodeProfile {
             result_class: GlmValueClass::Res,
             accesses: vec![GlmAccess {

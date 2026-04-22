@@ -208,6 +208,25 @@ pub enum NirScalarKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NirResultFamily {
+    Task,
+    Data,
+    Shader,
+    Kernel,
+}
+
+impl NirResultFamily {
+    pub fn type_name(self) -> &'static str {
+        match self {
+            Self::Task => "TaskResult",
+            Self::Data => "DataResult",
+            Self::Shader => "ShaderResult",
+            Self::Kernel => "KernelResult",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NirTypeShape {
     Scalar(NirScalarKind),
     Ref,
@@ -354,7 +373,32 @@ impl NirTypeRef {
         ) {
             return false;
         }
+        if self.is_result_family() {
+            return false;
+        }
         self.generic_args.iter().all(NirTypeRef::is_async_boundary_safe)
+    }
+
+    pub fn is_result_family(&self) -> bool {
+        self.result_family().is_some()
+    }
+
+    pub fn result_family(&self) -> Option<NirResultFamily> {
+        if self.is_ref || self.generic_args.len() != 1 {
+            return None;
+        }
+        match self.name.as_str() {
+            "TaskResult" => Some(NirResultFamily::Task),
+            "DataResult" => Some(NirResultFamily::Data),
+            "ShaderResult" => Some(NirResultFamily::Shader),
+            "KernelResult" => Some(NirResultFamily::Kernel),
+            _ => None,
+        }
+    }
+
+    pub fn result_payload(&self) -> Option<&NirTypeRef> {
+        self.result_family()?;
+        self.generic_args.first()
     }
 
     fn is_nominal_semantic_payload(&self) -> bool {

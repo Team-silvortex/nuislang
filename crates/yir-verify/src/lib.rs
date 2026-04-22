@@ -133,6 +133,7 @@ pub fn verify_module_with_registry(
     ensure_acyclic(module)?;
     verify_glm_protocol(module)?;
     verify_data_fabric_protocol(module, &resources)?;
+    verify_result_state_nodes(module)?;
     verify_project_type_contract_nodes(module)?;
     verify_cpu_heap_protocol(module)?;
     Ok(())
@@ -982,6 +983,181 @@ fn verify_cpu_heap_protocol(module: &YirModule) -> Result<(), String> {
     Ok(())
 }
 
+fn verify_result_state_nodes(module: &YirModule) -> Result<(), String> {
+    let nodes = module
+        .nodes
+        .iter()
+        .map(|node| (node.name.as_str(), node))
+        .collect::<BTreeMap<_, _>>();
+
+    for node in &module.nodes {
+        match node.op.semantic_op() {
+            SemanticOp::DataObserve => {
+                let source = observe_source_node(&nodes, node)?;
+                let actual = observe_state_arg(node)?;
+                if !data_observe_state_matches(source.op.semantic_op(), actual)? {
+                    return Err(format!(
+                        "node `{}` observes data state `{actual}`, but `{}` does not support that state",
+                        node.name, source.name
+                    ));
+                }
+            }
+            SemanticOp::DataIsReady
+            | SemanticOp::DataIsMoved
+            | SemanticOp::DataIsWindowed
+            | SemanticOp::DataValue => {
+                require_observe_source(&nodes, node, SemanticOp::DataObserve)?;
+            }
+            SemanticOp::ShaderObserve => {
+                let source = observe_source_node(&nodes, node)?;
+                let expected = expected_shader_observe_state(source.op.semantic_op())?;
+                let actual = observe_state_arg(node)?;
+                if actual != expected {
+                    return Err(format!(
+                        "node `{}` observes shader state `{actual}`, but `{}` produces `{expected}`",
+                        node.name, source.name
+                    ));
+                }
+            }
+            SemanticOp::ShaderIsPassReady | SemanticOp::ShaderIsFrameReady | SemanticOp::ShaderValue => {
+                require_observe_source(&nodes, node, SemanticOp::ShaderObserve)?;
+            }
+            SemanticOp::KernelObserve => {
+                let source = observe_source_node(&nodes, node)?;
+                let actual = observe_state_arg(node)?;
+                if actual != "config_ready" {
+                    return Err(format!(
+                        "node `{}` observes kernel state `{actual}`, expected `config_ready`",
+                        node.name
+                    ));
+                }
+                if source.op.semantic_op() != SemanticOp::CpuProjectProfileRef {
+                    return Err(format!(
+                        "node `{}` expects cpu.project_profile_ref input for kernel observe, got `{}`",
+                        node.name,
+                        source.op.full_name()
+                    ));
+                }
+            }
+            SemanticOp::KernelIsConfigReady | SemanticOp::KernelValue => {
+                require_observe_source(&nodes, node, SemanticOp::KernelObserve)?;
+            }
+            _ => {}
+        }
+    }
+
+    Ok(())
+}
+
+fn observe_source_node<'a>(
+    nodes: &'a BTreeMap<&str, &'a Node>,
+    node: &Node,
+) -> Result<&'a Node, String> {
+    let source_name = node
+        .op
+        .args
+        .first()
+        .ok_or_else(|| format!("node `{}` is missing observe source arg", node.name))?;
+    nodes.get(source_name.as_str()).copied().ok_or_else(|| {
+        format!(
+            "node `{}` references unknown observe source `{source_name}`",
+            node.name
+        )
+    })
+}
+
+fn observe_state_arg<'a>(node: &'a Node) -> Result<&'a str, String> {
+    node.op
+        .args
+        .get(1)
+        .map(|value| value.as_str())
+        .ok_or_else(|| format!("node `{}` is missing observe state arg", node.name))
+}
+
+fn require_observe_source(
+    nodes: &BTreeMap<&str, &Node>,
+    node: &Node,
+    expected: SemanticOp,
+) -> Result<(), String> {
+    let source = node
+        .op
+        .args
+        .first()
+        .ok_or_else(|| format!("node `{}` is missing result source arg", node.name))
+        .and_then(|name| {
+            nodes.get(name.as_str()).copied().ok_or_else(|| {
+                format!(
+                    "node `{}` references unknown result source `{name}`",
+                    node.name
+                )
+            })
+        })?;
+    if source.op.semantic_op() != expected {
+        return Err(format!(
+            "node `{}` expects `{}` input, got `{}`",
+            node.name,
+            semantic_op_name(expected),
+            source.op.full_name()
+        ));
+    }
+    Ok(())
+}
+
+fn data_observe_state_matches(op: SemanticOp, actual: &str) -> Result<bool, String> {
+    match op {
+        SemanticOp::DataBindCore | SemanticOp::DataMarker | SemanticOp::DataHandleTable => {
+            Ok(actual == "ready")
+        }
+        SemanticOp::DataOutputPipe => Ok(actual == "moved"),
+        SemanticOp::DataInputPipe
+        | SemanticOp::DataCopyWindow
+        | SemanticOp::DataImmutableWindow => Ok(matches!(actual, "ready" | "windowed")),
+        other => Err(format!(
+            "unsupported data observe source `{}`",
+            semantic_op_name(other)
+        )),
+    }
+}
+
+fn expected_shader_observe_state(op: SemanticOp) -> Result<&'static str, String> {
+    match op {
+        SemanticOp::ShaderBeginPass => Ok("pass_ready"),
+        SemanticOp::ShaderDrawInstanced => Ok("frame_ready"),
+        other => Err(format!(
+            "unsupported shader observe source `{}`",
+            semantic_op_name(other)
+        )),
+    }
+}
+
+fn semantic_op_name(op: SemanticOp) -> &'static str {
+    match op {
+        SemanticOp::CpuProjectProfileRef => "cpu.project_profile_ref",
+        SemanticOp::DataObserve => "data.observe",
+        SemanticOp::DataIsReady => "data.is_ready",
+        SemanticOp::DataIsMoved => "data.is_moved",
+        SemanticOp::DataIsWindowed => "data.is_windowed",
+        SemanticOp::DataValue => "data.value",
+        SemanticOp::ShaderObserve => "shader.observe",
+        SemanticOp::ShaderIsPassReady => "shader.is_pass_ready",
+        SemanticOp::ShaderIsFrameReady => "shader.is_frame_ready",
+        SemanticOp::ShaderValue => "shader.value",
+        SemanticOp::KernelObserve => "kernel.observe",
+        SemanticOp::KernelIsConfigReady => "kernel.is_config_ready",
+        SemanticOp::KernelValue => "kernel.value",
+        SemanticOp::DataBindCore => "data.bind_core",
+        SemanticOp::DataMarker => "data.marker",
+        SemanticOp::DataHandleTable => "data.handle_table",
+        SemanticOp::DataOutputPipe => "data.output_pipe",
+        SemanticOp::DataInputPipe => "data.input_pipe",
+        SemanticOp::DataCopyWindow => "data.copy_window",
+        SemanticOp::DataImmutableWindow => "data.immutable_window",
+        SemanticOp::ShaderBeginPass => "shader.begin_pass",
+        SemanticOp::ShaderDrawInstanced => "shader.draw_instanced",
+        _ => "other",
+    }
+}
+
 fn infer_borrow_scope_ends(
     module: &YirModule,
     order_index: &BTreeMap<String, usize>,
@@ -1721,5 +1897,73 @@ mod tests {
 
         let error = verify_module(&module).unwrap_err();
         assert!(error.contains("encodes `batch_lanes=12`"));
+    }
+
+    #[test]
+    fn rejects_mismatched_data_observe_state() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![
+                Resource {
+                    name: "cpu0".to_owned(),
+                    kind: ResourceKind::parse("cpu.arm64"),
+                },
+                Resource {
+                    name: "fabric0".to_owned(),
+                    kind: ResourceKind::parse("data.fabric"),
+                },
+            ],
+            nodes: vec![
+                node("value", "cpu0", "cpu.const", &["7"]),
+                node("pipe", "fabric0", "data.output_pipe", &["value"]),
+                node("result", "fabric0", "data.observe", &["pipe", "ready"]),
+            ],
+            edges: vec![xfer("value", "pipe"), dep("pipe", "result")],
+            node_lanes: BTreeMap::new(),
+        };
+
+        let error = verify_module(&module).unwrap_err();
+        assert!(error.contains("does not support that state"));
+    }
+
+    #[test]
+    fn accepts_kernel_result_observe_from_project_profile_ref() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![
+                Resource {
+                    name: "cpu0".to_owned(),
+                    kind: ResourceKind::parse("cpu.arm64"),
+                },
+                Resource {
+                    name: "kernel0".to_owned(),
+                    kind: ResourceKind::parse("kernel.compute"),
+                },
+            ],
+            nodes: vec![
+                node(
+                    "queue_depth",
+                    "cpu0",
+                    "cpu.project_profile_ref",
+                    &["kernel", "KernelUnit", "queue_depth"],
+                ),
+                node(
+                    "kernel_result",
+                    "kernel0",
+                    "kernel.observe",
+                    &["queue_depth", "config_ready"],
+                ),
+                node(
+                    "kernel_ready",
+                    "kernel0",
+                    "kernel.is_config_ready",
+                    &["kernel_result"],
+                ),
+            ],
+            edges: vec![xfer("queue_depth", "kernel_result"), dep("kernel_result", "kernel_ready")],
+            node_lanes: BTreeMap::new(),
+        };
+
+        verify_module(&module).unwrap();
     }
 }
