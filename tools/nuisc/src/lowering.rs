@@ -17,6 +17,39 @@ trait BootstrapLoweringProvider {
     fn lower(&self, module: &NirModule) -> Result<YirModule, String>;
 }
 
+#[derive(Clone, Copy)]
+enum ResultLoweringDomain {
+    Data,
+    Shader,
+    Kernel,
+}
+
+impl ResultLoweringDomain {
+    fn module_name(self) -> &'static str {
+        match self {
+            Self::Data => "data",
+            Self::Shader => "shader",
+            Self::Kernel => "kernel",
+        }
+    }
+
+    fn resource_name(self) -> &'static str {
+        match self {
+            Self::Data => "fabric0",
+            Self::Shader => "shader0",
+            Self::Kernel => "kernel0",
+        }
+    }
+
+    fn ensure_resource(self, yir: &mut YirModule) {
+        match self {
+            Self::Data => ensure_fabric_resource(yir),
+            Self::Shader => ensure_shader_resource(yir),
+            Self::Kernel => ensure_kernel_resource(yir),
+        }
+    }
+}
+
 fn dispatch_nustar_lowering(
     module: &NirModule,
     nustar_manifest: &NustarPackageManifest,
@@ -626,32 +659,54 @@ fn lower_expr(
             Ok(name)
         }
         NirExpr::DataResult { value, state: flow } => {
-            ensure_fabric_resource(state.yir);
-            let value_name = lower_expr(value, state, bindings)?;
-            let name = next_name(state, "data_result");
-            state.yir.nodes.push(Node {
-                name: name.clone(),
-                resource: "fabric0".to_owned(),
-                op: Operation {
-                    module: "data".to_owned(),
-                    instruction: "observe".to_owned(),
-                    args: vec![value_name.clone(), flow.render().to_owned()],
-                },
-            });
-            push_dep_edges(state, &value_name, &name);
-            Ok(name)
+            lower_result_observe_node(
+                state,
+                bindings,
+                ResultLoweringDomain::Data,
+                value,
+                "data_result",
+                flow.render(),
+            )
         }
         NirExpr::DataReady(result) => {
-            lower_data_unary_value_effect(state, bindings, result, "data_ready", "is_ready")
+            lower_result_unary_value_effect(
+                state,
+                bindings,
+                ResultLoweringDomain::Data,
+                result,
+                "data_ready",
+                "is_ready",
+            )
         }
         NirExpr::DataMoved(result) => {
-            lower_data_unary_value_effect(state, bindings, result, "data_moved", "is_moved")
+            lower_result_unary_value_effect(
+                state,
+                bindings,
+                ResultLoweringDomain::Data,
+                result,
+                "data_moved",
+                "is_moved",
+            )
         }
         NirExpr::DataWindowed(result) => {
-            lower_data_unary_value_effect(state, bindings, result, "data_windowed", "is_windowed")
+            lower_result_unary_value_effect(
+                state,
+                bindings,
+                ResultLoweringDomain::Data,
+                result,
+                "data_windowed",
+                "is_windowed",
+            )
         }
         NirExpr::DataValue(result) => {
-            lower_data_unary_value_effect(state, bindings, result, "data_value", "value")
+            lower_result_unary_value_effect(
+                state,
+                bindings,
+                ResultLoweringDomain::Data,
+                result,
+                "data_value",
+                "value",
+            )
         }
         NirExpr::DataCopyWindow { input, offset, len } => {
             ensure_fabric_resource(state.yir);
@@ -1024,30 +1079,32 @@ fn lower_expr(
             lower_project_profile_ref(state, "kernel", unit, "batch_lanes")
         }
         NirExpr::KernelResult { value, state: flow } => {
-            ensure_kernel_resource(state.yir);
-            let value_name = lower_expr(value, state, bindings)?;
-            let name = next_name(state, "kernel_result");
-            state.yir.nodes.push(Node {
-                name: name.clone(),
-                resource: "kernel0".to_owned(),
-                op: Operation {
-                    module: "kernel".to_owned(),
-                    instruction: "observe".to_owned(),
-                    args: vec![value_name.clone(), flow.render().to_owned()],
-                },
-            });
-            push_dep_edges(state, &value_name, &name);
-            Ok(name)
+            lower_result_observe_node(
+                state,
+                bindings,
+                ResultLoweringDomain::Kernel,
+                value,
+                "kernel_result",
+                flow.render(),
+            )
         }
-        NirExpr::KernelConfigReady(result) => lower_kernel_unary_value_effect(
+        NirExpr::KernelConfigReady(result) => lower_result_unary_value_effect(
             state,
             bindings,
+            ResultLoweringDomain::Kernel,
             result,
             "kernel_config_ready",
             "is_config_ready",
         ),
         NirExpr::KernelValue(result) => {
-            lower_kernel_unary_value_effect(state, bindings, result, "kernel_value", "value")
+            lower_result_unary_value_effect(
+                state,
+                bindings,
+                ResultLoweringDomain::Kernel,
+                result,
+                "kernel_value",
+                "value",
+            )
         }
         NirExpr::ShaderTarget {
             format,
@@ -1113,37 +1170,40 @@ fn lower_expr(
             Ok(name)
         }
         NirExpr::ShaderResult { value, state: flow } => {
-            ensure_shader_resource(state.yir);
-            let value_name = lower_expr(value, state, bindings)?;
-            let name = next_name(state, "shader_result");
-            state.yir.nodes.push(Node {
-                name: name.clone(),
-                resource: "shader0".to_owned(),
-                op: Operation {
-                    module: "shader".to_owned(),
-                    instruction: "observe".to_owned(),
-                    args: vec![value_name.clone(), flow.render().to_owned()],
-                },
-            });
-            push_dep_edges(state, &value_name, &name);
-            Ok(name)
+            lower_result_observe_node(
+                state,
+                bindings,
+                ResultLoweringDomain::Shader,
+                value,
+                "shader_result",
+                flow.render(),
+            )
         }
-        NirExpr::ShaderPassReady(result) => lower_shader_unary_value_effect(
+        NirExpr::ShaderPassReady(result) => lower_result_unary_value_effect(
             state,
             bindings,
+            ResultLoweringDomain::Shader,
             result,
             "shader_pass_ready",
             "is_pass_ready",
         ),
-        NirExpr::ShaderFrameReady(result) => lower_shader_unary_value_effect(
+        NirExpr::ShaderFrameReady(result) => lower_result_unary_value_effect(
             state,
             bindings,
+            ResultLoweringDomain::Shader,
             result,
             "shader_frame_ready",
             "is_frame_ready",
         ),
         NirExpr::ShaderValue(result) => {
-            lower_shader_unary_value_effect(state, bindings, result, "shader_value", "value")
+            lower_result_unary_value_effect(
+                state,
+                bindings,
+                ResultLoweringDomain::Shader,
+                result,
+                "shader_value",
+                "value",
+            )
         }
         NirExpr::ShaderBeginPass {
             target,
@@ -1656,67 +1716,46 @@ fn lower_cpu_unary_value_effect(
     Ok(name)
 }
 
-fn lower_data_unary_value_effect(
+fn lower_result_observe_node(
     state: &mut LoweringState<'_>,
     bindings: &BTreeMap<String, String>,
+    domain: ResultLoweringDomain,
     input: &NirExpr,
     prefix: &str,
-    instruction: &str,
+    observed_state: &str,
 ) -> Result<String, String> {
-    ensure_fabric_resource(state.yir);
+    domain.ensure_resource(state.yir);
     let input_name = lower_expr(input, state, bindings)?;
     let name = next_name(state, prefix);
     state.yir.nodes.push(Node {
         name: name.clone(),
-        resource: "fabric0".to_owned(),
+        resource: domain.resource_name().to_owned(),
         op: Operation {
-            module: "data".to_owned(),
-            instruction: instruction.to_owned(),
-            args: vec![input_name.clone()],
+            module: domain.module_name().to_owned(),
+            instruction: "observe".to_owned(),
+            args: vec![input_name.clone(), observed_state.to_owned()],
         },
     });
     push_dep_edges(state, &input_name, &name);
     Ok(name)
 }
 
-fn lower_shader_unary_value_effect(
+fn lower_result_unary_value_effect(
     state: &mut LoweringState<'_>,
     bindings: &BTreeMap<String, String>,
+    domain: ResultLoweringDomain,
     input: &NirExpr,
     prefix: &str,
     instruction: &str,
 ) -> Result<String, String> {
-    ensure_shader_resource(state.yir);
+    domain.ensure_resource(state.yir);
     let input_name = lower_expr(input, state, bindings)?;
     let name = next_name(state, prefix);
     state.yir.nodes.push(Node {
         name: name.clone(),
-        resource: "shader0".to_owned(),
+        resource: domain.resource_name().to_owned(),
         op: Operation {
-            module: "shader".to_owned(),
-            instruction: instruction.to_owned(),
-            args: vec![input_name.clone()],
-        },
-    });
-    push_dep_edges(state, &input_name, &name);
-    Ok(name)
-}
-
-fn lower_kernel_unary_value_effect(
-    state: &mut LoweringState<'_>,
-    bindings: &BTreeMap<String, String>,
-    input: &NirExpr,
-    prefix: &str,
-    instruction: &str,
-) -> Result<String, String> {
-    ensure_kernel_resource(state.yir);
-    let input_name = lower_expr(input, state, bindings)?;
-    let name = next_name(state, prefix);
-    state.yir.nodes.push(Node {
-        name: name.clone(),
-        resource: "kernel0".to_owned(),
-        op: Operation {
-            module: "kernel".to_owned(),
+            module: domain.module_name().to_owned(),
             instruction: instruction.to_owned(),
             args: vec![input_name.clone()],
         },
