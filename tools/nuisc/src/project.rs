@@ -5,8 +5,8 @@ use std::{
 };
 
 use nuis_semantics::model::{
-    AstExpr, AstExternFunction, AstModule, AstStmt, AstTypeRef, NirExpr, NirModule, NirStmt,
-    NirTypeRef,
+    AstExpr, AstExternFunction, AstModule, AstStmt, AstTypeRef, NirDataFlowState, NirExpr,
+    NirModule, NirResultStage, NirStmt, NirTypeRef,
 };
 use yir_core::{
     EdgeKind, Node, Operation, OperationDomainFamily, Resource, ResourceKind, SemanticOp, YirModule,
@@ -70,6 +70,19 @@ pub struct ProjectBuildMetadata {
 pub struct ProjectAbiResolution {
     pub requirements: Vec<ProjectAbiRequirement>,
     pub explicit: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ProjectLinkStageContract {
+    uplink: NirResultStage,
+    downlink: NirResultStage,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ProjectLinkBridgeContract {
+    stages: ProjectLinkStageContract,
+    uplink_payload: Option<NirTypeRef>,
+    downlink_payload: Option<NirTypeRef>,
 }
 
 pub fn is_project_input(path: &Path) -> bool {
@@ -482,6 +495,7 @@ pub fn validate_project_links_against_yir(
         if let Some(via) = &link.via {
             let (via_domain, _via_unit) = split_domain_unit(via)?;
             if via_domain == "data" {
+                let contract = required_project_link_stage_contract(&link.from, &link.to, via)?;
                 let has_fabric = module
                     .resources
                     .iter()
@@ -517,15 +531,15 @@ pub fn validate_project_links_against_yir(
                 let has_uplink = has_xfer_segment(module, &node_families, &from_domain, "data");
                 if !has_uplink {
                     return Err(format!(
-                        "project link `{}` -> `{}` via `{}` requires a `{}` -> `data` xfer segment in YIR",
-                        link.from, link.to, via, from_domain
+                        "project link `{}` -> `{}` via `{}` requires a `{}` -> `data` xfer segment in YIR for uplink stage `{}`",
+                        link.from, link.to, via, from_domain, contract.uplink.render()
                     ));
                 }
                 let has_downlink = has_xfer_segment(module, &node_families, "data", &to_domain);
                 if !has_downlink {
                     return Err(format!(
-                        "project link `{}` -> `{}` via `{}` requires a `data` -> `{}` xfer segment in YIR",
-                        link.from, link.to, via, to_domain
+                        "project link `{}` -> `{}` via `{}` requires a `data` -> `{}` xfer segment in YIR for downlink stage `{}`",
+                        link.from, link.to, via, to_domain, contract.downlink.render()
                     ));
                 }
                 validate_data_profile_token_types(project, &link.from, &link.to, via)?;
@@ -808,6 +822,7 @@ pub fn validate_project_links_against_nir(
         if let Some(via) = &link.via {
             let (via_domain, via_unit) = split_domain_unit(via)?;
             if via_domain == "data" {
+                let contract = required_project_link_stage_contract(&link.from, &link.to, via)?;
                 let data_support = support_surface_for_domain(&mut support_surface_cache, "data")?;
                 require_declared_support_surface(
                     &data_support,
@@ -835,8 +850,8 @@ pub fn validate_project_links_against_nir(
                 )?;
                 if !nir_uses_data_profile_send_uplink(module, &via_unit) {
                     return Err(format!(
-                        "project link `{}` -> `{}` via `{}` requires CPU entry to use data_profile_send_uplink(\"{}\") at NIR level",
-                        link.from, link.to, via, via_unit
+                        "project link `{}` -> `{}` via `{}` requires CPU entry to use data_profile_send_uplink(\"{}\") for uplink stage `{}` at NIR level",
+                        link.from, link.to, via, via_unit, contract.uplink.render()
                     ));
                 }
                 require_declared_support_surface(
@@ -847,8 +862,8 @@ pub fn validate_project_links_against_nir(
                 )?;
                 if !nir_uses_data_profile_send_downlink(module, &via_unit) {
                     return Err(format!(
-                        "project link `{}` -> `{}` via `{}` requires CPU entry to use data_profile_send_downlink(\"{}\") at NIR level",
-                        link.from, link.to, via, via_unit
+                        "project link `{}` -> `{}` via `{}` requires CPU entry to use data_profile_send_downlink(\"{}\") for downlink stage `{}` at NIR level",
+                        link.from, link.to, via, via_unit, contract.downlink.render()
                     ));
                 }
             }
@@ -2067,6 +2082,7 @@ fn validate_data_profile_for_link(
     if domain != "data" {
         return Ok(());
     }
+    let contract = required_project_link_stage_contract(from_endpoint, to_endpoint, endpoint)?;
     let (from_domain, _) = split_domain_unit(from_endpoint)?;
     let (to_domain, _) = split_domain_unit(to_endpoint)?;
     let declared_support = support_surface_for_domain(&mut BTreeMap::new(), "data")?;
@@ -2110,6 +2126,10 @@ fn validate_data_profile_for_link(
         resolve_project_profile_target_name("data", &unit, "marker:uplink_payload_shape");
     let downlink_shape =
         resolve_project_profile_target_name("data", &unit, "marker:downlink_payload_shape");
+    let uplink_window_policy =
+        resolve_project_profile_target_name("data", &unit, "marker:uplink_window_policy");
+    let downlink_window_policy =
+        resolve_project_profile_target_name("data", &unit, "marker:downlink_window_policy");
     let uplink_windows = module
         .nodes
         .iter()
@@ -2179,6 +2199,44 @@ fn validate_data_profile_for_link(
             unit
         ));
     }
+    if contract.uplink == NirResultStage::Data(NirDataFlowState::Windowed) {
+        if !module.nodes.iter().any(|node| node.name == uplink_window_policy) {
+            return Err(format!(
+                "project data unit `data.{}` requires `uplink_window_policy` marker node for bridge stage `{}`",
+                unit,
+                contract.uplink.render()
+            ));
+        }
+        if !uplink_windows
+            .iter()
+            .all(|window| has_edge_to(module, &uplink_window_policy, window))
+        {
+            return Err(format!(
+                "project data unit `data.{}` requires uplink window policy to feed all uplink window nodes for bridge stage `{}`",
+                unit,
+                contract.uplink.render()
+            ));
+        }
+    }
+    if contract.downlink == NirResultStage::Data(NirDataFlowState::Windowed) {
+        if !module.nodes.iter().any(|node| node.name == downlink_window_policy) {
+            return Err(format!(
+                "project data unit `data.{}` requires `downlink_window_policy` marker node for bridge stage `{}`",
+                unit,
+                contract.downlink.render()
+            ));
+        }
+        if !downlink_windows
+            .iter()
+            .all(|window| has_edge_to(module, &downlink_window_policy, window))
+        {
+            return Err(format!(
+                "project data unit `data.{}` requires downlink window policy to feed all downlink window nodes for bridge stage `{}`",
+                unit,
+                contract.downlink.render()
+            ));
+        }
+    }
 
     Ok(())
 }
@@ -2193,6 +2251,8 @@ fn validate_data_profile_token_types(
     if domain != "data" {
         return Ok(());
     }
+    let bridge = build_project_link_bridge_contract(project, from_endpoint, to_endpoint, endpoint)?;
+    let contract = required_project_link_stage_contract(from_endpoint, to_endpoint, endpoint)?;
     let profile_module = project
         .modules
         .iter()
@@ -2242,8 +2302,6 @@ fn validate_data_profile_token_types(
         "downlink_payload_class",
         "uplink_payload_shape",
         "downlink_payload_shape",
-        "uplink_window_policy",
-        "downlink_window_policy",
     ] {
         let marker_ty = find_profile_call_declared_type(&profile_fn.body, "data_marker", Some(tag))
             .ok_or_else(|| {
@@ -2251,12 +2309,51 @@ fn validate_data_profile_token_types(
                     "project data unit `data.{}` requires typed `Marker<Tag>` binding for marker `{}`",
                     unit, tag
                 )
-            })?;
+        })?;
         require_profile_semantic_type(&marker_ty, "Marker", true, &unit, tag)?;
     }
+    if contract.uplink == NirResultStage::Data(NirDataFlowState::Windowed) {
+        let marker_ty = find_profile_call_declared_type(
+            &profile_fn.body,
+            "data_marker",
+            Some("uplink_window_policy"),
+        )
+        .ok_or_else(|| {
+            format!(
+                "project data unit `data.{}` requires typed `Marker<Tag>` binding for marker `uplink_window_policy` because uplink bridge stage is `{}`",
+                unit,
+                contract.uplink.render()
+            )
+        })?;
+        require_marker_semantic_payload_name(
+            &marker_ty,
+            "UplinkWindowPolicy",
+            &unit,
+            "uplink_window_policy",
+        )?;
+    }
+    if contract.downlink == NirResultStage::Data(NirDataFlowState::Windowed) {
+        let marker_ty = find_profile_call_declared_type(
+            &profile_fn.body,
+            "data_marker",
+            Some("downlink_window_policy"),
+        )
+        .ok_or_else(|| {
+            format!(
+                "project data unit `data.{}` requires typed `Marker<Tag>` binding for marker `downlink_window_policy` because downlink bridge stage is `{}`",
+                unit,
+                contract.downlink.render()
+            )
+        })?;
+        require_marker_semantic_payload_name(
+            &marker_ty,
+            "DownlinkWindowPolicy",
+            &unit,
+            "downlink_window_policy",
+        )?;
+    }
 
-    if let Some(uplink_ty) = infer_project_route_payload_type(project, from_endpoint, &unit, true)?
-    {
+    if let Some(uplink_ty) = bridge.uplink_payload.as_ref() {
         let marker_ty =
             find_profile_call_declared_type(&profile_fn.body, "data_marker", Some("uplink_payload_class"))
                 .ok_or_else(|| {
@@ -2267,7 +2364,7 @@ fn validate_data_profile_token_types(
                 })?;
         require_marker_semantic_payload_name(
             &marker_ty,
-            &payload_class_marker_name(&uplink_ty),
+            &payload_class_marker_name(uplink_ty),
             &unit,
             "uplink_payload_class",
         )?;
@@ -2282,14 +2379,13 @@ fn validate_data_profile_token_types(
                 })?;
         require_marker_semantic_payload_name(
             &marker_ty,
-            &payload_shape_marker_name(&uplink_ty),
+            &payload_shape_marker_name(uplink_ty),
             &unit,
             "uplink_payload_shape",
         )?;
     }
 
-    if let Some(downlink_ty) = infer_project_route_payload_type(project, to_endpoint, &unit, false)?
-    {
+    if let Some(downlink_ty) = bridge.downlink_payload.as_ref() {
         let marker_ty =
             find_profile_call_declared_type(&profile_fn.body, "data_marker", Some("downlink_payload_class"))
                 .ok_or_else(|| {
@@ -2300,7 +2396,7 @@ fn validate_data_profile_token_types(
                 })?;
         require_marker_semantic_payload_name(
             &marker_ty,
-            &payload_class_marker_name(&downlink_ty),
+            &payload_class_marker_name(downlink_ty),
             &unit,
             "downlink_payload_class",
         )?;
@@ -2315,7 +2411,7 @@ fn validate_data_profile_token_types(
                 })?;
         require_marker_semantic_payload_name(
             &marker_ty,
-            &payload_shape_marker_name(&downlink_ty),
+            &payload_shape_marker_name(downlink_ty),
             &unit,
             "downlink_payload_shape",
         )?;
@@ -4074,6 +4170,13 @@ fn validate_project_links(
                     link.from, link.to, via
                 ));
             }
+            let contract =
+                required_project_link_stage_contract(&link.from, &link.to, via).map_err(|error| {
+                    format!(
+                        "project link `{}` -> `{}` via `{}` is not yet supported: {error}",
+                        link.from, link.to, via
+                    )
+                })?;
             if !from_module
                 .uses
                 .iter()
@@ -4096,9 +4199,136 @@ fn validate_project_links(
                     ));
                 }
             }
+            validate_project_link_stage_contract(&link.from, &link.to, via, contract)?;
         }
     }
     Ok(())
+}
+
+fn required_project_link_stage_contract(
+    from: &str,
+    to: &str,
+    via: &str,
+) -> Result<ProjectLinkStageContract, String> {
+    let (from_domain, _) = split_domain_unit(from)?;
+    let (to_domain, _) = split_domain_unit(to)?;
+    let (via_domain, _) = split_domain_unit(via)?;
+    if via_domain != "data" {
+        return Err(format!(
+            "mediator `{via}` is outside the current staged bridge model"
+        ));
+    }
+
+    let cpu_edge = from_domain == "cpu" || to_domain == "cpu";
+    let hetero_peer = matches!(
+        (from_domain.as_str(), to_domain.as_str()),
+        ("cpu", "shader")
+            | ("shader", "cpu")
+            | ("cpu", "kernel")
+            | ("kernel", "cpu")
+            | ("cpu", "cpu")
+    );
+    if !cpu_edge || !hetero_peer {
+        return Err(format!(
+            "current staged bridges only support cpu<->cpu, cpu<->shader, and cpu<->kernel over `data.*`"
+        ));
+    }
+
+    Ok(ProjectLinkStageContract {
+        uplink: NirResultStage::Data(NirDataFlowState::Windowed),
+        downlink: NirResultStage::Data(NirDataFlowState::Windowed),
+    })
+}
+
+fn validate_project_link_stage_contract(
+    from: &str,
+    to: &str,
+    via: &str,
+    contract: ProjectLinkStageContract,
+) -> Result<(), String> {
+    if contract.uplink != NirResultStage::Data(NirDataFlowState::Windowed)
+        || contract.downlink != NirResultStage::Data(NirDataFlowState::Windowed)
+    {
+        return Err(format!(
+            "project link `{from}` -> `{to}` via `{via}` requires staged fabric bridge `uplink={}` `downlink={}`",
+            contract.uplink.render(),
+            contract.downlink.render()
+        ));
+    }
+    Ok(())
+}
+
+fn build_project_link_bridge_contract(
+    project: &LoadedProject,
+    from: &str,
+    to: &str,
+    via: &str,
+) -> Result<ProjectLinkBridgeContract, String> {
+    let (_, data_unit) = split_domain_unit(via)?;
+    let uplink_source = resolve_bridge_payload_source(from, to, true)?;
+    let downlink_source = resolve_bridge_payload_source(from, to, false)?;
+    let stages = required_project_link_stage_contract(from, to, via)?;
+    let uplink_payload = infer_project_route_payload_type(project, &uplink_source, &data_unit, true)?;
+    let downlink_payload =
+        infer_project_route_payload_type(project, &downlink_source, &data_unit, false)?;
+
+    validate_bridge_stage_payload(
+        "uplink",
+        from,
+        to,
+        via,
+        stages.uplink,
+        uplink_payload.as_ref(),
+    )?;
+    validate_bridge_stage_payload(
+        "downlink",
+        from,
+        to,
+        via,
+        stages.downlink,
+        downlink_payload.as_ref(),
+    )?;
+
+    Ok(ProjectLinkBridgeContract {
+        stages,
+        uplink_payload,
+        downlink_payload,
+    })
+}
+
+fn resolve_bridge_payload_source(from: &str, to: &str, uplink: bool) -> Result<String, String> {
+    let (from_domain, _) = split_domain_unit(from)?;
+    let (to_domain, _) = split_domain_unit(to)?;
+    if from_domain == "cpu" {
+        return Ok(from.to_owned());
+    }
+    if to_domain == "cpu" {
+        return Ok(to.to_owned());
+    }
+    Ok(if uplink { from } else { to }.to_owned())
+}
+
+fn validate_bridge_stage_payload(
+    direction: &str,
+    from: &str,
+    to: &str,
+    via: &str,
+    stage: NirResultStage,
+    payload: Option<&NirTypeRef>,
+) -> Result<(), String> {
+    let payload = payload.ok_or_else(|| {
+        format!(
+            "project link `{from}` -> `{to}` via `{via}` requires a `{direction}` payload contract for stage `{}`",
+            stage.render()
+        )
+    })?;
+    stage.validate_payload(payload).map_err(|error| {
+        format!(
+            "project link `{from}` -> `{to}` via `{via}` has invalid `{direction}` payload contract `{}` for stage `{}`: {error}",
+            payload.render(),
+            stage.render()
+        )
+    })
 }
 
 fn validate_project_abi_requirements(
@@ -4367,29 +4597,70 @@ mod tests {
 
     #[test]
     fn accepts_typed_data_profile_tokens_for_project_link() {
-        let project = project_with_modules(vec![(
-            "fabric_plane.ns",
-            r#"
-            mod data FabricPlane {
-              fn profile() {
-                let profile_handles: HandleTable<FabricBindings> =
-                  data_handle_table("host=cpu0", "render=shader0");
-                let cpu_to_shader: Marker<CpuToShader> = data_marker("cpu_to_shader");
-                let shader_to_cpu: Marker<ShaderToCpu> = data_marker("shader_to_cpu");
-                let uplink_pipe: Marker<UplinkPipe> = data_marker("uplink_pipe");
-                let downlink_pipe: Marker<DownlinkPipe> = data_marker("downlink_pipe");
-                let uplink_pipe_class: Marker<UplinkPipeClass> = data_marker("uplink_pipe_class");
-                let downlink_pipe_class: Marker<DownlinkPipeClass> = data_marker("downlink_pipe_class");
-                let uplink_payload_class: Marker<PayloadClassWindow> = data_marker("uplink_payload_class");
-                let downlink_payload_class: Marker<PayloadClassWindow> = data_marker("downlink_payload_class");
-                let uplink_payload_shape: Marker<PayloadShapeWindowSurfaceShaderPacket> = data_marker("uplink_payload_shape");
-                let downlink_payload_shape: Marker<PayloadShapeWindowFrame> = data_marker("downlink_payload_shape");
-                let uplink_window_policy: Marker<UplinkWindowPolicy> = data_marker("uplink_window_policy");
-                let downlink_window_policy: Marker<DownlinkWindowPolicy> = data_marker("downlink_window_policy");
-              }
-            }
-            "#,
-        )]);
+        let project = project_with_modules(vec![
+            (
+                "main.ns",
+                r#"
+                mod cpu Main {
+                  fn main() {
+                    let packet: SurfaceShaderPacket =
+                      shader_profile_packet("SurfaceShader", 1, 2, 3);
+                    let gpu_packet: Window<SurfaceShaderPacket> =
+                      data_profile_send_uplink("FabricPlane", packet);
+                    let frame: Frame = shader_profile_render("SurfaceShader", gpu_packet);
+                    let host_frame: Window<Frame> =
+                      data_profile_send_downlink("FabricPlane", frame);
+                    print(host_frame);
+                  }
+                }
+                "#,
+            ),
+            (
+                "surface_shader.ns",
+                r#"
+                mod shader SurfaceShader {
+                  fn profile() {
+                    const vertex_count: i64 = 4;
+                    const instance_count: i64 = 1;
+                    const packet_color_slot: i64 = 0;
+                    const packet_speed_slot: i64 = 1;
+                    const packet_radius_slot: i64 = 2;
+                    const packet_tag: i64 = 17;
+                    const material_mode: i64 = 2;
+                    const pass_kind: i64 = 1;
+                    const packet_field_count: i64 = 3;
+                    let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
+                    let profile_view: Viewport = shader_viewport(160, 120);
+                    let profile_pipe: Pipeline = shader_pipeline("lit_sphere", "triangle_strip");
+                    let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", "stub");
+                  }
+                }
+                "#,
+            ),
+            (
+                "fabric_plane.ns",
+                r#"
+                mod data FabricPlane {
+                  fn profile() {
+                    let profile_handles: HandleTable<FabricBindings> =
+                      data_handle_table("host=cpu0", "render=shader0");
+                    let cpu_to_shader: Marker<CpuToShader> = data_marker("cpu_to_shader");
+                    let shader_to_cpu: Marker<ShaderToCpu> = data_marker("shader_to_cpu");
+                    let uplink_pipe: Marker<UplinkPipe> = data_marker("uplink_pipe");
+                    let downlink_pipe: Marker<DownlinkPipe> = data_marker("downlink_pipe");
+                    let uplink_pipe_class: Marker<UplinkPipeClass> = data_marker("uplink_pipe_class");
+                    let downlink_pipe_class: Marker<DownlinkPipeClass> = data_marker("downlink_pipe_class");
+                    let uplink_payload_class: Marker<PayloadClassWindow> = data_marker("uplink_payload_class");
+                    let downlink_payload_class: Marker<PayloadClassWindow> = data_marker("downlink_payload_class");
+                    let uplink_payload_shape: Marker<PayloadShapeWindowSurfaceShaderPacket> = data_marker("uplink_payload_shape");
+                    let downlink_payload_shape: Marker<PayloadShapeWindowFrame> = data_marker("downlink_payload_shape");
+                    let uplink_window_policy: Marker<UplinkWindowPolicy> = data_marker("uplink_window_policy");
+                    let downlink_window_policy: Marker<DownlinkWindowPolicy> = data_marker("downlink_window_policy");
+                  }
+                }
+                "#,
+            ),
+        ]);
 
         validate_data_profile_token_types(
             &project,
@@ -4402,29 +4673,70 @@ mod tests {
 
     #[test]
     fn rejects_untyped_data_profile_marker_for_project_link() {
-        let project = project_with_modules(vec![(
-            "fabric_plane.ns",
-            r#"
-            mod data FabricPlane {
-              fn profile() {
-                let profile_handles: HandleTable<FabricBindings> =
-                  data_handle_table("host=cpu0", "render=shader0");
-                let cpu_to_shader: Marker = data_marker("cpu_to_shader");
-                let shader_to_cpu: Marker<ShaderToCpu> = data_marker("shader_to_cpu");
-                let uplink_pipe: Marker<UplinkPipe> = data_marker("uplink_pipe");
-                let downlink_pipe: Marker<DownlinkPipe> = data_marker("downlink_pipe");
-                let uplink_pipe_class: Marker<UplinkPipeClass> = data_marker("uplink_pipe_class");
-                let downlink_pipe_class: Marker<DownlinkPipeClass> = data_marker("downlink_pipe_class");
-                let uplink_payload_class: Marker<PayloadClassWindow> = data_marker("uplink_payload_class");
-                let downlink_payload_class: Marker<PayloadClassWindow> = data_marker("downlink_payload_class");
-                let uplink_payload_shape: Marker<PayloadShapeWindowSurfaceShaderPacket> = data_marker("uplink_payload_shape");
-                let downlink_payload_shape: Marker<PayloadShapeWindowFrame> = data_marker("downlink_payload_shape");
-                let uplink_window_policy: Marker<UplinkWindowPolicy> = data_marker("uplink_window_policy");
-                let downlink_window_policy: Marker<DownlinkWindowPolicy> = data_marker("downlink_window_policy");
-              }
-            }
-            "#,
-        )]);
+        let project = project_with_modules(vec![
+            (
+                "main.ns",
+                r#"
+                mod cpu Main {
+                  fn main() {
+                    let packet: SurfaceShaderPacket =
+                      shader_profile_packet("SurfaceShader", 1, 2, 3);
+                    let gpu_packet: Window<SurfaceShaderPacket> =
+                      data_profile_send_uplink("FabricPlane", packet);
+                    let frame: Frame = shader_profile_render("SurfaceShader", gpu_packet);
+                    let host_frame: Window<Frame> =
+                      data_profile_send_downlink("FabricPlane", frame);
+                    print(host_frame);
+                  }
+                }
+                "#,
+            ),
+            (
+                "surface_shader.ns",
+                r#"
+                mod shader SurfaceShader {
+                  fn profile() {
+                    const vertex_count: i64 = 4;
+                    const instance_count: i64 = 1;
+                    const packet_color_slot: i64 = 0;
+                    const packet_speed_slot: i64 = 1;
+                    const packet_radius_slot: i64 = 2;
+                    const packet_tag: i64 = 17;
+                    const material_mode: i64 = 2;
+                    const pass_kind: i64 = 1;
+                    const packet_field_count: i64 = 3;
+                    let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
+                    let profile_view: Viewport = shader_viewport(160, 120);
+                    let profile_pipe: Pipeline = shader_pipeline("lit_sphere", "triangle_strip");
+                    let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", "stub");
+                  }
+                }
+                "#,
+            ),
+            (
+                "fabric_plane.ns",
+                r#"
+                mod data FabricPlane {
+                  fn profile() {
+                    let profile_handles: HandleTable<FabricBindings> =
+                      data_handle_table("host=cpu0", "render=shader0");
+                    let cpu_to_shader: Marker = data_marker("cpu_to_shader");
+                    let shader_to_cpu: Marker<ShaderToCpu> = data_marker("shader_to_cpu");
+                    let uplink_pipe: Marker<UplinkPipe> = data_marker("uplink_pipe");
+                    let downlink_pipe: Marker<DownlinkPipe> = data_marker("downlink_pipe");
+                    let uplink_pipe_class: Marker<UplinkPipeClass> = data_marker("uplink_pipe_class");
+                    let downlink_pipe_class: Marker<DownlinkPipeClass> = data_marker("downlink_pipe_class");
+                    let uplink_payload_class: Marker<PayloadClassWindow> = data_marker("uplink_payload_class");
+                    let downlink_payload_class: Marker<PayloadClassWindow> = data_marker("downlink_payload_class");
+                    let uplink_payload_shape: Marker<PayloadShapeWindowSurfaceShaderPacket> = data_marker("uplink_payload_shape");
+                    let downlink_payload_shape: Marker<PayloadShapeWindowFrame> = data_marker("downlink_payload_shape");
+                    let uplink_window_policy: Marker<UplinkWindowPolicy> = data_marker("uplink_window_policy");
+                    let downlink_window_policy: Marker<DownlinkWindowPolicy> = data_marker("downlink_window_policy");
+                  }
+                }
+                "#,
+            ),
+        ]);
 
         let error = validate_data_profile_token_types(
             &project,
@@ -4435,6 +4747,83 @@ mod tests {
         .unwrap_err();
 
         assert!(error.contains("typed form `Marker<...>`"));
+    }
+
+    #[test]
+    fn rejects_missing_window_policy_marker_for_windowed_bridge() {
+        let project = project_with_modules(vec![
+            (
+                "main.ns",
+                r#"
+                mod cpu Main {
+                  fn main() {
+                    let packet: SurfaceShaderPacket =
+                      shader_profile_packet("SurfaceShader", 1, 2, 3);
+                    let gpu_packet: Window<SurfaceShaderPacket> =
+                      data_profile_send_uplink("FabricPlane", packet);
+                    let frame: Frame = shader_profile_render("SurfaceShader", gpu_packet);
+                    let host_frame: Window<Frame> =
+                      data_profile_send_downlink("FabricPlane", frame);
+                    print(host_frame);
+                  }
+                }
+                "#,
+            ),
+            (
+                "surface_shader.ns",
+                r#"
+                mod shader SurfaceShader {
+                  fn profile() {
+                    const vertex_count: i64 = 4;
+                    const instance_count: i64 = 1;
+                    const packet_color_slot: i64 = 0;
+                    const packet_speed_slot: i64 = 1;
+                    const packet_radius_slot: i64 = 2;
+                    const packet_tag: i64 = 17;
+                    const material_mode: i64 = 2;
+                    const pass_kind: i64 = 1;
+                    const packet_field_count: i64 = 3;
+                    let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
+                    let profile_view: Viewport = shader_viewport(160, 120);
+                    let profile_pipe: Pipeline = shader_pipeline("lit_sphere", "triangle_strip");
+                    let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", "stub");
+                  }
+                }
+                "#,
+            ),
+            (
+                "fabric_plane.ns",
+                r#"
+                mod data FabricPlane {
+                  fn profile() {
+                    let profile_handles: HandleTable<FabricBindings> =
+                      data_handle_table("host=cpu0", "render=shader0");
+                    let cpu_to_shader: Marker<CpuToShader> = data_marker("cpu_to_shader");
+                    let shader_to_cpu: Marker<ShaderToCpu> = data_marker("shader_to_cpu");
+                    let uplink_pipe: Marker<UplinkPipe> = data_marker("uplink_pipe");
+                    let downlink_pipe: Marker<DownlinkPipe> = data_marker("downlink_pipe");
+                    let uplink_pipe_class: Marker<UplinkPipeClass> = data_marker("uplink_pipe_class");
+                    let downlink_pipe_class: Marker<DownlinkPipeClass> = data_marker("downlink_pipe_class");
+                    let uplink_payload_class: Marker<PayloadClassWindow> = data_marker("uplink_payload_class");
+                    let downlink_payload_class: Marker<PayloadClassWindow> = data_marker("downlink_payload_class");
+                    let uplink_payload_shape: Marker<PayloadShapeWindowSurfaceShaderPacket> = data_marker("uplink_payload_shape");
+                    let downlink_payload_shape: Marker<PayloadShapeWindowFrame> = data_marker("downlink_payload_shape");
+                    let downlink_window_policy: Marker<DownlinkWindowPolicy> = data_marker("downlink_window_policy");
+                  }
+                }
+                "#,
+            ),
+        ]);
+
+        let error = validate_data_profile_token_types(
+            &project,
+            "cpu.Main",
+            "shader.SurfaceShader",
+            "data.FabricPlane",
+        )
+        .unwrap_err();
+
+        assert!(error.contains("uplink_window_policy"));
     }
 
     #[test]
@@ -4681,5 +5070,82 @@ mod tests {
             .nodes
             .iter()
             .any(|node| node.name == "project_profile_kernel_KernelUnit_slot_contract_type"));
+    }
+
+    #[test]
+    fn project_link_stage_contract_accepts_cpu_to_shader_over_data() {
+        let contract = required_project_link_stage_contract(
+            "cpu.Main",
+            "shader.SurfaceShader",
+            "data.FabricPlane",
+        )
+        .unwrap();
+
+        assert_eq!(contract.uplink, NirResultStage::Data(NirDataFlowState::Windowed));
+        assert_eq!(contract.downlink, NirResultStage::Data(NirDataFlowState::Windowed));
+    }
+
+    #[test]
+    fn project_link_stage_contract_rejects_shader_to_kernel_for_now() {
+        let error = required_project_link_stage_contract(
+            "shader.SurfaceShader",
+            "kernel.KernelUnit",
+            "data.FabricPlane",
+        )
+        .unwrap_err();
+
+        assert!(error.contains("cpu<->cpu"));
+        assert!(error.contains("cpu<->shader"));
+        assert!(error.contains("cpu<->kernel"));
+    }
+
+    #[test]
+    fn rejects_missing_bridge_payload_contract_for_windowed_link() {
+        let project = project_with_modules(vec![
+            (
+                "main.ns",
+                r#"
+                mod cpu Main {
+                  fn main() {
+                    return;
+                  }
+                }
+                "#,
+            ),
+            (
+                "fabric_plane.ns",
+                r#"
+                mod data FabricPlane {
+                  fn profile() {
+                    let profile_handles: HandleTable<FabricBindings> =
+                      data_handle_table("host=cpu0", "render=shader0");
+                    let cpu_to_shader: Marker<CpuToShader> = data_marker("cpu_to_shader");
+                    let shader_to_cpu: Marker<ShaderToCpu> = data_marker("shader_to_cpu");
+                    let uplink_pipe: Marker<UplinkPipe> = data_marker("uplink_pipe");
+                    let downlink_pipe: Marker<DownlinkPipe> = data_marker("downlink_pipe");
+                    let uplink_pipe_class: Marker<UplinkPipeClass> = data_marker("uplink_pipe_class");
+                    let downlink_pipe_class: Marker<DownlinkPipeClass> = data_marker("downlink_pipe_class");
+                    let uplink_payload_class: Marker<PayloadClassWindow> = data_marker("uplink_payload_class");
+                    let downlink_payload_class: Marker<PayloadClassWindow> = data_marker("downlink_payload_class");
+                    let uplink_payload_shape: Marker<PayloadShapeWindowSurfaceShaderPacket> = data_marker("uplink_payload_shape");
+                    let downlink_payload_shape: Marker<PayloadShapeWindowFrame> = data_marker("downlink_payload_shape");
+                    let uplink_window_policy: Marker<UplinkWindowPolicy> = data_marker("uplink_window_policy");
+                    let downlink_window_policy: Marker<DownlinkWindowPolicy> = data_marker("downlink_window_policy");
+                  }
+                }
+                "#,
+            ),
+        ]);
+
+        let error = build_project_link_bridge_contract(
+            &project,
+            "cpu.Main",
+            "shader.SurfaceShader",
+            "data.FabricPlane",
+        )
+        .unwrap_err();
+
+        assert!(error.contains("payload contract"));
+        assert!(error.contains("data.FabricPlane"));
     }
 }
