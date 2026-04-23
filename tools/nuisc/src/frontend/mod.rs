@@ -6,8 +6,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use nuis_semantics::model::{
     AstBinaryOp, AstExpr, AstFunction, AstModule, AstParam, AstStmt, AstTypeRef, NirBinaryOp,
     NirDataFlowState, NirExpr, NirExternFunction, NirExternInterface, NirFunction, NirModule,
-    NirKernelFlowState, NirParam, NirResultFamily, NirShaderFlowState, NirStmt, NirStructDef,
-    NirStructField, NirTypeRef, NirUse,
+    NirKernelFlowState, NirParam, NirResultFamily, NirResultStage, NirShaderFlowState, NirStmt,
+    NirStructDef, NirStructField, NirTypeRef, NirUse,
 };
 
 pub fn frontend_name() -> &'static str {
@@ -889,68 +889,56 @@ fn lower_call_expr_with_async(
             Ok(NirExpr::CpuJoinResult(Box::new(lowered)))
         }
         "task_completed" => {
-            let [result] = args else {
-                return Err("task_completed(...) expects exactly one task result".to_owned());
-            };
-            let lowered = lower_nested_expr_with_async(
-                result,
+            lower_result_observer_call(
+                "task_completed",
+                args,
                 current_domain,
                 current_function_is_async,
                 bindings,
                 signatures,
                 struct_table,
-                None,
-            )?;
-            ensure_task_result_like("task_completed", &lowered, bindings, signatures, struct_table)?;
-            Ok(NirExpr::CpuTaskCompleted(Box::new(lowered)))
+                NirResultFamily::Task,
+                |expr| NirExpr::CpuTaskCompleted(Box::new(expr)),
+            )
         }
         "task_timed_out" => {
-            let [result] = args else {
-                return Err("task_timed_out(...) expects exactly one task result".to_owned());
-            };
-            let lowered = lower_nested_expr_with_async(
-                result,
+            lower_result_observer_call(
+                "task_timed_out",
+                args,
                 current_domain,
                 current_function_is_async,
                 bindings,
                 signatures,
                 struct_table,
-                None,
-            )?;
-            ensure_task_result_like("task_timed_out", &lowered, bindings, signatures, struct_table)?;
-            Ok(NirExpr::CpuTaskTimedOut(Box::new(lowered)))
+                NirResultFamily::Task,
+                |expr| NirExpr::CpuTaskTimedOut(Box::new(expr)),
+            )
         }
         "task_cancelled" => {
-            let [result] = args else {
-                return Err("task_cancelled(...) expects exactly one task result".to_owned());
-            };
-            let lowered = lower_nested_expr_with_async(
-                result,
+            lower_result_observer_call(
+                "task_cancelled",
+                args,
                 current_domain,
                 current_function_is_async,
                 bindings,
                 signatures,
                 struct_table,
-                None,
-            )?;
-            ensure_task_result_like("task_cancelled", &lowered, bindings, signatures, struct_table)?;
-            Ok(NirExpr::CpuTaskCancelled(Box::new(lowered)))
+                NirResultFamily::Task,
+                |expr| NirExpr::CpuTaskCancelled(Box::new(expr)),
+            )
         }
         "task_value" => {
-            let [result] = args else {
-                return Err("task_value(...) expects exactly one task result".to_owned());
-            };
-            let lowered = lower_nested_expr_with_async(
-                result,
+            lower_result_observer_call(
+                "task_value",
+                args,
                 current_domain,
                 current_function_is_async,
                 bindings,
                 signatures,
                 struct_table,
-                None,
-            )?;
-            ensure_task_result_like("task_value", &lowered, bindings, signatures, struct_table)?;
-            Ok(NirExpr::CpuTaskValue(Box::new(lowered)))
+                NirResultFamily::Task,
+                |expr| NirExpr::CpuTaskValue(Box::new(expr)),
+            )
         }
         "timeout" => {
             if current_domain != "cpu" {
@@ -1294,8 +1282,15 @@ fn lower_call_expr_with_async(
                 bindings,
                 signatures,
                 struct_table,
-                infer_data_result_state,
-                |value, state| NirExpr::DataResult { value, state },
+                NirResultFamily::Data,
+                infer_result_stage,
+                |value, stage| match stage {
+                    NirResultStage::Data(state) => Ok(NirExpr::DataResult { value, state }),
+                    other => Err(format!(
+                        "expected data result stage, found `{}`",
+                        other.render()
+                    )),
+                },
                 "expects a direct data operation like pipe/window/profile send",
             )
         }
@@ -1360,8 +1355,15 @@ fn lower_call_expr_with_async(
                 bindings,
                 signatures,
                 struct_table,
-                infer_shader_result_state,
-                |value, state| NirExpr::ShaderResult { value, state },
+                NirResultFamily::Shader,
+                infer_result_stage,
+                |value, stage| match stage {
+                    NirResultStage::Shader(state) => Ok(NirExpr::ShaderResult { value, state }),
+                    other => Err(format!(
+                        "expected shader result stage, found `{}`",
+                        other.render()
+                    )),
+                },
                 "expects a direct shader operation like begin_pass/render",
             )
         }
@@ -2270,8 +2272,15 @@ fn lower_call_expr_with_async(
                 bindings,
                 signatures,
                 struct_table,
-                infer_kernel_result_state,
-                |value, state| NirExpr::KernelResult { value, state },
+                NirResultFamily::Kernel,
+                infer_result_stage,
+                |value, stage| match stage {
+                    NirResultStage::Kernel(state) => Ok(NirExpr::KernelResult { value, state }),
+                    other => Err(format!(
+                        "expected kernel result stage, found `{}`",
+                        other.render()
+                    )),
+                },
                 "expects a direct kernel profile/config expression",
             )
         }
@@ -2659,7 +2668,7 @@ fn lower_single_nested_expr(
     )
 }
 
-fn lower_result_wrapper_call<State: Copy>(
+fn lower_result_wrapper_call(
     name: &str,
     args: &[AstExpr],
     current_domain: &str,
@@ -2667,8 +2676,9 @@ fn lower_result_wrapper_call<State: Copy>(
     bindings: &BTreeMap<String, NirTypeRef>,
     signatures: &BTreeMap<String, FunctionSignature>,
     struct_table: &BTreeMap<String, NirStructDef>,
-    infer_state: fn(&NirExpr) -> Option<State>,
-    build: fn(Box<NirExpr>, State) -> NirExpr,
+    family: NirResultFamily,
+    infer_stage: fn(&NirExpr) -> Option<NirResultStage>,
+    build: fn(Box<NirExpr>, NirResultStage) -> Result<NirExpr, String>,
     usage_hint: &str,
 ) -> Result<NirExpr, String> {
     let lowered = lower_single_nested_expr(
@@ -2680,10 +2690,24 @@ fn lower_result_wrapper_call<State: Copy>(
         signatures,
         struct_table,
     )?;
-    let Some(state) = infer_state(&lowered) else {
+    let Some(stage) = infer_stage(&lowered) else {
         return Err(format!("{name}(...) {usage_hint}"));
     };
-    Ok(build(Box::new(lowered), state))
+    if !family.supports_stage(stage) {
+        return Err(format!(
+            "{name}(...) inferred incompatible `{}` stage `{}`",
+            family.type_name(),
+            stage.render()
+        ));
+    }
+    let payload = expr_type(&lowered, bindings, signatures, struct_table)
+        .ok_or_else(|| format!("{name}(...) could not infer payload type for result wrapper"))?;
+    validate_result_stage_payload(stage, &payload).map_err(|error| format!("{name}(...): {error}"))?;
+    build(Box::new(lowered), stage).map_err(|error| format!("{name}(...): {error}"))
+}
+
+fn validate_result_stage_payload(stage: NirResultStage, payload: &NirTypeRef) -> Result<(), String> {
+    stage.validate_payload(payload)
 }
 
 fn lower_result_observer_call(
@@ -2710,44 +2734,24 @@ fn lower_result_observer_call(
     Ok(build(lowered))
 }
 
-fn ensure_task_result_like(
-    name: &str,
-    expr: &NirExpr,
-    bindings: &BTreeMap<String, NirTypeRef>,
-    signatures: &BTreeMap<String, FunctionSignature>,
-    struct_table: &BTreeMap<String, NirStructDef>,
-) -> Result<(), String> {
-    ensure_result_like(
-        name,
-        expr,
-        NirResultFamily::Task,
-        bindings,
-        signatures,
-        struct_table,
-    )
-}
-
-fn infer_data_result_state(expr: &NirExpr) -> Option<NirDataFlowState> {
+fn infer_result_stage(expr: &NirExpr) -> Option<NirResultStage> {
     match expr {
         NirExpr::DataBindCore(_)
         | NirExpr::DataMarker(_)
         | NirExpr::DataHandleTable(_)
-        | NirExpr::DataInputPipe(_) => Some(NirDataFlowState::Ready),
-        NirExpr::DataOutputPipe(_) => Some(NirDataFlowState::Moved),
+        | NirExpr::DataInputPipe(_) => Some(NirDataFlowState::Ready.into()),
+        NirExpr::DataOutputPipe(_) => Some(NirDataFlowState::Moved.into()),
         NirExpr::DataCopyWindow { .. }
         | NirExpr::DataImmutableWindow { .. }
         | NirExpr::DataProfileSendUplink { .. }
-        | NirExpr::DataProfileSendDownlink { .. } => Some(NirDataFlowState::Windowed),
-        _ => None,
-    }
-}
-
-fn infer_shader_result_state(expr: &NirExpr) -> Option<NirShaderFlowState> {
-    match expr {
-        NirExpr::ShaderBeginPass { .. } => Some(NirShaderFlowState::PassReady),
+        | NirExpr::DataProfileSendDownlink { .. } => Some(NirDataFlowState::Windowed.into()),
+        NirExpr::ShaderBeginPass { .. } => Some(NirShaderFlowState::PassReady.into()),
         NirExpr::ShaderDrawInstanced { .. } | NirExpr::ShaderProfileRender { .. } => {
-            Some(NirShaderFlowState::FrameReady)
+            Some(NirShaderFlowState::FrameReady.into())
         }
+        NirExpr::KernelProfileBindCoreRef { .. }
+        | NirExpr::KernelProfileQueueDepthRef { .. }
+        | NirExpr::KernelProfileBatchLanesRef { .. } => Some(NirKernelFlowState::ConfigReady.into()),
         _ => None,
     }
 }
@@ -2771,15 +2775,6 @@ fn ensure_result_like(
             "{name}(...) requires a typed {} in the current frontend",
             family.type_name().to_ascii_lowercase()
         )),
-    }
-}
-
-fn infer_kernel_result_state(expr: &NirExpr) -> Option<NirKernelFlowState> {
-    match expr {
-        NirExpr::KernelProfileBindCoreRef { .. }
-        | NirExpr::KernelProfileQueueDepthRef { .. }
-        | NirExpr::KernelProfileBatchLanesRef { .. } => Some(NirKernelFlowState::ConfigReady),
-        _ => None,
     }
 }
 

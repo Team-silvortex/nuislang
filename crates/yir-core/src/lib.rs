@@ -123,6 +123,14 @@ pub enum SemanticOp {
     CpuStoreNext,
     CpuStoreAt,
     CpuFree,
+    CpuJoin,
+    CpuCancel,
+    CpuTimeout,
+    CpuJoinResult,
+    CpuTaskCompleted,
+    CpuTaskTimedOut,
+    CpuTaskCancelled,
+    CpuTaskValue,
     DataMove,
     DataCopyWindow,
     DataImmutableWindow,
@@ -221,6 +229,14 @@ impl Operation {
             (OperationDomainFamily::Cpu, "store_next") => SemanticOp::CpuStoreNext,
             (OperationDomainFamily::Cpu, "store_at") => SemanticOp::CpuStoreAt,
             (OperationDomainFamily::Cpu, "free") => SemanticOp::CpuFree,
+            (OperationDomainFamily::Cpu, "join") => SemanticOp::CpuJoin,
+            (OperationDomainFamily::Cpu, "cancel") => SemanticOp::CpuCancel,
+            (OperationDomainFamily::Cpu, "timeout") => SemanticOp::CpuTimeout,
+            (OperationDomainFamily::Cpu, "join_result") => SemanticOp::CpuJoinResult,
+            (OperationDomainFamily::Cpu, "task_completed") => SemanticOp::CpuTaskCompleted,
+            (OperationDomainFamily::Cpu, "task_timed_out") => SemanticOp::CpuTaskTimedOut,
+            (OperationDomainFamily::Cpu, "task_cancelled") => SemanticOp::CpuTaskCancelled,
+            (OperationDomainFamily::Cpu, "task_value") => SemanticOp::CpuTaskValue,
             (OperationDomainFamily::Data, "move") => SemanticOp::DataMove,
             (OperationDomainFamily::Data, "copy_window") => SemanticOp::DataCopyWindow,
             (OperationDomainFamily::Data, "immutable_window") => SemanticOp::DataImmutableWindow,
@@ -305,7 +321,8 @@ impl Operation {
             }
             "input_i64" | "extern_call_i64" => CpuLlvmLoweringClass::Runtime,
             "print" | "await" | "async_call" | "spawn_task" | "join" | "cancel"
-            | "timeout" | "join_result" => {
+            | "timeout" | "join_result" | "task_completed" | "task_timed_out"
+            | "task_cancelled" | "task_value" => {
                 CpuLlvmLoweringClass::Effect
             }
             _ => CpuLlvmLoweringClass::Other,
@@ -525,6 +542,26 @@ pub fn glm_profile_for_operation(op: &Operation) -> GlmNodeProfile {
                 class: GlmValueClass::Res,
                 mode: GlmUseMode::Read,
             }],
+            effect: GlmEffect::None,
+        },
+        SemanticOp::CpuJoin
+        | SemanticOp::CpuCancel
+        | SemanticOp::CpuTimeout
+        | SemanticOp::CpuJoinResult
+        | SemanticOp::CpuTaskCompleted
+        | SemanticOp::CpuTaskTimedOut
+        | SemanticOp::CpuTaskCancelled
+        | SemanticOp::CpuTaskValue => GlmNodeProfile {
+            result_class: GlmValueClass::Val,
+            accesses: op
+                .args
+                .iter()
+                .map(|input| GlmAccess {
+                    input: input.clone(),
+                    class: GlmValueClass::Val,
+                    mode: GlmUseMode::Read,
+                })
+                .collect(),
             effect: GlmEffect::None,
         },
         _ => GlmNodeProfile {

@@ -224,6 +224,10 @@ impl NirResultFamily {
             Self::Kernel => "KernelResult",
         }
     }
+
+    pub fn supports_stage(self, stage: NirResultStage) -> bool {
+        self == stage.family()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -902,6 +906,101 @@ pub enum NirDataFlowState {
     Windowed,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NirResultStage {
+    Data(NirDataFlowState),
+    Shader(NirShaderFlowState),
+    Kernel(NirKernelFlowState),
+}
+
+impl NirResultStage {
+    pub fn family(self) -> NirResultFamily {
+        match self {
+            Self::Data(_) => NirResultFamily::Data,
+            Self::Shader(_) => NirResultFamily::Shader,
+            Self::Kernel(_) => NirResultFamily::Kernel,
+        }
+    }
+
+    pub fn render(self) -> &'static str {
+        match self {
+            Self::Data(state) => state.render(),
+            Self::Shader(state) => state.render(),
+            Self::Kernel(state) => state.render(),
+        }
+    }
+
+    pub fn validate_payload(self, payload: &NirTypeRef) -> Result<(), String> {
+        match self {
+            Self::Data(state) => match state {
+                NirDataFlowState::Ready => {
+                    if matches!(
+                        payload.container_kind(),
+                        Some(NirContainerKind::Pipe | NirContainerKind::Window)
+                    ) {
+                        return Err(format!(
+                            "`data_result(...)->{}` cannot carry staged container payload `{}`",
+                            self.render(),
+                            payload.render()
+                        ));
+                    }
+                    Ok(())
+                }
+                NirDataFlowState::Moved => {
+                    if payload.container_kind() != Some(NirContainerKind::Pipe) {
+                        return Err(format!(
+                            "`data_result(...)->{}` expects `Pipe<...>` payload, found `{}`",
+                            self.render(),
+                            payload.render()
+                        ));
+                    }
+                    Ok(())
+                }
+                NirDataFlowState::Windowed => {
+                    if payload.container_kind() != Some(NirContainerKind::Window) {
+                        return Err(format!(
+                            "`data_result(...)->{}` expects `Window<...>` payload, found `{}`",
+                            self.render(),
+                            payload.render()
+                        ));
+                    }
+                    Ok(())
+                }
+            },
+            Self::Shader(state) => {
+                let expected = match state {
+                    NirShaderFlowState::PassReady => "Pass",
+                    NirShaderFlowState::FrameReady => "Frame",
+                };
+                if payload.is_ref
+                    || payload.is_optional
+                    || !payload.generic_args.is_empty()
+                    || payload.name != expected
+                {
+                    return Err(format!(
+                        "`shader_result(...)->{}` expects `{expected}` payload, found `{}`",
+                        self.render(),
+                        payload.render()
+                    ));
+                }
+                Ok(())
+            }
+            Self::Kernel(state) => match state {
+                NirKernelFlowState::ConfigReady => {
+                    if !payload.is_integer_scalar() {
+                        return Err(format!(
+                            "`kernel_result(...)->{}` expects integer scalar payload, found `{}`",
+                            self.render(),
+                            payload.render()
+                        ));
+                    }
+                    Ok(())
+                }
+            },
+        }
+    }
+}
+
 impl NirDataFlowState {
     pub fn render(self) -> &'static str {
         match self {
@@ -909,6 +1008,10 @@ impl NirDataFlowState {
             Self::Moved => "moved",
             Self::Windowed => "windowed",
         }
+    }
+
+    pub fn validate_payload(self, payload: &NirTypeRef) -> Result<(), String> {
+        NirResultStage::from(self).validate_payload(payload)
     }
 }
 
@@ -925,6 +1028,10 @@ impl NirShaderFlowState {
             Self::FrameReady => "frame_ready",
         }
     }
+
+    pub fn validate_payload(self, payload: &NirTypeRef) -> Result<(), String> {
+        NirResultStage::from(self).validate_payload(payload)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -937,6 +1044,28 @@ impl NirKernelFlowState {
         match self {
             Self::ConfigReady => "config_ready",
         }
+    }
+
+    pub fn validate_payload(self, payload: &NirTypeRef) -> Result<(), String> {
+        NirResultStage::from(self).validate_payload(payload)
+    }
+}
+
+impl From<NirDataFlowState> for NirResultStage {
+    fn from(value: NirDataFlowState) -> Self {
+        Self::Data(value)
+    }
+}
+
+impl From<NirShaderFlowState> for NirResultStage {
+    fn from(value: NirShaderFlowState) -> Self {
+        Self::Shader(value)
+    }
+}
+
+impl From<NirKernelFlowState> for NirResultStage {
+    fn from(value: NirKernelFlowState) -> Self {
+        Self::Kernel(value)
     }
 }
 
@@ -1125,4 +1254,82 @@ pub struct NustarPackage {
     pub domain_family: String,
     pub entry_crate: String,
     pub ops: Vec<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        NirDataFlowState, NirKernelFlowState, NirResultFamily, NirResultStage,
+        NirShaderFlowState, NirTypeRef,
+    };
+
+    fn named(name: &str) -> NirTypeRef {
+        NirTypeRef {
+            name: name.to_owned(),
+            generic_args: Vec::new(),
+            is_optional: false,
+            is_ref: false,
+        }
+    }
+
+    fn generic(name: &str, arg: NirTypeRef) -> NirTypeRef {
+        NirTypeRef {
+            name: name.to_owned(),
+            generic_args: vec![arg],
+            is_optional: false,
+            is_ref: false,
+        }
+    }
+
+    #[test]
+    fn rejects_moved_data_state_with_non_pipe_payload() {
+        let error = NirDataFlowState::Moved.validate_payload(&named("i64")).unwrap_err();
+        assert!(error.contains("moved"));
+        assert!(error.contains("Pipe<...>"));
+    }
+
+    #[test]
+    fn result_stage_reports_owning_family() {
+        assert_eq!(
+            NirResultStage::from(NirDataFlowState::Windowed).family(),
+            NirResultFamily::Data
+        );
+        assert_eq!(
+            NirResultStage::from(NirShaderFlowState::FrameReady).family(),
+            NirResultFamily::Shader
+        );
+        assert_eq!(
+            NirResultStage::from(NirKernelFlowState::ConfigReady).family(),
+            NirResultFamily::Kernel
+        );
+        assert!(NirResultFamily::Data.supports_stage(NirDataFlowState::Ready.into()));
+        assert!(!NirResultFamily::Data.supports_stage(NirShaderFlowState::PassReady.into()));
+    }
+
+    #[test]
+    fn rejects_windowed_data_state_with_non_window_payload() {
+        let error = NirDataFlowState::Windowed
+            .validate_payload(&generic("Pipe", named("i64")))
+            .unwrap_err();
+        assert!(error.contains("windowed"));
+        assert!(error.contains("Window<...>"));
+    }
+
+    #[test]
+    fn rejects_pass_ready_shader_state_with_non_pass_payload() {
+        let error = NirShaderFlowState::PassReady
+            .validate_payload(&named("Frame"))
+            .unwrap_err();
+        assert!(error.contains("pass_ready"));
+        assert!(error.contains("Pass"));
+    }
+
+    #[test]
+    fn rejects_kernel_config_ready_with_non_integer_payload() {
+        let error = NirKernelFlowState::ConfigReady
+            .validate_payload(&named("bool"))
+            .unwrap_err();
+        assert!(error.contains("config_ready"));
+        assert!(error.contains("integer scalar"));
+    }
 }

@@ -992,6 +992,12 @@ fn verify_result_state_nodes(module: &YirModule) -> Result<(), String> {
 
     for node in &module.nodes {
         match node.op.semantic_op() {
+            SemanticOp::CpuTaskCompleted
+            | SemanticOp::CpuTaskTimedOut
+            | SemanticOp::CpuTaskCancelled
+            | SemanticOp::CpuTaskValue => {
+                require_observe_source(&nodes, node, SemanticOp::CpuJoinResult)?;
+            }
             SemanticOp::DataObserve => {
                 let source = observe_source_node(&nodes, node)?;
                 let actual = observe_state_arg(node)?;
@@ -1133,6 +1139,11 @@ fn expected_shader_observe_state(op: SemanticOp) -> Result<&'static str, String>
 fn semantic_op_name(op: SemanticOp) -> &'static str {
     match op {
         SemanticOp::CpuProjectProfileRef => "cpu.project_profile_ref",
+        SemanticOp::CpuJoinResult => "cpu.join_result",
+        SemanticOp::CpuTaskCompleted => "cpu.task_completed",
+        SemanticOp::CpuTaskTimedOut => "cpu.task_timed_out",
+        SemanticOp::CpuTaskCancelled => "cpu.task_cancelled",
+        SemanticOp::CpuTaskValue => "cpu.task_value",
         SemanticOp::DataObserve => "data.observe",
         SemanticOp::DataIsReady => "data.is_ready",
         SemanticOp::DataIsMoved => "data.is_moved",
@@ -1965,5 +1976,26 @@ mod tests {
         };
 
         verify_module(&module).unwrap();
+    }
+
+    #[test]
+    fn rejects_task_value_without_join_result_source() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![Resource {
+                name: "cpu0".to_owned(),
+                kind: ResourceKind::parse("cpu.arm64"),
+            }],
+            nodes: vec![
+                node("value", "cpu0", "cpu.const", &["7"]),
+                node("task", "cpu0", "cpu.spawn_task", &["ping", "value"]),
+                node("invalid", "cpu0", "cpu.task_value", &["task"]),
+            ],
+            edges: vec![dep("value", "task"), dep("task", "invalid")],
+            node_lanes: BTreeMap::new(),
+        };
+
+        let error = verify_module(&module).unwrap_err();
+        assert!(error.contains("expects `cpu.join_result` input"));
     }
 }
