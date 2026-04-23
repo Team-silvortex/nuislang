@@ -2621,6 +2621,7 @@ fn materialize_project_type_contract_nodes(
     module: &mut YirModule,
 ) -> Result<(), String> {
     ensure_project_resource(module, "cpu0", "cpu.arm64");
+    materialize_project_bridge_contract_nodes(project, module)?;
 
     for project_module in &project.modules {
         match project_module.ast.domain.as_str() {
@@ -2640,6 +2641,91 @@ fn materialize_project_type_contract_nodes(
     Ok(())
 }
 
+fn materialize_project_bridge_contract_nodes(
+    project: &LoadedProject,
+    module: &mut YirModule,
+) -> Result<(), String> {
+    for link in &project.manifest.links {
+        let Some(via) = &link.via else {
+            continue;
+        };
+        let (via_domain, via_unit) = split_domain_unit(via)?;
+        if via_domain != "data" {
+            continue;
+        }
+        let bridge = build_project_link_bridge_contract(project, &link.from, &link.to, via)?;
+        let id = project_link_contract_id(&link.from, &link.to, via);
+        let stage_node = format!("project_link_{id}_bridge_stage_type");
+        let uplink_payload_node = format!("project_link_{id}_uplink_bridge_payload_type");
+        let downlink_payload_node = format!("project_link_{id}_downlink_bridge_payload_type");
+        push_profile_text_node(
+            module,
+            stage_node.clone(),
+            format!(
+                "uplink={};downlink={}",
+                bridge.stages.uplink.render(),
+                bridge.stages.downlink.render()
+            ),
+        );
+        push_profile_text_node(
+            module,
+            uplink_payload_node.clone(),
+            bridge
+                .uplink_payload
+                .as_ref()
+                .map(NirTypeRef::render)
+                .unwrap_or_else(|| "unknown".to_owned()),
+        );
+        push_profile_text_node(
+            module,
+            downlink_payload_node.clone(),
+            bridge
+                .downlink_payload
+                .as_ref()
+                .map(NirTypeRef::render)
+                .unwrap_or_else(|| "unknown".to_owned()),
+        );
+        connect_project_contract_node(
+            module,
+            &stage_node,
+            &resolve_project_profile_target_name("data", &via_unit, "marker:uplink_window_policy"),
+        );
+        connect_project_contract_node(
+            module,
+            &stage_node,
+            &resolve_project_profile_target_name(
+                "data",
+                &via_unit,
+                "marker:downlink_window_policy",
+            ),
+        );
+        connect_project_contract_node(
+            module,
+            &uplink_payload_node,
+            &resolve_project_profile_target_name("data", &via_unit, "marker:uplink_payload_shape"),
+        );
+        connect_project_contract_node(
+            module,
+            &downlink_payload_node,
+            &resolve_project_profile_target_name(
+                "data",
+                &via_unit,
+                "marker:downlink_payload_shape",
+            ),
+        );
+    }
+    Ok(())
+}
+
+fn project_link_contract_id(from: &str, to: &str, via: &str) -> String {
+    format!(
+        "{}_to_{}_via_{}",
+        sanitize_ident(from),
+        sanitize_ident(to),
+        sanitize_ident(via)
+    )
+}
+
 fn materialize_data_type_contract_nodes(
     project: &LoadedProject,
     unit: &str,
@@ -2655,7 +2741,8 @@ fn materialize_data_type_contract_nodes(
         if via_domain != "data" || via_unit != unit {
             continue;
         }
-        if let Some(ty) = infer_project_route_payload_type(project, &link.from, unit, true)? {
+        let bridge = build_project_link_bridge_contract(project, &link.from, &link.to, via)?;
+        if let Some(ty) = bridge.uplink_payload {
             uplink_payload = Some(merge_project_payload_contract(
                 uplink_payload.take(),
                 ty,
@@ -2664,7 +2751,7 @@ fn materialize_data_type_contract_nodes(
                 "uplink",
             )?);
         }
-        if let Some(ty) = infer_project_route_payload_type(project, &link.to, unit, false)? {
+        if let Some(ty) = bridge.downlink_payload {
             downlink_payload = Some(merge_project_payload_contract(
                 downlink_payload.take(),
                 ty,
@@ -5044,6 +5131,30 @@ mod tests {
         assert!(yir.nodes.iter().any(|node| {
             node.name == "project_profile_data_FabricPlane_uplink_payload_shape_type"
         }));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.name.contains("_bridge_stage_type")
+                && node.op.args.first().is_some_and(|value| value
+                    == "uplink=windowed;downlink=windowed")));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.name.contains("_uplink_bridge_payload_type")
+                && node
+                    .op
+                    .args
+                    .first()
+                    .is_some_and(|value| value == "Window<SurfaceShaderPacket>")));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.name.contains("_downlink_bridge_payload_type")
+                && node
+                    .op
+                    .args
+                    .first()
+                    .is_some_and(|value| value == "Window<Frame>")));
     }
 
     #[test]

@@ -500,6 +500,18 @@ fn verify_project_type_contract_nodes(module: &YirModule) -> Result<(), String> 
                 require_prefixed_contract_value(node.name.as_str(), value, "PayloadShape")?;
             }
             ProjectContractKind::DataHandleTableSchema | ProjectContractKind::ShaderPacketType => {}
+            ProjectContractKind::BridgeStageContract => {
+                verify_bridge_stage_contract_text(node.name.as_str(), value)?;
+            }
+            ProjectContractKind::BridgePayloadContract(direction) => {
+                verify_bridge_payload_contract_text(
+                    &nodes,
+                    node.name.as_str(),
+                    value,
+                    target,
+                    direction,
+                )?;
+            }
             ProjectContractKind::KernelSlotContract => {
                 verify_kernel_slot_contract_text(node.name.as_str(), value, target)?;
             }
@@ -517,7 +529,15 @@ enum ProjectContractKind {
     ShaderPacketType,
     ShaderPacketClass,
     ShaderPacketShape,
+    BridgeStageContract,
+    BridgePayloadContract(BridgePayloadDirection),
     KernelSlotContract,
+}
+
+#[derive(Clone, Copy)]
+enum BridgePayloadDirection {
+    Uplink,
+    Downlink,
 }
 
 struct ProjectContract<'a> {
@@ -527,6 +547,39 @@ struct ProjectContract<'a> {
 }
 
 fn classify_project_contract_node(name: &str) -> Option<ProjectContract<'_>> {
+    if let Some(id) = name
+        .strip_prefix("project_link_")
+        .and_then(|suffix| suffix.strip_suffix("_bridge_stage_type"))
+    {
+        return Some(ProjectContract {
+            kind: ProjectContractKind::BridgeStageContract,
+            target: project_link_bridge_contract_target(id, true),
+            _unit: id,
+        });
+    }
+    if let Some(id) = name
+        .strip_prefix("project_link_")
+        .and_then(|suffix| suffix.strip_suffix("_uplink_bridge_payload_type"))
+    {
+        return Some(ProjectContract {
+            kind: ProjectContractKind::BridgePayloadContract(BridgePayloadDirection::Uplink),
+            target: project_link_bridge_payload_contract_target(id, BridgePayloadDirection::Uplink),
+            _unit: id,
+        });
+    }
+    if let Some(id) = name
+        .strip_prefix("project_link_")
+        .and_then(|suffix| suffix.strip_suffix("_downlink_bridge_payload_type"))
+    {
+        return Some(ProjectContract {
+            kind: ProjectContractKind::BridgePayloadContract(BridgePayloadDirection::Downlink),
+            target: project_link_bridge_payload_contract_target(
+                id,
+                BridgePayloadDirection::Downlink,
+            ),
+            _unit: id,
+        });
+    }
     if let Some(unit) = name
         .strip_prefix("project_profile_data_")
         .and_then(|suffix| suffix.strip_suffix("_uplink_payload_class_type"))
@@ -620,6 +673,29 @@ fn classify_project_contract_node(name: &str) -> Option<ProjectContract<'_>> {
     None
 }
 
+fn project_link_bridge_contract_target(id: &str, stage: bool) -> String {
+    let marker = if stage {
+        "uplink_window_policy"
+    } else {
+        "uplink_payload_shape"
+    };
+    if let Some(data_unit) = id.split("_via_data_").nth(1) {
+        return format!("project_profile_data_{data_unit}_{marker}");
+    }
+    format!("project_link_{id}_missing_target")
+}
+
+fn project_link_bridge_payload_contract_target(id: &str, direction: BridgePayloadDirection) -> String {
+    let marker = match direction {
+        BridgePayloadDirection::Uplink => "uplink_payload_shape",
+        BridgePayloadDirection::Downlink => "downlink_payload_shape",
+    };
+    if let Some(data_unit) = id.split("_via_data_").nth(1) {
+        return format!("project_profile_data_{data_unit}_{marker}");
+    }
+    format!("project_link_{id}_missing_target")
+}
+
 fn require_prefixed_contract_value(
     node_name: &str,
     value: &str,
@@ -631,6 +707,100 @@ fn require_prefixed_contract_value(
         ));
     }
     Ok(())
+}
+
+fn verify_bridge_stage_contract_text(node_name: &str, value: &str) -> Result<(), String> {
+    let fields = parse_semicolon_kv_contract(node_name, value, "bridge stage")?;
+    let uplink = fields.get("uplink").ok_or_else(|| {
+        format!("project contract node `{node_name}` is missing bridge `uplink` stage")
+    })?;
+    let downlink = fields.get("downlink").ok_or_else(|| {
+        format!("project contract node `{node_name}` is missing bridge `downlink` stage")
+    })?;
+    if *uplink != "windowed" || *downlink != "windowed" {
+        return Err(format!(
+            "project contract node `{node_name}` currently expects `uplink=windowed;downlink=windowed`, got `{value}`"
+        ));
+    }
+    Ok(())
+}
+
+fn verify_bridge_payload_contract_text(
+    nodes: &BTreeMap<&str, &Node>,
+    node_name: &str,
+    value: &str,
+    target: &Node,
+    direction: BridgePayloadDirection,
+) -> Result<(), String> {
+    if value.is_empty() || value == "unknown" {
+        return Err(format!(
+            "project contract node `{node_name}` requires non-empty bridge payload, got `{value}`"
+        ));
+    }
+    if !value.starts_with("Window<") {
+        return Err(format!(
+            "project contract node `{node_name}` currently expects bridge payload to be `Window<...>`, got `{value}`"
+        ));
+    }
+    let expected_shape = payload_shape_contract_for_bridge_payload(value).ok_or_else(|| {
+        format!("project contract node `{node_name}` could not derive payload shape from `{value}`")
+    })?;
+    let target_shape_node_name = format!("{}_type", target.name);
+    let target_shape_node = nodes
+        .get(target_shape_node_name.as_str())
+        .copied()
+        .unwrap_or(target);
+    let target_shape = target_shape_node
+        .op
+        .args
+        .first()
+        .map(|value| value.as_str())
+        .ok_or_else(|| {
+            format!(
+                "project contract node `{node_name}` targets `{}` without payload shape text",
+                target_shape_node.name
+            )
+        })?;
+    if target_shape != expected_shape {
+        let direction = match direction {
+            BridgePayloadDirection::Uplink => "uplink",
+            BridgePayloadDirection::Downlink => "downlink",
+        };
+        return Err(format!(
+            "project contract node `{node_name}` has {direction} bridge payload `{value}` requiring `{expected_shape}`, but target `{}` encodes `{target_shape}`",
+            target_shape_node.name
+        ));
+    }
+    Ok(())
+}
+
+fn payload_shape_contract_for_bridge_payload(value: &str) -> Option<String> {
+    let normalized = value.replace(['<', '>'], "");
+    Some(format!("PayloadShape{}", sanitize_contract_type_fragment(&normalized)))
+}
+
+fn sanitize_contract_type_fragment(value: &str) -> String {
+    value
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric() || *ch == '_')
+        .collect()
+}
+
+fn parse_semicolon_kv_contract<'a>(
+    node_name: &str,
+    value: &'a str,
+    label: &str,
+) -> Result<BTreeMap<&'a str, &'a str>, String> {
+    value
+        .split(';')
+        .filter(|entry| !entry.trim().is_empty())
+        .map(|entry| {
+            let (key, raw) = entry.split_once('=').ok_or_else(|| {
+                format!("project contract node `{node_name}` has invalid {label} field `{entry}`")
+            })?;
+            Ok((key.trim(), raw.trim()))
+        })
+        .collect::<Result<BTreeMap<_, _>, String>>()
 }
 
 fn verify_kernel_slot_contract_text(
@@ -1997,5 +2167,84 @@ mod tests {
 
         let error = verify_module(&module).unwrap_err();
         assert!(error.contains("expects `cpu.join_result` input"));
+    }
+
+    #[test]
+    fn rejects_invalid_project_bridge_stage_contract() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![Resource {
+                name: "cpu0".to_owned(),
+                kind: ResourceKind::parse("cpu.arm64"),
+            }],
+            nodes: vec![
+                node(
+                    "project_link_cpu_Main_to_shader_SurfaceShader_via_data_FabricPlane_bridge_stage_type",
+                    "cpu0",
+                    "cpu.text",
+                    &["uplink=ready;downlink=windowed"],
+                ),
+                node(
+                    "project_profile_data_FabricPlane_uplink_window_policy",
+                    "cpu0",
+                    "cpu.text",
+                    &["marker"],
+                ),
+            ],
+            edges: vec![dep(
+                "project_link_cpu_Main_to_shader_SurfaceShader_via_data_FabricPlane_bridge_stage_type",
+                "project_profile_data_FabricPlane_uplink_window_policy",
+            )],
+            node_lanes: BTreeMap::new(),
+        };
+
+        let error = verify_module(&module).unwrap_err();
+        assert!(error.contains("uplink=windowed;downlink=windowed"));
+    }
+
+    #[test]
+    fn rejects_bridge_payload_shape_mismatch() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![Resource {
+                name: "cpu0".to_owned(),
+                kind: ResourceKind::parse("cpu.arm64"),
+            }],
+            nodes: vec![
+                node(
+                    "project_link_cpu_Main_to_shader_SurfaceShader_via_data_FabricPlane_uplink_bridge_payload_type",
+                    "cpu0",
+                    "cpu.text",
+                    &["Window<SurfaceShaderPacket>"],
+                ),
+                node(
+                    "project_profile_data_FabricPlane_uplink_payload_shape",
+                    "cpu0",
+                    "cpu.text",
+                    &["uplink_payload_shape"],
+                ),
+                node(
+                    "project_profile_data_FabricPlane_uplink_payload_shape_type",
+                    "cpu0",
+                    "cpu.text",
+                    &["PayloadShapeWindowFrame"],
+                ),
+            ],
+            edges: vec![
+                dep(
+                    "project_link_cpu_Main_to_shader_SurfaceShader_via_data_FabricPlane_uplink_bridge_payload_type",
+                    "project_profile_data_FabricPlane_uplink_payload_shape",
+                ),
+                dep(
+                    "project_profile_data_FabricPlane_uplink_payload_shape_type",
+                    "project_profile_data_FabricPlane_uplink_payload_shape",
+                ),
+            ],
+            node_lanes: BTreeMap::new(),
+        };
+
+        let error = verify_module(&module).unwrap_err();
+        assert!(error.contains("PayloadShapeWindowSurfaceShaderPacket"));
+        assert!(error.contains("PayloadShapeWindowFrame"));
     }
 }
