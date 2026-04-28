@@ -56,6 +56,8 @@ pub enum CommandKind {
         input: PathBuf,
         output_dir: PathBuf,
         verbose_cache: bool,
+        cpu_abi: Option<String>,
+        target: Option<String>,
     },
 }
 
@@ -235,17 +237,29 @@ where
         }),
         "compile" => {
             let mut verbose_cache = false;
+            let mut cpu_abi = None;
+            let mut target = None;
             let mut positional = Vec::new();
-            for arg in args.by_ref() {
+            while let Some(arg) = args.next() {
                 if arg == "--verbose-cache" {
                     verbose_cache = true;
+                } else if arg == "--cpu-abi" {
+                    cpu_abi = Some(args.next().ok_or_else(|| {
+                        "usage: nuisc compile [--verbose-cache] [--cpu-abi ABI] [--target TRIPLE] <input.ns|project-dir|nuis.toml> <output-dir>"
+                            .to_owned()
+                    })?);
+                } else if arg == "--target" {
+                    target = Some(args.next().ok_or_else(|| {
+                        "usage: nuisc compile [--verbose-cache] [--cpu-abi ABI] [--target TRIPLE] <input.ns|project-dir|nuis.toml> <output-dir>"
+                            .to_owned()
+                    })?);
                 } else {
                     positional.push(arg);
                 }
             }
             if positional.len() != 2 {
                 return Err(
-                    "usage: nuisc compile [--verbose-cache] <input.ns|project-dir|nuis.toml> <output-dir>"
+                    "usage: nuisc compile [--verbose-cache] [--cpu-abi ABI] [--target TRIPLE] <input.ns|project-dir|nuis.toml> <output-dir>"
                         .to_owned(),
                 );
             }
@@ -253,6 +267,8 @@ where
                 input: PathBuf::from(&positional[0]),
                 output_dir: PathBuf::from(&positional[1]),
                 verbose_cache,
+                cpu_abi,
+                target,
             })
         }
         other => Err(format!(

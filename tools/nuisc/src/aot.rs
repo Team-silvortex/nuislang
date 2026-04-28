@@ -37,12 +37,24 @@ pub struct BuildManifestContext {
     pub loaded_nustar: Vec<String>,
     pub compile_cache: Option<BuildManifestCacheInfo>,
     pub project: Option<BuildManifestProjectInfo>,
+    pub cpu_target: CpuBuildTarget,
 }
 
 pub struct BuildManifestCacheInfo {
     pub status: String,
     pub key: String,
     pub root: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CpuBuildTarget {
+    pub abi: String,
+    pub machine_arch: String,
+    pub machine_os: String,
+    pub object_format: String,
+    pub calling_abi: String,
+    pub clang_target: String,
+    pub cross_compile: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -55,6 +67,139 @@ enum VcsInfo {
     None,
 }
 
+pub fn host_cpu_build_target() -> CpuBuildTarget {
+    let machine_arch = host_machine_arch().to_owned();
+    let machine_os = host_machine_os().to_owned();
+    let object_format = host_object_format().to_owned();
+    let calling_abi = host_calling_abi().to_owned();
+    CpuBuildTarget {
+        abi: format!("cpu.{machine_arch}.{calling_abi}"),
+        machine_arch: machine_arch.clone(),
+        machine_os: machine_os.clone(),
+        object_format,
+        calling_abi,
+        clang_target: clang_target_triple(&machine_arch, &machine_os),
+        cross_compile: false,
+    }
+}
+
+pub fn resolve_cpu_build_target_from_project_abi(
+    resolution: Option<&crate::project::ProjectAbiResolution>,
+) -> Result<CpuBuildTarget, String> {
+    let Some(cpu_abi) = resolution.and_then(|resolution| {
+        resolution
+            .requirements
+            .iter()
+            .find(|item| item.domain == "cpu")
+            .map(|item| item.abi.as_str())
+    }) else {
+        return Ok(host_cpu_build_target());
+    };
+    resolve_cpu_build_target_from_abi(cpu_abi)
+}
+
+pub fn resolve_cpu_build_target(
+    resolution: Option<&crate::project::ProjectAbiResolution>,
+    cpu_abi_override: Option<&str>,
+    target_override: Option<&str>,
+) -> Result<CpuBuildTarget, String> {
+    let mut target = if let Some(cpu_abi) = cpu_abi_override {
+        resolve_cpu_build_target_from_abi(cpu_abi)?
+    } else if let Some(target) = target_override {
+        resolve_cpu_build_target_from_target(target, resolution)?
+    } else {
+        resolve_cpu_build_target_from_project_abi(resolution)?
+    };
+
+    if let Some(target_text) = target_override {
+        let explicit_target = resolve_cpu_build_target_from_target(target_text, resolution)?;
+        if target.machine_arch != explicit_target.machine_arch
+            || target.machine_os != explicit_target.machine_os
+        {
+            return Err(format!(
+                "`--cpu-abi {}` resolves to {}-{}, but `--target {}` resolves to {}-{}",
+                target.abi,
+                target.machine_arch,
+                target.machine_os,
+                target_text,
+                explicit_target.machine_arch,
+                explicit_target.machine_os
+            ));
+        }
+        target.clang_target = explicit_target.clang_target;
+        target.machine_arch = explicit_target.machine_arch;
+        target.machine_os = explicit_target.machine_os;
+        target.object_format = explicit_target.object_format;
+        target.calling_abi = explicit_target.calling_abi;
+        target.cross_compile = explicit_target.cross_compile;
+    }
+
+    Ok(target)
+}
+
+pub fn resolve_cpu_build_target_from_abi(abi: &str) -> Result<CpuBuildTarget, String> {
+    let lower = abi.to_ascii_lowercase();
+    let (machine_arch, machine_os, object_format, calling_abi) =
+        if lower.contains("arm64") && (lower.contains("apple") || lower.contains("darwin")) {
+            ("arm64", "darwin", "mach-o", "aapcs64-darwin")
+        } else if lower.contains("arm64") && lower.contains("linux") {
+            ("arm64", "linux", "elf", "aapcs64")
+        } else if lower.contains("arm64") && lower.contains("nurs.c-abi") {
+            let os = host_machine_os();
+            (
+                "arm64",
+                os,
+                object_format_for_os(os),
+                calling_abi_for_machine("arm64", os),
+            )
+        } else if lower.contains("x86_64") && (lower.contains("win64") || lower.contains("windows"))
+        {
+            ("x86_64", "windows", "coff", "win64")
+        } else if lower.contains("x86_64") && lower.contains("sysv64") {
+            ("x86_64", "linux", "elf", "sysv64")
+        } else {
+            return Err(format!(
+                "unsupported cpu ABI profile `{abi}` for CPU AOT target resolution"
+            ));
+        };
+    Ok(CpuBuildTarget {
+        abi: abi.to_owned(),
+        machine_arch: machine_arch.to_owned(),
+        machine_os: machine_os.to_owned(),
+        object_format: object_format.to_owned(),
+        calling_abi: calling_abi.to_owned(),
+        clang_target: clang_target_triple(machine_arch, machine_os),
+        cross_compile: machine_arch != host_machine_arch() || machine_os != host_machine_os(),
+    })
+}
+
+pub fn resolve_cpu_build_target_from_target(
+    target: &str,
+    resolution: Option<&crate::project::ProjectAbiResolution>,
+) -> Result<CpuBuildTarget, String> {
+    let (machine_arch, machine_os) = parse_clang_target_triple(target)?;
+    let object_format = object_format_for_os(machine_os);
+    let calling_abi = calling_abi_for_machine(machine_arch, machine_os);
+    let abi = resolution
+        .and_then(|resolution| {
+            resolution
+                .requirements
+                .iter()
+                .find(|item| item.domain == "cpu")
+                .map(|item| item.abi.clone())
+        })
+        .unwrap_or_else(|| format!("cpu.{machine_arch}.{calling_abi}"));
+    Ok(CpuBuildTarget {
+        abi,
+        machine_arch: machine_arch.to_owned(),
+        machine_os: machine_os.to_owned(),
+        object_format: object_format.to_owned(),
+        calling_abi: calling_abi.to_owned(),
+        clang_target: target.to_owned(),
+        cross_compile: machine_arch != host_machine_arch() || machine_os != host_machine_os(),
+    })
+}
+
 pub fn write_and_link(
     input: &Path,
     output_dir: &Path,
@@ -62,6 +207,7 @@ pub fn write_and_link(
     nir: &NirModule,
     yir: &YirModule,
     llvm_ir: &str,
+    cpu_target: &CpuBuildTarget,
 ) -> Result<CompileArtifacts, String> {
     fs::create_dir_all(output_dir)
         .map_err(|error| format!("failed to create `{}`: {error}", output_dir.display()))?;
@@ -86,9 +232,9 @@ pub fn write_and_link(
         .map_err(|error| format!("failed to write `{}`: {error}", shim_path.display()))?;
 
     let (binary_path, packaging_mode) = if requires_window_bundle(yir) {
-        build_window_bundle(&yir_path, output_dir, &exe_path)?
+        build_window_bundle(&yir_path, output_dir, &exe_path, cpu_target)?
     } else {
-        compile_native_binary(&ll_path, &shim_path, &exe_path)?;
+        compile_native_binary(&ll_path, &shim_path, &exe_path, cpu_target)?;
         (exe_path.display().to_string(), "native-cpu-llvm".to_owned())
     };
 
@@ -192,6 +338,38 @@ pub fn write_build_manifest(
     out.push_str(&format!(
         "packaging_mode = \"{}\"\n",
         escape_toml_string(&written.packaging_mode)
+    ));
+    out.push_str(&format!(
+        "cpu_target_abi = \"{}\"\n",
+        escape_toml_string(&context.cpu_target.abi)
+    ));
+    out.push_str(&format!(
+        "cpu_target_machine_arch = \"{}\"\n",
+        escape_toml_string(&context.cpu_target.machine_arch)
+    ));
+    out.push_str(&format!(
+        "cpu_target_machine_os = \"{}\"\n",
+        escape_toml_string(&context.cpu_target.machine_os)
+    ));
+    out.push_str(&format!(
+        "cpu_target_object_format = \"{}\"\n",
+        escape_toml_string(&context.cpu_target.object_format)
+    ));
+    out.push_str(&format!(
+        "cpu_target_calling_abi = \"{}\"\n",
+        escape_toml_string(&context.cpu_target.calling_abi)
+    ));
+    out.push_str(&format!(
+        "cpu_target_clang = \"{}\"\n",
+        escape_toml_string(&context.cpu_target.clang_target)
+    ));
+    out.push_str(&format!(
+        "cpu_target_cross = {}\n",
+        if context.cpu_target.cross_compile {
+            "true"
+        } else {
+            "false"
+        }
     ));
     out.push_str(&format!(
         "tool_nuisc = \"{}\"\n",
@@ -420,6 +598,13 @@ pub struct BuildManifestVerifyReport {
     pub input: String,
     pub output_dir: String,
     pub packaging_mode: String,
+    pub cpu_target_abi: String,
+    pub cpu_target_machine_arch: String,
+    pub cpu_target_machine_os: String,
+    pub cpu_target_object_format: String,
+    pub cpu_target_calling_abi: String,
+    pub cpu_target_clang: String,
+    pub cpu_target_cross: bool,
     pub compile_cache_status: Option<String>,
     pub compile_cache_key: Option<String>,
     pub compile_cache_root: Option<String>,
@@ -440,6 +625,17 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
     let input = parse_required_toml_string(&source, "input", path)?;
     let output_dir = parse_required_toml_string(&source, "output_dir", path)?;
     let packaging_mode = parse_required_toml_string(&source, "packaging_mode", path)?;
+    let cpu_target_abi = parse_required_toml_string(&source, "cpu_target_abi", path)?;
+    let cpu_target_machine_arch =
+        parse_required_toml_string(&source, "cpu_target_machine_arch", path)?;
+    let cpu_target_machine_os =
+        parse_required_toml_string(&source, "cpu_target_machine_os", path)?;
+    let cpu_target_object_format =
+        parse_required_toml_string(&source, "cpu_target_object_format", path)?;
+    let cpu_target_calling_abi =
+        parse_required_toml_string(&source, "cpu_target_calling_abi", path)?;
+    let cpu_target_clang = parse_required_toml_string(&source, "cpu_target_clang", path)?;
+    let cpu_target_cross = parse_required_toml_bool(&source, "cpu_target_cross", path)?;
     let compile_cache_status = parse_optional_toml_string(&source, "compile_cache_status");
     let compile_cache_key = parse_optional_toml_string(&source, "compile_cache_key");
     let compile_cache_root = parse_optional_toml_string(&source, "compile_cache_root");
@@ -478,6 +674,13 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
         input,
         output_dir,
         packaging_mode,
+        cpu_target_abi,
+        cpu_target_machine_arch,
+        cpu_target_machine_os,
+        cpu_target_object_format,
+        cpu_target_calling_abi,
+        cpu_target_clang,
+        cpu_target_cross,
         compile_cache_status,
         compile_cache_key,
         compile_cache_root,
@@ -551,6 +754,11 @@ fn parse_required_toml_string(source: &str, key: &str, path: &Path) -> Result<St
         .ok_or_else(|| format!("`{}` is missing required key `{key}`", path.display()))
 }
 
+fn parse_required_toml_bool(source: &str, key: &str, path: &Path) -> Result<bool, String> {
+    parse_optional_toml_bool(source, key)
+        .ok_or_else(|| format!("`{}` is missing required key `{key}`", path.display()))
+}
+
 fn parse_optional_toml_string(source: &str, key: &str) -> Option<String> {
     let prefix = format!("{key} = ");
     for raw in source.lines() {
@@ -561,6 +769,21 @@ fn parse_optional_toml_string(source: &str, key: &str) -> Option<String> {
                 return Some(value[1..value.len() - 1].to_owned());
             }
             return None;
+        }
+    }
+    None
+}
+
+fn parse_optional_toml_bool(source: &str, key: &str) -> Option<bool> {
+    let prefix = format!("{key} = ");
+    for raw in source.lines() {
+        let line = raw.trim();
+        if let Some(rest) = line.strip_prefix(&prefix) {
+            return match rest.trim() {
+                "true" => Some(true),
+                "false" => Some(false),
+                _ => None,
+            };
         }
     }
     None
@@ -611,11 +834,97 @@ fn requires_window_bundle(yir: &YirModule) -> bool {
         .any(|node| node.op.module == "cpu" && node.op.instruction == "window")
 }
 
+fn host_machine_arch() -> &'static str {
+    match std::env::consts::ARCH {
+        "aarch64" => "arm64",
+        other => other,
+    }
+}
+
+fn host_machine_os() -> &'static str {
+    match std::env::consts::OS {
+        "macos" => "darwin",
+        other => other,
+    }
+}
+
+fn object_format_for_os(os: &str) -> &'static str {
+    match os {
+        "darwin" => "mach-o",
+        "linux" => "elf",
+        "windows" => "coff",
+        _ => "unknown",
+    }
+}
+
+fn calling_abi_for_machine(machine_arch: &str, machine_os: &str) -> &'static str {
+    match (machine_arch, machine_os) {
+        ("arm64", "darwin") => "aapcs64-darwin",
+        ("arm64", _) => "aapcs64",
+        ("x86_64", "windows") => "win64",
+        ("x86_64", _) => "sysv64",
+        _ => "unknown",
+    }
+}
+
+fn host_object_format() -> &'static str {
+    object_format_for_os(host_machine_os())
+}
+
+fn host_calling_abi() -> &'static str {
+    calling_abi_for_machine(host_machine_arch(), host_machine_os())
+}
+
+fn clang_target_triple(machine_arch: &str, machine_os: &str) -> String {
+    match (machine_arch, machine_os) {
+        ("arm64", "darwin") => "aarch64-apple-darwin".to_owned(),
+        ("arm64", "linux") => "aarch64-unknown-linux-gnu".to_owned(),
+        ("x86_64", "linux") => "x86_64-unknown-linux-gnu".to_owned(),
+        ("x86_64", "windows") => "x86_64-pc-windows-msvc".to_owned(),
+        _ => format!("{machine_arch}-unknown-{machine_os}"),
+    }
+}
+
+fn parse_clang_target_triple(target: &str) -> Result<(&'static str, &'static str), String> {
+    let lower = target.to_ascii_lowercase();
+    let machine_arch = if lower.starts_with("aarch64-") || lower.starts_with("arm64-") {
+        "arm64"
+    } else if lower.starts_with("x86_64-") || lower.starts_with("amd64-") {
+        "x86_64"
+    } else {
+        return Err(format!(
+            "unsupported CPU target triple `{target}`; expected arm64/aarch64 or x86_64 family"
+        ));
+    };
+    let machine_os = if lower.contains("apple-darwin")
+        || lower.contains("unknown-darwin")
+        || lower.contains("macos")
+    {
+        "darwin"
+    } else if lower.contains("windows") || lower.contains("msvc") || lower.contains("mingw") {
+        "windows"
+    } else if lower.contains("linux") {
+        "linux"
+    } else {
+        return Err(format!(
+            "unsupported CPU target triple `{target}`; expected darwin/linux/windows flavor"
+        ));
+    };
+    Ok((machine_arch, machine_os))
+}
+
 fn build_window_bundle(
     yir_path: &Path,
     output_dir: &Path,
     exe_path: &Path,
+    cpu_target: &CpuBuildTarget,
 ) -> Result<(String, String), String> {
+    if cpu_target.cross_compile {
+        return Err(format!(
+            "window AOT bundle packaging does not support cross-compiling yet; requested `{}` -> {}",
+            cpu_target.abi, cpu_target.clang_target
+        ));
+    }
     let output = Command::new("cargo")
         .arg("run")
         .arg("-p")
@@ -641,8 +950,15 @@ fn build_window_bundle(
     ))
 }
 
-fn compile_native_binary(ll_path: &Path, shim_path: &Path, exe_path: &Path) -> Result<(), String> {
+fn compile_native_binary(
+    ll_path: &Path,
+    shim_path: &Path,
+    exe_path: &Path,
+    cpu_target: &CpuBuildTarget,
+) -> Result<(), String> {
     let output = Command::new("/usr/bin/clang")
+        .arg("-target")
+        .arg(&cpu_target.clang_target)
         .arg(ll_path)
         .arg(shim_path)
         .arg("-O2")
@@ -816,5 +1132,138 @@ fn c_type_for_ast_type(ty: &AstTypeRef) -> &'static str {
         "f64" => "double",
         "bool" => "int32_t",
         _ => "int64_t",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        resolve_cpu_build_target_from_abi, verify_build_manifest, BuildManifestCacheInfo,
+        BuildManifestContext, BuildManifestProjectInfo, CompileArtifacts, CpuBuildTarget,
+    };
+    use std::{
+        fs,
+        path::PathBuf,
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
+    fn temp_dir(label: &str) -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("nuis_{label}_{nonce}"));
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn resolve_cpu_build_target_for_known_abis() {
+        let apple = resolve_cpu_build_target_from_abi("cpu.arm64.apple_aapcs64").unwrap();
+        assert_eq!(apple.machine_arch, "arm64");
+        assert_eq!(apple.machine_os, "darwin");
+        assert_eq!(apple.clang_target, "aarch64-apple-darwin");
+
+        let linux = resolve_cpu_build_target_from_abi("cpu.x86_64.sysv64").unwrap();
+        assert_eq!(linux.machine_arch, "x86_64");
+        assert_eq!(linux.machine_os, "linux");
+        assert_eq!(linux.object_format, "elf");
+        assert_eq!(linux.calling_abi, "sysv64");
+
+        let windows = resolve_cpu_build_target_from_abi("cpu.x86_64.win64").unwrap();
+        assert_eq!(windows.machine_os, "windows");
+        assert_eq!(windows.clang_target, "x86_64-pc-windows-msvc");
+    }
+
+    #[test]
+    fn resolve_cpu_build_target_from_target_triple() {
+        let target = super::resolve_cpu_build_target_from_target(
+            "x86_64-unknown-linux-gnu",
+            None,
+        )
+        .unwrap();
+        assert_eq!(target.machine_arch, "x86_64");
+        assert_eq!(target.machine_os, "linux");
+        assert_eq!(target.object_format, "elf");
+        assert_eq!(target.calling_abi, "sysv64");
+    }
+
+    #[test]
+    fn reject_conflicting_cpu_abi_and_target_override() {
+        let error = super::resolve_cpu_build_target(
+            None,
+            Some("cpu.arm64.apple_aapcs64"),
+            Some("x86_64-unknown-linux-gnu"),
+        )
+        .unwrap_err();
+        assert!(error.contains("--cpu-abi"));
+        assert!(error.contains("--target"));
+    }
+
+    #[test]
+    fn build_manifest_round_trips_cpu_target_metadata() {
+        let dir = temp_dir("build_manifest_cpu_target");
+        let ast = dir.join("demo.ast.txt");
+        let nir = dir.join("demo.nir.txt");
+        let yir = dir.join("demo.yir");
+        let ll = dir.join("demo.ll");
+        let bin = dir.join("demo.bin");
+        fs::write(&ast, "ast").unwrap();
+        fs::write(&nir, "nir").unwrap();
+        fs::write(&yir, "yir").unwrap();
+        fs::write(&ll, "llvm").unwrap();
+        fs::write(&bin, "bin").unwrap();
+
+        let written = CompileArtifacts {
+            ast_path: ast.display().to_string(),
+            nir_path: nir.display().to_string(),
+            yir_path: yir.display().to_string(),
+            llvm_ir_path: ll.display().to_string(),
+            binary_path: bin.display().to_string(),
+            packaging_mode: "native-cpu-llvm".to_owned(),
+        };
+        let cpu_target = CpuBuildTarget {
+            abi: "cpu.x86_64.sysv64".to_owned(),
+            machine_arch: "x86_64".to_owned(),
+            machine_os: "linux".to_owned(),
+            object_format: "elf".to_owned(),
+            calling_abi: "sysv64".to_owned(),
+            clang_target: "x86_64-unknown-linux-gnu".to_owned(),
+            cross_compile: true,
+        };
+        let manifest = super::write_build_manifest(
+            &dir,
+            &written,
+            &BuildManifestContext {
+                input_path: "/tmp/demo.ns".to_owned(),
+                output_dir: dir.display().to_string(),
+                loaded_nustar: vec!["official.cpu".to_owned()],
+                compile_cache: Some(BuildManifestCacheInfo {
+                    status: "miss".to_owned(),
+                    key: "abc".to_owned(),
+                    root: "/tmp/cache".to_owned(),
+                }),
+                project: Some(BuildManifestProjectInfo {
+                    name: "demo".to_owned(),
+                    abi_mode: "explicit".to_owned(),
+                    abi_entries: vec![("cpu".to_owned(), cpu_target.abi.clone())],
+                    manifest_copy_path: None,
+                    modules_index_path: None,
+                    links_index_path: None,
+                    host_ffi_index_path: None,
+                    abi_index_path: None,
+                }),
+                cpu_target: cpu_target.clone(),
+            },
+        )
+        .unwrap();
+        let report = verify_build_manifest(PathBuf::from(manifest).as_path()).unwrap();
+        assert_eq!(report.cpu_target_abi, cpu_target.abi);
+        assert_eq!(report.cpu_target_machine_arch, cpu_target.machine_arch);
+        assert_eq!(report.cpu_target_machine_os, cpu_target.machine_os);
+        assert_eq!(report.cpu_target_object_format, cpu_target.object_format);
+        assert_eq!(report.cpu_target_calling_abi, cpu_target.calling_abi);
+        assert_eq!(report.cpu_target_clang, cpu_target.clang_target);
+        assert!(report.cpu_target_cross);
     }
 }

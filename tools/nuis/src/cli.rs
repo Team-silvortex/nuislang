@@ -44,6 +44,8 @@ pub enum CommandKind {
     ReleaseCheck {
         input: PathBuf,
         output_dir: PathBuf,
+        cpu_abi: Option<String>,
+        target: Option<String>,
     },
     Check {
         input: PathBuf,
@@ -52,6 +54,8 @@ pub enum CommandKind {
         input: PathBuf,
         output_dir: PathBuf,
         verbose_cache: bool,
+        cpu_abi: Option<String>,
+        target: Option<String>,
     },
     DumpAst {
         input: PathBuf,
@@ -271,8 +275,26 @@ where
             })
         }
         "release-check" => {
-            let input = PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned()));
-            let output_dir = PathBuf::from(args.next().unwrap_or_else(|| {
+            let mut cpu_abi = None;
+            let mut target = None;
+            let mut positional = Vec::new();
+            while let Some(arg) = args.next() {
+                if arg == "--cpu-abi" {
+                    cpu_abi = Some(args.next().ok_or_else(|| {
+                        "usage: nuis release-check [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] [output-dir]"
+                            .to_owned()
+                    })?);
+                } else if arg == "--target" {
+                    target = Some(args.next().ok_or_else(|| {
+                        "usage: nuis release-check [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] [output-dir]"
+                            .to_owned()
+                    })?);
+                } else {
+                    positional.push(arg);
+                }
+            }
+            let input = PathBuf::from(positional.first().cloned().unwrap_or_else(|| ".".to_owned()));
+            let output_dir = PathBuf::from(positional.get(1).cloned().unwrap_or_else(|| {
                 format!(
                     "target/nuis-release-check/{}",
                     sanitize_path_label(
@@ -284,17 +306,40 @@ where
                     )
                 )
             }));
-            Ok(CommandKind::ReleaseCheck { input, output_dir })
+            if positional.len() > 2 {
+                return Err(
+                    "usage: nuis release-check [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] [output-dir]"
+                        .to_owned(),
+                );
+            }
+            Ok(CommandKind::ReleaseCheck {
+                input,
+                output_dir,
+                cpu_abi,
+                target,
+            })
         }
         "check" => Ok(CommandKind::Check {
             input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
         }),
         "build" => {
             let mut verbose_cache = false;
+            let mut cpu_abi = None;
+            let mut target = None;
             let mut positional = Vec::new();
-            for arg in args.by_ref() {
+            while let Some(arg) = args.next() {
                 if arg == "--verbose-cache" {
                     verbose_cache = true;
+                } else if arg == "--cpu-abi" {
+                    cpu_abi = Some(args.next().ok_or_else(|| {
+                        "usage: nuis build [--verbose-cache] [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] <output-dir>"
+                            .to_owned()
+                    })?);
+                } else if arg == "--target" {
+                    target = Some(args.next().ok_or_else(|| {
+                        "usage: nuis build [--verbose-cache] [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] <output-dir>"
+                            .to_owned()
+                    })?);
                 } else {
                     positional.push(arg);
                 }
@@ -304,7 +349,7 @@ where
                 2 => (PathBuf::from(&positional[0]), PathBuf::from(&positional[1])),
                 _ => {
                     return Err(
-                        "usage: nuis build [--verbose-cache] [input.ns|project-dir|nuis.toml] <output-dir>"
+                        "usage: nuis build [--verbose-cache] [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] <output-dir>"
                             .to_owned(),
                     )
                 }
@@ -313,6 +358,8 @@ where
                 input,
                 output_dir,
                 verbose_cache,
+                cpu_abi,
+                target,
             })
         }
         "dump-ast" => Ok(CommandKind::DumpAst {

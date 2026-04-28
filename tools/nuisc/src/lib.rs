@@ -487,6 +487,18 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             println!("  input: {}", report.input);
             println!("  output_dir: {}", report.output_dir);
             println!("  packaging_mode: {}", report.packaging_mode);
+            println!("  cpu_target_abi: {}", report.cpu_target_abi);
+            println!(
+                "  cpu_target_machine: {}-{}",
+                report.cpu_target_machine_arch, report.cpu_target_machine_os
+            );
+            println!("  cpu_target_object_format: {}", report.cpu_target_object_format);
+            println!("  cpu_target_calling_abi: {}", report.cpu_target_calling_abi);
+            println!("  cpu_target_clang: {}", report.cpu_target_clang);
+            println!(
+                "  cpu_target_cross: {}",
+                if report.cpu_target_cross { "true" } else { "false" }
+            );
             if let Some(status) = report.compile_cache_status {
                 println!("  compile_cache_status: {}", status);
             }
@@ -839,12 +851,24 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             input,
             output_dir,
             verbose_cache,
+            cpu_abi,
+            target,
         } => {
             let project = if project::is_project_input(&input) {
                 Some(project::load_project(&input)?)
             } else {
                 None
             };
+            let project_abi_resolution = if let Some(project) = &project {
+                Some(project::resolve_project_abi(project)?)
+            } else {
+                None
+            };
+            let cpu_target = aot::resolve_cpu_build_target(
+                project_abi_resolution.as_ref(),
+                cpu_abi.as_deref(),
+                target.as_deref(),
+            )?;
             let effective_input = if let Some(project) = &project {
                 project.root.join(format!("{}.ns", project.manifest.name))
             } else {
@@ -868,17 +892,13 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     &artifacts.nir,
                     &artifacts.yir,
                     &artifacts.llvm_ir,
+                    &cpu_target,
                 )?;
                 let _ = cache::store_compile_cache(&cache_key, &output_dir)?;
                 written
             };
             let project_metadata = if let Some(project) = &project {
                 Some(project::write_project_metadata(&output_dir, project)?)
-            } else {
-                None
-            };
-            let project_abi_resolution = if let Some(project) = &project {
-                Some(project::resolve_project_abi(project)?)
             } else {
                 None
             };
@@ -938,6 +958,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                                 .as_ref()
                                 .map(|item| item.abi_index_path.clone()),
                         }),
+                    cpu_target: cpu_target.clone(),
                 },
             )?;
             println!("compiled nuis source: {}", input.display());
@@ -963,6 +984,20 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     .map(String::as_str)
                     .collect::<Vec<_>>()
                     .join(", ")
+            );
+            println!("cpu_target_abi: {}", cpu_target.abi);
+            println!(
+                "cpu_target_machine: {}-{}",
+                cpu_target.machine_arch, cpu_target.machine_os
+            );
+            println!("cpu_target_clang: {}", cpu_target.clang_target);
+            println!(
+                "cpu_target_cross: {}",
+                if cpu_target.cross_compile {
+                    "true"
+                } else {
+                    "false"
+                }
             );
             println!("ast: {}", written.ast_path);
             println!("nir: {}", written.nir_path);

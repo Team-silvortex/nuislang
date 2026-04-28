@@ -78,7 +78,12 @@ fn run() -> Result<(), String> {
                 json,
             })?;
         }
-        cli::CommandKind::ReleaseCheck { input, output_dir } => {
+        cli::CommandKind::ReleaseCheck {
+            input,
+            output_dir,
+            cpu_abi,
+            target,
+        } => {
             println!("release-check: check");
             nuisc::run(nuisc::CommandKind::Check {
                 input: input.clone(),
@@ -88,6 +93,8 @@ fn run() -> Result<(), String> {
                 input: input.clone(),
                 output_dir: output_dir.clone(),
                 verbose_cache: false,
+                cpu_abi,
+                target,
             })?;
             println!("release-check: verify-build-manifest");
             let manifest = output_dir.join("nuis.build.manifest.toml");
@@ -105,11 +112,15 @@ fn run() -> Result<(), String> {
             input,
             output_dir,
             verbose_cache,
+            cpu_abi,
+            target,
         } => {
             nuisc::run(nuisc::CommandKind::Compile {
                 input,
                 output_dir,
                 verbose_cache,
+                cpu_abi,
+                target,
             })?;
         }
         cli::CommandKind::DumpAst { input } => {
@@ -459,7 +470,9 @@ fn print_help() {
     println!("  nuis fmt [input.ns|project-dir|nuis.toml]");
     println!("  nuis bindings <input.ns|project-dir|nuis.toml>");
     println!("  nuis check [input.ns|project-dir|nuis.toml]");
-    println!("  nuis build [--verbose-cache] [input.ns|project-dir|nuis.toml] <output-dir>");
+    println!(
+        "  nuis build [--verbose-cache] [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] <output-dir>"
+    );
     println!("  nuis dump-ast [input.ns|project-dir|nuis.toml]");
     println!("  nuis dump-nir [input.ns|project-dir|nuis.toml]");
     println!("  nuis dump-yir [input.ns|project-dir|nuis.toml]");
@@ -472,7 +485,9 @@ fn print_help() {
     );
     println!("  nuis clean-cache [--all] [--json] [input.ns|project-dir|nuis.toml]");
     println!("  nuis cache-prune [--all] [--keep N] [--json] [input.ns|project-dir|nuis.toml]");
-    println!("  nuis release-check [input.ns|project-dir|nuis.toml] [output-dir]");
+    println!(
+        "  nuis release-check [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] [output-dir]"
+    );
     println!("  nuis rc <status|start|stop|track|projects|versions> [...]");
     println!("  nuis project-status [project-dir|nuis.toml]");
     println!("  nuis project-lock-abi [project-dir|nuis.toml]");
