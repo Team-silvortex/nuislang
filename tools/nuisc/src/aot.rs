@@ -84,6 +84,7 @@ pub fn host_cpu_build_target() -> CpuBuildTarget {
 }
 
 pub fn resolve_cpu_build_target_from_project_abi(
+    registry_root: &Path,
     resolution: Option<&crate::project::ProjectAbiResolution>,
 ) -> Result<CpuBuildTarget, String> {
     let Some(cpu_abi) = resolution.and_then(|resolution| {
@@ -95,24 +96,25 @@ pub fn resolve_cpu_build_target_from_project_abi(
     }) else {
         return Ok(host_cpu_build_target());
     };
-    resolve_cpu_build_target_from_abi(cpu_abi)
+    resolve_cpu_build_target_from_abi(registry_root, cpu_abi)
 }
 
 pub fn resolve_cpu_build_target(
+    registry_root: &Path,
     resolution: Option<&crate::project::ProjectAbiResolution>,
     cpu_abi_override: Option<&str>,
     target_override: Option<&str>,
 ) -> Result<CpuBuildTarget, String> {
     let mut target = if let Some(cpu_abi) = cpu_abi_override {
-        resolve_cpu_build_target_from_abi(cpu_abi)?
+        resolve_cpu_build_target_from_abi(registry_root, cpu_abi)?
     } else if let Some(target) = target_override {
-        resolve_cpu_build_target_from_target(target, resolution)?
+        resolve_cpu_build_target_from_target(registry_root, target)?
     } else {
-        resolve_cpu_build_target_from_project_abi(resolution)?
+        resolve_cpu_build_target_from_project_abi(registry_root, resolution)?
     };
 
     if let Some(target_text) = target_override {
-        let explicit_target = resolve_cpu_build_target_from_target(target_text, resolution)?;
+        let explicit_target = resolve_cpu_build_target_from_target(registry_root, target_text)?;
         if target.machine_arch != explicit_target.machine_arch
             || target.machine_os != explicit_target.machine_os
         {
@@ -137,66 +139,40 @@ pub fn resolve_cpu_build_target(
     Ok(target)
 }
 
-pub fn resolve_cpu_build_target_from_abi(abi: &str) -> Result<CpuBuildTarget, String> {
-    let lower = abi.to_ascii_lowercase();
-    let (machine_arch, machine_os, object_format, calling_abi) =
-        if lower.contains("arm64") && (lower.contains("apple") || lower.contains("darwin")) {
-            ("arm64", "darwin", "mach-o", "aapcs64-darwin")
-        } else if lower.contains("arm64") && lower.contains("linux") {
-            ("arm64", "linux", "elf", "aapcs64")
-        } else if lower.contains("arm64") && lower.contains("nurs.c-abi") {
-            let os = host_machine_os();
-            (
-                "arm64",
-                os,
-                object_format_for_os(os),
-                calling_abi_for_machine("arm64", os),
-            )
-        } else if lower.contains("x86_64") && (lower.contains("win64") || lower.contains("windows"))
-        {
-            ("x86_64", "windows", "coff", "win64")
-        } else if lower.contains("x86_64") && lower.contains("sysv64") {
-            ("x86_64", "linux", "elf", "sysv64")
-        } else {
-            return Err(format!(
-                "unsupported cpu ABI profile `{abi}` for CPU AOT target resolution"
-            ));
-        };
+pub fn resolve_cpu_build_target_from_abi(
+    registry_root: &Path,
+    abi: &str,
+) -> Result<CpuBuildTarget, String> {
+    let manifest = crate::registry::load_manifest_for_domain(registry_root, "cpu")?;
+    crate::registry::validate_manifest_abi(&manifest, abi)?;
+    let registered = crate::registry::registered_abi_target(&manifest, abi)?;
     Ok(CpuBuildTarget {
-        abi: abi.to_owned(),
-        machine_arch: machine_arch.to_owned(),
-        machine_os: machine_os.to_owned(),
-        object_format: object_format.to_owned(),
-        calling_abi: calling_abi.to_owned(),
-        clang_target: clang_target_triple(machine_arch, machine_os),
-        cross_compile: machine_arch != host_machine_arch() || machine_os != host_machine_os(),
+        abi: registered.abi,
+        machine_arch: registered.machine_arch.clone(),
+        machine_os: registered.machine_os.clone(),
+        object_format: registered.object_format,
+        calling_abi: registered.calling_abi,
+        clang_target: registered.clang_target,
+        cross_compile: registered.machine_arch != host_machine_arch()
+            || registered.machine_os != host_machine_os(),
     })
 }
 
 pub fn resolve_cpu_build_target_from_target(
+    registry_root: &Path,
     target: &str,
-    resolution: Option<&crate::project::ProjectAbiResolution>,
 ) -> Result<CpuBuildTarget, String> {
-    let (machine_arch, machine_os) = parse_clang_target_triple(target)?;
-    let object_format = object_format_for_os(machine_os);
-    let calling_abi = calling_abi_for_machine(machine_arch, machine_os);
-    let abi = resolution
-        .and_then(|resolution| {
-            resolution
-                .requirements
-                .iter()
-                .find(|item| item.domain == "cpu")
-                .map(|item| item.abi.clone())
-        })
-        .unwrap_or_else(|| format!("cpu.{machine_arch}.{calling_abi}"));
+    let manifest = crate::registry::load_manifest_for_domain(registry_root, "cpu")?;
+    let registered = crate::registry::registered_abi_target_for_clang(&manifest, target)?;
     Ok(CpuBuildTarget {
-        abi,
-        machine_arch: machine_arch.to_owned(),
-        machine_os: machine_os.to_owned(),
-        object_format: object_format.to_owned(),
-        calling_abi: calling_abi.to_owned(),
-        clang_target: target.to_owned(),
-        cross_compile: machine_arch != host_machine_arch() || machine_os != host_machine_os(),
+        abi: registered.abi,
+        machine_arch: registered.machine_arch.clone(),
+        machine_os: registered.machine_os.clone(),
+        object_format: registered.object_format,
+        calling_abi: registered.calling_abi,
+        clang_target: registered.clang_target,
+        cross_compile: registered.machine_arch != host_machine_arch()
+            || registered.machine_os != host_machine_os(),
     })
 }
 
@@ -885,34 +861,6 @@ fn clang_target_triple(machine_arch: &str, machine_os: &str) -> String {
     }
 }
 
-fn parse_clang_target_triple(target: &str) -> Result<(&'static str, &'static str), String> {
-    let lower = target.to_ascii_lowercase();
-    let machine_arch = if lower.starts_with("aarch64-") || lower.starts_with("arm64-") {
-        "arm64"
-    } else if lower.starts_with("x86_64-") || lower.starts_with("amd64-") {
-        "x86_64"
-    } else {
-        return Err(format!(
-            "unsupported CPU target triple `{target}`; expected arm64/aarch64 or x86_64 family"
-        ));
-    };
-    let machine_os = if lower.contains("apple-darwin")
-        || lower.contains("unknown-darwin")
-        || lower.contains("macos")
-    {
-        "darwin"
-    } else if lower.contains("windows") || lower.contains("msvc") || lower.contains("mingw") {
-        "windows"
-    } else if lower.contains("linux") {
-        "linux"
-    } else {
-        return Err(format!(
-            "unsupported CPU target triple `{target}`; expected darwin/linux/windows flavor"
-        ));
-    };
-    Ok((machine_arch, machine_os))
-}
-
 fn build_window_bundle(
     yir_path: &Path,
     output_dir: &Path,
@@ -1157,29 +1105,49 @@ mod tests {
         dir
     }
 
+    fn registry_root() -> PathBuf {
+        let root = temp_dir("nustar_registry");
+        fs::write(
+            root.join("index.toml"),
+            "[[package]]\npackage_id = \"official.cpu\"\nmanifest = \"cpu.toml\"\ndomain_family = \"cpu\"\n",
+        )
+        .unwrap();
+        fs::write(
+            root.join("cpu.toml"),
+            "manifest_schema = \"nustar-manifest-v1\"\npackage_id = \"official.cpu\"\ndomain_family = \"cpu\"\nfrontend = \"nustar-cpu\"\nentry_crate = \"crates/yir-domain-cpu\"\nast_entry = \"cpu.ast.bootstrap.v1\"\nnir_entry = \"cpu.nir.bootstrap.v1\"\nyir_lowering_entry = \"cpu.yir.lowering.v1\"\npart_verify_entry = \"cpu.verify.partial.v1\"\nast_surface = [\"cpu.mod-ast.v1\"]\nnir_surface = [\"nir.cpu.surface.v1\"]\nyir_lowering = [\"yir.cpu.lowering.v1\"]\npart_verify = [\"verify.cpu.contract.v1\"]\nbinary_extension = \"nustar\"\npackage_layout = \"single-envelope\"\nmachine_abi_policy = \"exact-match\"\nabi_profiles = [\"cpu.arm64.apple_aapcs64\", \"cpu.x86_64.sysv64\", \"cpu.x86_64.win64\"]\nabi_capabilities = [\"cpu.arm64.apple_aapcs64:op:cpu.*\", \"cpu.x86_64.sysv64:op:cpu.*\", \"cpu.x86_64.win64:op:cpu.*\"]\nabi_targets = [\"cpu.arm64.apple_aapcs64:arch=arm64|os=darwin|object=mach-o|calling=aapcs64-darwin|clang=aarch64-apple-darwin\", \"cpu.x86_64.sysv64:arch=x86_64|os=linux|object=elf|calling=sysv64|clang=x86_64-unknown-linux-gnu\", \"cpu.x86_64.win64:arch=x86_64|os=windows|object=coff|calling=win64|clang=x86_64-pc-windows-msvc\"]\nimplementation_kinds = [\"native-stub\"]\nloader_entry = \"nustar.bootstrap.v1\"\nloader_abi = \"nustar-loader-v1\"\nhost_ffi_surface = []\nhost_ffi_abis = []\nhost_ffi_bridge = \"none\"\nsupport_surface = []\nsupport_profile_slots = []\ndefault_lanes = []\nprofiles = [\"aot\"]\nresource_families = [\"cpu\", \"cpu.arm64\"]\nunit_types = [\"Main\"]\nlowering_targets = [\"llvm\"]\nops = [\"cpu.const\"]\n",
+        )
+        .unwrap();
+        root
+    }
+
     #[test]
     fn resolve_cpu_build_target_for_known_abis() {
-        let apple = resolve_cpu_build_target_from_abi("cpu.arm64.apple_aapcs64").unwrap();
+        let registry_root = registry_root();
+        let apple =
+            resolve_cpu_build_target_from_abi(&registry_root, "cpu.arm64.apple_aapcs64").unwrap();
         assert_eq!(apple.machine_arch, "arm64");
         assert_eq!(apple.machine_os, "darwin");
         assert_eq!(apple.clang_target, "aarch64-apple-darwin");
 
-        let linux = resolve_cpu_build_target_from_abi("cpu.x86_64.sysv64").unwrap();
+        let linux =
+            resolve_cpu_build_target_from_abi(&registry_root, "cpu.x86_64.sysv64").unwrap();
         assert_eq!(linux.machine_arch, "x86_64");
         assert_eq!(linux.machine_os, "linux");
         assert_eq!(linux.object_format, "elf");
         assert_eq!(linux.calling_abi, "sysv64");
 
-        let windows = resolve_cpu_build_target_from_abi("cpu.x86_64.win64").unwrap();
+        let windows =
+            resolve_cpu_build_target_from_abi(&registry_root, "cpu.x86_64.win64").unwrap();
         assert_eq!(windows.machine_os, "windows");
         assert_eq!(windows.clang_target, "x86_64-pc-windows-msvc");
     }
 
     #[test]
     fn resolve_cpu_build_target_from_target_triple() {
+        let registry_root = registry_root();
         let target = super::resolve_cpu_build_target_from_target(
+            registry_root.as_path(),
             "x86_64-unknown-linux-gnu",
-            None,
         )
         .unwrap();
         assert_eq!(target.machine_arch, "x86_64");
@@ -1190,7 +1158,9 @@ mod tests {
 
     #[test]
     fn reject_conflicting_cpu_abi_and_target_override() {
+        let registry_root = registry_root();
         let error = super::resolve_cpu_build_target(
+            registry_root.as_path(),
             None,
             Some("cpu.arm64.apple_aapcs64"),
             Some("x86_64-unknown-linux-gnu"),

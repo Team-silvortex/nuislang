@@ -865,6 +865,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 None
             };
             let cpu_target = aot::resolve_cpu_build_target(
+                Path::new("nustar-packages"),
                 project_abi_resolution.as_ref(),
                 cpu_abi.as_deref(),
                 target.as_deref(),

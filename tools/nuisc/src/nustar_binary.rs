@@ -79,6 +79,9 @@ pub fn validate_manifest_for_packaging(manifest: &NustarPackageManifest) -> Resu
     for profile in &manifest.abi_profiles {
         crate::registry::validate_manifest_abi(manifest, profile)?;
         crate::registry::validate_abi_capabilities(manifest, profile, &[], &[])?;
+        if manifest.domain_family == "cpu" {
+            crate::registry::registered_abi_target(manifest, profile)?;
+        }
     }
 
     let mut capabilities_by_abi = BTreeMap::<String, Vec<(String, String)>>::new();
@@ -533,7 +536,7 @@ fn implementation_contract(binary: &NustarBinary, kind: &str) -> ImplementationC
 
 fn render_manifest(manifest: &NustarPackageManifest) -> String {
     format!(
-        "manifest_schema = \"{}\"\npackage_id = \"{}\"\ndomain_family = \"{}\"\nfrontend = \"{}\"\nentry_crate = \"{}\"\nast_entry = \"{}\"\nnir_entry = \"{}\"\nyir_lowering_entry = \"{}\"\npart_verify_entry = \"{}\"\nast_surface = {}\nnir_surface = {}\nyir_lowering = {}\npart_verify = {}\nbinary_extension = \"{}\"\npackage_layout = \"{}\"\nmachine_abi_policy = \"{}\"\nabi_profiles = {}\nabi_capabilities = {}\nimplementation_kinds = {}\nloader_entry = \"{}\"\nloader_abi = \"{}\"\nhost_ffi_surface = {}\nhost_ffi_abis = {}\nhost_ffi_bridge = \"{}\"\nsupport_surface = {}\nsupport_profile_slots = {}\ndefault_lanes = {}\nprofiles = {}\nresource_families = {}\nunit_types = {}\nlowering_targets = {}\nops = {}\n",
+        "manifest_schema = \"{}\"\npackage_id = \"{}\"\ndomain_family = \"{}\"\nfrontend = \"{}\"\nentry_crate = \"{}\"\nast_entry = \"{}\"\nnir_entry = \"{}\"\nyir_lowering_entry = \"{}\"\npart_verify_entry = \"{}\"\nast_surface = {}\nnir_surface = {}\nyir_lowering = {}\npart_verify = {}\nbinary_extension = \"{}\"\npackage_layout = \"{}\"\nmachine_abi_policy = \"{}\"\nabi_profiles = {}\nabi_capabilities = {}\nabi_targets = {}\nimplementation_kinds = {}\nloader_entry = \"{}\"\nloader_abi = \"{}\"\nhost_ffi_surface = {}\nhost_ffi_abis = {}\nhost_ffi_bridge = \"{}\"\nsupport_surface = {}\nsupport_profile_slots = {}\ndefault_lanes = {}\nprofiles = {}\nresource_families = {}\nunit_types = {}\nlowering_targets = {}\nops = {}\n",
         manifest.manifest_schema,
         manifest.package_id,
         manifest.domain_family,
@@ -552,6 +555,7 @@ fn render_manifest(manifest: &NustarPackageManifest) -> String {
         manifest.machine_abi_policy,
         render_array(&manifest.abi_profiles),
         render_array(&manifest.abi_capabilities),
+        render_array(&manifest.abi_targets),
         render_array(&manifest.implementation_kinds),
         manifest.loader_entry,
         manifest.loader_abi,
@@ -637,6 +641,7 @@ fn parse_manifest_text(source: &str, path: &Path) -> Result<NustarPackageManifes
         abi_profiles: parse_optional_string_array(source, "abi_profiles").unwrap_or_default(),
         abi_capabilities: parse_optional_string_array(source, "abi_capabilities")
             .unwrap_or_default(),
+        abi_targets: parse_optional_string_array(source, "abi_targets").unwrap_or_default(),
         implementation_kinds: parse_string_array(source, "implementation_kinds", path)?,
         loader_entry: parse_required_string(source, "loader_entry", path)?,
         loader_abi: parse_required_string(source, "loader_abi", path)?,
@@ -754,6 +759,15 @@ mod tests {
     }
 
     fn make_manifest(domain: &str) -> NustarPackageManifest {
+        let abi_profiles = vec![format!("{domain}.abi.v1")];
+        let abi_targets = if domain == "cpu" {
+            vec![format!(
+                "{}:arch=arm64|os=darwin|object=mach-o|calling=aapcs64-darwin|clang=aarch64-apple-darwin",
+                abi_profiles[0]
+            )]
+        } else {
+            Vec::new()
+        };
         NustarPackageManifest {
             manifest_schema: "nustar-manifest-v1".to_owned(),
             package_id: format!("test.{domain}"),
@@ -771,8 +785,9 @@ mod tests {
             binary_extension: "nustar".to_owned(),
             package_layout: "single-envelope".to_owned(),
             machine_abi_policy: "exact-match".to_owned(),
-            abi_profiles: vec![format!("{domain}.abi.v1")],
+            abi_profiles,
             abi_capabilities: Vec::new(),
+            abi_targets,
             implementation_kinds: vec!["native-stub".to_owned()],
             loader_entry: "nustar.bootstrap.v1".to_owned(),
             loader_abi: "nustar-loader-v1".to_owned(),
