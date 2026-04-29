@@ -61,6 +61,7 @@ pub struct RegisteredAbiTarget {
     pub object_format: String,
     pub calling_abi: String,
     pub clang_target: String,
+    pub host_adaptive: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1148,6 +1149,7 @@ fn parse_registered_abi_target(
     manifest: &NustarPackageManifest,
     raw: &str,
 ) -> Result<RegisteredAbiTarget, String> {
+    let mut host_adaptive = false;
     let mut machine_arch = None::<String>;
     let mut machine_os = None::<String>;
     let mut object_format = None::<String>;
@@ -1160,13 +1162,16 @@ fn parse_registered_abi_target(
                 manifest.package_id, field, raw
             ));
         };
-        let value = value.trim().to_owned();
+        let value = value.trim();
+        if value == "host" {
+            host_adaptive = true;
+        }
         match key.trim() {
-            "arch" => machine_arch = Some(value),
-            "os" => machine_os = Some(value),
-            "object" => object_format = Some(value),
-            "calling" => calling_abi = Some(value),
-            "clang" => clang_target = Some(value),
+            "arch" => machine_arch = Some(resolve_host_adaptive_arch(value).to_owned()),
+            "os" => machine_os = Some(resolve_host_adaptive_os(value).to_owned()),
+            "object" => object_format = Some(resolve_host_adaptive_object(value).to_owned()),
+            "calling" => calling_abi = Some(resolve_host_adaptive_calling(value).to_owned()),
+            "clang" => clang_target = Some(resolve_host_adaptive_clang(value).to_owned()),
             other => {
                 return Err(format!(
                     "nustar package `{}` has invalid abi_targets key `{}` in `{}`; expected `arch`, `os`, `object`, `calling`, or `clang`",
@@ -1207,7 +1212,111 @@ fn parse_registered_abi_target(
                 manifest.package_id, raw
             )
         })?,
+        host_adaptive,
     })
+}
+
+fn resolve_host_adaptive_arch(value: &str) -> &'static str {
+    if value == "host" {
+        host_arch()
+    } else {
+        match value {
+            "arm64" => "arm64",
+            "x86_64" => "x86_64",
+            other => Box::leak(other.to_owned().into_boxed_str()),
+        }
+    }
+}
+
+fn resolve_host_adaptive_os(value: &str) -> &'static str {
+    if value == "host" {
+        host_os()
+    } else {
+        match value {
+            "darwin" => "darwin",
+            "linux" => "linux",
+            "windows" => "windows",
+            other => Box::leak(other.to_owned().into_boxed_str()),
+        }
+    }
+}
+
+fn resolve_host_adaptive_object(value: &str) -> &'static str {
+    if value == "host" {
+        host_object_format()
+    } else {
+        match value {
+            "mach-o" => "mach-o",
+            "elf" => "elf",
+            "coff" => "coff",
+            other => Box::leak(other.to_owned().into_boxed_str()),
+        }
+    }
+}
+
+fn resolve_host_adaptive_calling(value: &str) -> &'static str {
+    if value == "host" {
+        host_calling_abi()
+    } else {
+        match value {
+            "aapcs64-darwin" => "aapcs64-darwin",
+            "aapcs64" => "aapcs64",
+            "sysv64" => "sysv64",
+            "win64" => "win64",
+            other => Box::leak(other.to_owned().into_boxed_str()),
+        }
+    }
+}
+
+fn resolve_host_adaptive_clang(value: &str) -> String {
+    if value == "host" {
+        host_clang_target()
+    } else {
+        value.to_owned()
+    }
+}
+
+fn host_arch() -> &'static str {
+    match std::env::consts::ARCH {
+        "aarch64" => "arm64",
+        other => Box::leak(other.to_owned().into_boxed_str()),
+    }
+}
+
+fn host_os() -> &'static str {
+    match std::env::consts::OS {
+        "macos" => "darwin",
+        other => Box::leak(other.to_owned().into_boxed_str()),
+    }
+}
+
+fn host_object_format() -> &'static str {
+    match std::env::consts::OS {
+        "macos" => "mach-o",
+        "linux" => "elf",
+        "windows" => "coff",
+        other => Box::leak(other.to_owned().into_boxed_str()),
+    }
+}
+
+fn host_calling_abi() -> &'static str {
+    match (host_arch(), host_os()) {
+        ("arm64", "darwin") => "aapcs64-darwin",
+        ("arm64", _) => "aapcs64",
+        ("x86_64", "windows") => "win64",
+        ("x86_64", _) => "sysv64",
+        _ => "unknown",
+    }
+}
+
+fn host_clang_target() -> String {
+    match (host_arch(), host_os()) {
+        ("arm64", "darwin") => "aarch64-apple-darwin".to_owned(),
+        ("arm64", "linux") => "aarch64-unknown-linux-gnu".to_owned(),
+        ("x86_64", "linux") => "x86_64-unknown-linux-gnu".to_owned(),
+        ("x86_64", "windows") => "x86_64-pc-windows-msvc".to_owned(),
+        (arch, os) => format!("{arch}-unknown-{os}"),
+    }
 }
 
 fn parse_optional_string(source: &str, key: &str) -> Option<String> {
@@ -1297,4 +1406,61 @@ fn parse_array(raw: &str) -> Option<Vec<String>> {
         items.push(parse_quoted(part.trim())?);
     }
     Some(items)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn cpu_manifest_with_host_target() -> NustarPackageManifest {
+        NustarPackageManifest {
+            manifest_schema: "nustar-manifest-v1".to_owned(),
+            package_id: "official.cpu".to_owned(),
+            domain_family: "cpu".to_owned(),
+            frontend: "nustar-cpu".to_owned(),
+            entry_crate: "crates/yir-domain-cpu".to_owned(),
+            ast_entry: "cpu.ast.bootstrap.v1".to_owned(),
+            nir_entry: "cpu.nir.bootstrap.v1".to_owned(),
+            yir_lowering_entry: "cpu.yir.lowering.v1".to_owned(),
+            part_verify_entry: "cpu.verify.partial.v1".to_owned(),
+            ast_surface: vec!["cpu.mod-ast.v1".to_owned()],
+            nir_surface: vec!["nir.cpu.surface.v1".to_owned()],
+            yir_lowering: vec!["yir.cpu.lowering.v1".to_owned()],
+            part_verify: vec!["verify.cpu.contract.v1".to_owned()],
+            binary_extension: "nustar".to_owned(),
+            package_layout: "single-envelope".to_owned(),
+            machine_abi_policy: "exact-match".to_owned(),
+            abi_profiles: vec!["cpu.host.v1".to_owned()],
+            abi_capabilities: vec!["cpu.host.v1:op:cpu.*".to_owned()],
+            abi_targets: vec![
+                "cpu.host.v1:arch=host|os=host|object=host|calling=host|clang=host".to_owned(),
+            ],
+            implementation_kinds: vec!["native-stub".to_owned()],
+            loader_entry: "nustar.bootstrap.v1".to_owned(),
+            loader_abi: "nustar-loader-v1".to_owned(),
+            host_ffi_surface: Vec::new(),
+            host_ffi_abis: Vec::new(),
+            host_ffi_bridge: "none".to_owned(),
+            support_surface: Vec::new(),
+            support_profile_slots: Vec::new(),
+            default_lanes: Vec::new(),
+            profiles: vec!["aot".to_owned()],
+            resource_families: vec!["cpu".to_owned()],
+            unit_types: vec!["Main".to_owned()],
+            lowering_targets: vec!["llvm".to_owned()],
+            ops: vec!["cpu.const".to_owned()],
+        }
+    }
+
+    #[test]
+    fn registered_abi_target_expands_host_adaptive_contract() {
+        let manifest = cpu_manifest_with_host_target();
+        let target = registered_abi_target(&manifest, "cpu.host.v1").unwrap();
+        assert_eq!(target.machine_arch, host_arch());
+        assert_eq!(target.machine_os, host_os());
+        assert_eq!(target.object_format, host_object_format());
+        assert_eq!(target.calling_abi, host_calling_abi());
+        assert_eq!(target.clang_target, host_clang_target());
+        assert!(target.host_adaptive);
+    }
 }

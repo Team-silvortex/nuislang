@@ -16,6 +16,7 @@ package_layout = "single-envelope"
 machine_abi_policy = "exact-match"
 abi_profiles = ["data.fabric.v1", "data.fabric.macos.arm64.v1", "data.fabric.linux.x86_64.v1", "data.fabric.windows.x86_64.v1"]
 abi_capabilities = ["data.fabric.v1:surface:data.profile.*|op:data.*", "data.fabric.macos.arm64.v1:surface:data.profile.*|op:data.*", "data.fabric.linux.x86_64.v1:surface:data.profile.*|op:data.*", "data.fabric.windows.x86_64.v1:surface:data.profile.*|op:data.*"]
+abi_targets = ["data.fabric.v1:arch=host|os=host|object=host|calling=host|clang=host", "data.fabric.macos.arm64.v1:arch=arm64|os=darwin|object=mach-o|calling=aapcs64-darwin|clang=aarch64-apple-darwin", "data.fabric.linux.x86_64.v1:arch=x86_64|os=linux|object=elf|calling=sysv64|clang=x86_64-unknown-linux-gnu", "data.fabric.windows.x86_64.v1:arch=x86_64|os=windows|object=coff|calling=win64|clang=x86_64-pc-windows-msvc"]
 implementation_kinds = ["native-stub", "native-dylib", "llvm-bc"]
 loader_entry = "nustar.bootstrap.v1"
 loader_abi = "nustar-loader-v1"

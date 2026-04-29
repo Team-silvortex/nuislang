@@ -16,6 +16,7 @@ package_layout = "single-envelope"
 machine_abi_policy = "exact-match"
 abi_profiles = ["shader.metal.msl2_4", "shader.render.cpu-fallback.v1", "shader.vulkan.spv1_6", "shader.dx12.dxil6_8", "shader.opengl.glsl460"]
 abi_capabilities = ["shader.metal.msl2_4:surface:shader.profile.*|surface:shader.inline.wgsl.v1|op:shader.*", "shader.render.cpu-fallback.v1:surface:shader.profile.*|op:shader.target|op:shader.viewport|op:shader.pipeline|op:shader.begin_pass|op:shader.draw_instanced|op:shader.draw_ball|op:shader.draw_sphere|op:shader.print", "shader.vulkan.spv1_6:surface:shader.profile.*|surface:shader.inline.wgsl.v1|op:shader.*", "shader.dx12.dxil6_8:surface:shader.profile.*|surface:shader.inline.wgsl.v1|op:shader.*", "shader.opengl.glsl460:surface:shader.profile.*|op:shader.*"]
+abi_targets = ["shader.metal.msl2_4:arch=arm64|os=darwin|object=mach-o|calling=aapcs64-darwin|clang=aarch64-apple-darwin", "shader.render.cpu-fallback.v1:arch=host|os=host|object=host|calling=host|clang=host", "shader.vulkan.spv1_6:arch=x86_64|os=linux|object=elf|calling=sysv64|clang=x86_64-unknown-linux-gnu", "shader.dx12.dxil6_8:arch=x86_64|os=windows|object=coff|calling=win64|clang=x86_64-pc-windows-msvc"]
 implementation_kinds = ["native-stub", "native-dylib", "llvm-bc"]
 loader_entry = "nustar.bootstrap.v1"
 loader_abi = "nustar-loader-v1"

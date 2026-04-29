@@ -612,6 +612,9 @@ fn recommend_abi_profile_for_host(
     if manifest.abi_profiles.is_empty() {
         return None;
     }
+    if let Some(profile) = recommend_registered_abi_profile_for_host(manifest) {
+        return Some(profile);
+    }
     let arch = match std::env::consts::ARCH {
         "aarch64" => "arm64",
         other => other,
@@ -665,6 +668,88 @@ fn recommend_abi_profile_for_host(
         }
     }
     Some(best)
+}
+
+fn recommend_registered_abi_profile_for_host(
+    manifest: &crate::registry::NustarPackageManifest,
+) -> Option<String> {
+    let host_arch = match std::env::consts::ARCH {
+        "aarch64" => "arm64",
+        other => other,
+    };
+    let host_os = match std::env::consts::OS {
+        "macos" => "darwin",
+        other => other,
+    };
+    let mut best = None::<(i32, String)>;
+    for profile in &manifest.abi_profiles {
+        let Ok(target) = crate::registry::registered_abi_target(manifest, profile) else {
+            continue;
+        };
+        let mut score = 0i32;
+        if target.machine_arch == host_arch {
+            score += 100;
+        }
+        if target.machine_os == host_os {
+            score += 100;
+        }
+        if target.object_format == host_object_format() {
+            score += 40;
+        }
+        if target.calling_abi == host_calling_abi(host_arch, host_os) {
+            score += 40;
+        }
+        if !target.host_adaptive {
+            score += 15;
+        }
+        if manifest.domain_family == "shader" {
+            let lower = profile.to_ascii_lowercase();
+            if host_os == "darwin" && lower.contains("metal") {
+                score += 60;
+            }
+            if host_os == "windows" && (lower.contains("dx12") || lower.contains("dxil")) {
+                score += 60;
+            }
+            if host_os == "linux" && (lower.contains("vulkan") || lower.contains("spv")) {
+                score += 60;
+            }
+            if lower.contains("cpu-fallback") {
+                score -= 20;
+            }
+        } else if manifest.domain_family == "kernel" {
+            let lower = profile.to_ascii_lowercase();
+            if host_os == "darwin" && (lower.contains("apple_ane") || lower.contains("coreml")) {
+                score += 60;
+            }
+            if lower.contains("cpu-fallback") {
+                score -= 10;
+            }
+        }
+        match &best {
+            Some((best_score, _)) if *best_score >= score => {}
+            _ => best = Some((score, profile.clone())),
+        }
+    }
+    best.map(|(_, profile)| profile)
+}
+
+fn host_object_format() -> &'static str {
+    match std::env::consts::OS {
+        "macos" => "mach-o",
+        "linux" => "elf",
+        "windows" => "coff",
+        _ => "unknown",
+    }
+}
+
+fn host_calling_abi(host_arch: &str, host_os: &str) -> &'static str {
+    match (host_arch, host_os) {
+        ("arm64", "darwin") => "aapcs64-darwin",
+        ("arm64", _) => "aapcs64",
+        ("x86_64", "windows") => "win64",
+        ("x86_64", _) => "sysv64",
+        _ => "unknown",
+    }
 }
 
 fn required_abi_surfaces_for_domain(
@@ -5258,5 +5343,319 @@ mod tests {
 
         assert!(error.contains("payload contract"));
         assert!(error.contains("data.FabricPlane"));
+    }
+
+    #[test]
+    fn recommend_cpu_abi_profile_prefers_registered_host_target() {
+        let host_arch = match std::env::consts::ARCH {
+            "aarch64" => "arm64",
+            other => other,
+        };
+        let host_os = match std::env::consts::OS {
+            "macos" => "darwin",
+            other => other,
+        };
+        let host_object = host_object_format();
+        let host_calling = host_calling_abi(host_arch, host_os);
+        let host_clang = match (host_arch, host_os) {
+            ("arm64", "darwin") => "aarch64-apple-darwin",
+            ("arm64", "linux") => "aarch64-unknown-linux-gnu",
+            ("x86_64", "linux") => "x86_64-unknown-linux-gnu",
+            ("x86_64", "windows") => "x86_64-pc-windows-msvc",
+            _ => "x86_64-unknown-linux-gnu",
+        };
+        let alt = if host_arch == "arm64" && host_os == "darwin" {
+            (
+                "cpu.x86_64.win64",
+                "x86_64",
+                "windows",
+                "coff",
+                "win64",
+                "x86_64-pc-windows-msvc",
+            )
+        } else {
+            (
+                "cpu.arm64.apple_aapcs64",
+                "arm64",
+                "darwin",
+                "mach-o",
+                "aapcs64-darwin",
+                "aarch64-apple-darwin",
+            )
+        };
+        let manifest = crate::registry::NustarPackageManifest {
+            manifest_schema: "nustar-manifest-v1".to_owned(),
+            package_id: "official.cpu".to_owned(),
+            domain_family: "cpu".to_owned(),
+            frontend: "nustar-cpu".to_owned(),
+            entry_crate: "crates/yir-domain-cpu".to_owned(),
+            ast_entry: "cpu.ast.bootstrap.v1".to_owned(),
+            nir_entry: "cpu.nir.bootstrap.v1".to_owned(),
+            yir_lowering_entry: "cpu.yir.lowering.v1".to_owned(),
+            part_verify_entry: "cpu.verify.partial.v1".to_owned(),
+            ast_surface: vec!["cpu.mod-ast.v1".to_owned()],
+            nir_surface: vec!["nir.cpu.surface.v1".to_owned()],
+            yir_lowering: vec!["yir.cpu.lowering.v1".to_owned()],
+            part_verify: vec!["verify.cpu.contract.v1".to_owned()],
+            binary_extension: "nustar".to_owned(),
+            package_layout: "single-envelope".to_owned(),
+            machine_abi_policy: "exact-match".to_owned(),
+            abi_profiles: vec!["cpu.host.match".to_owned(), alt.0.to_owned()],
+            abi_capabilities: vec![
+                "cpu.host.match:op:cpu.*".to_owned(),
+                format!("{}:op:cpu.*", alt.0),
+            ],
+            abi_targets: vec![
+                format!(
+                    "cpu.host.match:arch={}|os={}|object={}|calling={}|clang={}",
+                    host_arch, host_os, host_object, host_calling, host_clang
+                ),
+                format!(
+                    "{}:arch={}|os={}|object={}|calling={}|clang={}",
+                    alt.0, alt.1, alt.2, alt.3, alt.4, alt.5
+                ),
+            ],
+            implementation_kinds: vec!["native-stub".to_owned()],
+            loader_entry: "nustar.bootstrap.v1".to_owned(),
+            loader_abi: "nustar-loader-v1".to_owned(),
+            host_ffi_surface: Vec::new(),
+            host_ffi_abis: Vec::new(),
+            host_ffi_bridge: "none".to_owned(),
+            support_surface: Vec::new(),
+            support_profile_slots: Vec::new(),
+            default_lanes: Vec::new(),
+            profiles: vec!["aot".to_owned()],
+            resource_families: vec!["cpu".to_owned()],
+            unit_types: vec!["Main".to_owned()],
+            lowering_targets: vec!["llvm".to_owned()],
+            ops: vec!["cpu.const".to_owned()],
+        };
+
+        let selected = recommend_abi_profile_for_host(&manifest).unwrap();
+        assert_eq!(selected, "cpu.host.match");
+    }
+
+    #[test]
+    fn recommend_data_abi_profile_prefers_registered_host_target() {
+        let host_arch = match std::env::consts::ARCH {
+            "aarch64" => "arm64",
+            other => other,
+        };
+        let host_os = match std::env::consts::OS {
+            "macos" => "darwin",
+            other => other,
+        };
+        let host_object = host_object_format();
+        let host_calling = host_calling_abi(host_arch, host_os);
+        let host_clang = match (host_arch, host_os) {
+            ("arm64", "darwin") => "aarch64-apple-darwin",
+            ("arm64", "linux") => "aarch64-unknown-linux-gnu",
+            ("x86_64", "linux") => "x86_64-unknown-linux-gnu",
+            ("x86_64", "windows") => "x86_64-pc-windows-msvc",
+            _ => "x86_64-unknown-linux-gnu",
+        };
+        let manifest = crate::registry::NustarPackageManifest {
+            manifest_schema: "nustar-manifest-v1".to_owned(),
+            package_id: "official.data".to_owned(),
+            domain_family: "data".to_owned(),
+            frontend: "nustar-data".to_owned(),
+            entry_crate: "crates/yir-core".to_owned(),
+            ast_entry: "data.ast.bootstrap.v1".to_owned(),
+            nir_entry: "data.nir.bootstrap.v1".to_owned(),
+            yir_lowering_entry: "data.yir.lowering.v1".to_owned(),
+            part_verify_entry: "data.verify.partial.v1".to_owned(),
+            ast_surface: vec!["data.mod-ast.v1".to_owned()],
+            nir_surface: vec!["nir.data.surface.v1".to_owned()],
+            yir_lowering: vec!["yir.data.lowering.v1".to_owned()],
+            part_verify: vec!["verify.data.contract.v1".to_owned()],
+            binary_extension: "nustar".to_owned(),
+            package_layout: "single-envelope".to_owned(),
+            machine_abi_policy: "exact-match".to_owned(),
+            abi_profiles: vec![
+                "data.fabric.v1".to_owned(),
+                "data.fabric.host-match.v1".to_owned(),
+                "data.fabric.alt.v1".to_owned(),
+            ],
+            abi_capabilities: vec![
+                "data.fabric.v1:surface:data.profile.*|op:data.*".to_owned(),
+                "data.fabric.host-match.v1:surface:data.profile.*|op:data.*".to_owned(),
+                "data.fabric.alt.v1:surface:data.profile.*|op:data.*".to_owned(),
+            ],
+            abi_targets: vec![
+                "data.fabric.v1:arch=host|os=host|object=host|calling=host|clang=host".to_owned(),
+                format!(
+                    "data.fabric.host-match.v1:arch={}|os={}|object={}|calling={}|clang={}",
+                    host_arch, host_os, host_object, host_calling, host_clang
+                ),
+                "data.fabric.alt.v1:arch=x86_64|os=windows|object=coff|calling=win64|clang=x86_64-pc-windows-msvc".to_owned(),
+            ],
+            implementation_kinds: vec!["native-stub".to_owned()],
+            loader_entry: "nustar.bootstrap.v1".to_owned(),
+            loader_abi: "nustar-loader-v1".to_owned(),
+            host_ffi_surface: Vec::new(),
+            host_ffi_abis: Vec::new(),
+            host_ffi_bridge: "none".to_owned(),
+            support_surface: Vec::new(),
+            support_profile_slots: Vec::new(),
+            default_lanes: Vec::new(),
+            profiles: vec!["aot".to_owned()],
+            resource_families: vec!["data".to_owned()],
+            unit_types: vec!["FabricPlane".to_owned()],
+            lowering_targets: vec!["fabric-abi".to_owned()],
+            ops: vec!["data.move".to_owned()],
+        };
+
+        let selected = recommend_abi_profile_for_host(&manifest).unwrap();
+        assert_eq!(selected, "data.fabric.host-match.v1");
+    }
+
+    #[test]
+    fn recommend_kernel_abi_profile_prefers_registered_host_target() {
+        let host_arch = match std::env::consts::ARCH {
+            "aarch64" => "arm64",
+            other => other,
+        };
+        let host_os = match std::env::consts::OS {
+            "macos" => "darwin",
+            other => other,
+        };
+        let host_object = host_object_format();
+        let host_calling = host_calling_abi(host_arch, host_os);
+        let host_clang = match (host_arch, host_os) {
+            ("arm64", "darwin") => "aarch64-apple-darwin",
+            ("arm64", "linux") => "aarch64-unknown-linux-gnu",
+            ("x86_64", "linux") => "x86_64-unknown-linux-gnu",
+            ("x86_64", "windows") => "x86_64-pc-windows-msvc",
+            _ => "x86_64-unknown-linux-gnu",
+        };
+        let manifest = crate::registry::NustarPackageManifest {
+            manifest_schema: "nustar-manifest-v1".to_owned(),
+            package_id: "official.kernel".to_owned(),
+            domain_family: "kernel".to_owned(),
+            frontend: "nustar-kernel".to_owned(),
+            entry_crate: "crates/yir-domain-kernel".to_owned(),
+            ast_entry: "kernel.ast.bootstrap.v1".to_owned(),
+            nir_entry: "kernel.nir.bootstrap.v1".to_owned(),
+            yir_lowering_entry: "kernel.yir.lowering.v1".to_owned(),
+            part_verify_entry: "kernel.verify.partial.v1".to_owned(),
+            ast_surface: vec!["kernel.mod-ast.v1".to_owned()],
+            nir_surface: vec!["nir.kernel.surface.v1".to_owned()],
+            yir_lowering: vec!["yir.kernel.lowering.v1".to_owned()],
+            part_verify: vec!["verify.kernel.contract.v1".to_owned()],
+            binary_extension: "nustar".to_owned(),
+            package_layout: "single-envelope".to_owned(),
+            machine_abi_policy: "exact-match".to_owned(),
+            abi_profiles: vec![
+                "kernel.cpu-fallback.v1".to_owned(),
+                "kernel.host-match.v1".to_owned(),
+                "kernel.alt.v1".to_owned(),
+            ],
+            abi_capabilities: vec![
+                "kernel.cpu-fallback.v1:surface:kernel.profile.*|op:kernel.*".to_owned(),
+                "kernel.host-match.v1:surface:kernel.profile.*|op:kernel.*".to_owned(),
+                "kernel.alt.v1:surface:kernel.profile.*|op:kernel.*".to_owned(),
+            ],
+            abi_targets: vec![
+                "kernel.cpu-fallback.v1:arch=host|os=host|object=host|calling=host|clang=host"
+                    .to_owned(),
+                format!(
+                    "kernel.host-match.v1:arch={}|os={}|object={}|calling={}|clang={}",
+                    host_arch, host_os, host_object, host_calling, host_clang
+                ),
+                "kernel.alt.v1:arch=x86_64|os=windows|object=coff|calling=win64|clang=x86_64-pc-windows-msvc".to_owned(),
+            ],
+            implementation_kinds: vec!["native-stub".to_owned()],
+            loader_entry: "nustar.bootstrap.v1".to_owned(),
+            loader_abi: "nustar-loader-v1".to_owned(),
+            host_ffi_surface: Vec::new(),
+            host_ffi_abis: Vec::new(),
+            host_ffi_bridge: "none".to_owned(),
+            support_surface: Vec::new(),
+            support_profile_slots: Vec::new(),
+            default_lanes: Vec::new(),
+            profiles: vec!["aot".to_owned()],
+            resource_families: vec!["kernel".to_owned()],
+            unit_types: vec!["KernelUnit".to_owned()],
+            lowering_targets: vec!["coreml".to_owned()],
+            ops: vec!["kernel.tensor".to_owned()],
+        };
+
+        let selected = recommend_abi_profile_for_host(&manifest).unwrap();
+        assert_eq!(selected, "kernel.host-match.v1");
+    }
+
+    #[test]
+    fn recommend_shader_abi_profile_prefers_registered_host_target() {
+        let host_arch = match std::env::consts::ARCH {
+            "aarch64" => "arm64",
+            other => other,
+        };
+        let host_os = match std::env::consts::OS {
+            "macos" => "darwin",
+            other => other,
+        };
+        let host_object = host_object_format();
+        let host_calling = host_calling_abi(host_arch, host_os);
+        let host_clang = match (host_arch, host_os) {
+            ("arm64", "darwin") => "aarch64-apple-darwin",
+            ("arm64", "linux") => "aarch64-unknown-linux-gnu",
+            ("x86_64", "linux") => "x86_64-unknown-linux-gnu",
+            ("x86_64", "windows") => "x86_64-pc-windows-msvc",
+            _ => "x86_64-unknown-linux-gnu",
+        };
+        let manifest = crate::registry::NustarPackageManifest {
+            manifest_schema: "nustar-manifest-v1".to_owned(),
+            package_id: "official.shader".to_owned(),
+            domain_family: "shader".to_owned(),
+            frontend: "nustar-shader".to_owned(),
+            entry_crate: "crates/yir-domain-shader".to_owned(),
+            ast_entry: "shader.ast.bootstrap.v1".to_owned(),
+            nir_entry: "shader.nir.bootstrap.v1".to_owned(),
+            yir_lowering_entry: "shader.yir.lowering.v1".to_owned(),
+            part_verify_entry: "shader.verify.partial.v1".to_owned(),
+            ast_surface: vec!["shader.mod-ast.v1".to_owned()],
+            nir_surface: vec!["nir.shader.surface.v1".to_owned()],
+            yir_lowering: vec!["yir.shader.lowering.v1".to_owned()],
+            part_verify: vec!["verify.shader.contract.v1".to_owned()],
+            binary_extension: "nustar".to_owned(),
+            package_layout: "single-envelope".to_owned(),
+            machine_abi_policy: "exact-match".to_owned(),
+            abi_profiles: vec![
+                "shader.render.cpu-fallback.v1".to_owned(),
+                "shader.host-match.v1".to_owned(),
+                "shader.alt.v1".to_owned(),
+            ],
+            abi_capabilities: vec![
+                "shader.render.cpu-fallback.v1:surface:shader.profile.*|op:shader.*".to_owned(),
+                "shader.host-match.v1:surface:shader.profile.*|op:shader.*".to_owned(),
+                "shader.alt.v1:surface:shader.profile.*|op:shader.*".to_owned(),
+            ],
+            abi_targets: vec![
+                "shader.render.cpu-fallback.v1:arch=host|os=host|object=host|calling=host|clang=host"
+                    .to_owned(),
+                format!(
+                    "shader.host-match.v1:arch={}|os={}|object={}|calling={}|clang={}",
+                    host_arch, host_os, host_object, host_calling, host_clang
+                ),
+                "shader.alt.v1:arch=x86_64|os=windows|object=coff|calling=win64|clang=x86_64-pc-windows-msvc".to_owned(),
+            ],
+            implementation_kinds: vec!["native-stub".to_owned()],
+            loader_entry: "nustar.bootstrap.v1".to_owned(),
+            loader_abi: "nustar-loader-v1".to_owned(),
+            host_ffi_surface: Vec::new(),
+            host_ffi_abis: Vec::new(),
+            host_ffi_bridge: "none".to_owned(),
+            support_surface: Vec::new(),
+            support_profile_slots: Vec::new(),
+            default_lanes: Vec::new(),
+            profiles: vec!["aot".to_owned()],
+            resource_families: vec!["shader".to_owned()],
+            unit_types: vec!["SurfaceShader".to_owned()],
+            lowering_targets: vec!["metal".to_owned()],
+            ops: vec!["shader.target".to_owned()],
+        };
+
+        let selected = recommend_abi_profile_for_host(&manifest).unwrap();
+        assert_eq!(selected, "shader.host-match.v1");
     }
 }
