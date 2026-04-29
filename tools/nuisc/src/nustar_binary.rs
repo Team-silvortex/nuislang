@@ -50,6 +50,14 @@ pub struct ImplementationContract {
     pub notes: String,
 }
 
+fn render_abi_target_contracts(manifest: &NustarPackageManifest) -> Vec<String> {
+    manifest
+        .abi_targets
+        .iter()
+        .map(|entry| format!("abi_target={entry}"))
+        .collect::<Vec<_>>()
+}
+
 pub fn validate_manifest_for_packaging(manifest: &NustarPackageManifest) -> Result<(), String> {
     if manifest.abi_profiles.is_empty() {
         return Err(format!(
@@ -463,7 +471,10 @@ fn implementation_contract(binary: &NustarBinary, kind: &str) -> ImplementationC
                 format!("machine_os={}", binary.machine_os),
                 format!("object_format={}", binary.object_format),
                 format!("calling_abi={}", binary.calling_abi),
-            ],
+            ]
+            .into_iter()
+            .chain(render_abi_target_contracts(&binary.manifest))
+            .collect(),
             link_mode: "host-dynamic-load".to_owned(),
             machine_abi_policy: binary.manifest.machine_abi_policy.clone(),
             notes: "expects a host-loadable shared library exporting the canonical loader entry with the canonical host/result structs".to_owned(),
@@ -488,7 +499,10 @@ fn implementation_contract(binary: &NustarBinary, kind: &str) -> ImplementationC
                 format!("lowering_target_machine={}", binary.machine_arch),
                 format!("lowering_object_format={}", binary.object_format),
                 format!("lowering_calling_abi={}", binary.calling_abi),
-            ],
+            ]
+            .into_iter()
+            .chain(render_abi_target_contracts(&binary.manifest))
+            .collect(),
             link_mode: "nuisc-link-or-lower".to_owned(),
             machine_abi_policy: binary.manifest.machine_abi_policy.clone(),
             notes: "expects LLVM bitcode carrying the canonical loader entry symbol and the same bootstrap signature for later lowering/link integration".to_owned(),
@@ -504,7 +518,10 @@ fn implementation_contract(binary: &NustarBinary, kind: &str) -> ImplementationC
             artifact_container: "opaque stub payload".to_owned(),
             implementation_section: ".nustar.impl.stub".to_owned(),
             required_exports: vec!["nustar.manifest.v1".to_owned()],
-            required_metadata: vec!["prototype_only=true".to_owned()],
+            required_metadata: vec!["prototype_only=true".to_owned()]
+                .into_iter()
+                .chain(render_abi_target_contracts(&binary.manifest))
+                .collect(),
             link_mode: "non-loadable".to_owned(),
             machine_abi_policy: binary.manifest.machine_abi_policy.clone(),
             notes: "prototype-only placeholder implementation; may be inspected and packaged but does not provide executable domain code".to_owned(),
@@ -524,7 +541,10 @@ fn implementation_contract(binary: &NustarBinary, kind: &str) -> ImplementationC
                 "nustar.manifest.v1".to_owned(),
                 "nustar.loader_abi.v1".to_owned(),
             ],
-            required_metadata: vec!["custom_kind_requires_explicit_loader_adapter=true".to_owned()],
+            required_metadata: vec!["custom_kind_requires_explicit_loader_adapter=true".to_owned()]
+                .into_iter()
+                .chain(render_abi_target_contracts(&binary.manifest))
+                .collect(),
             link_mode: "custom".to_owned(),
             machine_abi_policy: binary.manifest.machine_abi_policy.clone(),
             notes: format!(
@@ -889,6 +909,24 @@ mod tests {
                     error
                 );
             }
+        }
+    }
+
+    #[test]
+    fn implementation_contracts_include_abi_target_metadata() {
+        let mut manifest = make_manifest("cpu");
+        manifest.implementation_kinds = vec!["native-dylib".to_owned(), "llvm-bc".to_owned()];
+        let binary = default_binary(manifest, Vec::new());
+        let contracts = implementation_contracts(&binary);
+        for contract in contracts {
+            assert!(
+                contract
+                    .required_metadata
+                    .iter()
+                    .any(|item| item.starts_with("abi_target=")),
+                "missing abi_target metadata in {} contract",
+                contract.kind
+            );
         }
     }
 

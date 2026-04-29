@@ -61,6 +61,7 @@ pub struct RegisteredAbiTarget {
     pub object_format: String,
     pub calling_abi: String,
     pub clang_target: String,
+    pub backend_family: Option<String>,
     pub host_adaptive: bool,
 }
 
@@ -1155,6 +1156,7 @@ fn parse_registered_abi_target(
     let mut object_format = None::<String>;
     let mut calling_abi = None::<String>;
     let mut clang_target = None::<String>;
+    let mut backend_family = None::<String>;
     for field in fields.split('|').map(str::trim).filter(|field| !field.is_empty()) {
         let Some((key, value)) = field.split_once('=') else {
             return Err(format!(
@@ -1172,9 +1174,10 @@ fn parse_registered_abi_target(
             "object" => object_format = Some(resolve_host_adaptive_object(value).to_owned()),
             "calling" => calling_abi = Some(resolve_host_adaptive_calling(value).to_owned()),
             "clang" => clang_target = Some(resolve_host_adaptive_clang(value).to_owned()),
+            "backend" => backend_family = Some(value.to_owned()),
             other => {
                 return Err(format!(
-                    "nustar package `{}` has invalid abi_targets key `{}` in `{}`; expected `arch`, `os`, `object`, `calling`, or `clang`",
+                    "nustar package `{}` has invalid abi_targets key `{}` in `{}`; expected `arch`, `os`, `object`, `calling`, `clang`, or `backend`",
                     manifest.package_id, other, raw
                 ));
             }
@@ -1212,6 +1215,7 @@ fn parse_registered_abi_target(
                 manifest.package_id, raw
             )
         })?,
+        backend_family,
         host_adaptive,
     })
 }
@@ -1462,5 +1466,18 @@ mod tests {
         assert_eq!(target.calling_abi, host_calling_abi());
         assert_eq!(target.clang_target, host_clang_target());
         assert!(target.host_adaptive);
+    }
+
+    #[test]
+    fn registered_abi_target_preserves_backend_family() {
+        let mut manifest = cpu_manifest_with_host_target();
+        manifest.abi_profiles = vec!["cpu.backend.v1".to_owned()];
+        manifest.abi_capabilities = vec!["cpu.backend.v1:op:cpu.*".to_owned()];
+        manifest.abi_targets = vec![
+            "cpu.backend.v1:arch=arm64|os=darwin|object=mach-o|calling=aapcs64-darwin|clang=aarch64-apple-darwin|backend=metal".to_owned(),
+        ];
+        let target = registered_abi_target(&manifest, "cpu.backend.v1").unwrap();
+        assert_eq!(target.backend_family.as_deref(), Some("metal"));
+        assert!(!target.host_adaptive);
     }
 }

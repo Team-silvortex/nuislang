@@ -333,6 +333,9 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 "  abi_capabilities: {}",
                 binary.manifest.abi_capabilities.join(", ")
             );
+            if !binary.manifest.abi_targets.is_empty() {
+                println!("  abi_targets: {}", binary.manifest.abi_targets.join(", "));
+            }
             println!("  blob_bytes: {}", binary.implementation_blob.len());
         }
         CommandKind::InspectNustar { input } => {
@@ -362,6 +365,9 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     "  abi_capabilities: {}",
                     binary.manifest.abi_capabilities.join(", ")
                 );
+            }
+            if !binary.manifest.abi_targets.is_empty() {
+                println!("  abi_targets: {}", binary.manifest.abi_targets.join(", "));
             }
             if !binary.manifest.host_ffi_surface.is_empty() {
                 println!(
@@ -1000,6 +1006,31 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     "false"
                 }
             );
+            if let Some(resolution) = &project_abi_resolution {
+                for item in &resolution.requirements {
+                    println!("abi: {}={}", item.domain, item.abi);
+                    if let Ok(manifest) =
+                        registry::load_manifest_for_domain(Path::new("nustar-packages"), &item.domain)
+                    {
+                        if let Ok(target) = registry::registered_abi_target(&manifest, &item.abi) {
+                            println!(
+                                "  abi_target_machine: {}-{}",
+                                target.machine_arch, target.machine_os
+                            );
+                            println!("  abi_target_object: {}", target.object_format);
+                            println!("  abi_target_calling: {}", target.calling_abi);
+                            println!("  abi_target_clang: {}", target.clang_target);
+                            if let Some(backend) = target.backend_family {
+                                println!("  abi_target_backend: {}", backend);
+                            }
+                            println!(
+                                "  abi_target_host_adaptive: {}",
+                                if target.host_adaptive { "true" } else { "false" }
+                            );
+                        }
+                    }
+                }
+            }
             println!("ast: {}", written.ast_path);
             println!("nir: {}", written.nir_path);
             println!("yir: {}", written.yir_path);

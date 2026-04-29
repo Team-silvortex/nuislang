@@ -177,6 +177,28 @@ fn run() -> Result<(), String> {
             );
             for item in resolution.requirements {
                 println!("  abi: {}={}", item.domain, item.abi);
+                if let Ok(manifest) = nuisc::registry::load_manifest_for_domain(
+                    std::path::Path::new("nustar-packages"),
+                    &item.domain,
+                ) {
+                    if let Ok(target) = nuisc::registry::registered_abi_target(&manifest, &item.abi)
+                    {
+                        println!(
+                            "    abi_target_machine: {}-{}",
+                            target.machine_arch, target.machine_os
+                        );
+                        println!("    abi_target_object: {}", target.object_format);
+                        println!("    abi_target_calling: {}", target.calling_abi);
+                        println!("    abi_target_clang: {}", target.clang_target);
+                        if let Some(backend) = target.backend_family {
+                            println!("    abi_target_backend: {}", backend);
+                        }
+                        println!(
+                            "    abi_target_host_adaptive: {}",
+                            if target.host_adaptive { "true" } else { "false" }
+                        );
+                    }
+                }
             }
             for item in &project.manifest.galaxy_dependencies {
                 println!("  galaxy: {}={}", item.name, item.version);

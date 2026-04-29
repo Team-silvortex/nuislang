@@ -19,7 +19,7 @@ package_layout = "single-envelope"
 machine_abi_policy = "exact-match"
 abi_profiles = ["kernel.apple_ane.coreml.v1", "kernel.cpu-fallback.v1", "kernel.cpu-fallback.sysv64.v1", "kernel.cpu-fallback.win64.v1", "kernel.vulkan.compute.spv1_6.v1"]
 abi_capabilities = ["kernel.apple_ane.coreml.v1:surface:kernel.profile.*|op:kernel.*", "kernel.cpu-fallback.v1:surface:kernel.profile.*|op:kernel.*", "kernel.cpu-fallback.sysv64.v1:surface:kernel.profile.*|op:kernel.*", "kernel.cpu-fallback.win64.v1:surface:kernel.profile.*|op:kernel.*", "kernel.vulkan.compute.spv1_6.v1:surface:kernel.profile.*|op:kernel.*"]
-abi_targets = ["kernel.apple_ane.coreml.v1:arch=arm64|os=darwin|object=mach-o|calling=aapcs64-darwin|clang=aarch64-apple-darwin", "kernel.cpu-fallback.v1:arch=host|os=host|object=host|calling=host|clang=host", "kernel.cpu-fallback.sysv64.v1:arch=x86_64|os=linux|object=elf|calling=sysv64|clang=x86_64-unknown-linux-gnu", "kernel.cpu-fallback.win64.v1:arch=x86_64|os=windows|object=coff|calling=win64|clang=x86_64-pc-windows-msvc"]
+abi_targets = ["kernel.apple_ane.coreml.v1:arch=arm64|os=darwin|object=mach-o|calling=aapcs64-darwin|clang=aarch64-apple-darwin|backend=coreml", "kernel.cpu-fallback.v1:arch=host|os=host|object=host|calling=host|clang=host|backend=cpu-fallback", "kernel.cpu-fallback.sysv64.v1:arch=x86_64|os=linux|object=elf|calling=sysv64|clang=x86_64-unknown-linux-gnu|backend=cpu-fallback", "kernel.cpu-fallback.win64.v1:arch=x86_64|os=windows|object=coff|calling=win64|clang=x86_64-pc-windows-msvc|backend=cpu-fallback"]
 implementation_kinds = ["native-stub", "native-dylib", "llvm-bc"]
 loader_entry = "nustar.bootstrap.v1"
 loader_abi = "nustar-loader-v1"

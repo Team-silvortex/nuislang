@@ -703,25 +703,33 @@ fn recommend_registered_abi_profile_for_host(
             score += 15;
         }
         if manifest.domain_family == "shader" {
-            let lower = profile.to_ascii_lowercase();
-            if host_os == "darwin" && lower.contains("metal") {
+            let backend = target
+                .backend_family
+                .as_deref()
+                .unwrap_or(profile.as_str())
+                .to_ascii_lowercase();
+            if host_os == "darwin" && backend.contains("metal") {
                 score += 60;
             }
-            if host_os == "windows" && (lower.contains("dx12") || lower.contains("dxil")) {
+            if host_os == "windows" && (backend.contains("dx12") || backend.contains("dxil")) {
                 score += 60;
             }
-            if host_os == "linux" && (lower.contains("vulkan") || lower.contains("spv")) {
+            if host_os == "linux" && (backend.contains("vulkan") || backend.contains("spv")) {
                 score += 60;
             }
-            if lower.contains("cpu-fallback") {
+            if backend.contains("cpu-fallback") {
                 score -= 20;
             }
         } else if manifest.domain_family == "kernel" {
-            let lower = profile.to_ascii_lowercase();
-            if host_os == "darwin" && (lower.contains("apple_ane") || lower.contains("coreml")) {
+            let backend = target
+                .backend_family
+                .as_deref()
+                .unwrap_or(profile.as_str())
+                .to_ascii_lowercase();
+            if host_os == "darwin" && (backend.contains("apple_ane") || backend.contains("coreml")) {
                 score += 60;
             }
-            if lower.contains("cpu-fallback") {
+            if backend.contains("cpu-fallback") {
                 score -= 10;
             }
         }
@@ -5559,10 +5567,10 @@ mod tests {
                 "kernel.cpu-fallback.v1:arch=host|os=host|object=host|calling=host|clang=host"
                     .to_owned(),
                 format!(
-                    "kernel.host-match.v1:arch={}|os={}|object={}|calling={}|clang={}",
+                    "kernel.host-match.v1:arch={}|os={}|object={}|calling={}|clang={}|backend=coreml",
                     host_arch, host_os, host_object, host_calling, host_clang
                 ),
-                "kernel.alt.v1:arch=x86_64|os=windows|object=coff|calling=win64|clang=x86_64-pc-windows-msvc".to_owned(),
+                "kernel.alt.v1:arch=x86_64|os=windows|object=coff|calling=win64|clang=x86_64-pc-windows-msvc|backend=cpu-fallback".to_owned(),
             ],
             implementation_kinds: vec!["native-stub".to_owned()],
             loader_entry: "nustar.bootstrap.v1".to_owned(),
@@ -5634,10 +5642,10 @@ mod tests {
                 "shader.render.cpu-fallback.v1:arch=host|os=host|object=host|calling=host|clang=host"
                     .to_owned(),
                 format!(
-                    "shader.host-match.v1:arch={}|os={}|object={}|calling={}|clang={}",
+                    "shader.host-match.v1:arch={}|os={}|object={}|calling={}|clang={}|backend=metal",
                     host_arch, host_os, host_object, host_calling, host_clang
                 ),
-                "shader.alt.v1:arch=x86_64|os=windows|object=coff|calling=win64|clang=x86_64-pc-windows-msvc".to_owned(),
+                "shader.alt.v1:arch=x86_64|os=windows|object=coff|calling=win64|clang=x86_64-pc-windows-msvc|backend=directx".to_owned(),
             ],
             implementation_kinds: vec!["native-stub".to_owned()],
             loader_entry: "nustar.bootstrap.v1".to_owned(),
