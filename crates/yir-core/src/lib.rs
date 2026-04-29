@@ -159,6 +159,21 @@ pub enum SemanticOp {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AsyncCoreOp {
+    Await,
+    ScheduleCall,
+    SpawnTask,
+    JoinTask,
+    CancelTask,
+    TimeoutTask,
+    ObserveTaskResult,
+    ProbeTaskCompleted,
+    ProbeTaskTimedOut,
+    ProbeTaskCancelled,
+    ExtractTaskValue,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CpuLlvmLoweringClass {
     NonCpu,
     Literal,
@@ -296,6 +311,76 @@ impl Operation {
         )
     }
 
+    pub fn async_core_op(&self) -> Option<AsyncCoreOp> {
+        match self.semantic_op() {
+            SemanticOp::CpuJoin => Some(AsyncCoreOp::JoinTask),
+            SemanticOp::CpuCancel => Some(AsyncCoreOp::CancelTask),
+            SemanticOp::CpuTimeout => Some(AsyncCoreOp::TimeoutTask),
+            SemanticOp::CpuJoinResult => Some(AsyncCoreOp::ObserveTaskResult),
+            SemanticOp::CpuTaskCompleted => Some(AsyncCoreOp::ProbeTaskCompleted),
+            SemanticOp::CpuTaskTimedOut => Some(AsyncCoreOp::ProbeTaskTimedOut),
+            SemanticOp::CpuTaskCancelled => Some(AsyncCoreOp::ProbeTaskCancelled),
+            SemanticOp::CpuTaskValue => Some(AsyncCoreOp::ExtractTaskValue),
+            _ if self.domain_family() == OperationDomainFamily::Cpu => match self.instruction.as_str()
+            {
+                "await" => Some(AsyncCoreOp::Await),
+                "async_call" => Some(AsyncCoreOp::ScheduleCall),
+                "spawn_task" => Some(AsyncCoreOp::SpawnTask),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    pub fn is_async_core_op(&self) -> bool {
+        self.async_core_op().is_some()
+    }
+
+    pub fn is_async_task_result_observer(&self) -> bool {
+        matches!(
+            self.async_core_op(),
+            Some(
+                AsyncCoreOp::ProbeTaskCompleted
+                    | AsyncCoreOp::ProbeTaskTimedOut
+                    | AsyncCoreOp::ProbeTaskCancelled
+                    | AsyncCoreOp::ExtractTaskValue
+            )
+        )
+    }
+
+    pub fn semantic_name(&self) -> &'static str {
+        match self.semantic_op() {
+            SemanticOp::CpuProjectProfileRef => "cpu.project_profile_ref",
+            SemanticOp::CpuJoinResult => "cpu.join_result",
+            SemanticOp::CpuTaskCompleted => "cpu.task_completed",
+            SemanticOp::CpuTaskTimedOut => "cpu.task_timed_out",
+            SemanticOp::CpuTaskCancelled => "cpu.task_cancelled",
+            SemanticOp::CpuTaskValue => "cpu.task_value",
+            SemanticOp::DataObserve => "data.observe",
+            SemanticOp::DataIsReady => "data.is_ready",
+            SemanticOp::DataIsMoved => "data.is_moved",
+            SemanticOp::DataIsWindowed => "data.is_windowed",
+            SemanticOp::DataValue => "data.value",
+            SemanticOp::ShaderObserve => "shader.observe",
+            SemanticOp::ShaderIsPassReady => "shader.is_pass_ready",
+            SemanticOp::ShaderIsFrameReady => "shader.is_frame_ready",
+            SemanticOp::ShaderValue => "shader.value",
+            SemanticOp::KernelObserve => "kernel.observe",
+            SemanticOp::KernelIsConfigReady => "kernel.is_config_ready",
+            SemanticOp::KernelValue => "kernel.value",
+            SemanticOp::DataBindCore => "data.bind_core",
+            SemanticOp::DataMarker => "data.marker",
+            SemanticOp::DataHandleTable => "data.handle_table",
+            SemanticOp::DataOutputPipe => "data.output_pipe",
+            SemanticOp::DataInputPipe => "data.input_pipe",
+            SemanticOp::DataCopyWindow => "data.copy_window",
+            SemanticOp::DataImmutableWindow => "data.immutable_window",
+            SemanticOp::ShaderBeginPass => "shader.begin_pass",
+            SemanticOp::ShaderDrawInstanced => "shader.draw_instanced",
+            _ => "other",
+        }
+    }
+
     pub fn cpu_llvm_lowering_class(&self) -> CpuLlvmLoweringClass {
         if self.domain_family() != OperationDomainFamily::Cpu {
             return CpuLlvmLoweringClass::NonCpu;
@@ -320,9 +405,8 @@ impl Operation {
                 CpuLlvmLoweringClass::Memory
             }
             "input_i64" | "extern_call_i64" => CpuLlvmLoweringClass::Runtime,
-            "print" | "await" | "async_call" | "spawn_task" | "join" | "cancel"
-            | "timeout" | "join_result" | "task_completed" | "task_timed_out"
-            | "task_cancelled" | "task_value" => {
+            "print" => CpuLlvmLoweringClass::Effect,
+            _ if self.is_async_core_op() => {
                 CpuLlvmLoweringClass::Effect
             }
             _ => CpuLlvmLoweringClass::Other,
@@ -544,14 +628,7 @@ pub fn glm_profile_for_operation(op: &Operation) -> GlmNodeProfile {
             }],
             effect: GlmEffect::None,
         },
-        SemanticOp::CpuJoin
-        | SemanticOp::CpuCancel
-        | SemanticOp::CpuTimeout
-        | SemanticOp::CpuJoinResult
-        | SemanticOp::CpuTaskCompleted
-        | SemanticOp::CpuTaskTimedOut
-        | SemanticOp::CpuTaskCancelled
-        | SemanticOp::CpuTaskValue => GlmNodeProfile {
+        _ if op.is_async_core_op() => GlmNodeProfile {
             result_class: GlmValueClass::Val,
             accesses: op
                 .args
@@ -583,7 +660,8 @@ pub fn glm_profile_for_operation(op: &Operation) -> GlmNodeProfile {
 #[cfg(test)]
 mod tests {
     use super::{
-        GlmEffect, GlmUseMode, GlmValueClass, Operation, OperationDomainFamily, SemanticOp,
+        AsyncCoreOp, CpuLlvmLoweringClass, GlmEffect, GlmUseMode, GlmValueClass, Operation,
+        OperationDomainFamily, SemanticOp,
     };
 
     #[test]
@@ -600,6 +678,40 @@ mod tests {
         assert_eq!(profile.result_class, GlmValueClass::Res);
         assert_eq!(profile.accesses[0].mode, GlmUseMode::Own);
         assert_eq!(profile.effect, GlmEffect::DomainMove);
+    }
+
+    #[test]
+    fn classifies_async_primitives_as_yir_core_ops() {
+        let async_call = Operation::parse("cpu.async_call", vec!["ping".to_owned()]).unwrap();
+        let spawn = Operation::parse(
+            "cpu.spawn_task",
+            vec!["ping".to_owned(), "async_call_0".to_owned()],
+        )
+        .unwrap();
+        let join_result =
+            Operation::parse("cpu.join_result", vec!["task_0".to_owned()]).unwrap();
+        let task_value =
+            Operation::parse("cpu.task_value", vec!["result_0".to_owned()]).unwrap();
+
+        assert_eq!(async_call.async_core_op(), Some(AsyncCoreOp::ScheduleCall));
+        assert_eq!(spawn.async_core_op(), Some(AsyncCoreOp::SpawnTask));
+        assert_eq!(join_result.async_core_op(), Some(AsyncCoreOp::ObserveTaskResult));
+        assert_eq!(task_value.async_core_op(), Some(AsyncCoreOp::ExtractTaskValue));
+        assert!(task_value.is_async_task_result_observer());
+    }
+
+    #[test]
+    fn lowers_async_primitives_as_effectful_cpu_nodes() {
+        let task_value =
+            Operation::parse("cpu.task_value", vec!["result_0".to_owned()]).unwrap();
+        assert_eq!(
+            task_value.cpu_llvm_lowering_class(),
+            CpuLlvmLoweringClass::Effect
+        );
+
+        let profile = super::glm_profile_for_operation(&task_value);
+        assert_eq!(profile.result_class, GlmValueClass::Val);
+        assert_eq!(profile.accesses[0].input, "result_0");
     }
 }
 

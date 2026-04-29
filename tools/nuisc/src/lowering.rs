@@ -180,8 +180,33 @@ fn default_lane_for_node<'a>(
     family: &str,
     node: &'a Node,
 ) -> &'a str {
+    if node.name.starts_with("project_link_") {
+        return "contract";
+    }
     if node.name.starts_with("project_profile_") {
-        return "profile";
+        if family == "cpu" && node.op.instruction == "text" {
+            return "contract";
+        }
+        if family == "cpu" {
+            return "profile";
+        }
+        if family == "data" {
+            return match node.op.semantic_op() {
+                SemanticOp::DataImmutableWindow => "profile_uplink",
+                SemanticOp::DataCopyWindow | SemanticOp::DataInputPipe => "profile_downlink",
+                SemanticOp::DataHandleTable | SemanticOp::DataBindCore | SemanticOp::DataMarker => {
+                    "profile_control"
+                }
+                SemanticOp::DataMove => "profile_fabric",
+                _ => "profile_data",
+            };
+        }
+        if family == "shader" {
+            return "profile_setup";
+        }
+        if family == "kernel" || family == "npu" {
+            return "profile_compute";
+        }
     }
     if let Some(lane) = lane_policy.get(&node.op.full_name()) {
         return lane.as_str();

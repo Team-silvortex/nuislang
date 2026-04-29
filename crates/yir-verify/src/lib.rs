@@ -1162,10 +1162,7 @@ fn verify_result_state_nodes(module: &YirModule) -> Result<(), String> {
 
     for node in &module.nodes {
         match node.op.semantic_op() {
-            SemanticOp::CpuTaskCompleted
-            | SemanticOp::CpuTaskTimedOut
-            | SemanticOp::CpuTaskCancelled
-            | SemanticOp::CpuTaskValue => {
+            _ if node.op.is_async_task_result_observer() => {
                 require_observe_source(&nodes, node, SemanticOp::CpuJoinResult)?;
             }
             SemanticOp::DataObserve => {
