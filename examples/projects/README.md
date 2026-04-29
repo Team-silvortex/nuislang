@@ -1,17 +1,76 @@
 # `nuis` Projects
 
 This folder contains multi-file `nuis` project examples driven by `nuis.toml`.
-Projects can now also declare a first project-level `links` list, so instance relations are not only implicit in file layout.
-Those links are now checked against final `YIR` as real `source -> data -> target`
-exchange structure, not only as loose metadata.
-Projects can also lock required Nustar ABI profiles per domain via
-`abi = ["cpu=...", "shader=...", "data=...", "kernel=..."]`.
-If `abi` is omitted, `nuisc/nuis` now auto-resolve a host-matching ABI set
-per involved domain and validate YIR against that effective ABI contract.
-Per-domain lane defaults are now also declared by each Nustar package via
-`default_lanes = ["op.name=lane"]`, so project/profile lowering stays
-mod-owned and `nuisc` only applies the declared policy plus narrow fallback
-rules when a package has not specified one yet.
+This is the current canonical route for reading real `.ns` programs in this repo.
+
+## What A Project Gives You
+
+Compared with a single `.ns` file, project mode currently adds:
+
+* `nuis.toml` manifest
+* multi-file `mod cpu / mod data / mod shader / mod kernel` split
+* project-level `links`
+* project-level ABI locking or auto-resolution
+* project metadata outputs during `build`
+* compile-cache identity based on the whole project input set
+
+Current project `links` are not only manifest hints anymore. They are checked
+against final `YIR` as real `source -> data -> target` exchange structure.
+
+Projects can lock required `nustar` ABI profiles per domain via:
+
+```toml
+abi = [
+  "cpu=cpu.arm64.apple_aapcs64",
+  "data=data.fabric.macos.arm64.v1",
+  "shader=shader.metal.msl2_4",
+]
+```
+
+If `abi` is omitted, `nuisc/nuis` now auto-resolve a host-matching ABI set per
+involved domain from the `abi_targets` registered by each `nustar` package.
+
+Per-domain lane defaults are also declared by each `nustar` package through
+`default_lanes = ["op.name=lane"]`, so project/profile lowering stays mod-owned
+and `nuisc` only applies declared policy plus narrow fallback rules.
+
+## Core Commands
+
+Inspect project state:
+
+```bash
+cargo run -p nuis -- project-status examples/projects/window_controls_demo
+cargo run -p nuis -- project-lock-abi examples/projects/window_controls_demo
+```
+
+Validate and build:
+
+```bash
+cargo run -p nuis -- check examples/projects/window_controls_demo
+cargo run -p nuis -- build examples/projects/window_controls_demo examples/bins/window_controls_demo_project
+
+cargo run -p nuis -- check examples/projects/kernel_tensor_demo
+cargo run -p nuis -- build examples/projects/kernel_tensor_demo examples/bins/kernel_tensor_demo_project
+```
+
+Inspect cache and artifact metadata:
+
+```bash
+cargo run -p nuis -- cache-status examples/projects/window_controls_demo
+cargo run -p nuis -- verify-build-manifest examples/bins/window_controls_demo_project/nuis.build.manifest.toml
+```
+
+Override CPU target when needed:
+
+```bash
+cargo run -p nuis -- build --cpu-abi cpu.arm64.apple_aapcs64 \
+  examples/projects/kernel_tensor_demo \
+  examples/bins/kernel_tensor_demo_project
+
+cargo run -p nuis -- build --target aarch64-apple-darwin \
+  examples/projects/kernel_tensor_demo \
+  examples/bins/kernel_tensor_demo_project
+```
 
 Recommended starting point:
 
@@ -48,14 +107,25 @@ Use:
 
 ```bash
 cargo run -p nuis -- check examples/projects/window_controls_demo
+cargo run -p nuis -- project-status examples/projects/window_controls_demo
 cargo run -p nuis -- dump-ast examples/projects/window_controls_demo
+cargo run -p nuis -- dump-nir examples/projects/window_controls_demo
+cargo run -p nuis -- dump-yir examples/projects/window_controls_demo
 cargo run -p nuis -- build examples/projects/window_controls_demo examples/bins/window_controls_demo_project
 cargo run -p nuis -- check examples/projects/kernel_tensor_demo
 cargo run -p nuis -- build examples/projects/kernel_tensor_demo examples/bins/kernel_tensor_demo_project
 ```
 
-Output bundle:
+Generated outputs to expect from a project build:
 
 * [examples/bins/window_controls_demo_project/window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/bins/window_controls_demo_project/window_controls_demo)
 * [examples/bins/window_controls_demo_project/nuis.project.host_ffi.txt](/Users/Shared/chroot/dev/nuislang/examples/bins/window_controls_demo_project/nuis.project.host_ffi.txt)
   generated host-ffi contract index (abi/interface/symbol/signature) consumed by the project route
+* `nuis.project.modules.txt`
+  module index emitted by the project route
+* `nuis.project.links.txt`
+  link index emitted by the project route
+* `nuis.project.abi.txt`
+  effective ABI lock/auto-resolution summary
+* `nuis.build.manifest.toml`
+  build manifest including per-domain target/backend details

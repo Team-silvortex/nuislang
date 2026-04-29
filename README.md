@@ -1,40 +1,91 @@
 # nuislang
 
-> AOT-first system programming language for heterogeneous execution, built around `nuis -> NIR -> YIR -> LLVM/AOT`, with future external integration points such as `yalivia` and `vulpoya`.
+> AOT-first heterogeneous systems language and toolchain built around `nuis -> NIR -> YIR -> LLVM/AOT`, with `nustar` packages providing per-domain parsing, lowering, ABI contracts, and verification surfaces.
 
----
+## Current Status
+
+The repository is in an active architecture-building stage. The most stable current spine is:
+
+```text
+nuis source / project
+  -> nuisc
+  -> NIR
+  -> YIR
+  -> LLVM / AOT packaging
+```
+
+The key thing that is already real today is not “all language features are done”, but that the project now has one increasingly consistent execution model across:
+
+* `cpu`
+* `data`
+* `shader`
+* `kernel`
+
+That model is increasingly enforced through `YIR` contracts, project validation, per-domain `nustar` manifests, and verifier checks rather than only ad hoc frontend rules.
 
 ## Toolchain
 
 ```text
-nuis     -> front-door workflow tool (build/check/registry)
-nuis-rc  -> resident control tool (local toolchain versions + local project index)
-nuisc    -> core scheduler/compiler (nuis -> NIR -> YIR -> LLVM/AOT)
-yalivia  -> separate project (JIT/runtime adapter, not managed here)
-vulpoya  -> separate project (syntax/constraint analysis, not managed here)
+nuis     -> front-door workflow tool
+nuis-rc  -> resident control tool (later-stage, still intentionally thin)
+nuisc    -> compiler/scheduler core
+yalivia  -> separate future JIT/runtime project
+vulpoya  -> separate future analyzer/verifier project
 ```
 
-## Model
+Current responsibility split:
 
-```id="c9qk3b"
-source → nuis -> nuisc -> NIR -> YIR -> LLVM/AOT
-                         ↓
-                     nustar packages
+* `nuis` is the main workflow surface for `check`, `build`, caches, projects, and package inspection.
+* `nuisc` is the compiler/scheduler core that consumes `.ns` or project inputs and emits `NIR`, `YIR`, LLVM IR, and AOT outputs.
+* `nustar` packages are where per-domain ABI support, default lanes, frontend/lowering entrypoints, and package contracts are registered.
+
+## Quick Start
+
+Recommended first commands:
+
+```bash
+cargo run -p nuis -- check examples/projects/window_controls_demo
+cargo run -p nuis -- project-status examples/projects/window_controls_demo
+cargo run -p nuis -- build examples/projects/window_controls_demo examples/bins/window_controls_demo_project
 ```
 
----
+Useful inspection commands:
 
-## Properties
+```bash
+cargo run -p nuis -- dump-ast examples/projects/window_controls_demo
+cargo run -p nuis -- dump-nir examples/projects/window_controls_demo
+cargo run -p nuis -- dump-yir examples/projects/window_controls_demo
+cargo run -p nuis -- verify-build-manifest examples/bins/window_controls_demo_project/nuis.build.manifest.toml
+```
 
-* AOT-oriented compilation
-* Heterogeneous execution targets
-* Custom IR (YIR) as primary semantic layer
-* Integrated analysis and verification
+CPU target override is now explicit:
 
-## Examples
+```bash
+cargo run -p nuis -- build --cpu-abi cpu.arm64.apple_aapcs64 \
+  examples/projects/kernel_tensor_demo \
+  examples/bins/kernel_tensor_demo_project
 
-The example set is now organized around the current project stage rather than
-only historical file order.
+cargo run -p nuis -- build --target aarch64-apple-darwin \
+  examples/projects/kernel_tensor_demo \
+  examples/bins/kernel_tensor_demo_project
+```
+
+## What Is Working Well Right Now
+
+High-signal implemented surfaces:
+
+* multi-file `nuis.toml` projects with project-level `links`
+* lazy `nustar` loading and per-domain ABI resolution
+* ABI auto-selection from registered `abi_targets`
+* explicit `--cpu-abi` and `--target` overrides for CPU builds
+* compile-cache inspection and pruning through `nuis`
+* AOT bundle generation for current CPU-only and macOS window-hosted demo paths
+* project-level host FFI contract indexing
+* `cpu/data/shader/kernel` result-family validation in `YIR`
+* task-style async primitives with `spawn / join / cancel / timeout / join_result`
+* core-level async/result metadata beginning to move into `yir-core`
+
+## Current Reference Examples
 
 Start here:
 
@@ -45,65 +96,35 @@ Start here:
 * [examples/bins/README.md](/Users/Shared/chroot/dev/nuislang/examples/bins/README.md)
 * [stdlib/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/README.md)
 
-Current high-signal examples:
+Recommended current examples:
 
 * [examples/ns/core/hello_world.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/core/hello_world.ns)
 * [examples/ns/types/hello_ref_struct.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/types/hello_ref_struct.ns)
 * [examples/ns/data/hello_data.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/data/hello_data.ns)
-* [examples/ns/data/hello_instantiate.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/data/hello_instantiate.ns)
 * [examples/ns/ffi/hello_ffi.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_ffi.ns)
-* [examples/ns/ffi/hello_c_ffi.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_c_ffi.ns)
 * [examples/ns/demos/window_controls_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/window_controls_demo.ns)
 * [examples/projects/window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo)
+* [examples/projects/kernel_tensor_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/kernel_tensor_demo)
 * [examples/yir/demos/window_controls_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/demos/window_controls_demo.yir)
+* [examples/yir/data/data_fabric_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/data/data_fabric_demo.yir)
 * [examples/yir/shader/shader_bindings_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/shader/shader_bindings_demo.yir)
 * [examples/yir/kernel/kernel_auto_broadcast_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/kernel/kernel_auto_broadcast_demo.yir)
-* [examples/yir/data/data_fabric_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/data/data_fabric_demo.yir)
 
----
+## Key Architectural Notes
+
+Current high-signal architectural facts:
+
+* `YIR` is the main semantic execution boundary in this repository.
+* `nuisc` is intentionally becoming more mod-agnostic; per-domain support should come from registered `nustar` contracts.
+* `abi_targets` now live in `nustar` manifests and drive auto ABI selection, CLI overrides, packaging metadata, and loader contracts.
+* default lane policy also belongs to `nustar` manifests; `nuisc` should only apply that policy plus narrow fallbacks.
+* `data.handle_table` remains an indirection/resource-binding surface, not a place to own large payload blobs directly.
+* current Fabric host integration is intentionally thin and AOT-first, with static typed action tables rather than a heavy runtime metadata graph.
+* async/result semantics are being normalized into `yir-core`, even though the concrete entry ops are still currently surfaced through `cpu.*`.
 
 ## Notes
 
-* LLVM is used as a backend
-* Designed as a general-purpose system language
-* Forms its own toolchain and execution model (language, IR, compiler core, external runtime/verifier boundaries)
-* Current YIR reference surface already includes heterogenous `cpu / shader / kernel / data` families, with shader pass composition and kernel tensor ops expanding incrementally from the same graph model
-* The current repo now also has a second host-preview style control demo in `examples/yir/demos/window_controls_demo.yir`, where multiple `cpu.input_i64` controls drive one structured render packet through `data.fabric` into the shader path
-* The `shader` family now also has a minimal resource-layout surface (`uniform / storage / attachment / bind_set`) so future backend package manifests can describe stage bindings instead of only pass topology
-* The `shader` family also includes a first texture-resource slice (`texture2d / sampler / sample_nearest`) plus matching binding kinds for package manifests
-* The texture path now also has a normalized UV surface (`uv / sample_uv_nearest / sample_uv_linear`) so sampling semantics do not depend on hard-coded integer texel coordinates
-* The preferred sampling entry points are now `sample / sample_uv`, with actual nearest-vs-linear behavior selected by `sampler.filter`; the older explicit sample ops remain as compatibility aliases
-* The render path also has a first state surface (`blend_state / depth_state / raster_state / render_state`) so backend packages can describe more than pass topology and bindings
-* The render path also has a first geometry-input surface (`vertex_layout / vertex_buffer / index_buffer` plus matching bindings) so package manifests can describe mesh-style stage inputs
-* The handwritten shader reference path now interprets bound `triangle` / `triangle_strip` geometry as point, edge, and minimal area coverage instead of only pass metadata
-* Shader package manifests now also record texture/sampler binding details like texture shape plus sampler filter/address mode, so sampling semantics begin to survive packaging
-* The `data` family now has a first typed Fabric surface (`output_pipe / input_pipe / marker / copy_window / immutable_window / handle_table`) so cross-domain exchange is starting to look like a real data plane instead of a bare value hop
-* `data.handle_table` now also survives packaging as top-level fabric-binding metadata, so resource indirection starts to participate in AOT bundle description instead of only live verification
-* Shader stage packaging now records both the concrete stage resource and the associated fabric handle table when present, so host/render binding decisions can begin to follow Fabric metadata instead of ad hoc scanning
-* The `data` family now also has a first `bind_core` surface, so short-term CPU-hosted Fabric workers can be described and packaged in a DPDK-like “occupy a core” style
-* Current macOS AOT host stubs now read `fabric_worker_core`, start a dedicated Fabric worker thread, and apply it as that thread's startup affinity hint; this is intentionally weaker than a true exclusive-core Fabric runtime
-* Current Fabric host booting is also kept intentionally thin and AOT-first: host stubs embed a static typed action table derived from `data.*` nodes instead of constructing a heavyweight dynamic metadata system at runtime
-* That typed Fabric action table now also carries a minimal class/slot ABI tag, so host-side dispatch no longer depends only on ad hoc string matching
-* Project-level `links` are no longer only manifest hints: they now participate in project validation, auto-instantiate CPU-side units from the project graph, and require a real `source -> data -> target` `xfer` shape in final `YIR`
-* The current `.ns` frontend now treats `mod` as a top-level builtin declaration and rejects nested `mod` definitions inside functions or other `mod` bodies
-* The current `.ns` frontend also has a first `instantiate <domain> <unit>` surface: inside `mod cpu <unit>`, CPU code can request other domain units by name, and `nuisc` now validates those unit names lazily against the corresponding `nustar` package registration
-* The current `.ns` frontend also has a first `extern "nurs" interface ...` surface for CPU-side host integration; today it bridges through a C-compatible ABI, but the source language already distinguishes the Rust-oriented `NURS` interface from plain `extern "c"`
-* The handwritten `YIR` value layer now also has a first typed scalar/aggregate surface: `bool / i32 / i64 / f32 / f64` plus named `struct` values with `cpu.field` extraction
-* The CPU surface now also has a first typed arithmetic slice for `i32 / f32 / f64`, and that path already runs through reference execution, LLVM IR emission, and AOT packaging
-* The CPU surface now also has a first typed comparison/conversion slice, so typed values can be compared and cast without collapsing back into the untyped `i64` path first
-* `shader` and `kernel` now also have a first typed-scalar surface of their own, so domain-local setup no longer has to collapse back to the old integer-only path for simple constants and scalar arithmetic
-* The handwritten shader draw path now also consumes typed scalar packets directly, so `draw_ball / draw_sphere / draw_instanced` no longer require the old `(int, int)` packet shape
-* The `kernel` family now also has a first tensor-scalar and shape/index query surface (`splat / add_scalar / mul_scalar / shape / rows / cols / element_at`), so it is starting to feel like a real numerical graph tool instead of only a handful of tensor-wide ops
-* `kernel.fill` and `kernel.add_bias` now also accept typed scalar value references directly, so old literal/tensor paths stay valid while newer graphs can move toward a more uniform scalar-fed style
-* The `kernel` family now also has a first shape-transform surface (`reshape / slice / row / col`), so tensor graphs can start doing real structural manipulation instead of only whole-tensor math
-* The `kernel` family now also has a first axis-reduction surface with `reduce_sum_axis rows|cols`, so tensor graphs can start expressing structured reductions without dropping straight to full global sums
-* The `kernel` family now also has a first broadcast surface plus `reduce_max / reduce_mean` and their axis variants, so shape-aligned tensor composition and structured reductions are starting to feel like one coherent subsystem
-* The `kernel` family now also has `reduce_min / argmax` and their axis variants, so the reduction surface is starting to look more like something you could actually use for real ML/kernel graph work
-* The `kernel` family now also has `argmin / sort / topk`, so basic selection and ranking workflows can start to live inside the same YIR kernel surface instead of immediately falling out to another layer
-* `kernel.add / mul / add_bias` now also auto-broadcast compatible tensor shapes, so common row-bias/column-scale style graphs no longer need to spell every expansion out manually
-* `kernel.topk_axis rows|cols` is now in too, so the selection surface is no longer just flat-global; it can already express per-row and per-column ranking in the current reference path
-* The repository-level `nuis` standard library is now explicitly split into three layers under `stdlib/`: `core`, `std`, and `ns-nova`
-* `core` is the minimal semantics-first foundation, `std` is the practical systems layer, and `ns-nova` is the GPU-first rendering/application framework layer
+This README is still paired with the longer architecture/whitepaper material below. The whitepaper remains useful for long-range design direction, but the sections above should be treated as the faster-moving “what is actually true in this repo right now” layer.
 
 ---
 

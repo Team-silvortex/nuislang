@@ -1162,13 +1162,10 @@ fn verify_result_state_nodes(module: &YirModule) -> Result<(), String> {
 
     for node in &module.nodes {
         match node.op.semantic_op() {
-            _ if node.op.is_async_task_result_observer() => {
-                require_observe_source(&nodes, node, SemanticOp::CpuJoinResult)?;
-            }
             SemanticOp::DataObserve => {
                 let source = observe_source_node(&nodes, node)?;
                 let actual = observe_state_arg(node)?;
-                if !data_observe_state_matches(source.op.semantic_op(), actual)? {
+                if !node.op.observe_state_matches_source(&source.op, actual)? {
                     return Err(format!(
                         "node `{}` observes data state `{actual}`, but `{}` does not support that state",
                         node.name, source.name
@@ -1183,11 +1180,10 @@ fn verify_result_state_nodes(module: &YirModule) -> Result<(), String> {
             }
             SemanticOp::ShaderObserve => {
                 let source = observe_source_node(&nodes, node)?;
-                let expected = expected_shader_observe_state(source.op.semantic_op())?;
                 let actual = observe_state_arg(node)?;
-                if actual != expected {
+                if !node.op.observe_state_matches_source(&source.op, actual)? {
                     return Err(format!(
-                        "node `{}` observes shader state `{actual}`, but `{}` produces `{expected}`",
+                        "node `{}` observes shader state `{actual}`, but `{}` does not support that state",
                         node.name, source.name
                     ));
                 }
@@ -1198,12 +1194,6 @@ fn verify_result_state_nodes(module: &YirModule) -> Result<(), String> {
             SemanticOp::KernelObserve => {
                 let source = observe_source_node(&nodes, node)?;
                 let actual = observe_state_arg(node)?;
-                if actual != "config_ready" {
-                    return Err(format!(
-                        "node `{}` observes kernel state `{actual}`, expected `config_ready`",
-                        node.name
-                    ));
-                }
                 if source.op.semantic_op() != SemanticOp::CpuProjectProfileRef {
                     return Err(format!(
                         "node `{}` expects cpu.project_profile_ref input for kernel observe, got `{}`",
@@ -1211,15 +1201,35 @@ fn verify_result_state_nodes(module: &YirModule) -> Result<(), String> {
                         source.op.full_name()
                     ));
                 }
+                if !node.op.observe_state_matches_source(&source.op, actual)? {
+                    return Err(format!(
+                        "node `{}` observes kernel state `{actual}`, but `{}` does not support that state",
+                        node.name, source.name
+                    ));
+                }
             }
             SemanticOp::KernelIsConfigReady | SemanticOp::KernelValue => {
                 require_observe_source(&nodes, node, SemanticOp::KernelObserve)?;
+            }
+            _ if node.op.result_source_semantic_op().is_some() => {
+                require_expected_result_source(&nodes, node)?;
             }
             _ => {}
         }
     }
 
     Ok(())
+}
+
+fn require_expected_result_source(
+    nodes: &BTreeMap<&str, &Node>,
+    node: &Node,
+) -> Result<(), String> {
+    let expected = node
+        .op
+        .result_source_semantic_op()
+        .ok_or_else(|| format!("node `{}` has no expected result source contract", node.name))?;
+    require_observe_source(nodes, node, expected)
 }
 
 fn observe_source_node<'a>(
@@ -1274,33 +1284,6 @@ fn require_observe_source(
         ));
     }
     Ok(())
-}
-
-fn data_observe_state_matches(op: SemanticOp, actual: &str) -> Result<bool, String> {
-    match op {
-        SemanticOp::DataBindCore | SemanticOp::DataMarker | SemanticOp::DataHandleTable => {
-            Ok(actual == "ready")
-        }
-        SemanticOp::DataOutputPipe => Ok(actual == "moved"),
-        SemanticOp::DataInputPipe
-        | SemanticOp::DataCopyWindow
-        | SemanticOp::DataImmutableWindow => Ok(matches!(actual, "ready" | "windowed")),
-        other => Err(format!(
-            "unsupported data observe source `{}`",
-            semantic_op_name(other)
-        )),
-    }
-}
-
-fn expected_shader_observe_state(op: SemanticOp) -> Result<&'static str, String> {
-    match op {
-        SemanticOp::ShaderBeginPass => Ok("pass_ready"),
-        SemanticOp::ShaderDrawInstanced => Ok("frame_ready"),
-        other => Err(format!(
-            "unsupported shader observe source `{}`",
-            semantic_op_name(other)
-        )),
-    }
 }
 
 fn semantic_op_name(op: SemanticOp) -> &'static str {

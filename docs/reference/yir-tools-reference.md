@@ -50,14 +50,27 @@ Current reference commands:
 
 * `status`
 * `registry`
+* `fmt <input>`
 * `bindings <input.ns>`
 * `pack-nustar <package-id> <output.nustar>`
 * `inspect-nustar <input.nustar>`
 * `loader-contract <package-id>`
+* `verify-build-manifest <nuis.build.manifest.toml>`
+* `cache-status [--all] [--verbose-cache] [--json] [input]`
+* `clean-cache [--all] [--json] [input]`
+* `cache-prune [--all] [--keep N] [--json] [input]`
+* `project-status <input.ns|project-dir|nuis.toml>`
+* `project-lock-abi <project-dir|nuis.toml>`
+* `release-check <input> <output-dir>`
 * `check <input.ns>`
 * `build <input.ns> <output-dir>`
+* `build --cpu-abi <abi> <input> <output-dir>`
+* `build --target <triple> <input> <output-dir>`
+* `dump-ast <input.ns>`
 * `dump-nir <input.ns>`
 * `dump-yir <input.ns>`
+* `rc ...`
+* `galaxy ...`
 
 `nuis` is the current front-door workflow tool. It should grow into the
 user-facing toolchain surface while reusing `nuisc` as the compiler core.
@@ -89,6 +102,36 @@ Current loading-contract direction is:
 * host/runtime bootstrap stays machine-ABI aware: current `.nustar` packages carry `machine_arch / machine_os / object_format / calling_abi`
 * `loader-contract` now also defines per-kind implementation-segment requirements, including container kind, implementation section name, required exports, required metadata, and link mode
 * machine ABI compatibility is explicit and inspectable
+* `abi_targets` now also participate in package inspection, loader-contract metadata, project auto-resolution, and CPU-target override validation
+
+## Project Workflow Notes
+
+The front-door workflow is now project-aware:
+
+* `check`, `build`, `dump-ast`, `dump-nir`, `dump-yir`, `bindings`, and cache commands all accept single-file `.ns`, project directories, or direct `nuis.toml` inputs where applicable
+* `project-status` prints the resolved project graph, effective ABI mode, and per-domain ABI target details
+* `project-lock-abi` materializes the currently recommended host-matching ABI set into the project manifest
+* `verify-build-manifest` now reports CPU target metadata including ABI, machine arch/os, object format, calling ABI, clang triple, and cross-build flag
+
+## Build Override Notes
+
+Current CPU build override surface:
+
+```text
+nuis build --cpu-abi <registered-cpu-abi> <input> <output-dir>
+nuis build --target <clang-target-triple> <input> <output-dir>
+nuis release-check --cpu-abi <registered-cpu-abi> <input> <output-dir>
+nuis release-check --target <clang-target-triple> <input> <output-dir>
+nuisc compile --cpu-abi <registered-cpu-abi> <input> <output-dir>
+nuisc compile --target <clang-target-triple> <input> <output-dir>
+```
+
+Important current rule:
+
+* CPU ABI support is intended to come from `nustar` registration, not hardcoded `nuisc` tables
+* explicit CPU overrides are checked against registered `abi_targets`
+* project auto-ABI selection also prefers registered `abi_targets`
+* current window-hosted AppKit bundle packaging still rejects cross-target output instead of pretending to support it
 
 ## Core compiler
 
@@ -100,6 +143,25 @@ cargo run -p nuisc -- <command>
 
 `nuisc` is the current compiler-core CLI. It still exposes the same minimal
 pipeline surface directly while the higher-level `nuis` workflow matures.
+Its current command surface broadly mirrors the relevant `nuis` compiler-facing
+subcommands:
+
+* `status`
+* `registry`
+* `fmt`
+* `bindings`
+* `pack-nustar`
+* `inspect-nustar`
+* `loader-contract`
+* `verify-build-manifest`
+* `cache-status`
+* `clean-cache`
+* `cache-prune`
+* `dump-ast`
+* `dump-nir`
+* `dump-yir`
+* `check`
+* `compile`
 
 ## Parse + verify + execute
 
@@ -195,13 +257,12 @@ distribution design.
 Current behavior:
 
 * pure CPU graphs can be compiled to a native binary through LLVM/clang
-* hetero/window demos can be packaged into a macOS AppKit-hosted single binary
-  using embedded prerendered framebuffer content
 * hetero/window demos with `cpu.tick_i64` can now also be packaged into a
   macOS AppKit-hosted single binary with an embedded `YIR` runtime path:
   generated hosts link `libyir_runtime_host.a`, embed the `.yir` module bytes,
   and generate live framebuffer updates in-process instead of shelling out to a
   sidecar exporter
+* the `window_controls_demo` project route now builds successfully through this path
 * shader packaging already has a contract/package skeleton for future backend
   variants
 * shader package manifests may now include per-stage binding layout entries, texture/sampler/geometry binding kinds, minimal render-state metadata, sampler/texture binding details such as filter, address mode, and texture shape, plus top-level fabric handle-table metadata, per-stage fabric table association, and Fabric worker core binding metadata
@@ -214,6 +275,7 @@ Current behavior:
   each Fabric action, so host-side dispatch can remain static without falling
   back to string-only pattern matching
 * this is still weaker than a strict reserved-core runtime model
+* CPU build manifests and `project-status` output now also expose per-domain ABI target details such as backend family and host-adaptive selection
 
 This is the beginning of a `YIR`-native toolchain, not the final shape.
 

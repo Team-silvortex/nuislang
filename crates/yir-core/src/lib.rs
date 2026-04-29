@@ -174,6 +174,29 @@ pub enum AsyncCoreOp {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum YirResultFamily {
+    Task,
+    Data,
+    Shader,
+    Kernel,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum YirResultState {
+    Task(TaskLifecycleState),
+    Data(DataFlowState),
+    Shader(ShaderFlowState),
+    Kernel(KernelFlowState),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum YirResultRole {
+    Entry,
+    StateProbe,
+    PayloadExtractor,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CpuLlvmLoweringClass {
     NonCpu,
     Literal,
@@ -381,6 +404,142 @@ impl Operation {
         }
     }
 
+    pub fn result_family(&self) -> Option<YirResultFamily> {
+        match self.semantic_op() {
+            SemanticOp::CpuJoinResult
+            | SemanticOp::CpuTaskCompleted
+            | SemanticOp::CpuTaskTimedOut
+            | SemanticOp::CpuTaskCancelled
+            | SemanticOp::CpuTaskValue => Some(YirResultFamily::Task),
+            SemanticOp::DataObserve
+            | SemanticOp::DataIsReady
+            | SemanticOp::DataIsMoved
+            | SemanticOp::DataIsWindowed
+            | SemanticOp::DataValue => Some(YirResultFamily::Data),
+            SemanticOp::ShaderObserve
+            | SemanticOp::ShaderIsPassReady
+            | SemanticOp::ShaderIsFrameReady
+            | SemanticOp::ShaderValue => Some(YirResultFamily::Shader),
+            SemanticOp::KernelObserve
+            | SemanticOp::KernelIsConfigReady
+            | SemanticOp::KernelValue => Some(YirResultFamily::Kernel),
+            _ => None,
+        }
+    }
+
+    pub fn result_role(&self) -> Option<YirResultRole> {
+        match self.semantic_op() {
+            SemanticOp::CpuJoinResult
+            | SemanticOp::DataObserve
+            | SemanticOp::ShaderObserve
+            | SemanticOp::KernelObserve => Some(YirResultRole::Entry),
+            SemanticOp::CpuTaskCompleted
+            | SemanticOp::CpuTaskTimedOut
+            | SemanticOp::CpuTaskCancelled
+            | SemanticOp::DataIsReady
+            | SemanticOp::DataIsMoved
+            | SemanticOp::DataIsWindowed
+            | SemanticOp::ShaderIsPassReady
+            | SemanticOp::ShaderIsFrameReady
+            | SemanticOp::KernelIsConfigReady => Some(YirResultRole::StateProbe),
+            SemanticOp::CpuTaskValue
+            | SemanticOp::DataValue
+            | SemanticOp::ShaderValue
+            | SemanticOp::KernelValue => Some(YirResultRole::PayloadExtractor),
+            _ => None,
+        }
+    }
+
+    pub fn result_source_semantic_op(&self) -> Option<SemanticOp> {
+        match self.semantic_op() {
+            SemanticOp::CpuTaskCompleted
+            | SemanticOp::CpuTaskTimedOut
+            | SemanticOp::CpuTaskCancelled
+            | SemanticOp::CpuTaskValue => Some(SemanticOp::CpuJoinResult),
+            SemanticOp::DataIsReady
+            | SemanticOp::DataIsMoved
+            | SemanticOp::DataIsWindowed
+            | SemanticOp::DataValue => Some(SemanticOp::DataObserve),
+            SemanticOp::ShaderIsPassReady | SemanticOp::ShaderIsFrameReady | SemanticOp::ShaderValue => {
+                Some(SemanticOp::ShaderObserve)
+            }
+            SemanticOp::KernelIsConfigReady | SemanticOp::KernelValue => {
+                Some(SemanticOp::KernelObserve)
+            }
+            _ => None,
+        }
+    }
+
+    pub fn result_probe_state(&self) -> Option<YirResultState> {
+        match self.semantic_op() {
+            SemanticOp::CpuTaskCompleted => {
+                Some(YirResultState::Task(TaskLifecycleState::Completed))
+            }
+            SemanticOp::CpuTaskTimedOut => Some(YirResultState::Task(TaskLifecycleState::TimedOut)),
+            SemanticOp::CpuTaskCancelled => {
+                Some(YirResultState::Task(TaskLifecycleState::Cancelled))
+            }
+            SemanticOp::DataIsReady => Some(YirResultState::Data(DataFlowState::Ready)),
+            SemanticOp::DataIsMoved => Some(YirResultState::Data(DataFlowState::Moved)),
+            SemanticOp::DataIsWindowed => Some(YirResultState::Data(DataFlowState::Windowed)),
+            SemanticOp::ShaderIsPassReady => {
+                Some(YirResultState::Shader(ShaderFlowState::PassReady))
+            }
+            SemanticOp::ShaderIsFrameReady => {
+                Some(YirResultState::Shader(ShaderFlowState::FrameReady))
+            }
+            SemanticOp::KernelIsConfigReady => {
+                Some(YirResultState::Kernel(KernelFlowState::ConfigReady))
+            }
+            _ => None,
+        }
+    }
+
+    pub fn observe_state_matches_source(
+        &self,
+        source: &Operation,
+        state: &str,
+    ) -> Result<bool, String> {
+        match self.semantic_op() {
+            SemanticOp::DataObserve => match source.semantic_op() {
+                SemanticOp::DataBindCore | SemanticOp::DataMarker | SemanticOp::DataHandleTable => {
+                    Ok(state == "ready")
+                }
+                SemanticOp::DataOutputPipe => Ok(state == "moved"),
+                SemanticOp::DataInputPipe
+                | SemanticOp::DataCopyWindow
+                | SemanticOp::DataImmutableWindow => Ok(matches!(state, "ready" | "windowed")),
+                other => Err(format!(
+                    "unsupported data observe source `{}`",
+                    semantic_op_display_name(other)
+                )),
+            },
+            SemanticOp::ShaderObserve => {
+                let expected = match source.semantic_op() {
+                    SemanticOp::ShaderBeginPass => "pass_ready",
+                    SemanticOp::ShaderDrawInstanced => "frame_ready",
+                    other => {
+                        return Err(format!(
+                            "unsupported shader observe source `{}`",
+                            semantic_op_display_name(other)
+                        ))
+                    }
+                };
+                Ok(state == expected)
+            }
+            SemanticOp::KernelObserve => {
+                if source.semantic_op() != SemanticOp::CpuProjectProfileRef {
+                    return Ok(false);
+                }
+                Ok(state == "config_ready")
+            }
+            _ => Err(format!(
+                "operation `{}` does not define an observe-state contract",
+                self.full_name()
+            )),
+        }
+    }
+
     pub fn cpu_llvm_lowering_class(&self) -> CpuLlvmLoweringClass {
         if self.domain_family() != OperationDomainFamily::Cpu {
             return CpuLlvmLoweringClass::NonCpu;
@@ -412,6 +571,45 @@ impl Operation {
             _ => CpuLlvmLoweringClass::Other,
         }
     }
+}
+
+fn semantic_op_display_name(op: SemanticOp) -> &'static str {
+    let (module, instruction) = match op {
+        SemanticOp::CpuProjectProfileRef => ("cpu", "project_profile_ref"),
+        SemanticOp::CpuJoinResult => ("cpu", "join_result"),
+        SemanticOp::CpuTaskCompleted => ("cpu", "task_completed"),
+        SemanticOp::CpuTaskTimedOut => ("cpu", "task_timed_out"),
+        SemanticOp::CpuTaskCancelled => ("cpu", "task_cancelled"),
+        SemanticOp::CpuTaskValue => ("cpu", "task_value"),
+        SemanticOp::DataObserve => ("data", "observe"),
+        SemanticOp::DataIsReady => ("data", "is_ready"),
+        SemanticOp::DataIsMoved => ("data", "is_moved"),
+        SemanticOp::DataIsWindowed => ("data", "is_windowed"),
+        SemanticOp::DataValue => ("data", "value"),
+        SemanticOp::ShaderObserve => ("shader", "observe"),
+        SemanticOp::ShaderIsPassReady => ("shader", "is_pass_ready"),
+        SemanticOp::ShaderIsFrameReady => ("shader", "is_frame_ready"),
+        SemanticOp::ShaderValue => ("shader", "value"),
+        SemanticOp::KernelObserve => ("kernel", "observe"),
+        SemanticOp::KernelIsConfigReady => ("kernel", "is_config_ready"),
+        SemanticOp::KernelValue => ("kernel", "value"),
+        SemanticOp::DataBindCore => ("data", "bind_core"),
+        SemanticOp::DataMarker => ("data", "marker"),
+        SemanticOp::DataHandleTable => ("data", "handle_table"),
+        SemanticOp::DataOutputPipe => ("data", "output_pipe"),
+        SemanticOp::DataInputPipe => ("data", "input_pipe"),
+        SemanticOp::DataCopyWindow => ("data", "copy_window"),
+        SemanticOp::DataImmutableWindow => ("data", "immutable_window"),
+        SemanticOp::ShaderBeginPass => ("shader", "begin_pass"),
+        SemanticOp::ShaderDrawInstanced => ("shader", "draw_instanced"),
+        _ => return "other",
+    };
+    Operation {
+        module: module.to_owned(),
+        instruction: instruction.to_owned(),
+        args: Vec::new(),
+    }
+    .semantic_name()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -660,8 +858,11 @@ pub fn glm_profile_for_operation(op: &Operation) -> GlmNodeProfile {
 #[cfg(test)]
 mod tests {
     use super::{
-        AsyncCoreOp, CpuLlvmLoweringClass, GlmEffect, GlmUseMode, GlmValueClass, Operation,
-        OperationDomainFamily, SemanticOp,
+        AsyncCoreOp, CpuLlvmLoweringClass, DataFlowState, DataResultHandle, GlmEffect,
+        GlmUseMode, GlmValueClass, KernelFlowState, KernelResultHandle, Operation,
+        OperationDomainFamily, SemanticOp, ShaderFlowState, ShaderResultHandle,
+        TaskLifecycleState, TaskResultHandle, Value, YirResultFamily, YirResultRole,
+        YirResultState,
     };
 
     #[test]
@@ -697,6 +898,8 @@ mod tests {
         assert_eq!(spawn.async_core_op(), Some(AsyncCoreOp::SpawnTask));
         assert_eq!(join_result.async_core_op(), Some(AsyncCoreOp::ObserveTaskResult));
         assert_eq!(task_value.async_core_op(), Some(AsyncCoreOp::ExtractTaskValue));
+        assert_eq!(join_result.result_role(), Some(YirResultRole::Entry));
+        assert_eq!(task_value.result_role(), Some(YirResultRole::PayloadExtractor));
         assert!(task_value.is_async_task_result_observer());
     }
 
@@ -712,6 +915,114 @@ mod tests {
         let profile = super::glm_profile_for_operation(&task_value);
         assert_eq!(profile.result_class, GlmValueClass::Val);
         assert_eq!(profile.accesses[0].input, "result_0");
+    }
+
+    #[test]
+    fn exposes_result_family_state_and_payload_from_values() {
+        let task = Value::TaskResult(TaskResultHandle {
+            label: "ping".to_owned(),
+            state: TaskLifecycleState::Completed,
+            result: Some(Box::new(Value::Int(7))),
+        });
+        let data = Value::DataResult(DataResultHandle {
+            state: DataFlowState::Windowed,
+            value: Box::new(Value::Int(11)),
+        });
+        let shader = Value::ShaderResult(ShaderResultHandle {
+            state: ShaderFlowState::FrameReady,
+            value: Box::new(Value::Int(13)),
+        });
+        let kernel = Value::KernelResult(KernelResultHandle {
+            state: KernelFlowState::ConfigReady,
+            value: Box::new(Value::Int(17)),
+        });
+
+        assert_eq!(task.result_family(), Some(YirResultFamily::Task));
+        assert_eq!(
+            task.result_state(),
+            Some(YirResultState::Task(TaskLifecycleState::Completed))
+        );
+        assert_eq!(task.result_payload(), Some(&Value::Int(7)));
+
+        assert_eq!(data.result_family(), Some(YirResultFamily::Data));
+        assert_eq!(
+            data.result_state(),
+            Some(YirResultState::Data(DataFlowState::Windowed))
+        );
+        assert_eq!(data.result_payload(), Some(&Value::Int(11)));
+
+        assert_eq!(shader.result_family(), Some(YirResultFamily::Shader));
+        assert_eq!(
+            shader.result_state(),
+            Some(YirResultState::Shader(ShaderFlowState::FrameReady))
+        );
+        assert_eq!(shader.result_payload(), Some(&Value::Int(13)));
+
+        assert_eq!(kernel.result_family(), Some(YirResultFamily::Kernel));
+        assert_eq!(
+            kernel.result_state(),
+            Some(YirResultState::Kernel(KernelFlowState::ConfigReady))
+        );
+        assert_eq!(kernel.result_payload(), Some(&Value::Int(17)));
+    }
+
+    #[test]
+    fn validates_observe_states_via_core_contract() {
+        let data_observe =
+            Operation::parse("data.observe", vec!["pipe".to_owned(), "moved".to_owned()]).unwrap();
+        let data_source = Operation::parse("data.output_pipe", vec!["payload".to_owned()]).unwrap();
+        assert!(data_observe
+            .observe_state_matches_source(&data_source, "moved")
+            .unwrap());
+
+        let shader_observe = Operation::parse(
+            "shader.observe",
+            vec!["draw".to_owned(), "frame_ready".to_owned()],
+        )
+        .unwrap();
+        let shader_source =
+            Operation::parse("shader.draw_instanced", vec!["pass".to_owned()]).unwrap();
+        assert!(shader_observe
+            .observe_state_matches_source(&shader_source, "frame_ready")
+            .unwrap());
+
+        let kernel_observe = Operation::parse(
+            "kernel.observe",
+            vec!["profile".to_owned(), "config_ready".to_owned()],
+        )
+        .unwrap();
+        let kernel_source = Operation::parse(
+            "cpu.project_profile_ref",
+            vec!["kernel".to_owned(), "KernelUnit".to_owned(), "queue_depth".to_owned()],
+        )
+        .unwrap();
+        assert!(kernel_observe
+            .observe_state_matches_source(&kernel_source, "config_ready")
+            .unwrap());
+    }
+
+    #[test]
+    fn exposes_result_probe_states_for_state_helpers() {
+        let task_completed =
+            Operation::parse("cpu.task_completed", vec!["result_0".to_owned()]).unwrap();
+        let shader_ready =
+            Operation::parse("shader.is_frame_ready", vec!["shader_result".to_owned()]).unwrap();
+        let data_moved =
+            Operation::parse("data.is_moved", vec!["data_result".to_owned()]).unwrap();
+
+        assert_eq!(task_completed.result_role(), Some(YirResultRole::StateProbe));
+        assert_eq!(
+            task_completed.result_probe_state(),
+            Some(YirResultState::Task(TaskLifecycleState::Completed))
+        );
+        assert_eq!(
+            shader_ready.result_probe_state(),
+            Some(YirResultState::Shader(ShaderFlowState::FrameReady))
+        );
+        assert_eq!(
+            data_moved.result_probe_state(),
+            Some(YirResultState::Data(DataFlowState::Moved))
+        );
     }
 }
 
@@ -1016,6 +1327,38 @@ impl fmt::Display for TaskLifecycleState {
             Self::Completed => f.write_str("completed"),
             Self::TimedOut => f.write_str("timed_out"),
             Self::Cancelled => f.write_str("cancelled"),
+        }
+    }
+}
+
+impl Value {
+    pub fn result_family(&self) -> Option<YirResultFamily> {
+        match self {
+            Self::TaskResult(_) => Some(YirResultFamily::Task),
+            Self::DataResult(_) => Some(YirResultFamily::Data),
+            Self::ShaderResult(_) => Some(YirResultFamily::Shader),
+            Self::KernelResult(_) => Some(YirResultFamily::Kernel),
+            _ => None,
+        }
+    }
+
+    pub fn result_state(&self) -> Option<YirResultState> {
+        match self {
+            Self::TaskResult(result) => Some(YirResultState::Task(result.state)),
+            Self::DataResult(result) => Some(YirResultState::Data(result.state)),
+            Self::ShaderResult(result) => Some(YirResultState::Shader(result.state)),
+            Self::KernelResult(result) => Some(YirResultState::Kernel(result.state)),
+            _ => None,
+        }
+    }
+
+    pub fn result_payload(&self) -> Option<&Value> {
+        match self {
+            Self::TaskResult(result) => result.result.as_deref(),
+            Self::DataResult(result) => Some(result.value.as_ref()),
+            Self::ShaderResult(result) => Some(result.value.as_ref()),
+            Self::KernelResult(result) => Some(result.value.as_ref()),
+            _ => None,
         }
     }
 }

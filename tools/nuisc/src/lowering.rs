@@ -1,7 +1,10 @@
 use std::{collections::BTreeMap, path::Path};
 
 use nuis_semantics::model::{NirBinaryOp, NirExpr, NirFunction, NirModule, NirStmt};
-use yir_core::{Edge, EdgeKind, Node, Operation, Resource, ResourceKind, SemanticOp, YirModule};
+use yir_core::{
+    Edge, EdgeKind, Node, Operation, Resource, ResourceKind, SemanticOp, TaskLifecycleState,
+    YirResultRole, YirResultState, YirModule,
+};
 
 use crate::registry::NustarPackageManifest;
 
@@ -919,52 +922,35 @@ fn lower_expr(
             Ok(name)
         }
         NirExpr::CpuJoinResult(task) => {
-            let task_name = lower_expr(task, state, bindings)?;
-            let name = next_name(state, "cpu_join_result");
-            state.yir.nodes.push(Node {
-                name: name.clone(),
-                resource: "cpu0".to_owned(),
-                op: Operation {
-                    module: "cpu".to_owned(),
-                    instruction: "join_result".to_owned(),
-                    args: vec![task_name.clone()],
-                },
-            });
-            push_dep_edges(state, &task_name, &name);
-            state.yir.edges.push(Edge {
-                kind: EdgeKind::Effect,
-                from: task_name,
-                to: name.clone(),
-            });
-            Ok(name)
+            lower_task_result_entry_node(state, bindings, task)
         }
-        NirExpr::CpuTaskCompleted(result) => lower_cpu_unary_value_effect(
+        NirExpr::CpuTaskCompleted(result) => lower_task_result_observer_node(
             state,
             bindings,
             result,
-            "cpu_task_completed",
-            "task_completed",
+            YirResultRole::StateProbe,
+            Some(YirResultState::Task(TaskLifecycleState::Completed)),
         ),
-        NirExpr::CpuTaskTimedOut(result) => lower_cpu_unary_value_effect(
+        NirExpr::CpuTaskTimedOut(result) => lower_task_result_observer_node(
             state,
             bindings,
             result,
-            "cpu_task_timed_out",
-            "task_timed_out",
+            YirResultRole::StateProbe,
+            Some(YirResultState::Task(TaskLifecycleState::TimedOut)),
         ),
-        NirExpr::CpuTaskCancelled(result) => lower_cpu_unary_value_effect(
+        NirExpr::CpuTaskCancelled(result) => lower_task_result_observer_node(
             state,
             bindings,
             result,
-            "cpu_task_cancelled",
-            "task_cancelled",
+            YirResultRole::StateProbe,
+            Some(YirResultState::Task(TaskLifecycleState::Cancelled)),
         ),
-        NirExpr::CpuTaskValue(result) => lower_cpu_unary_value_effect(
+        NirExpr::CpuTaskValue(result) => lower_task_result_observer_node(
             state,
             bindings,
             result,
-            "cpu_task_value",
-            "task_value",
+            YirResultRole::PayloadExtractor,
+            None,
         ),
         NirExpr::CpuTimeout { task, limit } => {
             let task_name = lower_expr(task, state, bindings)?;
@@ -1765,6 +1751,65 @@ fn lower_result_observe_node(
     Ok(name)
 }
 
+fn lower_task_result_entry_node(
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+    input: &NirExpr,
+) -> Result<String, String> {
+    let task_name = lower_expr(input, state, bindings)?;
+    let name = next_name(state, "cpu_join_result");
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "join_result".to_owned(),
+            args: vec![task_name.clone()],
+        },
+    });
+    push_dep_edges(state, &task_name, &name);
+    state.yir.edges.push(Edge {
+        kind: EdgeKind::Effect,
+        from: task_name,
+        to: name.clone(),
+    });
+    Ok(name)
+}
+
+fn lower_task_result_observer_node(
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+    input: &NirExpr,
+    role: YirResultRole,
+    observed_state: Option<YirResultState>,
+) -> Result<String, String> {
+    let (prefix, instruction) = match (role, observed_state) {
+        (YirResultRole::StateProbe, Some(YirResultState::Task(TaskLifecycleState::Completed))) => {
+            ("cpu_task_completed", "task_completed")
+        }
+        (YirResultRole::StateProbe, Some(YirResultState::Task(TaskLifecycleState::TimedOut))) => {
+            ("cpu_task_timed_out", "task_timed_out")
+        }
+        (YirResultRole::StateProbe, Some(YirResultState::Task(TaskLifecycleState::Cancelled))) => {
+            ("cpu_task_cancelled", "task_cancelled")
+        }
+        (YirResultRole::PayloadExtractor, None) => ("cpu_task_value", "task_value"),
+        (YirResultRole::Entry, _) => {
+            return Err("task result entry must lower through lower_task_result_entry_node".to_owned())
+        }
+        (YirResultRole::StateProbe, Some(other)) => {
+            return Err(format!("unsupported non-task result probe state `{other:?}` for task observer"))
+        }
+        (YirResultRole::StateProbe, None) => {
+            return Err("task state probe requires an explicit task lifecycle state".to_owned())
+        }
+        (YirResultRole::PayloadExtractor, Some(_)) => {
+            return Err("task payload extractor must not carry an explicit result state".to_owned())
+        }
+    };
+    lower_cpu_unary_value_effect(state, bindings, input, prefix, instruction)
+}
+
 fn lower_result_unary_value_effect(
     state: &mut LoweringState<'_>,
     bindings: &BTreeMap<String, String>,
@@ -2249,6 +2294,7 @@ mod tests {
                 let task: Task<i64> = timeout(spawn(ping()), 16);
                 let result: TaskResult<i64> = join_result(task);
                 let done: bool = task_completed(result);
+                let timed_out: bool = task_timed_out(result);
                 let value: i64 = task_value(result);
                 return value;
               }
@@ -2258,17 +2304,29 @@ mod tests {
         .unwrap();
         let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
 
-        assert!(yir
+        let join_result = yir
             .nodes
             .iter()
-            .any(|node| node.op.module == "cpu" && node.op.instruction == "join_result"));
-        assert!(yir
+            .find(|node| node.op.module == "cpu" && node.op.instruction == "join_result")
+            .unwrap();
+        let completed = yir
             .nodes
             .iter()
-            .any(|node| node.op.module == "cpu" && node.op.instruction == "task_completed"));
-        assert!(yir
+            .find(|node| node.op.module == "cpu" && node.op.instruction == "task_completed")
+            .unwrap();
+        let timed_out = yir
             .nodes
             .iter()
-            .any(|node| node.op.module == "cpu" && node.op.instruction == "task_value"));
+            .find(|node| node.op.module == "cpu" && node.op.instruction == "task_timed_out")
+            .unwrap();
+        let value = yir
+            .nodes
+            .iter()
+            .find(|node| node.op.module == "cpu" && node.op.instruction == "task_value")
+            .unwrap();
+
+        assert_eq!(completed.op.args, vec![join_result.name.clone()]);
+        assert_eq!(timed_out.op.args, vec![join_result.name.clone()]);
+        assert_eq!(value.op.args, vec![join_result.name.clone()]);
     }
 }

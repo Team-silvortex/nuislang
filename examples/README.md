@@ -42,6 +42,8 @@ These are the best current front-end examples to read first.
   front-end `cpu + data + shader` control/render demo that now builds to a live macOS bundle
 * [projects/window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo)
   same live ball demo as a multi-file `nuis.toml` project with `main / shader / data` split
+* [projects/kernel_tensor_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/kernel_tensor_demo)
+  current multi-file `cpu + data + kernel` project route
 
 ## Recommended `YIR` examples
 
@@ -115,6 +117,8 @@ Use the bundle folder whose name matches the source path you care about:
 
 * [window_controls_demo_project](/Users/Shared/chroot/dev/nuislang/examples/bins/window_controls_demo_project/window_controls_demo)
   canonical multi-file project route
+* [kernel_tensor_demo_project](/Users/Shared/chroot/dev/nuislang/examples/bins/kernel_tensor_demo_project/kernel_tensor_demo)
+  canonical kernel-project route
 * [window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/bins/window_controls_demo/window_controls_demo)
   handwritten `YIR` route kept as a direct backend reference
 * [window_controls_demo_ns](/Users/Shared/chroot/dev/nuislang/examples/bins/window_controls_demo_ns/window_controls_demo)
