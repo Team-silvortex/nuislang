@@ -95,6 +95,7 @@ Start here:
 * [examples/yir/README.md](/Users/Shared/chroot/dev/nuislang/examples/yir/README.md)
 * [examples/bins/README.md](/Users/Shared/chroot/dev/nuislang/examples/bins/README.md)
 * [stdlib/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/README.md)
+* [docs/README.md](/Users/Shared/chroot/dev/nuislang/docs/README.md)
 
 Recommended current examples:
 
@@ -125,6 +126,19 @@ Current high-signal architectural facts:
 ## Notes
 
 This README is still paired with the longer architecture/whitepaper material below. The whitepaper remains useful for long-range design direction, but the sections above should be treated as the faster-moving “what is actually true in this repo right now” layer.
+
+---
+
+## Historical / Design Material
+
+Everything below this line should be read as longer-range design and architecture material, not as the shortest path to understanding the repository's current implementation state.
+
+Recommended order from here:
+
+* [docs/README.md](/Users/Shared/chroot/dev/nuislang/docs/README.md)
+* [docs/reference/yir-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-reference.md)
+* [docs/reference/yir-tools-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-tools-reference.md)
+* then the whitepaper section below if you want the broader design argument
 
 ---
 

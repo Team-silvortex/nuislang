@@ -31,6 +31,7 @@ This reference currently covers:
 * current standard domain families
 * current reference op surfaces
 * current verifier rules for the pure `cpu` memory prototype
+* the current direction of async/result normalization in `yir-core`
 
 This reference does not yet attempt to freeze:
 
@@ -38,6 +39,14 @@ This reference does not yet attempt to freeze:
 * final `GLM`
 * full `Fabric verifier`
 * final `nustar` package ABI
+
+Important current boundary:
+
+* some concrete ops are still surfaced through domain names such as `cpu.*`
+* but contracts around async/result families, observer roles, and result-state
+  reasoning are increasingly being lifted into `yir-core`
+* when implementation and prose differ, prefer the currently checked-in
+  `yir-core` + verifier behavior
 
 ---
 

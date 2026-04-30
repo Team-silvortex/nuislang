@@ -5,6 +5,7 @@ This folder contains the current front-end examples for:
 * `mod <domain> <unit>` parsing
 * `AST -> NIR -> YIR` lowering
 * lazy `nustar` binding through `nuis / nuisc`
+* current async/task surface at the source-language layer
 
 Subdirectories:
 
@@ -43,3 +44,19 @@ cargo run -p nuis -- dump-yir examples/ns/data/hello_data.ns
 cargo run -p nuis -- build examples/ns/data/hello_instantiate.ns /tmp/nuis_hello_instantiate
 cargo run -p nuis -- build examples/ns/demos/window_controls_demo.ns examples/bins/window_controls_demo_ns
 ```
+
+Project route is now preferred once a demo spans multiple domains or needs
+real profile/link orchestration:
+
+```bash
+cargo run -p nuis -- check examples/projects/window_controls_demo
+cargo run -p nuis -- project-status examples/projects/window_controls_demo
+```
+
+Current source-language notes worth keeping in mind while reading these files:
+
+* `mod` is a top-level builtin declaration, not a nested construct
+* `cpu` is currently the only domain that can declare `async fn`
+* current explicit task-style async surface is intentionally small:
+  `spawn`, `join`, `cancel`, `timeout`, `join_result`, and `task_*`
+* cross-domain interaction is expected to route through project links and `mod data`, not direct nested mod definitions

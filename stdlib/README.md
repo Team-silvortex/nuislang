@@ -17,7 +17,34 @@ This directory currently defines structure and intent, not a fully implemented i
 That is deliberate: the current frontend still centers on executable entry modules, while the standard-library
 level is being stabilized first as a repository/module contract.
 
+## Relationship
+
+The intended dependency direction is:
+
+```text
+core -> std -> ns-nova
+```
+
+Read that as:
+
+* `core` should carry the smallest source-level semantic contracts
+* `std` should add practical systems helpers without hiding execution semantics
+* `ns-nova` should build a GPU-first application/rendering framework on top of those lower layers
+
+## Current Reality
+
+At the current repo stage:
+
+* this is still mostly a structure/contract layer, not a fully populated importable source tree
+* the live implementation focus is still on `nuis / nuisc / YIR / nustar`
+* the standard-library split is nevertheless important now, because it already informs how future APIs should be grouped and what should or should not leak across layers
+
+## Read In This Order
+
+* [core](/Users/Shared/chroot/dev/nuislang/stdlib/core/README.md)
+* [std](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
+* [ns-nova](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/README.md)
+
 See also:
 
 * [index.toml](/Users/Shared/chroot/dev/nuislang/stdlib/index.toml)
-

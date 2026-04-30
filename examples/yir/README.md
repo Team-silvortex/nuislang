@@ -9,6 +9,10 @@ The main families represented here are:
 * `kernel`
 * `data`
 
+These handwritten examples are still important even though project-route `.ns`
+examples are becoming the main user-facing path, because they remain the
+clearest way to inspect raw execution-graph shape and verifier behavior.
+
 Subdirectories:
 
 * [cpu](/Users/Shared/chroot/dev/nuislang/examples/yir/cpu/README.md)
@@ -37,6 +41,19 @@ cargo run -p yir-run -- examples/yir/demos/hello_yir.yir
 cargo run -p yir-run -- examples/yir/demos/window_controls_demo.yir
 cargo run -p yir-pack-aot -- examples/yir/demos/window_controls_demo.yir examples/bins/window_controls_demo 4
 ```
+
+Also useful while comparing handwritten graphs against the `.ns` pipeline:
+
+```bash
+cargo run -p nuis -- dump-yir examples/projects/window_controls_demo
+cargo run -p nuis -- dump-yir examples/projects/kernel_tensor_demo
+```
+
+Current reading guidance:
+
+* prefer these files when you want to understand `YIR` graph shape directly
+* prefer `examples/projects/*` when you want the current canonical end-to-end workflow
+* use the invalid examples to understand verifier boundaries, especially for memory, data-plane, and ownership-sensitive paths
 
 Generated bundle:
 

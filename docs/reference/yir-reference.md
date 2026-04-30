@@ -19,3 +19,13 @@ This split is intentional:
   packaging, and preview/export tooling
 
 Both documents are expected to evolve together with the implementation.
+
+Current emphasis:
+
+* `YIR LangRef` is the better place to look for execution semantics, graph shape,
+  lane behavior, and result/observe rules
+* `YIR Tools Reference` is the better place to look for workflow, CLI, build
+  outputs, cache behavior, packaging, and inspection commands
+* async/result normalization is currently moving more of its contract into
+  `yir-core`, so some rules that used to feel domain-local are becoming
+  language-level `YIR` concepts
