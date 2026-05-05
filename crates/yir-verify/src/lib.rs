@@ -312,7 +312,8 @@ enum DataValueKind {
     Other,
     PipeOutput,
     PipeInput,
-    Window,
+    WindowMutable,
+    WindowImmutable,
     Marker,
     HandleTable,
     CoreBinding,
@@ -350,6 +351,12 @@ fn verify_data_fabric_protocol(
                 }
                 SemanticOp::DataOutputPipe => {
                     let source = infer_data_value_kind(&value_kinds, &nodes, &node.op.args[0]);
+                    if source == DataValueKind::WindowMutable {
+                        return Err(format!(
+                            "node `{}` cannot send mutable window payload `{}` across data pipe",
+                            node.name, node.op.args[0]
+                        ));
+                    }
                     if source == DataValueKind::PipeOutput || source == DataValueKind::PipeInput {
                         return Err(format!(
                             "node `{}` creates nested pipe value from `{}`",
@@ -372,17 +379,23 @@ fn verify_data_fabric_protocol(
                     let source = infer_data_value_kind(&value_kinds, &nodes, &node.op.args[0]);
                     if matches!(
                         source,
-                        DataValueKind::PipeOutput
+                        DataValueKind::WindowMutable
+                            | DataValueKind::WindowImmutable
+                            | DataValueKind::PipeOutput
                             | DataValueKind::PipeInput
                             | DataValueKind::Marker
                             | DataValueKind::HandleTable
                     ) {
                         return Err(format!(
-                            "node `{}` cannot create window from `{}`",
+                            "node `{}` cannot create nested/illegal window from `{}`",
                             node.name, node.op.args[0]
                         ));
                     }
-                    DataValueKind::Window
+                    match node.op.semantic_op() {
+                        SemanticOp::DataCopyWindow => DataValueKind::WindowMutable,
+                        SemanticOp::DataImmutableWindow => DataValueKind::WindowImmutable,
+                        _ => unreachable!(),
+                    }
                 }
                 SemanticOp::DataMarker => DataValueKind::Marker,
                 SemanticOp::DataHandleTable => {
@@ -899,9 +912,8 @@ fn infer_data_value_kind(
                 SemanticOp::DataBindCore => DataValueKind::CoreBinding,
                 SemanticOp::DataOutputPipe => DataValueKind::PipeOutput,
                 SemanticOp::DataInputPipe | SemanticOp::DataMove => DataValueKind::Other,
-                SemanticOp::DataCopyWindow | SemanticOp::DataImmutableWindow => {
-                    DataValueKind::Window
-                }
+                SemanticOp::DataCopyWindow => DataValueKind::WindowMutable,
+                SemanticOp::DataImmutableWindow => DataValueKind::WindowImmutable,
                 _ => DataValueKind::Other,
             })
             .unwrap_or(DataValueKind::Other)
@@ -957,6 +969,12 @@ fn verify_cpu_heap_protocol(module: &YirModule) -> Result<(), String> {
                     .get(&node.op.args[1])
                     .copied()
                     .unwrap_or(PointerState::Unknown);
+                if let PointerState::Borrowed(next_id) = next {
+                    return Err(format!(
+                        "node `{}` cannot capture borrowed pointer `&{}` as linked-list next pointer",
+                        node.name, next_id
+                    ));
+                }
                 let id = next_id;
                 next_id += 1;
                 heap.insert(
@@ -1085,6 +1103,12 @@ fn verify_cpu_heap_protocol(module: &YirModule) -> Result<(), String> {
                 let dest = pointer_arg(&values, &node.op.args[0]);
                 ensure_node_writable(dest, &heap, &borrow_counts, node)?;
                 let next = pointer_arg(&values, &node.op.args[1]);
+                if let PointerState::Borrowed(next_id) = next {
+                    return Err(format!(
+                        "node `{}` cannot write borrowed pointer `&{}` into linked-list next field",
+                        node.name, next_id
+                    ));
+                }
                 if let PointerState::Owned(id) = dest {
                     if let Some(binding) = heap.get_mut(&id) {
                         match &mut binding.kind {
@@ -1122,6 +1146,7 @@ fn verify_cpu_heap_protocol(module: &YirModule) -> Result<(), String> {
                     PointerState::Owned(id) => {
                         ensure_live_heap(&heap, id, node)?;
                         ensure_no_active_borrows(&borrow_counts, id, node, "free")?;
+                        ensure_no_live_heap_aliases(&heap, id, node)?;
                         if let Some(binding) = heap.get_mut(&id) {
                             binding.live = false;
                         }
@@ -1631,6 +1656,30 @@ fn ensure_no_active_borrows(
     ))
 }
 
+fn ensure_no_live_heap_aliases(
+    heap: &BTreeMap<usize, HeapBinding>,
+    id: usize,
+    node: &Node,
+) -> Result<(), String> {
+    for (owner_id, binding) in heap {
+        if !binding.live || *owner_id == id {
+            continue;
+        }
+        let HeapObjectKind::Node { next } = binding.kind else {
+            continue;
+        };
+        if matches!(next, PointerState::Owned(next_id) | PointerState::Borrowed(next_id) if next_id == id)
+        {
+            return Err(format!(
+                "node `{}` cannot free `&{}` while live node `&{}` still links to it",
+                node.name, id, owner_id
+            ));
+        }
+    }
+
+    Ok(())
+}
+
 fn topological_order(module: &YirModule) -> Result<Vec<String>, String> {
     let mut adjacency = BTreeMap::<String, Vec<String>>::new();
     let mut indegree = BTreeMap::<String, usize>::new();
@@ -1862,6 +1911,147 @@ mod tests {
                 dep("v2", "write_head"),
                 effect("end_ref", "write_head"),
                 lifetime("head", "write_head"),
+            ],
+            node_lanes: BTreeMap::new(),
+        };
+
+        verify_module(&module).unwrap();
+    }
+
+    #[test]
+    fn alloc_node_with_borrowed_next_is_rejected() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![Resource {
+                name: "cpu0".to_owned(),
+                kind: ResourceKind::parse("cpu.arm64"),
+            }],
+            nodes: vec![
+                node("nil", "cpu0", "cpu.null", &[]),
+                node("v1", "cpu0", "cpu.const", &["10"]),
+                node("v2", "cpu0", "cpu.const", &["20"]),
+                node("tail_raw", "cpu0", "cpu.alloc_node", &["v2", "nil"]),
+                node("tail", "cpu0", "cpu.move_ptr", &["tail_raw"]),
+                node("tail_ref", "cpu0", "cpu.borrow", &["tail"]),
+                node("head_raw", "cpu0", "cpu.alloc_node", &["v1", "tail_ref"]),
+            ],
+            edges: vec![
+                dep("v2", "tail_raw"),
+                dep("nil", "tail_raw"),
+                dep("tail_raw", "tail"),
+                lifetime("tail_raw", "tail"),
+                dep("tail", "tail_ref"),
+                dep("v1", "head_raw"),
+                dep("tail_ref", "head_raw"),
+            ],
+            node_lanes: BTreeMap::new(),
+        };
+
+        let error = verify_module(&module).unwrap_err();
+        assert!(error.contains("cannot capture borrowed pointer"));
+    }
+
+    #[test]
+    fn store_next_with_borrowed_pointer_is_rejected() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![Resource {
+                name: "cpu0".to_owned(),
+                kind: ResourceKind::parse("cpu.arm64"),
+            }],
+            nodes: vec![
+                node("nil", "cpu0", "cpu.null", &[]),
+                node("v1", "cpu0", "cpu.const", &["10"]),
+                node("v2", "cpu0", "cpu.const", &["20"]),
+                node("tail_raw", "cpu0", "cpu.alloc_node", &["v2", "nil"]),
+                node("tail", "cpu0", "cpu.move_ptr", &["tail_raw"]),
+                node("head_raw", "cpu0", "cpu.alloc_node", &["v1", "nil"]),
+                node("head", "cpu0", "cpu.move_ptr", &["head_raw"]),
+                node("tail_ref", "cpu0", "cpu.borrow", &["tail"]),
+                node("link_tail", "cpu0", "cpu.store_next", &["head", "tail_ref"]),
+            ],
+            edges: vec![
+                dep("v2", "tail_raw"),
+                dep("nil", "tail_raw"),
+                dep("tail_raw", "tail"),
+                lifetime("tail_raw", "tail"),
+                dep("v1", "head_raw"),
+                dep("nil", "head_raw"),
+                dep("head_raw", "head"),
+                lifetime("head_raw", "head"),
+                dep("tail", "tail_ref"),
+                dep("head", "link_tail"),
+                dep("tail_ref", "link_tail"),
+                lifetime("head", "link_tail"),
+            ],
+            node_lanes: BTreeMap::new(),
+        };
+
+        let error = verify_module(&module).unwrap_err();
+        assert!(error.contains("cannot write borrowed pointer"));
+    }
+
+    #[test]
+    fn freeing_live_link_target_is_rejected() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![Resource {
+                name: "cpu0".to_owned(),
+                kind: ResourceKind::parse("cpu.arm64"),
+            }],
+            nodes: vec![
+                node("nil", "cpu0", "cpu.null", &[]),
+                node("v2", "cpu0", "cpu.const", &["20"]),
+                node("v1", "cpu0", "cpu.const", &["10"]),
+                node("tail", "cpu0", "cpu.alloc_node", &["v2", "nil"]),
+                node("head", "cpu0", "cpu.alloc_node", &["v1", "tail"]),
+                node("drop_tail", "cpu0", "cpu.free", &["tail"]),
+            ],
+            edges: vec![
+                dep("v2", "tail"),
+                dep("nil", "tail"),
+                dep("v1", "head"),
+                dep("tail", "head"),
+                dep("tail", "drop_tail"),
+                effect("head", "drop_tail"),
+                lifetime("tail", "drop_tail"),
+            ],
+            node_lanes: BTreeMap::new(),
+        };
+
+        let error = verify_module(&module).unwrap_err();
+        assert!(error.contains("still links to it"));
+    }
+
+    #[test]
+    fn freeing_detached_link_target_is_allowed() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![Resource {
+                name: "cpu0".to_owned(),
+                kind: ResourceKind::parse("cpu.arm64"),
+            }],
+            nodes: vec![
+                node("nil", "cpu0", "cpu.null", &[]),
+                node("v2", "cpu0", "cpu.const", &["20"]),
+                node("v1", "cpu0", "cpu.const", &["10"]),
+                node("tail", "cpu0", "cpu.alloc_node", &["v2", "nil"]),
+                node("head", "cpu0", "cpu.alloc_node", &["v1", "tail"]),
+                node("detach_tail", "cpu0", "cpu.store_next", &["head", "nil"]),
+                node("drop_tail", "cpu0", "cpu.free", &["tail"]),
+            ],
+            edges: vec![
+                dep("v2", "tail"),
+                dep("nil", "tail"),
+                dep("v1", "head"),
+                dep("tail", "head"),
+                dep("head", "detach_tail"),
+                dep("nil", "detach_tail"),
+                effect("head", "detach_tail"),
+                lifetime("head", "detach_tail"),
+                dep("tail", "drop_tail"),
+                effect("detach_tail", "drop_tail"),
+                lifetime("tail", "drop_tail"),
             ],
             node_lanes: BTreeMap::new(),
         };
@@ -2180,6 +2370,70 @@ mod tests {
 
         let error = verify_module(&module).unwrap_err();
         assert!(error.contains("uplink=windowed;downlink=windowed"));
+    }
+
+    #[test]
+    fn rejects_nested_data_window_values() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![
+                Resource {
+                    name: "cpu0".to_owned(),
+                    kind: ResourceKind::parse("cpu.arm64"),
+                },
+                Resource {
+                    name: "fabric0".to_owned(),
+                    kind: ResourceKind::parse("data.fabric"),
+                },
+            ],
+            nodes: vec![
+                node("seed", "cpu0", "cpu.const", &["7"]),
+                node("value", "fabric0", "data.move", &["seed", "cpu0"]),
+                node("window0", "fabric0", "data.immutable_window", &["value", "0", "1"]),
+                node("window1", "fabric0", "data.copy_window", &["window0", "0", "1"]),
+            ],
+            edges: vec![
+                xfer("seed", "value"),
+                dep("value", "window0"),
+                dep("window0", "window1"),
+            ],
+            node_lanes: BTreeMap::new(),
+        };
+
+        let error = verify_module(&module).unwrap_err();
+        assert!(error.contains("cannot create nested/illegal window"));
+    }
+
+    #[test]
+    fn rejects_mutable_window_payload_across_data_pipe() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![
+                Resource {
+                    name: "cpu0".to_owned(),
+                    kind: ResourceKind::parse("cpu.arm64"),
+                },
+                Resource {
+                    name: "fabric0".to_owned(),
+                    kind: ResourceKind::parse("data.fabric"),
+                },
+            ],
+            nodes: vec![
+                node("seed", "cpu0", "cpu.const", &["7"]),
+                node("value", "fabric0", "data.move", &["seed", "cpu0"]),
+                node("window0", "fabric0", "data.copy_window", &["value", "0", "1"]),
+                node("pipe", "fabric0", "data.output_pipe", &["window0"]),
+            ],
+            edges: vec![
+                xfer("seed", "value"),
+                dep("value", "window0"),
+                dep("window0", "pipe"),
+            ],
+            node_lanes: BTreeMap::new(),
+        };
+
+        let error = verify_module(&module).unwrap_err();
+        assert!(error.contains("cannot send mutable window payload"));
     }
 
     #[test]

@@ -858,11 +858,11 @@ pub fn glm_profile_for_operation(op: &Operation) -> GlmNodeProfile {
 #[cfg(test)]
 mod tests {
     use super::{
-        AsyncCoreOp, CpuLlvmLoweringClass, DataFlowState, DataResultHandle, GlmEffect,
-        GlmUseMode, GlmValueClass, KernelFlowState, KernelResultHandle, Operation,
-        OperationDomainFamily, SemanticOp, ShaderFlowState, ShaderResultHandle,
-        TaskLifecycleState, TaskResultHandle, Value, YirResultFamily, YirResultRole,
-        YirResultState,
+        AsyncCoreOp, CpuLlvmLoweringClass, DataFlowState, DataMod, DataResultHandle, DataWindow,
+        ExecutionState, GlmEffect, GlmUseMode, GlmValueClass, KernelFlowState,
+        KernelResultHandle, Node, Operation, OperationDomainFamily, RegisteredMod, Resource,
+        ResourceKind, SemanticOp, ShaderFlowState, ShaderResultHandle, TaskLifecycleState,
+        TaskResultHandle, Value, YirResultFamily, YirResultRole, YirResultState,
     };
 
     #[test]
@@ -1023,6 +1023,96 @@ mod tests {
             data_moved.result_probe_state(),
             Some(YirResultState::Data(DataFlowState::Moved))
         );
+    }
+
+    #[test]
+    fn freeing_live_link_target_is_rejected_in_execution_state() {
+        let mut state = ExecutionState::default();
+        let tail = state.alloc_heap_node(20, None);
+        let _head = state.alloc_heap_node(10, Some(tail));
+
+        let error = state.free_heap_node(Some(tail)).unwrap_err();
+        assert!(error.contains("still links to it"));
+    }
+
+    #[test]
+    fn data_mod_rejects_nested_window_payloads() {
+        let resource = Resource {
+            name: "fabric0".to_owned(),
+            kind: ResourceKind::parse("data.fabric"),
+        };
+        let data_mod = DataMod;
+        let mut state = ExecutionState::default();
+
+        state
+            .values
+            .insert("base".to_owned(), Value::Int(7));
+        let first = data_mod
+            .execute(
+                &Node {
+                    name: "window0".to_owned(),
+                    resource: "fabric0".to_owned(),
+                    op: Operation::parse(
+                        "data.immutable_window",
+                        vec!["base".to_owned(), "0".to_owned(), "1".to_owned()],
+                    )
+                    .unwrap(),
+                },
+                &resource,
+                &mut state,
+            )
+            .unwrap();
+        state.values.insert("window0".to_owned(), first);
+
+        let error = data_mod
+            .execute(
+                &Node {
+                    name: "window1".to_owned(),
+                    resource: "fabric0".to_owned(),
+                    op: Operation::parse(
+                        "data.copy_window",
+                        vec!["window0".to_owned(), "0".to_owned(), "1".to_owned()],
+                    )
+                    .unwrap(),
+                },
+                &resource,
+                &mut state,
+        )
+            .unwrap_err();
+        assert!(error.contains("cannot wrap non-window-compatible payload"));
+    }
+
+    #[test]
+    fn data_mod_rejects_mutable_window_payloads_for_output_pipe() {
+        let resource = Resource {
+            name: "fabric0".to_owned(),
+            kind: ResourceKind::parse("data.fabric"),
+        };
+        let data_mod = DataMod;
+        let mut state = ExecutionState::default();
+
+        state.values.insert(
+            "window0".to_owned(),
+            Value::DataWindow(DataWindow {
+                base: Box::new(Value::Int(7)),
+                offset: 0,
+                len: 1,
+                immutable: false,
+            }),
+        );
+
+        let error = data_mod
+            .execute(
+                &Node {
+                    name: "pipe".to_owned(),
+                    resource: "fabric0".to_owned(),
+                    op: Operation::parse("data.output_pipe", vec!["window0".to_owned()]).unwrap(),
+                },
+                &resource,
+                &mut state,
+            )
+            .unwrap_err();
+        assert!(error.contains("illegal pipe payload"));
     }
 }
 
@@ -1994,6 +2084,16 @@ impl ExecutionState {
         let Some(address) = pointer else {
             return Err("null pointer free".to_owned());
         };
+        for (owner_id, node) in &self.heap {
+            if *owner_id == address {
+                continue;
+            }
+            if node.next == Some(address) {
+                return Err(format!(
+                    "cannot free `&{address}` while live node `&{owner_id}` still links to it"
+                ));
+            }
+        }
         if self.heap.remove(&address).is_some() || self.buffers.remove(&address).is_some() {
             Ok(())
         } else {
@@ -2323,7 +2423,8 @@ fn is_move_value_legal(value: &Value) -> bool {
 
 fn is_window_base_legal(value: &Value) -> bool {
     match value {
-        Value::DataHandleTable(_)
+        Value::DataWindow(_)
+        | Value::DataHandleTable(_)
         | Value::DataMarker(_)
         | Value::DataPipe(_)
         | Value::DataResult(_) => false,
@@ -2338,6 +2439,7 @@ fn is_window_base_legal(value: &Value) -> bool {
 
 fn is_pipe_payload_legal(value: &Value) -> bool {
     match value {
+        Value::DataWindow(window) if !window.immutable => false,
         Value::DataPipe(_) | Value::DataResult(_) => false,
         Value::Tuple(items) => items.iter().all(is_move_value_legal),
         Value::Struct(value) => value

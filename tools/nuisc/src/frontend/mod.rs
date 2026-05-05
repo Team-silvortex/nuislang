@@ -2125,7 +2125,7 @@ fn lower_call_expr_with_async(
                         .to_owned(),
                 );
             };
-            Ok(NirExpr::DataCopyWindow {
+            Ok(NirExpr::DataImmutableWindow {
                 input: Box::new(lower_expr(
                     input,
                     current_domain,

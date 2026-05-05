@@ -589,8 +589,8 @@ fn lower_expr(
             bindings,
             unit,
             input,
-            "data_copy_window",
-            "copy_window",
+            "data_immutable_window",
+            "immutable_window",
             "downlink_len",
         ),
         NirExpr::ShaderProfileRender { unit, packet } => {

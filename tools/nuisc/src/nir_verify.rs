@@ -7,7 +7,8 @@ use nuis_semantics::model::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum NirDataKind {
     Other,
-    Window,
+    WindowMutable,
+    WindowImmutable,
     Marker,
     HandleTable,
     PipeOutput,
@@ -146,6 +147,7 @@ fn verify_stmt(
                     &mut else_data_bindings,
                 )?;
             }
+            merge_branch_state(moved, borrows, &then_moved, &then_borrows, &else_moved, &else_borrows);
         }
         NirStmt::Return(value) => {
             if let Some(value) = value {
@@ -154,6 +156,30 @@ fn verify_stmt(
         }
     }
     Ok(())
+}
+
+fn merge_branch_state(
+    moved: &mut BTreeSet<String>,
+    borrows: &mut BTreeMap<String, usize>,
+    then_moved: &BTreeSet<String>,
+    then_borrows: &BTreeMap<String, usize>,
+    else_moved: &BTreeSet<String>,
+    else_borrows: &BTreeMap<String, usize>,
+) {
+    moved.extend(then_moved.iter().cloned());
+    moved.extend(else_moved.iter().cloned());
+
+    let mut merged_borrows = BTreeMap::<String, usize>::new();
+    for name in then_borrows.keys().chain(else_borrows.keys()) {
+        let then_count = then_borrows.get(name).copied().unwrap_or(0);
+        let else_count = else_borrows.get(name).copied().unwrap_or(0);
+        let merged = then_count.max(else_count);
+        if merged > 0 {
+            merged_borrows.insert(name.clone(), merged);
+        }
+    }
+
+    *borrows = merged_borrows;
 }
 
 fn note_binding_effects(
@@ -228,13 +254,15 @@ fn verify_expr(
             let source = infer_data_kind(input, data_bindings);
             if matches!(
                 source,
-                NirDataKind::PipeOutput
+                NirDataKind::WindowMutable
+                    | NirDataKind::WindowImmutable
+                    | NirDataKind::PipeOutput
                     | NirDataKind::PipeInput
                     | NirDataKind::Marker
                     | NirDataKind::HandleTable
             ) {
                 return Err(format!(
-                    "nir verify: cannot create data window from `{}`",
+                    "nir verify: cannot create nested data window from `{}`",
                     render_data_expr_name(input)
                 ));
             }
@@ -242,6 +270,12 @@ fn verify_expr(
         NirExpr::DataProfileSendUplink { input, .. }
         | NirExpr::DataProfileSendDownlink { input, .. } => {
             let source = infer_data_kind(input, data_bindings);
+            if matches!(source, NirDataKind::WindowMutable) {
+                return Err(format!(
+                    "nir verify: data_profile_send requires immutable window payload, got `{}`",
+                    render_data_expr_name(input)
+                ));
+            }
             if matches!(
                 source,
                 NirDataKind::PipeOutput
@@ -262,6 +296,14 @@ fn verify_expr(
         if let Some(first_access) = profile.accesses.first() {
             match expr {
                 NirExpr::Move(inner) | NirExpr::Free(inner) => {
+                    if matches!(expr, NirExpr::Move(_))
+                        && expr_is_borrowed_pointer(inner, borrow_bindings)
+                    {
+                        return Err(format!(
+                            "nir verify: cannot move borrowed pointer `{}`",
+                            render_data_expr_name(inner)
+                        ));
+                    }
                     if matches!(first_access.mode, NirGlmUseMode::Own) {
                         if let Some(source) = expr_resource_key(inner) {
                             if borrows.get(&source).copied().unwrap_or(0) > 0 {
@@ -475,6 +517,12 @@ fn verify_expr(
         NirExpr::AllocNode { value, next } => {
             verify_expr(value, moved, borrows, borrow_bindings, data_bindings)?;
             verify_expr(next, moved, borrows, borrow_bindings, data_bindings)?;
+            if expr_is_borrowed_pointer(next, borrow_bindings) {
+                return Err(format!(
+                    "nir verify: alloc_node cannot capture borrowed pointer `{}` as structural next link",
+                    render_data_expr_name(next)
+                ));
+            }
         }
         NirExpr::AllocBuffer { len, fill } => {
             verify_expr(len, moved, borrows, borrow_bindings, data_bindings)?;
@@ -491,6 +539,12 @@ fn verify_expr(
         NirExpr::StoreNext { target, next } => {
             verify_expr(target, moved, borrows, borrow_bindings, data_bindings)?;
             verify_expr(next, moved, borrows, borrow_bindings, data_bindings)?;
+            if expr_is_borrowed_pointer(next, borrow_bindings) {
+                return Err(format!(
+                    "nir verify: store_next cannot write borrowed pointer `{}` into structural next link",
+                    render_data_expr_name(next)
+                ));
+            }
         }
         NirExpr::StoreAt {
             buffer,
@@ -527,6 +581,18 @@ fn verify_expr(
     }
 
     Ok(())
+}
+
+fn expr_is_borrowed_pointer(
+    expr: &NirExpr,
+    borrow_bindings: &BTreeMap<String, String>,
+) -> bool {
+    match expr {
+        NirExpr::Borrow(_) => true,
+        NirExpr::Var(name) => borrow_bindings.contains_key(name),
+        NirExpr::Await(inner) => expr_is_borrowed_pointer(inner, borrow_bindings),
+        _ => false,
+    }
 }
 
 fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), String> {
@@ -752,10 +818,10 @@ fn infer_data_kind(expr: &NirExpr, data_bindings: &BTreeMap<String, NirDataKind>
         }
         NirExpr::DataOutputPipe(_) => NirDataKind::PipeOutput,
         NirExpr::DataInputPipe(_) => NirDataKind::PipeInput,
-        NirExpr::DataCopyWindow { .. }
-        | NirExpr::DataImmutableWindow { .. }
+        NirExpr::DataCopyWindow { .. } => NirDataKind::WindowMutable,
+        NirExpr::DataImmutableWindow { .. }
         | NirExpr::DataProfileSendUplink { .. }
-        | NirExpr::DataProfileSendDownlink { .. } => NirDataKind::Window,
+        | NirExpr::DataProfileSendDownlink { .. } => NirDataKind::WindowImmutable,
         _ => NirDataKind::Other,
     }
 }
@@ -772,6 +838,8 @@ fn render_data_expr_name(expr: &NirExpr) -> String {
         NirExpr::DataInputPipe(_) => "input_pipe".to_owned(),
         NirExpr::DataCopyWindow { .. } => "copy_window".to_owned(),
         NirExpr::DataImmutableWindow { .. } => "immutable_window".to_owned(),
+        NirExpr::DataProfileSendUplink { .. } => "profile_send_uplink".to_owned(),
+        NirExpr::DataProfileSendDownlink { .. } => "profile_send_downlink".to_owned(),
         _ => "value".to_owned(),
     }
 }
@@ -854,6 +922,203 @@ mod tests {
     }
 
     #[test]
+    fn owner_write_after_conditional_borrow_is_rejected() {
+        let module = module_with_body(vec![
+            NirStmt::Let {
+                name: "cond".to_owned(),
+                ty: None,
+                value: NirExpr::Bool(true),
+            },
+            NirStmt::Let {
+                name: "head".to_owned(),
+                ty: None,
+                value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                    value: Box::new(NirExpr::Int(10)),
+                    next: Box::new(NirExpr::Null),
+                })),
+            },
+            NirStmt::If {
+                condition: NirExpr::Var("cond".to_owned()),
+                then_body: vec![NirStmt::Let {
+                    name: "head_ref".to_owned(),
+                    ty: None,
+                    value: NirExpr::Borrow(Box::new(NirExpr::Var("head".to_owned()))),
+                }],
+                else_body: vec![],
+            },
+            NirStmt::Expr(NirExpr::StoreValue {
+                target: Box::new(NirExpr::Var("head".to_owned())),
+                value: Box::new(NirExpr::Int(77)),
+            }),
+        ]);
+
+        let error = verify_nir_module(&module).unwrap_err();
+        assert!(error.contains("cannot write `head` while borrow(s) are active"));
+    }
+
+    #[test]
+    fn owner_use_after_conditional_move_is_rejected() {
+        let module = module_with_body(vec![
+            NirStmt::Let {
+                name: "cond".to_owned(),
+                ty: None,
+                value: NirExpr::Bool(true),
+            },
+            NirStmt::Let {
+                name: "head".to_owned(),
+                ty: None,
+                value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                    value: Box::new(NirExpr::Int(10)),
+                    next: Box::new(NirExpr::Null),
+                })),
+            },
+            NirStmt::If {
+                condition: NirExpr::Var("cond".to_owned()),
+                then_body: vec![NirStmt::Let {
+                    name: "taken".to_owned(),
+                    ty: None,
+                    value: NirExpr::Move(Box::new(NirExpr::Var("head".to_owned()))),
+                }],
+                else_body: vec![],
+            },
+            NirStmt::Expr(NirExpr::LoadValue(Box::new(NirExpr::Var("head".to_owned())))),
+        ]);
+
+        let error = verify_nir_module(&module).unwrap_err();
+        assert!(error.contains("use of moved value `head`"));
+    }
+
+    #[test]
+    fn owner_write_after_branch_ended_borrow_is_allowed() {
+        let module = module_with_body(vec![
+            NirStmt::Let {
+                name: "cond".to_owned(),
+                ty: None,
+                value: NirExpr::Bool(true),
+            },
+            NirStmt::Let {
+                name: "head".to_owned(),
+                ty: None,
+                value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                    value: Box::new(NirExpr::Int(10)),
+                    next: Box::new(NirExpr::Null),
+                })),
+            },
+            NirStmt::Let {
+                name: "head_ref".to_owned(),
+                ty: None,
+                value: NirExpr::Borrow(Box::new(NirExpr::Var("head".to_owned()))),
+            },
+            NirStmt::If {
+                condition: NirExpr::Var("cond".to_owned()),
+                then_body: vec![NirStmt::Expr(NirExpr::BorrowEnd(Box::new(NirExpr::Var(
+                    "head_ref".to_owned(),
+                ))))],
+                else_body: vec![NirStmt::Expr(NirExpr::BorrowEnd(Box::new(NirExpr::Var(
+                    "head_ref".to_owned(),
+                ))))],
+            },
+            NirStmt::Expr(NirExpr::StoreValue {
+                target: Box::new(NirExpr::Var("head".to_owned())),
+                value: Box::new(NirExpr::Int(77)),
+            }),
+        ]);
+
+        verify_nir_module(&module).unwrap();
+    }
+
+    #[test]
+    fn move_of_borrowed_pointer_is_rejected() {
+        let module = module_with_body(vec![
+            NirStmt::Let {
+                name: "head".to_owned(),
+                ty: None,
+                value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                    value: Box::new(NirExpr::Int(10)),
+                    next: Box::new(NirExpr::Null),
+                })),
+            },
+            NirStmt::Let {
+                name: "head_ref".to_owned(),
+                ty: None,
+                value: NirExpr::Borrow(Box::new(NirExpr::Var("head".to_owned()))),
+            },
+            NirStmt::Let {
+                name: "taken".to_owned(),
+                ty: None,
+                value: NirExpr::Move(Box::new(NirExpr::Var("head_ref".to_owned()))),
+            },
+        ]);
+
+        let error = verify_nir_module(&module).unwrap_err();
+        assert!(error.contains("cannot move borrowed pointer"));
+    }
+
+    #[test]
+    fn alloc_node_with_borrowed_next_is_rejected() {
+        let module = module_with_body(vec![
+            NirStmt::Let {
+                name: "tail".to_owned(),
+                ty: None,
+                value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                    value: Box::new(NirExpr::Int(30)),
+                    next: Box::new(NirExpr::Null),
+                })),
+            },
+            NirStmt::Let {
+                name: "tail_ref".to_owned(),
+                ty: None,
+                value: NirExpr::Borrow(Box::new(NirExpr::Var("tail".to_owned()))),
+            },
+            NirStmt::Let {
+                name: "head".to_owned(),
+                ty: None,
+                value: NirExpr::AllocNode {
+                    value: Box::new(NirExpr::Int(10)),
+                    next: Box::new(NirExpr::Var("tail_ref".to_owned())),
+                },
+            },
+        ]);
+
+        let error = verify_nir_module(&module).unwrap_err();
+        assert!(error.contains("alloc_node cannot capture borrowed pointer"));
+    }
+
+    #[test]
+    fn store_next_with_borrowed_pointer_is_rejected() {
+        let module = module_with_body(vec![
+            NirStmt::Let {
+                name: "tail".to_owned(),
+                ty: None,
+                value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                    value: Box::new(NirExpr::Int(30)),
+                    next: Box::new(NirExpr::Null),
+                })),
+            },
+            NirStmt::Let {
+                name: "head".to_owned(),
+                ty: None,
+                value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                    value: Box::new(NirExpr::Int(10)),
+                    next: Box::new(NirExpr::Null),
+                })),
+            },
+            NirStmt::Let {
+                name: "tail_ref".to_owned(),
+                ty: None,
+                value: NirExpr::Borrow(Box::new(NirExpr::Var("tail".to_owned()))),
+            },
+            NirStmt::Expr(NirExpr::StoreNext {
+                target: Box::new(NirExpr::Var("head".to_owned())),
+                next: Box::new(NirExpr::Var("tail_ref".to_owned())),
+            }),
+        ]);
+
+        let error = verify_nir_module(&module).unwrap_err();
+        assert!(error.contains("store_next cannot write borrowed pointer"));
+    }
+
+    #[test]
     fn borrow_end_without_active_borrow_is_rejected() {
         let module = module_with_body(vec![
             NirStmt::Let {
@@ -902,7 +1167,23 @@ mod tests {
         })]);
 
         let error = verify_nir_module(&module).unwrap_err();
-        assert!(error.contains("cannot create data window"));
+        assert!(error.contains("cannot create nested data window"));
+    }
+
+    #[test]
+    fn data_window_rejects_nested_window_source() {
+        let module = module_with_body(vec![NirStmt::Expr(NirExpr::DataCopyWindow {
+            input: Box::new(NirExpr::DataImmutableWindow {
+                input: Box::new(NirExpr::Int(7)),
+                offset: Box::new(NirExpr::Int(0)),
+                len: Box::new(NirExpr::Int(1)),
+            }),
+            offset: Box::new(NirExpr::Int(0)),
+            len: Box::new(NirExpr::Int(1)),
+        })]);
+
+        let error = verify_nir_module(&module).unwrap_err();
+        assert!(error.contains("cannot create nested data window"));
     }
 
     #[test]
@@ -917,5 +1198,20 @@ mod tests {
 
         let error = verify_nir_module(&module).unwrap_err();
         assert!(error.contains("data_profile_send cannot wrap illegal window payload"));
+    }
+
+    #[test]
+    fn data_profile_send_rejects_mutable_window_source() {
+        let module = module_with_body(vec![NirStmt::Expr(NirExpr::DataProfileSendUplink {
+            unit: "FabricPlane".to_owned(),
+            input: Box::new(NirExpr::DataCopyWindow {
+                input: Box::new(NirExpr::Int(7)),
+                offset: Box::new(NirExpr::Int(0)),
+                len: Box::new(NirExpr::Int(1)),
+            }),
+        })]);
+
+        let error = verify_nir_module(&module).unwrap_err();
+        assert!(error.contains("requires immutable window payload"));
     }
 }
