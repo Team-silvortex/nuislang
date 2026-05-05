@@ -1529,6 +1529,7 @@ fn expr_uses_shader_profile_render(expr: &NirExpr, unit: &str) -> bool {
         | NirExpr::DataMoved(inner)
         | NirExpr::DataWindowed(inner)
         | NirExpr::DataValue(inner)
+        | NirExpr::DataFreezeWindow(inner)
         | NirExpr::ShaderPassReady(inner)
         | NirExpr::ShaderFrameReady(inner)
         | NirExpr::ShaderValue(inner)
@@ -1758,6 +1759,7 @@ fn expr_walk_any(expr: &NirExpr, predicate: &dyn Fn(&NirExpr) -> bool) -> bool {
         | NirExpr::DataMoved(inner)
         | NirExpr::DataWindowed(inner)
         | NirExpr::DataValue(inner)
+        | NirExpr::DataFreezeWindow(inner)
         | NirExpr::ShaderPassReady(inner)
         | NirExpr::ShaderFrameReady(inner)
         | NirExpr::ShaderValue(inner)
@@ -5200,7 +5202,7 @@ mod tests {
                     let downlink_window_policy: Marker<DownlinkWindowPolicy> = data_marker("downlink_window_policy");
                     let uplink_window: Window<i64> =
                       data_immutable_window(window_offset, window_offset, uplink_len);
-                    let downlink_window: Window<i64> =
+                    let downlink_window: WindowMut<i64> =
                       data_copy_window(window_offset, window_offset, downlink_len);
                   }
                 }

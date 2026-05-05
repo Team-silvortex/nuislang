@@ -11,7 +11,7 @@ Recommended reading order:
 * `hello_data.ns`
   smallest data-oriented frontend route
 * `hello_data_window.ns`
-  windows plus typed data-plane framing
+  immutable `Window<T>` plus local mutable `WindowMut<T>` framing
 * `hello_instantiate.ns`
   CPU-side unit instantiation and cross-domain use
 
@@ -26,3 +26,8 @@ Project-scale `data_profile_*` flows currently live in:
 
 * `/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo/main.ns`
 * `/Users/Shared/chroot/dev/nuislang/examples/projects/kernel_tensor_demo/main.ns`
+
+Current note:
+
+* `data_immutable_window(...)` is the bridge-safe `Window<T>` route
+* `data_copy_window(...)` is the local mutable `WindowMut<T>` route

@@ -6,7 +6,7 @@ mod cpu Main {
     let pipe: Pipe<i64> = data_output_pipe(source);
     let ready: Marker = data_marker("window_ready");
     let slice: Window<i64> = data_immutable_window(source, 0, 1);
-    let copy: Window<i64> = data_copy_window(source, 0, 1);
+    let copy: WindowMut<i64> = data_copy_window(source, 0, 1);
     print(source);
   }
 }

@@ -246,6 +246,12 @@ pub enum NirContainerKind {
     Task,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NirWindowMode {
+    Mutable,
+    Immutable,
+}
+
 impl NirTypeRef {
     pub fn scalar_kind(&self) -> Option<NirScalarKind> {
         if self.is_ref || !self.generic_args.is_empty() {
@@ -311,10 +317,21 @@ impl NirTypeRef {
 
     pub fn container_kind(&self) -> Option<NirContainerKind> {
         match self.name.as_str() {
-            "Window" if !self.is_ref => Some(NirContainerKind::Window),
+            "Window" | "WindowMut" if !self.is_ref => Some(NirContainerKind::Window),
             "Pipe" if !self.is_ref => Some(NirContainerKind::Pipe),
             "Instance" if !self.is_ref => Some(NirContainerKind::Instance),
             "Task" if !self.is_ref => Some(NirContainerKind::Task),
+            _ => None,
+        }
+    }
+
+    pub fn window_mode(&self) -> Option<NirWindowMode> {
+        if self.is_ref {
+            return None;
+        }
+        match self.name.as_str() {
+            "Window" => Some(NirWindowMode::Immutable),
+            "WindowMut" => Some(NirWindowMode::Mutable),
             _ => None,
         }
     }
@@ -681,6 +698,7 @@ pub enum NirExpr {
         offset: Box<NirExpr>,
         len: Box<NirExpr>,
     },
+    DataFreezeWindow(Box<NirExpr>),
     DataImmutableWindow {
         input: Box<NirExpr>,
         offset: Box<NirExpr>,
@@ -1188,7 +1206,9 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
             }],
             effect: NirGlmEffect::DomainMove,
         }),
-        NirExpr::DataCopyWindow { .. } | NirExpr::DataImmutableWindow { .. } => {
+        NirExpr::DataCopyWindow { .. }
+        | NirExpr::DataImmutableWindow { .. }
+        | NirExpr::DataFreezeWindow(_) => {
             Some(NirGlmProfile {
                 result_class: NirGlmValueClass::Val,
                 accesses: vec![NirGlmAccess {
@@ -1259,8 +1279,8 @@ pub struct NustarPackage {
 #[cfg(test)]
 mod tests {
     use super::{
-        NirDataFlowState, NirKernelFlowState, NirResultFamily, NirResultStage,
-        NirShaderFlowState, NirTypeRef,
+        NirContainerKind, NirDataFlowState, NirKernelFlowState, NirResultFamily,
+        NirResultStage, NirShaderFlowState, NirTypeRef, NirWindowMode,
     };
 
     fn named(name: &str) -> NirTypeRef {
@@ -1313,6 +1333,19 @@ mod tests {
             .unwrap_err();
         assert!(error.contains("windowed"));
         assert!(error.contains("Window<...>"));
+    }
+
+    #[test]
+    fn tracks_window_mutability_in_type_metadata() {
+        let immutable = generic("Window", named("i64"));
+        let mutable = generic("WindowMut", named("i64"));
+
+        assert_eq!(immutable.window_mode(), Some(NirWindowMode::Immutable));
+        assert_eq!(mutable.window_mode(), Some(NirWindowMode::Mutable));
+        assert_eq!(immutable.container_kind(), Some(NirContainerKind::Window));
+        assert_eq!(mutable.container_kind(), Some(NirContainerKind::Window));
+        immutable.validate_container_contract().unwrap();
+        mutable.validate_container_contract().unwrap();
     }
 
     #[test]

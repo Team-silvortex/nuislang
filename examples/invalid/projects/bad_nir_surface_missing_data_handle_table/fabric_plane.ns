@@ -18,6 +18,6 @@ mod data FabricPlane {
     let uplink_window_policy: Marker = data_marker("uplink_window_policy");
     let downlink_window_policy: Marker = data_marker("downlink_window_policy");
     let uplink_window: Window = data_immutable_window(window_offset, window_offset, uplink_len);
-    let downlink_window: Window = data_copy_window(window_offset, window_offset, downlink_len);
+    let downlink_window: WindowMut = data_copy_window(window_offset, window_offset, downlink_len);
   }
 }

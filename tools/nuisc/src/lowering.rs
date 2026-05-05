@@ -756,6 +756,22 @@ fn lower_expr(
             push_dep_edges(state, &len_name, &name);
             Ok(name)
         }
+        NirExpr::DataFreezeWindow(input) => {
+            ensure_fabric_resource(state.yir);
+            let input_name = lower_expr(input, state, bindings)?;
+            let name = next_name(state, "data_freeze_window");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "fabric0".to_owned(),
+                op: Operation {
+                    module: "data".to_owned(),
+                    instruction: "freeze_window".to_owned(),
+                    args: vec![input_name.clone()],
+                },
+            });
+            push_dep_edges(state, &input_name, &name);
+            Ok(name)
+        }
         NirExpr::DataImmutableWindow { input, offset, len } => {
             ensure_fabric_resource(state.yir);
             let input_name = lower_expr(input, state, bindings)?;

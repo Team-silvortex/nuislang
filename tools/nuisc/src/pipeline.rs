@@ -270,6 +270,7 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         | NirExpr::DataMoved(inner)
         | NirExpr::DataWindowed(inner)
         | NirExpr::DataValue(inner)
+        | NirExpr::DataFreezeWindow(inner)
         | NirExpr::ShaderPassReady(inner)
         | NirExpr::ShaderFrameReady(inner)
         | NirExpr::ShaderValue(inner)

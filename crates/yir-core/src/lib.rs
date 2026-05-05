@@ -133,6 +133,7 @@ pub enum SemanticOp {
     CpuTaskValue,
     DataMove,
     DataCopyWindow,
+    DataFreezeWindow,
     DataImmutableWindow,
     DataOutputPipe,
     DataInputPipe,
@@ -277,6 +278,7 @@ impl Operation {
             (OperationDomainFamily::Cpu, "task_value") => SemanticOp::CpuTaskValue,
             (OperationDomainFamily::Data, "move") => SemanticOp::DataMove,
             (OperationDomainFamily::Data, "copy_window") => SemanticOp::DataCopyWindow,
+            (OperationDomainFamily::Data, "freeze_window") => SemanticOp::DataFreezeWindow,
             (OperationDomainFamily::Data, "immutable_window") => SemanticOp::DataImmutableWindow,
             (OperationDomainFamily::Data, "output_pipe") => SemanticOp::DataOutputPipe,
             (OperationDomainFamily::Data, "input_pipe") => SemanticOp::DataInputPipe,
@@ -330,7 +332,9 @@ impl Operation {
     pub fn is_data_window_semantic_op(&self) -> bool {
         matches!(
             self.semantic_op(),
-            SemanticOp::DataCopyWindow | SemanticOp::DataImmutableWindow
+            SemanticOp::DataCopyWindow
+                | SemanticOp::DataFreezeWindow
+                | SemanticOp::DataImmutableWindow
         )
     }
 
@@ -397,6 +401,7 @@ impl Operation {
             SemanticOp::DataOutputPipe => "data.output_pipe",
             SemanticOp::DataInputPipe => "data.input_pipe",
             SemanticOp::DataCopyWindow => "data.copy_window",
+            SemanticOp::DataFreezeWindow => "data.freeze_window",
             SemanticOp::DataImmutableWindow => "data.immutable_window",
             SemanticOp::ShaderBeginPass => "shader.begin_pass",
             SemanticOp::ShaderDrawInstanced => "shader.draw_instanced",
@@ -508,6 +513,7 @@ impl Operation {
                 SemanticOp::DataOutputPipe => Ok(state == "moved"),
                 SemanticOp::DataInputPipe
                 | SemanticOp::DataCopyWindow
+                | SemanticOp::DataFreezeWindow
                 | SemanticOp::DataImmutableWindow => Ok(matches!(state, "ready" | "windowed")),
                 other => Err(format!(
                     "unsupported data observe source `{}`",
@@ -599,6 +605,7 @@ fn semantic_op_display_name(op: SemanticOp) -> &'static str {
         SemanticOp::DataOutputPipe => ("data", "output_pipe"),
         SemanticOp::DataInputPipe => ("data", "input_pipe"),
         SemanticOp::DataCopyWindow => ("data", "copy_window"),
+        SemanticOp::DataFreezeWindow => ("data", "freeze_window"),
         SemanticOp::DataImmutableWindow => ("data", "immutable_window"),
         SemanticOp::ShaderBeginPass => ("shader", "begin_pass"),
         SemanticOp::ShaderDrawInstanced => ("shader", "draw_instanced"),
@@ -808,7 +815,9 @@ pub fn glm_profile_for_operation(op: &Operation) -> GlmNodeProfile {
             }],
             effect: GlmEffect::DomainMove,
         },
-        SemanticOp::DataCopyWindow | SemanticOp::DataImmutableWindow => GlmNodeProfile {
+        SemanticOp::DataCopyWindow
+        | SemanticOp::DataFreezeWindow
+        | SemanticOp::DataImmutableWindow => GlmNodeProfile {
             result_class: GlmValueClass::Res,
             accesses: vec![GlmAccess {
                 input: op.args[0].clone(),
@@ -1110,9 +1119,46 @@ mod tests {
                 },
                 &resource,
                 &mut state,
-            )
+        )
             .unwrap_err();
         assert!(error.contains("illegal pipe payload"));
+    }
+
+    #[test]
+    fn data_mod_freeze_window_converts_mutable_window_to_immutable() {
+        let resource = Resource {
+            name: "fabric0".to_owned(),
+            kind: ResourceKind::parse("data.fabric"),
+        };
+        let data_mod = DataMod;
+        let mut state = ExecutionState::default();
+
+        state.values.insert(
+            "window0".to_owned(),
+            Value::DataWindow(DataWindow {
+                base: Box::new(Value::Int(7)),
+                offset: 0,
+                len: 1,
+                immutable: false,
+            }),
+        );
+
+        let value = data_mod
+            .execute(
+                &Node {
+                    name: "frozen".to_owned(),
+                    resource: "fabric0".to_owned(),
+                    op: Operation::parse("data.freeze_window", vec!["window0".to_owned()]).unwrap(),
+                },
+                &resource,
+                &mut state,
+            )
+            .unwrap();
+
+        let Value::DataWindow(window) = value else {
+            panic!("expected frozen data window");
+        };
+        assert!(window.immutable);
     }
 }
 
@@ -2140,6 +2186,15 @@ impl RegisteredMod for DataMod {
                 }
                 Ok(InstructionSemantics::pure(deps))
             }
+            "freeze_window" => {
+                if node.op.args.len() != 1 {
+                    return Err(format!(
+                        "node `{}` expects `data.freeze_window <name> <resource> <window>`",
+                        node.name
+                    ));
+                }
+                Ok(InstructionSemantics::pure(vec![node.op.args[0].clone()]))
+            }
             "marker" => {
                 if node.op.args.len() != 1 {
                     return Err(format!(
@@ -2270,6 +2325,19 @@ impl RegisteredMod for DataMod {
                     immutable: node.op.instruction == "immutable_window",
                 });
                 Ok(window)
+            }
+            "freeze_window" => {
+                let window = state.expect_value(&node.op.args[0])?.clone();
+                match window {
+                    Value::DataWindow(window) => Ok(Value::DataWindow(DataWindow {
+                        immutable: true,
+                        ..window
+                    })),
+                    other => Err(format!(
+                        "data.freeze_window expects window input, got {}",
+                        other
+                    )),
+                }
             }
             "marker" => Ok(Value::DataMarker(DataMarker {
                 tag: node.op.args[0].clone(),

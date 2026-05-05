@@ -374,6 +374,9 @@ fn render_nir_expr(value: &NirExpr) -> String {
             render_nir_expr(offset),
             render_nir_expr(len)
         ),
+        NirExpr::DataFreezeWindow(input) => {
+            format!("data_freeze_window({})", render_nir_expr(input))
+        }
         NirExpr::DataImmutableWindow { input, offset, len } => format!(
             "data_immutable_window({}, {}, {})",
             render_nir_expr(input),

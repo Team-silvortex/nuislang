@@ -370,6 +370,8 @@ Important boundary note:
 * `data.*` ops are the instruction-level surface for Fabric-style exchange. The architecture term `Fabric` remains valid, but the standard op family name is `data`.
 * The current handwritten prototype now includes a first typed Fabric surface: `move`, `copy_window`, `immutable_window`, `marker`, `bind_core`, `output_pipe`, `input_pipe`, and `handle_table`.
 * The current verifier already enforces a minimal legality set for that surface: `input_pipe` must consume `output_pipe`, nested pipes are rejected, and `window` wrappers may not be formed from marker/handle carriers.
+* The current frontend/runtime contract now also distinguishes local mutable windows from bridge-safe immutable windows: `copy_window` is the local mutable-view primitive, while `immutable_window` is the stable cross-domain view primitive.
+* Current project/data-pipe paths only allow immutable windows to cross the explicit `output_pipe/input_pipe` bridge; mutable windows are expected to stay local until they are converted into an immutable view.
 * `data.move` is the current `MoveValue` primitive surface and therefore only accepts plain value payloads, not `window`, `marker`, `handle`, or `pipe` carriers.
 * `data.move` also currently behaves as an `Own` consume in the verifier: after a move, later graph-visible uses of the same source must already be ordered before that move node.
 * `data.handle_table` is strictly a resource-indirection primitive: entries must use unique slots and may only reference declared resources, never concrete data payloads.

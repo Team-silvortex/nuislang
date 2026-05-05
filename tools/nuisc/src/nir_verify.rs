@@ -289,6 +289,15 @@ fn verify_expr(
                 ));
             }
         }
+        NirExpr::DataFreezeWindow(input) => {
+            let source = infer_data_kind(input, data_bindings);
+            if !matches!(source, NirDataKind::WindowMutable | NirDataKind::WindowImmutable) {
+                return Err(format!(
+                    "nir verify: data_freeze_window expects window input, got `{}`",
+                    render_data_expr_name(input)
+                ));
+            }
+        }
         _ => {}
     }
 
@@ -491,6 +500,9 @@ fn verify_expr(
         NirExpr::DataResult { value: inner, .. }
         | NirExpr::ShaderResult { value: inner, .. }
         | NirExpr::KernelResult { value: inner, .. } => {
+            verify_expr(inner, moved, borrows, borrow_bindings, data_bindings)?
+        }
+        NirExpr::DataFreezeWindow(inner) => {
             verify_expr(inner, moved, borrows, borrow_bindings, data_bindings)?
         }
         NirExpr::DataProfileSendUplink { input, .. }
@@ -723,6 +735,7 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
         | NirExpr::KernelResult { value: inner, .. } => {
             verify_expr_uses(inner, moved)?
         }
+        NirExpr::DataFreezeWindow(inner) => verify_expr_uses(inner, moved)?,
         NirExpr::DataProfileSendUplink { input, .. }
         | NirExpr::DataProfileSendDownlink { input, .. } => verify_expr_uses(input, moved)?,
         NirExpr::DataCopyWindow { input, offset, len }
@@ -820,6 +833,7 @@ fn infer_data_kind(expr: &NirExpr, data_bindings: &BTreeMap<String, NirDataKind>
         NirExpr::DataInputPipe(_) => NirDataKind::PipeInput,
         NirExpr::DataCopyWindow { .. } => NirDataKind::WindowMutable,
         NirExpr::DataImmutableWindow { .. }
+        | NirExpr::DataFreezeWindow(_)
         | NirExpr::DataProfileSendUplink { .. }
         | NirExpr::DataProfileSendDownlink { .. } => NirDataKind::WindowImmutable,
         _ => NirDataKind::Other,
@@ -838,6 +852,7 @@ fn render_data_expr_name(expr: &NirExpr) -> String {
         NirExpr::DataInputPipe(_) => "input_pipe".to_owned(),
         NirExpr::DataCopyWindow { .. } => "copy_window".to_owned(),
         NirExpr::DataImmutableWindow { .. } => "immutable_window".to_owned(),
+        NirExpr::DataFreezeWindow(_) => "freeze_window".to_owned(),
         NirExpr::DataProfileSendUplink { .. } => "profile_send_uplink".to_owned(),
         NirExpr::DataProfileSendDownlink { .. } => "profile_send_downlink".to_owned(),
         _ => "value".to_owned(),
@@ -1213,5 +1228,19 @@ mod tests {
 
         let error = verify_nir_module(&module).unwrap_err();
         assert!(error.contains("requires immutable window payload"));
+    }
+
+    #[test]
+    fn data_profile_send_accepts_frozen_window_source() {
+        let module = module_with_body(vec![NirStmt::Expr(NirExpr::DataProfileSendUplink {
+            unit: "FabricPlane".to_owned(),
+            input: Box::new(NirExpr::DataFreezeWindow(Box::new(NirExpr::DataCopyWindow {
+                input: Box::new(NirExpr::Int(7)),
+                offset: Box::new(NirExpr::Int(0)),
+                len: Box::new(NirExpr::Int(1)),
+            }))),
+        })]);
+
+        verify_nir_module(&module).unwrap();
     }
 }

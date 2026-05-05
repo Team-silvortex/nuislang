@@ -31,7 +31,7 @@ mod cpu Main {
     let frame: Frame =
       shader_draw_instanced(main_pass, gpu_packet, shader_vertex_budget, shader_instance_budget);
 
-    let downlink_window: Window =
+    let downlink_window: WindowMut =
       data_copy_window(frame, data_window_offset, data_downlink_len);
     link frame_out: Pipe<Window> = output downlink_window;
     let host_frame: Window = data_input_pipe(frame_out);

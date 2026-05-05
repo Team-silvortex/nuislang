@@ -397,6 +397,19 @@ fn verify_data_fabric_protocol(
                         _ => unreachable!(),
                     }
                 }
+                SemanticOp::DataFreezeWindow => {
+                    let source = infer_data_value_kind(&value_kinds, &nodes, &node.op.args[0]);
+                    if !matches!(
+                        source,
+                        DataValueKind::WindowMutable | DataValueKind::WindowImmutable
+                    ) {
+                        return Err(format!(
+                            "node `{}` expects window input for freeze_window, got `{}`",
+                            node.name, node.op.args[0]
+                        ));
+                    }
+                    DataValueKind::WindowImmutable
+                }
                 SemanticOp::DataMarker => DataValueKind::Marker,
                 SemanticOp::DataHandleTable => {
                     let mut seen_slots = BTreeSet::new();
@@ -913,6 +926,7 @@ fn infer_data_value_kind(
                 SemanticOp::DataOutputPipe => DataValueKind::PipeOutput,
                 SemanticOp::DataInputPipe | SemanticOp::DataMove => DataValueKind::Other,
                 SemanticOp::DataCopyWindow => DataValueKind::WindowMutable,
+                SemanticOp::DataFreezeWindow => DataValueKind::WindowImmutable,
                 SemanticOp::DataImmutableWindow => DataValueKind::WindowImmutable,
                 _ => DataValueKind::Other,
             })
@@ -2434,6 +2448,39 @@ mod tests {
 
         let error = verify_module(&module).unwrap_err();
         assert!(error.contains("cannot send mutable window payload"));
+    }
+
+    #[test]
+    fn accepts_frozen_window_payload_across_data_pipe() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![
+                Resource {
+                    name: "cpu0".to_owned(),
+                    kind: ResourceKind::parse("cpu.arm64"),
+                },
+                Resource {
+                    name: "fabric0".to_owned(),
+                    kind: ResourceKind::parse("data.fabric"),
+                },
+            ],
+            nodes: vec![
+                node("seed", "cpu0", "cpu.const", &["7"]),
+                node("value", "fabric0", "data.move", &["seed", "cpu0"]),
+                node("window0", "fabric0", "data.copy_window", &["value", "0", "1"]),
+                node("frozen", "fabric0", "data.freeze_window", &["window0"]),
+                node("pipe", "fabric0", "data.output_pipe", &["frozen"]),
+            ],
+            edges: vec![
+                xfer("seed", "value"),
+                dep("value", "window0"),
+                dep("window0", "frozen"),
+                dep("frozen", "pipe"),
+            ],
+            node_lanes: BTreeMap::new(),
+        };
+
+        verify_module(&module).unwrap();
     }
 
     #[test]

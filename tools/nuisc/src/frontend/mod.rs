@@ -7,7 +7,7 @@ use nuis_semantics::model::{
     AstBinaryOp, AstExpr, AstFunction, AstModule, AstParam, AstStmt, AstTypeRef, NirBinaryOp,
     NirDataFlowState, NirExpr, NirExternFunction, NirExternInterface, NirFunction, NirModule,
     NirKernelFlowState, NirParam, NirResultFamily, NirResultStage, NirShaderFlowState, NirStmt,
-    NirStructDef, NirStructField, NirTypeRef, NirUse,
+    NirStructDef, NirStructField, NirTypeRef, NirUse, NirWindowMode,
 };
 
 pub fn frontend_name() -> &'static str {
@@ -1437,6 +1437,19 @@ fn lower_call_expr_with_async(
                 )?),
             })
         }
+        "data_freeze_window" => {
+            let [input] = args else {
+                return Err("data_freeze_window(...) expects 1 arg".to_owned());
+            };
+            Ok(NirExpr::DataFreezeWindow(Box::new(lower_expr(
+                input,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?)))
+        }
         "data_immutable_window" => {
             let [input, offset, len] = args else {
                 return Err("data_immutable_window(...) expects 3 args".to_owned());
@@ -2742,6 +2755,7 @@ fn infer_result_stage(expr: &NirExpr) -> Option<NirResultStage> {
         | NirExpr::DataInputPipe(_) => Some(NirDataFlowState::Ready.into()),
         NirExpr::DataOutputPipe(_) => Some(NirDataFlowState::Moved.into()),
         NirExpr::DataCopyWindow { .. }
+        | NirExpr::DataFreezeWindow(_)
         | NirExpr::DataImmutableWindow { .. }
         | NirExpr::DataProfileSendUplink { .. }
         | NirExpr::DataProfileSendDownlink { .. } => Some(NirDataFlowState::Windowed.into()),
@@ -2883,6 +2897,16 @@ fn infer_nir_expr_type(
             Some(bool_type())
         }
         NirExpr::DataValue(result) => result_payload_type(result, bindings, signatures, struct_table),
+        NirExpr::DataFreezeWindow(input) => {
+            let inner = infer_nir_expr_type(input, bindings, signatures, struct_table)?;
+            let payload = match inner.window_mode() {
+                Some(NirWindowMode::Mutable | NirWindowMode::Immutable) => {
+                    inner.container_payload()?.clone()
+                }
+                None => return None,
+            };
+            Some(generic_named_type("Window", vec![payload]))
+        }
         NirExpr::CpuExternCall { callee, .. } => signatures
             .get(callee)
             .and_then(|sig| sig.return_type.clone()),
@@ -2903,7 +2927,11 @@ fn infer_nir_expr_type(
             let inner = infer_nir_expr_type(value, bindings, signatures, struct_table)?;
             Some(generic_named_type("Pipe", vec![inner]))
         }
-        NirExpr::DataCopyWindow { input, .. } | NirExpr::DataImmutableWindow { input, .. } => {
+        NirExpr::DataCopyWindow { input, .. } => {
+            let inner = infer_nir_expr_type(input, bindings, signatures, struct_table)?;
+            Some(generic_named_type("WindowMut", vec![inner]))
+        }
+        NirExpr::DataImmutableWindow { input, .. } => {
             let inner = infer_nir_expr_type(input, bindings, signatures, struct_table)?;
             Some(generic_named_type("Window", vec![inner]))
         }
@@ -2964,6 +2992,18 @@ fn resolve_declared_or_inferred(
 }
 
 fn compatible_types(expected: &NirTypeRef, actual: &NirTypeRef) -> bool {
+    if expected.window_mode() == Some(NirWindowMode::Immutable)
+        && actual.window_mode() == Some(NirWindowMode::Mutable)
+        && expected.is_optional == actual.is_optional
+        && expected.is_ref == actual.is_ref
+        && expected.generic_args.len() == actual.generic_args.len()
+    {
+        return expected
+            .generic_args
+            .iter()
+            .zip(&actual.generic_args)
+            .all(|(lhs, rhs)| compatible_types(lhs, rhs));
+    }
     if expected.name == actual.name
         && !expected.is_ref
         && !actual.is_ref
@@ -3262,6 +3302,53 @@ mod tests {
         .unwrap_err();
 
         assert!(error.contains("Pipe<Pipe"));
+    }
+
+    #[test]
+    fn accepts_window_mut_type_annotation() {
+        parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() {
+                let copy: WindowMut<i64> = data_copy_window(7, 0, 1);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn keeps_window_annotation_compatible_with_copy_window_for_now() {
+        parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() {
+                let copy: Window<i64> = data_copy_window(7, 0, 1);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn infers_frozen_window_as_immutable_window_type() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() {
+                let frozen: Window<i64> = data_freeze_window(data_copy_window(7, 0, 1));
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let NirStmt::Let { ty: Some(ty), .. } = &module.functions[0].body[0] else {
+            panic!("expected typed let binding");
+        };
+        assert_eq!(ty.render(), "Window<i64>");
     }
 
     #[test]

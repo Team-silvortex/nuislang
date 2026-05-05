@@ -650,6 +650,7 @@ fn walk_child_exprs(expr: &NirExpr, f: &mut dyn FnMut(&NirExpr)) {
         | NirExpr::DataMoved(inner)
         | NirExpr::DataWindowed(inner)
         | NirExpr::DataValue(inner)
+        | NirExpr::DataFreezeWindow(inner)
         | NirExpr::ShaderPassReady(inner)
         | NirExpr::ShaderFrameReady(inner)
         | NirExpr::ShaderValue(inner)
