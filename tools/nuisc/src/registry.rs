@@ -365,15 +365,25 @@ fn implied_slots_for_surface(domain_family: &str, surface: &str) -> &'static [&'
             "pass_kind",
             "packet_field_count",
         ],
-        ("shader", "shader.profile.seed.color.v1") => &["packet_color_slot", "material_mode"],
-        ("shader", "shader.profile.seed.speed.v1") => &["packet_speed_slot", "packet_tag"],
+        ("shader", "shader.profile.seed.color.v1") => {
+            &["packet_color_slot", "slider_color_slot", "material_mode"]
+        }
+        ("shader", "shader.profile.seed.speed.v1") => {
+            &["packet_speed_slot", "slider_speed_slot", "packet_tag"]
+        }
         ("shader", "shader.profile.seed.radius.v1") => {
-            &["packet_radius_slot", "packet_field_count"]
+            &["packet_radius_slot", "slider_radius_slot", "packet_field_count"]
         }
         ("shader", "shader.profile.packet.v1") => &[
             "packet_color_slot",
             "packet_speed_slot",
             "packet_radius_slot",
+            "slider_color_slot",
+            "slider_speed_slot",
+            "slider_radius_slot",
+            "header_accent_slot",
+            "toggle_live_slot",
+            "focus_slot",
         ],
         ("shader", "shader.profile.target.v1") => &["target"],
         ("shader", "shader.profile.viewport.v1") => &["viewport"],
@@ -383,6 +393,12 @@ fn implied_slots_for_surface(domain_family: &str, surface: &str) -> &'static [&'
             "packet_color_slot",
             "packet_speed_slot",
             "packet_radius_slot",
+            "slider_color_slot",
+            "slider_speed_slot",
+            "slider_radius_slot",
+            "header_accent_slot",
+            "toggle_live_slot",
+            "focus_slot",
         ],
         ("shader", "shader.profile.packet-tag.v1") => &["packet_tag"],
         ("shader", "shader.profile.material-mode.v1") => &["material_mode"],
@@ -723,11 +739,23 @@ fn walk_child_exprs(expr: &NirExpr, f: &mut dyn FnMut(&NirExpr)) {
             color,
             speed,
             radius,
+            accent,
+            toggle_state,
+            focus_index,
             ..
         } => {
             f(color);
             f(speed);
             f(radius);
+            if let Some(accent) = accent {
+                f(accent);
+            }
+            if let Some(toggle_state) = toggle_state {
+                f(toggle_state);
+            }
+            if let Some(focus_index) = focus_index {
+                f(focus_index);
+            }
         }
         NirExpr::ShaderProfileSpeedSeed {
             delta, scale, base, ..

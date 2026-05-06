@@ -501,11 +501,23 @@ fn verify_expr(
             color,
             speed,
             radius,
+            accent,
+            toggle_state,
+            focus_index,
             ..
         } => {
             verify_expr(color, moved, borrows, borrow_bindings, data_bindings)?;
             verify_expr(speed, moved, borrows, borrow_bindings, data_bindings)?;
             verify_expr(radius, moved, borrows, borrow_bindings, data_bindings)?;
+            if let Some(accent) = accent {
+                verify_expr(accent, moved, borrows, borrow_bindings, data_bindings)?;
+            }
+            if let Some(toggle_state) = toggle_state {
+                verify_expr(toggle_state, moved, borrows, borrow_bindings, data_bindings)?;
+            }
+            if let Some(focus_index) = focus_index {
+                verify_expr(focus_index, moved, borrows, borrow_bindings, data_bindings)?;
+            }
         }
         NirExpr::ShaderDrawInstanced { pass, packet, .. } => {
             verify_expr(pass, moved, borrows, borrow_bindings, data_bindings)?;
@@ -753,11 +765,23 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
             color,
             speed,
             radius,
+            accent,
+            toggle_state,
+            focus_index,
             ..
         } => {
             verify_expr_uses(color, moved)?;
             verify_expr_uses(speed, moved)?;
             verify_expr_uses(radius, moved)?;
+            if let Some(accent) = accent {
+                verify_expr_uses(accent, moved)?;
+            }
+            if let Some(toggle_state) = toggle_state {
+                verify_expr_uses(toggle_state, moved)?;
+            }
+            if let Some(focus_index) = focus_index {
+                verify_expr_uses(focus_index, moved)?;
+            }
         }
         NirExpr::ShaderDrawInstanced { pass, packet, .. } => {
             verify_expr_uses(pass, moved)?;

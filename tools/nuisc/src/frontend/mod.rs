@@ -1919,19 +1919,53 @@ fn lower_call_expr_with_async(
                 delta: Box::new(delta),
             })
         }
-        "shader_profile_packet" => {
-            let [unit, color, speed, radius] = args else {
-                return Err("shader_profile_packet(...) expects 4 args".to_owned());
+        "shader_profile_packet" | "shader_profile_panel_packet" => {
+            let (unit, color, speed, radius, accent, toggle_state, focus_index) = match args {
+                [unit, color, speed, radius] => {
+                    (unit, color, speed, radius, None, None, None)
+                }
+                [unit, color, speed, radius, accent, toggle_state, focus_index] => (
+                    unit,
+                    color,
+                    speed,
+                    radius,
+                    Some(accent),
+                    Some(toggle_state),
+                    Some(focus_index),
+                ),
+                _ => {
+                    return Err(
+                        if callee == "shader_profile_panel_packet" {
+                            "shader_profile_panel_packet(...) expects 7 args".to_owned()
+                        } else {
+                            "shader_profile_packet(...) expects 4 or 7 args".to_owned()
+                        },
+                    )
+                }
             };
+            if callee == "shader_profile_panel_packet"
+                && (accent.is_none() || toggle_state.is_none() || focus_index.is_none())
+            {
+                return Err("shader_profile_panel_packet(...) expects 7 args".to_owned());
+            }
             if current_domain != "cpu" {
                 return Err(
-                    "shader_profile_packet(...) is currently only allowed inside `mod cpu <unit>`"
+                    if callee == "shader_profile_panel_packet" {
+                        "shader_profile_panel_packet(...) is currently only allowed inside `mod cpu <unit>`"
+                    } else {
+                        "shader_profile_packet(...) is currently only allowed inside `mod cpu <unit>`"
+                    }
                         .to_owned(),
                 );
             }
             let AstExpr::Text(unit) = unit else {
                 return Err(
-                    "shader_profile_packet(...) expects a string literal unit name".to_owned(),
+                    if callee == "shader_profile_panel_packet" {
+                        "shader_profile_panel_packet(...) expects a string literal unit name"
+                            .to_owned()
+                    } else {
+                        "shader_profile_packet(...) expects a string literal unit name".to_owned()
+                    },
                 );
             };
             let color = lower_expr(
@@ -1958,11 +1992,58 @@ fn lower_call_expr_with_async(
                 struct_table,
                 Some(&i64_type()),
             )?;
+            let accent = accent
+                .map(|expr| {
+                    lower_expr(
+                        expr,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        Some(&i64_type()),
+                    )
+                    .map(Box::new)
+                })
+                .transpose()?;
+            let toggle_state = toggle_state
+                .map(|expr| {
+                    lower_expr(
+                        expr,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        Some(&i64_type()),
+                    )
+                    .map(Box::new)
+                })
+                .transpose()?;
+            let focus_index = focus_index
+                .map(|expr| {
+                    lower_expr(
+                        expr,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        Some(&i64_type()),
+                    )
+                    .map(Box::new)
+                })
+                .transpose()?;
             Ok(NirExpr::ShaderProfilePacket {
                 unit: unit.clone(),
+                packet_type_name: if callee == "shader_profile_panel_packet" {
+                    Some("NovaPanelPacket".to_owned())
+                } else {
+                    None
+                },
                 color: Box::new(color),
                 speed: Box::new(speed),
                 radius: Box::new(radius),
+                accent,
+                toggle_state,
+                focus_index,
             })
         }
         "shader_profile_packet_color_slot" => {
@@ -2964,7 +3045,16 @@ fn infer_nir_expr_type(
         NirExpr::ShaderProfileColorSeed { .. } => Some(i64_type()),
         NirExpr::ShaderProfileSpeedSeed { .. } => Some(i64_type()),
         NirExpr::ShaderProfileRadiusSeed { .. } => Some(i64_type()),
-        NirExpr::ShaderProfilePacket { unit, .. } => Some(named_type(&format!("{unit}Packet"))),
+        NirExpr::ShaderProfilePacket {
+            unit,
+            packet_type_name,
+            ..
+        } => {
+            let packet_name = packet_type_name
+                .clone()
+                .unwrap_or_else(|| format!("{unit}Packet"));
+            Some(named_type(&packet_name))
+        }
         NirExpr::DataProfileBindCoreRef { .. } => Some(named_type("Unit")),
         NirExpr::DataProfileWindowOffsetRef { .. } => Some(i64_type()),
         NirExpr::DataProfileUplinkLenRef { .. } => Some(i64_type()),

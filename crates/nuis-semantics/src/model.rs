@@ -801,9 +801,13 @@ pub enum NirExpr {
     },
     ShaderProfilePacket {
         unit: String,
+        packet_type_name: Option<String>,
         color: Box<NirExpr>,
         speed: Box<NirExpr>,
         radius: Box<NirExpr>,
+        accent: Option<Box<NirExpr>>,
+        toggle_state: Option<Box<NirExpr>>,
+        focus_index: Option<Box<NirExpr>>,
     },
     DataProfileBindCoreRef {
         unit: String,

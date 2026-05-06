@@ -45,18 +45,24 @@ mod cpu Main {
     let packed_color: i64 = data_read_window(frozen_controls, 0);
     let packed_speed: i64 = data_read_window(frozen_controls, 1);
     let packed_radius: i64 = data_read_window(frozen_controls, 2);
+    let panel_accent: i64 = packed_color + color_delta;
+    let panel_toggle_state: i64 = frame_tick;
+    let panel_focus_index: i64 = color_delta + speed_delta;
 
-    let render_controls = shader_profile_packet(
+    let render_controls: NovaPanelPacket = shader_profile_panel_packet(
       "SurfaceShader",
       packed_color,
       packed_speed,
-      packed_radius
+      packed_radius,
+      panel_accent,
+      panel_toggle_state,
+      panel_focus_index
     );
 
     data_profile_bind_core("FabricPlane");
     let fabric_handles: HandleTable<FabricPlaneBindings> =
       data_profile_handle_table("FabricPlane");
-    let gpu_packet: Window<SurfaceShaderPacket> =
+    let gpu_packet: Window<NovaPanelPacket> =
       data_profile_send_uplink("FabricPlane", render_controls);
     let frame: Frame = shader_profile_render("SurfaceShader", gpu_packet);
 

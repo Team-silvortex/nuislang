@@ -548,31 +548,155 @@ fn lower_expr(
         }
         NirExpr::ShaderProfilePacket {
             unit,
+            packet_type_name,
             color,
             speed,
             radius,
+            accent,
+            toggle_state,
+            focus_index,
         } => {
             let color_name = lower_expr(color, state, bindings)?;
             let speed_name = lower_expr(speed, state, bindings)?;
             let radius_name = lower_expr(radius, state, bindings)?;
+            let accent_name = accent
+                .as_ref()
+                .map(|expr| lower_expr(expr, state, bindings))
+                .transpose()?;
+            let toggle_name = toggle_state
+                .as_ref()
+                .map(|expr| lower_expr(expr, state, bindings))
+                .transpose()?;
+            let focus_name = focus_index
+                .as_ref()
+                .map(|expr| lower_expr(expr, state, bindings))
+                .transpose()?;
             let name = next_name(state, "shader_profile_packet");
+            let packet_type = packet_type_name
+                .clone()
+                .unwrap_or_else(|| format!("{unit}Packet"));
+            let is_nova_panel = packet_type == "NovaPanelPacket";
+            let mut panel_group_nodes = Vec::new();
+            let args = if is_nova_panel {
+                let accent_name = accent_name
+                    .as_ref()
+                    .expect("nova panel packet must carry header accent");
+                let toggle_name = toggle_name
+                    .as_ref()
+                    .expect("nova panel packet must carry toggle state");
+                let focus_name = focus_name
+                    .as_ref()
+                    .expect("nova panel packet must carry focus slot");
+
+                let header_struct = next_name(state, "nova_panel_header");
+                state.yir.nodes.push(Node {
+                    name: header_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaHeaderPacket".to_owned(),
+                            format!("accent={accent_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, accent_name, &header_struct);
+                panel_group_nodes.push(header_struct.clone());
+
+                let slider_struct = next_name(state, "nova_panel_sliders");
+                state.yir.nodes.push(Node {
+                    name: slider_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaSliderGroupPacket".to_owned(),
+                            format!("color={color_name}"),
+                            format!("speed={speed_name}"),
+                            format!("radius={radius_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, &color_name, &slider_struct);
+                push_dep_edges(state, &speed_name, &slider_struct);
+                push_dep_edges(state, &radius_name, &slider_struct);
+                panel_group_nodes.push(slider_struct.clone());
+
+                let toggle_struct = next_name(state, "nova_panel_toggle");
+                state.yir.nodes.push(Node {
+                    name: toggle_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaTogglePacket".to_owned(),
+                            format!("live={toggle_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &toggle_struct);
+                panel_group_nodes.push(toggle_struct.clone());
+
+                let focus_struct = next_name(state, "nova_panel_focus");
+                state.yir.nodes.push(Node {
+                    name: focus_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaFocusPacket".to_owned(),
+                            format!("slot={focus_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, focus_name, &focus_struct);
+                panel_group_nodes.push(focus_struct.clone());
+
+                vec![
+                    packet_type,
+                    format!("header={header_struct}"),
+                    format!("sliders={slider_struct}"),
+                    format!("toggle={toggle_struct}"),
+                    format!("focus={focus_struct}"),
+                ]
+            } else {
+                vec![
+                    packet_type,
+                    format!("color={color_name}"),
+                    format!("speed={speed_name}"),
+                    format!("radius_scale={radius_name}"),
+                ]
+            };
             state.yir.nodes.push(Node {
                 name: name.clone(),
                 resource: "cpu0".to_owned(),
                 op: Operation {
                     module: "cpu".to_owned(),
                     instruction: "struct".to_owned(),
-                    args: vec![
-                        format!("{unit}Packet"),
-                        format!("color={color_name}"),
-                        format!("speed={speed_name}"),
-                        format!("radius_scale={radius_name}"),
-                    ],
+                    args,
                 },
             });
             push_dep_edges(state, &color_name, &name);
             push_dep_edges(state, &speed_name, &name);
             push_dep_edges(state, &radius_name, &name);
+            for group_node in panel_group_nodes {
+                push_dep_edges(state, &group_node, &name);
+            }
+            if !is_nova_panel {
+                if let Some(accent_name) = &accent_name {
+                    push_dep_edges(state, accent_name, &name);
+                }
+                if let Some(toggle_name) = &toggle_name {
+                    push_dep_edges(state, toggle_name, &name);
+                }
+                if let Some(focus_name) = &focus_name {
+                    push_dep_edges(state, focus_name, &name);
+                }
+            }
             Ok(name)
         }
         NirExpr::DataProfileSendUplink { unit, input } => lower_data_profile_send(

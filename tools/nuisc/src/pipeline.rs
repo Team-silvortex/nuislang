@@ -246,11 +246,23 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
             color,
             speed,
             radius,
+            accent,
+            toggle_state,
+            focus_index,
             ..
         } => {
             collect_instantiated_units_expr(color, units);
             collect_instantiated_units_expr(speed, units);
             collect_instantiated_units_expr(radius, units);
+            if let Some(accent) = accent {
+                collect_instantiated_units_expr(accent, units);
+            }
+            if let Some(toggle_state) = toggle_state {
+                collect_instantiated_units_expr(toggle_state, units);
+            }
+            if let Some(focus_index) = focus_index {
+                collect_instantiated_units_expr(focus_index, units);
+            }
         }
         NirExpr::Borrow(inner)
         | NirExpr::Await(inner)

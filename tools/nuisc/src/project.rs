@@ -1033,8 +1033,8 @@ fn validate_shader_profile_for_link(
     for required_surface in shader_support_surface_contract() {
         require_declared_support_surface(&declared_support, "shader", &unit, required_surface)?;
     }
-
-    for (slot, node_name) in shader_profile_slot_targets(&unit) {
+    let packet_contract = infer_shader_packet_contract(project, &unit)?;
+    for (slot, node_name) in shader_profile_slot_targets(&unit, packet_contract.as_ref()) {
         require_declared_profile_slot(&declared_slots, "shader", &unit, slot)?;
         let exists = module.nodes.iter().any(|node| node.name == node_name);
         if !exists {
@@ -2000,13 +2000,9 @@ fn validate_shader_packet_contract(project: &LoadedProject, unit: &str) -> Resul
         ));
     }
 
-    let slot_names = [
-        "packet_color_slot",
-        "packet_speed_slot",
-        "packet_radius_slot",
-    ];
+    let slot_names = shader_packet_slot_names(&contract);
     let mut seen = BTreeSet::new();
-    for slot in slot_names {
+    for &slot in slot_names {
         let value = int_bindings.get(slot).copied().ok_or_else(|| {
             format!(
                 "project shader unit `shader.{}` requires `{}` profile const",
@@ -2028,6 +2024,25 @@ fn validate_shader_packet_contract(project: &LoadedProject, unit: &str) -> Resul
     }
 
     Ok(())
+}
+
+fn shader_packet_slot_names(contract: &ShaderPacketContract) -> &'static [&'static str] {
+    if contract.type_name == "NovaPanelPacket" {
+        &[
+            "slider_color_slot",
+            "slider_speed_slot",
+            "slider_radius_slot",
+            "header_accent_slot",
+            "toggle_live_slot",
+            "focus_slot",
+        ]
+    } else {
+        &[
+            "packet_color_slot",
+            "packet_speed_slot",
+            "packet_radius_slot",
+        ]
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2079,7 +2094,12 @@ fn collect_shader_packet_contracts_in_body(
                 ty: Some(ty),
                 value:
                     NirExpr::ShaderProfilePacket {
-                        unit: shader_unit, ..
+                        unit: shader_unit,
+                        packet_type_name,
+                        accent,
+                        toggle_state,
+                        focus_index,
+                        ..
                     },
                 ..
             }
@@ -2087,13 +2107,20 @@ fn collect_shader_packet_contracts_in_body(
                 ty,
                 value:
                     NirExpr::ShaderProfilePacket {
-                        unit: shader_unit, ..
+                        unit: shader_unit,
+                        packet_type_name,
+                        accent,
+                        toggle_state,
+                        focus_index,
+                        ..
                     },
                 ..
             } if shader_unit == unit => {
+                let extended =
+                    accent.is_some() || toggle_state.is_some() || focus_index.is_some();
                 discovered.push(ShaderPacketContract {
-                    type_name: ty.render(),
-                    field_count: 3,
+                    type_name: packet_type_name.clone().unwrap_or_else(|| ty.render()),
+                    field_count: if extended { 6 } else { 3 },
                 });
             }
             NirStmt::If {
@@ -3193,8 +3220,11 @@ fn data_support_surface_contract() -> &'static [&'static str] {
     ]
 }
 
-fn shader_profile_slot_targets(unit: &str) -> Vec<(&'static str, String)> {
-    vec![
+fn shader_profile_slot_targets(
+    unit: &str,
+    packet_contract: Option<&ShaderPacketContract>,
+) -> Vec<(&'static str, String)> {
+    let mut slots = vec![
         (
             "target",
             resolve_project_profile_target_name("shader", unit, "target"),
@@ -3216,18 +3246,6 @@ fn shader_profile_slot_targets(unit: &str) -> Vec<(&'static str, String)> {
             resolve_project_profile_target_name("shader", unit, "instance_count"),
         ),
         (
-            "packet_color_slot",
-            resolve_project_profile_target_name("shader", unit, "packet_color_slot"),
-        ),
-        (
-            "packet_speed_slot",
-            resolve_project_profile_target_name("shader", unit, "packet_speed_slot"),
-        ),
-        (
-            "packet_radius_slot",
-            resolve_project_profile_target_name("shader", unit, "packet_radius_slot"),
-        ),
-        (
             "packet_tag",
             resolve_project_profile_target_name("shader", unit, "packet_tag"),
         ),
@@ -3243,7 +3261,14 @@ fn shader_profile_slot_targets(unit: &str) -> Vec<(&'static str, String)> {
             "packet_field_count",
             resolve_project_profile_target_name("shader", unit, "packet_field_count"),
         ),
-    ]
+    ];
+    let packet_slots = packet_contract
+        .map(shader_packet_slot_names)
+        .unwrap_or(&["packet_color_slot", "packet_speed_slot", "packet_radius_slot"]);
+    for slot in packet_slots {
+        slots.push((slot, resolve_project_profile_target_name("shader", unit, slot)));
+    }
+    slots
 }
 
 fn kernel_profile_slot_targets(unit: &str) -> Vec<(&'static str, String)> {
@@ -3856,6 +3881,30 @@ fn resolve_project_profile_target_name(domain: &str, unit: &str, slot: &str) -> 
         ),
         ("shader", "packet_radius_slot") => format!(
             "project_profile_shader_{}_packet_radius_slot",
+            sanitize_ident(unit)
+        ),
+        ("shader", "slider_color_slot") => format!(
+            "project_profile_shader_{}_slider_color_slot",
+            sanitize_ident(unit)
+        ),
+        ("shader", "slider_speed_slot") => format!(
+            "project_profile_shader_{}_slider_speed_slot",
+            sanitize_ident(unit)
+        ),
+        ("shader", "slider_radius_slot") => format!(
+            "project_profile_shader_{}_slider_radius_slot",
+            sanitize_ident(unit)
+        ),
+        ("shader", "header_accent_slot") => format!(
+            "project_profile_shader_{}_header_accent_slot",
+            sanitize_ident(unit)
+        ),
+        ("shader", "toggle_live_slot") => format!(
+            "project_profile_shader_{}_toggle_live_slot",
+            sanitize_ident(unit)
+        ),
+        ("shader", "focus_slot") => format!(
+            "project_profile_shader_{}_focus_slot",
             sanitize_ident(unit)
         ),
         ("shader", "packet_tag") => {

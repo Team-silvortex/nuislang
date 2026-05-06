@@ -542,16 +542,44 @@ fn render_nir_expr(value: &NirExpr) -> String {
         ),
         NirExpr::ShaderProfilePacket {
             unit,
+            packet_type_name,
             color,
             speed,
             radius,
-        } => format!(
-            "shader_profile_packet(\"{}\", {}, {}, {})",
-            escape_debug(unit),
-            render_nir_expr(color),
-            render_nir_expr(speed),
-            render_nir_expr(radius)
-        ),
+            accent,
+            toggle_state,
+            focus_index,
+        } => {
+            let packet_callee = if packet_type_name.as_deref() == Some("NovaPanelPacket") {
+                "shader_profile_panel_packet"
+            } else {
+                "shader_profile_packet"
+            };
+            if let (Some(accent), Some(toggle_state), Some(focus_index)) =
+                (accent.as_ref(), toggle_state.as_ref(), focus_index.as_ref())
+            {
+                format!(
+                    "{}(\"{}\", {}, {}, {}, {}, {}, {})",
+                    packet_callee,
+                    escape_debug(unit),
+                    render_nir_expr(color),
+                    render_nir_expr(speed),
+                    render_nir_expr(radius),
+                    render_nir_expr(accent),
+                    render_nir_expr(toggle_state),
+                    render_nir_expr(focus_index)
+                )
+            } else {
+                format!(
+                    "{}(\"{}\", {}, {}, {})",
+                    packet_callee,
+                    escape_debug(unit),
+                    render_nir_expr(color),
+                    render_nir_expr(speed),
+                    render_nir_expr(radius)
+                )
+            }
+        }
         NirExpr::DataProfileBindCoreRef { unit } => {
             format!("data_profile_bind_core(\"{}\")", escape_debug(unit))
         }

@@ -1399,11 +1399,11 @@ fn draw_control_panel_surface(
     let packet = parse_ball_packet(value, "shader.draw_instanced")?;
     let width = width.max(32);
     let height = height.max(18);
-    let color_value = packet.color_key.rem_euclid(128) as usize;
+    let color_value = packet.accent.rem_euclid(128) as usize;
     let speed_value = packet.speed.round().abs() as usize % 128;
     let radius_value = (packet.radius_scale * 96.0).round().abs() as usize % 128;
-    let accent = control_panel_accent(packet.color_key);
-    let button_on = packet.speed.rem_euclid(2.0) >= 1.0;
+    let accent = control_panel_accent(packet.accent);
+    let button_on = packet.toggle_state != 0;
 
     let mut rows = vec![vec![' '; width]; height];
     let panel_left = 2usize;
@@ -1503,6 +1503,11 @@ fn draw_control_panel_surface(
         accent,
     );
     put_text(&mut rows, panel_left + 3, panel_bottom.saturating_sub(1), "gain");
+
+    let focus_y = panel_top + 6 + packet.focus_index.rem_euclid(3) as usize * 4;
+    if focus_y > 0 {
+        put_text(&mut rows, slider_left.saturating_sub(3), focus_y, ">");
+    }
 
     let rows = rows
         .into_iter()
@@ -1839,6 +1844,9 @@ struct BallPacket {
     color_key: i64,
     speed: f32,
     radius_scale: f32,
+    accent: i64,
+    toggle_state: i64,
+    focus_index: i64,
 }
 
 fn parse_ball_packet(value: &Value, op: &str) -> Result<BallPacket, String> {
@@ -1854,6 +1862,9 @@ fn parse_ball_packet(value: &Value, op: &str) -> Result<BallPacket, String> {
                 color_key,
                 speed,
                 radius_scale,
+                accent: color_key,
+                toggle_state: if speed.round() as i64 % 2 == 0 { 0 } else { 1 },
+                focus_index: color_key.rem_euclid(3),
             })
         }
         Value::Struct(packet) => parse_ball_packet_struct(packet, op),
@@ -1864,31 +1875,84 @@ fn parse_ball_packet(value: &Value, op: &str) -> Result<BallPacket, String> {
 }
 
 fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket, String> {
-    let color = packet
-        .fields
-        .iter()
-        .find(|(name, _)| name == "color")
-        .map(|(_, value)| value)
+    let color = find_packet_field(packet, &["color", "slider_color"], &["sliders"], &["color"])
         .ok_or_else(|| format!("{op} struct packet is missing `color` field"))?;
-    let speed = packet
-        .fields
-        .iter()
-        .find(|(name, _)| name == "speed")
-        .map(|(_, value)| value)
+    let speed = find_packet_field(packet, &["speed", "slider_speed"], &["sliders"], &["speed"])
         .ok_or_else(|| format!("{op} struct packet is missing `speed` field"))?;
-    let radius_scale = packet
-        .fields
-        .iter()
-        .find(|(name, _)| name == "radius_scale")
-        .map(|(_, value)| scalar_to_f32(value, op))
+    let radius_scale = find_packet_field(
+        packet,
+        &["radius_scale", "slider_radius"],
+        &["sliders"],
+        &["radius"],
+    )
+        .map(|value| scalar_to_f32(value, op))
         .transpose()?
         .unwrap_or(1.0);
+    let accent = find_packet_field(
+        packet,
+        &["accent", "header_accent"],
+        &["header"],
+        &["accent"],
+    )
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or_else(|| scalar_to_color_key(color, op).unwrap_or(0));
+    let toggle_state = find_packet_field(
+        packet,
+        &["toggle_state", "toggle_live"],
+        &["toggle"],
+        &["live"],
+    )
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(1);
+    let focus_index = find_packet_field(
+        packet,
+        &["focus_index", "focus_slot"],
+        &["focus"],
+        &["slot"],
+    )
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(0);
 
     Ok(BallPacket {
         color_key: scalar_to_color_key(color, op)?,
         speed: scalar_to_f32(speed, op)?,
         radius_scale,
+        accent,
+        toggle_state,
+        focus_index,
     })
+}
+
+fn find_packet_field<'a>(
+    packet: &'a StructValue,
+    flat_names: &[&str],
+    nested_struct_names: &[&str],
+    nested_field_names: &[&str],
+) -> Option<&'a Value> {
+    packet
+        .fields
+        .iter()
+        .find(|(name, _)| flat_names.iter().any(|candidate| name == candidate))
+        .map(|(_, value)| value)
+        .or_else(|| {
+            packet
+                .fields
+                .iter()
+                .find(|(name, _)| nested_struct_names.iter().any(|candidate| name == candidate))
+                .and_then(|(_, value)| match value {
+                    Value::Struct(inner) => inner
+                        .fields
+                        .iter()
+                        .find(|(name, _)| {
+                            nested_field_names.iter().any(|candidate| name == candidate)
+                        })
+                        .map(|(_, value)| value),
+                    _ => None,
+                })
+        })
 }
 
 fn scalar_to_color_key(value: &Value, op: &str) -> Result<i64, String> {
