@@ -120,6 +120,7 @@ Current high-signal architectural facts:
 * `abi_targets` now live in `nustar` manifests and drive auto ABI selection, CLI overrides, packaging metadata, and loader contracts.
 * default lane policy also belongs to `nustar` manifests; `nuisc` should only apply that policy plus narrow fallbacks.
 * `data.handle_table` remains an indirection/resource-binding surface, not a place to own large payload blobs directly.
+* `data.fabric` is being kept on a strict seven-family primitive model: `bind`, `handle`, `marker`, `move`, `window`, `pipe`, and `observe`. Higher-level helpers must lower into those families rather than invent new primitive classes.
 * current Fabric host integration is intentionally thin and AOT-first, with static typed action tables rather than a heavy runtime metadata graph.
 * async/result semantics are being normalized into `yir-core`, even though the concrete entry ops are still currently surfaced through `cpu.*`.
 

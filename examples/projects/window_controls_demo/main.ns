@@ -34,11 +34,23 @@ mod cpu Main {
     let curved_panel_radius: i64 = HostRenderCurves.radius_curve(base_panel_radius);
     let panel_radius: i64 = HostRenderCurves.mix_tick(curved_panel_radius, frame_tick);
 
+    let control_buffer: ref Buffer = alloc_buffer(3, 0);
+    let control_window: WindowMut<i64> = data_copy_window(control_buffer, 0, 3);
+    let control_window_color: WindowMut<i64> = data_write_window(control_window, 0, panel_color);
+    let control_window_speed: WindowMut<i64> =
+      data_write_window(control_window_color, 1, panel_speed);
+    let control_window_radius: WindowMut<i64> =
+      data_write_window(control_window_speed, 2, panel_radius);
+    let frozen_controls: Window<i64> = data_freeze_window(control_window_radius);
+    let packed_color: i64 = data_read_window(frozen_controls, 0);
+    let packed_speed: i64 = data_read_window(frozen_controls, 1);
+    let packed_radius: i64 = data_read_window(frozen_controls, 2);
+
     let render_controls = shader_profile_packet(
       "SurfaceShader",
-      panel_color,
-      panel_speed,
-      panel_radius
+      packed_color,
+      packed_speed,
+      packed_radius
     );
 
     data_profile_bind_core("FabricPlane");

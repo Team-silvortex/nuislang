@@ -13,12 +13,29 @@ pub struct GalaxyManifest {
     pub name: String,
     pub version: String,
     pub package_kind: String,
+    pub framework: Option<String>,
     pub project: String,
     pub summary: String,
     pub license: String,
     pub repository: String,
     pub authors: Vec<String>,
     pub include: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct NsNovaManifest {
+    pub framework_schema: String,
+    pub framework: String,
+    pub project: String,
+    pub entry_cpu_unit: Option<String>,
+    pub primary_data_unit: Option<String>,
+    pub primary_shader_unit: Option<String>,
+    pub primary_kernel_unit: Option<String>,
+    pub render_links: Vec<String>,
+    pub cpu_units: Vec<String>,
+    pub data_units: Vec<String>,
+    pub shader_units: Vec<String>,
+    pub kernel_units: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -136,7 +153,7 @@ pub struct GalaxyDoctorReport {
     pub dependencies: Vec<GalaxyDoctorDependency>,
 }
 
-pub fn init(input: &Path) -> Result<PathBuf, String> {
+pub fn init(input: &Path, framework: Option<&str>) -> Result<PathBuf, String> {
     ensure_local_layout()?;
     let project = nuisc::project::load_project(input)?;
     let manifest_path = project.root.join("galaxy.toml");
@@ -147,9 +164,15 @@ pub fn init(input: &Path) -> Result<PathBuf, String> {
         ));
     }
 
-    let manifest = default_manifest(&project)?;
+    let manifest = default_manifest(&project, framework)?;
     fs::write(&manifest_path, render_manifest(&manifest))
         .map_err(|error| format!("failed to write `{}`: {error}", manifest_path.display()))?;
+    if framework == Some("ns-nova") {
+        let nova_path = project.root.join("ns-nova.toml");
+        let nova_manifest = default_ns_nova_manifest(&project);
+        fs::write(&nova_path, render_ns_nova_manifest(&nova_manifest))
+            .map_err(|error| format!("failed to write `{}`: {error}", nova_path.display()))?;
+    }
     Ok(manifest_path)
 }
 
@@ -175,6 +198,41 @@ pub fn check(input: &Path) -> Result<CheckedGalaxy, String> {
                 manifest_path.display(),
                 path.display()
             ));
+        }
+    }
+    if manifest.framework.as_deref() == Some("ns-nova") {
+        let profile_path = root.join("ns-nova.toml");
+        let profile_source = fs::read_to_string(&profile_path)
+            .map_err(|error| format!("failed to read `{}`: {error}", profile_path.display()))?;
+        let profile = parse_ns_nova_manifest(&profile_source, &profile_path)?;
+        if profile.project != "nuis.toml" {
+            return Err(format!(
+                "ns-nova profile `{}` must point at `nuis.toml`, got `{}`",
+                profile_path.display(),
+                profile.project
+            ));
+        }
+        let declared = project
+            .modules
+            .iter()
+            .map(|module| format!("{}.{}", module.ast.domain, module.ast.unit))
+            .collect::<BTreeSet<_>>();
+        for unit in [
+            profile.entry_cpu_unit.as_deref(),
+            profile.primary_data_unit.as_deref(),
+            profile.primary_shader_unit.as_deref(),
+            profile.primary_kernel_unit.as_deref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            if !declared.contains(unit) {
+                return Err(format!(
+                    "ns-nova profile `{}` references missing project unit `{}`",
+                    profile_path.display(),
+                    unit
+                ));
+            }
         }
     }
 
@@ -625,7 +683,10 @@ fn nuis_home_root() -> PathBuf {
     PathBuf::from(home).join(".nuis")
 }
 
-fn default_manifest(project: &nuisc::project::LoadedProject) -> Result<GalaxyManifest, String> {
+fn default_manifest(
+    project: &nuisc::project::LoadedProject,
+    framework: Option<&str>,
+) -> Result<GalaxyManifest, String> {
     let mut include = vec!["nuis.toml".to_owned()];
     for module in &project.modules {
         let relative = module
@@ -638,23 +699,121 @@ fn default_manifest(project: &nuisc::project::LoadedProject) -> Result<GalaxyMan
             include.push(relative);
         }
     }
+    if framework == Some("ns-nova") && !include.iter().any(|item| item == "ns-nova.toml") {
+        include.push("ns-nova.toml".to_owned());
+    }
     include.sort();
+
+    let framework = framework.map(|value| value.trim().to_owned());
+    let package_kind = if framework.as_deref() == Some("ns-nova") {
+        "nuis-framework".to_owned()
+    } else {
+        "nuis-project".to_owned()
+    };
+    let summary = if framework.as_deref() == Some("ns-nova") {
+        format!(
+            "Galaxy package for ns-nova framework project `{}`",
+            project.manifest.name
+        )
+    } else {
+        format!(
+            "Galaxy package for nuis project `{}`",
+            project.manifest.name
+        )
+    };
 
     Ok(GalaxyManifest {
         manifest_schema: "galaxy-manifest-v1".to_owned(),
         name: project.manifest.name.clone(),
         version: "0.1.0".to_owned(),
-        package_kind: "nuis-project".to_owned(),
+        package_kind,
+        framework,
         project: "nuis.toml".to_owned(),
-        summary: format!(
-            "Galaxy package for nuis project `{}`",
-            project.manifest.name
-        ),
+        summary,
         license: "UNLICENSED".to_owned(),
         repository: String::new(),
         authors: Vec::new(),
         include,
     })
+}
+
+fn default_ns_nova_manifest(project: &nuisc::project::LoadedProject) -> NsNovaManifest {
+    let mut cpu_units = Vec::new();
+    let mut data_units = Vec::new();
+    let mut shader_units = Vec::new();
+    let mut kernel_units = Vec::new();
+    let mut entry_cpu_unit = None;
+    for module in &project.modules {
+        let entry = module.ast.unit.clone();
+        match module.ast.domain.as_str() {
+            "cpu" => {
+                if module.path == project.entry_path {
+                    entry_cpu_unit = Some(format!("cpu.{}", module.ast.unit));
+                }
+                cpu_units.push(entry)
+            }
+            "data" => data_units.push(entry),
+            "shader" => shader_units.push(entry),
+            "kernel" => kernel_units.push(entry),
+            _ => {}
+        }
+    }
+    cpu_units.sort();
+    data_units.sort();
+    shader_units.sort();
+    kernel_units.sort();
+    let primary_data_unit = project
+        .manifest
+        .links
+        .iter()
+        .find_map(|link| link.via.as_ref().map(|via| via.trim().to_owned()));
+    let primary_shader_unit = project
+        .manifest
+        .links
+        .iter()
+        .find_map(|link| link.from.starts_with("shader.").then(|| link.from.clone()))
+        .or_else(|| {
+            project
+                .manifest
+                .links
+                .iter()
+                .find_map(|link| link.to.starts_with("shader.").then(|| link.to.clone()))
+        });
+    let primary_kernel_unit = project
+        .manifest
+        .links
+        .iter()
+        .find_map(|link| link.from.starts_with("kernel.").then(|| link.from.clone()))
+        .or_else(|| {
+            project
+                .manifest
+                .links
+                .iter()
+                .find_map(|link| link.to.starts_with("kernel.").then(|| link.to.clone()))
+        });
+    let render_links = project
+        .manifest
+        .links
+        .iter()
+        .map(|link| match &link.via {
+            Some(via) => format!("{} -> {} via {}", link.from, link.to, via),
+            None => format!("{} -> {}", link.from, link.to),
+        })
+        .collect::<Vec<_>>();
+    NsNovaManifest {
+        framework_schema: "ns-nova-manifest-v1".to_owned(),
+        framework: "ns-nova".to_owned(),
+        project: "nuis.toml".to_owned(),
+        entry_cpu_unit,
+        primary_data_unit,
+        primary_shader_unit,
+        primary_kernel_unit,
+        render_links,
+        cpu_units,
+        data_units,
+        shader_units,
+        kernel_units,
+    }
 }
 
 fn resolve_galaxy_manifest(input: &Path) -> Result<(PathBuf, PathBuf), String> {
@@ -828,19 +987,56 @@ fn extract_bundle(bytes: &[u8], path: &Path, output: &Path) -> Result<(), String
 }
 
 fn render_manifest(manifest: &GalaxyManifest) -> String {
-    format!(
-        "manifest_schema = \"{}\"\nname = \"{}\"\nversion = \"{}\"\npackage_kind = \"{}\"\nproject = \"{}\"\nsummary = \"{}\"\nlicense = \"{}\"\nrepository = \"{}\"\nauthors = {}\ninclude = {}\n",
+    let mut source = format!(
+        "manifest_schema = \"{}\"\nname = \"{}\"\nversion = \"{}\"\npackage_kind = \"{}\"\n",
         manifest.manifest_schema,
         escape(&manifest.name),
         escape(&manifest.version),
         escape(&manifest.package_kind),
+    );
+    if let Some(framework) = &manifest.framework {
+        source.push_str(&format!("framework = \"{}\"\n", escape(framework)));
+    }
+    source.push_str(&format!(
+        "project = \"{}\"\nsummary = \"{}\"\nlicense = \"{}\"\nrepository = \"{}\"\nauthors = {}\ninclude = {}\n",
         escape(&manifest.project),
         escape(&manifest.summary),
         escape(&manifest.license),
         escape(&manifest.repository),
         render_string_array(&manifest.authors),
         render_string_array(&manifest.include),
-    )
+    ));
+    source
+}
+
+fn render_ns_nova_manifest(manifest: &NsNovaManifest) -> String {
+    let mut source = format!(
+        "framework_schema = \"{}\"\nframework = \"{}\"\nproject = \"{}\"\n",
+        escape(&manifest.framework_schema),
+        escape(&manifest.framework),
+        escape(&manifest.project),
+    );
+    if let Some(value) = &manifest.entry_cpu_unit {
+        source.push_str(&format!("entry_cpu_unit = \"{}\"\n", escape(value)));
+    }
+    if let Some(value) = &manifest.primary_data_unit {
+        source.push_str(&format!("primary_data_unit = \"{}\"\n", escape(value)));
+    }
+    if let Some(value) = &manifest.primary_shader_unit {
+        source.push_str(&format!("primary_shader_unit = \"{}\"\n", escape(value)));
+    }
+    if let Some(value) = &manifest.primary_kernel_unit {
+        source.push_str(&format!("primary_kernel_unit = \"{}\"\n", escape(value)));
+    }
+    source.push_str(&format!(
+        "render_links = {}\ncpu_units = {}\ndata_units = {}\nshader_units = {}\nkernel_units = {}\n",
+        render_string_array(&manifest.render_links),
+        render_string_array(&manifest.cpu_units),
+        render_string_array(&manifest.data_units),
+        render_string_array(&manifest.shader_units),
+        render_string_array(&manifest.kernel_units),
+    ));
+    source
 }
 
 fn parse_manifest(source: &str, path: &Path) -> Result<GalaxyManifest, String> {
@@ -849,12 +1045,30 @@ fn parse_manifest(source: &str, path: &Path) -> Result<GalaxyManifest, String> {
         name: parse_required_string(source, "name", path)?,
         version: parse_required_string(source, "version", path)?,
         package_kind: parse_required_string(source, "package_kind", path)?,
+        framework: parse_optional_string(source, "framework"),
         project: parse_required_string(source, "project", path)?,
         summary: parse_optional_string(source, "summary").unwrap_or_default(),
         license: parse_optional_string(source, "license").unwrap_or_default(),
         repository: parse_optional_string(source, "repository").unwrap_or_default(),
         authors: parse_optional_string_array(source, "authors").unwrap_or_default(),
         include: parse_optional_string_array(source, "include").unwrap_or_default(),
+    })
+}
+
+fn parse_ns_nova_manifest(source: &str, path: &Path) -> Result<NsNovaManifest, String> {
+    Ok(NsNovaManifest {
+        framework_schema: parse_required_string(source, "framework_schema", path)?,
+        framework: parse_required_string(source, "framework", path)?,
+        project: parse_required_string(source, "project", path)?,
+        entry_cpu_unit: parse_optional_string(source, "entry_cpu_unit"),
+        primary_data_unit: parse_optional_string(source, "primary_data_unit"),
+        primary_shader_unit: parse_optional_string(source, "primary_shader_unit"),
+        primary_kernel_unit: parse_optional_string(source, "primary_kernel_unit"),
+        render_links: parse_optional_string_array(source, "render_links").unwrap_or_default(),
+        cpu_units: parse_optional_string_array(source, "cpu_units").unwrap_or_default(),
+        data_units: parse_optional_string_array(source, "data_units").unwrap_or_default(),
+        shader_units: parse_optional_string_array(source, "shader_units").unwrap_or_default(),
+        kernel_units: parse_optional_string_array(source, "kernel_units").unwrap_or_default(),
     })
 }
 
@@ -907,6 +1121,87 @@ fn parse_optional_string_array(source: &str, key: &str) -> Option<Vec<String>> {
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        escape, parse_manifest, parse_ns_nova_manifest, render_manifest, render_ns_nova_manifest,
+        GalaxyManifest, NsNovaManifest,
+    };
+    use std::path::Path;
+
+    #[test]
+    fn renders_and_parses_optional_framework_metadata() {
+        let manifest = GalaxyManifest {
+            manifest_schema: "galaxy-manifest-v1".to_owned(),
+            name: "nova-demo".to_owned(),
+            version: "0.1.0".to_owned(),
+            package_kind: "nuis-framework".to_owned(),
+            framework: Some("ns-nova".to_owned()),
+            project: "nuis.toml".to_owned(),
+            summary: "Galaxy package for ns-nova framework project `nova-demo`".to_owned(),
+            license: "UNLICENSED".to_owned(),
+            repository: String::new(),
+            authors: vec!["OpenAI".to_owned()],
+            include: vec!["nuis.toml".to_owned(), "main.ns".to_owned()],
+        };
+        let rendered = render_manifest(&manifest);
+        assert!(rendered.contains("framework = \"ns-nova\""));
+        let parsed = parse_manifest(&rendered, Path::new("galaxy.toml")).unwrap();
+        assert_eq!(parsed.framework.as_deref(), Some("ns-nova"));
+        assert_eq!(parsed.package_kind, "nuis-framework");
+    }
+
+    #[test]
+    fn renders_without_framework_line_when_absent() {
+        let manifest = GalaxyManifest {
+            manifest_schema: "galaxy-manifest-v1".to_owned(),
+            name: "plain-demo".to_owned(),
+            version: "0.1.0".to_owned(),
+            package_kind: "nuis-project".to_owned(),
+            framework: None,
+            project: "nuis.toml".to_owned(),
+            summary: "Galaxy package for nuis project `plain-demo`".to_owned(),
+            license: "UNLICENSED".to_owned(),
+            repository: String::new(),
+            authors: Vec::new(),
+            include: vec!["nuis.toml".to_owned()],
+        };
+        let rendered = render_manifest(&manifest);
+        assert!(!rendered.contains("\nframework = "));
+        let parsed = parse_manifest(&rendered, Path::new("galaxy.toml")).unwrap();
+        assert_eq!(parsed.framework, None);
+    }
+
+    #[test]
+    fn escape_still_handles_quotes_and_slashes() {
+        assert_eq!(escape("a\\b\"c"), "a\\\\b\\\"c");
+    }
+
+    #[test]
+    fn renders_and_parses_ns_nova_profile() {
+        let manifest = NsNovaManifest {
+            framework_schema: "ns-nova-manifest-v1".to_owned(),
+            framework: "ns-nova".to_owned(),
+            project: "nuis.toml".to_owned(),
+            entry_cpu_unit: Some("cpu.Main".to_owned()),
+            primary_data_unit: Some("data.FabricPlane".to_owned()),
+            primary_shader_unit: Some("shader.SurfaceShader".to_owned()),
+            primary_kernel_unit: None,
+            render_links: vec![
+                "cpu.Main -> shader.SurfaceShader via data.FabricPlane".to_owned(),
+                "shader.SurfaceShader -> cpu.Main via data.FabricPlane".to_owned(),
+            ],
+            cpu_units: vec!["Main".to_owned()],
+            data_units: vec!["FabricPlane".to_owned()],
+            shader_units: vec!["SurfaceShader".to_owned()],
+            kernel_units: Vec::new(),
+        };
+        let rendered = render_ns_nova_manifest(&manifest);
+        let parsed = parse_ns_nova_manifest(&rendered, Path::new("ns-nova.toml")).unwrap();
+        assert_eq!(parsed, manifest);
+    }
 }
 
 fn parse_local_index_entry(source: &str, path: &Path) -> Result<LocalGalaxyIndexEntry, String> {

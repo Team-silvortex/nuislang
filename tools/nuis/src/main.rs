@@ -279,10 +279,13 @@ fn run() -> Result<(), String> {
             }
         }
         cli::CommandKind::Galaxy(command) => match command {
-            cli::GalaxyCommand::Init { input } => {
-                let manifest_path = galaxy::init(&input)?;
+            cli::GalaxyCommand::Init { input, framework } => {
+                let manifest_path = galaxy::init(&input, framework.as_deref())?;
                 println!("initialized galaxy package");
                 println!("  manifest: {}", manifest_path.display());
+                if let Some(framework) = framework {
+                    println!("  framework: {}", framework);
+                }
                 println!("  local_index: {}", galaxy::local_index_root().display());
             }
             cli::GalaxyCommand::Check { input } => {
@@ -292,6 +295,9 @@ fn run() -> Result<(), String> {
                 println!("  manifest: {}", checked.manifest_path.display());
                 println!("  version: {}", checked.manifest.version);
                 println!("  package_kind: {}", checked.manifest.package_kind);
+                if let Some(framework) = &checked.manifest.framework {
+                    println!("  framework: {}", framework);
+                }
                 println!("  project: {}", checked.manifest.project);
                 println!("  include_files: {}", checked.include_files.len());
                 println!("  local_index: {}", galaxy::local_index_root().display());
@@ -315,6 +321,9 @@ fn run() -> Result<(), String> {
                 println!("  name: {}", inspected.manifest.name);
                 println!("  version: {}", inspected.manifest.version);
                 println!("  package_kind: {}", inspected.manifest.package_kind);
+                if let Some(framework) = &inspected.manifest.framework {
+                    println!("  framework: {}", framework);
+                }
                 println!("  project: {}", inspected.manifest.project);
                 println!("  summary: {}", inspected.manifest.summary);
                 println!("  entries: {}", inspected.entries.len());
@@ -453,6 +462,9 @@ fn run() -> Result<(), String> {
                 println!("  name: {}", inspected.manifest.name);
                 println!("  version: {}", inspected.manifest.version);
                 println!("  package_kind: {}", inspected.manifest.package_kind);
+                if let Some(framework) = &inspected.manifest.framework {
+                    println!("  framework: {}", framework);
+                }
                 println!("  project: {}", inspected.manifest.project);
                 println!("  summary: {}", inspected.manifest.summary);
                 println!("  entries: {}", inspected.entries.len());
@@ -513,7 +525,7 @@ fn print_help() {
     println!("  nuis rc <status|start|stop|track|projects|versions> [...]");
     println!("  nuis project-status [project-dir|nuis.toml]");
     println!("  nuis project-lock-abi [project-dir|nuis.toml]");
-    println!("  nuis galaxy init [project-dir]");
+    println!("  nuis galaxy init [project-dir] [--framework <name>]");
     println!("  nuis galaxy check [project-dir|galaxy.toml]");
     println!("  nuis galaxy pack [project-dir|galaxy.toml] [output.galaxy]");
     println!("  nuis galaxy inspect <input.galaxy>");

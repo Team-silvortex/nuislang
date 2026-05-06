@@ -1391,6 +1391,130 @@ fn draw_sphere_surface(value: &Value) -> Result<FrameSurface, String> {
     draw_sphere_surface_with_size(value, 48, 32)
 }
 
+fn draw_control_panel_surface(
+    value: &Value,
+    width: usize,
+    height: usize,
+) -> Result<FrameSurface, String> {
+    let packet = parse_ball_packet(value, "shader.draw_instanced")?;
+    let width = width.max(32);
+    let height = height.max(18);
+    let color_value = packet.color_key.rem_euclid(128) as usize;
+    let speed_value = packet.speed.round().abs() as usize % 128;
+    let radius_value = (packet.radius_scale * 96.0).round().abs() as usize % 128;
+    let accent = control_panel_accent(packet.color_key);
+    let button_on = packet.speed.rem_euclid(2.0) >= 1.0;
+
+    let mut rows = vec![vec![' '; width]; height];
+    let panel_left = 2usize;
+    let panel_top = 1usize;
+    let panel_right = width.saturating_sub(3);
+    let panel_bottom = height.saturating_sub(2);
+
+    draw_box(
+        &mut rows,
+        panel_left,
+        panel_top,
+        panel_right,
+        panel_bottom,
+        '/',
+        '\\',
+        '\\',
+        '/',
+        '-',
+        '|',
+    );
+    fill_rect(
+        &mut rows,
+        panel_left + 1,
+        panel_top + 1,
+        panel_right.saturating_sub(1),
+        panel_bottom.saturating_sub(1),
+        '.',
+    );
+    put_text(&mut rows, panel_left + 3, panel_top + 2, "ns-nova control panel");
+
+    let slider_left = panel_left + 16;
+    let slider_right = panel_right.saturating_sub(12);
+    let slider_width = slider_right.saturating_sub(slider_left + 1).max(8);
+    let slider_specs = [
+        ("COLOR", color_value, panel_top + 6),
+        ("SPEED", speed_value, panel_top + 10),
+        ("RADIUS", radius_value, panel_top + 14),
+    ];
+    for (label, value, y) in slider_specs {
+        put_text(&mut rows, panel_left + 3, y, label);
+        draw_slider(
+            &mut rows,
+            slider_left,
+            y,
+            slider_width,
+            value.min(127),
+            accent,
+        );
+        put_text(
+            &mut rows,
+            slider_right + 2,
+            y,
+            &format!("{:>3}", value.min(127)),
+        );
+    }
+
+    let button_left = panel_right.saturating_sub(15);
+    let button_right = panel_right.saturating_sub(4);
+    let button_top = panel_top + 3;
+    let button_bottom = button_top + 3;
+    draw_box(
+        &mut rows,
+        button_left,
+        button_top,
+        button_right,
+        button_bottom,
+        '[',
+        ']',
+        ']',
+        '[',
+        '=',
+        '|',
+    );
+    fill_rect(
+        &mut rows,
+        button_left + 1,
+        button_top + 1,
+        button_right.saturating_sub(1),
+        button_bottom.saturating_sub(1),
+        if button_on { accent } else { ':' },
+    );
+    put_text(
+        &mut rows,
+        button_left + 2,
+        button_top + 1,
+        if button_on { "LIVE" } else { "IDLE" },
+    );
+
+    let knob_center_x = panel_left + 8;
+    let knob_center_y = panel_bottom.saturating_sub(5);
+    draw_knob(
+        &mut rows,
+        knob_center_x,
+        knob_center_y,
+        4,
+        radius_value.min(127),
+        accent,
+    );
+    put_text(&mut rows, panel_left + 3, panel_bottom.saturating_sub(1), "gain");
+
+    let rows = rows
+        .into_iter()
+        .map(|row| row.into_iter().collect::<String>())
+        .collect::<Vec<_>>();
+    Ok(FrameSurface {
+        width,
+        height,
+        rows,
+    })
+}
+
 fn draw_render_pass_surface(
     pass: &RenderPass,
     packet: &Value,
@@ -1437,6 +1561,9 @@ fn draw_render_pass_surface(
     }
 
     let mut frame = match pass.pipeline.shading_model.as_str() {
+        "control_panel" | "nova_controls" | "ui_controls" => {
+            draw_control_panel_surface(packet, width, height)
+        }
         "ball" | "sphere" | "lit_sphere" => draw_sphere_surface_with_size(packet, width, height),
         _ => draw_ball_surface_with_size(packet, width, height),
     }?;
@@ -1556,6 +1683,154 @@ fn sphere_palette(color: i64) -> &'static [char] {
         0 => &[':', '-', '=', '+', '*', 'o'],
         1 => &[':', '-', '=', '+', '*', 'O'],
         _ => &[':', '-', '=', '+', '*', '@'],
+    }
+}
+
+fn control_panel_accent(color: i64) -> char {
+    match color.rem_euclid(4) {
+        0 => '#',
+        1 => '*',
+        2 => '@',
+        _ => '+',
+    }
+}
+
+fn draw_slider(
+    rows: &mut [Vec<char>],
+    left: usize,
+    y: usize,
+    width: usize,
+    value: usize,
+    accent: char,
+) {
+    if y >= rows.len() || left >= rows[y].len() || width < 4 {
+        return;
+    }
+    let right = left.saturating_add(width.saturating_sub(1));
+    if right >= rows[y].len() {
+        return;
+    }
+    rows[y][left] = '[';
+    rows[y][right] = ']';
+    for x in (left + 1)..right {
+        rows[y][x] = '-';
+    }
+    let inner = right.saturating_sub(left + 1).max(1);
+    let fill = (value.min(127) * inner) / 127;
+    for x in 0..fill.min(inner) {
+        rows[y][left + 1 + x] = '=';
+    }
+    let knob_x = left + 1 + fill.min(inner.saturating_sub(1));
+    rows[y][knob_x] = accent;
+}
+
+fn draw_knob(
+    rows: &mut [Vec<char>],
+    cx: usize,
+    cy: usize,
+    radius: usize,
+    value: usize,
+    accent: char,
+) {
+    if rows.is_empty() || radius == 0 {
+        return;
+    }
+    let angle = (value.min(127) as f32 / 127.0) * std::f32::consts::PI * 1.5
+        + std::f32::consts::PI * 0.75;
+    let needle_x = cx as f32 + angle.cos() * radius as f32 * 0.7;
+    let needle_y = cy as f32 + angle.sin() * radius as f32 * 0.7;
+    for y in cy.saturating_sub(radius)..=(cy + radius).min(rows.len().saturating_sub(1)) {
+        for x in cx.saturating_sub(radius)..=(cx + radius).min(rows[y].len().saturating_sub(1)) {
+            let dx = x as isize - cx as isize;
+            let dy = y as isize - cy as isize;
+            let dist2 = dx * dx + dy * dy;
+            let r2 = (radius as isize) * (radius as isize);
+            if dist2 <= r2 && dist2 >= r2.saturating_sub(radius as isize * 2) {
+                rows[y][x] = 'o';
+            }
+        }
+    }
+    if cy < rows.len() && cx < rows[cy].len() {
+        rows[cy][cx] = accent;
+    }
+    let nx = needle_x.round().clamp(0.0, (rows[0].len().saturating_sub(1)) as f32) as usize;
+    let ny = needle_y.round().clamp(0.0, (rows.len().saturating_sub(1)) as f32) as usize;
+    stamp_line(rows, cx, cy, nx, ny, accent);
+    if ny < rows.len() && nx < rows[ny].len() {
+        rows[ny][nx] = accent;
+    }
+}
+
+fn draw_box(
+    rows: &mut [Vec<char>],
+    left: usize,
+    top: usize,
+    right: usize,
+    bottom: usize,
+    tl: char,
+    tr: char,
+    br: char,
+    bl: char,
+    horizontal: char,
+    vertical: char,
+) {
+    if rows.is_empty() || top >= rows.len() || bottom >= rows.len() || left >= right {
+        return;
+    }
+    for x in left..=right.min(rows[top].len().saturating_sub(1)) {
+        rows[top][x] = horizontal;
+        rows[bottom][x] = horizontal;
+    }
+    for y in top..=bottom {
+        if left < rows[y].len() {
+            rows[y][left] = vertical;
+        }
+        if right < rows[y].len() {
+            rows[y][right] = vertical;
+        }
+    }
+    if left < rows[top].len() {
+        rows[top][left] = tl;
+    }
+    if right < rows[top].len() {
+        rows[top][right] = tr;
+    }
+    if right < rows[bottom].len() {
+        rows[bottom][right] = br;
+    }
+    if left < rows[bottom].len() {
+        rows[bottom][left] = bl;
+    }
+}
+
+fn fill_rect(
+    rows: &mut [Vec<char>],
+    left: usize,
+    top: usize,
+    right: usize,
+    bottom: usize,
+    fill: char,
+) {
+    if rows.is_empty() {
+        return;
+    }
+    for y in top..=bottom.min(rows.len().saturating_sub(1)) {
+        for x in left..=right.min(rows[y].len().saturating_sub(1)) {
+            rows[y][x] = fill;
+        }
+    }
+}
+
+fn put_text(rows: &mut [Vec<char>], left: usize, y: usize, text: &str) {
+    if y >= rows.len() {
+        return;
+    }
+    for (offset, ch) in text.chars().enumerate() {
+        let x = left + offset;
+        if x >= rows[y].len() {
+            break;
+        }
+        rows[y][x] = ch;
     }
 }
 

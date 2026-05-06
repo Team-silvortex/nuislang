@@ -162,6 +162,31 @@ pub enum SemanticOp {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DataFabricPrimitive {
+    Bind,
+    Handle,
+    Marker,
+    Move,
+    Window,
+    Pipe,
+    Observe,
+}
+
+impl DataFabricPrimitive {
+    pub fn render(self) -> &'static str {
+        match self {
+            Self::Bind => "bind",
+            Self::Handle => "handle",
+            Self::Marker => "marker",
+            Self::Move => "move",
+            Self::Window => "window",
+            Self::Pipe => "pipe",
+            Self::Observe => "observe",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AsyncCoreOp {
     Await,
     ScheduleCall,
@@ -342,6 +367,29 @@ impl Operation {
                 | SemanticOp::DataFreezeWindow
                 | SemanticOp::DataImmutableWindow
         )
+    }
+
+    pub fn data_fabric_primitive(&self) -> Option<DataFabricPrimitive> {
+        match self.semantic_op() {
+            SemanticOp::DataBindCore => Some(DataFabricPrimitive::Bind),
+            SemanticOp::DataHandleTable => Some(DataFabricPrimitive::Handle),
+            SemanticOp::DataMarker => Some(DataFabricPrimitive::Marker),
+            SemanticOp::DataMove => Some(DataFabricPrimitive::Move),
+            SemanticOp::DataCopyWindow
+            | SemanticOp::DataReadWindow
+            | SemanticOp::DataWriteWindow
+            | SemanticOp::DataFreezeWindow
+            | SemanticOp::DataImmutableWindow => Some(DataFabricPrimitive::Window),
+            SemanticOp::DataOutputPipe | SemanticOp::DataInputPipe => {
+                Some(DataFabricPrimitive::Pipe)
+            }
+            SemanticOp::DataObserve
+            | SemanticOp::DataIsReady
+            | SemanticOp::DataIsMoved
+            | SemanticOp::DataIsWindowed
+            | SemanticOp::DataValue => Some(DataFabricPrimitive::Observe),
+            _ => None,
+        }
     }
 
     pub fn async_core_op(&self) -> Option<AsyncCoreOp> {
@@ -881,11 +929,12 @@ pub fn glm_profile_for_operation(op: &Operation) -> GlmNodeProfile {
 #[cfg(test)]
 mod tests {
     use super::{
-        AsyncCoreOp, CpuLlvmLoweringClass, DataFlowState, DataMod, DataResultHandle, DataWindow,
-        ExecutionState, GlmEffect, GlmUseMode, GlmValueClass, KernelFlowState,
-        KernelResultHandle, Node, Operation, OperationDomainFamily, RegisteredMod, Resource,
-        ResourceKind, SemanticOp, ShaderFlowState, ShaderResultHandle, TaskLifecycleState,
-        TaskResultHandle, Value, YirResultFamily, YirResultRole, YirResultState,
+        AsyncCoreOp, CpuLlvmLoweringClass, DataFabricPrimitive, DataFlowState, DataMod,
+        DataResultHandle, DataWindow, ExecutionState, GlmEffect, GlmUseMode, GlmValueClass,
+        KernelFlowState, KernelResultHandle, Node, Operation, OperationDomainFamily,
+        RegisteredMod, Resource, ResourceKind, SemanticOp, ShaderFlowState, ShaderResultHandle,
+        TaskLifecycleState, TaskResultHandle, Value, YirResultFamily, YirResultRole,
+        YirResultState,
     };
 
     #[test]
@@ -1318,6 +1367,31 @@ mod tests {
             .unwrap();
 
         assert_eq!(value, Value::Int(55));
+    }
+
+    #[test]
+    fn classifies_data_fabric_primitives_into_seven_families() {
+        let cases = [
+            ("data.bind_core", Some(DataFabricPrimitive::Bind)),
+            ("data.handle_table", Some(DataFabricPrimitive::Handle)),
+            ("data.marker", Some(DataFabricPrimitive::Marker)),
+            ("data.move", Some(DataFabricPrimitive::Move)),
+            ("data.copy_window", Some(DataFabricPrimitive::Window)),
+            ("data.read_window", Some(DataFabricPrimitive::Window)),
+            ("data.write_window", Some(DataFabricPrimitive::Window)),
+            ("data.freeze_window", Some(DataFabricPrimitive::Window)),
+            ("data.output_pipe", Some(DataFabricPrimitive::Pipe)),
+            ("data.input_pipe", Some(DataFabricPrimitive::Pipe)),
+            ("data.observe", Some(DataFabricPrimitive::Observe)),
+            ("data.is_ready", Some(DataFabricPrimitive::Observe)),
+            ("data.value", Some(DataFabricPrimitive::Observe)),
+            ("cpu.const", None),
+        ];
+
+        for (op, expected) in cases {
+            let parsed = Operation::parse(op, Vec::new()).unwrap();
+            assert_eq!(parsed.data_fabric_primitive(), expected, "op={op}");
+        }
     }
 }
 

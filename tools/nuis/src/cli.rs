@@ -82,6 +82,7 @@ pub enum CommandKind {
 pub enum GalaxyCommand {
     Init {
         input: PathBuf,
+        framework: Option<String>,
     },
     Check {
         input: PathBuf,
@@ -393,9 +394,24 @@ where
 {
     let subcommand = args.next().unwrap_or_else(|| "check".to_owned());
     match subcommand.as_str() {
-        "init" => Ok(CommandKind::Galaxy(GalaxyCommand::Init {
-            input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
-        })),
+        "init" => {
+            let mut input = PathBuf::from(".".to_owned());
+            let mut framework = None;
+            while let Some(arg) = args.next() {
+                if arg == "--framework" {
+                    framework = Some(args.next().ok_or_else(|| {
+                        "usage: nuis galaxy init [project-dir] [--framework <name>]".to_owned()
+                    })?);
+                } else if input == PathBuf::from(".") {
+                    input = PathBuf::from(arg);
+                } else {
+                    return Err(format!(
+                        "unknown nuis galaxy init argument `{arg}`; expected `[project-dir] [--framework <name>]`"
+                    ));
+                }
+            }
+            Ok(CommandKind::Galaxy(GalaxyCommand::Init { input, framework }))
+        }
         "check" => Ok(CommandKind::Galaxy(GalaxyCommand::Check {
             input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
         })),

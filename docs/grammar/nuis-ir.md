@@ -76,6 +76,21 @@ Fabric primitives are fixed.
 
 Extensions must **compose primitives** rather than introduce new ones.
 
+The current `data.fabric` surface in this repository is organized around seven
+primitive families:
+
+1. `bind`
+2. `handle`
+3. `marker`
+4. `move`
+5. `window`
+6. `pipe`
+7. `observe`
+
+Frontend conveniences such as `data_profile_send_uplink(...)` are not new
+primitives. They are only valid if they lower into legal compositions of the
+seven families above.
+
 This guarantees verifier tractability.
 
 ---
@@ -368,9 +383,15 @@ Important boundary note:
 * The current CPU verifier treats borrows conservatively: once a borrow exists, later `move/free/write` on the same owned object are rejected until the borrow is ordered to end, either by last-use inference or by an explicit `cpu.borrow_end` node.
 * `kernel.*` ops are the standard tensor/kernel execution surface. They may lower to `npu`, `gpu-kernel`, or future accelerators without changing the core graph semantics.
 * `data.*` ops are the instruction-level surface for Fabric-style exchange. The architecture term `Fabric` remains valid, but the standard op family name is `data`.
-* The current handwritten prototype now includes a first typed Fabric surface: `move`, `copy_window`, `immutable_window`, `marker`, `bind_core`, `output_pipe`, `input_pipe`, and `handle_table`.
+* The current handwritten prototype now includes a first typed Fabric surface,
+  but each op still belongs to one of the seven primitive families:
+  `bind_core` -> `bind`; `handle_table` -> `handle`; `marker` -> `marker`;
+  `move` -> `move`; `copy_window` / `read_window` / `write_window` /
+  `freeze_window` / `immutable_window` -> `window`; `output_pipe` /
+  `input_pipe` -> `pipe`; `observe` / `is_ready` / `is_moved` /
+  `is_windowed` / `value` -> `observe`.
 * The current verifier already enforces a minimal legality set for that surface: `input_pipe` must consume `output_pipe`, nested pipes are rejected, and `window` wrappers may not be formed from marker/handle carriers.
-* The current frontend/runtime contract now also distinguishes local mutable windows from bridge-safe immutable windows: `copy_window` is the local mutable-view primitive, while `immutable_window` is the stable cross-domain view primitive.
+* The current frontend/runtime contract now also distinguishes local mutable windows from bridge-safe immutable windows: `copy_window` is the local mutable-view primitive, `read_window` / `write_window` are explicit access primitives, `freeze_window` is the local-to-bridge convergence primitive, and `immutable_window` remains the direct stable cross-domain view primitive.
 * Current project/data-pipe paths only allow immutable windows to cross the explicit `output_pipe/input_pipe` bridge; mutable windows are expected to stay local until they are converted into an immutable view.
 * `data.move` is the current `MoveValue` primitive surface and therefore only accepts plain value payloads, not `window`, `marker`, `handle`, or `pipe` carriers.
 * `data.move` also currently behaves as an `Own` consume in the verifier: after a move, later graph-visible uses of the same source must already be ordered before that move node.
