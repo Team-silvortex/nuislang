@@ -2,11 +2,16 @@ mod cpu Main {
   fn main() {
     data_bind_core(2);
     let handles: HandleTable = data_handle_table("host=cpu0", "fabric=fabric0");
+    let backing: ref Buffer = alloc_buffer(4, 0);
     let source: i64 = 99;
     let pipe: Pipe<i64> = data_output_pipe(source);
     let ready: Marker = data_marker("window_ready");
     let slice: Window<i64> = data_immutable_window(source, 0, 1);
-    let copy: WindowMut<i64> = data_copy_window(source, 0, 1);
+    let copy: WindowMut<i64> = data_copy_window(backing, 1, 2);
+    let updated: WindowMut<i64> = data_write_window(copy, 0, 123);
+    let frozen: Window<i64> = data_freeze_window(updated);
+    let slot_one: i64 = load_at(backing, 1);
     print(source);
+    print(slot_one);
   }
 }

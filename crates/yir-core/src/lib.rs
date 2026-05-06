@@ -133,6 +133,8 @@ pub enum SemanticOp {
     CpuTaskValue,
     DataMove,
     DataCopyWindow,
+    DataReadWindow,
+    DataWriteWindow,
     DataFreezeWindow,
     DataImmutableWindow,
     DataOutputPipe,
@@ -278,6 +280,8 @@ impl Operation {
             (OperationDomainFamily::Cpu, "task_value") => SemanticOp::CpuTaskValue,
             (OperationDomainFamily::Data, "move") => SemanticOp::DataMove,
             (OperationDomainFamily::Data, "copy_window") => SemanticOp::DataCopyWindow,
+            (OperationDomainFamily::Data, "read_window") => SemanticOp::DataReadWindow,
+            (OperationDomainFamily::Data, "write_window") => SemanticOp::DataWriteWindow,
             (OperationDomainFamily::Data, "freeze_window") => SemanticOp::DataFreezeWindow,
             (OperationDomainFamily::Data, "immutable_window") => SemanticOp::DataImmutableWindow,
             (OperationDomainFamily::Data, "output_pipe") => SemanticOp::DataOutputPipe,
@@ -333,6 +337,8 @@ impl Operation {
         matches!(
             self.semantic_op(),
             SemanticOp::DataCopyWindow
+                | SemanticOp::DataReadWindow
+                | SemanticOp::DataWriteWindow
                 | SemanticOp::DataFreezeWindow
                 | SemanticOp::DataImmutableWindow
         )
@@ -401,6 +407,8 @@ impl Operation {
             SemanticOp::DataOutputPipe => "data.output_pipe",
             SemanticOp::DataInputPipe => "data.input_pipe",
             SemanticOp::DataCopyWindow => "data.copy_window",
+            SemanticOp::DataReadWindow => "data.read_window",
+            SemanticOp::DataWriteWindow => "data.write_window",
             SemanticOp::DataFreezeWindow => "data.freeze_window",
             SemanticOp::DataImmutableWindow => "data.immutable_window",
             SemanticOp::ShaderBeginPass => "shader.begin_pass",
@@ -513,6 +521,8 @@ impl Operation {
                 SemanticOp::DataOutputPipe => Ok(state == "moved"),
                 SemanticOp::DataInputPipe
                 | SemanticOp::DataCopyWindow
+                | SemanticOp::DataReadWindow
+                | SemanticOp::DataWriteWindow
                 | SemanticOp::DataFreezeWindow
                 | SemanticOp::DataImmutableWindow => Ok(matches!(state, "ready" | "windowed")),
                 other => Err(format!(
@@ -605,6 +615,8 @@ fn semantic_op_display_name(op: SemanticOp) -> &'static str {
         SemanticOp::DataOutputPipe => ("data", "output_pipe"),
         SemanticOp::DataInputPipe => ("data", "input_pipe"),
         SemanticOp::DataCopyWindow => ("data", "copy_window"),
+        SemanticOp::DataReadWindow => ("data", "read_window"),
+        SemanticOp::DataWriteWindow => ("data", "write_window"),
         SemanticOp::DataFreezeWindow => ("data", "freeze_window"),
         SemanticOp::DataImmutableWindow => ("data", "immutable_window"),
         SemanticOp::ShaderBeginPass => ("shader", "begin_pass"),
@@ -816,6 +828,8 @@ pub fn glm_profile_for_operation(op: &Operation) -> GlmNodeProfile {
             effect: GlmEffect::DomainMove,
         },
         SemanticOp::DataCopyWindow
+        | SemanticOp::DataReadWindow
+        | SemanticOp::DataWriteWindow
         | SemanticOp::DataFreezeWindow
         | SemanticOp::DataImmutableWindow => GlmNodeProfile {
             result_class: GlmValueClass::Res,
@@ -1159,6 +1173,151 @@ mod tests {
             panic!("expected frozen data window");
         };
         assert!(window.immutable);
+    }
+
+    #[test]
+    fn data_mod_write_window_updates_single_slot_mutable_window() {
+        let resource = Resource {
+            name: "fabric0".to_owned(),
+            kind: ResourceKind::parse("data.fabric"),
+        };
+        let data_mod = DataMod;
+        let mut state = ExecutionState::default();
+
+        state.values.insert(
+            "window0".to_owned(),
+            Value::DataWindow(DataWindow {
+                base: Box::new(Value::Int(7)),
+                offset: 0,
+                len: 1,
+                immutable: false,
+            }),
+        );
+        state.values.insert("value0".to_owned(), Value::Int(11));
+
+        let value = data_mod
+            .execute(
+                &Node {
+                    name: "updated".to_owned(),
+                    resource: "fabric0".to_owned(),
+                    op: Operation::parse(
+                        "data.write_window",
+                        vec!["window0".to_owned(), "0".to_owned(), "value0".to_owned()],
+                    )
+                    .unwrap(),
+                },
+                &resource,
+                &mut state,
+            )
+            .unwrap();
+
+        let Value::DataWindow(window) = value else {
+            panic!("expected mutable data window");
+        };
+        assert!(!window.immutable);
+        assert_eq!(*window.base, Value::Int(11));
+    }
+
+    #[test]
+    fn data_mod_write_window_updates_buffer_backed_window_storage() {
+        let resource = Resource {
+            name: "fabric0".to_owned(),
+            kind: ResourceKind::parse("data.fabric"),
+        };
+        let data_mod = DataMod;
+        let mut state = ExecutionState::default();
+        let buffer = state.alloc_heap_buffer(4, 0);
+
+        state.values.insert("buffer0".to_owned(), Value::Pointer(Some(buffer)));
+        state.values.insert("value0".to_owned(), Value::Int(33));
+
+        let window = data_mod
+            .execute(
+                &Node {
+                    name: "window0".to_owned(),
+                    resource: "fabric0".to_owned(),
+                    op: Operation::parse(
+                        "data.copy_window",
+                        vec!["buffer0".to_owned(), "1".to_owned(), "2".to_owned()],
+                    )
+                    .unwrap(),
+                },
+                &resource,
+                &mut state,
+            )
+            .unwrap();
+        state.values.insert("window0".to_owned(), window);
+
+        let updated = data_mod
+            .execute(
+                &Node {
+                    name: "updated".to_owned(),
+                    resource: "fabric0".to_owned(),
+                    op: Operation::parse(
+                        "data.write_window",
+                        vec!["window0".to_owned(), "0".to_owned(), "value0".to_owned()],
+                    )
+                    .unwrap(),
+                },
+                &resource,
+                &mut state,
+            )
+            .unwrap();
+
+        let Value::DataWindow(window) = updated else {
+            panic!("expected buffer-backed data window");
+        };
+        assert_eq!(state.read_heap_buffer_at(Some(buffer), 1).unwrap(), 33);
+        assert_eq!(window.offset, 1);
+        assert_eq!(window.len, 2);
+    }
+
+    #[test]
+    fn data_mod_read_window_reads_buffer_backed_window_storage() {
+        let resource = Resource {
+            name: "fabric0".to_owned(),
+            kind: ResourceKind::parse("data.fabric"),
+        };
+        let data_mod = DataMod;
+        let mut state = ExecutionState::default();
+        let buffer = state.alloc_heap_buffer(4, 0);
+        state.write_heap_buffer_at(Some(buffer), 2, 55).unwrap();
+        state.values.insert("buffer0".to_owned(), Value::Pointer(Some(buffer)));
+
+        let window = data_mod
+            .execute(
+                &Node {
+                    name: "window0".to_owned(),
+                    resource: "fabric0".to_owned(),
+                    op: Operation::parse(
+                        "data.copy_window",
+                        vec!["buffer0".to_owned(), "1".to_owned(), "2".to_owned()],
+                    )
+                    .unwrap(),
+                },
+                &resource,
+                &mut state,
+            )
+            .unwrap();
+        state.values.insert("window0".to_owned(), window);
+
+        let value = data_mod
+            .execute(
+                &Node {
+                    name: "value".to_owned(),
+                    resource: "fabric0".to_owned(),
+                    op: Operation::parse(
+                        "data.read_window",
+                        vec!["window0".to_owned(), "1".to_owned()],
+                    )
+                    .unwrap(),
+                },
+                &resource,
+                &mut state,
+            )
+            .unwrap();
+
+        assert_eq!(value, Value::Int(55));
     }
 }
 
@@ -2186,6 +2345,32 @@ impl RegisteredMod for DataMod {
                 }
                 Ok(InstructionSemantics::pure(deps))
             }
+            "read_window" => {
+                if node.op.args.len() != 2 {
+                    return Err(format!(
+                        "node `{}` expects `data.read_window <name> <resource> <window> <index>`",
+                        node.name
+                    ));
+                }
+                let mut deps = vec![node.op.args[0].clone()];
+                if node.op.args[1].parse::<usize>().is_err() {
+                    deps.push(node.op.args[1].clone());
+                }
+                Ok(InstructionSemantics::pure(deps))
+            }
+            "write_window" => {
+                if node.op.args.len() != 3 {
+                    return Err(format!(
+                        "node `{}` expects `data.write_window <name> <resource> <window> <index> <value>`",
+                        node.name
+                    ));
+                }
+                let mut deps = vec![node.op.args[0].clone(), node.op.args[2].clone()];
+                if node.op.args[1].parse::<usize>().is_err() {
+                    deps.push(node.op.args[1].clone());
+                }
+                Ok(InstructionSemantics::pure(deps))
+            }
             "freeze_window" => {
                 if node.op.args.len() != 1 {
                     return Err(format!(
@@ -2318,6 +2503,7 @@ impl RegisteredMod for DataMod {
                 }
                 let offset = resolve_window_usize_arg(state, node, 1, "offset")?;
                 let len = resolve_window_usize_arg(state, node, 2, "len")?;
+                validate_data_window_range(state, &base, offset, len)?;
                 let window = Value::DataWindow(DataWindow {
                     base: Box::new(base),
                     offset,
@@ -2325,6 +2511,17 @@ impl RegisteredMod for DataMod {
                     immutable: node.op.instruction == "immutable_window",
                 });
                 Ok(window)
+            }
+            "read_window" => {
+                let window = state.expect_value(&node.op.args[0])?.clone();
+                let index = resolve_window_usize_arg(state, node, 1, "index")?;
+                read_data_window_value(state, window, index)
+            }
+            "write_window" => {
+                let window = state.expect_value(&node.op.args[0])?.clone();
+                let index = resolve_window_usize_arg(state, node, 1, "index")?;
+                let value = state.expect_value(&node.op.args[2])?.clone();
+                write_data_window_value(state, window, index, value)
             }
             "freeze_window" => {
                 let window = state.expect_value(&node.op.args[0])?.clone();
@@ -2516,6 +2713,125 @@ fn is_pipe_payload_legal(value: &Value) -> bool {
             .all(|(_, value)| is_move_value_legal(value)),
         _ => true,
     }
+}
+
+fn validate_data_window_range(
+    state: &ExecutionState,
+    base: &Value,
+    offset: usize,
+    len: usize,
+) -> Result<(), String> {
+    match base {
+        Value::Pointer(pointer) => {
+            let Some(address) = pointer else {
+                return Err("data window cannot wrap null buffer pointer".to_owned());
+            };
+            if state.heap.contains_key(address) {
+                return Err(format!(
+                    "data window cannot wrap node pointer `&{address}` as buffer backing"
+                ));
+            }
+            let buffer = state
+                .buffers
+                .get(address)
+                .ok_or_else(|| format!("data window cannot wrap dangling buffer pointer `&{address}`"))?;
+            let end = offset
+                .checked_add(len)
+                .ok_or_else(|| "data window range overflows usize".to_owned())?;
+            if end > buffer.elements.len() {
+                return Err(format!(
+                    "data window range offset={} len={} exceeds buffer length {}",
+                    offset,
+                    len,
+                    buffer.elements.len()
+                ));
+            }
+            Ok(())
+        }
+        _ if offset == 0 && len == 1 => Ok(()),
+        _ => Err(format!(
+            "inline data window currently supports only offset=0 len=1, got offset={} len={}",
+            offset, len
+        )),
+    }
+}
+
+fn write_data_window_value(
+    state: &mut ExecutionState,
+    window: Value,
+    index: usize,
+    value: Value,
+) -> Result<Value, String> {
+    let Value::DataWindow(window) = window else {
+        return Err("data.write_window expects window input".to_owned());
+    };
+    if window.immutable {
+        return Err("data.write_window cannot modify immutable window".to_owned());
+    }
+    let slot = window
+        .offset
+        .checked_add(index)
+        .ok_or_else(|| "data.write_window index overflows usize".to_owned())?;
+    if index >= window.len {
+        return Err(format!(
+            "data.write_window index {} out of bounds for window len={}",
+            index, window.len
+        ));
+    }
+    if let Value::Pointer(pointer) = window.base.as_ref() {
+        let scalar = match value {
+            Value::Int(value) => value,
+            Value::I32(value) => value as i64,
+            other => {
+                return Err(format!(
+                    "data.write_window expects i64-like payload for buffer-backed window, got {}",
+                    other
+                ))
+            }
+        };
+        state.write_heap_buffer_at(*pointer, slot, scalar)?;
+        return Ok(Value::DataWindow(window));
+    }
+    if window.offset != 0 || window.len != 1 || index != 0 {
+        return Err(format!(
+            "inline data.write_window currently supports only single-slot mutable windows, got offset={} len={} index={index}",
+            window.offset, window.len
+        ));
+    }
+    Ok(Value::DataWindow(DataWindow {
+        base: Box::new(value),
+        ..window
+    }))
+}
+
+fn read_data_window_value(
+    state: &ExecutionState,
+    window: Value,
+    index: usize,
+) -> Result<Value, String> {
+    let Value::DataWindow(window) = window else {
+        return Err("data.read_window expects window input".to_owned());
+    };
+    if index >= window.len {
+        return Err(format!(
+            "data.read_window index {} out of bounds for window len={}",
+            index, window.len
+        ));
+    }
+    let slot = window
+        .offset
+        .checked_add(index)
+        .ok_or_else(|| "data.read_window index overflows usize".to_owned())?;
+    if let Value::Pointer(pointer) = window.base.as_ref() {
+        return Ok(Value::Int(state.read_heap_buffer_at(*pointer, slot)?));
+    }
+    if window.offset != 0 || window.len != 1 || index != 0 {
+        return Err(format!(
+            "inline data.read_window currently supports only single-slot windows, got offset={} len={} index={index}",
+            window.offset, window.len
+        ));
+    }
+    Ok((*window.base).clone())
 }
 
 fn resolve_window_usize_arg(

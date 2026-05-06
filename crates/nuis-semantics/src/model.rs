@@ -698,6 +698,15 @@ pub enum NirExpr {
         offset: Box<NirExpr>,
         len: Box<NirExpr>,
     },
+    DataReadWindow {
+        window: Box<NirExpr>,
+        index: Box<NirExpr>,
+    },
+    DataWriteWindow {
+        window: Box<NirExpr>,
+        index: Box<NirExpr>,
+        value: Box<NirExpr>,
+    },
     DataFreezeWindow(Box<NirExpr>),
     DataImmutableWindow {
         input: Box<NirExpr>,
@@ -1207,6 +1216,8 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
             effect: NirGlmEffect::DomainMove,
         }),
         NirExpr::DataCopyWindow { .. }
+        | NirExpr::DataReadWindow { .. }
+        | NirExpr::DataWriteWindow { .. }
         | NirExpr::DataImmutableWindow { .. }
         | NirExpr::DataFreezeWindow(_) => {
             Some(NirGlmProfile {

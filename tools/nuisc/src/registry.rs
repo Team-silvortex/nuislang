@@ -695,6 +695,19 @@ fn walk_child_exprs(expr: &NirExpr, f: &mut dyn FnMut(&NirExpr)) {
         | NirExpr::KernelResult { value: input, .. } => {
             f(input)
         }
+        NirExpr::DataReadWindow { window, index } => {
+            f(window);
+            f(index);
+        }
+        NirExpr::DataWriteWindow {
+            window,
+            index,
+            value,
+        } => {
+            f(window);
+            f(index);
+            f(value);
+        }
         NirExpr::DataCopyWindow { input, offset, len }
         | NirExpr::DataImmutableWindow { input, offset, len } => {
             f(input);

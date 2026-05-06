@@ -343,6 +343,19 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         NirExpr::DataResult { value: input, .. }
         | NirExpr::ShaderResult { value: input, .. }
         | NirExpr::KernelResult { value: input, .. } => collect_instantiated_units_expr(input, units),
+        NirExpr::DataReadWindow { window, index } => {
+            collect_instantiated_units_expr(window, units);
+            collect_instantiated_units_expr(index, units);
+        }
+        NirExpr::DataWriteWindow {
+            window,
+            index,
+            value,
+        } => {
+            collect_instantiated_units_expr(window, units);
+            collect_instantiated_units_expr(index, units);
+            collect_instantiated_units_expr(value, units);
+        }
         NirExpr::DataCopyWindow { input, offset, len }
         | NirExpr::DataImmutableWindow { input, offset, len } => {
             collect_instantiated_units_expr(input, units);

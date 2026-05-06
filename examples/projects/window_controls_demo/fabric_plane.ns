@@ -22,9 +22,11 @@ mod data FabricPlane {
     let uplink_window_policy: Marker<UplinkWindowPolicy> = data_marker("uplink_window_policy");
     let downlink_window_policy: Marker<DownlinkWindowPolicy> =
       data_marker("downlink_window_policy");
-    let uplink_window: Window<i64> =
-      data_immutable_window(window_offset, window_offset, uplink_len);
-    let downlink_window: WindowMut<i64> =
+    let uplink_window_mut: WindowMut<i64> =
+      data_copy_window(window_offset, window_offset, uplink_len);
+    let uplink_window: Window<i64> = data_freeze_window(uplink_window_mut);
+    let downlink_window_mut: WindowMut<i64> =
       data_copy_window(window_offset, window_offset, downlink_len);
+    let downlink_window: Window<i64> = data_freeze_window(downlink_window_mut);
   }
 }

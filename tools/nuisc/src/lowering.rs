@@ -756,6 +756,48 @@ fn lower_expr(
             push_dep_edges(state, &len_name, &name);
             Ok(name)
         }
+        NirExpr::DataReadWindow { window, index } => {
+            ensure_fabric_resource(state.yir);
+            let window_name = lower_expr(window, state, bindings)?;
+            let index_name = lower_expr(index, state, bindings)?;
+            let name = next_name(state, "data_read_window");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "fabric0".to_owned(),
+                op: Operation {
+                    module: "data".to_owned(),
+                    instruction: "read_window".to_owned(),
+                    args: vec![window_name.clone(), index_name.clone()],
+                },
+            });
+            push_dep_edges(state, &window_name, &name);
+            push_dep_edges(state, &index_name, &name);
+            Ok(name)
+        }
+        NirExpr::DataWriteWindow {
+            window,
+            index,
+            value,
+        } => {
+            ensure_fabric_resource(state.yir);
+            let window_name = lower_expr(window, state, bindings)?;
+            let index_name = lower_expr(index, state, bindings)?;
+            let value_name = lower_expr(value, state, bindings)?;
+            let name = next_name(state, "data_write_window");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "fabric0".to_owned(),
+                op: Operation {
+                    module: "data".to_owned(),
+                    instruction: "write_window".to_owned(),
+                    args: vec![window_name.clone(), index_name.clone(), value_name.clone()],
+                },
+            });
+            push_dep_edges(state, &window_name, &name);
+            push_dep_edges(state, &index_name, &name);
+            push_dep_edges(state, &value_name, &name);
+            Ok(name)
+        }
         NirExpr::DataFreezeWindow(input) => {
             ensure_fabric_resource(state.yir);
             let input_name = lower_expr(input, state, bindings)?;

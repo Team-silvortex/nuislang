@@ -267,6 +267,38 @@ fn verify_expr(
                 ));
             }
         }
+        NirExpr::DataReadWindow { window, index } => {
+            let source = infer_data_kind(window, data_bindings);
+            if !matches!(source, NirDataKind::WindowMutable | NirDataKind::WindowImmutable) {
+                return Err(format!(
+                    "nir verify: data_read_window expects window input, got `{}`",
+                    render_data_expr_name(window)
+                ));
+            }
+            let index_kind = infer_data_kind(index, data_bindings);
+            if index_kind != NirDataKind::Other {
+                return Err(format!(
+                    "nir verify: data_read_window expects scalar index, got `{}`",
+                    render_data_expr_name(index)
+                ));
+            }
+        }
+        NirExpr::DataWriteWindow { window, index, .. } => {
+            let source = infer_data_kind(window, data_bindings);
+            if source != NirDataKind::WindowMutable {
+                return Err(format!(
+                    "nir verify: data_write_window expects mutable window input, got `{}`",
+                    render_data_expr_name(window)
+                ));
+            }
+            let index_kind = infer_data_kind(index, data_bindings);
+            if index_kind != NirDataKind::Other {
+                return Err(format!(
+                    "nir verify: data_write_window expects scalar index, got `{}`",
+                    render_data_expr_name(index)
+                ));
+            }
+        }
         NirExpr::DataProfileSendUplink { input, .. }
         | NirExpr::DataProfileSendDownlink { input, .. } => {
             let source = infer_data_kind(input, data_bindings);
@@ -505,6 +537,19 @@ fn verify_expr(
         NirExpr::DataFreezeWindow(inner) => {
             verify_expr(inner, moved, borrows, borrow_bindings, data_bindings)?
         }
+        NirExpr::DataReadWindow { window, index } => {
+            verify_expr(window, moved, borrows, borrow_bindings, data_bindings)?;
+            verify_expr(index, moved, borrows, borrow_bindings, data_bindings)?;
+        }
+        NirExpr::DataWriteWindow {
+            window,
+            index,
+            value,
+        } => {
+            verify_expr(window, moved, borrows, borrow_bindings, data_bindings)?;
+            verify_expr(index, moved, borrows, borrow_bindings, data_bindings)?;
+            verify_expr(value, moved, borrows, borrow_bindings, data_bindings)?;
+        }
         NirExpr::DataProfileSendUplink { input, .. }
         | NirExpr::DataProfileSendDownlink { input, .. } => {
             verify_expr(input, moved, borrows, borrow_bindings, data_bindings)?
@@ -736,6 +781,19 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
             verify_expr_uses(inner, moved)?
         }
         NirExpr::DataFreezeWindow(inner) => verify_expr_uses(inner, moved)?,
+        NirExpr::DataReadWindow { window, index } => {
+            verify_expr_uses(window, moved)?;
+            verify_expr_uses(index, moved)?;
+        }
+        NirExpr::DataWriteWindow {
+            window,
+            index,
+            value,
+        } => {
+            verify_expr_uses(window, moved)?;
+            verify_expr_uses(index, moved)?;
+            verify_expr_uses(value, moved)?;
+        }
         NirExpr::DataProfileSendUplink { input, .. }
         | NirExpr::DataProfileSendDownlink { input, .. } => verify_expr_uses(input, moved)?,
         NirExpr::DataCopyWindow { input, offset, len }
@@ -832,6 +890,7 @@ fn infer_data_kind(expr: &NirExpr, data_bindings: &BTreeMap<String, NirDataKind>
         NirExpr::DataOutputPipe(_) => NirDataKind::PipeOutput,
         NirExpr::DataInputPipe(_) => NirDataKind::PipeInput,
         NirExpr::DataCopyWindow { .. } => NirDataKind::WindowMutable,
+        NirExpr::DataWriteWindow { .. } => NirDataKind::WindowMutable,
         NirExpr::DataImmutableWindow { .. }
         | NirExpr::DataFreezeWindow(_)
         | NirExpr::DataProfileSendUplink { .. }
@@ -851,6 +910,8 @@ fn render_data_expr_name(expr: &NirExpr) -> String {
         NirExpr::DataOutputPipe(_) => "output_pipe".to_owned(),
         NirExpr::DataInputPipe(_) => "input_pipe".to_owned(),
         NirExpr::DataCopyWindow { .. } => "copy_window".to_owned(),
+        NirExpr::DataReadWindow { .. } => "read_window".to_owned(),
+        NirExpr::DataWriteWindow { .. } => "write_window".to_owned(),
         NirExpr::DataImmutableWindow { .. } => "immutable_window".to_owned(),
         NirExpr::DataFreezeWindow(_) => "freeze_window".to_owned(),
         NirExpr::DataProfileSendUplink { .. } => "profile_send_uplink".to_owned(),
@@ -1239,6 +1300,36 @@ mod tests {
                 offset: Box::new(NirExpr::Int(0)),
                 len: Box::new(NirExpr::Int(1)),
             }))),
+        })]);
+
+        verify_nir_module(&module).unwrap();
+    }
+
+    #[test]
+    fn data_write_window_requires_mutable_window_source() {
+        let module = module_with_body(vec![NirStmt::Expr(NirExpr::DataWriteWindow {
+            window: Box::new(NirExpr::DataImmutableWindow {
+                input: Box::new(NirExpr::Int(7)),
+                offset: Box::new(NirExpr::Int(0)),
+                len: Box::new(NirExpr::Int(1)),
+            }),
+            index: Box::new(NirExpr::Int(0)),
+            value: Box::new(NirExpr::Int(9)),
+        })]);
+
+        let error = verify_nir_module(&module).unwrap_err();
+        assert!(error.contains("expects mutable window input"));
+    }
+
+    #[test]
+    fn data_read_window_accepts_immutable_window_source() {
+        let module = module_with_body(vec![NirStmt::Expr(NirExpr::DataReadWindow {
+            window: Box::new(NirExpr::DataImmutableWindow {
+                input: Box::new(NirExpr::Int(7)),
+                offset: Box::new(NirExpr::Int(0)),
+                len: Box::new(NirExpr::Int(1)),
+            }),
+            index: Box::new(NirExpr::Int(0)),
         })]);
 
         verify_nir_module(&module).unwrap();

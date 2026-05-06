@@ -1556,6 +1556,19 @@ fn expr_uses_shader_profile_render(expr: &NirExpr, unit: &str) -> bool {
             expr_uses_shader_profile_render(buffer, unit)
                 || expr_uses_shader_profile_render(index, unit)
         }
+        NirExpr::DataReadWindow { window, index } => {
+            expr_uses_shader_profile_render(window, unit)
+                || expr_uses_shader_profile_render(index, unit)
+        }
+        NirExpr::DataWriteWindow {
+            window,
+            index,
+            value,
+        } => {
+            expr_uses_shader_profile_render(window, unit)
+                || expr_uses_shader_profile_render(index, unit)
+                || expr_uses_shader_profile_render(value, unit)
+        }
         NirExpr::StoreValue { target, value } => {
             expr_uses_shader_profile_render(target, unit)
                 || expr_uses_shader_profile_render(value, unit)
@@ -1778,6 +1791,12 @@ fn expr_walk_any(expr: &NirExpr, predicate: &dyn Fn(&NirExpr) -> bool) -> bool {
         NirExpr::AllocNode { value, next } => predicate(value) || predicate(next),
         NirExpr::AllocBuffer { len, fill } => predicate(len) || predicate(fill),
         NirExpr::LoadAt { buffer, index } => predicate(buffer) || predicate(index),
+        NirExpr::DataReadWindow { window, index } => predicate(window) || predicate(index),
+        NirExpr::DataWriteWindow {
+            window,
+            index,
+            value,
+        } => predicate(window) || predicate(index) || predicate(value),
         NirExpr::StoreValue { target, value } => predicate(target) || predicate(value),
         NirExpr::StoreNext { target, next } => predicate(target) || predicate(next),
         NirExpr::StoreAt {

@@ -1437,6 +1437,97 @@ fn lower_call_expr_with_async(
                 )?),
             })
         }
+        "data_read_window" => {
+            let [window, index] = args else {
+                return Err("data_read_window(...) expects 2 args".to_owned());
+            };
+            let window_expr = lower_expr(
+                window,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            let index_expr = lower_expr(
+                index,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let Some(window_ty) = expr_type(&window_expr, bindings, signatures, struct_table) else {
+                return Err("data_read_window(...) could not infer window type".to_owned());
+            };
+            if window_ty.window_mode().is_none() {
+                return Err(format!(
+                    "data_read_window(...) expects Window<T> or WindowMut<T>, got `{}`",
+                    window_ty.render()
+                ));
+            }
+            Ok(NirExpr::DataReadWindow {
+                window: Box::new(window_expr),
+                index: Box::new(index_expr),
+            })
+        }
+        "data_write_window" => {
+            let [window, index, value] = args else {
+                return Err("data_write_window(...) expects 3 args".to_owned());
+            };
+            let window_expr = lower_expr(
+                window,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            let index_expr = lower_expr(
+                index,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let value_expr = lower_expr(
+                value,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            let Some(window_ty) = expr_type(&window_expr, bindings, signatures, struct_table) else {
+                return Err("data_write_window(...) could not infer window type".to_owned());
+            };
+            if window_ty.window_mode() != Some(NirWindowMode::Mutable) {
+                return Err(format!(
+                    "data_write_window(...) expects WindowMut<T>, got `{}`",
+                    window_ty.render()
+                ));
+            }
+            let payload_ty = window_ty
+                .container_payload()
+                .cloned()
+                .ok_or_else(|| "data_write_window(...) expects window payload type".to_owned())?;
+            let Some(value_ty) = expr_type(&value_expr, bindings, signatures, struct_table) else {
+                return Err("data_write_window(...) could not infer value type".to_owned());
+            };
+            if !compatible_types(&payload_ty, &value_ty) {
+                return Err(format!(
+                    "data_write_window(...) expects payload `{}`, got `{}`",
+                    payload_ty.render(),
+                    value_ty.render()
+                ));
+            }
+            Ok(NirExpr::DataWriteWindow {
+                window: Box::new(window_expr),
+                index: Box::new(index_expr),
+                value: Box::new(value_expr),
+            })
+        }
         "data_freeze_window" => {
             let [input] = args else {
                 return Err("data_freeze_window(...) expects 1 arg".to_owned());
@@ -2755,6 +2846,7 @@ fn infer_result_stage(expr: &NirExpr) -> Option<NirResultStage> {
         | NirExpr::DataInputPipe(_) => Some(NirDataFlowState::Ready.into()),
         NirExpr::DataOutputPipe(_) => Some(NirDataFlowState::Moved.into()),
         NirExpr::DataCopyWindow { .. }
+        | NirExpr::DataWriteWindow { .. }
         | NirExpr::DataFreezeWindow(_)
         | NirExpr::DataImmutableWindow { .. }
         | NirExpr::DataProfileSendUplink { .. }
@@ -2927,14 +3019,37 @@ fn infer_nir_expr_type(
             let inner = infer_nir_expr_type(value, bindings, signatures, struct_table)?;
             Some(generic_named_type("Pipe", vec![inner]))
         }
-        NirExpr::DataCopyWindow { input, .. } => {
-            let inner = infer_nir_expr_type(input, bindings, signatures, struct_table)?;
-            Some(generic_named_type("WindowMut", vec![inner]))
+        NirExpr::DataCopyWindow { input, .. } => infer_data_window_type(
+            input,
+            bindings,
+            signatures,
+            struct_table,
+            NirWindowMode::Mutable,
+        ),
+        NirExpr::DataReadWindow { window, .. } => {
+            let window_ty = infer_nir_expr_type(window, bindings, signatures, struct_table)?;
+            window_ty.container_payload().cloned()
         }
-        NirExpr::DataImmutableWindow { input, .. } => {
-            let inner = infer_nir_expr_type(input, bindings, signatures, struct_table)?;
-            Some(generic_named_type("Window", vec![inner]))
+        NirExpr::DataWriteWindow { window, value, .. } => {
+            let window_ty = infer_nir_expr_type(window, bindings, signatures, struct_table)?;
+            if window_ty.window_mode() != Some(NirWindowMode::Mutable) {
+                return None;
+            }
+            let payload = window_ty.container_payload()?.clone();
+            let value_ty = infer_nir_expr_type(value, bindings, signatures, struct_table)?;
+            if compatible_types(&payload, &value_ty) {
+                Some(window_ty)
+            } else {
+                None
+            }
         }
+        NirExpr::DataImmutableWindow { input, .. } => infer_data_window_type(
+            input,
+            bindings,
+            signatures,
+            struct_table,
+            NirWindowMode::Immutable,
+        ),
         NirExpr::DataInputPipe(value) => {
             let pipe_ty = infer_nir_expr_type(value, bindings, signatures, struct_table)?;
             pipe_ty.generic_args.first().cloned()
@@ -2964,6 +3079,25 @@ fn infer_nir_expr_type(
             }
         }
     }
+}
+
+fn infer_data_window_type(
+    input: &NirExpr,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+    mode: NirWindowMode,
+) -> Option<NirTypeRef> {
+    let inner = infer_nir_expr_type(input, bindings, signatures, struct_table)?;
+    let payload = if inner.is_ref && inner.name == "Buffer" {
+        i64_type()
+    } else {
+        inner
+    };
+    Some(match mode {
+        NirWindowMode::Mutable => generic_named_type("WindowMut", vec![payload]),
+        NirWindowMode::Immutable => generic_named_type("Window", vec![payload]),
+    })
 }
 
 fn resolve_declared_or_inferred(
@@ -3349,6 +3483,66 @@ mod tests {
             panic!("expected typed let binding");
         };
         assert_eq!(ty.render(), "Window<i64>");
+    }
+
+    #[test]
+    fn infers_written_window_as_mutable_window_type() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() {
+                let copy: WindowMut<i64> = data_copy_window(7, 0, 1);
+                let updated: WindowMut<i64> = data_write_window(copy, 0, 9);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let NirStmt::Let { ty: Some(ty), .. } = &module.functions[0].body[1] else {
+            panic!("expected typed let binding");
+        };
+        assert_eq!(ty.render(), "WindowMut<i64>");
+    }
+
+    #[test]
+    fn infers_buffer_backed_window_payload_as_i64() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() {
+                let backing: ref Buffer = alloc_buffer(4, 0);
+                let copy: WindowMut<i64> = data_copy_window(backing, 1, 2);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let NirStmt::Let { ty: Some(ty), .. } = &module.functions[0].body[1] else {
+            panic!("expected typed let binding");
+        };
+        assert_eq!(ty.render(), "WindowMut<i64>");
+    }
+
+    #[test]
+    fn infers_read_window_payload_type() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() {
+                let copy: WindowMut<i64> = data_copy_window(7, 0, 1);
+                let value: i64 = data_read_window(copy, 0);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let NirStmt::Let { ty: Some(ty), .. } = &module.functions[0].body[1] else {
+            panic!("expected typed let binding");
+        };
+        assert_eq!(ty.render(), "i64");
     }
 
     #[test]

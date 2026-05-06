@@ -397,6 +397,29 @@ fn verify_data_fabric_protocol(
                         _ => unreachable!(),
                     }
                 }
+                SemanticOp::DataReadWindow => {
+                    let source = infer_data_value_kind(&value_kinds, &nodes, &node.op.args[0]);
+                    if !matches!(
+                        source,
+                        DataValueKind::WindowMutable | DataValueKind::WindowImmutable
+                    ) {
+                        return Err(format!(
+                            "node `{}` expects window input for read_window, got `{}`",
+                            node.name, node.op.args[0]
+                        ));
+                    }
+                    DataValueKind::Other
+                }
+                SemanticOp::DataWriteWindow => {
+                    let source = infer_data_value_kind(&value_kinds, &nodes, &node.op.args[0]);
+                    if source != DataValueKind::WindowMutable {
+                        return Err(format!(
+                            "node `{}` expects mutable window input for write_window, got `{}`",
+                            node.name, node.op.args[0]
+                        ));
+                    }
+                    DataValueKind::WindowMutable
+                }
                 SemanticOp::DataFreezeWindow => {
                     let source = infer_data_value_kind(&value_kinds, &nodes, &node.op.args[0]);
                     if !matches!(
@@ -924,8 +947,11 @@ fn infer_data_value_kind(
                 SemanticOp::DataHandleTable => DataValueKind::HandleTable,
                 SemanticOp::DataBindCore => DataValueKind::CoreBinding,
                 SemanticOp::DataOutputPipe => DataValueKind::PipeOutput,
-                SemanticOp::DataInputPipe | SemanticOp::DataMove => DataValueKind::Other,
+                SemanticOp::DataInputPipe | SemanticOp::DataMove | SemanticOp::DataReadWindow => {
+                    DataValueKind::Other
+                }
                 SemanticOp::DataCopyWindow => DataValueKind::WindowMutable,
+                SemanticOp::DataWriteWindow => DataValueKind::WindowMutable,
                 SemanticOp::DataFreezeWindow => DataValueKind::WindowImmutable,
                 SemanticOp::DataImmutableWindow => DataValueKind::WindowImmutable,
                 _ => DataValueKind::Other,
@@ -1351,6 +1377,8 @@ fn semantic_op_name(op: SemanticOp) -> &'static str {
         SemanticOp::DataOutputPipe => "data.output_pipe",
         SemanticOp::DataInputPipe => "data.input_pipe",
         SemanticOp::DataCopyWindow => "data.copy_window",
+        SemanticOp::DataReadWindow => "data.read_window",
+        SemanticOp::DataWriteWindow => "data.write_window",
         SemanticOp::DataImmutableWindow => "data.immutable_window",
         SemanticOp::ShaderBeginPass => "shader.begin_pass",
         SemanticOp::ShaderDrawInstanced => "shader.draw_instanced",
@@ -2476,6 +2504,69 @@ mod tests {
                 dep("value", "window0"),
                 dep("window0", "frozen"),
                 dep("frozen", "pipe"),
+            ],
+            node_lanes: BTreeMap::new(),
+        };
+
+        verify_module(&module).unwrap();
+    }
+
+    #[test]
+    fn rejects_write_window_on_immutable_input() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![
+                Resource {
+                    name: "cpu0".to_owned(),
+                    kind: ResourceKind::parse("cpu.arm64"),
+                },
+                Resource {
+                    name: "fabric0".to_owned(),
+                    kind: ResourceKind::parse("data.fabric"),
+                },
+            ],
+            nodes: vec![
+                node("seed", "cpu0", "cpu.const", &["7"]),
+                node("value", "fabric0", "data.move", &["seed", "cpu0"]),
+                node("window0", "fabric0", "data.immutable_window", &["value", "0", "1"]),
+                node("updated", "fabric0", "data.write_window", &["window0", "0", "value"]),
+            ],
+            edges: vec![
+                xfer("seed", "value"),
+                dep("value", "window0"),
+                dep("window0", "updated"),
+                dep("value", "updated"),
+            ],
+            node_lanes: BTreeMap::new(),
+        };
+
+        verify_module(&module).unwrap_err();
+    }
+
+    #[test]
+    fn accepts_read_window_on_immutable_input() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![
+                Resource {
+                    name: "cpu0".to_owned(),
+                    kind: ResourceKind::parse("cpu.arm64"),
+                },
+                Resource {
+                    name: "fabric0".to_owned(),
+                    kind: ResourceKind::parse("data.fabric"),
+                },
+            ],
+            nodes: vec![
+                node("seed", "cpu0", "cpu.const", &["7"]),
+                node("value", "fabric0", "data.move", &["seed", "cpu0"]),
+                node("window0", "fabric0", "data.immutable_window", &["value", "0", "1"]),
+                node("read", "fabric0", "data.read_window", &["window0", "0"]),
+            ],
+            edges: vec![
+                xfer("seed", "value"),
+                dep("value", "window0"),
+                dep("window0", "read"),
             ],
             node_lanes: BTreeMap::new(),
         };
