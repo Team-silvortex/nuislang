@@ -48,14 +48,34 @@ mod cpu Main {
     let panel_accent: i64 = packed_color + color_delta;
     let panel_toggle_state: i64 = frame_tick;
     let panel_focus_index: i64 = color_delta + speed_delta;
+    let panel_header: NovaHeaderPacket =
+      nova_header_packet(panel_accent, panel_focus_index);
+    let slider_color: NovaSliderPacket = nova_slider_packet(packed_color);
+    let slider_speed: NovaSliderPacket = nova_slider_packet(packed_speed);
+    let slider_radius: NovaSliderPacket = nova_slider_packet(packed_radius);
+    let panel_sliders: NovaSliderGroupPacket =
+      nova_slider_group_packet(slider_color, slider_speed, slider_radius);
+    let panel_toggle: NovaTogglePacket = nova_toggle_packet(panel_toggle_state);
+    let panel_progress: NovaProgressPacket = nova_progress_packet(packed_speed);
+    let panel_meter: NovaMeterPacket = nova_meter_packet(packed_radius);
+    let panel_button: NovaButtonPacket =
+      nova_button_packet(panel_toggle_state, panel_accent, panel_focus_index);
+    let panel_text_input: NovaTextInputPacket =
+      nova_text_input_packet(packed_color, panel_focus_index, packed_radius);
+    let panel_select: NovaSelectPacket =
+      nova_select_packet(panel_focus_index, panel_accent, 4);
+    let panel_focus: NovaFocusPacket = nova_focus_packet(panel_focus_index);
 
-    let render_controls: NovaPanelPacket = nova_panel_packet(
-      packed_color,
-      packed_speed,
-      packed_radius,
-      panel_accent,
-      panel_toggle_state,
-      panel_focus_index
+    let render_controls: NovaPanelPacket = nova_panel_from_parts(
+      panel_header,
+      panel_sliders,
+      panel_toggle,
+      panel_progress,
+      panel_meter,
+      panel_button,
+      panel_text_input,
+      panel_select,
+      panel_focus
     );
 
     data_profile_bind_core("FabricPlane");

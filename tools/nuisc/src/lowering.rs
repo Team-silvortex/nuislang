@@ -598,10 +598,12 @@ fn lower_expr(
                         args: vec![
                             "NovaHeaderPacket".to_owned(),
                             format!("accent={accent_name}"),
+                            format!("title_mode={focus_name}"),
                         ],
                     },
                 });
                 push_dep_edges(state, accent_name, &header_struct);
+                push_dep_edges(state, focus_name, &header_struct);
                 panel_group_nodes.push(header_struct.clone());
 
                 let color_slider = next_name(state, "nova_slider_color");
@@ -716,11 +718,13 @@ fn lower_expr(
                             "NovaButtonPacket".to_owned(),
                             format!("active={toggle_name}"),
                             format!("accent={accent_name}"),
+                            format!("intent={focus_name}"),
                         ],
                     },
                 });
                 push_dep_edges(state, toggle_name, &button_struct);
                 push_dep_edges(state, accent_name, &button_struct);
+                push_dep_edges(state, focus_name, &button_struct);
                 panel_group_nodes.push(button_struct.clone());
 
                 let text_input_struct = next_name(state, "nova_panel_text_input");
@@ -734,11 +738,13 @@ fn lower_expr(
                             "NovaTextInputPacket".to_owned(),
                             format!("echo={color_name}"),
                             format!("caret={focus_name}"),
+                            format!("placeholder={accent_name}"),
                         ],
                     },
                 });
                 push_dep_edges(state, &color_name, &text_input_struct);
                 push_dep_edges(state, focus_name, &text_input_struct);
+                push_dep_edges(state, accent_name, &text_input_struct);
                 panel_group_nodes.push(text_input_struct.clone());
 
                 let select_struct = next_name(state, "nova_panel_select");
@@ -752,6 +758,7 @@ fn lower_expr(
                             "NovaSelectPacket".to_owned(),
                             format!("selected={focus_name}"),
                             format!("accent={accent_name}"),
+                            "options=3".to_owned(),
                         ],
                     },
                 });

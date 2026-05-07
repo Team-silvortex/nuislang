@@ -2182,6 +2182,361 @@ fn lower_call_expr_with_async(
             };
             Ok(NirExpr::ShaderProfilePacketFieldCountRef { unit: unit.clone() })
         }
+        "nova_header_packet" => {
+            let (accent, title_mode) = match args {
+                [accent] => (accent, None),
+                [accent, title_mode] => (accent, Some(title_mode)),
+                _ => return Err("nova_header_packet(...) expects 1 or 2 args".to_owned()),
+            };
+            let accent = lower_expr(
+                accent,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let title_mode = title_mode
+                .map(|expr| {
+                    lower_expr(
+                        expr,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        Some(&i64_type()),
+                    )
+                })
+                .transpose()?
+                .unwrap_or_else(|| accent.clone());
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaHeaderPacket".to_owned(),
+                fields: vec![
+                    ("accent".to_owned(), accent),
+                    ("title_mode".to_owned(), title_mode),
+                ],
+            })
+        }
+        "nova_slider_packet" | "nova_progress_packet" | "nova_meter_packet" => {
+            let [value] = args else {
+                return Err(format!("{callee}(...) expects 1 arg"));
+            };
+            let value = lower_expr(
+                value,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let type_name = match callee {
+                "nova_slider_packet" => "NovaSliderPacket",
+                "nova_progress_packet" => "NovaProgressPacket",
+                _ => "NovaMeterPacket",
+            };
+            Ok(NirExpr::StructLiteral {
+                type_name: type_name.to_owned(),
+                fields: vec![("value".to_owned(), value)],
+            })
+        }
+        "nova_toggle_packet" => {
+            let [live] = args else {
+                return Err("nova_toggle_packet(...) expects 1 arg".to_owned());
+            };
+            let live = lower_expr(
+                live,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaTogglePacket".to_owned(),
+                fields: vec![("live".to_owned(), live)],
+            })
+        }
+        "nova_button_packet" => {
+            let (active, accent, intent) = match args {
+                [active, accent] => (active, accent, None),
+                [active, accent, intent] => (active, accent, Some(intent)),
+                _ => return Err("nova_button_packet(...) expects 2 or 3 args".to_owned()),
+            };
+            let active = lower_expr(
+                active,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let accent = lower_expr(
+                accent,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let intent = intent
+                .map(|expr| {
+                    lower_expr(
+                        expr,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        Some(&i64_type()),
+                    )
+                })
+                .transpose()?
+                .unwrap_or_else(|| active.clone());
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaButtonPacket".to_owned(),
+                fields: vec![
+                    ("active".to_owned(), active),
+                    ("accent".to_owned(), accent),
+                    ("intent".to_owned(), intent),
+                ],
+            })
+        }
+        "nova_text_input_packet" => {
+            let (echo, caret, placeholder) = match args {
+                [echo, caret] => (echo, caret, None),
+                [echo, caret, placeholder] => (echo, caret, Some(placeholder)),
+                _ => {
+                    return Err("nova_text_input_packet(...) expects 2 or 3 args".to_owned());
+                }
+            };
+            let echo = lower_expr(
+                echo,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let caret = lower_expr(
+                caret,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let placeholder = placeholder
+                .map(|expr| {
+                    lower_expr(
+                        expr,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        Some(&i64_type()),
+                    )
+                })
+                .transpose()?
+                .unwrap_or_else(|| echo.clone());
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaTextInputPacket".to_owned(),
+                fields: vec![
+                    ("echo".to_owned(), echo),
+                    ("caret".to_owned(), caret),
+                    ("placeholder".to_owned(), placeholder),
+                ],
+            })
+        }
+        "nova_select_packet" => {
+            let (selected, accent, options) = match args {
+                [selected, accent] => (selected, accent, None),
+                [selected, accent, options] => (selected, accent, Some(options)),
+                _ => return Err("nova_select_packet(...) expects 2 or 3 args".to_owned()),
+            };
+            let selected = lower_expr(
+                selected,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let accent = lower_expr(
+                accent,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let options = options
+                .map(|expr| {
+                    lower_expr(
+                        expr,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        Some(&i64_type()),
+                    )
+                })
+                .transpose()?
+                .unwrap_or_else(|| NirExpr::Int(3));
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaSelectPacket".to_owned(),
+                fields: vec![
+                    ("selected".to_owned(), selected),
+                    ("accent".to_owned(), accent),
+                    ("options".to_owned(), options),
+                ],
+            })
+        }
+        "nova_focus_packet" => {
+            let [slot] = args else {
+                return Err("nova_focus_packet(...) expects 1 arg".to_owned());
+            };
+            let slot = lower_expr(
+                slot,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaFocusPacket".to_owned(),
+                fields: vec![("slot".to_owned(), slot)],
+            })
+        }
+        "nova_slider_group_packet" => {
+            let [color, speed, radius] = args else {
+                return Err("nova_slider_group_packet(...) expects 3 args".to_owned());
+            };
+            let color = lower_expr(
+                color,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaSliderPacket")),
+            )?;
+            let speed = lower_expr(
+                speed,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaSliderPacket")),
+            )?;
+            let radius = lower_expr(
+                radius,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaSliderPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaSliderGroupPacket".to_owned(),
+                fields: vec![
+                    ("color".to_owned(), color),
+                    ("speed".to_owned(), speed),
+                    ("radius".to_owned(), radius),
+                ],
+            })
+        }
+        "nova_panel_from_parts" => {
+            let [header, sliders, toggle, progress, meter, button, text_input, select, focus] =
+                args
+            else {
+                return Err("nova_panel_from_parts(...) expects 9 args".to_owned());
+            };
+            let header = lower_expr(
+                header,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaHeaderPacket")),
+            )?;
+            let sliders = lower_expr(
+                sliders,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaSliderGroupPacket")),
+            )?;
+            let toggle = lower_expr(
+                toggle,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaTogglePacket")),
+            )?;
+            let progress = lower_expr(
+                progress,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaProgressPacket")),
+            )?;
+            let meter = lower_expr(
+                meter,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaMeterPacket")),
+            )?;
+            let button = lower_expr(
+                button,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaButtonPacket")),
+            )?;
+            let text_input = lower_expr(
+                text_input,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaTextInputPacket")),
+            )?;
+            let select = lower_expr(
+                select,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaSelectPacket")),
+            )?;
+            let focus = lower_expr(
+                focus,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaFocusPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaPanelPacket".to_owned(),
+                fields: vec![
+                    ("header".to_owned(), header),
+                    ("sliders".to_owned(), sliders),
+                    ("toggle".to_owned(), toggle),
+                    ("progress".to_owned(), progress),
+                    ("meter".to_owned(), meter),
+                    ("button".to_owned(), button),
+                    ("text_input".to_owned(), text_input),
+                    ("select".to_owned(), select),
+                    ("focus".to_owned(), focus),
+                ],
+            })
+        }
         "data_profile_bind_core" => {
             let [unit] = args else {
                 return Err("data_profile_bind_core(...) expects 1 arg".to_owned());
@@ -4084,6 +4439,97 @@ mod tests {
             }) if ty.render() == "NovaPanelPacket"
                 && unit == "__nova__"
                 && packet_type_name.as_deref() == Some("NovaPanelPacket")
+        ));
+    }
+
+    #[test]
+    fn lowers_nova_control_packet_builders() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let slider: NovaSliderPacket = nova_slider_packet(7);
+                let button: NovaButtonPacket = nova_button_packet(1, 9);
+                let select: NovaSelectPacket = nova_select_packet(2, 5);
+                return 1;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            function.body.first(),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            }) if ty.render() == "NovaSliderPacket" && type_name == "NovaSliderPacket"
+        ));
+        assert!(matches!(
+            function.body.get(1),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            }) if ty.render() == "NovaButtonPacket" && type_name == "NovaButtonPacket"
+        ));
+        assert!(matches!(
+            function.body.get(2),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            }) if ty.render() == "NovaSelectPacket" && type_name == "NovaSelectPacket"
+        ));
+    }
+
+    #[test]
+    fn lowers_nova_panel_from_parts_builder() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let header: NovaHeaderPacket = nova_header_packet(8);
+                let slider_color: NovaSliderPacket = nova_slider_packet(1);
+                let slider_speed: NovaSliderPacket = nova_slider_packet(2);
+                let slider_radius: NovaSliderPacket = nova_slider_packet(3);
+                let sliders: NovaSliderGroupPacket =
+                  nova_slider_group_packet(slider_color, slider_speed, slider_radius);
+                let toggle: NovaTogglePacket = nova_toggle_packet(1);
+                let progress: NovaProgressPacket = nova_progress_packet(2);
+                let meter: NovaMeterPacket = nova_meter_packet(3);
+                let button: NovaButtonPacket = nova_button_packet(1, 8);
+                let text_input: NovaTextInputPacket = nova_text_input_packet(4, 1);
+                let select: NovaSelectPacket = nova_select_packet(0, 8);
+                let focus: NovaFocusPacket = nova_focus_packet(2);
+                let panel: NovaPanelPacket = nova_panel_from_parts(
+                  header, sliders, toggle, progress, meter, button, text_input, select, focus
+                );
+                return 1;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            function.body.get(12),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            }) if ty.render() == "NovaPanelPacket" && type_name == "NovaPanelPacket"
         ));
     }
 

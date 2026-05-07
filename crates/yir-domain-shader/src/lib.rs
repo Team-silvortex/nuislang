@@ -1447,7 +1447,11 @@ fn draw_control_panel_surface(
         &mut rows,
         panel_left + 3,
         panel_top + 2,
-        "ns-nova control panel",
+        if packet.header_title_mode.rem_euclid(2) == 0 {
+            "ns-nova control panel"
+        } else {
+            "ns-nova reactive controls"
+        },
     );
     put_text(
         &mut rows,
@@ -1555,7 +1559,14 @@ fn draw_control_panel_surface(
         &mut rows,
         button_left + 2,
         button_top + 1,
-        if button_on { "APPLY" } else { "READY" },
+        match packet.button_intent.rem_euclid(3) {
+            0 if button_on => "APPLY",
+            0 => "READY",
+            1 if button_on => "LIVE ",
+            1 => "ARM  ",
+            _ if button_on => "SYNC ",
+            _ => "HOLD ",
+        },
     );
 
     let knob_center_x = panel_left + 8;
@@ -1594,6 +1605,9 @@ fn draw_control_panel_surface(
     );
     let text_value = format!("nova-{:03}", packet.text_echo.abs() % 1000);
     put_text(&mut rows, text_left + 2, text_top + 1, &text_value);
+    if packet.text_placeholder.rem_euclid(2) != 0 {
+        put_text(&mut rows, text_left + 2, text_top, "query");
+    }
     let caret_x =
         text_left + 2 + (packet.text_caret.rem_euclid(text_value.len() as i64 + 1) as usize);
     if caret_x < text_right {
@@ -1602,13 +1616,25 @@ fn draw_control_panel_surface(
 
     let select_left = panel_right.saturating_sub(28);
     let select_y = panel_bottom.saturating_sub(3);
-    put_text(&mut rows, select_left, select_y, "AUTO");
-    put_text(&mut rows, select_left + 7, select_y, "MAN");
-    put_text(&mut rows, select_left + 13, select_y, "GPU");
-    let selected_x = match packet.select_index.rem_euclid(3) {
+    let option_count = packet.select_options.clamp(2, 4) as usize;
+    let labels = match option_count {
+        2 => ["AUTO", "MAN ", "", ""],
+        3 => ["AUTO", "MAN ", "GPU ", ""],
+        _ => ["AUTO", "MAN ", "GPU ", "CPU "],
+    };
+    put_text(&mut rows, select_left, select_y, labels[0]);
+    put_text(&mut rows, select_left + 7, select_y, labels[1]);
+    if option_count >= 3 {
+        put_text(&mut rows, select_left + 13, select_y, labels[2]);
+    }
+    if option_count >= 4 {
+        put_text(&mut rows, select_left + 19, select_y, labels[3]);
+    }
+    let selected_x = match packet.select_index.rem_euclid(option_count as i64) {
         0 => select_left.saturating_sub(2),
         1 => select_left + 5,
-        _ => select_left + 11,
+        2 => select_left + 11,
+        _ => select_left + 17,
     };
     put_text(&mut rows, selected_x, select_y, ">");
 
@@ -1970,9 +1996,13 @@ struct BallPacket {
     progress_value: i64,
     meter_value: i64,
     button_state: i64,
+    button_intent: i64,
+    header_title_mode: i64,
     text_caret: i64,
     text_echo: i64,
+    text_placeholder: i64,
     select_index: i64,
+    select_options: i64,
 }
 
 fn parse_ball_packet(value: &Value, op: &str) -> Result<BallPacket, String> {
@@ -1994,9 +2024,13 @@ fn parse_ball_packet(value: &Value, op: &str) -> Result<BallPacket, String> {
                 progress_value: speed.round() as i64,
                 meter_value: (radius_scale * 96.0).round() as i64,
                 button_state: if speed.round() as i64 % 2 == 0 { 0 } else { 1 },
+                button_intent: color_key.rem_euclid(3),
+                header_title_mode: color_key.rem_euclid(2),
                 text_caret: color_key.rem_euclid(6),
                 text_echo: color_key,
+                text_placeholder: radius_scale.round() as i64,
                 select_index: color_key.rem_euclid(3),
+                select_options: 3,
             })
         }
         Value::Struct(packet) => parse_ball_packet_struct(packet, op),
@@ -2064,6 +2098,15 @@ fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket
         .map(|value| scalar_to_color_key(value, op))
         .transpose()?
         .unwrap_or(toggle_state);
+    let button_intent = find_packet_field(packet, &["button_intent"], &["button"], &["intent"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(focus_index);
+    let header_title_mode =
+        find_packet_field(packet, &["header_title_mode"], &["header"], &["title_mode"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(focus_index.rem_euclid(2));
     let text_caret = find_packet_field(packet, &["text_caret"], &["text_input"], &["caret"])
         .map(|value| scalar_to_color_key(value, op))
         .transpose()?
@@ -2072,10 +2115,23 @@ fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket
         .map(|value| scalar_to_color_key(value, op))
         .transpose()?
         .unwrap_or(accent);
+    let text_placeholder = find_packet_field(
+        packet,
+        &["text_placeholder"],
+        &["text_input"],
+        &["placeholder"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(radius_scale.round() as i64);
     let select_index = find_packet_field(packet, &["select_index"], &["select"], &["selected"])
         .map(|value| scalar_to_color_key(value, op))
         .transpose()?
         .unwrap_or(focus_index);
+    let select_options = find_packet_field(packet, &["select_options"], &["select"], &["options"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(3);
 
     Ok(BallPacket {
         color_key: scalar_to_color_key(color, op)?,
@@ -2087,9 +2143,13 @@ fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket
         progress_value,
         meter_value,
         button_state,
+        button_intent,
+        header_title_mode,
         text_caret,
         text_echo,
+        text_placeholder,
         select_index,
+        select_options,
     })
 }
 

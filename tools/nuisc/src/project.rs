@@ -1653,6 +1653,7 @@ fn expr_uses_shader_profile_packet(expr: &NirExpr, unit: &str) -> bool {
             packet_type_name,
             ..
         } => shader_unit == unit || packet_type_name.as_deref() == Some("NovaPanelPacket"),
+        NirExpr::StructLiteral { type_name, .. } => type_name == "NovaPanelPacket",
         _ => expr_walk_any(expr, &|inner| expr_uses_shader_profile_packet(inner, unit)),
     }
 }
@@ -2137,6 +2138,21 @@ fn collect_shader_packet_contracts_in_body(
                 discovered.push(ShaderPacketContract {
                     type_name: packet_type_name.clone().unwrap_or_else(|| ty.render()),
                     field_count: if extended { 6 } else { 3 },
+                });
+            }
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            }
+            | NirStmt::Const {
+                ty,
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } if type_name == "NovaPanelPacket" || ty.render() == "NovaPanelPacket" => {
+                discovered.push(ShaderPacketContract {
+                    type_name: "NovaPanelPacket".to_owned(),
+                    field_count: 6,
                 });
             }
             NirStmt::If {
@@ -5137,6 +5153,64 @@ mod tests {
                     let profile_view: Viewport = shader_viewport(160, 120);
                     let profile_pipe: Pipeline = shader_pipeline("lit_sphere", "triangle_strip");
                     let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", "stub");
+                  }
+                }
+                "#,
+            ),
+        ]);
+
+        validate_shader_packet_contract(&project, "SurfaceShader").unwrap();
+    }
+
+    #[test]
+    fn validates_nova_panel_contract_from_struct_literal_usage() {
+        let project = project_with_modules(vec![
+            (
+                "main.ns",
+                r#"
+                mod cpu Main {
+                  fn main() {
+                    let header: NovaHeaderPacket = nova_header_packet(8);
+                    let slider_color: NovaSliderPacket = nova_slider_packet(1);
+                    let slider_speed: NovaSliderPacket = nova_slider_packet(2);
+                    let slider_radius: NovaSliderPacket = nova_slider_packet(3);
+                    let sliders: NovaSliderGroupPacket =
+                      nova_slider_group_packet(slider_color, slider_speed, slider_radius);
+                    let toggle: NovaTogglePacket = nova_toggle_packet(1);
+                    let progress: NovaProgressPacket = nova_progress_packet(2);
+                    let meter: NovaMeterPacket = nova_meter_packet(3);
+                    let button: NovaButtonPacket = nova_button_packet(1, 8);
+                    let text_input: NovaTextInputPacket = nova_text_input_packet(4, 1);
+                    let select: NovaSelectPacket = nova_select_packet(0, 8);
+                    let focus: NovaFocusPacket = nova_focus_packet(2);
+                    let packet: NovaPanelPacket = nova_panel_from_parts(
+                      header, sliders, toggle, progress, meter, button, text_input, select, focus
+                    );
+                  }
+                }
+                "#,
+            ),
+            (
+                "surface_shader.ns",
+                r#"
+                mod shader SurfaceShader {
+                  fn profile() {
+                    const vertex_count: i64 = 4;
+                    const instance_count: i64 = 1;
+                    const slider_color_slot: i64 = 0;
+                    const slider_speed_slot: i64 = 1;
+                    const slider_radius_slot: i64 = 2;
+                    const header_accent_slot: i64 = 3;
+                    const toggle_live_slot: i64 = 4;
+                    const focus_slot: i64 = 5;
+                    const packet_tag: i64 = 17;
+                    const material_mode: i64 = 2;
+                    const pass_kind: i64 = 1;
+                    const packet_field_count: i64 = 6;
+                    let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
+                    let profile_view: Viewport = shader_viewport(160, 120);
+                    let profile_pipe: Pipeline = shader_pipeline("nova_controls", "triangle_strip");
+                    let profile_wgsl: ShaderModule = shader_inline_wgsl("nova_controls", "stub");
                   }
                 }
                 "#,
