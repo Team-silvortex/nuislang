@@ -402,13 +402,14 @@ impl Operation {
             SemanticOp::CpuTaskTimedOut => Some(AsyncCoreOp::ProbeTaskTimedOut),
             SemanticOp::CpuTaskCancelled => Some(AsyncCoreOp::ProbeTaskCancelled),
             SemanticOp::CpuTaskValue => Some(AsyncCoreOp::ExtractTaskValue),
-            _ if self.domain_family() == OperationDomainFamily::Cpu => match self.instruction.as_str()
-            {
-                "await" => Some(AsyncCoreOp::Await),
-                "async_call" => Some(AsyncCoreOp::ScheduleCall),
-                "spawn_task" => Some(AsyncCoreOp::SpawnTask),
-                _ => None,
-            },
+            _ if self.domain_family() == OperationDomainFamily::Cpu => {
+                match self.instruction.as_str() {
+                    "await" => Some(AsyncCoreOp::Await),
+                    "async_call" => Some(AsyncCoreOp::ScheduleCall),
+                    "spawn_task" => Some(AsyncCoreOp::SpawnTask),
+                    _ => None,
+                }
+            }
             _ => None,
         }
     }
@@ -521,9 +522,9 @@ impl Operation {
             | SemanticOp::DataIsMoved
             | SemanticOp::DataIsWindowed
             | SemanticOp::DataValue => Some(SemanticOp::DataObserve),
-            SemanticOp::ShaderIsPassReady | SemanticOp::ShaderIsFrameReady | SemanticOp::ShaderValue => {
-                Some(SemanticOp::ShaderObserve)
-            }
+            SemanticOp::ShaderIsPassReady
+            | SemanticOp::ShaderIsFrameReady
+            | SemanticOp::ShaderValue => Some(SemanticOp::ShaderObserve),
             SemanticOp::KernelIsConfigReady | SemanticOp::KernelValue => {
                 Some(SemanticOp::KernelObserve)
             }
@@ -629,9 +630,7 @@ impl Operation {
             }
             "input_i64" | "extern_call_i64" => CpuLlvmLoweringClass::Runtime,
             "print" => CpuLlvmLoweringClass::Effect,
-            _ if self.is_async_core_op() => {
-                CpuLlvmLoweringClass::Effect
-            }
+            _ if self.is_async_core_op() => CpuLlvmLoweringClass::Effect,
             _ => CpuLlvmLoweringClass::Other,
         }
     }
@@ -931,8 +930,8 @@ mod tests {
     use super::{
         AsyncCoreOp, CpuLlvmLoweringClass, DataFabricPrimitive, DataFlowState, DataMod,
         DataResultHandle, DataWindow, ExecutionState, GlmEffect, GlmUseMode, GlmValueClass,
-        KernelFlowState, KernelResultHandle, Node, Operation, OperationDomainFamily,
-        RegisteredMod, Resource, ResourceKind, SemanticOp, ShaderFlowState, ShaderResultHandle,
+        KernelFlowState, KernelResultHandle, Node, Operation, OperationDomainFamily, RegisteredMod,
+        Resource, ResourceKind, SemanticOp, ShaderFlowState, ShaderResultHandle,
         TaskLifecycleState, TaskResultHandle, Value, YirResultFamily, YirResultRole,
         YirResultState,
     };
@@ -961,24 +960,30 @@ mod tests {
             vec!["ping".to_owned(), "async_call_0".to_owned()],
         )
         .unwrap();
-        let join_result =
-            Operation::parse("cpu.join_result", vec!["task_0".to_owned()]).unwrap();
-        let task_value =
-            Operation::parse("cpu.task_value", vec!["result_0".to_owned()]).unwrap();
+        let join_result = Operation::parse("cpu.join_result", vec!["task_0".to_owned()]).unwrap();
+        let task_value = Operation::parse("cpu.task_value", vec!["result_0".to_owned()]).unwrap();
 
         assert_eq!(async_call.async_core_op(), Some(AsyncCoreOp::ScheduleCall));
         assert_eq!(spawn.async_core_op(), Some(AsyncCoreOp::SpawnTask));
-        assert_eq!(join_result.async_core_op(), Some(AsyncCoreOp::ObserveTaskResult));
-        assert_eq!(task_value.async_core_op(), Some(AsyncCoreOp::ExtractTaskValue));
+        assert_eq!(
+            join_result.async_core_op(),
+            Some(AsyncCoreOp::ObserveTaskResult)
+        );
+        assert_eq!(
+            task_value.async_core_op(),
+            Some(AsyncCoreOp::ExtractTaskValue)
+        );
         assert_eq!(join_result.result_role(), Some(YirResultRole::Entry));
-        assert_eq!(task_value.result_role(), Some(YirResultRole::PayloadExtractor));
+        assert_eq!(
+            task_value.result_role(),
+            Some(YirResultRole::PayloadExtractor)
+        );
         assert!(task_value.is_async_task_result_observer());
     }
 
     #[test]
     fn lowers_async_primitives_as_effectful_cpu_nodes() {
-        let task_value =
-            Operation::parse("cpu.task_value", vec!["result_0".to_owned()]).unwrap();
+        let task_value = Operation::parse("cpu.task_value", vec!["result_0".to_owned()]).unwrap();
         assert_eq!(
             task_value.cpu_llvm_lowering_class(),
             CpuLlvmLoweringClass::Effect
@@ -1065,7 +1070,11 @@ mod tests {
         .unwrap();
         let kernel_source = Operation::parse(
             "cpu.project_profile_ref",
-            vec!["kernel".to_owned(), "KernelUnit".to_owned(), "queue_depth".to_owned()],
+            vec![
+                "kernel".to_owned(),
+                "KernelUnit".to_owned(),
+                "queue_depth".to_owned(),
+            ],
         )
         .unwrap();
         assert!(kernel_observe
@@ -1079,10 +1088,12 @@ mod tests {
             Operation::parse("cpu.task_completed", vec!["result_0".to_owned()]).unwrap();
         let shader_ready =
             Operation::parse("shader.is_frame_ready", vec!["shader_result".to_owned()]).unwrap();
-        let data_moved =
-            Operation::parse("data.is_moved", vec!["data_result".to_owned()]).unwrap();
+        let data_moved = Operation::parse("data.is_moved", vec!["data_result".to_owned()]).unwrap();
 
-        assert_eq!(task_completed.result_role(), Some(YirResultRole::StateProbe));
+        assert_eq!(
+            task_completed.result_role(),
+            Some(YirResultRole::StateProbe)
+        );
         assert_eq!(
             task_completed.result_probe_state(),
             Some(YirResultState::Task(TaskLifecycleState::Completed))
@@ -1116,9 +1127,7 @@ mod tests {
         let data_mod = DataMod;
         let mut state = ExecutionState::default();
 
-        state
-            .values
-            .insert("base".to_owned(), Value::Int(7));
+        state.values.insert("base".to_owned(), Value::Int(7));
         let first = data_mod
             .execute(
                 &Node {
@@ -1149,7 +1158,7 @@ mod tests {
                 },
                 &resource,
                 &mut state,
-        )
+            )
             .unwrap_err();
         assert!(error.contains("cannot wrap non-window-compatible payload"));
     }
@@ -1182,7 +1191,7 @@ mod tests {
                 },
                 &resource,
                 &mut state,
-        )
+            )
             .unwrap_err();
         assert!(error.contains("illegal pipe payload"));
     }
@@ -1277,7 +1286,9 @@ mod tests {
         let mut state = ExecutionState::default();
         let buffer = state.alloc_heap_buffer(4, 0);
 
-        state.values.insert("buffer0".to_owned(), Value::Pointer(Some(buffer)));
+        state
+            .values
+            .insert("buffer0".to_owned(), Value::Pointer(Some(buffer)));
         state.values.insert("value0".to_owned(), Value::Int(33));
 
         let window = data_mod
@@ -1331,7 +1342,9 @@ mod tests {
         let mut state = ExecutionState::default();
         let buffer = state.alloc_heap_buffer(4, 0);
         state.write_heap_buffer_at(Some(buffer), 2, 55).unwrap();
-        state.values.insert("buffer0".to_owned(), Value::Pointer(Some(buffer)));
+        state
+            .values
+            .insert("buffer0".to_owned(), Value::Pointer(Some(buffer)));
 
         let window = data_mod
             .execute(
@@ -2489,7 +2502,10 @@ impl RegisteredMod for DataMod {
                     ));
                 }
                 parse_data_flow_state(&node.op.args[1]).map_err(|error| {
-                    format!("node `{}` has invalid data observe state: {error}", node.name)
+                    format!(
+                        "node `{}` has invalid data observe state: {error}",
+                        node.name
+                    )
                 })?;
                 Ok(InstructionSemantics::pure(vec![node.op.args[0].clone()]))
             }
@@ -2805,10 +2821,9 @@ fn validate_data_window_range(
                     "data window cannot wrap node pointer `&{address}` as buffer backing"
                 ));
             }
-            let buffer = state
-                .buffers
-                .get(address)
-                .ok_or_else(|| format!("data window cannot wrap dangling buffer pointer `&{address}`"))?;
+            let buffer = state.buffers.get(address).ok_or_else(|| {
+                format!("data window cannot wrap dangling buffer pointer `&{address}`")
+            })?;
             let end = offset
                 .checked_add(len)
                 .ok_or_else(|| "data window range overflows usize".to_owned())?;

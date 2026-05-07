@@ -1,6 +1,6 @@
 use yir_core::{
-    ExecutionState, InstructionSemantics, KernelFlowState, KernelResultHandle, Node,
-    RegisteredMod, Resource, TensorValue, Value,
+    ExecutionState, InstructionSemantics, KernelFlowState, KernelResultHandle, Node, RegisteredMod,
+    Resource, TensorValue, Value,
 };
 
 pub struct KernelMod;
@@ -147,7 +147,10 @@ fn describe_kernel_node(node: &Node, resource: &Resource) -> Result<InstructionS
                 ));
             }
             parse_kernel_flow_state(&node.op.args[1]).map_err(|error| {
-                format!("node `{}` has invalid kernel observe state: {error}", node.name)
+                format!(
+                    "node `{}` has invalid kernel observe state: {error}",
+                    node.name
+                )
             })?;
             Ok(InstructionSemantics::pure(vec![node.op.args[0].clone()]))
         }
@@ -450,7 +453,10 @@ fn execute_kernel_node(
         }
         "is_config_ready" => {
             let result = state.expect_kernel_result(&node.op.args[0])?;
-            Ok(Value::Bool(matches!(result.state, KernelFlowState::ConfigReady)))
+            Ok(Value::Bool(matches!(
+                result.state,
+                KernelFlowState::ConfigReady
+            )))
         }
         "value" => {
             let result = state.expect_kernel_result(&node.op.args[0])?;

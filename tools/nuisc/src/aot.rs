@@ -604,8 +604,7 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
     let cpu_target_abi = parse_required_toml_string(&source, "cpu_target_abi", path)?;
     let cpu_target_machine_arch =
         parse_required_toml_string(&source, "cpu_target_machine_arch", path)?;
-    let cpu_target_machine_os =
-        parse_required_toml_string(&source, "cpu_target_machine_os", path)?;
+    let cpu_target_machine_os = parse_required_toml_string(&source, "cpu_target_machine_os", path)?;
     let cpu_target_object_format =
         parse_required_toml_string(&source, "cpu_target_object_format", path)?;
     let cpu_target_calling_abi =
@@ -1129,8 +1128,7 @@ mod tests {
         assert_eq!(apple.machine_os, "darwin");
         assert_eq!(apple.clang_target, "aarch64-apple-darwin");
 
-        let linux =
-            resolve_cpu_build_target_from_abi(&registry_root, "cpu.x86_64.sysv64").unwrap();
+        let linux = resolve_cpu_build_target_from_abi(&registry_root, "cpu.x86_64.sysv64").unwrap();
         assert_eq!(linux.machine_arch, "x86_64");
         assert_eq!(linux.machine_os, "linux");
         assert_eq!(linux.object_format, "elf");

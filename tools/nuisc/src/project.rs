@@ -726,7 +726,8 @@ fn recommend_registered_abi_profile_for_host(
                 .as_deref()
                 .unwrap_or(profile.as_str())
                 .to_ascii_lowercase();
-            if host_os == "darwin" && (backend.contains("apple_ane") || backend.contains("coreml")) {
+            if host_os == "darwin" && (backend.contains("apple_ane") || backend.contains("coreml"))
+            {
                 score += 60;
             }
             if backend.contains("cpu-fallback") {
@@ -1648,8 +1649,10 @@ fn expr_uses_shader_profile_render(expr: &NirExpr, unit: &str) -> bool {
 fn expr_uses_shader_profile_packet(expr: &NirExpr, unit: &str) -> bool {
     match expr {
         NirExpr::ShaderProfilePacket {
-            unit: shader_unit, ..
-        } => shader_unit == unit,
+            unit: shader_unit,
+            packet_type_name,
+            ..
+        } => shader_unit == unit || packet_type_name.as_deref() == Some("NovaPanelPacket"),
         _ => expr_walk_any(expr, &|inner| expr_uses_shader_profile_packet(inner, unit)),
     }
 }
@@ -1823,9 +1826,9 @@ fn expr_walk_any(expr: &NirExpr, predicate: &dyn Fn(&NirExpr) -> bool) -> bool {
             radius,
             ..
         } => predicate(color) || predicate(speed) || predicate(radius),
-        NirExpr::CpuSpawn { args, .. } | NirExpr::CpuExternCall { args, .. } | NirExpr::Call { args, .. } => {
-            args.iter().any(predicate)
-        }
+        NirExpr::CpuSpawn { args, .. }
+        | NirExpr::CpuExternCall { args, .. }
+        | NirExpr::Call { args, .. } => args.iter().any(predicate),
         NirExpr::CpuTimeout { task, limit } => predicate(task) || predicate(limit),
         NirExpr::MethodCall { receiver, args, .. } => {
             predicate(receiver) || args.iter().any(predicate)
@@ -1983,6 +1986,10 @@ fn validate_shader_packet_contract(project: &LoadedProject, unit: &str) -> Resul
     let Some(contract) = infer_shader_packet_contract(project, unit)? else {
         return Ok(());
     };
+    let declared_support = support_surface_for_domain(&mut BTreeMap::new(), "shader")?;
+    for required_surface in shader_packet_support_surface_contract(&contract) {
+        require_declared_support_surface(&declared_support, "shader", unit, required_surface)?;
+    }
 
     let packet_field_count = int_bindings
         .get("packet_field_count")
@@ -2024,6 +2031,16 @@ fn validate_shader_packet_contract(project: &LoadedProject, unit: &str) -> Resul
     }
 
     Ok(())
+}
+
+fn shader_packet_support_surface_contract(
+    contract: &ShaderPacketContract,
+) -> &'static [&'static str] {
+    if contract.type_name == "NovaPanelPacket" {
+        &["shader.profile.packet.nova.v1"]
+    } else {
+        &[]
+    }
 }
 
 fn shader_packet_slot_names(contract: &ShaderPacketContract) -> &'static [&'static str] {
@@ -2115,9 +2132,8 @@ fn collect_shader_packet_contracts_in_body(
                         ..
                     },
                 ..
-            } if shader_unit == unit => {
-                let extended =
-                    accent.is_some() || toggle_state.is_some() || focus_index.is_some();
+            } if shader_unit == unit || packet_type_name.as_deref() == Some("NovaPanelPacket") => {
+                let extended = accent.is_some() || toggle_state.is_some() || focus_index.is_some();
                 discovered.push(ShaderPacketContract {
                     type_name: packet_type_name.clone().unwrap_or_else(|| ty.render()),
                     field_count: if extended { 6 } else { 3 },
@@ -2341,7 +2357,11 @@ fn validate_data_profile_for_link(
         ));
     }
     if contract.uplink == NirResultStage::Data(NirDataFlowState::Windowed) {
-        if !module.nodes.iter().any(|node| node.name == uplink_window_policy) {
+        if !module
+            .nodes
+            .iter()
+            .any(|node| node.name == uplink_window_policy)
+        {
             return Err(format!(
                 "project data unit `data.{}` requires `uplink_window_policy` marker node for bridge stage `{}`",
                 unit,
@@ -2360,7 +2380,11 @@ fn validate_data_profile_for_link(
         }
     }
     if contract.downlink == NirResultStage::Data(NirDataFlowState::Windowed) {
-        if !module.nodes.iter().any(|node| node.name == downlink_window_policy) {
+        if !module
+            .nodes
+            .iter()
+            .any(|node| node.name == downlink_window_policy)
+        {
             return Err(format!(
                 "project data unit `data.{}` requires `downlink_window_policy` marker node for bridge stage `{}`",
                 unit,
@@ -3262,11 +3286,16 @@ fn shader_profile_slot_targets(
             resolve_project_profile_target_name("shader", unit, "packet_field_count"),
         ),
     ];
-    let packet_slots = packet_contract
-        .map(shader_packet_slot_names)
-        .unwrap_or(&["packet_color_slot", "packet_speed_slot", "packet_radius_slot"]);
+    let packet_slots = packet_contract.map(shader_packet_slot_names).unwrap_or(&[
+        "packet_color_slot",
+        "packet_speed_slot",
+        "packet_radius_slot",
+    ]);
     for slot in packet_slots {
-        slots.push((slot, resolve_project_profile_target_name("shader", unit, slot)));
+        slots.push((
+            slot,
+            resolve_project_profile_target_name("shader", unit, slot),
+        ));
     }
     slots
 }
@@ -3903,10 +3932,9 @@ fn resolve_project_profile_target_name(domain: &str, unit: &str, slot: &str) -> 
             "project_profile_shader_{}_toggle_live_slot",
             sanitize_ident(unit)
         ),
-        ("shader", "focus_slot") => format!(
-            "project_profile_shader_{}_focus_slot",
-            sanitize_ident(unit)
-        ),
+        ("shader", "focus_slot") => {
+            format!("project_profile_shader_{}_focus_slot", sanitize_ident(unit))
+        }
         ("shader", "packet_tag") => {
             format!("project_profile_shader_{}_packet_tag", sanitize_ident(unit))
         }
@@ -4420,8 +4448,8 @@ fn validate_project_links(
                     link.from, link.to, via
                 ));
             }
-            let contract =
-                required_project_link_stage_contract(&link.from, &link.to, via).map_err(|error| {
+            let contract = required_project_link_stage_contract(&link.from, &link.to, via)
+                .map_err(|error| {
                     format!(
                         "project link `{}` -> `{}` via `{}` is not yet supported: {error}",
                         link.from, link.to, via
@@ -4518,7 +4546,8 @@ fn build_project_link_bridge_contract(
     let uplink_source = resolve_bridge_payload_source(from, to, true)?;
     let downlink_source = resolve_bridge_payload_source(from, to, false)?;
     let stages = required_project_link_stage_contract(from, to, via)?;
-    let uplink_payload = infer_project_route_payload_type(project, &uplink_source, &data_unit, true)?;
+    let uplink_payload =
+        infer_project_route_payload_type(project, &uplink_source, &data_unit, true)?;
     let downlink_payload =
         infer_project_route_payload_type(project, &downlink_source, &data_unit, false)?;
 
@@ -5160,6 +5189,18 @@ mod tests {
     }
 
     #[test]
+    fn nova_panel_packet_requires_nova_support_surface() {
+        let contract = ShaderPacketContract {
+            type_name: "NovaPanelPacket".to_owned(),
+            field_count: 6,
+        };
+        assert_eq!(
+            shader_packet_support_surface_contract(&contract),
+            ["shader.profile.packet.nova.v1"]
+        );
+    }
+
+    #[test]
     fn validates_kernel_profile_slot_contract() {
         let project = project_with_modules(vec![(
             "kernel_unit.ns",
@@ -5298,8 +5339,11 @@ mod tests {
             .nodes
             .iter()
             .any(|node| node.name.contains("_bridge_stage_type")
-                && node.op.args.first().is_some_and(|value| value
-                    == "uplink=windowed;downlink=windowed")));
+                && node
+                    .op
+                    .args
+                    .first()
+                    .is_some_and(|value| value == "uplink=windowed;downlink=windowed")));
         assert!(yir
             .nodes
             .iter()
@@ -5355,8 +5399,14 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(contract.uplink, NirResultStage::Data(NirDataFlowState::Windowed));
-        assert_eq!(contract.downlink, NirResultStage::Data(NirDataFlowState::Windowed));
+        assert_eq!(
+            contract.uplink,
+            NirResultStage::Data(NirDataFlowState::Windowed)
+        );
+        assert_eq!(
+            contract.downlink,
+            NirResultStage::Data(NirDataFlowState::Windowed)
+        );
     }
 
     #[test]

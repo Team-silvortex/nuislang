@@ -195,7 +195,11 @@ fn run() -> Result<(), String> {
                         }
                         println!(
                             "    abi_target_host_adaptive: {}",
-                            if target.host_adaptive { "true" } else { "false" }
+                            if target.host_adaptive {
+                                "true"
+                            } else {
+                                "false"
+                            }
                         );
                     }
                 }

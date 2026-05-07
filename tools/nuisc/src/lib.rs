@@ -498,12 +498,22 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 "  cpu_target_machine: {}-{}",
                 report.cpu_target_machine_arch, report.cpu_target_machine_os
             );
-            println!("  cpu_target_object_format: {}", report.cpu_target_object_format);
-            println!("  cpu_target_calling_abi: {}", report.cpu_target_calling_abi);
+            println!(
+                "  cpu_target_object_format: {}",
+                report.cpu_target_object_format
+            );
+            println!(
+                "  cpu_target_calling_abi: {}",
+                report.cpu_target_calling_abi
+            );
             println!("  cpu_target_clang: {}", report.cpu_target_clang);
             println!(
                 "  cpu_target_cross: {}",
-                if report.cpu_target_cross { "true" } else { "false" }
+                if report.cpu_target_cross {
+                    "true"
+                } else {
+                    "false"
+                }
             );
             if let Some(status) = report.compile_cache_status {
                 println!("  compile_cache_status: {}", status);
@@ -1009,9 +1019,10 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             if let Some(resolution) = &project_abi_resolution {
                 for item in &resolution.requirements {
                     println!("abi: {}={}", item.domain, item.abi);
-                    if let Ok(manifest) =
-                        registry::load_manifest_for_domain(Path::new("nustar-packages"), &item.domain)
-                    {
+                    if let Ok(manifest) = registry::load_manifest_for_domain(
+                        Path::new("nustar-packages"),
+                        &item.domain,
+                    ) {
                         if let Ok(target) = registry::registered_abi_target(&manifest, &item.abi) {
                             println!(
                                 "  abi_target_machine: {}-{}",
@@ -1025,7 +1036,11 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                             }
                             println!(
                                 "  abi_target_host_adaptive: {}",
-                                if target.host_adaptive { "true" } else { "false" }
+                                if target.host_adaptive {
+                                    "true"
+                                } else {
+                                    "false"
+                                }
                             );
                         }
                     }

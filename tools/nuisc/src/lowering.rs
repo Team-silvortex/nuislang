@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, path::Path};
 use nuis_semantics::model::{NirBinaryOp, NirExpr, NirFunction, NirModule, NirStmt};
 use yir_core::{
     Edge, EdgeKind, Node, Operation, Resource, ResourceKind, SemanticOp, TaskLifecycleState,
-    YirResultRole, YirResultState, YirModule,
+    YirModule, YirResultRole, YirResultState,
 };
 
 use crate::registry::NustarPackageManifest;
@@ -604,6 +604,45 @@ fn lower_expr(
                 push_dep_edges(state, accent_name, &header_struct);
                 panel_group_nodes.push(header_struct.clone());
 
+                let color_slider = next_name(state, "nova_slider_color");
+                state.yir.nodes.push(Node {
+                    name: color_slider.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec!["NovaSliderPacket".to_owned(), format!("value={color_name}")],
+                    },
+                });
+                push_dep_edges(state, &color_name, &color_slider);
+
+                let speed_slider = next_name(state, "nova_slider_speed");
+                state.yir.nodes.push(Node {
+                    name: speed_slider.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec!["NovaSliderPacket".to_owned(), format!("value={speed_name}")],
+                    },
+                });
+                push_dep_edges(state, &speed_name, &speed_slider);
+
+                let radius_slider = next_name(state, "nova_slider_radius");
+                state.yir.nodes.push(Node {
+                    name: radius_slider.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaSliderPacket".to_owned(),
+                            format!("value={radius_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, &radius_name, &radius_slider);
+
                 let slider_struct = next_name(state, "nova_panel_sliders");
                 state.yir.nodes.push(Node {
                     name: slider_struct.clone(),
@@ -613,15 +652,15 @@ fn lower_expr(
                         instruction: "struct".to_owned(),
                         args: vec![
                             "NovaSliderGroupPacket".to_owned(),
-                            format!("color={color_name}"),
-                            format!("speed={speed_name}"),
-                            format!("radius={radius_name}"),
+                            format!("color={color_slider}"),
+                            format!("speed={speed_slider}"),
+                            format!("radius={radius_slider}"),
                         ],
                     },
                 });
-                push_dep_edges(state, &color_name, &slider_struct);
-                push_dep_edges(state, &speed_name, &slider_struct);
-                push_dep_edges(state, &radius_name, &slider_struct);
+                push_dep_edges(state, &color_slider, &slider_struct);
+                push_dep_edges(state, &speed_slider, &slider_struct);
+                push_dep_edges(state, &radius_slider, &slider_struct);
                 panel_group_nodes.push(slider_struct.clone());
 
                 let toggle_struct = next_name(state, "nova_panel_toggle");
@@ -631,14 +670,94 @@ fn lower_expr(
                     op: Operation {
                         module: "cpu".to_owned(),
                         instruction: "struct".to_owned(),
-                        args: vec![
-                            "NovaTogglePacket".to_owned(),
-                            format!("live={toggle_name}"),
-                        ],
+                        args: vec!["NovaTogglePacket".to_owned(), format!("live={toggle_name}")],
                     },
                 });
                 push_dep_edges(state, toggle_name, &toggle_struct);
                 panel_group_nodes.push(toggle_struct.clone());
+
+                let progress_struct = next_name(state, "nova_panel_progress");
+                state.yir.nodes.push(Node {
+                    name: progress_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaProgressPacket".to_owned(),
+                            format!("value={speed_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, &speed_name, &progress_struct);
+                panel_group_nodes.push(progress_struct.clone());
+
+                let meter_struct = next_name(state, "nova_panel_meter");
+                state.yir.nodes.push(Node {
+                    name: meter_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec!["NovaMeterPacket".to_owned(), format!("value={radius_name}")],
+                    },
+                });
+                push_dep_edges(state, &radius_name, &meter_struct);
+                panel_group_nodes.push(meter_struct.clone());
+
+                let button_struct = next_name(state, "nova_panel_button");
+                state.yir.nodes.push(Node {
+                    name: button_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaButtonPacket".to_owned(),
+                            format!("active={toggle_name}"),
+                            format!("accent={accent_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &button_struct);
+                push_dep_edges(state, accent_name, &button_struct);
+                panel_group_nodes.push(button_struct.clone());
+
+                let text_input_struct = next_name(state, "nova_panel_text_input");
+                state.yir.nodes.push(Node {
+                    name: text_input_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaTextInputPacket".to_owned(),
+                            format!("echo={color_name}"),
+                            format!("caret={focus_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, &color_name, &text_input_struct);
+                push_dep_edges(state, focus_name, &text_input_struct);
+                panel_group_nodes.push(text_input_struct.clone());
+
+                let select_struct = next_name(state, "nova_panel_select");
+                state.yir.nodes.push(Node {
+                    name: select_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaSelectPacket".to_owned(),
+                            format!("selected={focus_name}"),
+                            format!("accent={accent_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, focus_name, &select_struct);
+                push_dep_edges(state, accent_name, &select_struct);
+                panel_group_nodes.push(select_struct.clone());
 
                 let focus_struct = next_name(state, "nova_panel_focus");
                 state.yir.nodes.push(Node {
@@ -647,10 +766,7 @@ fn lower_expr(
                     op: Operation {
                         module: "cpu".to_owned(),
                         instruction: "struct".to_owned(),
-                        args: vec![
-                            "NovaFocusPacket".to_owned(),
-                            format!("slot={focus_name}"),
-                        ],
+                        args: vec!["NovaFocusPacket".to_owned(), format!("slot={focus_name}")],
                     },
                 });
                 push_dep_edges(state, focus_name, &focus_struct);
@@ -661,6 +777,11 @@ fn lower_expr(
                     format!("header={header_struct}"),
                     format!("sliders={slider_struct}"),
                     format!("toggle={toggle_struct}"),
+                    format!("progress={progress_struct}"),
+                    format!("meter={meter_struct}"),
+                    format!("button={button_struct}"),
+                    format!("text_input={text_input_struct}"),
+                    format!("select={select_struct}"),
                     format!("focus={focus_struct}"),
                 ]
             } else {
@@ -810,56 +931,46 @@ fn lower_expr(
             });
             Ok(name)
         }
-        NirExpr::DataResult { value, state: flow } => {
-            lower_result_observe_node(
-                state,
-                bindings,
-                ResultLoweringDomain::Data,
-                value,
-                "data_result",
-                flow.render(),
-            )
-        }
-        NirExpr::DataReady(result) => {
-            lower_result_unary_value_effect(
-                state,
-                bindings,
-                ResultLoweringDomain::Data,
-                result,
-                "data_ready",
-                "is_ready",
-            )
-        }
-        NirExpr::DataMoved(result) => {
-            lower_result_unary_value_effect(
-                state,
-                bindings,
-                ResultLoweringDomain::Data,
-                result,
-                "data_moved",
-                "is_moved",
-            )
-        }
-        NirExpr::DataWindowed(result) => {
-            lower_result_unary_value_effect(
-                state,
-                bindings,
-                ResultLoweringDomain::Data,
-                result,
-                "data_windowed",
-                "is_windowed",
-            )
-        }
-        NirExpr::DataValue(result) => {
-            lower_result_unary_value_effect(
-                state,
-                bindings,
-                ResultLoweringDomain::Data,
-                result,
-                "data_value",
-                "value",
-            )
-        }
+        NirExpr::DataResult { value, state: flow } => lower_result_observe_node(
+            state,
+            bindings,
+            ResultLoweringDomain::Data,
+            value,
+            "data_result",
+            flow.render(),
+        ),
+        NirExpr::DataReady(result) => lower_result_unary_value_effect(
+            state,
+            bindings,
+            ResultLoweringDomain::Data,
+            result,
+            "data_ready",
+            "is_ready",
+        ),
+        NirExpr::DataMoved(result) => lower_result_unary_value_effect(
+            state,
+            bindings,
+            ResultLoweringDomain::Data,
+            result,
+            "data_moved",
+            "is_moved",
+        ),
+        NirExpr::DataWindowed(result) => lower_result_unary_value_effect(
+            state,
+            bindings,
+            ResultLoweringDomain::Data,
+            result,
+            "data_windowed",
+            "is_windowed",
+        ),
+        NirExpr::DataValue(result) => lower_result_unary_value_effect(
+            state,
+            bindings,
+            ResultLoweringDomain::Data,
+            result,
+            "data_value",
+            "value",
+        ),
         NirExpr::DataCopyWindow { input, offset, len } => {
             ensure_fabric_resource(state.yir);
             let input_name = lower_expr(input, state, bindings)?;
@@ -1103,9 +1214,7 @@ fn lower_expr(
             });
             Ok(name)
         }
-        NirExpr::CpuJoinResult(task) => {
-            lower_task_result_entry_node(state, bindings, task)
-        }
+        NirExpr::CpuJoinResult(task) => lower_task_result_entry_node(state, bindings, task),
         NirExpr::CpuTaskCompleted(result) => lower_task_result_observer_node(
             state,
             bindings,
@@ -1271,16 +1380,14 @@ fn lower_expr(
         NirExpr::KernelProfileBatchLanesRef { unit } => {
             lower_project_profile_ref(state, "kernel", unit, "batch_lanes")
         }
-        NirExpr::KernelResult { value, state: flow } => {
-            lower_result_observe_node(
-                state,
-                bindings,
-                ResultLoweringDomain::Kernel,
-                value,
-                "kernel_result",
-                flow.render(),
-            )
-        }
+        NirExpr::KernelResult { value, state: flow } => lower_result_observe_node(
+            state,
+            bindings,
+            ResultLoweringDomain::Kernel,
+            value,
+            "kernel_result",
+            flow.render(),
+        ),
         NirExpr::KernelConfigReady(result) => lower_result_unary_value_effect(
             state,
             bindings,
@@ -1289,16 +1396,14 @@ fn lower_expr(
             "kernel_config_ready",
             "is_config_ready",
         ),
-        NirExpr::KernelValue(result) => {
-            lower_result_unary_value_effect(
-                state,
-                bindings,
-                ResultLoweringDomain::Kernel,
-                result,
-                "kernel_value",
-                "value",
-            )
-        }
+        NirExpr::KernelValue(result) => lower_result_unary_value_effect(
+            state,
+            bindings,
+            ResultLoweringDomain::Kernel,
+            result,
+            "kernel_value",
+            "value",
+        ),
         NirExpr::ShaderTarget {
             format,
             width,
@@ -1362,16 +1467,14 @@ fn lower_expr(
             });
             Ok(name)
         }
-        NirExpr::ShaderResult { value, state: flow } => {
-            lower_result_observe_node(
-                state,
-                bindings,
-                ResultLoweringDomain::Shader,
-                value,
-                "shader_result",
-                flow.render(),
-            )
-        }
+        NirExpr::ShaderResult { value, state: flow } => lower_result_observe_node(
+            state,
+            bindings,
+            ResultLoweringDomain::Shader,
+            value,
+            "shader_result",
+            flow.render(),
+        ),
         NirExpr::ShaderPassReady(result) => lower_result_unary_value_effect(
             state,
             bindings,
@@ -1388,16 +1491,14 @@ fn lower_expr(
             "shader_frame_ready",
             "is_frame_ready",
         ),
-        NirExpr::ShaderValue(result) => {
-            lower_result_unary_value_effect(
-                state,
-                bindings,
-                ResultLoweringDomain::Shader,
-                result,
-                "shader_value",
-                "value",
-            )
-        }
+        NirExpr::ShaderValue(result) => lower_result_unary_value_effect(
+            state,
+            bindings,
+            ResultLoweringDomain::Shader,
+            result,
+            "shader_value",
+            "value",
+        ),
         NirExpr::ShaderBeginPass {
             target,
             pipeline,
@@ -1977,10 +2078,14 @@ fn lower_task_result_observer_node(
         }
         (YirResultRole::PayloadExtractor, None) => ("cpu_task_value", "task_value"),
         (YirResultRole::Entry, _) => {
-            return Err("task result entry must lower through lower_task_result_entry_node".to_owned())
+            return Err(
+                "task result entry must lower through lower_task_result_entry_node".to_owned(),
+            )
         }
         (YirResultRole::StateProbe, Some(other)) => {
-            return Err(format!("unsupported non-task result probe state `{other:?}` for task observer"))
+            return Err(format!(
+                "unsupported non-task result probe state `{other:?}` for task observer"
+            ))
         }
         (YirResultRole::StateProbe, None) => {
             return Err("task state probe requires an explicit task lifecycle state".to_owned())

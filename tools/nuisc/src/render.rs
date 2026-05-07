@@ -551,13 +551,29 @@ fn render_nir_expr(value: &NirExpr) -> String {
             focus_index,
         } => {
             let packet_callee = if packet_type_name.as_deref() == Some("NovaPanelPacket") {
-                "shader_profile_panel_packet"
+                if unit == "__nova__" {
+                    "nova_panel_packet"
+                } else {
+                    "shader_profile_panel_packet"
+                }
             } else {
                 "shader_profile_packet"
             };
             if let (Some(accent), Some(toggle_state), Some(focus_index)) =
                 (accent.as_ref(), toggle_state.as_ref(), focus_index.as_ref())
             {
+                if packet_callee == "nova_panel_packet" {
+                    return format!(
+                        "{}({}, {}, {}, {}, {}, {})",
+                        packet_callee,
+                        render_nir_expr(color),
+                        render_nir_expr(speed),
+                        render_nir_expr(radius),
+                        render_nir_expr(accent),
+                        render_nir_expr(toggle_state),
+                        render_nir_expr(focus_index)
+                    );
+                }
                 format!(
                     "{}(\"{}\", {}, {}, {}, {}, {}, {})",
                     packet_callee,

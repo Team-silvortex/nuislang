@@ -5,9 +5,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{
     AstBinaryOp, AstExpr, AstFunction, AstModule, AstParam, AstStmt, AstTypeRef, NirBinaryOp,
-    NirDataFlowState, NirExpr, NirExternFunction, NirExternInterface, NirFunction, NirModule,
-    NirKernelFlowState, NirParam, NirResultFamily, NirResultStage, NirShaderFlowState, NirStmt,
-    NirStructDef, NirStructField, NirTypeRef, NirUse, NirWindowMode,
+    NirDataFlowState, NirExpr, NirExternFunction, NirExternInterface, NirFunction,
+    NirKernelFlowState, NirModule, NirParam, NirResultFamily, NirResultStage, NirShaderFlowState,
+    NirStmt, NirStructDef, NirStructField, NirTypeRef, NirUse, NirWindowMode,
 };
 
 pub fn frontend_name() -> &'static str {
@@ -786,7 +786,9 @@ fn lower_call_expr_with_async(
     match callee {
         "spawn" => {
             if current_domain != "cpu" {
-                return Err("spawn(...) is currently only allowed inside `mod cpu <unit>`".to_owned());
+                return Err(
+                    "spawn(...) is currently only allowed inside `mod cpu <unit>`".to_owned(),
+                );
             }
             let [call] = args else {
                 return Err("spawn(...) expects exactly one async function call".to_owned());
@@ -796,7 +798,9 @@ fn lower_call_expr_with_async(
                 args: spawned_args,
             } = call
             else {
-                return Err("spawn(...) expects an async function call like `spawn(task())`".to_owned());
+                return Err(
+                    "spawn(...) expects an async function call like `spawn(task())`".to_owned(),
+                );
             };
             let signature = signatures.get(spawned_callee).ok_or_else(|| {
                 format!("spawn(...) references unknown function `{spawned_callee}`")
@@ -833,7 +837,9 @@ fn lower_call_expr_with_async(
         }
         "join" => {
             if current_domain != "cpu" {
-                return Err("join(...) is currently only allowed inside `mod cpu <unit>`".to_owned());
+                return Err(
+                    "join(...) is currently only allowed inside `mod cpu <unit>`".to_owned(),
+                );
             }
             let [task] = args else {
                 return Err("join(...) expects exactly one task handle".to_owned());
@@ -852,7 +858,9 @@ fn lower_call_expr_with_async(
         }
         "cancel" => {
             if current_domain != "cpu" {
-                return Err("cancel(...) is currently only allowed inside `mod cpu <unit>`".to_owned());
+                return Err(
+                    "cancel(...) is currently only allowed inside `mod cpu <unit>`".to_owned(),
+                );
             }
             let [task] = args else {
                 return Err("cancel(...) expects exactly one task handle".to_owned());
@@ -871,7 +879,9 @@ fn lower_call_expr_with_async(
         }
         "join_result" => {
             if current_domain != "cpu" {
-                return Err("join_result(...) is currently only allowed inside `mod cpu <unit>`".to_owned());
+                return Err(
+                    "join_result(...) is currently only allowed inside `mod cpu <unit>`".to_owned(),
+                );
             }
             let [task] = args else {
                 return Err("join_result(...) expects exactly one task handle".to_owned());
@@ -888,61 +898,55 @@ fn lower_call_expr_with_async(
             ensure_task_like("join_result", &lowered, bindings, signatures, struct_table)?;
             Ok(NirExpr::CpuJoinResult(Box::new(lowered)))
         }
-        "task_completed" => {
-            lower_result_observer_call(
-                "task_completed",
-                args,
-                current_domain,
-                current_function_is_async,
-                bindings,
-                signatures,
-                struct_table,
-                NirResultFamily::Task,
-                |expr| NirExpr::CpuTaskCompleted(Box::new(expr)),
-            )
-        }
-        "task_timed_out" => {
-            lower_result_observer_call(
-                "task_timed_out",
-                args,
-                current_domain,
-                current_function_is_async,
-                bindings,
-                signatures,
-                struct_table,
-                NirResultFamily::Task,
-                |expr| NirExpr::CpuTaskTimedOut(Box::new(expr)),
-            )
-        }
-        "task_cancelled" => {
-            lower_result_observer_call(
-                "task_cancelled",
-                args,
-                current_domain,
-                current_function_is_async,
-                bindings,
-                signatures,
-                struct_table,
-                NirResultFamily::Task,
-                |expr| NirExpr::CpuTaskCancelled(Box::new(expr)),
-            )
-        }
-        "task_value" => {
-            lower_result_observer_call(
-                "task_value",
-                args,
-                current_domain,
-                current_function_is_async,
-                bindings,
-                signatures,
-                struct_table,
-                NirResultFamily::Task,
-                |expr| NirExpr::CpuTaskValue(Box::new(expr)),
-            )
-        }
+        "task_completed" => lower_result_observer_call(
+            "task_completed",
+            args,
+            current_domain,
+            current_function_is_async,
+            bindings,
+            signatures,
+            struct_table,
+            NirResultFamily::Task,
+            |expr| NirExpr::CpuTaskCompleted(Box::new(expr)),
+        ),
+        "task_timed_out" => lower_result_observer_call(
+            "task_timed_out",
+            args,
+            current_domain,
+            current_function_is_async,
+            bindings,
+            signatures,
+            struct_table,
+            NirResultFamily::Task,
+            |expr| NirExpr::CpuTaskTimedOut(Box::new(expr)),
+        ),
+        "task_cancelled" => lower_result_observer_call(
+            "task_cancelled",
+            args,
+            current_domain,
+            current_function_is_async,
+            bindings,
+            signatures,
+            struct_table,
+            NirResultFamily::Task,
+            |expr| NirExpr::CpuTaskCancelled(Box::new(expr)),
+        ),
+        "task_value" => lower_result_observer_call(
+            "task_value",
+            args,
+            current_domain,
+            current_function_is_async,
+            bindings,
+            signatures,
+            struct_table,
+            NirResultFamily::Task,
+            |expr| NirExpr::CpuTaskValue(Box::new(expr)),
+        ),
         "timeout" => {
             if current_domain != "cpu" {
-                return Err("timeout(...) is currently only allowed inside `mod cpu <unit>`".to_owned());
+                return Err(
+                    "timeout(...) is currently only allowed inside `mod cpu <unit>`".to_owned(),
+                );
             }
             let [task, limit] = args else {
                 return Err("timeout(...) expects exactly two arguments: task and limit".to_owned());
@@ -1273,139 +1277,121 @@ fn lower_call_expr_with_async(
             )?;
             Ok(NirExpr::DataInputPipe(Box::new(lowered)))
         }
-        "data_result" => {
-            lower_result_wrapper_call(
-                "data_result",
-                args,
-                current_domain,
-                current_function_is_async,
-                bindings,
-                signatures,
-                struct_table,
-                NirResultFamily::Data,
-                infer_result_stage,
-                |value, stage| match stage {
-                    NirResultStage::Data(state) => Ok(NirExpr::DataResult { value, state }),
-                    other => Err(format!(
-                        "expected data result stage, found `{}`",
-                        other.render()
-                    )),
-                },
-                "expects a direct data operation like pipe/window/profile send",
-            )
-        }
-        "data_ready" => {
-            lower_result_observer_call(
-                "data_ready",
-                args,
-                current_domain,
-                current_function_is_async,
-                bindings,
-                signatures,
-                struct_table,
-                NirResultFamily::Data,
-                |expr| NirExpr::DataReady(Box::new(expr)),
-            )
-        }
-        "data_moved" => {
-            lower_result_observer_call(
-                "data_moved",
-                args,
-                current_domain,
-                current_function_is_async,
-                bindings,
-                signatures,
-                struct_table,
-                NirResultFamily::Data,
-                |expr| NirExpr::DataMoved(Box::new(expr)),
-            )
-        }
-        "data_windowed" => {
-            lower_result_observer_call(
-                "data_windowed",
-                args,
-                current_domain,
-                current_function_is_async,
-                bindings,
-                signatures,
-                struct_table,
-                NirResultFamily::Data,
-                |expr| NirExpr::DataWindowed(Box::new(expr)),
-            )
-        }
-        "data_value" => {
-            lower_result_observer_call(
-                "data_value",
-                args,
-                current_domain,
-                current_function_is_async,
-                bindings,
-                signatures,
-                struct_table,
-                NirResultFamily::Data,
-                |expr| NirExpr::DataValue(Box::new(expr)),
-            )
-        }
-        "shader_result" => {
-            lower_result_wrapper_call(
-                "shader_result",
-                args,
-                current_domain,
-                current_function_is_async,
-                bindings,
-                signatures,
-                struct_table,
-                NirResultFamily::Shader,
-                infer_result_stage,
-                |value, stage| match stage {
-                    NirResultStage::Shader(state) => Ok(NirExpr::ShaderResult { value, state }),
-                    other => Err(format!(
-                        "expected shader result stage, found `{}`",
-                        other.render()
-                    )),
-                },
-                "expects a direct shader operation like begin_pass/render",
-            )
-        }
-        "shader_pass_ready" => {
-            lower_result_observer_call(
-                "shader_pass_ready",
-                args,
-                current_domain,
-                current_function_is_async,
-                bindings,
-                signatures,
-                struct_table,
-                NirResultFamily::Shader,
-                |expr| NirExpr::ShaderPassReady(Box::new(expr)),
-            )
-        }
-        "shader_frame_ready" => {
-            lower_result_observer_call(
-                "shader_frame_ready",
-                args,
-                current_domain,
-                current_function_is_async,
-                bindings,
-                signatures,
-                struct_table,
-                NirResultFamily::Shader,
-                |expr| NirExpr::ShaderFrameReady(Box::new(expr)),
-            )
-        }
-        "shader_value" => {
-            lower_result_observer_call(
-                "shader_value",
-                args,
-                current_domain,
-                current_function_is_async,
-                bindings,
-                signatures,
-                struct_table,
-                NirResultFamily::Shader,
-                |expr| NirExpr::ShaderValue(Box::new(expr)),
-            )
-        }
+        "data_result" => lower_result_wrapper_call(
+            "data_result",
+            args,
+            current_domain,
+            current_function_is_async,
+            bindings,
+            signatures,
+            struct_table,
+            NirResultFamily::Data,
+            infer_result_stage,
+            |value, stage| match stage {
+                NirResultStage::Data(state) => Ok(NirExpr::DataResult { value, state }),
+                other => Err(format!(
+                    "expected data result stage, found `{}`",
+                    other.render()
+                )),
+            },
+            "expects a direct data operation like pipe/window/profile send",
+        ),
+        "data_ready" => lower_result_observer_call(
+            "data_ready",
+            args,
+            current_domain,
+            current_function_is_async,
+            bindings,
+            signatures,
+            struct_table,
+            NirResultFamily::Data,
+            |expr| NirExpr::DataReady(Box::new(expr)),
+        ),
+        "data_moved" => lower_result_observer_call(
+            "data_moved",
+            args,
+            current_domain,
+            current_function_is_async,
+            bindings,
+            signatures,
+            struct_table,
+            NirResultFamily::Data,
+            |expr| NirExpr::DataMoved(Box::new(expr)),
+        ),
+        "data_windowed" => lower_result_observer_call(
+            "data_windowed",
+            args,
+            current_domain,
+            current_function_is_async,
+            bindings,
+            signatures,
+            struct_table,
+            NirResultFamily::Data,
+            |expr| NirExpr::DataWindowed(Box::new(expr)),
+        ),
+        "data_value" => lower_result_observer_call(
+            "data_value",
+            args,
+            current_domain,
+            current_function_is_async,
+            bindings,
+            signatures,
+            struct_table,
+            NirResultFamily::Data,
+            |expr| NirExpr::DataValue(Box::new(expr)),
+        ),
+        "shader_result" => lower_result_wrapper_call(
+            "shader_result",
+            args,
+            current_domain,
+            current_function_is_async,
+            bindings,
+            signatures,
+            struct_table,
+            NirResultFamily::Shader,
+            infer_result_stage,
+            |value, stage| match stage {
+                NirResultStage::Shader(state) => Ok(NirExpr::ShaderResult { value, state }),
+                other => Err(format!(
+                    "expected shader result stage, found `{}`",
+                    other.render()
+                )),
+            },
+            "expects a direct shader operation like begin_pass/render",
+        ),
+        "shader_pass_ready" => lower_result_observer_call(
+            "shader_pass_ready",
+            args,
+            current_domain,
+            current_function_is_async,
+            bindings,
+            signatures,
+            struct_table,
+            NirResultFamily::Shader,
+            |expr| NirExpr::ShaderPassReady(Box::new(expr)),
+        ),
+        "shader_frame_ready" => lower_result_observer_call(
+            "shader_frame_ready",
+            args,
+            current_domain,
+            current_function_is_async,
+            bindings,
+            signatures,
+            struct_table,
+            NirResultFamily::Shader,
+            |expr| NirExpr::ShaderFrameReady(Box::new(expr)),
+        ),
+        "shader_value" => lower_result_observer_call(
+            "shader_value",
+            args,
+            current_domain,
+            current_function_is_async,
+            bindings,
+            signatures,
+            struct_table,
+            NirResultFamily::Shader,
+            |expr| NirExpr::ShaderValue(Box::new(expr)),
+        ),
         "data_copy_window" => {
             let [input, offset, len] = args else {
                 return Err("data_copy_window(...) expects 3 args".to_owned());
@@ -1457,7 +1443,8 @@ fn lower_call_expr_with_async(
                 struct_table,
                 Some(&i64_type()),
             )?;
-            let Some(window_ty) = expr_type(&window_expr, bindings, signatures, struct_table) else {
+            let Some(window_ty) = expr_type(&window_expr, bindings, signatures, struct_table)
+            else {
                 return Err("data_read_window(...) could not infer window type".to_owned());
             };
             if window_ty.window_mode().is_none() {
@@ -1499,7 +1486,8 @@ fn lower_call_expr_with_async(
                 struct_table,
                 None,
             )?;
-            let Some(window_ty) = expr_type(&window_expr, bindings, signatures, struct_table) else {
+            let Some(window_ty) = expr_type(&window_expr, bindings, signatures, struct_table)
+            else {
                 return Err("data_write_window(...) could not infer window type".to_owned());
             };
             if window_ty.window_mode() != Some(NirWindowMode::Mutable) {
@@ -1919,54 +1907,76 @@ fn lower_call_expr_with_async(
                 delta: Box::new(delta),
             })
         }
-        "shader_profile_packet" | "shader_profile_panel_packet" => {
-            let (unit, color, speed, radius, accent, toggle_state, focus_index) = match args {
-                [unit, color, speed, radius] => {
-                    (unit, color, speed, radius, None, None, None)
-                }
-                [unit, color, speed, radius, accent, toggle_state, focus_index] => (
-                    unit,
-                    color,
-                    speed,
-                    radius,
-                    Some(accent),
-                    Some(toggle_state),
-                    Some(focus_index),
-                ),
-                _ => {
-                    return Err(
-                        if callee == "shader_profile_panel_packet" {
-                            "shader_profile_panel_packet(...) expects 7 args".to_owned()
-                        } else {
-                            "shader_profile_packet(...) expects 4 or 7 args".to_owned()
-                        },
-                    )
-                }
-            };
-            if callee == "shader_profile_panel_packet"
-                && (accent.is_none() || toggle_state.is_none() || focus_index.is_none())
-            {
-                return Err("shader_profile_panel_packet(...) expects 7 args".to_owned());
-            }
+        "shader_profile_packet" | "shader_profile_panel_packet" | "nova_panel_packet" => {
             if current_domain != "cpu" {
                 return Err(
                     if callee == "shader_profile_panel_packet" {
                         "shader_profile_panel_packet(...) is currently only allowed inside `mod cpu <unit>`"
+                    } else if callee == "nova_panel_packet" {
+                        "nova_panel_packet(...) is currently only allowed inside `mod cpu <unit>`"
                     } else {
                         "shader_profile_packet(...) is currently only allowed inside `mod cpu <unit>`"
                     }
                         .to_owned(),
                 );
             }
-            let AstExpr::Text(unit) = unit else {
-                return Err(
-                    if callee == "shader_profile_panel_packet" {
+            let (unit_name, color, speed, radius, accent, toggle_state, focus_index) = if callee
+                == "nova_panel_packet"
+            {
+                match args {
+                    [color, speed, radius, accent, toggle_state, focus_index] => (
+                        "__nova__".to_owned(),
+                        color,
+                        speed,
+                        radius,
+                        Some(accent),
+                        Some(toggle_state),
+                        Some(focus_index),
+                    ),
+                    _ => return Err("nova_panel_packet(...) expects 6 args".to_owned()),
+                }
+            } else {
+                let (unit, color, speed, radius, accent, toggle_state, focus_index) = match args {
+                    [unit, color, speed, radius] => (unit, color, speed, radius, None, None, None),
+                    [unit, color, speed, radius, accent, toggle_state, focus_index] => (
+                        unit,
+                        color,
+                        speed,
+                        radius,
+                        Some(accent),
+                        Some(toggle_state),
+                        Some(focus_index),
+                    ),
+                    _ => {
+                        return Err(if callee == "shader_profile_panel_packet" {
+                            "shader_profile_panel_packet(...) expects 7 args".to_owned()
+                        } else {
+                            "shader_profile_packet(...) expects 4 or 7 args".to_owned()
+                        })
+                    }
+                };
+                if callee == "shader_profile_panel_packet"
+                    && (accent.is_none() || toggle_state.is_none() || focus_index.is_none())
+                {
+                    return Err("shader_profile_panel_packet(...) expects 7 args".to_owned());
+                }
+                let AstExpr::Text(unit_name) = unit else {
+                    return Err(if callee == "shader_profile_panel_packet" {
                         "shader_profile_panel_packet(...) expects a string literal unit name"
                             .to_owned()
                     } else {
                         "shader_profile_packet(...) expects a string literal unit name".to_owned()
-                    },
-                );
+                    });
+                };
+                (
+                    unit_name.clone(),
+                    color,
+                    speed,
+                    radius,
+                    accent,
+                    toggle_state,
+                    focus_index,
+                )
             };
             let color = lower_expr(
                 color,
@@ -2032,8 +2042,10 @@ fn lower_call_expr_with_async(
                 })
                 .transpose()?;
             Ok(NirExpr::ShaderProfilePacket {
-                unit: unit.clone(),
-                packet_type_name: if callee == "shader_profile_panel_packet" {
+                unit: unit_name,
+                packet_type_name: if callee == "shader_profile_panel_packet"
+                    || callee == "nova_panel_packet"
+                {
                     Some("NovaPanelPacket".to_owned())
                 } else {
                     None
@@ -2448,53 +2460,47 @@ fn lower_call_expr_with_async(
             };
             Ok(NirExpr::KernelProfileBatchLanesRef { unit: unit.clone() })
         }
-        "kernel_result" => {
-            lower_result_wrapper_call(
-                "kernel_result",
-                args,
-                current_domain,
-                current_function_is_async,
-                bindings,
-                signatures,
-                struct_table,
-                NirResultFamily::Kernel,
-                infer_result_stage,
-                |value, stage| match stage {
-                    NirResultStage::Kernel(state) => Ok(NirExpr::KernelResult { value, state }),
-                    other => Err(format!(
-                        "expected kernel result stage, found `{}`",
-                        other.render()
-                    )),
-                },
-                "expects a direct kernel profile/config expression",
-            )
-        }
-        "kernel_config_ready" => {
-            lower_result_observer_call(
-                "kernel_config_ready",
-                args,
-                current_domain,
-                current_function_is_async,
-                bindings,
-                signatures,
-                struct_table,
-                NirResultFamily::Kernel,
-                |expr| NirExpr::KernelConfigReady(Box::new(expr)),
-            )
-        }
-        "kernel_value" => {
-            lower_result_observer_call(
-                "kernel_value",
-                args,
-                current_domain,
-                current_function_is_async,
-                bindings,
-                signatures,
-                struct_table,
-                NirResultFamily::Kernel,
-                |expr| NirExpr::KernelValue(Box::new(expr)),
-            )
-        }
+        "kernel_result" => lower_result_wrapper_call(
+            "kernel_result",
+            args,
+            current_domain,
+            current_function_is_async,
+            bindings,
+            signatures,
+            struct_table,
+            NirResultFamily::Kernel,
+            infer_result_stage,
+            |value, stage| match stage {
+                NirResultStage::Kernel(state) => Ok(NirExpr::KernelResult { value, state }),
+                other => Err(format!(
+                    "expected kernel result stage, found `{}`",
+                    other.render()
+                )),
+            },
+            "expects a direct kernel profile/config expression",
+        ),
+        "kernel_config_ready" => lower_result_observer_call(
+            "kernel_config_ready",
+            args,
+            current_domain,
+            current_function_is_async,
+            bindings,
+            signatures,
+            struct_table,
+            NirResultFamily::Kernel,
+            |expr| NirExpr::KernelConfigReady(Box::new(expr)),
+        ),
+        "kernel_value" => lower_result_observer_call(
+            "kernel_value",
+            args,
+            current_domain,
+            current_function_is_async,
+            bindings,
+            signatures,
+            struct_table,
+            NirResultFamily::Kernel,
+            |expr| NirExpr::KernelValue(Box::new(expr)),
+        ),
         "shader_target" => {
             let [format, width, height] = args else {
                 return Err("shader_target(...) expects 3 args".to_owned());
@@ -2815,9 +2821,7 @@ fn ensure_task_like(
     struct_table: &BTreeMap<String, NirStructDef>,
 ) -> Result<(), String> {
     match infer_nir_expr_type(expr, bindings, signatures, struct_table) {
-        Some(ty)
-            if ty.container_kind() == Some(nuis_semantics::model::NirContainerKind::Task) =>
-        {
+        Some(ty) if ty.container_kind() == Some(nuis_semantics::model::NirContainerKind::Task) => {
             Ok(())
         }
         Some(ty) => Err(format!(
@@ -2887,11 +2891,15 @@ fn lower_result_wrapper_call(
     }
     let payload = expr_type(&lowered, bindings, signatures, struct_table)
         .ok_or_else(|| format!("{name}(...) could not infer payload type for result wrapper"))?;
-    validate_result_stage_payload(stage, &payload).map_err(|error| format!("{name}(...): {error}"))?;
+    validate_result_stage_payload(stage, &payload)
+        .map_err(|error| format!("{name}(...): {error}"))?;
     build(Box::new(lowered), stage).map_err(|error| format!("{name}(...): {error}"))
 }
 
-fn validate_result_stage_payload(stage: NirResultStage, payload: &NirTypeRef) -> Result<(), String> {
+fn validate_result_stage_payload(
+    stage: NirResultStage,
+    payload: &NirTypeRef,
+) -> Result<(), String> {
     stage.validate_payload(payload)
 }
 
@@ -2938,7 +2946,9 @@ fn infer_result_stage(expr: &NirExpr) -> Option<NirResultStage> {
         }
         NirExpr::KernelProfileBindCoreRef { .. }
         | NirExpr::KernelProfileQueueDepthRef { .. }
-        | NirExpr::KernelProfileBatchLanesRef { .. } => Some(NirKernelFlowState::ConfigReady.into()),
+        | NirExpr::KernelProfileBatchLanesRef { .. } => {
+            Some(NirKernelFlowState::ConfigReady.into())
+        }
         _ => None,
     }
 }
@@ -2985,7 +2995,9 @@ fn result_payload_type(
     struct_table: &BTreeMap<String, NirStructDef>,
 ) -> Option<NirTypeRef> {
     expr_type(expr, bindings, signatures, struct_table).and_then(|ty| {
-        ty.result_payload().cloned().or_else(|| ty.container_payload().cloned())
+        ty.result_payload()
+            .cloned()
+            .or_else(|| ty.container_payload().cloned())
     })
 }
 
@@ -3020,12 +3032,16 @@ fn infer_nir_expr_type(
             .map(|ty| generic_named_type("Task", vec![ty])),
         NirExpr::CpuJoin(task) => result_payload_type(task, bindings, signatures, struct_table),
         NirExpr::CpuCancel(task) => infer_nir_expr_type(task, bindings, signatures, struct_table),
-        NirExpr::CpuJoinResult(task) => result_payload_type(task, bindings, signatures, struct_table)
-            .map(|ty| make_result_type(NirResultFamily::Task, ty)),
+        NirExpr::CpuJoinResult(task) => {
+            result_payload_type(task, bindings, signatures, struct_table)
+                .map(|ty| make_result_type(NirResultFamily::Task, ty))
+        }
         NirExpr::CpuTaskCompleted(_)
         | NirExpr::CpuTaskTimedOut(_)
         | NirExpr::CpuTaskCancelled(_) => Some(bool_type()),
-        NirExpr::CpuTaskValue(result) => result_payload_type(result, bindings, signatures, struct_table),
+        NirExpr::CpuTaskValue(result) => {
+            result_payload_type(result, bindings, signatures, struct_table)
+        }
         NirExpr::CpuTimeout { task, .. } => {
             infer_nir_expr_type(task, bindings, signatures, struct_table)
         }
@@ -3067,7 +3083,9 @@ fn infer_nir_expr_type(
         NirExpr::KernelResult { value, .. } => expr_type(value, bindings, signatures, struct_table)
             .map(|inner| make_result_type(NirResultFamily::Kernel, inner)),
         NirExpr::KernelConfigReady(_) => Some(bool_type()),
-        NirExpr::KernelValue(result) => result_payload_type(result, bindings, signatures, struct_table),
+        NirExpr::KernelValue(result) => {
+            result_payload_type(result, bindings, signatures, struct_table)
+        }
         NirExpr::DataProfileSendUplink { input, .. }
         | NirExpr::DataProfileSendDownlink { input, .. } => {
             let window_inner = infer_nir_expr_type(input, bindings, signatures, struct_table)?;
@@ -3078,7 +3096,9 @@ fn infer_nir_expr_type(
         NirExpr::DataReady(_) | NirExpr::DataMoved(_) | NirExpr::DataWindowed(_) => {
             Some(bool_type())
         }
-        NirExpr::DataValue(result) => result_payload_type(result, bindings, signatures, struct_table),
+        NirExpr::DataValue(result) => {
+            result_payload_type(result, bindings, signatures, struct_table)
+        }
         NirExpr::DataFreezeWindow(input) => {
             let inner = infer_nir_expr_type(input, bindings, signatures, struct_table)?;
             let payload = match inner.window_mode() {
@@ -3101,7 +3121,9 @@ fn infer_nir_expr_type(
         NirExpr::ShaderResult { value, .. } => expr_type(value, bindings, signatures, struct_table)
             .map(|inner| make_result_type(NirResultFamily::Shader, inner)),
         NirExpr::ShaderPassReady(_) | NirExpr::ShaderFrameReady(_) => Some(bool_type()),
-        NirExpr::ShaderValue(result) => result_payload_type(result, bindings, signatures, struct_table),
+        NirExpr::ShaderValue(result) => {
+            result_payload_type(result, bindings, signatures, struct_table)
+        }
         NirExpr::ShaderBeginPass { .. } => Some(named_type("Pass")),
         NirExpr::ShaderDrawInstanced { .. } => Some(named_type("Frame")),
         NirExpr::ShaderProfileRender { .. } => Some(named_type("Frame")),
@@ -3342,7 +3364,11 @@ fn validate_declared_nir_types(module: &NirModule) -> Result<(), String> {
                 module.domain
             ));
         }
-        if function.is_async && module.domain == "cpu" && function.name == "main" && !function.params.is_empty() {
+        if function.is_async
+            && module.domain == "cpu"
+            && function.name == "main"
+            && !function.params.is_empty()
+        {
             return Err(format!(
                 "async entry `mod cpu {}::main` cannot take parameters in the current scheduler; pass data through explicit data/profile contracts or call async helpers from `main` instead",
                 module.unit
@@ -4019,6 +4045,45 @@ mod tests {
                 value: NirExpr::ShaderValue(_),
                 ..
             }) if ty.render() == "Frame"
+        ));
+    }
+
+    #[test]
+    fn lowers_nova_panel_packet_without_shader_unit_literal() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let packet: NovaPanelPacket = nova_panel_packet(1, 2, 3, 4, 5, 6);
+                return 1;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            function.body.first(),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value:
+                    NirExpr::ShaderProfilePacket {
+                        unit,
+                        packet_type_name,
+                        accent: Some(_),
+                        toggle_state: Some(_),
+                        focus_index: Some(_),
+                        ..
+                    },
+                ..
+            }) if ty.render() == "NovaPanelPacket"
+                && unit == "__nova__"
+                && packet_type_name.as_deref() == Some("NovaPanelPacket")
         ));
     }
 

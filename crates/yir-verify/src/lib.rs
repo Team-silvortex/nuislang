@@ -734,7 +734,10 @@ fn project_link_bridge_contract_target(id: &str, stage: bool) -> String {
     format!("project_link_{id}_missing_target")
 }
 
-fn project_link_bridge_payload_contract_target(id: &str, direction: BridgePayloadDirection) -> String {
+fn project_link_bridge_payload_contract_target(
+    id: &str,
+    direction: BridgePayloadDirection,
+) -> String {
     let marker = match direction {
         BridgePayloadDirection::Uplink => "uplink_payload_shape",
         BridgePayloadDirection::Downlink => "downlink_payload_shape",
@@ -825,7 +828,10 @@ fn verify_bridge_payload_contract_text(
 
 fn payload_shape_contract_for_bridge_payload(value: &str) -> Option<String> {
     let normalized = value.replace(['<', '>'], "");
-    Some(format!("PayloadShape{}", sanitize_contract_type_fragment(&normalized)))
+    Some(format!(
+        "PayloadShape{}",
+        sanitize_contract_type_fragment(&normalized)
+    ))
 }
 
 fn sanitize_contract_type_fragment(value: &str) -> String {
@@ -1253,7 +1259,9 @@ fn verify_result_state_nodes(module: &YirModule) -> Result<(), String> {
                     ));
                 }
             }
-            SemanticOp::ShaderIsPassReady | SemanticOp::ShaderIsFrameReady | SemanticOp::ShaderValue => {
+            SemanticOp::ShaderIsPassReady
+            | SemanticOp::ShaderIsFrameReady
+            | SemanticOp::ShaderValue => {
                 require_observe_source(&nodes, node, SemanticOp::ShaderObserve)?;
             }
             SemanticOp::KernelObserve => {
@@ -1290,10 +1298,12 @@ fn require_expected_result_source(
     nodes: &BTreeMap<&str, &Node>,
     node: &Node,
 ) -> Result<(), String> {
-    let expected = node
-        .op
-        .result_source_semantic_op()
-        .ok_or_else(|| format!("node `{}` has no expected result source contract", node.name))?;
+    let expected = node.op.result_source_semantic_op().ok_or_else(|| {
+        format!(
+            "node `{}` has no expected result source contract",
+            node.name
+        )
+    })?;
     require_observe_source(nodes, node, expected)
 }
 
@@ -2353,7 +2363,10 @@ mod tests {
                     &["kernel_result"],
                 ),
             ],
-            edges: vec![xfer("queue_depth", "kernel_result"), dep("kernel_result", "kernel_ready")],
+            edges: vec![
+                xfer("queue_depth", "kernel_result"),
+                dep("kernel_result", "kernel_ready"),
+            ],
             node_lanes: BTreeMap::new(),
         };
 
@@ -2431,8 +2444,18 @@ mod tests {
             nodes: vec![
                 node("seed", "cpu0", "cpu.const", &["7"]),
                 node("value", "fabric0", "data.move", &["seed", "cpu0"]),
-                node("window0", "fabric0", "data.immutable_window", &["value", "0", "1"]),
-                node("window1", "fabric0", "data.copy_window", &["window0", "0", "1"]),
+                node(
+                    "window0",
+                    "fabric0",
+                    "data.immutable_window",
+                    &["value", "0", "1"],
+                ),
+                node(
+                    "window1",
+                    "fabric0",
+                    "data.copy_window",
+                    &["window0", "0", "1"],
+                ),
             ],
             edges: vec![
                 xfer("seed", "value"),
@@ -2463,7 +2486,12 @@ mod tests {
             nodes: vec![
                 node("seed", "cpu0", "cpu.const", &["7"]),
                 node("value", "fabric0", "data.move", &["seed", "cpu0"]),
-                node("window0", "fabric0", "data.copy_window", &["value", "0", "1"]),
+                node(
+                    "window0",
+                    "fabric0",
+                    "data.copy_window",
+                    &["value", "0", "1"],
+                ),
                 node("pipe", "fabric0", "data.output_pipe", &["window0"]),
             ],
             edges: vec![
@@ -2495,7 +2523,12 @@ mod tests {
             nodes: vec![
                 node("seed", "cpu0", "cpu.const", &["7"]),
                 node("value", "fabric0", "data.move", &["seed", "cpu0"]),
-                node("window0", "fabric0", "data.copy_window", &["value", "0", "1"]),
+                node(
+                    "window0",
+                    "fabric0",
+                    "data.copy_window",
+                    &["value", "0", "1"],
+                ),
                 node("frozen", "fabric0", "data.freeze_window", &["window0"]),
                 node("pipe", "fabric0", "data.output_pipe", &["frozen"]),
             ],
@@ -2528,8 +2561,18 @@ mod tests {
             nodes: vec![
                 node("seed", "cpu0", "cpu.const", &["7"]),
                 node("value", "fabric0", "data.move", &["seed", "cpu0"]),
-                node("window0", "fabric0", "data.immutable_window", &["value", "0", "1"]),
-                node("updated", "fabric0", "data.write_window", &["window0", "0", "value"]),
+                node(
+                    "window0",
+                    "fabric0",
+                    "data.immutable_window",
+                    &["value", "0", "1"],
+                ),
+                node(
+                    "updated",
+                    "fabric0",
+                    "data.write_window",
+                    &["window0", "0", "value"],
+                ),
             ],
             edges: vec![
                 xfer("seed", "value"),
@@ -2560,7 +2603,12 @@ mod tests {
             nodes: vec![
                 node("seed", "cpu0", "cpu.const", &["7"]),
                 node("value", "fabric0", "data.move", &["seed", "cpu0"]),
-                node("window0", "fabric0", "data.immutable_window", &["value", "0", "1"]),
+                node(
+                    "window0",
+                    "fabric0",
+                    "data.immutable_window",
+                    &["value", "0", "1"],
+                ),
                 node("read", "fabric0", "data.read_window", &["window0", "0"]),
             ],
             edges: vec![

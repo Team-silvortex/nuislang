@@ -397,7 +397,9 @@ impl NirTypeRef {
         if self.is_result_family() {
             return false;
         }
-        self.generic_args.iter().all(NirTypeRef::is_async_boundary_safe)
+        self.generic_args
+            .iter()
+            .all(NirTypeRef::is_async_boundary_safe)
     }
 
     pub fn is_result_family(&self) -> bool {
@@ -509,7 +511,9 @@ impl NirTypeRef {
                     ));
                 }
                 if payload.container_kind() == Some(NirContainerKind::Task) {
-                    return Err("`Task<Task<...>>` is not a supported explicit async primitive".to_owned());
+                    return Err(
+                        "`Task<Task<...>>` is not a supported explicit async primitive".to_owned(),
+                    );
                 }
             }
             None => {
@@ -1223,16 +1227,14 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::DataReadWindow { .. }
         | NirExpr::DataWriteWindow { .. }
         | NirExpr::DataImmutableWindow { .. }
-        | NirExpr::DataFreezeWindow(_) => {
-            Some(NirGlmProfile {
-                result_class: NirGlmValueClass::Val,
-                accesses: vec![NirGlmAccess {
-                    class: NirGlmValueClass::Val,
-                    mode: NirGlmUseMode::Read,
-                }],
-                effect: NirGlmEffect::None,
-            })
-        }
+        | NirExpr::DataFreezeWindow(_) => Some(NirGlmProfile {
+            result_class: NirGlmValueClass::Val,
+            accesses: vec![NirGlmAccess {
+                class: NirGlmValueClass::Val,
+                mode: NirGlmUseMode::Read,
+            }],
+            effect: NirGlmEffect::None,
+        }),
         NirExpr::DataInputPipe(_) => Some(NirGlmProfile {
             result_class: NirGlmValueClass::Val,
             accesses: vec![NirGlmAccess {
@@ -1294,8 +1296,8 @@ pub struct NustarPackage {
 #[cfg(test)]
 mod tests {
     use super::{
-        NirContainerKind, NirDataFlowState, NirKernelFlowState, NirResultFamily,
-        NirResultStage, NirShaderFlowState, NirTypeRef, NirWindowMode,
+        NirContainerKind, NirDataFlowState, NirKernelFlowState, NirResultFamily, NirResultStage,
+        NirShaderFlowState, NirTypeRef, NirWindowMode,
     };
 
     fn named(name: &str) -> NirTypeRef {
@@ -1318,7 +1320,9 @@ mod tests {
 
     #[test]
     fn rejects_moved_data_state_with_non_pipe_payload() {
-        let error = NirDataFlowState::Moved.validate_payload(&named("i64")).unwrap_err();
+        let error = NirDataFlowState::Moved
+            .validate_payload(&named("i64"))
+            .unwrap_err();
         assert!(error.contains("moved"));
         assert!(error.contains("Pipe<...>"));
     }

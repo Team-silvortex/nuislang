@@ -49,8 +49,7 @@ mod cpu Main {
     let panel_toggle_state: i64 = frame_tick;
     let panel_focus_index: i64 = color_delta + speed_delta;
 
-    let render_controls: NovaPanelPacket = shader_profile_panel_packet(
-      "SurfaceShader",
+    let render_controls: NovaPanelPacket = nova_panel_packet(
       packed_color,
       packed_speed,
       packed_radius,

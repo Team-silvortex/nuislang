@@ -147,7 +147,14 @@ fn verify_stmt(
                     &mut else_data_bindings,
                 )?;
             }
-            merge_branch_state(moved, borrows, &then_moved, &then_borrows, &else_moved, &else_borrows);
+            merge_branch_state(
+                moved,
+                borrows,
+                &then_moved,
+                &then_borrows,
+                &else_moved,
+                &else_borrows,
+            );
         }
         NirStmt::Return(value) => {
             if let Some(value) = value {
@@ -269,7 +276,10 @@ fn verify_expr(
         }
         NirExpr::DataReadWindow { window, index } => {
             let source = infer_data_kind(window, data_bindings);
-            if !matches!(source, NirDataKind::WindowMutable | NirDataKind::WindowImmutable) {
+            if !matches!(
+                source,
+                NirDataKind::WindowMutable | NirDataKind::WindowImmutable
+            ) {
                 return Err(format!(
                     "nir verify: data_read_window expects window input, got `{}`",
                     render_data_expr_name(window)
@@ -323,7 +333,10 @@ fn verify_expr(
         }
         NirExpr::DataFreezeWindow(input) => {
             let source = infer_data_kind(input, data_bindings);
-            if !matches!(source, NirDataKind::WindowMutable | NirDataKind::WindowImmutable) {
+            if !matches!(
+                source,
+                NirDataKind::WindowMutable | NirDataKind::WindowImmutable
+            ) {
                 return Err(format!(
                     "nir verify: data_freeze_window expects window input, got `{}`",
                     render_data_expr_name(input)
@@ -652,10 +665,7 @@ fn verify_expr(
     Ok(())
 }
 
-fn expr_is_borrowed_pointer(
-    expr: &NirExpr,
-    borrow_bindings: &BTreeMap<String, String>,
-) -> bool {
+fn expr_is_borrowed_pointer(expr: &NirExpr, borrow_bindings: &BTreeMap<String, String>) -> bool {
     match expr {
         NirExpr::Borrow(_) => true,
         NirExpr::Var(name) => borrow_bindings.contains_key(name),
@@ -722,9 +732,7 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
         | NirExpr::ShaderFrameReady(inner)
         | NirExpr::ShaderValue(inner)
         | NirExpr::KernelConfigReady(inner)
-        | NirExpr::KernelValue(inner) => {
-            verify_expr_uses(inner, moved)?
-        }
+        | NirExpr::KernelValue(inner) => verify_expr_uses(inner, moved)?,
         NirExpr::CpuSpawn { args, .. } | NirExpr::CpuExternCall { args, .. } => {
             for arg in args {
                 verify_expr_uses(arg, moved)?;
@@ -801,9 +809,7 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
         }
         NirExpr::DataResult { value: inner, .. }
         | NirExpr::ShaderResult { value: inner, .. }
-        | NirExpr::KernelResult { value: inner, .. } => {
-            verify_expr_uses(inner, moved)?
-        }
+        | NirExpr::KernelResult { value: inner, .. } => verify_expr_uses(inner, moved)?,
         NirExpr::DataFreezeWindow(inner) => verify_expr_uses(inner, moved)?,
         NirExpr::DataReadWindow { window, index } => {
             verify_expr_uses(window, moved)?;
@@ -1081,7 +1087,9 @@ mod tests {
                 }],
                 else_body: vec![],
             },
-            NirStmt::Expr(NirExpr::LoadValue(Box::new(NirExpr::Var("head".to_owned())))),
+            NirStmt::Expr(NirExpr::LoadValue(Box::new(NirExpr::Var(
+                "head".to_owned(),
+            )))),
         ]);
 
         let error = verify_nir_module(&module).unwrap_err();
@@ -1319,11 +1327,13 @@ mod tests {
     fn data_profile_send_accepts_frozen_window_source() {
         let module = module_with_body(vec![NirStmt::Expr(NirExpr::DataProfileSendUplink {
             unit: "FabricPlane".to_owned(),
-            input: Box::new(NirExpr::DataFreezeWindow(Box::new(NirExpr::DataCopyWindow {
-                input: Box::new(NirExpr::Int(7)),
-                offset: Box::new(NirExpr::Int(0)),
-                len: Box::new(NirExpr::Int(1)),
-            }))),
+            input: Box::new(NirExpr::DataFreezeWindow(Box::new(
+                NirExpr::DataCopyWindow {
+                    input: Box::new(NirExpr::Int(7)),
+                    offset: Box::new(NirExpr::Int(0)),
+                    len: Box::new(NirExpr::Int(1)),
+                },
+            ))),
         })]);
 
         verify_nir_module(&module).unwrap();

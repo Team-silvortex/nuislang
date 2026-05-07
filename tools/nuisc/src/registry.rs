@@ -9,6 +9,19 @@ use yir_core::YirModule;
 
 const INDEX_FILE: &str = "index.toml";
 
+fn resolve_registry_root(root: &Path) -> PathBuf {
+    if root.exists() {
+        return root.to_path_buf();
+    }
+    let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("..");
+    let candidate = workspace_root.join(root);
+    if candidate.exists() {
+        candidate
+    } else {
+        root.to_path_buf()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NustarPackageIndexEntry {
     pub package_id: String,
@@ -137,17 +150,36 @@ pub fn load_manifest_for_domain(
     root: &Path,
     domain_family: &str,
 ) -> Result<NustarPackageManifest, String> {
-    let index = load_index(root)?;
-    let entry = index
-        .into_iter()
-        .find(|entry| entry.domain_family == domain_family)
-        .ok_or_else(|| {
-            format!(
-                "no nustar package is indexed for mod domain `{domain_family}` in `{}`",
-                root.join(INDEX_FILE).display()
-            )
-        })?;
-    let path = manifest_path(root, &entry);
+    let root = resolve_registry_root(root);
+    let path = match load_index(&root) {
+        Ok(index) => {
+            match index
+                .into_iter()
+                .find(|entry| entry.domain_family == domain_family)
+            {
+                Some(entry) => manifest_path(&root, &entry),
+                None => {
+                    let direct = root.join(format!("{domain_family}.toml"));
+                    if direct.exists() {
+                        direct
+                    } else {
+                        return Err(format!(
+                            "no nustar package is indexed for mod domain `{domain_family}` in `{}`",
+                            root.join(INDEX_FILE).display()
+                        ));
+                    }
+                }
+            }
+        }
+        Err(index_error) => {
+            let direct = root.join(format!("{domain_family}.toml"));
+            if direct.exists() {
+                direct
+            } else {
+                return Err(index_error);
+            }
+        }
+    };
     let source = fs::read_to_string(&path)
         .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
     parse_manifest(&source, &path)
@@ -371,9 +403,11 @@ fn implied_slots_for_surface(domain_family: &str, surface: &str) -> &'static [&'
         ("shader", "shader.profile.seed.speed.v1") => {
             &["packet_speed_slot", "slider_speed_slot", "packet_tag"]
         }
-        ("shader", "shader.profile.seed.radius.v1") => {
-            &["packet_radius_slot", "slider_radius_slot", "packet_field_count"]
-        }
+        ("shader", "shader.profile.seed.radius.v1") => &[
+            "packet_radius_slot",
+            "slider_radius_slot",
+            "packet_field_count",
+        ],
         ("shader", "shader.profile.packet.v1") => &[
             "packet_color_slot",
             "packet_speed_slot",
@@ -708,9 +742,7 @@ fn walk_child_exprs(expr: &NirExpr, f: &mut dyn FnMut(&NirExpr)) {
         }
         NirExpr::DataResult { value: input, .. }
         | NirExpr::ShaderResult { value: input, .. }
-        | NirExpr::KernelResult { value: input, .. } => {
-            f(input)
-        }
+        | NirExpr::KernelResult { value: input, .. } => f(input),
         NirExpr::DataReadWindow { window, index } => {
             f(window);
             f(index);
@@ -768,7 +800,9 @@ fn walk_child_exprs(expr: &NirExpr, f: &mut dyn FnMut(&NirExpr)) {
         | NirExpr::DataProfileSendDownlink { input, .. }
         | NirExpr::ShaderProfileRender { packet: input, .. }
         | NirExpr::FieldAccess { base: input, .. } => f(input),
-        NirExpr::CpuSpawn { args, .. } | NirExpr::CpuExternCall { args, .. } | NirExpr::Call { args, .. } => {
+        NirExpr::CpuSpawn { args, .. }
+        | NirExpr::CpuExternCall { args, .. }
+        | NirExpr::Call { args, .. } => {
             for arg in args {
                 f(arg);
             }
@@ -1199,7 +1233,11 @@ fn parse_registered_abi_target(
     let mut calling_abi = None::<String>;
     let mut clang_target = None::<String>;
     let mut backend_family = None::<String>;
-    for field in fields.split('|').map(str::trim).filter(|field| !field.is_empty()) {
+    for field in fields
+        .split('|')
+        .map(str::trim)
+        .filter(|field| !field.is_empty())
+    {
         let Some((key, value)) = field.split_once('=') else {
             return Err(format!(
                 "nustar package `{}` has invalid abi_targets field `{}` in `{}`; expected `key=value`",

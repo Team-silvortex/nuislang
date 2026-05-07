@@ -354,7 +354,9 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         }
         NirExpr::DataResult { value: input, .. }
         | NirExpr::ShaderResult { value: input, .. }
-        | NirExpr::KernelResult { value: input, .. } => collect_instantiated_units_expr(input, units),
+        | NirExpr::KernelResult { value: input, .. } => {
+            collect_instantiated_units_expr(input, units)
+        }
         NirExpr::DataReadWindow { window, index } => {
             collect_instantiated_units_expr(window, units);
             collect_instantiated_units_expr(index, units);

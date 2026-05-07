@@ -354,7 +354,10 @@ impl RegisteredMod for ShaderMod {
                     ));
                 }
                 parse_shader_flow_state(&node.op.args[1]).map_err(|error| {
-                    format!("node `{}` has invalid shader observe state: {error}", node.name)
+                    format!(
+                        "node `{}` has invalid shader observe state: {error}",
+                        node.name
+                    )
                 })?;
                 Ok(InstructionSemantics::pure(vec![node.op.args[0].clone()]))
             }
@@ -873,11 +876,17 @@ impl RegisteredMod for ShaderMod {
             }
             "is_pass_ready" => {
                 let result = state.expect_shader_result(&node.op.args[0])?;
-                Ok(Value::Bool(matches!(result.state, ShaderFlowState::PassReady)))
+                Ok(Value::Bool(matches!(
+                    result.state,
+                    ShaderFlowState::PassReady
+                )))
             }
             "is_frame_ready" => {
                 let result = state.expect_shader_result(&node.op.args[0])?;
-                Ok(Value::Bool(matches!(result.state, ShaderFlowState::FrameReady)))
+                Ok(Value::Bool(matches!(
+                    result.state,
+                    ShaderFlowState::FrameReady
+                )))
             }
             "value" => {
                 let result = state.expect_shader_result(&node.op.args[0])?;
@@ -1398,12 +1407,14 @@ fn draw_control_panel_surface(
 ) -> Result<FrameSurface, String> {
     let packet = parse_ball_packet(value, "shader.draw_instanced")?;
     let width = width.max(32);
-    let height = height.max(18);
+    let height = height.max(24);
     let color_value = packet.accent.rem_euclid(128) as usize;
     let speed_value = packet.speed.round().abs() as usize % 128;
     let radius_value = (packet.radius_scale * 96.0).round().abs() as usize % 128;
+    let progress_value = packet.progress_value.rem_euclid(128) as usize;
+    let meter_value = packet.meter_value.rem_euclid(128) as usize;
     let accent = control_panel_accent(packet.accent);
-    let button_on = packet.toggle_state != 0;
+    let button_on = packet.button_state != 0;
 
     let mut rows = vec![vec![' '; width]; height];
     let panel_left = 2usize;
@@ -1432,7 +1443,28 @@ fn draw_control_panel_surface(
         panel_bottom.saturating_sub(1),
         '.',
     );
-    put_text(&mut rows, panel_left + 3, panel_top + 2, "ns-nova control panel");
+    put_text(
+        &mut rows,
+        panel_left + 3,
+        panel_top + 2,
+        "ns-nova control panel",
+    );
+    put_text(
+        &mut rows,
+        panel_left + 3,
+        panel_top + 3,
+        "range / button / meter / text / select",
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(18),
+        panel_top + 2,
+        if packet.toggle_state != 0 {
+            "mode: live"
+        } else {
+            "mode: idle"
+        },
+    );
 
     let slider_left = panel_left + 16;
     let slider_right = panel_right.saturating_sub(12);
@@ -1459,6 +1491,40 @@ fn draw_control_panel_surface(
             &format!("{:>3}", value.min(127)),
         );
     }
+
+    let progress_y = panel_top + 17;
+    put_text(&mut rows, panel_left + 3, progress_y, "PROGRESS");
+    draw_slider(
+        &mut rows,
+        slider_left,
+        progress_y,
+        slider_width,
+        progress_value.min(127),
+        accent,
+    );
+    put_text(
+        &mut rows,
+        slider_right + 2,
+        progress_y,
+        &format!("{:>3}", progress_value.min(127)),
+    );
+
+    let meter_y = panel_top + 19;
+    put_text(&mut rows, panel_left + 3, meter_y, "METER");
+    draw_slider(
+        &mut rows,
+        slider_left,
+        meter_y,
+        slider_width,
+        meter_value.min(127),
+        accent,
+    );
+    put_text(
+        &mut rows,
+        slider_right + 2,
+        meter_y,
+        &format!("{:>3}", meter_value.min(127)),
+    );
 
     let button_left = panel_right.saturating_sub(15);
     let button_right = panel_right.saturating_sub(4);
@@ -1489,7 +1555,7 @@ fn draw_control_panel_surface(
         &mut rows,
         button_left + 2,
         button_top + 1,
-        if button_on { "LIVE" } else { "IDLE" },
+        if button_on { "APPLY" } else { "READY" },
     );
 
     let knob_center_x = panel_left + 8;
@@ -1502,11 +1568,61 @@ fn draw_control_panel_surface(
         radius_value.min(127),
         accent,
     );
-    put_text(&mut rows, panel_left + 3, panel_bottom.saturating_sub(1), "gain");
+    put_text(
+        &mut rows,
+        panel_left + 3,
+        panel_bottom.saturating_sub(1),
+        "gain",
+    );
 
-    let focus_y = panel_top + 6 + packet.focus_index.rem_euclid(3) as usize * 4;
-    if focus_y > 0 {
-        put_text(&mut rows, slider_left.saturating_sub(3), focus_y, ">");
+    let text_left = panel_left + 4;
+    let text_right = panel_left + 24;
+    let text_top = panel_bottom.saturating_sub(5);
+    let text_bottom = text_top + 2;
+    draw_box(
+        &mut rows,
+        text_left,
+        text_top,
+        text_right,
+        text_bottom,
+        '[',
+        ']',
+        ']',
+        '[',
+        '-',
+        '|',
+    );
+    let text_value = format!("nova-{:03}", packet.text_echo.abs() % 1000);
+    put_text(&mut rows, text_left + 2, text_top + 1, &text_value);
+    let caret_x =
+        text_left + 2 + (packet.text_caret.rem_euclid(text_value.len() as i64 + 1) as usize);
+    if caret_x < text_right {
+        rows[text_bottom][caret_x] = accent;
+    }
+
+    let select_left = panel_right.saturating_sub(28);
+    let select_y = panel_bottom.saturating_sub(3);
+    put_text(&mut rows, select_left, select_y, "AUTO");
+    put_text(&mut rows, select_left + 7, select_y, "MAN");
+    put_text(&mut rows, select_left + 13, select_y, "GPU");
+    let selected_x = match packet.select_index.rem_euclid(3) {
+        0 => select_left.saturating_sub(2),
+        1 => select_left + 5,
+        _ => select_left + 11,
+    };
+    put_text(&mut rows, selected_x, select_y, ">");
+
+    let focus_target = packet.focus_index.rem_euclid(6) as usize;
+    let focus_marker = match focus_target {
+        0 => (slider_left.saturating_sub(3), panel_top + 6),
+        1 => (slider_left.saturating_sub(3), panel_top + 10),
+        2 => (slider_left.saturating_sub(3), panel_top + 14),
+        3 => (button_left.saturating_sub(2), button_top + 1),
+        4 => (text_left.saturating_sub(2), text_top + 1),
+        _ => (select_left.saturating_sub(2), select_y),
+    };
+    if focus_marker.1 < rows.len() && focus_marker.0 < rows[focus_marker.1].len() {
+        rows[focus_marker.1][focus_marker.0] = '>';
     }
 
     let rows = rows
@@ -1740,8 +1856,8 @@ fn draw_knob(
     if rows.is_empty() || radius == 0 {
         return;
     }
-    let angle = (value.min(127) as f32 / 127.0) * std::f32::consts::PI * 1.5
-        + std::f32::consts::PI * 0.75;
+    let angle =
+        (value.min(127) as f32 / 127.0) * std::f32::consts::PI * 1.5 + std::f32::consts::PI * 0.75;
     let needle_x = cx as f32 + angle.cos() * radius as f32 * 0.7;
     let needle_y = cy as f32 + angle.sin() * radius as f32 * 0.7;
     for y in cy.saturating_sub(radius)..=(cy + radius).min(rows.len().saturating_sub(1)) {
@@ -1758,8 +1874,12 @@ fn draw_knob(
     if cy < rows.len() && cx < rows[cy].len() {
         rows[cy][cx] = accent;
     }
-    let nx = needle_x.round().clamp(0.0, (rows[0].len().saturating_sub(1)) as f32) as usize;
-    let ny = needle_y.round().clamp(0.0, (rows.len().saturating_sub(1)) as f32) as usize;
+    let nx = needle_x
+        .round()
+        .clamp(0.0, (rows[0].len().saturating_sub(1)) as f32) as usize;
+    let ny = needle_y
+        .round()
+        .clamp(0.0, (rows.len().saturating_sub(1)) as f32) as usize;
     stamp_line(rows, cx, cy, nx, ny, accent);
     if ny < rows.len() && nx < rows[ny].len() {
         rows[ny][nx] = accent;
@@ -1847,6 +1967,12 @@ struct BallPacket {
     accent: i64,
     toggle_state: i64,
     focus_index: i64,
+    progress_value: i64,
+    meter_value: i64,
+    button_state: i64,
+    text_caret: i64,
+    text_echo: i64,
+    select_index: i64,
 }
 
 fn parse_ball_packet(value: &Value, op: &str) -> Result<BallPacket, String> {
@@ -1865,6 +1991,12 @@ fn parse_ball_packet(value: &Value, op: &str) -> Result<BallPacket, String> {
                 accent: color_key,
                 toggle_state: if speed.round() as i64 % 2 == 0 { 0 } else { 1 },
                 focus_index: color_key.rem_euclid(3),
+                progress_value: speed.round() as i64,
+                meter_value: (radius_scale * 96.0).round() as i64,
+                button_state: if speed.round() as i64 % 2 == 0 { 0 } else { 1 },
+                text_caret: color_key.rem_euclid(6),
+                text_echo: color_key,
+                select_index: color_key.rem_euclid(3),
             })
         }
         Value::Struct(packet) => parse_ball_packet_struct(packet, op),
@@ -1875,16 +2007,21 @@ fn parse_ball_packet(value: &Value, op: &str) -> Result<BallPacket, String> {
 }
 
 fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket, String> {
-    let color = find_packet_field(packet, &["color", "slider_color"], &["sliders"], &["color"])
+    let color = find_slider_packet_value(packet, "color")
+        .or_else(|| find_packet_field(packet, &["color", "slider_color"], &["sliders"], &["color"]))
         .ok_or_else(|| format!("{op} struct packet is missing `color` field"))?;
-    let speed = find_packet_field(packet, &["speed", "slider_speed"], &["sliders"], &["speed"])
+    let speed = find_slider_packet_value(packet, "speed")
+        .or_else(|| find_packet_field(packet, &["speed", "slider_speed"], &["sliders"], &["speed"]))
         .ok_or_else(|| format!("{op} struct packet is missing `speed` field"))?;
-    let radius_scale = find_packet_field(
-        packet,
-        &["radius_scale", "slider_radius"],
-        &["sliders"],
-        &["radius"],
-    )
+    let radius_scale = find_slider_packet_value(packet, "radius")
+        .or_else(|| {
+            find_packet_field(
+                packet,
+                &["radius_scale", "slider_radius"],
+                &["sliders"],
+                &["radius"],
+            )
+        })
         .map(|value| scalar_to_f32(value, op))
         .transpose()?
         .unwrap_or(1.0);
@@ -1894,27 +2031,51 @@ fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket
         &["header"],
         &["accent"],
     )
-        .map(|value| scalar_to_color_key(value, op))
-        .transpose()?
-        .unwrap_or_else(|| scalar_to_color_key(color, op).unwrap_or(0));
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or_else(|| scalar_to_color_key(color, op).unwrap_or(0));
     let toggle_state = find_packet_field(
         packet,
         &["toggle_state", "toggle_live"],
         &["toggle"],
         &["live"],
     )
-        .map(|value| scalar_to_color_key(value, op))
-        .transpose()?
-        .unwrap_or(1);
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(1);
     let focus_index = find_packet_field(
         packet,
         &["focus_index", "focus_slot"],
         &["focus"],
         &["slot"],
     )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(0);
+    let progress_value = find_packet_field(packet, &["progress_value"], &["progress"], &["value"])
         .map(|value| scalar_to_color_key(value, op))
         .transpose()?
-        .unwrap_or(0);
+        .unwrap_or_else(|| scalar_to_color_key(speed, op).unwrap_or(0));
+    let meter_value = find_packet_field(packet, &["meter_value"], &["meter"], &["value"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or_else(|| (radius_scale * 96.0).round() as i64);
+    let button_state = find_packet_field(packet, &["button_state"], &["button"], &["active"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(toggle_state);
+    let text_caret = find_packet_field(packet, &["text_caret"], &["text_input"], &["caret"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(focus_index);
+    let text_echo = find_packet_field(packet, &["text_echo"], &["text_input"], &["echo"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(accent);
+    let select_index = find_packet_field(packet, &["select_index"], &["select"], &["selected"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(focus_index);
 
     Ok(BallPacket {
         color_key: scalar_to_color_key(color, op)?,
@@ -1923,6 +2084,12 @@ fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket
         accent,
         toggle_state,
         focus_index,
+        progress_value,
+        meter_value,
+        button_state,
+        text_caret,
+        text_echo,
+        select_index,
     })
 }
 
@@ -1941,7 +2108,11 @@ fn find_packet_field<'a>(
             packet
                 .fields
                 .iter()
-                .find(|(name, _)| nested_struct_names.iter().any(|candidate| name == candidate))
+                .find(|(name, _)| {
+                    nested_struct_names
+                        .iter()
+                        .any(|candidate| name == candidate)
+                })
                 .and_then(|(_, value)| match value {
                     Value::Struct(inner) => inner
                         .fields
@@ -1952,6 +2123,28 @@ fn find_packet_field<'a>(
                         .map(|(_, value)| value),
                     _ => None,
                 })
+        })
+}
+
+fn find_slider_packet_value<'a>(packet: &'a StructValue, slider_name: &str) -> Option<&'a Value> {
+    packet
+        .fields
+        .iter()
+        .find(|(name, _)| name == "sliders")
+        .and_then(|(_, value)| match value {
+            Value::Struct(group) => group
+                .fields
+                .iter()
+                .find(|(name, _)| name == slider_name)
+                .and_then(|(_, value)| match value {
+                    Value::Struct(slider) => slider
+                        .fields
+                        .iter()
+                        .find(|(name, _)| name == "value")
+                        .map(|(_, value)| value),
+                    _ => None,
+                }),
+            _ => None,
         })
 }
 
