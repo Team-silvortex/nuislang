@@ -1808,6 +1808,219 @@ fn draw_control_panel_surface(
             packet.schedule_async_budget, packet.schedule_tick_mode
         ),
     );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 33,
+        &format!(
+            "sub b{} f{}",
+            packet.submission_batches, packet.submission_fences
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 34,
+        &format!(
+            "sig {} ph{}",
+            packet.submission_signal_mode, packet.submission_present_hint
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 35,
+        &format!("q k{} p{}", packet.queue_kind, packet.queue_priority),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 36,
+        &format!("qb {:>3} ow{}", packet.queue_budget, packet.queue_ownership),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 37,
+        &format!(
+            "sem w{} s{}",
+            packet.semaphore_wait_count, packet.semaphore_signal_count
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 38,
+        &format!(
+            "tm {} sc{}",
+            packet.semaphore_timeline_mode, packet.semaphore_scope
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 39,
+        &format!("tl v{} st{}", packet.timeline_value, packet.timeline_step),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 40,
+        &format!("ep {} dm{}", packet.timeline_epoch, packet.timeline_domain),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 41,
+        &format!("fn s{} e{}", packet.fence_signaled, packet.fence_epoch),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 42,
+        &format!("fs {} rc{}", packet.fence_scope, packet.fence_recycle_mode),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 43,
+        &format!("sg k{} ph{}", packet.signal_kind, packet.signal_phase),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 44,
+        &format!("sf {} ak{}", packet.signal_fanout, packet.signal_ack_mode),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 45,
+        &format!("ev k{} rt{}", packet.event_kind, packet.event_route),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 46,
+        &format!(
+            "ep {} pm{}",
+            packet.event_priority, packet.event_payload_mode
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 47,
+        &format!(
+            "dp q{} l{}",
+            packet.dispatch_queue_kind, packet.dispatch_lane
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 48,
+        &format!(
+            "db {} cm{}",
+            packet.dispatch_batch, packet.dispatch_completion_mode
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 49,
+        &format!(
+            "fb st{} lt{}",
+            packet.feedback_status, packet.feedback_latency
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 50,
+        &format!(
+            "fr {} ch{}",
+            packet.feedback_retries, packet.feedback_channel
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 51,
+        &format!("in k{} tg{}", packet.intent_kind, packet.intent_target),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 52,
+        &format!("iu {} pl{}", packet.intent_urgency, packet.intent_policy),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 53,
+        &format!(
+            "rk {} rs{}",
+            packet.reaction_kind, packet.reaction_result_slot
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 54,
+        &format!(
+            "rb {} em{}",
+            packet.reaction_stability, packet.reaction_echo_mode
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 55,
+        &format!("ok {} fs{}", packet.outcome_kind, packet.outcome_final_slot),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 56,
+        &format!(
+            "oc {} sm{}",
+            packet.outcome_confidence, packet.outcome_settle_mode
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 57,
+        &format!(
+            "rs {} cs{}",
+            packet.resolution_kind, packet.resolution_commit_slot
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 58,
+        &format!(
+            "rc {} pm{}",
+            packet.resolution_convergence, packet.resolution_policy_mode
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 59,
+        &format!("cm {} as{}", packet.commit_kind, packet.commit_applied_slot),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 60,
+        &format!(
+            "cd {} md{}",
+            packet.commit_durability, packet.commit_commit_mode
+        ),
+    );
     if layer_hidden {
         put_text(
             &mut rows,
@@ -2873,6 +3086,62 @@ struct BallPacket {
     schedule_queue_depth: i64,
     schedule_async_budget: i64,
     schedule_tick_mode: i64,
+    submission_batches: i64,
+    submission_fences: i64,
+    submission_signal_mode: i64,
+    submission_present_hint: i64,
+    queue_kind: i64,
+    queue_priority: i64,
+    queue_budget: i64,
+    queue_ownership: i64,
+    semaphore_wait_count: i64,
+    semaphore_signal_count: i64,
+    semaphore_timeline_mode: i64,
+    semaphore_scope: i64,
+    timeline_value: i64,
+    timeline_step: i64,
+    timeline_epoch: i64,
+    timeline_domain: i64,
+    fence_signaled: i64,
+    fence_epoch: i64,
+    fence_scope: i64,
+    fence_recycle_mode: i64,
+    signal_kind: i64,
+    signal_phase: i64,
+    signal_fanout: i64,
+    signal_ack_mode: i64,
+    event_kind: i64,
+    event_route: i64,
+    event_priority: i64,
+    event_payload_mode: i64,
+    dispatch_queue_kind: i64,
+    dispatch_lane: i64,
+    dispatch_batch: i64,
+    dispatch_completion_mode: i64,
+    feedback_status: i64,
+    feedback_latency: i64,
+    feedback_retries: i64,
+    feedback_channel: i64,
+    intent_kind: i64,
+    intent_target: i64,
+    intent_urgency: i64,
+    intent_policy: i64,
+    reaction_kind: i64,
+    reaction_result_slot: i64,
+    reaction_stability: i64,
+    reaction_echo_mode: i64,
+    outcome_kind: i64,
+    outcome_final_slot: i64,
+    outcome_confidence: i64,
+    outcome_settle_mode: i64,
+    resolution_kind: i64,
+    resolution_commit_slot: i64,
+    resolution_convergence: i64,
+    resolution_policy_mode: i64,
+    commit_kind: i64,
+    commit_applied_slot: i64,
+    commit_durability: i64,
+    commit_commit_mode: i64,
     toggle_state: i64,
     focus_index: i64,
     progress_value: i64,
@@ -3028,6 +3297,62 @@ fn parse_ball_packet(value: &Value, op: &str) -> Result<BallPacket, String> {
                 schedule_queue_depth: 4,
                 schedule_async_budget: (radius_scale * 24.0).round() as i64,
                 schedule_tick_mode: speed.round() as i64 % 3,
+                submission_batches: 2,
+                submission_fences: 1,
+                submission_signal_mode: speed.round() as i64 % 3,
+                submission_present_hint: color_key,
+                queue_kind: speed.round() as i64 % 3,
+                queue_priority: 2,
+                queue_budget: (radius_scale * 24.0).round() as i64,
+                queue_ownership: color_key,
+                semaphore_wait_count: 1,
+                semaphore_signal_count: 2,
+                semaphore_timeline_mode: speed.round() as i64 % 3,
+                semaphore_scope: color_key,
+                timeline_value: (radius_scale * 24.0).round() as i64,
+                timeline_step: 1,
+                timeline_epoch: 0,
+                timeline_domain: color_key,
+                fence_signaled: if speed.round() as i64 % 2 == 0 { 0 } else { 1 },
+                fence_epoch: 0,
+                fence_scope: color_key,
+                fence_recycle_mode: 1,
+                signal_kind: speed.round() as i64 % 3,
+                signal_phase: 2,
+                signal_fanout: 3,
+                signal_ack_mode: color_key,
+                event_kind: speed.round() as i64 % 3,
+                event_route: 2,
+                event_priority: 3,
+                event_payload_mode: color_key,
+                dispatch_queue_kind: speed.round() as i64 % 3,
+                dispatch_lane: 2,
+                dispatch_batch: 3,
+                dispatch_completion_mode: color_key,
+                feedback_status: if speed.round() as i64 % 2 == 0 { 0 } else { 1 },
+                feedback_latency: speed.round() as i64,
+                feedback_retries: radius_scale.round() as i64 % 4,
+                feedback_channel: color_key,
+                intent_kind: speed.round() as i64 % 3,
+                intent_target: color_key.rem_euclid(6),
+                intent_urgency: speed.round() as i64,
+                intent_policy: color_key,
+                reaction_kind: speed.round() as i64 % 3,
+                reaction_result_slot: color_key.rem_euclid(6),
+                reaction_stability: radius_scale.round() as i64 % 4,
+                reaction_echo_mode: color_key,
+                outcome_kind: speed.round() as i64 % 3,
+                outcome_final_slot: color_key.rem_euclid(6),
+                outcome_confidence: speed.round() as i64,
+                outcome_settle_mode: color_key,
+                resolution_kind: speed.round() as i64 % 3,
+                resolution_commit_slot: color_key.rem_euclid(6),
+                resolution_convergence: radius_scale.round() as i64 % 4,
+                resolution_policy_mode: color_key,
+                commit_kind: speed.round() as i64 % 3,
+                commit_applied_slot: color_key.rem_euclid(6),
+                commit_durability: speed.round() as i64,
+                commit_commit_mode: color_key,
                 toggle_state: if speed.round() as i64 % 2 == 0 { 0 } else { 1 },
                 focus_index: color_key.rem_euclid(3),
                 progress_value: speed.round() as i64,
@@ -3469,6 +3794,263 @@ fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket
             .map(|value| scalar_to_color_key(value, op))
             .transpose()?
             .unwrap_or(contrast.rem_euclid(3));
+    let submission_batches = find_packet_field(packet, &["batches"], &["submission"], &["batches"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(2);
+    let submission_fences = find_packet_field(packet, &["fences"], &["submission"], &["fences"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(1);
+    let submission_signal_mode =
+        find_packet_field(packet, &["signal_mode"], &["submission"], &["signal_mode"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(contrast.rem_euclid(3));
+    let submission_present_hint = find_packet_field(
+        packet,
+        &["present_hint"],
+        &["submission"],
+        &["present_hint"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(accent);
+    let queue_kind = find_packet_field(packet, &["kind"], &["queue"], &["kind"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(contrast.rem_euclid(3));
+    let queue_priority = find_packet_field(packet, &["priority"], &["queue"], &["priority"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(2);
+    let queue_budget = find_packet_field(packet, &["budget"], &["queue"], &["budget"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or((radius_scale * 24.0).round() as i64);
+    let queue_ownership = find_packet_field(packet, &["ownership"], &["queue"], &["ownership"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(accent);
+    let semaphore_wait_count =
+        find_packet_field(packet, &["wait_count"], &["semaphore"], &["wait_count"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(1);
+    let semaphore_signal_count =
+        find_packet_field(packet, &["signal_count"], &["semaphore"], &["signal_count"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(2);
+    let semaphore_timeline_mode = find_packet_field(
+        packet,
+        &["timeline_mode"],
+        &["semaphore"],
+        &["timeline_mode"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(contrast.rem_euclid(3));
+    let semaphore_scope = find_packet_field(packet, &["scope"], &["semaphore"], &["scope"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(accent);
+    let timeline_value = find_packet_field(packet, &["value"], &["timeline"], &["value"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or((radius_scale * 24.0).round() as i64);
+    let timeline_step = find_packet_field(packet, &["step"], &["timeline"], &["step"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(1);
+    let timeline_epoch = find_packet_field(packet, &["epoch"], &["timeline"], &["epoch"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(0);
+    let timeline_domain = find_packet_field(packet, &["domain"], &["timeline"], &["domain"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(accent);
+    let fence_signaled = find_packet_field(packet, &["signaled"], &["fence"], &["signaled"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(1);
+    let fence_epoch = find_packet_field(packet, &["epoch"], &["fence"], &["epoch"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(0);
+    let fence_scope = find_packet_field(packet, &["scope"], &["fence"], &["scope"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(accent);
+    let fence_recycle_mode =
+        find_packet_field(packet, &["recycle_mode"], &["fence"], &["recycle_mode"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(1);
+    let signal_kind = find_packet_field(packet, &["kind"], &["signal"], &["kind"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(contrast.rem_euclid(3));
+    let signal_phase = find_packet_field(packet, &["phase"], &["signal"], &["phase"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(2);
+    let signal_fanout = find_packet_field(packet, &["fanout"], &["signal"], &["fanout"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(3);
+    let signal_ack_mode = find_packet_field(packet, &["ack_mode"], &["signal"], &["ack_mode"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(accent);
+    let event_kind = find_packet_field(packet, &["kind"], &["event"], &["kind"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(contrast.rem_euclid(3));
+    let event_route = find_packet_field(packet, &["route"], &["event"], &["route"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(2);
+    let event_priority = find_packet_field(packet, &["priority"], &["event"], &["priority"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(3);
+    let event_payload_mode =
+        find_packet_field(packet, &["payload_mode"], &["event"], &["payload_mode"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(accent);
+    let dispatch_queue_kind =
+        find_packet_field(packet, &["queue_kind"], &["dispatch"], &["queue_kind"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(contrast.rem_euclid(3));
+    let dispatch_lane = find_packet_field(packet, &["lane"], &["dispatch"], &["lane"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(2);
+    let dispatch_batch = find_packet_field(packet, &["batch"], &["dispatch"], &["batch"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(3);
+    let dispatch_completion_mode = find_packet_field(
+        packet,
+        &["completion_mode"],
+        &["dispatch"],
+        &["completion_mode"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(accent);
+    let feedback_status = find_packet_field(packet, &["status"], &["feedback"], &["status"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or_else(|| scalar_to_color_key(speed, op).unwrap_or(0).rem_euclid(2));
+    let feedback_latency = find_packet_field(packet, &["latency"], &["feedback"], &["latency"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or_else(|| scalar_to_color_key(speed, op).unwrap_or(0));
+    let feedback_retries = find_packet_field(packet, &["retries"], &["feedback"], &["retries"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(radius_scale.round() as i64 % 4);
+    let feedback_channel = find_packet_field(packet, &["channel"], &["feedback"], &["channel"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(accent);
+    let intent_kind = find_packet_field(packet, &["kind"], &["intent"], &["kind"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(contrast.rem_euclid(3));
+    let intent_target = find_packet_field(packet, &["target_slot"], &["intent"], &["target_slot"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(contrast);
+    let intent_urgency = find_packet_field(packet, &["urgency"], &["intent"], &["urgency"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or_else(|| scalar_to_color_key(speed, op).unwrap_or(0));
+    let intent_policy = find_packet_field(packet, &["policy"], &["intent"], &["policy"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(accent);
+    let reaction_kind = find_packet_field(packet, &["kind"], &["reaction"], &["kind"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(contrast.rem_euclid(3));
+    let reaction_result_slot =
+        find_packet_field(packet, &["result_slot"], &["reaction"], &["result_slot"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(contrast);
+    let reaction_stability =
+        find_packet_field(packet, &["stability"], &["reaction"], &["stability"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(radius_scale.round() as i64 % 4);
+    let reaction_echo_mode =
+        find_packet_field(packet, &["echo_mode"], &["reaction"], &["echo_mode"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(accent);
+    let outcome_kind = find_packet_field(packet, &["kind"], &["outcome"], &["kind"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(contrast.rem_euclid(3));
+    let outcome_final_slot =
+        find_packet_field(packet, &["final_slot"], &["outcome"], &["final_slot"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(contrast);
+    let outcome_confidence =
+        find_packet_field(packet, &["confidence"], &["outcome"], &["confidence"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or_else(|| scalar_to_color_key(speed, op).unwrap_or(0));
+    let outcome_settle_mode =
+        find_packet_field(packet, &["settle_mode"], &["outcome"], &["settle_mode"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(accent);
+    let resolution_kind = find_packet_field(packet, &["kind"], &["resolution"], &["kind"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(contrast.rem_euclid(3));
+    let resolution_commit_slot =
+        find_packet_field(packet, &["commit_slot"], &["resolution"], &["commit_slot"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(contrast);
+    let resolution_convergence =
+        find_packet_field(packet, &["convergence"], &["resolution"], &["convergence"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(radius_scale.round() as i64 % 4);
+    let resolution_policy_mode =
+        find_packet_field(packet, &["policy_mode"], &["resolution"], &["policy_mode"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(accent);
+    let commit_kind = find_packet_field(packet, &["kind"], &["commit"], &["kind"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(contrast.rem_euclid(3));
+    let commit_applied_slot =
+        find_packet_field(packet, &["applied_slot"], &["commit"], &["applied_slot"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(contrast);
+    let commit_durability =
+        find_packet_field(packet, &["durability"], &["commit"], &["durability"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or_else(|| scalar_to_color_key(speed, op).unwrap_or(0));
+    let commit_commit_mode =
+        find_packet_field(packet, &["commit_mode"], &["commit"], &["commit_mode"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(accent);
     let color_min = find_slider_packet_field(packet, "color", "min")
         .map(|value| scalar_to_color_key(value, op))
         .transpose()?
@@ -3853,6 +4435,62 @@ fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket
         schedule_queue_depth,
         schedule_async_budget,
         schedule_tick_mode,
+        submission_batches,
+        submission_fences,
+        submission_signal_mode,
+        submission_present_hint,
+        queue_kind,
+        queue_priority,
+        queue_budget,
+        queue_ownership,
+        semaphore_wait_count,
+        semaphore_signal_count,
+        semaphore_timeline_mode,
+        semaphore_scope,
+        timeline_value,
+        timeline_step,
+        timeline_epoch,
+        timeline_domain,
+        fence_signaled,
+        fence_epoch,
+        fence_scope,
+        fence_recycle_mode,
+        signal_kind,
+        signal_phase,
+        signal_fanout,
+        signal_ack_mode,
+        event_kind,
+        event_route,
+        event_priority,
+        event_payload_mode,
+        dispatch_queue_kind,
+        dispatch_lane,
+        dispatch_batch,
+        dispatch_completion_mode,
+        feedback_status,
+        feedback_latency,
+        feedback_retries,
+        feedback_channel,
+        intent_kind,
+        intent_target,
+        intent_urgency,
+        intent_policy,
+        reaction_kind,
+        reaction_result_slot,
+        reaction_stability,
+        reaction_echo_mode,
+        outcome_kind,
+        outcome_final_slot,
+        outcome_confidence,
+        outcome_settle_mode,
+        resolution_kind,
+        resolution_commit_slot,
+        resolution_convergence,
+        resolution_policy_mode,
+        commit_kind,
+        commit_applied_slot,
+        commit_durability,
+        commit_commit_mode,
         toggle_state,
         focus_index,
         progress_value,

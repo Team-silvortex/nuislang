@@ -90,6 +90,14 @@ mod cpu Main {
       nova_resource_set_packet(2, 1, 1, panel_accent);
     let panel_schedule: NovaSchedulePacket =
       nova_schedule_packet(2, 4, packed_radius, panel_toggle_state);
+    let panel_submission: NovaSubmissionPacket =
+      nova_submission_packet(2, 1, panel_toggle_state, panel_accent);
+    let panel_queue: NovaQueuePacket =
+      nova_queue_packet(panel_toggle_state, 2, packed_radius, panel_accent);
+    let panel_semaphore: NovaSemaphorePacket =
+      nova_semaphore_packet(1, 2, panel_toggle_state, panel_accent);
+    let panel_timeline: NovaTimelinePacket =
+      nova_timeline_packet(packed_radius, 1, 0, panel_accent);
     let slider_color: NovaSliderPacket =
       nova_slider_packet(packed_color, 0, 127, 4, 0);
     let slider_speed: NovaSliderPacket =
@@ -175,6 +183,14 @@ mod cpu Main {
       nova_resource_set_state(panel_resource_set);
     let schedule_state: NovaScheduleState =
       nova_schedule_state(panel_schedule);
+    let submission_state: NovaSubmissionState =
+      nova_submission_state(panel_submission);
+    let queue_state: NovaQueueState =
+      nova_queue_state(panel_queue);
+    let semaphore_state: NovaSemaphoreState =
+      nova_semaphore_state(panel_semaphore);
+    let timeline_state: NovaTimelineState =
+      nova_timeline_state(panel_timeline);
     let list_selection: NovaSelectionState = nova_list_selection(panel_list);
     let table_selection: NovaSelectionState = nova_table_selection(panel_table);
     let tree_selection: NovaSelectionState = nova_tree_selection(panel_tree);
@@ -218,6 +234,74 @@ mod cpu Main {
       nova_resource_set_state_residency(resource_set_state);
     let panel_schedule_budget: i64 =
       nova_schedule_state_async_budget(schedule_state);
+    let panel_submission_batches: i64 =
+      nova_submission_state_batches(submission_state);
+    let panel_queue_budget: i64 =
+      nova_queue_state_budget(queue_state);
+    let panel_semaphore_scope: i64 =
+      nova_semaphore_state_scope(semaphore_state);
+    let panel_timeline_epoch: i64 =
+      nova_timeline_state_epoch(timeline_state);
+    let panel_fence: NovaFencePacket =
+      nova_fence_packet(panel_toggle_state, 0, panel_accent, 1);
+    let fence_state: NovaFenceState =
+      nova_fence_state(panel_fence);
+    let panel_fence_scope: i64 =
+      nova_fence_state_scope(fence_state);
+    let panel_signal: NovaSignalPacket =
+      nova_signal_packet(panel_toggle_state, 2, 3, panel_accent);
+    let signal_state: NovaSignalState =
+      nova_signal_state(panel_signal);
+    let panel_signal_phase: i64 =
+      nova_signal_state_phase(signal_state);
+    let panel_event: NovaEventPacket =
+      nova_event_packet(panel_toggle_state, 2, 3, panel_accent);
+    let event_state: NovaEventState =
+      nova_event_state(panel_event);
+    let panel_event_route: i64 =
+      nova_event_state_route(event_state);
+    let panel_dispatch: NovaDispatchPacket =
+      nova_dispatch_packet(panel_toggle_state, 2, 3, panel_accent);
+    let dispatch_state: NovaDispatchState =
+      nova_dispatch_state(panel_dispatch);
+    let panel_dispatch_lane: i64 =
+      nova_dispatch_state_lane(dispatch_state);
+    let panel_feedback: NovaFeedbackPacket =
+      nova_feedback_packet(panel_toggle_state, packed_speed, radius_delta, panel_accent);
+    let feedback_state: NovaFeedbackState =
+      nova_feedback_state(panel_feedback);
+    let panel_feedback_status: i64 =
+      nova_feedback_state_status(feedback_state);
+    let panel_intent: NovaIntentPacket =
+      nova_intent_packet(panel_toggle_state, panel_focus_index, packed_speed, panel_accent);
+    let intent_state: NovaIntentState =
+      nova_intent_state(panel_intent);
+    let panel_intent_target: i64 =
+      nova_intent_state_target(intent_state);
+    let panel_reaction: NovaReactionPacket =
+      nova_reaction_packet(panel_toggle_state, panel_focus_index, radius_delta, panel_accent);
+    let reaction_state: NovaReactionState =
+      nova_reaction_state(panel_reaction);
+    let panel_reaction_result: i64 =
+      nova_reaction_state_result(reaction_state);
+    let panel_outcome: NovaOutcomePacket =
+      nova_outcome_packet(panel_toggle_state, panel_focus_index, packed_speed, panel_accent);
+    let outcome_state: NovaOutcomeState =
+      nova_outcome_state(panel_outcome);
+    let panel_outcome_final: i64 =
+      nova_outcome_state_final(outcome_state);
+    let panel_resolution: NovaResolutionPacket =
+      nova_resolution_packet(panel_toggle_state, panel_focus_index, radius_delta, panel_accent);
+    let resolution_state: NovaResolutionState =
+      nova_resolution_state(panel_resolution);
+    let panel_resolution_commit: i64 =
+      nova_resolution_state_commit(resolution_state);
+    let panel_commit: NovaCommitPacket =
+      nova_commit_packet(panel_toggle_state, panel_focus_index, packed_speed, panel_accent);
+    let commit_state: NovaCommitState =
+      nova_commit_state(panel_commit);
+    let panel_commit_applied: i64 =
+      nova_commit_state_applied(commit_state);
     let list_selection_origin: i64 = nova_selection_state_origin(list_selection);
     let table_selection_origin: i64 = nova_selection_state_origin(table_selection);
     let tree_selection_origin: i64 = nova_selection_state_origin(tree_selection);
@@ -256,6 +340,20 @@ mod cpu Main {
       + panel_barrier_flush
       + panel_resource_residency
       + panel_schedule_budget
+      + panel_submission_batches
+      + panel_queue_budget
+      + panel_semaphore_scope
+      + panel_timeline_epoch
+      + panel_fence_scope
+      + panel_signal_phase
+      + panel_event_route
+      + panel_dispatch_lane
+      + panel_feedback_status
+      + panel_intent_target
+      + panel_reaction_result
+      + panel_outcome_final
+      + panel_resolution_commit
+      + panel_commit_applied
       + list_selection_origin
       + table_selection_origin
       + tree_selection_origin
@@ -300,6 +398,20 @@ mod cpu Main {
       panel_barrier,
       panel_resource_set,
       panel_schedule,
+      panel_submission,
+      panel_queue,
+      panel_semaphore,
+      panel_timeline,
+      panel_fence,
+      panel_signal,
+      panel_event,
+      panel_dispatch,
+      panel_feedback,
+      panel_intent,
+      panel_reaction,
+      panel_outcome,
+      panel_resolution,
+      panel_commit,
       panel_focus
     );
 

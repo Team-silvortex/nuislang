@@ -5211,6 +5211,20 @@ mod tests {
                     let barrier: NovaBarrierPacket = nova_barrier_packet(1, 1, 2, 8);
                     let resource_set: NovaResourceSetPacket = nova_resource_set_packet(2, 1, 1, 8);
                     let schedule: NovaSchedulePacket = nova_schedule_packet(2, 4, 9, 1);
+                    let submission: NovaSubmissionPacket = nova_submission_packet(2, 1, 1, 8);
+                    let queue: NovaQueuePacket = nova_queue_packet(1, 2, 9, 1);
+                    let semaphore: NovaSemaphorePacket = nova_semaphore_packet(1, 2, 1, 3);
+                    let timeline: NovaTimelinePacket = nova_timeline_packet(9, 1, 0, 3);
+                    let fence: NovaFencePacket = nova_fence_packet(1, 0, 3, 1);
+                    let signal: NovaSignalPacket = nova_signal_packet(1, 2, 3, 1);
+                    let event: NovaEventPacket = nova_event_packet(1, 2, 3, 1);
+                    let dispatch: NovaDispatchPacket = nova_dispatch_packet(1, 2, 3, 1);
+                    let feedback: NovaFeedbackPacket = nova_feedback_packet(1, 2, 3, 1);
+                    let intent: NovaIntentPacket = nova_intent_packet(1, 2, 3, 1);
+                    let reaction: NovaReactionPacket = nova_reaction_packet(1, 2, 3, 1);
+                    let outcome: NovaOutcomePacket = nova_outcome_packet(1, 2, 3, 1);
+                    let resolution: NovaResolutionPacket = nova_resolution_packet(1, 2, 3, 1);
+                    let commit: NovaCommitPacket = nova_commit_packet(1, 2, 3, 1);
                     let focus: NovaFocusPacket = nova_focus_packet(2);
                     let packet: NovaPanelPacket = nova_panel_from_parts(
                         header,
@@ -5247,10 +5261,24 @@ mod tests {
                         frame_graph,
                         attachment,
                         pass_chain,
-                        barrier,
-                        resource_set,
-                        schedule,
-                        focus
+                      barrier,
+                      resource_set,
+                      schedule,
+                      submission,
+                      queue,
+                        semaphore,
+                        timeline,
+                        fence,
+                        signal,
+                        event,
+                        dispatch,
+                        feedback,
+                        intent,
+                      reaction,
+                      outcome,
+                      resolution,
+                      commit,
+                      focus
                     );
                   }
                 }

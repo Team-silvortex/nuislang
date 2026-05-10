@@ -3177,6 +3177,678 @@ fn lower_call_expr_with_async(
                 ],
             })
         }
+        "nova_submission_packet" => {
+            let (batches, fences, signal_mode, present_hint) = match args {
+                [batches, fences, signal_mode, present_hint] => {
+                    (batches, fences, signal_mode, present_hint)
+                }
+                _ => return Err("nova_submission_packet(...) expects 4 args".to_owned()),
+            };
+            let batches = lower_expr(
+                batches,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let fences = lower_expr(
+                fences,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let signal_mode = lower_expr(
+                signal_mode,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let present_hint = lower_expr(
+                present_hint,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaSubmissionPacket".to_owned(),
+                fields: vec![
+                    ("batches".to_owned(), batches),
+                    ("fences".to_owned(), fences),
+                    ("signal_mode".to_owned(), signal_mode),
+                    ("present_hint".to_owned(), present_hint),
+                ],
+            })
+        }
+        "nova_queue_packet" => {
+            let (kind, priority, budget, ownership) = match args {
+                [kind, priority, budget, ownership] => (kind, priority, budget, ownership),
+                _ => return Err("nova_queue_packet(...) expects 4 args".to_owned()),
+            };
+            let kind = lower_expr(
+                kind,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let priority = lower_expr(
+                priority,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let budget = lower_expr(
+                budget,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let ownership = lower_expr(
+                ownership,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaQueuePacket".to_owned(),
+                fields: vec![
+                    ("kind".to_owned(), kind),
+                    ("priority".to_owned(), priority),
+                    ("budget".to_owned(), budget),
+                    ("ownership".to_owned(), ownership),
+                ],
+            })
+        }
+        "nova_semaphore_packet" => {
+            let (wait_count, signal_count, timeline_mode, scope) = match args {
+                [wait_count, signal_count, timeline_mode, scope] => {
+                    (wait_count, signal_count, timeline_mode, scope)
+                }
+                _ => return Err("nova_semaphore_packet(...) expects 4 args".to_owned()),
+            };
+            let wait_count = lower_expr(
+                wait_count,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let signal_count = lower_expr(
+                signal_count,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let timeline_mode = lower_expr(
+                timeline_mode,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let scope = lower_expr(
+                scope,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaSemaphorePacket".to_owned(),
+                fields: vec![
+                    ("wait_count".to_owned(), wait_count),
+                    ("signal_count".to_owned(), signal_count),
+                    ("timeline_mode".to_owned(), timeline_mode),
+                    ("scope".to_owned(), scope),
+                ],
+            })
+        }
+        "nova_timeline_packet" => {
+            let (value, step, epoch, domain) = match args {
+                [value, step, epoch, domain] => (value, step, epoch, domain),
+                _ => return Err("nova_timeline_packet(...) expects 4 args".to_owned()),
+            };
+            let value = lower_expr(
+                value,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let step = lower_expr(
+                step,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let epoch = lower_expr(
+                epoch,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let domain = lower_expr(
+                domain,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaTimelinePacket".to_owned(),
+                fields: vec![
+                    ("value".to_owned(), value),
+                    ("step".to_owned(), step),
+                    ("epoch".to_owned(), epoch),
+                    ("domain".to_owned(), domain),
+                ],
+            })
+        }
+        "nova_fence_packet" => {
+            let (signaled, epoch, scope, recycle_mode) = match args {
+                [signaled, epoch, scope, recycle_mode] => (signaled, epoch, scope, recycle_mode),
+                _ => return Err("nova_fence_packet(...) expects 4 args".to_owned()),
+            };
+            let signaled = lower_expr(
+                signaled,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let epoch = lower_expr(
+                epoch,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let scope = lower_expr(
+                scope,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let recycle_mode = lower_expr(
+                recycle_mode,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaFencePacket".to_owned(),
+                fields: vec![
+                    ("signaled".to_owned(), signaled),
+                    ("epoch".to_owned(), epoch),
+                    ("scope".to_owned(), scope),
+                    ("recycle_mode".to_owned(), recycle_mode),
+                ],
+            })
+        }
+        "nova_signal_packet" => {
+            let (kind, phase, fanout, ack_mode) = match args {
+                [kind, phase, fanout, ack_mode] => (kind, phase, fanout, ack_mode),
+                _ => return Err("nova_signal_packet(...) expects 4 args".to_owned()),
+            };
+            let kind = lower_expr(
+                kind,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let phase = lower_expr(
+                phase,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let fanout = lower_expr(
+                fanout,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let ack_mode = lower_expr(
+                ack_mode,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaSignalPacket".to_owned(),
+                fields: vec![
+                    ("kind".to_owned(), kind),
+                    ("phase".to_owned(), phase),
+                    ("fanout".to_owned(), fanout),
+                    ("ack_mode".to_owned(), ack_mode),
+                ],
+            })
+        }
+        "nova_event_packet" => {
+            let (kind, route, priority, payload_mode) = match args {
+                [kind, route, priority, payload_mode] => (kind, route, priority, payload_mode),
+                _ => return Err("nova_event_packet(...) expects 4 args".to_owned()),
+            };
+            let kind = lower_expr(
+                kind,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let route = lower_expr(
+                route,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let priority = lower_expr(
+                priority,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let payload_mode = lower_expr(
+                payload_mode,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaEventPacket".to_owned(),
+                fields: vec![
+                    ("kind".to_owned(), kind),
+                    ("route".to_owned(), route),
+                    ("priority".to_owned(), priority),
+                    ("payload_mode".to_owned(), payload_mode),
+                ],
+            })
+        }
+        "nova_dispatch_packet" => {
+            let (queue_kind, lane, batch, completion_mode) = match args {
+                [queue_kind, lane, batch, completion_mode] => {
+                    (queue_kind, lane, batch, completion_mode)
+                }
+                _ => return Err("nova_dispatch_packet(...) expects 4 args".to_owned()),
+            };
+            let queue_kind = lower_expr(
+                queue_kind,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let lane = lower_expr(
+                lane,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let batch = lower_expr(
+                batch,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let completion_mode = lower_expr(
+                completion_mode,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaDispatchPacket".to_owned(),
+                fields: vec![
+                    ("queue_kind".to_owned(), queue_kind),
+                    ("lane".to_owned(), lane),
+                    ("batch".to_owned(), batch),
+                    ("completion_mode".to_owned(), completion_mode),
+                ],
+            })
+        }
+        "nova_feedback_packet" => {
+            let (status, latency, retries, channel) = match args {
+                [status, latency, retries, channel] => (status, latency, retries, channel),
+                _ => return Err("nova_feedback_packet(...) expects 4 args".to_owned()),
+            };
+            let status = lower_expr(
+                status,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let latency = lower_expr(
+                latency,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let retries = lower_expr(
+                retries,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let channel = lower_expr(
+                channel,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaFeedbackPacket".to_owned(),
+                fields: vec![
+                    ("status".to_owned(), status),
+                    ("latency".to_owned(), latency),
+                    ("retries".to_owned(), retries),
+                    ("channel".to_owned(), channel),
+                ],
+            })
+        }
+        "nova_intent_packet" => {
+            let (kind, target_slot, urgency, policy) = match args {
+                [kind, target_slot, urgency, policy] => (kind, target_slot, urgency, policy),
+                _ => return Err("nova_intent_packet(...) expects 4 args".to_owned()),
+            };
+            let kind = lower_expr(
+                kind,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let target_slot = lower_expr(
+                target_slot,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let urgency = lower_expr(
+                urgency,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let policy = lower_expr(
+                policy,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaIntentPacket".to_owned(),
+                fields: vec![
+                    ("kind".to_owned(), kind),
+                    ("target_slot".to_owned(), target_slot),
+                    ("urgency".to_owned(), urgency),
+                    ("policy".to_owned(), policy),
+                ],
+            })
+        }
+        "nova_reaction_packet" => {
+            let (kind, result_slot, stability, echo_mode) = match args {
+                [kind, result_slot, stability, echo_mode] => {
+                    (kind, result_slot, stability, echo_mode)
+                }
+                _ => return Err("nova_reaction_packet(...) expects 4 args".to_owned()),
+            };
+            let kind = lower_expr(
+                kind,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let result_slot = lower_expr(
+                result_slot,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let stability = lower_expr(
+                stability,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let echo_mode = lower_expr(
+                echo_mode,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaReactionPacket".to_owned(),
+                fields: vec![
+                    ("kind".to_owned(), kind),
+                    ("result_slot".to_owned(), result_slot),
+                    ("stability".to_owned(), stability),
+                    ("echo_mode".to_owned(), echo_mode),
+                ],
+            })
+        }
+        "nova_outcome_packet" => {
+            let (kind, final_slot, confidence, settle_mode) = match args {
+                [kind, final_slot, confidence, settle_mode] => {
+                    (kind, final_slot, confidence, settle_mode)
+                }
+                _ => return Err("nova_outcome_packet(...) expects 4 args".to_owned()),
+            };
+            let kind = lower_expr(
+                kind,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let final_slot = lower_expr(
+                final_slot,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let confidence = lower_expr(
+                confidence,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let settle_mode = lower_expr(
+                settle_mode,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaOutcomePacket".to_owned(),
+                fields: vec![
+                    ("kind".to_owned(), kind),
+                    ("final_slot".to_owned(), final_slot),
+                    ("confidence".to_owned(), confidence),
+                    ("settle_mode".to_owned(), settle_mode),
+                ],
+            })
+        }
+        "nova_resolution_packet" => {
+            let (kind, commit_slot, convergence, policy_mode) = match args {
+                [kind, commit_slot, convergence, policy_mode] => {
+                    (kind, commit_slot, convergence, policy_mode)
+                }
+                _ => return Err("nova_resolution_packet(...) expects 4 args".to_owned()),
+            };
+            let kind = lower_expr(
+                kind,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let commit_slot = lower_expr(
+                commit_slot,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let convergence = lower_expr(
+                convergence,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let policy_mode = lower_expr(
+                policy_mode,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaResolutionPacket".to_owned(),
+                fields: vec![
+                    ("kind".to_owned(), kind),
+                    ("commit_slot".to_owned(), commit_slot),
+                    ("convergence".to_owned(), convergence),
+                    ("policy_mode".to_owned(), policy_mode),
+                ],
+            })
+        }
+        "nova_commit_packet" => {
+            let (kind, applied_slot, durability, commit_mode) = match args {
+                [kind, applied_slot, durability, commit_mode] => {
+                    (kind, applied_slot, durability, commit_mode)
+                }
+                _ => return Err("nova_commit_packet(...) expects 4 args".to_owned()),
+            };
+            let kind = lower_expr(
+                kind,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let applied_slot = lower_expr(
+                applied_slot,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let durability = lower_expr(
+                durability,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let commit_mode = lower_expr(
+                commit_mode,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaCommitPacket".to_owned(),
+                fields: vec![
+                    ("kind".to_owned(), kind),
+                    ("applied_slot".to_owned(), applied_slot),
+                    ("durability".to_owned(), durability),
+                    ("commit_mode".to_owned(), commit_mode),
+                ],
+            })
+        }
         "nova_slider_packet" => {
             let (value, min_value, max_value, step_value, disabled) = match args {
                 [value] => (value, None, None, None, None),
@@ -4126,10 +4798,10 @@ fn lower_call_expr_with_async(
             })
         }
         "nova_panel_from_parts" => {
-            let [header, sliders, toggle, progress, meter, button, text_input, select, checkbox, radio, textarea, tabs, list, table, tree, inspector, outline, theme, surface, viewport, layer, scene, camera, material, light, mesh, transform, node, pass, frame, target, frame_graph, attachment, pass_chain, barrier, resource_set, schedule, focus] =
+            let [header, sliders, toggle, progress, meter, button, text_input, select, checkbox, radio, textarea, tabs, list, table, tree, inspector, outline, theme, surface, viewport, layer, scene, camera, material, light, mesh, transform, node, pass, frame, target, frame_graph, attachment, pass_chain, barrier, resource_set, schedule, submission, queue, semaphore, timeline, fence, signal, event, dispatch, feedback, intent, reaction, outcome, resolution, commit, focus] =
                 args
             else {
-                return Err("nova_panel_from_parts(...) expects 38 args".to_owned());
+                return Err("nova_panel_from_parts(...) expects 52 args".to_owned());
             };
             let header = lower_expr(
                 header,
@@ -4427,6 +5099,118 @@ fn lower_call_expr_with_async(
                 struct_table,
                 Some(&named_type("NovaSchedulePacket")),
             )?;
+            let submission = lower_expr(
+                submission,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaSubmissionPacket")),
+            )?;
+            let queue = lower_expr(
+                queue,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaQueuePacket")),
+            )?;
+            let semaphore = lower_expr(
+                semaphore,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaSemaphorePacket")),
+            )?;
+            let timeline = lower_expr(
+                timeline,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaTimelinePacket")),
+            )?;
+            let fence = lower_expr(
+                fence,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaFencePacket")),
+            )?;
+            let signal = lower_expr(
+                signal,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaSignalPacket")),
+            )?;
+            let event = lower_expr(
+                event,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaEventPacket")),
+            )?;
+            let dispatch = lower_expr(
+                dispatch,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaDispatchPacket")),
+            )?;
+            let feedback = lower_expr(
+                feedback,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaFeedbackPacket")),
+            )?;
+            let intent = lower_expr(
+                intent,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaIntentPacket")),
+            )?;
+            let reaction = lower_expr(
+                reaction,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaReactionPacket")),
+            )?;
+            let outcome = lower_expr(
+                outcome,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaOutcomePacket")),
+            )?;
+            let resolution = lower_expr(
+                resolution,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaResolutionPacket")),
+            )?;
+            let commit = lower_expr(
+                commit,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaCommitPacket")),
+            )?;
             let focus = lower_expr(
                 focus,
                 current_domain,
@@ -4475,6 +5259,20 @@ fn lower_call_expr_with_async(
                     ("barrier".to_owned(), barrier),
                     ("resource_set".to_owned(), resource_set),
                     ("schedule".to_owned(), schedule),
+                    ("submission".to_owned(), submission),
+                    ("queue".to_owned(), queue),
+                    ("semaphore".to_owned(), semaphore),
+                    ("timeline".to_owned(), timeline),
+                    ("fence".to_owned(), fence),
+                    ("signal".to_owned(), signal),
+                    ("event".to_owned(), event),
+                    ("dispatch".to_owned(), dispatch),
+                    ("feedback".to_owned(), feedback),
+                    ("intent".to_owned(), intent),
+                    ("reaction".to_owned(), reaction),
+                    ("outcome".to_owned(), outcome),
+                    ("resolution".to_owned(), resolution),
+                    ("commit".to_owned(), commit),
                     ("focus".to_owned(), focus),
                 ],
             })
@@ -5976,6 +6774,650 @@ fn lower_call_expr_with_async(
                 ],
             })
         }
+        "nova_submission_state" => {
+            let [packet] = args else {
+                return Err("nova_submission_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaSubmissionPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaSubmissionState".to_owned(),
+                fields: vec![
+                    (
+                        "batches".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "batches".to_owned(),
+                        },
+                    ),
+                    (
+                        "fences".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "fences".to_owned(),
+                        },
+                    ),
+                    (
+                        "signal_mode".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "signal_mode".to_owned(),
+                        },
+                    ),
+                    (
+                        "present_hint".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "present_hint".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_queue_state" => {
+            let [packet] = args else {
+                return Err("nova_queue_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaQueuePacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaQueueState".to_owned(),
+                fields: vec![
+                    (
+                        "kind".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "kind".to_owned(),
+                        },
+                    ),
+                    (
+                        "priority".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "priority".to_owned(),
+                        },
+                    ),
+                    (
+                        "budget".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "budget".to_owned(),
+                        },
+                    ),
+                    (
+                        "ownership".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "ownership".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_semaphore_state" => {
+            let [packet] = args else {
+                return Err("nova_semaphore_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaSemaphorePacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaSemaphoreState".to_owned(),
+                fields: vec![
+                    (
+                        "wait_count".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "wait_count".to_owned(),
+                        },
+                    ),
+                    (
+                        "signal_count".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "signal_count".to_owned(),
+                        },
+                    ),
+                    (
+                        "timeline_mode".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "timeline_mode".to_owned(),
+                        },
+                    ),
+                    (
+                        "scope".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "scope".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_timeline_state" => {
+            let [packet] = args else {
+                return Err("nova_timeline_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaTimelinePacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaTimelineState".to_owned(),
+                fields: vec![
+                    (
+                        "value".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "value".to_owned(),
+                        },
+                    ),
+                    (
+                        "step".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "step".to_owned(),
+                        },
+                    ),
+                    (
+                        "epoch".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "epoch".to_owned(),
+                        },
+                    ),
+                    (
+                        "domain".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "domain".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_fence_state" => {
+            let [packet] = args else {
+                return Err("nova_fence_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaFencePacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaFenceState".to_owned(),
+                fields: vec![
+                    (
+                        "signaled".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "signaled".to_owned(),
+                        },
+                    ),
+                    (
+                        "epoch".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "epoch".to_owned(),
+                        },
+                    ),
+                    (
+                        "scope".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "scope".to_owned(),
+                        },
+                    ),
+                    (
+                        "recycle_mode".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "recycle_mode".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_signal_state" => {
+            let [packet] = args else {
+                return Err("nova_signal_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaSignalPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaSignalState".to_owned(),
+                fields: vec![
+                    (
+                        "kind".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "kind".to_owned(),
+                        },
+                    ),
+                    (
+                        "phase".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "phase".to_owned(),
+                        },
+                    ),
+                    (
+                        "fanout".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "fanout".to_owned(),
+                        },
+                    ),
+                    (
+                        "ack_mode".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "ack_mode".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_event_state" => {
+            let [packet] = args else {
+                return Err("nova_event_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaEventPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaEventState".to_owned(),
+                fields: vec![
+                    (
+                        "kind".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "kind".to_owned(),
+                        },
+                    ),
+                    (
+                        "route".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "route".to_owned(),
+                        },
+                    ),
+                    (
+                        "priority".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "priority".to_owned(),
+                        },
+                    ),
+                    (
+                        "payload_mode".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "payload_mode".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_dispatch_state" => {
+            let [packet] = args else {
+                return Err("nova_dispatch_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaDispatchPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaDispatchState".to_owned(),
+                fields: vec![
+                    (
+                        "queue_kind".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "queue_kind".to_owned(),
+                        },
+                    ),
+                    (
+                        "lane".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "lane".to_owned(),
+                        },
+                    ),
+                    (
+                        "batch".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "batch".to_owned(),
+                        },
+                    ),
+                    (
+                        "completion_mode".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "completion_mode".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_feedback_state" => {
+            let [packet] = args else {
+                return Err("nova_feedback_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaFeedbackPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaFeedbackState".to_owned(),
+                fields: vec![
+                    (
+                        "status".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "status".to_owned(),
+                        },
+                    ),
+                    (
+                        "latency".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "latency".to_owned(),
+                        },
+                    ),
+                    (
+                        "retries".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "retries".to_owned(),
+                        },
+                    ),
+                    (
+                        "channel".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "channel".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_intent_state" => {
+            let [packet] = args else {
+                return Err("nova_intent_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaIntentPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaIntentState".to_owned(),
+                fields: vec![
+                    (
+                        "kind".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "kind".to_owned(),
+                        },
+                    ),
+                    (
+                        "target_slot".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "target_slot".to_owned(),
+                        },
+                    ),
+                    (
+                        "urgency".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "urgency".to_owned(),
+                        },
+                    ),
+                    (
+                        "policy".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "policy".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_reaction_state" => {
+            let [packet] = args else {
+                return Err("nova_reaction_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaReactionPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaReactionState".to_owned(),
+                fields: vec![
+                    (
+                        "kind".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "kind".to_owned(),
+                        },
+                    ),
+                    (
+                        "result_slot".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "result_slot".to_owned(),
+                        },
+                    ),
+                    (
+                        "stability".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "stability".to_owned(),
+                        },
+                    ),
+                    (
+                        "echo_mode".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "echo_mode".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_outcome_state" => {
+            let [packet] = args else {
+                return Err("nova_outcome_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaOutcomePacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaOutcomeState".to_owned(),
+                fields: vec![
+                    (
+                        "kind".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "kind".to_owned(),
+                        },
+                    ),
+                    (
+                        "final_slot".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "final_slot".to_owned(),
+                        },
+                    ),
+                    (
+                        "confidence".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "confidence".to_owned(),
+                        },
+                    ),
+                    (
+                        "settle_mode".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "settle_mode".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_resolution_state" => {
+            let [packet] = args else {
+                return Err("nova_resolution_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaResolutionPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaResolutionState".to_owned(),
+                fields: vec![
+                    (
+                        "kind".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "kind".to_owned(),
+                        },
+                    ),
+                    (
+                        "commit_slot".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "commit_slot".to_owned(),
+                        },
+                    ),
+                    (
+                        "convergence".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "convergence".to_owned(),
+                        },
+                    ),
+                    (
+                        "policy_mode".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "policy_mode".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_commit_state" => {
+            let [packet] = args else {
+                return Err("nova_commit_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaCommitPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaCommitState".to_owned(),
+                fields: vec![
+                    (
+                        "kind".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "kind".to_owned(),
+                        },
+                    ),
+                    (
+                        "applied_slot".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "applied_slot".to_owned(),
+                        },
+                    ),
+                    (
+                        "durability".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "durability".to_owned(),
+                        },
+                    ),
+                    (
+                        "commit_mode".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "commit_mode".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
         "nova_selection_state" => {
             let [packet] = args else {
                 return Err("nova_selection_state(...) expects 1 arg".to_owned());
@@ -6179,6 +7621,62 @@ fn lower_call_expr_with_async(
         | "nova_schedule_state_queue_depth"
         | "nova_schedule_state_async_budget"
         | "nova_schedule_state_tick_mode"
+        | "nova_submission_state_batches"
+        | "nova_submission_state_fences"
+        | "nova_submission_state_signal_mode"
+        | "nova_submission_state_present_hint"
+        | "nova_queue_state_kind"
+        | "nova_queue_state_priority"
+        | "nova_queue_state_budget"
+        | "nova_queue_state_ownership"
+        | "nova_semaphore_state_wait_count"
+        | "nova_semaphore_state_signal_count"
+        | "nova_semaphore_state_timeline_mode"
+        | "nova_semaphore_state_scope"
+        | "nova_timeline_state_value"
+        | "nova_timeline_state_step"
+        | "nova_timeline_state_epoch"
+        | "nova_timeline_state_domain"
+        | "nova_fence_state_signaled"
+        | "nova_fence_state_epoch"
+        | "nova_fence_state_scope"
+        | "nova_fence_state_recycle_mode"
+        | "nova_signal_state_kind"
+        | "nova_signal_state_phase"
+        | "nova_signal_state_fanout"
+        | "nova_signal_state_ack_mode"
+        | "nova_event_state_kind"
+        | "nova_event_state_route"
+        | "nova_event_state_priority"
+        | "nova_event_state_payload_mode"
+        | "nova_dispatch_state_queue_kind"
+        | "nova_dispatch_state_lane"
+        | "nova_dispatch_state_batch"
+        | "nova_dispatch_state_completion_mode"
+        | "nova_feedback_state_status"
+        | "nova_feedback_state_latency"
+        | "nova_feedback_state_retries"
+        | "nova_feedback_state_channel"
+        | "nova_intent_state_kind"
+        | "nova_intent_state_target"
+        | "nova_intent_state_urgency"
+        | "nova_intent_state_policy"
+        | "nova_reaction_state_kind"
+        | "nova_reaction_state_result"
+        | "nova_reaction_state_stability"
+        | "nova_reaction_state_echo_mode"
+        | "nova_outcome_state_kind"
+        | "nova_outcome_state_final"
+        | "nova_outcome_state_confidence"
+        | "nova_outcome_state_settle_mode"
+        | "nova_resolution_state_kind"
+        | "nova_resolution_state_commit"
+        | "nova_resolution_state_convergence"
+        | "nova_resolution_state_policy_mode"
+        | "nova_commit_state_kind"
+        | "nova_commit_state_applied"
+        | "nova_commit_state_durability"
+        | "nova_commit_state_commit_mode"
         | "nova_selection_state_selected"
         | "nova_selection_state_span"
         | "nova_selection_state_mode"
@@ -6291,6 +7789,62 @@ fn lower_call_expr_with_async(
                 "nova_schedule_state_queue_depth" => ("NovaScheduleState", "queue_depth"),
                 "nova_schedule_state_async_budget" => ("NovaScheduleState", "async_budget"),
                 "nova_schedule_state_tick_mode" => ("NovaScheduleState", "tick_mode"),
+                "nova_submission_state_batches" => ("NovaSubmissionState", "batches"),
+                "nova_submission_state_fences" => ("NovaSubmissionState", "fences"),
+                "nova_submission_state_signal_mode" => ("NovaSubmissionState", "signal_mode"),
+                "nova_submission_state_present_hint" => ("NovaSubmissionState", "present_hint"),
+                "nova_queue_state_kind" => ("NovaQueueState", "kind"),
+                "nova_queue_state_priority" => ("NovaQueueState", "priority"),
+                "nova_queue_state_budget" => ("NovaQueueState", "budget"),
+                "nova_queue_state_ownership" => ("NovaQueueState", "ownership"),
+                "nova_semaphore_state_wait_count" => ("NovaSemaphoreState", "wait_count"),
+                "nova_semaphore_state_signal_count" => ("NovaSemaphoreState", "signal_count"),
+                "nova_semaphore_state_timeline_mode" => ("NovaSemaphoreState", "timeline_mode"),
+                "nova_semaphore_state_scope" => ("NovaSemaphoreState", "scope"),
+                "nova_timeline_state_value" => ("NovaTimelineState", "value"),
+                "nova_timeline_state_step" => ("NovaTimelineState", "step"),
+                "nova_timeline_state_epoch" => ("NovaTimelineState", "epoch"),
+                "nova_timeline_state_domain" => ("NovaTimelineState", "domain"),
+                "nova_fence_state_signaled" => ("NovaFenceState", "signaled"),
+                "nova_fence_state_epoch" => ("NovaFenceState", "epoch"),
+                "nova_fence_state_scope" => ("NovaFenceState", "scope"),
+                "nova_fence_state_recycle_mode" => ("NovaFenceState", "recycle_mode"),
+                "nova_signal_state_kind" => ("NovaSignalState", "kind"),
+                "nova_signal_state_phase" => ("NovaSignalState", "phase"),
+                "nova_signal_state_fanout" => ("NovaSignalState", "fanout"),
+                "nova_signal_state_ack_mode" => ("NovaSignalState", "ack_mode"),
+                "nova_event_state_kind" => ("NovaEventState", "kind"),
+                "nova_event_state_route" => ("NovaEventState", "route"),
+                "nova_event_state_priority" => ("NovaEventState", "priority"),
+                "nova_event_state_payload_mode" => ("NovaEventState", "payload_mode"),
+                "nova_dispatch_state_queue_kind" => ("NovaDispatchState", "queue_kind"),
+                "nova_dispatch_state_lane" => ("NovaDispatchState", "lane"),
+                "nova_dispatch_state_batch" => ("NovaDispatchState", "batch"),
+                "nova_dispatch_state_completion_mode" => ("NovaDispatchState", "completion_mode"),
+                "nova_feedback_state_status" => ("NovaFeedbackState", "status"),
+                "nova_feedback_state_latency" => ("NovaFeedbackState", "latency"),
+                "nova_feedback_state_retries" => ("NovaFeedbackState", "retries"),
+                "nova_feedback_state_channel" => ("NovaFeedbackState", "channel"),
+                "nova_intent_state_kind" => ("NovaIntentState", "kind"),
+                "nova_intent_state_target" => ("NovaIntentState", "target_slot"),
+                "nova_intent_state_urgency" => ("NovaIntentState", "urgency"),
+                "nova_intent_state_policy" => ("NovaIntentState", "policy"),
+                "nova_reaction_state_kind" => ("NovaReactionState", "kind"),
+                "nova_reaction_state_result" => ("NovaReactionState", "result_slot"),
+                "nova_reaction_state_stability" => ("NovaReactionState", "stability"),
+                "nova_reaction_state_echo_mode" => ("NovaReactionState", "echo_mode"),
+                "nova_outcome_state_kind" => ("NovaOutcomeState", "kind"),
+                "nova_outcome_state_final" => ("NovaOutcomeState", "final_slot"),
+                "nova_outcome_state_confidence" => ("NovaOutcomeState", "confidence"),
+                "nova_outcome_state_settle_mode" => ("NovaOutcomeState", "settle_mode"),
+                "nova_resolution_state_kind" => ("NovaResolutionState", "kind"),
+                "nova_resolution_state_commit" => ("NovaResolutionState", "commit_slot"),
+                "nova_resolution_state_convergence" => ("NovaResolutionState", "convergence"),
+                "nova_resolution_state_policy_mode" => ("NovaResolutionState", "policy_mode"),
+                "nova_commit_state_kind" => ("NovaCommitState", "kind"),
+                "nova_commit_state_applied" => ("NovaCommitState", "applied_slot"),
+                "nova_commit_state_durability" => ("NovaCommitState", "durability"),
+                "nova_commit_state_commit_mode" => ("NovaCommitState", "commit_mode"),
                 "nova_selection_state_selected" => ("NovaSelectionState", "selected"),
                 "nova_selection_state_span" => ("NovaSelectionState", "span"),
                 "nova_selection_state_mode" => ("NovaSelectionState", "mode"),
@@ -7552,6 +9106,62 @@ fn builtin_struct_field_type(type_name: &str, field: &str) -> Option<NirTypeRef>
             "lanes" | "queue_depth" | "async_budget" | "tick_mode" => Some(i64()),
             _ => None,
         },
+        "NovaSubmissionPacket" => match field {
+            "batches" | "fences" | "signal_mode" | "present_hint" => Some(i64()),
+            _ => None,
+        },
+        "NovaQueuePacket" => match field {
+            "kind" | "priority" | "budget" | "ownership" => Some(i64()),
+            _ => None,
+        },
+        "NovaSemaphorePacket" => match field {
+            "wait_count" | "signal_count" | "timeline_mode" | "scope" => Some(i64()),
+            _ => None,
+        },
+        "NovaTimelinePacket" => match field {
+            "value" | "step" | "epoch" | "domain" => Some(i64()),
+            _ => None,
+        },
+        "NovaFencePacket" => match field {
+            "signaled" | "epoch" | "scope" | "recycle_mode" => Some(i64()),
+            _ => None,
+        },
+        "NovaSignalPacket" => match field {
+            "kind" | "phase" | "fanout" | "ack_mode" => Some(i64()),
+            _ => None,
+        },
+        "NovaEventPacket" => match field {
+            "kind" | "route" | "priority" | "payload_mode" => Some(i64()),
+            _ => None,
+        },
+        "NovaDispatchPacket" => match field {
+            "queue_kind" | "lane" | "batch" | "completion_mode" => Some(i64()),
+            _ => None,
+        },
+        "NovaFeedbackPacket" => match field {
+            "status" | "latency" | "retries" | "channel" => Some(i64()),
+            _ => None,
+        },
+        "NovaIntentPacket" => match field {
+            "kind" | "target_slot" | "urgency" | "policy" => Some(i64()),
+            _ => None,
+        },
+        "NovaReactionPacket" => match field {
+            "kind" | "result_slot" | "stability" | "echo_mode" => Some(i64()),
+            _ => None,
+        },
+        "NovaOutcomePacket" => match field {
+            "kind" | "final_slot" | "confidence" | "settle_mode" => Some(i64()),
+            _ => None,
+        },
+        "NovaResolutionPacket" => match field {
+            "kind" | "commit_slot" | "convergence" | "policy_mode" => Some(i64()),
+            _ => None,
+        },
+        "NovaCommitPacket" => match field {
+            "kind" | "applied_slot" | "durability" | "commit_mode" => Some(i64()),
+            _ => None,
+        },
         "NovaSliderPacket" => match field {
             "value" | "min" | "max" | "step" | "disabled" => Some(i64()),
             _ => None,
@@ -7662,6 +9272,20 @@ fn builtin_struct_field_type(type_name: &str, field: &str) -> Option<NirTypeRef>
             "barrier" => Some(named("NovaBarrierPacket")),
             "resource_set" => Some(named("NovaResourceSetPacket")),
             "schedule" => Some(named("NovaSchedulePacket")),
+            "submission" => Some(named("NovaSubmissionPacket")),
+            "queue" => Some(named("NovaQueuePacket")),
+            "semaphore" => Some(named("NovaSemaphorePacket")),
+            "timeline" => Some(named("NovaTimelinePacket")),
+            "fence" => Some(named("NovaFencePacket")),
+            "signal" => Some(named("NovaSignalPacket")),
+            "event" => Some(named("NovaEventPacket")),
+            "dispatch" => Some(named("NovaDispatchPacket")),
+            "feedback" => Some(named("NovaFeedbackPacket")),
+            "intent" => Some(named("NovaIntentPacket")),
+            "reaction" => Some(named("NovaReactionPacket")),
+            "outcome" => Some(named("NovaOutcomePacket")),
+            "resolution" => Some(named("NovaResolutionPacket")),
+            "commit" => Some(named("NovaCommitPacket")),
             "focus" => Some(named("NovaFocusPacket")),
             _ => None,
         },
@@ -7795,6 +9419,62 @@ fn builtin_struct_field_type(type_name: &str, field: &str) -> Option<NirTypeRef>
         },
         "NovaScheduleState" => match field {
             "lanes" | "queue_depth" | "async_budget" | "tick_mode" => Some(i64()),
+            _ => None,
+        },
+        "NovaSubmissionState" => match field {
+            "batches" | "fences" | "signal_mode" | "present_hint" => Some(i64()),
+            _ => None,
+        },
+        "NovaQueueState" => match field {
+            "kind" | "priority" | "budget" | "ownership" => Some(i64()),
+            _ => None,
+        },
+        "NovaSemaphoreState" => match field {
+            "wait_count" | "signal_count" | "timeline_mode" | "scope" => Some(i64()),
+            _ => None,
+        },
+        "NovaTimelineState" => match field {
+            "value" | "step" | "epoch" | "domain" => Some(i64()),
+            _ => None,
+        },
+        "NovaFenceState" => match field {
+            "signaled" | "epoch" | "scope" | "recycle_mode" => Some(i64()),
+            _ => None,
+        },
+        "NovaSignalState" => match field {
+            "kind" | "phase" | "fanout" | "ack_mode" => Some(i64()),
+            _ => None,
+        },
+        "NovaEventState" => match field {
+            "kind" | "route" | "priority" | "payload_mode" => Some(i64()),
+            _ => None,
+        },
+        "NovaDispatchState" => match field {
+            "queue_kind" | "lane" | "batch" | "completion_mode" => Some(i64()),
+            _ => None,
+        },
+        "NovaFeedbackState" => match field {
+            "status" | "latency" | "retries" | "channel" => Some(i64()),
+            _ => None,
+        },
+        "NovaIntentState" => match field {
+            "kind" | "target_slot" | "urgency" | "policy" => Some(i64()),
+            _ => None,
+        },
+        "NovaReactionState" => match field {
+            "kind" | "result_slot" | "stability" | "echo_mode" => Some(i64()),
+            _ => None,
+        },
+        "NovaOutcomeState" => match field {
+            "kind" | "final_slot" | "confidence" | "settle_mode" => Some(i64()),
+            _ => None,
+        },
+        "NovaResolutionState" => match field {
+            "kind" | "commit_slot" | "convergence" | "policy_mode" => Some(i64()),
+            _ => None,
+        },
+        "NovaCommitState" => match field {
+            "kind" | "applied_slot" | "durability" | "commit_mode" => Some(i64()),
             _ => None,
         },
         "NovaSelectionState" => match field {
@@ -9685,6 +11365,440 @@ mod tests {
     }
 
     #[test]
+    fn lowers_nova_submission_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let submission: NovaSubmissionPacket = nova_submission_packet(2, 1, 1, 8);
+                let state: NovaSubmissionState = nova_submission_state(submission);
+                let batches: i64 = nova_submission_state_batches(state);
+                return batches;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaSubmissionState" && type_name == "NovaSubmissionState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_queue_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let queue: NovaQueuePacket = nova_queue_packet(1, 2, 9, 1);
+                let state: NovaQueueState = nova_queue_state(queue);
+                let budget: i64 = nova_queue_state_budget(state);
+                return budget;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaQueueState" && type_name == "NovaQueueState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_semaphore_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let semaphore: NovaSemaphorePacket = nova_semaphore_packet(1, 2, 1, 3);
+                let state: NovaSemaphoreState = nova_semaphore_state(semaphore);
+                let scope: i64 = nova_semaphore_state_scope(state);
+                return scope;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaSemaphoreState" && type_name == "NovaSemaphoreState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_timeline_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let timeline: NovaTimelinePacket = nova_timeline_packet(9, 1, 0, 3);
+                let state: NovaTimelineState = nova_timeline_state(timeline);
+                let epoch: i64 = nova_timeline_state_epoch(state);
+                return epoch;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaTimelineState" && type_name == "NovaTimelineState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_fence_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let fence: NovaFencePacket = nova_fence_packet(1, 0, 3, 1);
+                let state: NovaFenceState = nova_fence_state(fence);
+                let scope: i64 = nova_fence_state_scope(state);
+                return scope;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaFenceState" && type_name == "NovaFenceState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_signal_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let signal: NovaSignalPacket = nova_signal_packet(1, 2, 3, 4);
+                let state: NovaSignalState = nova_signal_state(signal);
+                let phase: i64 = nova_signal_state_phase(state);
+                return phase;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaSignalState" && type_name == "NovaSignalState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_event_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let event: NovaEventPacket = nova_event_packet(1, 2, 3, 4);
+                let state: NovaEventState = nova_event_state(event);
+                let route: i64 = nova_event_state_route(state);
+                return route;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaEventState" && type_name == "NovaEventState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_dispatch_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let dispatch: NovaDispatchPacket = nova_dispatch_packet(1, 2, 3, 4);
+                let state: NovaDispatchState = nova_dispatch_state(dispatch);
+                let queue_kind: i64 = nova_dispatch_state_queue_kind(state);
+                return queue_kind;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaDispatchState" && type_name == "NovaDispatchState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_feedback_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let feedback: NovaFeedbackPacket = nova_feedback_packet(1, 2, 3, 4);
+                let state: NovaFeedbackState = nova_feedback_state(feedback);
+                let status: i64 = nova_feedback_state_status(state);
+                return status;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaFeedbackState" && type_name == "NovaFeedbackState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_intent_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let intent: NovaIntentPacket = nova_intent_packet(1, 2, 3, 4);
+                let state: NovaIntentState = nova_intent_state(intent);
+                let target_slot: i64 = nova_intent_state_target(state);
+                return target_slot;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaIntentState" && type_name == "NovaIntentState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_reaction_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let reaction: NovaReactionPacket = nova_reaction_packet(1, 2, 3, 4);
+                let state: NovaReactionState = nova_reaction_state(reaction);
+                let result_slot: i64 = nova_reaction_state_result(state);
+                return result_slot;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaReactionState" && type_name == "NovaReactionState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_outcome_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let outcome: NovaOutcomePacket = nova_outcome_packet(1, 2, 3, 4);
+                let state: NovaOutcomeState = nova_outcome_state(outcome);
+                let final_slot: i64 = nova_outcome_state_final(state);
+                return final_slot;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaOutcomeState" && type_name == "NovaOutcomeState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_resolution_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let resolution: NovaResolutionPacket = nova_resolution_packet(1, 2, 3, 4);
+                let state: NovaResolutionState = nova_resolution_state(resolution);
+                let commit_slot: i64 = nova_resolution_state_commit(state);
+                return commit_slot;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaResolutionState" && type_name == "NovaResolutionState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_commit_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let commit: NovaCommitPacket = nova_commit_packet(1, 2, 3, 4);
+                let state: NovaCommitState = nova_commit_state(commit);
+                let applied_slot: i64 = nova_commit_state_applied(state);
+                return applied_slot;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaCommitState" && type_name == "NovaCommitState",
+            _ => false,
+        }));
+    }
+
+    #[test]
     fn lowers_nova_panel_from_parts_builder() {
         let module = parse_nuis_module(
             r#"
@@ -9731,6 +11845,20 @@ mod tests {
                 let barrier: NovaBarrierPacket = nova_barrier_packet(1, 1, 2, 8);
                 let resource_set: NovaResourceSetPacket = nova_resource_set_packet(2, 1, 1, 8);
                 let schedule: NovaSchedulePacket = nova_schedule_packet(2, 4, 9, 1);
+                let submission: NovaSubmissionPacket = nova_submission_packet(2, 1, 1, 8);
+                let queue: NovaQueuePacket = nova_queue_packet(1, 2, 9, 1);
+                let semaphore: NovaSemaphorePacket = nova_semaphore_packet(1, 2, 1, 3);
+                let timeline: NovaTimelinePacket = nova_timeline_packet(9, 1, 0, 3);
+                let fence: NovaFencePacket = nova_fence_packet(1, 0, 3, 1);
+                let signal: NovaSignalPacket = nova_signal_packet(1, 2, 3, 1);
+                let event: NovaEventPacket = nova_event_packet(1, 2, 3, 1);
+                let dispatch: NovaDispatchPacket = nova_dispatch_packet(1, 2, 3, 1);
+                let feedback: NovaFeedbackPacket = nova_feedback_packet(1, 2, 3, 1);
+                let intent: NovaIntentPacket = nova_intent_packet(1, 2, 3, 1);
+                let reaction: NovaReactionPacket = nova_reaction_packet(1, 2, 3, 1);
+                let outcome: NovaOutcomePacket = nova_outcome_packet(1, 2, 3, 1);
+                let resolution: NovaResolutionPacket = nova_resolution_packet(1, 2, 3, 1);
+                let commit: NovaCommitPacket = nova_commit_packet(1, 2, 3, 1);
                 let focus: NovaFocusPacket = nova_focus_packet(2);
                 let panel: NovaPanelPacket = nova_panel_from_parts(
                   header,
@@ -9770,6 +11898,20 @@ mod tests {
                   barrier,
                   resource_set,
                   schedule,
+                  submission,
+                  queue,
+                  semaphore,
+                  timeline,
+                  fence,
+                  signal,
+                  event,
+                  dispatch,
+                  feedback,
+                  intent,
+                  reaction,
+                  outcome,
+                  resolution,
+                  commit,
                   focus
                 );
                 return 1;

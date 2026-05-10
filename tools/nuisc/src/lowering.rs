@@ -1395,6 +1395,299 @@ fn lower_expr(
                 push_dep_edges(state, toggle_name, &schedule_struct);
                 panel_group_nodes.push(schedule_struct.clone());
 
+                let submission_struct = next_name(state, "nova_panel_submission");
+                state.yir.nodes.push(Node {
+                    name: submission_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaSubmissionPacket".to_owned(),
+                            "batches=2".to_owned(),
+                            "fences=1".to_owned(),
+                            format!("signal_mode={toggle_name}"),
+                            format!("present_hint={accent_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &submission_struct);
+                push_dep_edges(state, accent_name, &submission_struct);
+                panel_group_nodes.push(submission_struct.clone());
+
+                let queue_struct = next_name(state, "nova_panel_queue");
+                state.yir.nodes.push(Node {
+                    name: queue_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaQueuePacket".to_owned(),
+                            format!("kind={toggle_name}"),
+                            "priority=2".to_owned(),
+                            format!("budget={radius_name}"),
+                            format!("ownership={accent_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &queue_struct);
+                push_dep_edges(state, &radius_name, &queue_struct);
+                push_dep_edges(state, accent_name, &queue_struct);
+                panel_group_nodes.push(queue_struct.clone());
+
+                let semaphore_struct = next_name(state, "nova_panel_semaphore");
+                state.yir.nodes.push(Node {
+                    name: semaphore_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaSemaphorePacket".to_owned(),
+                            "wait_count=1".to_owned(),
+                            "signal_count=2".to_owned(),
+                            format!("timeline_mode={toggle_name}"),
+                            format!("scope={accent_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &semaphore_struct);
+                push_dep_edges(state, accent_name, &semaphore_struct);
+                panel_group_nodes.push(semaphore_struct.clone());
+
+                let timeline_struct = next_name(state, "nova_panel_timeline");
+                state.yir.nodes.push(Node {
+                    name: timeline_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaTimelinePacket".to_owned(),
+                            format!("value={radius_name}"),
+                            "step=1".to_owned(),
+                            "epoch=0".to_owned(),
+                            format!("domain={accent_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, &radius_name, &timeline_struct);
+                push_dep_edges(state, accent_name, &timeline_struct);
+                panel_group_nodes.push(timeline_struct.clone());
+
+                let fence_struct = next_name(state, "nova_panel_fence");
+                state.yir.nodes.push(Node {
+                    name: fence_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaFencePacket".to_owned(),
+                            format!("signaled={toggle_name}"),
+                            "epoch=0".to_owned(),
+                            format!("scope={accent_name}"),
+                            "recycle_mode=1".to_owned(),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &fence_struct);
+                push_dep_edges(state, accent_name, &fence_struct);
+                panel_group_nodes.push(fence_struct.clone());
+
+                let signal_struct = next_name(state, "nova_panel_signal");
+                state.yir.nodes.push(Node {
+                    name: signal_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaSignalPacket".to_owned(),
+                            format!("kind={toggle_name}"),
+                            "phase=2".to_owned(),
+                            "fanout=3".to_owned(),
+                            format!("ack_mode={accent_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &signal_struct);
+                push_dep_edges(state, accent_name, &signal_struct);
+                panel_group_nodes.push(signal_struct.clone());
+
+                let event_struct = next_name(state, "nova_panel_event");
+                state.yir.nodes.push(Node {
+                    name: event_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaEventPacket".to_owned(),
+                            format!("kind={toggle_name}"),
+                            "route=2".to_owned(),
+                            "priority=3".to_owned(),
+                            format!("payload_mode={accent_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &event_struct);
+                push_dep_edges(state, accent_name, &event_struct);
+                panel_group_nodes.push(event_struct.clone());
+
+                let dispatch_struct = next_name(state, "nova_panel_dispatch");
+                state.yir.nodes.push(Node {
+                    name: dispatch_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaDispatchPacket".to_owned(),
+                            format!("queue_kind={toggle_name}"),
+                            "lane=2".to_owned(),
+                            "batch=3".to_owned(),
+                            format!("completion_mode={accent_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &dispatch_struct);
+                push_dep_edges(state, accent_name, &dispatch_struct);
+                panel_group_nodes.push(dispatch_struct.clone());
+
+                let feedback_struct = next_name(state, "nova_panel_feedback");
+                state.yir.nodes.push(Node {
+                    name: feedback_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaFeedbackPacket".to_owned(),
+                            format!("status={toggle_name}"),
+                            format!("latency={speed_name}"),
+                            format!("retries={radius_name}"),
+                            format!("channel={accent_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &feedback_struct);
+                push_dep_edges(state, &speed_name, &feedback_struct);
+                push_dep_edges(state, &radius_name, &feedback_struct);
+                push_dep_edges(state, accent_name, &feedback_struct);
+                panel_group_nodes.push(feedback_struct.clone());
+
+                let intent_struct = next_name(state, "nova_panel_intent");
+                state.yir.nodes.push(Node {
+                    name: intent_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaIntentPacket".to_owned(),
+                            format!("kind={toggle_name}"),
+                            format!("target_slot={focus_name}"),
+                            format!("urgency={speed_name}"),
+                            format!("policy={accent_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &intent_struct);
+                push_dep_edges(state, focus_name, &intent_struct);
+                push_dep_edges(state, &speed_name, &intent_struct);
+                push_dep_edges(state, accent_name, &intent_struct);
+                panel_group_nodes.push(intent_struct.clone());
+
+                let reaction_struct = next_name(state, "nova_panel_reaction");
+                state.yir.nodes.push(Node {
+                    name: reaction_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaReactionPacket".to_owned(),
+                            format!("kind={toggle_name}"),
+                            format!("result_slot={focus_name}"),
+                            format!("stability={radius_name}"),
+                            format!("echo_mode={accent_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &reaction_struct);
+                push_dep_edges(state, focus_name, &reaction_struct);
+                push_dep_edges(state, &radius_name, &reaction_struct);
+                push_dep_edges(state, accent_name, &reaction_struct);
+                panel_group_nodes.push(reaction_struct.clone());
+
+                let outcome_struct = next_name(state, "nova_panel_outcome");
+                state.yir.nodes.push(Node {
+                    name: outcome_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaOutcomePacket".to_owned(),
+                            format!("kind={toggle_name}"),
+                            format!("final_slot={focus_name}"),
+                            format!("confidence={speed_name}"),
+                            format!("settle_mode={accent_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &outcome_struct);
+                push_dep_edges(state, focus_name, &outcome_struct);
+                push_dep_edges(state, &speed_name, &outcome_struct);
+                push_dep_edges(state, accent_name, &outcome_struct);
+                panel_group_nodes.push(outcome_struct.clone());
+
+                let resolution_struct = next_name(state, "nova_panel_resolution");
+                state.yir.nodes.push(Node {
+                    name: resolution_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaResolutionPacket".to_owned(),
+                            format!("kind={toggle_name}"),
+                            format!("commit_slot={focus_name}"),
+                            format!("convergence={radius_name}"),
+                            format!("policy_mode={accent_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &resolution_struct);
+                push_dep_edges(state, focus_name, &resolution_struct);
+                push_dep_edges(state, &radius_name, &resolution_struct);
+                push_dep_edges(state, accent_name, &resolution_struct);
+                panel_group_nodes.push(resolution_struct.clone());
+
+                let commit_struct = next_name(state, "nova_panel_commit");
+                state.yir.nodes.push(Node {
+                    name: commit_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaCommitPacket".to_owned(),
+                            format!("kind={toggle_name}"),
+                            format!("applied_slot={focus_name}"),
+                            format!("durability={speed_name}"),
+                            format!("commit_mode={accent_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &commit_struct);
+                push_dep_edges(state, focus_name, &commit_struct);
+                push_dep_edges(state, &speed_name, &commit_struct);
+                push_dep_edges(state, accent_name, &commit_struct);
+                panel_group_nodes.push(commit_struct.clone());
+
                 let focus_struct = next_name(state, "nova_panel_focus");
                 state.yir.nodes.push(Node {
                     name: focus_struct.clone(),
@@ -1447,6 +1740,20 @@ fn lower_expr(
                     format!("barrier={barrier_struct}"),
                     format!("resource_set={resource_set_struct}"),
                     format!("schedule={schedule_struct}"),
+                    format!("submission={submission_struct}"),
+                    format!("queue={queue_struct}"),
+                    format!("semaphore={semaphore_struct}"),
+                    format!("timeline={timeline_struct}"),
+                    format!("fence={fence_struct}"),
+                    format!("signal={signal_struct}"),
+                    format!("event={event_struct}"),
+                    format!("dispatch={dispatch_struct}"),
+                    format!("feedback={feedback_struct}"),
+                    format!("intent={intent_struct}"),
+                    format!("reaction={reaction_struct}"),
+                    format!("outcome={outcome_struct}"),
+                    format!("resolution={resolution_struct}"),
+                    format!("commit={commit_struct}"),
                     format!("focus={focus_struct}"),
                 ]
             } else {
