@@ -2217,9 +2217,24 @@ fn lower_call_expr_with_async(
                 ],
             })
         }
-        "nova_slider_packet" | "nova_progress_packet" | "nova_meter_packet" => {
-            let [value] = args else {
-                return Err(format!("{callee}(...) expects 1 arg"));
+        "nova_slider_packet" => {
+            let (value, min_value, max_value, step_value, disabled) = match args {
+                [value] => (value, None, None, None, None),
+                [value, min_value, max_value, step_value] => (
+                    value,
+                    Some(min_value),
+                    Some(max_value),
+                    Some(step_value),
+                    None,
+                ),
+                [value, min_value, max_value, step_value, disabled] => (
+                    value,
+                    Some(min_value),
+                    Some(max_value),
+                    Some(step_value),
+                    Some(disabled),
+                ),
+                _ => return Err("nova_slider_packet(...) expects 1, 4 or 5 args".to_owned()),
             };
             let value = lower_expr(
                 value,
@@ -2229,19 +2244,110 @@ fn lower_call_expr_with_async(
                 struct_table,
                 Some(&i64_type()),
             )?;
+            let min_expr = min_value
+                .map(|expr| {
+                    lower_expr(
+                        expr,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        Some(&i64_type()),
+                    )
+                })
+                .transpose()?
+                .unwrap_or_else(|| NirExpr::Int(0));
+            let max_expr = max_value
+                .map(|expr| {
+                    lower_expr(
+                        expr,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        Some(&i64_type()),
+                    )
+                })
+                .transpose()?
+                .unwrap_or_else(|| NirExpr::Int(127));
+            let step_expr = step_value
+                .map(|expr| {
+                    lower_expr(
+                        expr,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        Some(&i64_type()),
+                    )
+                })
+                .transpose()?
+                .unwrap_or_else(|| NirExpr::Int(1));
+            let disabled_expr = disabled
+                .map(|expr| {
+                    lower_expr(
+                        expr,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        Some(&i64_type()),
+                    )
+                })
+                .transpose()?
+                .unwrap_or_else(|| NirExpr::Int(0));
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaSliderPacket".to_owned(),
+                fields: vec![
+                    ("value".to_owned(), value),
+                    ("min".to_owned(), min_expr),
+                    ("max".to_owned(), max_expr),
+                    ("step".to_owned(), step_expr),
+                    ("disabled".to_owned(), disabled_expr),
+                ],
+            })
+        }
+        "nova_progress_packet" | "nova_meter_packet" => {
+            let (value, max_value) = match args {
+                [value] => (value, None),
+                [value, max_value] => (value, Some(max_value)),
+                _ => return Err(format!("{callee}(...) expects 1 or 2 args")),
+            };
+            let value = lower_expr(
+                value,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let max_expr = max_value
+                .map(|expr| {
+                    lower_expr(
+                        expr,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        Some(&i64_type()),
+                    )
+                })
+                .transpose()?
+                .unwrap_or_else(|| NirExpr::Int(127));
             let type_name = match callee {
-                "nova_slider_packet" => "NovaSliderPacket",
                 "nova_progress_packet" => "NovaProgressPacket",
                 _ => "NovaMeterPacket",
             };
             Ok(NirExpr::StructLiteral {
                 type_name: type_name.to_owned(),
-                fields: vec![("value".to_owned(), value)],
+                fields: vec![("value".to_owned(), value), ("max".to_owned(), max_expr)],
             })
         }
         "nova_toggle_packet" => {
-            let [live] = args else {
-                return Err("nova_toggle_packet(...) expects 1 arg".to_owned());
+            let (live, disabled) = match args {
+                [live] => (live, None),
+                [live, disabled] => (live, Some(disabled)),
+                _ => return Err("nova_toggle_packet(...) expects 1 or 2 args".to_owned()),
             };
             let live = lower_expr(
                 live,
@@ -2251,9 +2357,22 @@ fn lower_call_expr_with_async(
                 struct_table,
                 Some(&i64_type()),
             )?;
+            let disabled = disabled
+                .map(|expr| {
+                    lower_expr(
+                        expr,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        Some(&i64_type()),
+                    )
+                })
+                .transpose()?
+                .unwrap_or_else(|| NirExpr::Int(0));
             Ok(NirExpr::StructLiteral {
                 type_name: "NovaTogglePacket".to_owned(),
-                fields: vec![("live".to_owned(), live)],
+                fields: vec![("live".to_owned(), live), ("disabled".to_owned(), disabled)],
             })
         }
         "nova_button_packet" => {
@@ -2301,11 +2420,17 @@ fn lower_call_expr_with_async(
             })
         }
         "nova_text_input_packet" => {
-            let (echo, caret, placeholder) = match args {
-                [echo, caret] => (echo, caret, None),
-                [echo, caret, placeholder] => (echo, caret, Some(placeholder)),
+            let (echo, caret, placeholder, read_only, dirty) = match args {
+                [echo, caret] => (echo, caret, None, None, None),
+                [echo, caret, placeholder] => (echo, caret, Some(placeholder), None, None),
+                [echo, caret, placeholder, read_only] => {
+                    (echo, caret, Some(placeholder), Some(read_only), None)
+                }
+                [echo, caret, placeholder, read_only, dirty] => {
+                    (echo, caret, Some(placeholder), Some(read_only), Some(dirty))
+                }
                 _ => {
-                    return Err("nova_text_input_packet(...) expects 2 or 3 args".to_owned());
+                    return Err("nova_text_input_packet(...) expects 2, 3, 4 or 5 args".to_owned());
                 }
             };
             let echo = lower_expr(
@@ -2337,20 +2462,58 @@ fn lower_call_expr_with_async(
                 })
                 .transpose()?
                 .unwrap_or_else(|| echo.clone());
+            let read_only = read_only
+                .map(|expr| {
+                    lower_expr(
+                        expr,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        Some(&i64_type()),
+                    )
+                })
+                .transpose()?
+                .unwrap_or_else(|| NirExpr::Int(0));
+            let dirty = dirty
+                .map(|expr| {
+                    lower_expr(
+                        expr,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        Some(&i64_type()),
+                    )
+                })
+                .transpose()?
+                .unwrap_or_else(|| NirExpr::Int(0));
             Ok(NirExpr::StructLiteral {
                 type_name: "NovaTextInputPacket".to_owned(),
                 fields: vec![
                     ("echo".to_owned(), echo),
                     ("caret".to_owned(), caret),
                     ("placeholder".to_owned(), placeholder),
+                    ("read_only".to_owned(), read_only),
+                    ("dirty".to_owned(), dirty),
                 ],
             })
         }
         "nova_select_packet" => {
-            let (selected, accent, options) = match args {
-                [selected, accent] => (selected, accent, None),
-                [selected, accent, options] => (selected, accent, Some(options)),
-                _ => return Err("nova_select_packet(...) expects 2 or 3 args".to_owned()),
+            let (selected, accent, options, multiple, committed) = match args {
+                [selected, accent] => (selected, accent, None, None, None),
+                [selected, accent, options] => (selected, accent, Some(options), None, None),
+                [selected, accent, options, multiple] => {
+                    (selected, accent, Some(options), Some(multiple), None)
+                }
+                [selected, accent, options, multiple, committed] => (
+                    selected,
+                    accent,
+                    Some(options),
+                    Some(multiple),
+                    Some(committed),
+                ),
+                _ => return Err("nova_select_packet(...) expects 2, 3, 4 or 5 args".to_owned()),
             };
             let selected = lower_expr(
                 selected,
@@ -2381,12 +2544,570 @@ fn lower_call_expr_with_async(
                 })
                 .transpose()?
                 .unwrap_or_else(|| NirExpr::Int(3));
+            let multiple = multiple
+                .map(|expr| {
+                    lower_expr(
+                        expr,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        Some(&i64_type()),
+                    )
+                })
+                .transpose()?
+                .unwrap_or_else(|| NirExpr::Int(0));
+            let committed = committed
+                .map(|expr| {
+                    lower_expr(
+                        expr,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        Some(&i64_type()),
+                    )
+                })
+                .transpose()?
+                .unwrap_or_else(|| NirExpr::Int(1));
             Ok(NirExpr::StructLiteral {
                 type_name: "NovaSelectPacket".to_owned(),
                 fields: vec![
                     ("selected".to_owned(), selected),
                     ("accent".to_owned(), accent),
                     ("options".to_owned(), options),
+                    ("multiple".to_owned(), multiple),
+                    ("committed".to_owned(), committed),
+                ],
+            })
+        }
+        "nova_checkbox_packet" => {
+            let (checked, accent, disabled) = match args {
+                [checked, accent] => (checked, accent, None),
+                [checked, accent, disabled] => (checked, accent, Some(disabled)),
+                _ => return Err("nova_checkbox_packet(...) expects 2 or 3 args".to_owned()),
+            };
+            let checked = lower_expr(
+                checked,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let accent = lower_expr(
+                accent,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let disabled = disabled
+                .map(|expr| {
+                    lower_expr(
+                        expr,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        Some(&i64_type()),
+                    )
+                })
+                .transpose()?
+                .unwrap_or_else(|| NirExpr::Int(0));
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaCheckboxPacket".to_owned(),
+                fields: vec![
+                    ("checked".to_owned(), checked),
+                    ("accent".to_owned(), accent),
+                    ("disabled".to_owned(), disabled),
+                ],
+            })
+        }
+        "nova_radio_packet" => {
+            let (selected, options, accent, disabled) = match args {
+                [selected, options, accent] => (selected, options, accent, None),
+                [selected, options, accent, disabled] => {
+                    (selected, options, accent, Some(disabled))
+                }
+                _ => return Err("nova_radio_packet(...) expects 3 or 4 args".to_owned()),
+            };
+            let selected = lower_expr(
+                selected,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let options = lower_expr(
+                options,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let accent = lower_expr(
+                accent,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let disabled = disabled
+                .map(|expr| {
+                    lower_expr(
+                        expr,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        Some(&i64_type()),
+                    )
+                })
+                .transpose()?
+                .unwrap_or_else(|| NirExpr::Int(0));
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaRadioPacket".to_owned(),
+                fields: vec![
+                    ("selected".to_owned(), selected),
+                    ("options".to_owned(), options),
+                    ("accent".to_owned(), accent),
+                    ("disabled".to_owned(), disabled),
+                ],
+            })
+        }
+        "nova_textarea_packet" => {
+            let (lines, scroll, placeholder, read_only, dirty) = match args {
+                [lines, scroll] => (lines, scroll, None, None, None),
+                [lines, scroll, placeholder] => (lines, scroll, Some(placeholder), None, None),
+                [lines, scroll, placeholder, read_only] => {
+                    (lines, scroll, Some(placeholder), Some(read_only), None)
+                }
+                [lines, scroll, placeholder, read_only, dirty] => (
+                    lines,
+                    scroll,
+                    Some(placeholder),
+                    Some(read_only),
+                    Some(dirty),
+                ),
+                _ => {
+                    return Err("nova_textarea_packet(...) expects 2, 3, 4 or 5 args".to_owned());
+                }
+            };
+            let lines = lower_expr(
+                lines,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let scroll = lower_expr(
+                scroll,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let placeholder = placeholder
+                .map(|expr| {
+                    lower_expr(
+                        expr,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        Some(&i64_type()),
+                    )
+                })
+                .transpose()?
+                .unwrap_or_else(|| lines.clone());
+            let read_only = read_only
+                .map(|expr| {
+                    lower_expr(
+                        expr,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        Some(&i64_type()),
+                    )
+                })
+                .transpose()?
+                .unwrap_or_else(|| NirExpr::Int(0));
+            let dirty = dirty
+                .map(|expr| {
+                    lower_expr(
+                        expr,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        Some(&i64_type()),
+                    )
+                })
+                .transpose()?
+                .unwrap_or_else(|| NirExpr::Int(0));
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaTextAreaPacket".to_owned(),
+                fields: vec![
+                    ("lines".to_owned(), lines),
+                    ("scroll".to_owned(), scroll),
+                    ("placeholder".to_owned(), placeholder),
+                    ("read_only".to_owned(), read_only),
+                    ("dirty".to_owned(), dirty),
+                ],
+            })
+        }
+        "nova_tabs_packet" => {
+            let (active, count, accent, compact) = match args {
+                [active, count, accent] => (active, count, accent, None),
+                [active, count, accent, compact] => (active, count, accent, Some(compact)),
+                _ => return Err("nova_tabs_packet(...) expects 3 or 4 args".to_owned()),
+            };
+            let active = lower_expr(
+                active,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let count = lower_expr(
+                count,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let accent = lower_expr(
+                accent,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let compact = compact
+                .map(|expr| {
+                    lower_expr(
+                        expr,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        Some(&i64_type()),
+                    )
+                })
+                .transpose()?
+                .unwrap_or_else(|| NirExpr::Int(0));
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaTabsPacket".to_owned(),
+                fields: vec![
+                    ("active".to_owned(), active),
+                    ("count".to_owned(), count),
+                    ("accent".to_owned(), accent),
+                    ("compact".to_owned(), compact),
+                ],
+            })
+        }
+        "nova_list_packet" => {
+            let (selected, items, accent, dense) = match args {
+                [selected, items, accent] => (selected, items, accent, None),
+                [selected, items, accent, dense] => (selected, items, accent, Some(dense)),
+                _ => return Err("nova_list_packet(...) expects 3 or 4 args".to_owned()),
+            };
+            let selected = lower_expr(
+                selected,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let items = lower_expr(
+                items,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let accent = lower_expr(
+                accent,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let dense = dense
+                .map(|expr| {
+                    lower_expr(
+                        expr,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        Some(&i64_type()),
+                    )
+                })
+                .transpose()?
+                .unwrap_or_else(|| NirExpr::Int(0));
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaListPacket".to_owned(),
+                fields: vec![
+                    ("selected".to_owned(), selected),
+                    ("items".to_owned(), items),
+                    ("accent".to_owned(), accent),
+                    ("dense".to_owned(), dense),
+                ],
+            })
+        }
+        "nova_table_packet" => {
+            let (rows, cols, selected_row, zebra) = match args {
+                [rows, cols, selected_row] => (rows, cols, selected_row, None),
+                [rows, cols, selected_row, zebra] => (rows, cols, selected_row, Some(zebra)),
+                _ => return Err("nova_table_packet(...) expects 3 or 4 args".to_owned()),
+            };
+            let rows = lower_expr(
+                rows,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let cols = lower_expr(
+                cols,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let selected_row = lower_expr(
+                selected_row,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let zebra = zebra
+                .map(|expr| {
+                    lower_expr(
+                        expr,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        Some(&i64_type()),
+                    )
+                })
+                .transpose()?
+                .unwrap_or_else(|| NirExpr::Int(1));
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaTablePacket".to_owned(),
+                fields: vec![
+                    ("rows".to_owned(), rows),
+                    ("cols".to_owned(), cols),
+                    ("selected_row".to_owned(), selected_row),
+                    ("zebra".to_owned(), zebra),
+                ],
+            })
+        }
+        "nova_tree_packet" => {
+            let (selected, nodes, expanded, accent) = match args {
+                [selected, nodes, expanded, accent] => (selected, nodes, expanded, accent),
+                _ => return Err("nova_tree_packet(...) expects 4 args".to_owned()),
+            };
+            let selected = lower_expr(
+                selected,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let nodes = lower_expr(
+                nodes,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let expanded = lower_expr(
+                expanded,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let accent = lower_expr(
+                accent,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaTreePacket".to_owned(),
+                fields: vec![
+                    ("selected".to_owned(), selected),
+                    ("nodes".to_owned(), nodes),
+                    ("expanded".to_owned(), expanded),
+                    ("accent".to_owned(), accent),
+                ],
+            })
+        }
+        "nova_inspector_packet" => {
+            let (selected, fields, pinned, accent) = match args {
+                [selected, fields, pinned, accent] => (selected, fields, pinned, accent),
+                _ => return Err("nova_inspector_packet(...) expects 4 args".to_owned()),
+            };
+            let selected = lower_expr(
+                selected,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let fields = lower_expr(
+                fields,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let pinned = lower_expr(
+                pinned,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let accent = lower_expr(
+                accent,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaInspectorPacket".to_owned(),
+                fields: vec![
+                    ("selected".to_owned(), selected),
+                    ("fields".to_owned(), fields),
+                    ("pinned".to_owned(), pinned),
+                    ("accent".to_owned(), accent),
+                ],
+            })
+        }
+        "nova_outline_packet" => {
+            let (selected, items, collapsed, accent) = match args {
+                [selected, items, collapsed, accent] => (selected, items, collapsed, accent),
+                _ => return Err("nova_outline_packet(...) expects 4 args".to_owned()),
+            };
+            let selected = lower_expr(
+                selected,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let items = lower_expr(
+                items,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let collapsed = lower_expr(
+                collapsed,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let accent = lower_expr(
+                accent,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaOutlinePacket".to_owned(),
+                fields: vec![
+                    ("selected".to_owned(), selected),
+                    ("items".to_owned(), items),
+                    ("collapsed".to_owned(), collapsed),
+                    ("accent".to_owned(), accent),
+                ],
+            })
+        }
+        "nova_selection_packet" => {
+            let (selected, span, mode, origin) = match args {
+                [selected, span, mode, origin] => (selected, span, mode, origin),
+                _ => return Err("nova_selection_packet(...) expects 4 args".to_owned()),
+            };
+            let selected = lower_expr(
+                selected,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let span = lower_expr(
+                span,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let mode = lower_expr(
+                mode,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let origin = lower_expr(
+                origin,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaSelectionPacket".to_owned(),
+                fields: vec![
+                    ("selected".to_owned(), selected),
+                    ("span".to_owned(), span),
+                    ("mode".to_owned(), mode),
+                    ("origin".to_owned(), origin),
                 ],
             })
         }
@@ -2445,10 +3166,10 @@ fn lower_call_expr_with_async(
             })
         }
         "nova_panel_from_parts" => {
-            let [header, sliders, toggle, progress, meter, button, text_input, select, focus] =
+            let [header, sliders, toggle, progress, meter, button, text_input, select, checkbox, radio, textarea, tabs, list, table, tree, inspector, outline, focus] =
                 args
             else {
-                return Err("nova_panel_from_parts(...) expects 9 args".to_owned());
+                return Err("nova_panel_from_parts(...) expects 18 args".to_owned());
             };
             let header = lower_expr(
                 header,
@@ -2514,6 +3235,78 @@ fn lower_call_expr_with_async(
                 struct_table,
                 Some(&named_type("NovaSelectPacket")),
             )?;
+            let checkbox = lower_expr(
+                checkbox,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaCheckboxPacket")),
+            )?;
+            let radio = lower_expr(
+                radio,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaRadioPacket")),
+            )?;
+            let textarea = lower_expr(
+                textarea,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaTextAreaPacket")),
+            )?;
+            let tabs = lower_expr(
+                tabs,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaTabsPacket")),
+            )?;
+            let list = lower_expr(
+                list,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaListPacket")),
+            )?;
+            let table = lower_expr(
+                table,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaTablePacket")),
+            )?;
+            let tree = lower_expr(
+                tree,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaTreePacket")),
+            )?;
+            let inspector = lower_expr(
+                inspector,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaInspectorPacket")),
+            )?;
+            let outline = lower_expr(
+                outline,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaOutlinePacket")),
+            )?;
             let focus = lower_expr(
                 focus,
                 current_domain,
@@ -2533,8 +3326,767 @@ fn lower_call_expr_with_async(
                     ("button".to_owned(), button),
                     ("text_input".to_owned(), text_input),
                     ("select".to_owned(), select),
+                    ("checkbox".to_owned(), checkbox),
+                    ("radio".to_owned(), radio),
+                    ("textarea".to_owned(), textarea),
+                    ("tabs".to_owned(), tabs),
+                    ("list".to_owned(), list),
+                    ("table".to_owned(), table),
+                    ("tree".to_owned(), tree),
+                    ("inspector".to_owned(), inspector),
+                    ("outline".to_owned(), outline),
                     ("focus".to_owned(), focus),
                 ],
+            })
+        }
+        "nova_slider_disabled"
+        | "nova_toggle_disabled"
+        | "nova_text_input_dirty"
+        | "nova_text_input_read_only"
+        | "nova_select_committed"
+        | "nova_select_multiple"
+        | "nova_checkbox_checked"
+        | "nova_checkbox_disabled"
+        | "nova_radio_disabled"
+        | "nova_textarea_dirty"
+        | "nova_textarea_read_only"
+        | "nova_tabs_compact"
+        | "nova_list_dense"
+        | "nova_table_zebra"
+        | "nova_tree_expanded"
+        | "nova_inspector_pinned"
+        | "nova_outline_collapsed"
+        | "nova_selection_selected"
+        | "nova_selection_mode" => {
+            let [packet] = args else {
+                return Err(format!("{callee}(...) expects 1 arg"));
+            };
+            let (expected_type, field_name) = match callee {
+                "nova_slider_disabled" => ("NovaSliderPacket", "disabled"),
+                "nova_toggle_disabled" => ("NovaTogglePacket", "disabled"),
+                "nova_text_input_dirty" => ("NovaTextInputPacket", "dirty"),
+                "nova_text_input_read_only" => ("NovaTextInputPacket", "read_only"),
+                "nova_select_committed" => ("NovaSelectPacket", "committed"),
+                "nova_select_multiple" => ("NovaSelectPacket", "multiple"),
+                "nova_checkbox_checked" => ("NovaCheckboxPacket", "checked"),
+                "nova_checkbox_disabled" => ("NovaCheckboxPacket", "disabled"),
+                "nova_radio_disabled" => ("NovaRadioPacket", "disabled"),
+                "nova_textarea_dirty" => ("NovaTextAreaPacket", "dirty"),
+                "nova_textarea_read_only" => ("NovaTextAreaPacket", "read_only"),
+                "nova_tabs_compact" => ("NovaTabsPacket", "compact"),
+                "nova_list_dense" => ("NovaListPacket", "dense"),
+                "nova_table_zebra" => ("NovaTablePacket", "zebra"),
+                "nova_tree_expanded" => ("NovaTreePacket", "expanded"),
+                "nova_inspector_pinned" => ("NovaInspectorPacket", "pinned"),
+                "nova_outline_collapsed" => ("NovaOutlinePacket", "collapsed"),
+                "nova_selection_selected" => ("NovaSelectionPacket", "selected"),
+                _ => ("NovaSelectionPacket", "mode"),
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type(expected_type)),
+            )?;
+            Ok(NirExpr::FieldAccess {
+                base: Box::new(packet),
+                field: field_name.to_owned(),
+            })
+        }
+        "nova_slider_state" => {
+            let [packet] = args else {
+                return Err("nova_slider_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaSliderPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaSliderState".to_owned(),
+                fields: vec![
+                    (
+                        "value".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "value".to_owned(),
+                        },
+                    ),
+                    (
+                        "min".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "min".to_owned(),
+                        },
+                    ),
+                    (
+                        "max".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "max".to_owned(),
+                        },
+                    ),
+                    (
+                        "step".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "step".to_owned(),
+                        },
+                    ),
+                    (
+                        "disabled".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "disabled".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_toggle_state" => {
+            let [packet] = args else {
+                return Err("nova_toggle_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaTogglePacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaToggleState".to_owned(),
+                fields: vec![
+                    (
+                        "live".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "live".to_owned(),
+                        },
+                    ),
+                    (
+                        "disabled".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "disabled".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_text_input_state" => {
+            let [packet] = args else {
+                return Err("nova_text_input_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaTextInputPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaTextInputState".to_owned(),
+                fields: vec![
+                    (
+                        "dirty".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "dirty".to_owned(),
+                        },
+                    ),
+                    (
+                        "read_only".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "read_only".to_owned(),
+                        },
+                    ),
+                    (
+                        "caret".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "caret".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_select_state" => {
+            let [packet] = args else {
+                return Err("nova_select_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaSelectPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaSelectState".to_owned(),
+                fields: vec![
+                    (
+                        "committed".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "committed".to_owned(),
+                        },
+                    ),
+                    (
+                        "multiple".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "multiple".to_owned(),
+                        },
+                    ),
+                    (
+                        "selected".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "selected".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_checkbox_state" => {
+            let [packet] = args else {
+                return Err("nova_checkbox_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaCheckboxPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaCheckboxState".to_owned(),
+                fields: vec![
+                    (
+                        "checked".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "checked".to_owned(),
+                        },
+                    ),
+                    (
+                        "disabled".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "disabled".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_radio_state" => {
+            let [packet] = args else {
+                return Err("nova_radio_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaRadioPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaRadioState".to_owned(),
+                fields: vec![
+                    (
+                        "selected".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "selected".to_owned(),
+                        },
+                    ),
+                    (
+                        "options".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "options".to_owned(),
+                        },
+                    ),
+                    (
+                        "disabled".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "disabled".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_textarea_state" => {
+            let [packet] = args else {
+                return Err("nova_textarea_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaTextAreaPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaTextAreaState".to_owned(),
+                fields: vec![
+                    (
+                        "lines".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "lines".to_owned(),
+                        },
+                    ),
+                    (
+                        "scroll".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "scroll".to_owned(),
+                        },
+                    ),
+                    (
+                        "read_only".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "read_only".to_owned(),
+                        },
+                    ),
+                    (
+                        "dirty".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "dirty".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_tabs_state" => {
+            let [packet] = args else {
+                return Err("nova_tabs_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaTabsPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaTabsState".to_owned(),
+                fields: vec![
+                    (
+                        "active".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "active".to_owned(),
+                        },
+                    ),
+                    (
+                        "count".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "count".to_owned(),
+                        },
+                    ),
+                    (
+                        "compact".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "compact".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_list_state" => {
+            let [packet] = args else {
+                return Err("nova_list_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaListPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaListState".to_owned(),
+                fields: vec![
+                    (
+                        "selected".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "selected".to_owned(),
+                        },
+                    ),
+                    (
+                        "items".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "items".to_owned(),
+                        },
+                    ),
+                    (
+                        "dense".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "dense".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_table_state" => {
+            let [packet] = args else {
+                return Err("nova_table_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaTablePacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaTableState".to_owned(),
+                fields: vec![
+                    (
+                        "rows".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "rows".to_owned(),
+                        },
+                    ),
+                    (
+                        "cols".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "cols".to_owned(),
+                        },
+                    ),
+                    (
+                        "selected_row".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "selected_row".to_owned(),
+                        },
+                    ),
+                    (
+                        "zebra".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "zebra".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_tree_state" => {
+            let [packet] = args else {
+                return Err("nova_tree_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaTreePacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaTreeState".to_owned(),
+                fields: vec![
+                    (
+                        "selected".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "selected".to_owned(),
+                        },
+                    ),
+                    (
+                        "nodes".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "nodes".to_owned(),
+                        },
+                    ),
+                    (
+                        "expanded".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "expanded".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_inspector_state" => {
+            let [packet] = args else {
+                return Err("nova_inspector_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaInspectorPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaInspectorState".to_owned(),
+                fields: vec![
+                    (
+                        "selected".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "selected".to_owned(),
+                        },
+                    ),
+                    (
+                        "fields".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "fields".to_owned(),
+                        },
+                    ),
+                    (
+                        "pinned".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "pinned".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_outline_state" => {
+            let [packet] = args else {
+                return Err("nova_outline_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaOutlinePacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaOutlineState".to_owned(),
+                fields: vec![
+                    (
+                        "selected".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "selected".to_owned(),
+                        },
+                    ),
+                    (
+                        "items".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "items".to_owned(),
+                        },
+                    ),
+                    (
+                        "collapsed".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "collapsed".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_selection_state" => {
+            let [packet] = args else {
+                return Err("nova_selection_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaSelectionPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaSelectionState".to_owned(),
+                fields: vec![
+                    (
+                        "selected".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "selected".to_owned(),
+                        },
+                    ),
+                    (
+                        "span".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "span".to_owned(),
+                        },
+                    ),
+                    (
+                        "mode".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "mode".to_owned(),
+                        },
+                    ),
+                    (
+                        "origin".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "origin".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_list_selection"
+        | "nova_table_selection"
+        | "nova_tree_selection"
+        | "nova_inspector_selection"
+        | "nova_outline_selection" => {
+            let [packet] = args else {
+                return Err(format!("{callee}(...) expects 1 arg"));
+            };
+            let (expected_type, selected_field, span_field, mode_field, origin) = match callee {
+                "nova_list_selection" => ("NovaListPacket", "selected", "items", "dense", 0),
+                "nova_table_selection" => ("NovaTablePacket", "selected_row", "rows", "zebra", 1),
+                "nova_tree_selection" => ("NovaTreePacket", "selected", "nodes", "expanded", 2),
+                "nova_inspector_selection" => {
+                    ("NovaInspectorPacket", "selected", "fields", "pinned", 3)
+                }
+                _ => ("NovaOutlinePacket", "selected", "items", "collapsed", 4),
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type(expected_type)),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaSelectionState".to_owned(),
+                fields: vec![
+                    (
+                        "selected".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: selected_field.to_owned(),
+                        },
+                    ),
+                    (
+                        "span".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: span_field.to_owned(),
+                        },
+                    ),
+                    (
+                        "mode".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: mode_field.to_owned(),
+                        },
+                    ),
+                    ("origin".to_owned(), NirExpr::Int(origin)),
+                ],
+            })
+        }
+        "nova_slider_state_disabled"
+        | "nova_toggle_state_disabled"
+        | "nova_text_input_state_dirty"
+        | "nova_text_input_state_read_only"
+        | "nova_select_state_committed"
+        | "nova_select_state_multiple"
+        | "nova_checkbox_state_checked"
+        | "nova_checkbox_state_disabled"
+        | "nova_radio_state_selected"
+        | "nova_radio_state_disabled"
+        | "nova_textarea_state_dirty"
+        | "nova_textarea_state_read_only"
+        | "nova_tabs_state_active"
+        | "nova_tabs_state_compact"
+        | "nova_list_state_dense"
+        | "nova_list_state_selected"
+        | "nova_table_state_zebra"
+        | "nova_table_state_selected_row"
+        | "nova_tree_state_expanded"
+        | "nova_tree_state_selected"
+        | "nova_inspector_state_pinned"
+        | "nova_inspector_state_selected"
+        | "nova_outline_state_collapsed"
+        | "nova_outline_state_selected"
+        | "nova_selection_state_selected"
+        | "nova_selection_state_span"
+        | "nova_selection_state_mode"
+        | "nova_selection_state_origin" => {
+            let [state] = args else {
+                return Err(format!("{callee}(...) expects 1 arg"));
+            };
+            let (expected_type, field_name) = match callee {
+                "nova_slider_state_disabled" => ("NovaSliderState", "disabled"),
+                "nova_toggle_state_disabled" => ("NovaToggleState", "disabled"),
+                "nova_text_input_state_dirty" => ("NovaTextInputState", "dirty"),
+                "nova_text_input_state_read_only" => ("NovaTextInputState", "read_only"),
+                "nova_select_state_committed" => ("NovaSelectState", "committed"),
+                "nova_select_state_multiple" => ("NovaSelectState", "multiple"),
+                "nova_checkbox_state_checked" => ("NovaCheckboxState", "checked"),
+                "nova_checkbox_state_disabled" => ("NovaCheckboxState", "disabled"),
+                "nova_radio_state_selected" => ("NovaRadioState", "selected"),
+                "nova_radio_state_disabled" => ("NovaRadioState", "disabled"),
+                "nova_textarea_state_dirty" => ("NovaTextAreaState", "dirty"),
+                "nova_textarea_state_read_only" => ("NovaTextAreaState", "read_only"),
+                "nova_tabs_state_active" => ("NovaTabsState", "active"),
+                "nova_tabs_state_compact" => ("NovaTabsState", "compact"),
+                "nova_list_state_dense" => ("NovaListState", "dense"),
+                "nova_list_state_selected" => ("NovaListState", "selected"),
+                "nova_table_state_zebra" => ("NovaTableState", "zebra"),
+                "nova_table_state_selected_row" => ("NovaTableState", "selected_row"),
+                "nova_tree_state_expanded" => ("NovaTreeState", "expanded"),
+                "nova_tree_state_selected" => ("NovaTreeState", "selected"),
+                "nova_inspector_state_pinned" => ("NovaInspectorState", "pinned"),
+                "nova_inspector_state_selected" => ("NovaInspectorState", "selected"),
+                "nova_outline_state_collapsed" => ("NovaOutlineState", "collapsed"),
+                "nova_outline_state_selected" => ("NovaOutlineState", "selected"),
+                "nova_selection_state_selected" => ("NovaSelectionState", "selected"),
+                "nova_selection_state_span" => ("NovaSelectionState", "span"),
+                "nova_selection_state_mode" => ("NovaSelectionState", "mode"),
+                _ => ("NovaSelectionState", "origin"),
+            };
+            let state = lower_expr(
+                state,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type(expected_type)),
+            )?;
+            Ok(NirExpr::FieldAccess {
+                base: Box::new(state),
+                field: field_name.to_owned(),
             })
         }
         "data_profile_bind_core" => {
@@ -3683,10 +5235,174 @@ fn struct_field_type(
     field: &str,
     struct_table: &BTreeMap<String, NirStructDef>,
 ) -> Option<NirTypeRef> {
+    if let Some(builtin) = builtin_struct_field_type(&base_ty.name, field) {
+        return Some(builtin);
+    }
     struct_table
         .get(&base_ty.name)?
         .field(field)
         .map(|field| field.ty.clone())
+}
+
+fn builtin_struct_field_type(type_name: &str, field: &str) -> Option<NirTypeRef> {
+    let i64 = || i64_type();
+    let named = |name: &str| named_type(name);
+    match type_name {
+        "NovaHeaderPacket" => match field {
+            "accent" | "title_mode" => Some(i64()),
+            _ => None,
+        },
+        "NovaSliderPacket" => match field {
+            "value" | "min" | "max" | "step" | "disabled" => Some(i64()),
+            _ => None,
+        },
+        "NovaSliderGroupPacket" => match field {
+            "color" | "speed" | "radius" => Some(named("NovaSliderPacket")),
+            _ => None,
+        },
+        "NovaTogglePacket" => match field {
+            "live" | "disabled" => Some(i64()),
+            _ => None,
+        },
+        "NovaProgressPacket" | "NovaMeterPacket" => match field {
+            "value" | "max" => Some(i64()),
+            _ => None,
+        },
+        "NovaButtonPacket" => match field {
+            "active" | "accent" | "intent" => Some(i64()),
+            _ => None,
+        },
+        "NovaTextInputPacket" => match field {
+            "echo" | "caret" | "placeholder" | "read_only" | "dirty" => Some(i64()),
+            _ => None,
+        },
+        "NovaSelectPacket" => match field {
+            "selected" | "accent" | "options" | "multiple" | "committed" => Some(i64()),
+            _ => None,
+        },
+        "NovaCheckboxPacket" => match field {
+            "checked" | "accent" | "disabled" => Some(i64()),
+            _ => None,
+        },
+        "NovaRadioPacket" => match field {
+            "selected" | "options" | "accent" | "disabled" => Some(i64()),
+            _ => None,
+        },
+        "NovaTextAreaPacket" => match field {
+            "lines" | "scroll" | "placeholder" | "read_only" | "dirty" => Some(i64()),
+            _ => None,
+        },
+        "NovaTabsPacket" => match field {
+            "active" | "count" | "accent" | "compact" => Some(i64()),
+            _ => None,
+        },
+        "NovaListPacket" => match field {
+            "selected" | "items" | "accent" | "dense" => Some(i64()),
+            _ => None,
+        },
+        "NovaTablePacket" => match field {
+            "rows" | "cols" | "selected_row" | "zebra" => Some(i64()),
+            _ => None,
+        },
+        "NovaTreePacket" => match field {
+            "selected" | "nodes" | "expanded" | "accent" => Some(i64()),
+            _ => None,
+        },
+        "NovaInspectorPacket" => match field {
+            "selected" | "fields" | "pinned" | "accent" => Some(i64()),
+            _ => None,
+        },
+        "NovaOutlinePacket" => match field {
+            "selected" | "items" | "collapsed" | "accent" => Some(i64()),
+            _ => None,
+        },
+        "NovaSelectionPacket" => match field {
+            "selected" | "span" | "mode" | "origin" => Some(i64()),
+            _ => None,
+        },
+        "NovaFocusPacket" => match field {
+            "slot" => Some(i64()),
+            _ => None,
+        },
+        "NovaPanelPacket" => match field {
+            "header" => Some(named("NovaHeaderPacket")),
+            "sliders" => Some(named("NovaSliderGroupPacket")),
+            "toggle" => Some(named("NovaTogglePacket")),
+            "progress" => Some(named("NovaProgressPacket")),
+            "meter" => Some(named("NovaMeterPacket")),
+            "button" => Some(named("NovaButtonPacket")),
+            "text_input" => Some(named("NovaTextInputPacket")),
+            "select" => Some(named("NovaSelectPacket")),
+            "checkbox" => Some(named("NovaCheckboxPacket")),
+            "radio" => Some(named("NovaRadioPacket")),
+            "textarea" => Some(named("NovaTextAreaPacket")),
+            "tabs" => Some(named("NovaTabsPacket")),
+            "list" => Some(named("NovaListPacket")),
+            "table" => Some(named("NovaTablePacket")),
+            "tree" => Some(named("NovaTreePacket")),
+            "inspector" => Some(named("NovaInspectorPacket")),
+            "outline" => Some(named("NovaOutlinePacket")),
+            "focus" => Some(named("NovaFocusPacket")),
+            _ => None,
+        },
+        "NovaSliderState" => match field {
+            "value" | "min" | "max" | "step" | "disabled" => Some(i64()),
+            _ => None,
+        },
+        "NovaToggleState" => match field {
+            "live" | "disabled" => Some(i64()),
+            _ => None,
+        },
+        "NovaTextInputState" => match field {
+            "dirty" | "read_only" | "caret" => Some(i64()),
+            _ => None,
+        },
+        "NovaSelectState" => match field {
+            "committed" | "multiple" | "selected" => Some(i64()),
+            _ => None,
+        },
+        "NovaCheckboxState" => match field {
+            "checked" | "disabled" => Some(i64()),
+            _ => None,
+        },
+        "NovaRadioState" => match field {
+            "selected" | "options" | "disabled" => Some(i64()),
+            _ => None,
+        },
+        "NovaTextAreaState" => match field {
+            "lines" | "scroll" | "read_only" | "dirty" => Some(i64()),
+            _ => None,
+        },
+        "NovaTabsState" => match field {
+            "active" | "count" | "compact" => Some(i64()),
+            _ => None,
+        },
+        "NovaListState" => match field {
+            "selected" | "items" | "dense" => Some(i64()),
+            _ => None,
+        },
+        "NovaTableState" => match field {
+            "rows" | "cols" | "selected_row" | "zebra" => Some(i64()),
+            _ => None,
+        },
+        "NovaTreeState" => match field {
+            "selected" | "nodes" | "expanded" => Some(i64()),
+            _ => None,
+        },
+        "NovaInspectorState" => match field {
+            "selected" | "fields" | "pinned" => Some(i64()),
+            _ => None,
+        },
+        "NovaOutlineState" => match field {
+            "selected" | "items" | "collapsed" => Some(i64()),
+            _ => None,
+        },
+        "NovaSelectionState" => match field {
+            "selected" | "span" | "mode" | "origin" => Some(i64()),
+            _ => None,
+        },
+        _ => None,
+    }
 }
 
 fn validate_declared_nir_types(module: &NirModule) -> Result<(), String> {
@@ -4448,9 +6164,23 @@ mod tests {
             r#"
             mod cpu Main {
               fn main() -> i64 {
-                let slider: NovaSliderPacket = nova_slider_packet(7);
-                let button: NovaButtonPacket = nova_button_packet(1, 9);
-                let select: NovaSelectPacket = nova_select_packet(2, 5);
+                let slider: NovaSliderPacket = nova_slider_packet(7, 0, 10, 2, 1);
+                let progress: NovaProgressPacket = nova_progress_packet(4, 10);
+                let toggle: NovaTogglePacket = nova_toggle_packet(1, 1);
+                let button: NovaButtonPacket = nova_button_packet(1, 9, 2);
+                let text_input: NovaTextInputPacket =
+                  nova_text_input_packet(8, 1, 4, 1, 1);
+                let select: NovaSelectPacket = nova_select_packet(2, 5, 4, 1, 0);
+                let checkbox: NovaCheckboxPacket = nova_checkbox_packet(1, 5, 0);
+                let radio: NovaRadioPacket = nova_radio_packet(2, 4, 5, 1);
+                let textarea: NovaTextAreaPacket = nova_textarea_packet(3, 1, 7, 0, 1);
+                let tabs: NovaTabsPacket = nova_tabs_packet(1, 4, 5, 0);
+                let list: NovaListPacket = nova_list_packet(1, 5, 7, 1);
+                let table: NovaTablePacket = nova_table_packet(4, 3, 1, 1);
+                let tree: NovaTreePacket = nova_tree_packet(1, 6, 1, 7);
+                let inspector: NovaInspectorPacket = nova_inspector_packet(1, 4, 1, 7);
+                let outline: NovaOutlinePacket = nova_outline_packet(1, 6, 1, 7);
+                let selection: NovaSelectionPacket = nova_selection_packet(1, 6, 1, 4);
                 return 1;
               }
             }
@@ -4477,7 +6207,7 @@ mod tests {
                 ty: Some(ty),
                 value: NirExpr::StructLiteral { type_name, .. },
                 ..
-            }) if ty.render() == "NovaButtonPacket" && type_name == "NovaButtonPacket"
+            }) if ty.render() == "NovaProgressPacket" && type_name == "NovaProgressPacket"
         ));
         assert!(matches!(
             function.body.get(2),
@@ -4485,7 +6215,504 @@ mod tests {
                 ty: Some(ty),
                 value: NirExpr::StructLiteral { type_name, .. },
                 ..
+            }) if ty.render() == "NovaTogglePacket" && type_name == "NovaTogglePacket"
+        ));
+        assert!(matches!(
+            function.body.get(3),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            }) if ty.render() == "NovaButtonPacket" && type_name == "NovaButtonPacket"
+        ));
+        assert!(matches!(
+            function.body.get(4),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            }) if ty.render() == "NovaTextInputPacket" && type_name == "NovaTextInputPacket"
+        ));
+        assert!(matches!(
+            function.body.get(5),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
             }) if ty.render() == "NovaSelectPacket" && type_name == "NovaSelectPacket"
+        ));
+        assert!(matches!(
+            function.body.get(6),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            }) if ty.render() == "NovaCheckboxPacket" && type_name == "NovaCheckboxPacket"
+        ));
+        assert!(matches!(
+            function.body.get(7),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            }) if ty.render() == "NovaRadioPacket" && type_name == "NovaRadioPacket"
+        ));
+        assert!(matches!(
+            function.body.get(8),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            }) if ty.render() == "NovaTextAreaPacket" && type_name == "NovaTextAreaPacket"
+        ));
+        assert!(matches!(
+            function.body.get(9),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            }) if ty.render() == "NovaTabsPacket" && type_name == "NovaTabsPacket"
+        ));
+        assert!(matches!(
+            function.body.get(10),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            }) if ty.render() == "NovaListPacket" && type_name == "NovaListPacket"
+        ));
+        assert!(matches!(
+            function.body.get(11),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            }) if ty.render() == "NovaTablePacket" && type_name == "NovaTablePacket"
+        ));
+        assert!(matches!(
+            function.body.get(12),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            }) if ty.render() == "NovaTreePacket" && type_name == "NovaTreePacket"
+        ));
+        assert!(matches!(
+            function.body.get(13),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            }) if ty.render() == "NovaInspectorPacket" && type_name == "NovaInspectorPacket"
+        ));
+        assert!(matches!(
+            function.body.get(14),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            }) if ty.render() == "NovaOutlinePacket" && type_name == "NovaOutlinePacket"
+        ));
+        assert!(matches!(
+            function.body.get(15),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            }) if ty.render() == "NovaSelectionPacket" && type_name == "NovaSelectionPacket"
+        ));
+    }
+
+    #[test]
+    fn lowers_nova_control_state_observers() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let slider: NovaSliderPacket = nova_slider_packet(7, 0, 10, 2, 1);
+                let text_input: NovaTextInputPacket =
+                  nova_text_input_packet(8, 1, 4, 1, 1);
+                let select: NovaSelectPacket = nova_select_packet(2, 5, 4, 1, 0);
+                let slider_disabled: i64 = nova_slider_disabled(slider);
+                let dirty: i64 = nova_text_input_dirty(text_input);
+                let committed: i64 = nova_select_committed(select);
+                return committed;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            function.body.get(3),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::FieldAccess { field, .. },
+                ..
+            }) if ty.render() == "i64" && field == "disabled"
+        ));
+        assert!(matches!(
+            function.body.get(4),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::FieldAccess { field, .. },
+                ..
+            }) if ty.render() == "i64" && field == "dirty"
+        ));
+        assert!(matches!(
+            function.body.get(5),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::FieldAccess { field, .. },
+                ..
+            }) if ty.render() == "i64" && field == "committed"
+        ));
+    }
+
+    #[test]
+    fn lowers_extended_nova_control_state_observers() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let checkbox: NovaCheckboxPacket = nova_checkbox_packet(1, 5, 1);
+                let radio: NovaRadioPacket = nova_radio_packet(2, 4, 5, 0);
+                let textarea: NovaTextAreaPacket = nova_textarea_packet(3, 1, 7, 1, 1);
+                let tabs: NovaTabsPacket = nova_tabs_packet(1, 4, 5, 1);
+                let checkbox_state: NovaCheckboxState = nova_checkbox_state(checkbox);
+                let radio_state: NovaRadioState = nova_radio_state(radio);
+                let textarea_state: NovaTextAreaState = nova_textarea_state(textarea);
+                let tabs_state: NovaTabsState = nova_tabs_state(tabs);
+                let checked: i64 = nova_checkbox_state_checked(checkbox_state);
+                let radio_disabled: i64 = nova_radio_state_disabled(radio_state);
+                let dirty: i64 = nova_textarea_state_dirty(textarea_state);
+                let compact: i64 = nova_tabs_state_compact(tabs_state);
+                return checked + radio_disabled + dirty + compact;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            function.body.get(4),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            }) if ty.render() == "NovaCheckboxState" && type_name == "NovaCheckboxState"
+        ));
+        assert!(matches!(
+            function.body.get(5),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            }) if ty.render() == "NovaRadioState" && type_name == "NovaRadioState"
+        ));
+        assert!(matches!(
+            function.body.get(6),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            }) if ty.render() == "NovaTextAreaState" && type_name == "NovaTextAreaState"
+        ));
+        assert!(matches!(
+            function.body.get(7),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            }) if ty.render() == "NovaTabsState" && type_name == "NovaTabsState"
+        ));
+        assert!(matches!(
+            function.body.get(8),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::FieldAccess { field, .. },
+                ..
+            }) if ty.render() == "i64" && field == "checked"
+        ));
+        assert!(matches!(
+            function.body.get(9),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::FieldAccess { field, .. },
+                ..
+            }) if ty.render() == "i64" && field == "disabled"
+        ));
+        assert!(matches!(
+            function.body.get(10),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::FieldAccess { field, .. },
+                ..
+            }) if ty.render() == "i64" && field == "dirty"
+        ));
+        assert!(matches!(
+            function.body.get(11),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::FieldAccess { field, .. },
+                ..
+            }) if ty.render() == "i64" && field == "compact"
+        ));
+    }
+
+    #[test]
+    fn lowers_complex_nova_control_state_observers() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let list: NovaListPacket = nova_list_packet(1, 5, 7, 1);
+                let table: NovaTablePacket = nova_table_packet(4, 3, 1, 1);
+                let list_state: NovaListState = nova_list_state(list);
+                let table_state: NovaTableState = nova_table_state(table);
+                let tree: NovaTreePacket = nova_tree_packet(1, 6, 1, 7);
+                let tree_state: NovaTreeState = nova_tree_state(tree);
+                let inspector: NovaInspectorPacket = nova_inspector_packet(1, 4, 1, 7);
+                let inspector_state: NovaInspectorState = nova_inspector_state(inspector);
+                let outline: NovaOutlinePacket = nova_outline_packet(1, 6, 1, 7);
+                let outline_state: NovaOutlineState = nova_outline_state(outline);
+                let dense: i64 = nova_list_state_dense(list_state);
+                let selected: i64 = nova_list_state_selected(list_state);
+                let zebra: i64 = nova_table_state_zebra(table_state);
+                let selected_row: i64 = nova_table_state_selected_row(table_state);
+                let expanded: i64 = nova_tree_state_expanded(tree_state);
+                let tree_selected: i64 = nova_tree_state_selected(tree_state);
+                let pinned: i64 = nova_inspector_state_pinned(inspector_state);
+                let inspected: i64 = nova_inspector_state_selected(inspector_state);
+                let collapsed: i64 = nova_outline_state_collapsed(outline_state);
+                let outlined: i64 = nova_outline_state_selected(outline_state);
+                return dense + selected + zebra + selected_row + expanded + tree_selected + pinned + inspected + collapsed + outlined;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            function.body.get(2),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            }) if ty.render() == "NovaListState" && type_name == "NovaListState"
+        ));
+        assert!(matches!(
+            function.body.get(3),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            }) if ty.render() == "NovaTableState" && type_name == "NovaTableState"
+        ));
+        assert!(matches!(
+            function.body.get(5),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            }) if ty.render() == "NovaTreeState" && type_name == "NovaTreeState"
+        ));
+        assert!(matches!(
+            function.body.get(7),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            }) if ty.render() == "NovaInspectorState" && type_name == "NovaInspectorState"
+        ));
+        assert!(matches!(
+            function.body.get(9),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            }) if ty.render() == "NovaOutlineState" && type_name == "NovaOutlineState"
+        ));
+        assert!(matches!(
+            function.body.get(10),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::FieldAccess { field, .. },
+                ..
+            }) if ty.render() == "i64" && field == "dense"
+        ));
+        assert!(matches!(
+            function.body.get(11),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::FieldAccess { field, .. },
+                ..
+            }) if ty.render() == "i64" && field == "selected"
+        ));
+        assert!(matches!(
+            function.body.get(12),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::FieldAccess { field, .. },
+                ..
+            }) if ty.render() == "i64" && field == "zebra"
+        ));
+        assert!(matches!(
+            function.body.get(13),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::FieldAccess { field, .. },
+                ..
+            }) if ty.render() == "i64" && field == "selected_row"
+        ));
+        assert!(matches!(
+            function.body.get(14),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::FieldAccess { field, .. },
+                ..
+            }) if ty.render() == "i64" && field == "expanded"
+        ));
+        assert!(matches!(
+            function.body.get(15),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::FieldAccess { field, .. },
+                ..
+            }) if ty.render() == "i64" && field == "selected"
+        ));
+        assert!(matches!(
+            function.body.get(16),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::FieldAccess { field, .. },
+                ..
+            }) if ty.render() == "i64" && field == "pinned"
+        ));
+        assert!(matches!(
+            function.body.get(17),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::FieldAccess { field, .. },
+                ..
+            }) if ty.render() == "i64" && field == "selected"
+        ));
+        assert!(matches!(
+            function.body.get(18),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::FieldAccess { field, .. },
+                ..
+            }) if ty.render() == "i64" && field == "collapsed"
+        ));
+        assert!(matches!(
+            function.body.get(19),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::FieldAccess { field, .. },
+                ..
+            }) if ty.render() == "i64" && field == "selected"
+        ));
+    }
+
+    #[test]
+    fn lowers_shared_nova_selection_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let selection: NovaSelectionPacket = nova_selection_packet(2, 6, 1, 4);
+                let list: NovaListPacket = nova_list_packet(2, 6, 7, 1);
+                let table: NovaTablePacket = nova_table_packet(4, 3, 2, 1);
+                let tree: NovaTreePacket = nova_tree_packet(2, 6, 1, 7);
+                let inspector: NovaInspectorPacket = nova_inspector_packet(2, 4, 1, 7);
+                let outline: NovaOutlinePacket = nova_outline_packet(2, 6, 1, 7);
+                let state: NovaSelectionState = nova_selection_state(selection);
+                let list_selection: NovaSelectionState = nova_list_selection(list);
+                let table_selection: NovaSelectionState = nova_table_selection(table);
+                let tree_selection: NovaSelectionState = nova_tree_selection(tree);
+                let inspector_selection: NovaSelectionState = nova_inspector_selection(inspector);
+                let outline_selection: NovaSelectionState = nova_outline_selection(outline);
+                let selected: i64 = nova_selection_state_selected(state);
+                let span: i64 = nova_selection_state_span(list_selection);
+                let mode: i64 = nova_selection_state_mode(table_selection);
+                let origin: i64 = nova_selection_state_origin(tree_selection);
+                let inspector_origin: i64 = nova_selection_state_origin(inspector_selection);
+                let outline_origin: i64 = nova_selection_state_origin(outline_selection);
+                return selected + span + mode + origin + inspector_origin + outline_origin;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            function.body.get(6),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            }) if ty.render() == "NovaSelectionState" && type_name == "NovaSelectionState"
+        ));
+        assert!(matches!(
+            function.body.get(7),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            }) if ty.render() == "NovaSelectionState" && type_name == "NovaSelectionState"
+        ));
+        assert!(matches!(
+            function.body.get(12),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::FieldAccess { field, .. },
+                ..
+            }) if ty.render() == "i64" && field == "selected"
+        ));
+        assert!(matches!(
+            function.body.get(13),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::FieldAccess { field, .. },
+                ..
+            }) if ty.render() == "i64" && field == "span"
+        ));
+        assert!(matches!(
+            function.body.get(14),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::FieldAccess { field, .. },
+                ..
+            }) if ty.render() == "i64" && field == "mode"
+        ));
+        assert!(matches!(
+            function.body.get(15),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::FieldAccess { field, .. },
+                ..
+            }) if ty.render() == "i64" && field == "origin"
         ));
     }
 
@@ -4507,9 +6734,35 @@ mod tests {
                 let button: NovaButtonPacket = nova_button_packet(1, 8);
                 let text_input: NovaTextInputPacket = nova_text_input_packet(4, 1);
                 let select: NovaSelectPacket = nova_select_packet(0, 8);
+                let checkbox: NovaCheckboxPacket = nova_checkbox_packet(1, 8);
+                let radio: NovaRadioPacket = nova_radio_packet(1, 4, 8);
+                let textarea: NovaTextAreaPacket = nova_textarea_packet(3, 1);
+                let tabs: NovaTabsPacket = nova_tabs_packet(0, 4, 8);
+                let list: NovaListPacket = nova_list_packet(1, 5, 8);
+                let table: NovaTablePacket = nova_table_packet(4, 3, 1);
+                let tree: NovaTreePacket = nova_tree_packet(1, 6, 1, 8);
+                let inspector: NovaInspectorPacket = nova_inspector_packet(1, 4, 1, 8);
+                let outline: NovaOutlinePacket = nova_outline_packet(1, 6, 1, 8);
                 let focus: NovaFocusPacket = nova_focus_packet(2);
                 let panel: NovaPanelPacket = nova_panel_from_parts(
-                  header, sliders, toggle, progress, meter, button, text_input, select, focus
+                  header,
+                  sliders,
+                  toggle,
+                  progress,
+                  meter,
+                  button,
+                  text_input,
+                  select,
+                  checkbox,
+                  radio,
+                  textarea,
+                  tabs,
+                  list,
+                  table,
+                  tree,
+                  inspector,
+                  outline,
+                  focus
                 );
                 return 1;
               }
@@ -4524,7 +6777,7 @@ mod tests {
             .find(|function| function.name == "main")
             .unwrap();
         assert!(matches!(
-            function.body.get(12),
+            function.body.get(21),
             Some(NirStmt::Let {
                 ty: Some(ty),
                 value: NirExpr::StructLiteral { type_name, .. },

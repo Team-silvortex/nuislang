@@ -33,8 +33,8 @@ Current state:
 
 * this repository now treats `ns-nova` as a standard-library/framework layer target, not as a separate future repository by default
 * the current real-time demo path in `window_controls_demo_project` is the execution direction `ns-nova` should eventually absorb and abstract
+* `nuis galaxy init --framework ns-nova` now emits an `ns-nova.toml` profile that carries framework-level assembly metadata, including the standard `ns-nova-selection-v1` selection contract for relational controls such as `list`, `table`, `tree`, `inspector`, and `outline`
 
 See metadata:
 
 * [module.toml](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/module.toml)
-

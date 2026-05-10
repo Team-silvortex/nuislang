@@ -5182,9 +5182,35 @@ mod tests {
                     let button: NovaButtonPacket = nova_button_packet(1, 8);
                     let text_input: NovaTextInputPacket = nova_text_input_packet(4, 1);
                     let select: NovaSelectPacket = nova_select_packet(0, 8);
+                    let checkbox: NovaCheckboxPacket = nova_checkbox_packet(1, 8);
+                    let radio: NovaRadioPacket = nova_radio_packet(1, 4, 8);
+                    let textarea: NovaTextAreaPacket = nova_textarea_packet(3, 1);
+                    let tabs: NovaTabsPacket = nova_tabs_packet(0, 4, 8);
+                    let list: NovaListPacket = nova_list_packet(1, 5, 8);
+                    let table: NovaTablePacket = nova_table_packet(4, 3, 1);
+                    let tree: NovaTreePacket = nova_tree_packet(1, 6, 1, 8);
+                    let inspector: NovaInspectorPacket = nova_inspector_packet(1, 4, 1, 8);
+                    let outline: NovaOutlinePacket = nova_outline_packet(1, 6, 1, 8);
                     let focus: NovaFocusPacket = nova_focus_packet(2);
                     let packet: NovaPanelPacket = nova_panel_from_parts(
-                      header, sliders, toggle, progress, meter, button, text_input, select, focus
+                      header,
+                      sliders,
+                      toggle,
+                      progress,
+                      meter,
+                      button,
+                      text_input,
+                      select,
+                      checkbox,
+                      radio,
+                      textarea,
+                      tabs,
+                      list,
+                      table,
+                      tree,
+                      inspector,
+                      outline,
+                      focus
                     );
                   }
                 }

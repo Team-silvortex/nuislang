@@ -1408,13 +1408,22 @@ fn draw_control_panel_surface(
     let packet = parse_ball_packet(value, "shader.draw_instanced")?;
     let width = width.max(32);
     let height = height.max(24);
-    let color_value = packet.accent.rem_euclid(128) as usize;
-    let speed_value = packet.speed.round().abs() as usize % 128;
-    let radius_value = (packet.radius_scale * 96.0).round().abs() as usize % 128;
-    let progress_value = packet.progress_value.rem_euclid(128) as usize;
-    let meter_value = packet.meter_value.rem_euclid(128) as usize;
+    let color_value = normalize_control_value(packet.color_key, packet.color_min, packet.color_max);
+    let speed_value = normalize_control_value(
+        packet.speed.round() as i64,
+        packet.speed_min,
+        packet.speed_max,
+    );
+    let radius_value = normalize_control_value(
+        (packet.radius_scale * 96.0).round() as i64,
+        packet.radius_min,
+        packet.radius_max,
+    );
+    let progress_value = normalize_control_value(packet.progress_value, 0, packet.progress_max);
+    let meter_value = normalize_control_value(packet.meter_value, 0, packet.meter_max);
     let accent = control_panel_accent(packet.accent);
     let button_on = packet.button_state != 0;
+    let toggle_disabled = packet.toggle_disabled != 0;
 
     let mut rows = vec![vec![' '; width]; height];
     let panel_left = 2usize;
@@ -1463,7 +1472,9 @@ fn draw_control_panel_surface(
         &mut rows,
         panel_right.saturating_sub(18),
         panel_top + 2,
-        if packet.toggle_state != 0 {
+        if toggle_disabled {
+            "mode: locked"
+        } else if packet.toggle_state != 0 {
             "mode: live"
         } else {
             "mode: idle"
@@ -1474,11 +1485,35 @@ fn draw_control_panel_surface(
     let slider_right = panel_right.saturating_sub(12);
     let slider_width = slider_right.saturating_sub(slider_left + 1).max(8);
     let slider_specs = [
-        ("COLOR", color_value, panel_top + 6),
-        ("SPEED", speed_value, panel_top + 10),
-        ("RADIUS", radius_value, panel_top + 14),
+        (
+            "COLOR",
+            color_value,
+            panel_top + 6,
+            packet.color_disabled != 0,
+            packet.color_min,
+            packet.color_max,
+            packet.color_step,
+        ),
+        (
+            "SPEED",
+            speed_value,
+            panel_top + 10,
+            packet.speed_disabled != 0,
+            packet.speed_min,
+            packet.speed_max,
+            packet.speed_step,
+        ),
+        (
+            "RADIUS",
+            radius_value,
+            panel_top + 14,
+            packet.radius_disabled != 0,
+            packet.radius_min,
+            packet.radius_max,
+            packet.radius_step,
+        ),
     ];
-    for (label, value, y) in slider_specs {
+    for (label, value, y, disabled, min_value, max_value, step_value) in slider_specs {
         put_text(&mut rows, panel_left + 3, y, label);
         draw_slider(
             &mut rows,
@@ -1486,7 +1521,7 @@ fn draw_control_panel_surface(
             y,
             slider_width,
             value.min(127),
-            accent,
+            if disabled { ':' } else { accent },
         );
         put_text(
             &mut rows,
@@ -1494,6 +1529,11 @@ fn draw_control_panel_surface(
             y,
             &format!("{:>3}", value.min(127)),
         );
+        let meta = format!("{min_value}..{max_value} /{step_value}");
+        put_text(&mut rows, slider_left, y.saturating_sub(1), &meta);
+        if disabled {
+            put_text(&mut rows, slider_right + 7, y, "off");
+        }
     }
 
     let progress_y = panel_top + 17;
@@ -1553,13 +1593,20 @@ fn draw_control_panel_surface(
         button_top + 1,
         button_right.saturating_sub(1),
         button_bottom.saturating_sub(1),
-        if button_on { accent } else { ':' },
+        if toggle_disabled {
+            '.'
+        } else if button_on {
+            accent
+        } else {
+            ':'
+        },
     );
     put_text(
         &mut rows,
         button_left + 2,
         button_top + 1,
         match packet.button_intent.rem_euclid(3) {
+            _ if toggle_disabled => "LOCK ",
             0 if button_on => "APPLY",
             0 => "READY",
             1 if button_on => "LIVE ",
@@ -1608,6 +1655,12 @@ fn draw_control_panel_surface(
     if packet.text_placeholder.rem_euclid(2) != 0 {
         put_text(&mut rows, text_left + 2, text_top, "query");
     }
+    if packet.text_read_only != 0 {
+        put_text(&mut rows, text_right.saturating_sub(6), text_top, "ro");
+    }
+    if packet.text_dirty != 0 {
+        put_text(&mut rows, text_right.saturating_sub(12), text_top, "dirty");
+    }
     let caret_x =
         text_left + 2 + (packet.text_caret.rem_euclid(text_value.len() as i64 + 1) as usize);
     if caret_x < text_right {
@@ -1630,6 +1683,19 @@ fn draw_control_panel_surface(
     if option_count >= 4 {
         put_text(&mut rows, select_left + 19, select_y, labels[3]);
     }
+    if packet.select_multiple != 0 {
+        put_text(&mut rows, select_left, select_y.saturating_sub(1), "multi");
+    }
+    put_text(
+        &mut rows,
+        select_left + 22,
+        select_y,
+        if packet.select_committed != 0 {
+            "ok"
+        } else {
+            "pending"
+        },
+    );
     let selected_x = match packet.select_index.rem_euclid(option_count as i64) {
         0 => select_left.saturating_sub(2),
         1 => select_left + 5,
@@ -1637,6 +1703,271 @@ fn draw_control_panel_surface(
         _ => select_left + 17,
     };
     put_text(&mut rows, selected_x, select_y, ">");
+
+    let checkbox_y = panel_top + 6;
+    let checkbox_left = button_left;
+    put_text(&mut rows, checkbox_left, checkbox_y, "CHECK");
+    put_text(
+        &mut rows,
+        checkbox_left,
+        checkbox_y + 1,
+        if packet.checkbox_disabled != 0 {
+            "[~] disabled"
+        } else if packet.checkbox_checked != 0 {
+            "[x] enabled "
+        } else {
+            "[ ] enabled "
+        },
+    );
+
+    let radio_y = panel_top + 10;
+    let radio_left = button_left;
+    put_text(&mut rows, radio_left, radio_y, "RADIO");
+    let radio_count = packet.radio_options.clamp(2, 4) as usize;
+    for idx in 0..radio_count {
+        let label = match idx {
+            0 => "fast",
+            1 => "safe",
+            2 => "gpu ",
+            _ => "cpu ",
+        };
+        let mark = if packet.radio_selected.rem_euclid(radio_count as i64) as usize == idx {
+            "(*)"
+        } else {
+            "( )"
+        };
+        put_text(
+            &mut rows,
+            radio_left,
+            radio_y + 1 + idx,
+            &format!("{mark} {label}"),
+        );
+    }
+    if packet.radio_disabled != 0 {
+        put_text(&mut rows, radio_left + 8, radio_y, "off");
+    }
+
+    let tabs_y = panel_top + 4;
+    let tabs_count = packet.tabs_count.clamp(2, 4) as usize;
+    for idx in 0..tabs_count {
+        let label = match idx {
+            0 => "scene",
+            1 => "logic",
+            2 => "perf ",
+            _ => "gpu  ",
+        };
+        let active = packet.tabs_active.rem_euclid(tabs_count as i64) as usize == idx;
+        let compact = packet.tabs_compact != 0;
+        let text = if active {
+            if compact {
+                "[*]"
+            } else {
+                "[tab]"
+            }
+        } else if compact {
+            "[ ]"
+        } else {
+            "[---]"
+        };
+        put_text(
+            &mut rows,
+            panel_left + 3 + idx * 10,
+            tabs_y,
+            &format!("{text} {}", &label[..label.len().min(5)]),
+        );
+    }
+
+    let textarea_left = panel_left + 27;
+    let textarea_right = panel_right.saturating_sub(30);
+    let textarea_top = panel_bottom.saturating_sub(8);
+    let textarea_bottom = textarea_top + 4;
+    draw_box(
+        &mut rows,
+        textarea_left,
+        textarea_top,
+        textarea_right,
+        textarea_bottom,
+        '[',
+        ']',
+        ']',
+        '[',
+        '-',
+        '|',
+    );
+    put_text(&mut rows, textarea_left + 2, textarea_top, "notes");
+    let visible_lines = packet.textarea_lines.clamp(2, 3) as usize;
+    for line in 0..visible_lines {
+        let scroll = packet.textarea_scroll.rem_euclid(9) as usize;
+        let text = format!(
+            "line {} :: {}",
+            line + 1 + scroll,
+            packet.textarea_placeholder
+        );
+        put_text(&mut rows, textarea_left + 2, textarea_top + 1 + line, &text);
+    }
+    if packet.textarea_read_only != 0 {
+        put_text(
+            &mut rows,
+            textarea_right.saturating_sub(6),
+            textarea_top,
+            "ro",
+        );
+    }
+    if packet.textarea_dirty != 0 {
+        put_text(
+            &mut rows,
+            textarea_right.saturating_sub(13),
+            textarea_top,
+            "dirty",
+        );
+    }
+
+    let list_left = panel_left + 3;
+    let list_top = panel_bottom.saturating_sub(8);
+    put_text(&mut rows, list_left, list_top, "list");
+    let list_items = packet.list_items.clamp(3, 5) as usize;
+    for idx in 0..list_items {
+        let marker = if packet.list_selected.rem_euclid(list_items as i64) as usize == idx {
+            ">"
+        } else {
+            " "
+        };
+        let row = if packet.list_dense != 0 {
+            format!("{marker} item-{}", idx + 1)
+        } else {
+            format!(
+                "{marker} row {}  accent {}",
+                idx + 1,
+                packet.accent.rem_euclid(9)
+            )
+        };
+        put_text(&mut rows, list_left, list_top + 1 + idx, &row);
+    }
+
+    let table_left = panel_left + 50;
+    let table_top = panel_bottom.saturating_sub(8);
+    put_text(&mut rows, table_left, table_top, "table");
+    let rows_count = packet.table_rows.clamp(2, 4) as usize;
+    let cols_count = packet.table_cols.clamp(2, 4) as usize;
+    let mut header = String::from("+");
+    for _ in 0..cols_count {
+        header.push_str("---+");
+    }
+    put_text(&mut rows, table_left, table_top + 1, &header);
+    for row_idx in 0..rows_count {
+        let mut body = String::from("|");
+        for col_idx in 0..cols_count {
+            let glyph = if packet.table_zebra != 0 && row_idx % 2 == 1 {
+                ':'
+            } else {
+                '.'
+            };
+            let active =
+                packet.table_selected_row.rem_euclid(rows_count as i64) as usize == row_idx;
+            let cell = if active && col_idx == 0 {
+                format!(">{glyph}{glyph}")
+            } else {
+                format!("{glyph}{glyph}{glyph}")
+            };
+            body.push_str(&cell);
+            body.push('|');
+        }
+        put_text(&mut rows, table_left, table_top + 2 + row_idx, &body);
+    }
+
+    let tree_left = panel_right.saturating_sub(26);
+    let tree_top = panel_top + 15;
+    put_text(&mut rows, tree_left, tree_top, "tree");
+    let node_count = packet.tree_nodes.clamp(3, 6) as usize;
+    for idx in 0..node_count {
+        let selected = packet.tree_selected.rem_euclid(node_count as i64) as usize == idx;
+        let expanded = packet.tree_expanded != 0;
+        let prefix = match idx {
+            0 => {
+                if expanded {
+                    "v root"
+                } else {
+                    "> root"
+                }
+            }
+            1 | 2 => "  |- child",
+            _ => "  `- leaf ",
+        };
+        let line = if selected {
+            format!("> {prefix}{}", idx + 1)
+        } else {
+            format!("  {prefix}{}", idx + 1)
+        };
+        put_text(&mut rows, tree_left, tree_top + 1 + idx, &line);
+    }
+
+    let inspector_left = panel_right.saturating_sub(26);
+    let inspector_top = panel_top + 4;
+    put_text(&mut rows, inspector_left, inspector_top, "inspector");
+    put_text(
+        &mut rows,
+        inspector_left,
+        inspector_top + 1,
+        if packet.inspector_pinned != 0 {
+            "[pin] locked"
+        } else {
+            "[pin] float "
+        },
+    );
+    let inspector_fields = packet.inspector_fields.clamp(2, 4) as usize;
+    for idx in 0..inspector_fields {
+        let selected = packet
+            .inspector_selected
+            .rem_euclid(inspector_fields as i64) as usize
+            == idx;
+        let line = if selected {
+            format!(
+                "> field_{} = {}",
+                idx + 1,
+                packet.accent.rem_euclid(9) + idx as i64
+            )
+        } else {
+            format!(
+                "  field_{} = {}",
+                idx + 1,
+                packet.accent.rem_euclid(9) + idx as i64
+            )
+        };
+        put_text(&mut rows, inspector_left, inspector_top + 2 + idx, &line);
+    }
+
+    let outline_left = panel_left + 3;
+    let outline_top = panel_top + 17;
+    put_text(&mut rows, outline_left, outline_top, "outline");
+    let outline_items = packet.outline_items.clamp(3, 6) as usize;
+    for idx in 0..outline_items {
+        let selected = packet.outline_selected.rem_euclid(outline_items as i64) as usize == idx;
+        let collapsed = packet.outline_collapsed != 0;
+        let line = if idx == 0 {
+            if selected {
+                if collapsed {
+                    "> > section".to_owned()
+                } else {
+                    "> v section".to_owned()
+                }
+            } else if collapsed {
+                "  > section".to_owned()
+            } else {
+                "  v section".to_owned()
+            }
+        } else if collapsed {
+            if selected {
+                format!("> hidden {}", idx + 1)
+            } else {
+                format!("  hidden {}", idx + 1)
+            }
+        } else if selected {
+            format!("> item {}", idx + 1)
+        } else {
+            format!("  item {}", idx + 1)
+        };
+        put_text(&mut rows, outline_left, outline_top + 1 + idx, &line);
+    }
 
     let focus_target = packet.focus_index.rem_euclid(6) as usize;
     let focus_marker = match focus_target {
@@ -1990,19 +2321,67 @@ struct BallPacket {
     color_key: i64,
     speed: f32,
     radius_scale: f32,
+    color_min: i64,
+    color_max: i64,
+    color_step: i64,
+    color_disabled: i64,
+    speed_min: i64,
+    speed_max: i64,
+    speed_step: i64,
+    speed_disabled: i64,
+    radius_min: i64,
+    radius_max: i64,
+    radius_step: i64,
+    radius_disabled: i64,
     accent: i64,
     toggle_state: i64,
     focus_index: i64,
     progress_value: i64,
+    progress_max: i64,
     meter_value: i64,
+    meter_max: i64,
     button_state: i64,
     button_intent: i64,
     header_title_mode: i64,
+    toggle_disabled: i64,
     text_caret: i64,
     text_echo: i64,
     text_placeholder: i64,
+    text_read_only: i64,
+    text_dirty: i64,
     select_index: i64,
     select_options: i64,
+    select_multiple: i64,
+    select_committed: i64,
+    checkbox_checked: i64,
+    checkbox_disabled: i64,
+    radio_selected: i64,
+    radio_options: i64,
+    radio_disabled: i64,
+    textarea_lines: i64,
+    textarea_scroll: i64,
+    textarea_placeholder: i64,
+    textarea_read_only: i64,
+    textarea_dirty: i64,
+    tabs_active: i64,
+    tabs_count: i64,
+    tabs_compact: i64,
+    list_selected: i64,
+    list_items: i64,
+    list_dense: i64,
+    table_rows: i64,
+    table_cols: i64,
+    table_selected_row: i64,
+    table_zebra: i64,
+    tree_selected: i64,
+    tree_nodes: i64,
+    tree_expanded: i64,
+    inspector_selected: i64,
+    inspector_fields: i64,
+    inspector_pinned: i64,
+    outline_selected: i64,
+    outline_items: i64,
+    outline_collapsed: i64,
 }
 
 fn parse_ball_packet(value: &Value, op: &str) -> Result<BallPacket, String> {
@@ -2018,19 +2397,67 @@ fn parse_ball_packet(value: &Value, op: &str) -> Result<BallPacket, String> {
                 color_key,
                 speed,
                 radius_scale,
+                color_min: 0,
+                color_max: 127,
+                color_step: 4,
+                color_disabled: 0,
+                speed_min: 0,
+                speed_max: 63,
+                speed_step: 2,
+                speed_disabled: 0,
+                radius_min: 0,
+                radius_max: 127,
+                radius_step: 3,
+                radius_disabled: 0,
                 accent: color_key,
                 toggle_state: if speed.round() as i64 % 2 == 0 { 0 } else { 1 },
                 focus_index: color_key.rem_euclid(3),
                 progress_value: speed.round() as i64,
+                progress_max: 63,
                 meter_value: (radius_scale * 96.0).round() as i64,
+                meter_max: 127,
                 button_state: if speed.round() as i64 % 2 == 0 { 0 } else { 1 },
                 button_intent: color_key.rem_euclid(3),
                 header_title_mode: color_key.rem_euclid(2),
+                toggle_disabled: radius_scale.round() as i64 % 2,
                 text_caret: color_key.rem_euclid(6),
                 text_echo: color_key,
                 text_placeholder: radius_scale.round() as i64,
+                text_read_only: 0,
+                text_dirty: 0,
                 select_index: color_key.rem_euclid(3),
                 select_options: 3,
+                select_multiple: 0,
+                select_committed: 1,
+                checkbox_checked: color_key.rem_euclid(2),
+                checkbox_disabled: 0,
+                radio_selected: color_key.rem_euclid(4),
+                radio_options: 4,
+                radio_disabled: 0,
+                textarea_lines: 3,
+                textarea_scroll: speed.round() as i64,
+                textarea_placeholder: radius_scale.round() as i64,
+                textarea_read_only: 0,
+                textarea_dirty: 0,
+                tabs_active: color_key.rem_euclid(4),
+                tabs_count: 4,
+                tabs_compact: 0,
+                list_selected: color_key.rem_euclid(5),
+                list_items: 5,
+                list_dense: 0,
+                table_rows: 4,
+                table_cols: 3,
+                table_selected_row: color_key.rem_euclid(4),
+                table_zebra: 1,
+                tree_selected: color_key.rem_euclid(6),
+                tree_nodes: 6,
+                tree_expanded: speed.round() as i64 % 2,
+                inspector_selected: color_key.rem_euclid(4),
+                inspector_fields: 4,
+                inspector_pinned: speed.round() as i64 % 2,
+                outline_selected: color_key.rem_euclid(6),
+                outline_items: 6,
+                outline_collapsed: speed.round() as i64 % 2,
             })
         }
         Value::Struct(packet) => parse_ball_packet_struct(packet, op),
@@ -2068,6 +2495,54 @@ fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket
     .map(|value| scalar_to_color_key(value, op))
     .transpose()?
     .unwrap_or_else(|| scalar_to_color_key(color, op).unwrap_or(0));
+    let color_min = find_slider_packet_field(packet, "color", "min")
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(0);
+    let color_max = find_slider_packet_field(packet, "color", "max")
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(127);
+    let color_step = find_slider_packet_field(packet, "color", "step")
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(4);
+    let color_disabled = find_slider_packet_field(packet, "color", "disabled")
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(0);
+    let speed_min = find_slider_packet_field(packet, "speed", "min")
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(0);
+    let speed_max = find_slider_packet_field(packet, "speed", "max")
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(63);
+    let speed_step = find_slider_packet_field(packet, "speed", "step")
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(2);
+    let speed_disabled = find_slider_packet_field(packet, "speed", "disabled")
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(0);
+    let radius_min = find_slider_packet_field(packet, "radius", "min")
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(0);
+    let radius_max = find_slider_packet_field(packet, "radius", "max")
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(127);
+    let radius_step = find_slider_packet_field(packet, "radius", "step")
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(3);
+    let radius_disabled = find_slider_packet_field(packet, "radius", "disabled")
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(0);
     let toggle_state = find_packet_field(
         packet,
         &["toggle_state", "toggle_live"],
@@ -2077,6 +2552,11 @@ fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket
     .map(|value| scalar_to_color_key(value, op))
     .transpose()?
     .unwrap_or(1);
+    let toggle_disabled =
+        find_packet_field(packet, &["toggle_disabled"], &["toggle"], &["disabled"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(0);
     let focus_index = find_packet_field(
         packet,
         &["focus_index", "focus_slot"],
@@ -2090,10 +2570,18 @@ fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket
         .map(|value| scalar_to_color_key(value, op))
         .transpose()?
         .unwrap_or_else(|| scalar_to_color_key(speed, op).unwrap_or(0));
+    let progress_max = find_packet_field(packet, &["progress_max"], &["progress"], &["max"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(63);
     let meter_value = find_packet_field(packet, &["meter_value"], &["meter"], &["value"])
         .map(|value| scalar_to_color_key(value, op))
         .transpose()?
         .unwrap_or_else(|| (radius_scale * 96.0).round() as i64);
+    let meter_max = find_packet_field(packet, &["meter_max"], &["meter"], &["max"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(127);
     let button_state = find_packet_field(packet, &["button_state"], &["button"], &["active"])
         .map(|value| scalar_to_color_key(value, op))
         .transpose()?
@@ -2124,6 +2612,15 @@ fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket
     .map(|value| scalar_to_color_key(value, op))
     .transpose()?
     .unwrap_or(radius_scale.round() as i64);
+    let text_read_only =
+        find_packet_field(packet, &["text_read_only"], &["text_input"], &["read_only"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(0);
+    let text_dirty = find_packet_field(packet, &["text_dirty"], &["text_input"], &["dirty"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(0);
     let select_index = find_packet_field(packet, &["select_index"], &["select"], &["selected"])
         .map(|value| scalar_to_color_key(value, op))
         .transpose()?
@@ -2132,24 +2629,225 @@ fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket
         .map(|value| scalar_to_color_key(value, op))
         .transpose()?
         .unwrap_or(3);
+    let select_multiple =
+        find_packet_field(packet, &["select_multiple"], &["select"], &["multiple"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(0);
+    let select_committed =
+        find_packet_field(packet, &["select_committed"], &["select"], &["committed"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(1);
+    let checkbox_checked =
+        find_packet_field(packet, &["checkbox_checked"], &["checkbox"], &["checked"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(toggle_state);
+    let checkbox_disabled =
+        find_packet_field(packet, &["checkbox_disabled"], &["checkbox"], &["disabled"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(0);
+    let radio_selected = find_packet_field(packet, &["radio_selected"], &["radio"], &["selected"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(focus_index);
+    let radio_options = find_packet_field(packet, &["radio_options"], &["radio"], &["options"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(4);
+    let radio_disabled = find_packet_field(packet, &["radio_disabled"], &["radio"], &["disabled"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(0);
+    let textarea_lines = find_packet_field(packet, &["textarea_lines"], &["textarea"], &["lines"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(3);
+    let textarea_scroll =
+        find_packet_field(packet, &["textarea_scroll"], &["textarea"], &["scroll"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(text_caret);
+    let textarea_placeholder = find_packet_field(
+        packet,
+        &["textarea_placeholder"],
+        &["textarea"],
+        &["placeholder"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(text_placeholder);
+    let textarea_read_only = find_packet_field(
+        packet,
+        &["textarea_read_only"],
+        &["textarea"],
+        &["read_only"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(text_read_only);
+    let textarea_dirty = find_packet_field(packet, &["textarea_dirty"], &["textarea"], &["dirty"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(text_dirty);
+    let tabs_active = find_packet_field(packet, &["tabs_active"], &["tabs"], &["active"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(focus_index);
+    let tabs_count = find_packet_field(packet, &["tabs_count"], &["tabs"], &["count"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(4);
+    let tabs_compact = find_packet_field(packet, &["tabs_compact"], &["tabs"], &["compact"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(0);
+    let list_selected = find_packet_field(packet, &["list_selected"], &["list"], &["selected"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(focus_index);
+    let list_items = find_packet_field(packet, &["list_items"], &["list"], &["items"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(5);
+    let list_dense = find_packet_field(packet, &["list_dense"], &["list"], &["dense"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(0);
+    let table_rows = find_packet_field(packet, &["table_rows"], &["table"], &["rows"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(4);
+    let table_cols = find_packet_field(packet, &["table_cols"], &["table"], &["cols"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(3);
+    let table_selected_row = find_packet_field(
+        packet,
+        &["table_selected_row"],
+        &["table"],
+        &["selected_row"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(focus_index);
+    let table_zebra = find_packet_field(packet, &["table_zebra"], &["table"], &["zebra"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(1);
+    let tree_selected = find_packet_field(packet, &["tree_selected"], &["tree"], &["selected"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(focus_index);
+    let tree_nodes = find_packet_field(packet, &["tree_nodes"], &["tree"], &["nodes"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(6);
+    let tree_expanded = find_packet_field(packet, &["tree_expanded"], &["tree"], &["expanded"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(toggle_state);
+    let inspector_selected = find_packet_field(
+        packet,
+        &["inspector_selected"],
+        &["inspector"],
+        &["selected"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(focus_index);
+    let inspector_fields =
+        find_packet_field(packet, &["inspector_fields"], &["inspector"], &["fields"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(4);
+    let inspector_pinned =
+        find_packet_field(packet, &["inspector_pinned"], &["inspector"], &["pinned"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(toggle_state);
+    let outline_selected =
+        find_packet_field(packet, &["outline_selected"], &["outline"], &["selected"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(focus_index);
+    let outline_items = find_packet_field(packet, &["outline_items"], &["outline"], &["items"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(6);
+    let outline_collapsed =
+        find_packet_field(packet, &["outline_collapsed"], &["outline"], &["collapsed"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(toggle_state);
 
     Ok(BallPacket {
         color_key: scalar_to_color_key(color, op)?,
         speed: scalar_to_f32(speed, op)?,
         radius_scale,
+        color_min,
+        color_max,
+        color_step,
+        color_disabled,
+        speed_min,
+        speed_max,
+        speed_step,
+        speed_disabled,
+        radius_min,
+        radius_max,
+        radius_step,
+        radius_disabled,
         accent,
         toggle_state,
         focus_index,
         progress_value,
+        progress_max,
         meter_value,
+        meter_max,
         button_state,
         button_intent,
         header_title_mode,
+        toggle_disabled,
         text_caret,
         text_echo,
         text_placeholder,
+        text_read_only,
+        text_dirty,
         select_index,
         select_options,
+        select_multiple,
+        select_committed,
+        checkbox_checked,
+        checkbox_disabled,
+        radio_selected,
+        radio_options,
+        radio_disabled,
+        textarea_lines,
+        textarea_scroll,
+        textarea_placeholder,
+        textarea_read_only,
+        textarea_dirty,
+        tabs_active,
+        tabs_count,
+        tabs_compact,
+        list_selected,
+        list_items,
+        list_dense,
+        table_rows,
+        table_cols,
+        table_selected_row,
+        table_zebra,
+        tree_selected,
+        tree_nodes,
+        tree_expanded,
+        inspector_selected,
+        inspector_fields,
+        inspector_pinned,
+        outline_selected,
+        outline_items,
+        outline_collapsed,
     })
 }
 
@@ -2206,6 +2904,38 @@ fn find_slider_packet_value<'a>(packet: &'a StructValue, slider_name: &str) -> O
                 }),
             _ => None,
         })
+}
+
+fn find_slider_packet_field<'a>(
+    packet: &'a StructValue,
+    slider_name: &str,
+    field_name: &str,
+) -> Option<&'a Value> {
+    packet
+        .fields
+        .iter()
+        .find(|(name, _)| name == "sliders")
+        .and_then(|(_, value)| match value {
+            Value::Struct(group) => group
+                .fields
+                .iter()
+                .find(|(name, _)| name == slider_name)
+                .and_then(|(_, value)| match value {
+                    Value::Struct(slider) => slider
+                        .fields
+                        .iter()
+                        .find(|(name, _)| name == field_name)
+                        .map(|(_, value)| value),
+                    _ => None,
+                }),
+            _ => None,
+        })
+}
+
+fn normalize_control_value(value: i64, min: i64, max: i64) -> usize {
+    let max = max.max(min + 1);
+    let clamped = value.clamp(min, max);
+    (((clamped - min) * 127) / (max - min)) as usize
 }
 
 fn scalar_to_color_key(value: &Value, op: &str) -> Result<i64, String> {

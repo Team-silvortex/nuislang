@@ -50,21 +50,109 @@ mod cpu Main {
     let panel_focus_index: i64 = color_delta + speed_delta;
     let panel_header: NovaHeaderPacket =
       nova_header_packet(panel_accent, panel_focus_index);
-    let slider_color: NovaSliderPacket = nova_slider_packet(packed_color);
-    let slider_speed: NovaSliderPacket = nova_slider_packet(packed_speed);
-    let slider_radius: NovaSliderPacket = nova_slider_packet(packed_radius);
+    let slider_color: NovaSliderPacket =
+      nova_slider_packet(packed_color, 0, 127, 4, 0);
+    let slider_speed: NovaSliderPacket =
+      nova_slider_packet(packed_speed, 0, 63, 2, speed_delta);
+    let slider_radius: NovaSliderPacket =
+      nova_slider_packet(packed_radius, 0, 127, 3, radius_delta);
     let panel_sliders: NovaSliderGroupPacket =
       nova_slider_group_packet(slider_color, slider_speed, slider_radius);
-    let panel_toggle: NovaTogglePacket = nova_toggle_packet(panel_toggle_state);
-    let panel_progress: NovaProgressPacket = nova_progress_packet(packed_speed);
-    let panel_meter: NovaMeterPacket = nova_meter_packet(packed_radius);
+    let panel_toggle: NovaTogglePacket =
+      nova_toggle_packet(panel_toggle_state, radius_delta);
+    let panel_progress: NovaProgressPacket =
+      nova_progress_packet(packed_speed, 63);
+    let panel_meter: NovaMeterPacket =
+      nova_meter_packet(packed_radius, 127);
     let panel_button: NovaButtonPacket =
       nova_button_packet(panel_toggle_state, panel_accent, panel_focus_index);
     let panel_text_input: NovaTextInputPacket =
-      nova_text_input_packet(packed_color, panel_focus_index, packed_radius);
+      nova_text_input_packet(
+        packed_color,
+        panel_focus_index,
+        packed_radius,
+        speed_delta,
+        color_delta
+      );
     let panel_select: NovaSelectPacket =
-      nova_select_packet(panel_focus_index, panel_accent, 4);
+      nova_select_packet(panel_focus_index, panel_accent, 4, frame_tick, speed_delta);
+    let panel_checkbox: NovaCheckboxPacket =
+      nova_checkbox_packet(panel_toggle_state, panel_accent, radius_delta);
+    let panel_radio: NovaRadioPacket =
+      nova_radio_packet(panel_focus_index, 4, panel_accent, speed_delta);
+    let panel_textarea: NovaTextAreaPacket =
+      nova_textarea_packet(3, frame_tick, packed_radius, color_delta, speed_delta);
+    let panel_tabs: NovaTabsPacket =
+      nova_tabs_packet(panel_focus_index, 4, panel_accent, radius_delta);
+    let shared_selection: NovaSelectionPacket =
+      nova_selection_packet(panel_focus_index, 6, panel_toggle_state, 9);
+    let shared_selection_state: NovaSelectionState =
+      nova_selection_state(shared_selection);
+    let shared_selected: i64 = nova_selection_state_selected(shared_selection_state);
+    let shared_mode: i64 = nova_selection_state_mode(shared_selection_state);
+    let panel_list: NovaListPacket =
+      nova_list_packet(shared_selected, 5, panel_accent, speed_delta);
+    let panel_table: NovaTablePacket =
+      nova_table_packet(4, 3, shared_selected, radius_delta);
+    let panel_tree: NovaTreePacket =
+      nova_tree_packet(shared_selected, 6, shared_mode, panel_accent);
+    let panel_inspector: NovaInspectorPacket =
+      nova_inspector_packet(shared_selected, 4, shared_mode, panel_accent);
+    let panel_outline: NovaOutlinePacket =
+      nova_outline_packet(shared_selected, 6, shared_mode, panel_accent);
     let panel_focus: NovaFocusPacket = nova_focus_packet(panel_focus_index);
+    let slider_state: NovaSliderState = nova_slider_state(slider_speed);
+    let text_input_state: NovaTextInputState = nova_text_input_state(panel_text_input);
+    let select_state: NovaSelectState = nova_select_state(panel_select);
+    let checkbox_state: NovaCheckboxState = nova_checkbox_state(panel_checkbox);
+    let radio_state: NovaRadioState = nova_radio_state(panel_radio);
+    let textarea_state: NovaTextAreaState = nova_textarea_state(panel_textarea);
+    let tabs_state: NovaTabsState = nova_tabs_state(panel_tabs);
+    let list_state: NovaListState = nova_list_state(panel_list);
+    let table_state: NovaTableState = nova_table_state(panel_table);
+    let tree_state: NovaTreeState = nova_tree_state(panel_tree);
+    let inspector_state: NovaInspectorState = nova_inspector_state(panel_inspector);
+    let outline_state: NovaOutlineState = nova_outline_state(panel_outline);
+    let list_selection: NovaSelectionState = nova_list_selection(panel_list);
+    let table_selection: NovaSelectionState = nova_table_selection(panel_table);
+    let tree_selection: NovaSelectionState = nova_tree_selection(panel_tree);
+    let inspector_selection: NovaSelectionState = nova_inspector_selection(panel_inspector);
+    let outline_selection: NovaSelectionState = nova_outline_selection(panel_outline);
+    let speed_slider_disabled: i64 = nova_slider_state_disabled(slider_state);
+    let panel_input_dirty: i64 = nova_text_input_state_dirty(text_input_state);
+    let panel_select_committed: i64 = nova_select_state_committed(select_state);
+    let panel_checkbox_checked: i64 = nova_checkbox_state_checked(checkbox_state);
+    let panel_radio_disabled: i64 = nova_radio_state_disabled(radio_state);
+    let panel_textarea_dirty: i64 = nova_textarea_state_dirty(textarea_state);
+    let panel_tabs_compact: i64 = nova_tabs_state_compact(tabs_state);
+    let panel_list_dense: i64 = nova_list_state_dense(list_state);
+    let panel_table_selected_row: i64 = nova_table_state_selected_row(table_state);
+    let panel_tree_expanded: i64 = nova_tree_state_expanded(tree_state);
+    let panel_inspector_pinned: i64 = nova_inspector_state_pinned(inspector_state);
+    let panel_outline_collapsed: i64 = nova_outline_state_collapsed(outline_state);
+    let list_selection_origin: i64 = nova_selection_state_origin(list_selection);
+    let table_selection_origin: i64 = nova_selection_state_origin(table_selection);
+    let tree_selection_origin: i64 = nova_selection_state_origin(tree_selection);
+    let inspector_selection_origin: i64 = nova_selection_state_origin(inspector_selection);
+    let outline_selection_origin: i64 = nova_selection_state_origin(outline_selection);
+    let panel_state_mix: i64 =
+      speed_slider_disabled
+      + panel_input_dirty
+      + panel_select_committed
+      + panel_checkbox_checked
+      + panel_radio_disabled
+      + panel_textarea_dirty
+      + panel_tabs_compact
+      + panel_list_dense
+      + panel_table_selected_row
+      + panel_tree_expanded
+      + panel_inspector_pinned
+      + panel_outline_collapsed
+      + list_selection_origin
+      + table_selection_origin
+      + tree_selection_origin
+      + inspector_selection_origin
+      + outline_selection_origin;
 
     let render_controls: NovaPanelPacket = nova_panel_from_parts(
       panel_header,
@@ -75,6 +163,15 @@ mod cpu Main {
       panel_button,
       panel_text_input,
       panel_select,
+      panel_checkbox,
+      panel_radio,
+      panel_textarea,
+      panel_tabs,
+      panel_list,
+      panel_table,
+      panel_tree,
+      panel_inspector,
+      panel_outline,
       panel_focus
     );
 
@@ -87,6 +184,7 @@ mod cpu Main {
 
     let host_frame: Window<Frame> = data_profile_send_downlink("FabricPlane", frame);
 
+    print(panel_state_mix);
     cpu_present_frame(host_frame);
   }
 }

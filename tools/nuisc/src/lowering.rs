@@ -613,7 +613,14 @@ fn lower_expr(
                     op: Operation {
                         module: "cpu".to_owned(),
                         instruction: "struct".to_owned(),
-                        args: vec!["NovaSliderPacket".to_owned(), format!("value={color_name}")],
+                        args: vec![
+                            "NovaSliderPacket".to_owned(),
+                            format!("value={color_name}"),
+                            "min=0".to_owned(),
+                            "max=127".to_owned(),
+                            "step=4".to_owned(),
+                            "disabled=0".to_owned(),
+                        ],
                     },
                 });
                 push_dep_edges(state, &color_name, &color_slider);
@@ -625,7 +632,14 @@ fn lower_expr(
                     op: Operation {
                         module: "cpu".to_owned(),
                         instruction: "struct".to_owned(),
-                        args: vec!["NovaSliderPacket".to_owned(), format!("value={speed_name}")],
+                        args: vec![
+                            "NovaSliderPacket".to_owned(),
+                            format!("value={speed_name}"),
+                            "min=0".to_owned(),
+                            "max=63".to_owned(),
+                            "step=2".to_owned(),
+                            "disabled=0".to_owned(),
+                        ],
                     },
                 });
                 push_dep_edges(state, &speed_name, &speed_slider);
@@ -640,6 +654,10 @@ fn lower_expr(
                         args: vec![
                             "NovaSliderPacket".to_owned(),
                             format!("value={radius_name}"),
+                            "min=0".to_owned(),
+                            "max=127".to_owned(),
+                            "step=3".to_owned(),
+                            "disabled=0".to_owned(),
                         ],
                     },
                 });
@@ -672,7 +690,11 @@ fn lower_expr(
                     op: Operation {
                         module: "cpu".to_owned(),
                         instruction: "struct".to_owned(),
-                        args: vec!["NovaTogglePacket".to_owned(), format!("live={toggle_name}")],
+                        args: vec![
+                            "NovaTogglePacket".to_owned(),
+                            format!("live={toggle_name}"),
+                            "disabled=0".to_owned(),
+                        ],
                     },
                 });
                 push_dep_edges(state, toggle_name, &toggle_struct);
@@ -688,6 +710,7 @@ fn lower_expr(
                         args: vec![
                             "NovaProgressPacket".to_owned(),
                             format!("value={speed_name}"),
+                            "max=63".to_owned(),
                         ],
                     },
                 });
@@ -701,7 +724,11 @@ fn lower_expr(
                     op: Operation {
                         module: "cpu".to_owned(),
                         instruction: "struct".to_owned(),
-                        args: vec!["NovaMeterPacket".to_owned(), format!("value={radius_name}")],
+                        args: vec![
+                            "NovaMeterPacket".to_owned(),
+                            format!("value={radius_name}"),
+                            "max=127".to_owned(),
+                        ],
                     },
                 });
                 push_dep_edges(state, &radius_name, &meter_struct);
@@ -739,6 +766,8 @@ fn lower_expr(
                             format!("echo={color_name}"),
                             format!("caret={focus_name}"),
                             format!("placeholder={accent_name}"),
+                            "read_only=0".to_owned(),
+                            "dirty=0".to_owned(),
                         ],
                     },
                 });
@@ -759,12 +788,196 @@ fn lower_expr(
                             format!("selected={focus_name}"),
                             format!("accent={accent_name}"),
                             "options=3".to_owned(),
+                            "multiple=0".to_owned(),
+                            "committed=1".to_owned(),
                         ],
                     },
                 });
                 push_dep_edges(state, focus_name, &select_struct);
                 push_dep_edges(state, accent_name, &select_struct);
                 panel_group_nodes.push(select_struct.clone());
+
+                let checkbox_struct = next_name(state, "nova_panel_checkbox");
+                state.yir.nodes.push(Node {
+                    name: checkbox_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaCheckboxPacket".to_owned(),
+                            format!("checked={toggle_name}"),
+                            format!("accent={accent_name}"),
+                            "disabled=0".to_owned(),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &checkbox_struct);
+                push_dep_edges(state, accent_name, &checkbox_struct);
+                panel_group_nodes.push(checkbox_struct.clone());
+
+                let radio_struct = next_name(state, "nova_panel_radio");
+                state.yir.nodes.push(Node {
+                    name: radio_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaRadioPacket".to_owned(),
+                            format!("selected={focus_name}"),
+                            "options=4".to_owned(),
+                            format!("accent={accent_name}"),
+                            "disabled=0".to_owned(),
+                        ],
+                    },
+                });
+                push_dep_edges(state, focus_name, &radio_struct);
+                push_dep_edges(state, accent_name, &radio_struct);
+                panel_group_nodes.push(radio_struct.clone());
+
+                let textarea_struct = next_name(state, "nova_panel_textarea");
+                state.yir.nodes.push(Node {
+                    name: textarea_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaTextAreaPacket".to_owned(),
+                            "lines=3".to_owned(),
+                            format!("scroll={focus_name}"),
+                            format!("placeholder={accent_name}"),
+                            "read_only=0".to_owned(),
+                            "dirty=0".to_owned(),
+                        ],
+                    },
+                });
+                push_dep_edges(state, focus_name, &textarea_struct);
+                push_dep_edges(state, accent_name, &textarea_struct);
+                panel_group_nodes.push(textarea_struct.clone());
+
+                let tabs_struct = next_name(state, "nova_panel_tabs");
+                state.yir.nodes.push(Node {
+                    name: tabs_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaTabsPacket".to_owned(),
+                            format!("active={focus_name}"),
+                            "count=4".to_owned(),
+                            format!("accent={accent_name}"),
+                            "compact=0".to_owned(),
+                        ],
+                    },
+                });
+                push_dep_edges(state, focus_name, &tabs_struct);
+                push_dep_edges(state, accent_name, &tabs_struct);
+                panel_group_nodes.push(tabs_struct.clone());
+
+                let list_struct = next_name(state, "nova_panel_list");
+                state.yir.nodes.push(Node {
+                    name: list_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaListPacket".to_owned(),
+                            format!("selected={focus_name}"),
+                            "items=5".to_owned(),
+                            format!("accent={accent_name}"),
+                            "dense=0".to_owned(),
+                        ],
+                    },
+                });
+                push_dep_edges(state, focus_name, &list_struct);
+                push_dep_edges(state, accent_name, &list_struct);
+                panel_group_nodes.push(list_struct.clone());
+
+                let table_struct = next_name(state, "nova_panel_table");
+                state.yir.nodes.push(Node {
+                    name: table_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaTablePacket".to_owned(),
+                            "rows=4".to_owned(),
+                            "cols=3".to_owned(),
+                            format!("selected_row={focus_name}"),
+                            "zebra=1".to_owned(),
+                        ],
+                    },
+                });
+                push_dep_edges(state, focus_name, &table_struct);
+                panel_group_nodes.push(table_struct.clone());
+
+                let tree_struct = next_name(state, "nova_panel_tree");
+                state.yir.nodes.push(Node {
+                    name: tree_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaTreePacket".to_owned(),
+                            format!("selected={focus_name}"),
+                            "nodes=6".to_owned(),
+                            format!("expanded={toggle_name}"),
+                            format!("accent={accent_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, focus_name, &tree_struct);
+                push_dep_edges(state, toggle_name, &tree_struct);
+                push_dep_edges(state, accent_name, &tree_struct);
+                panel_group_nodes.push(tree_struct.clone());
+
+                let inspector_struct = next_name(state, "nova_panel_inspector");
+                state.yir.nodes.push(Node {
+                    name: inspector_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaInspectorPacket".to_owned(),
+                            format!("selected={focus_name}"),
+                            "fields=4".to_owned(),
+                            format!("pinned={toggle_name}"),
+                            format!("accent={accent_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, focus_name, &inspector_struct);
+                push_dep_edges(state, toggle_name, &inspector_struct);
+                push_dep_edges(state, accent_name, &inspector_struct);
+                panel_group_nodes.push(inspector_struct.clone());
+
+                let outline_struct = next_name(state, "nova_panel_outline");
+                state.yir.nodes.push(Node {
+                    name: outline_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaOutlinePacket".to_owned(),
+                            format!("selected={focus_name}"),
+                            "items=6".to_owned(),
+                            format!("collapsed={toggle_name}"),
+                            format!("accent={accent_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, focus_name, &outline_struct);
+                push_dep_edges(state, toggle_name, &outline_struct);
+                push_dep_edges(state, accent_name, &outline_struct);
+                panel_group_nodes.push(outline_struct.clone());
 
                 let focus_struct = next_name(state, "nova_panel_focus");
                 state.yir.nodes.push(Node {
@@ -789,6 +1002,15 @@ fn lower_expr(
                     format!("button={button_struct}"),
                     format!("text_input={text_input_struct}"),
                     format!("select={select_struct}"),
+                    format!("checkbox={checkbox_struct}"),
+                    format!("radio={radio_struct}"),
+                    format!("textarea={textarea_struct}"),
+                    format!("tabs={tabs_struct}"),
+                    format!("list={list_struct}"),
+                    format!("table={table_struct}"),
+                    format!("tree={tree_struct}"),
+                    format!("inspector={inspector_struct}"),
+                    format!("outline={outline_struct}"),
                     format!("focus={focus_struct}"),
                 ]
             } else {

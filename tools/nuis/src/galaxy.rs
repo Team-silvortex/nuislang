@@ -32,6 +32,11 @@ struct NsNovaManifest {
     pub primary_shader_unit: Option<String>,
     pub primary_kernel_unit: Option<String>,
     pub render_links: Vec<String>,
+    pub selection_schema: Option<String>,
+    pub selection_owner_unit: Option<String>,
+    pub selection_bridge_unit: Option<String>,
+    pub selection_render_unit: Option<String>,
+    pub selection_controls: Vec<String>,
     pub cpu_units: Vec<String>,
     pub data_units: Vec<String>,
     pub shader_units: Vec<String>,
@@ -222,6 +227,9 @@ pub fn check(input: &Path) -> Result<CheckedGalaxy, String> {
             profile.primary_data_unit.as_deref(),
             profile.primary_shader_unit.as_deref(),
             profile.primary_kernel_unit.as_deref(),
+            profile.selection_owner_unit.as_deref(),
+            profile.selection_bridge_unit.as_deref(),
+            profile.selection_render_unit.as_deref(),
         ]
         .into_iter()
         .flatten()
@@ -231,6 +239,21 @@ pub fn check(input: &Path) -> Result<CheckedGalaxy, String> {
                     "ns-nova profile `{}` references missing project unit `{}`",
                     profile_path.display(),
                     unit
+                ));
+            }
+        }
+        if let Some(schema) = profile.selection_schema.as_deref() {
+            if schema != "ns-nova-selection-v1" {
+                return Err(format!(
+                    "ns-nova profile `{}` has unsupported selection_schema `{}`; expected `ns-nova-selection-v1`",
+                    profile_path.display(),
+                    schema
+                ));
+            }
+            if profile.selection_controls.is_empty() {
+                return Err(format!(
+                    "ns-nova profile `{}` enables selection_schema but declares no `selection_controls`",
+                    profile_path.display()
                 ));
             }
         }
@@ -800,15 +823,33 @@ fn default_ns_nova_manifest(project: &nuisc::project::LoadedProject) -> NsNovaMa
             None => format!("{} -> {}", link.from, link.to),
         })
         .collect::<Vec<_>>();
+    let selection_controls = vec![
+        "list".to_owned(),
+        "table".to_owned(),
+        "tree".to_owned(),
+        "inspector".to_owned(),
+        "outline".to_owned(),
+    ];
     NsNovaManifest {
         framework_schema: "ns-nova-manifest-v1".to_owned(),
         framework: "ns-nova".to_owned(),
         project: "nuis.toml".to_owned(),
         entry_cpu_unit,
-        primary_data_unit,
-        primary_shader_unit,
+        primary_data_unit: primary_data_unit.clone(),
+        primary_shader_unit: primary_shader_unit.clone(),
         primary_kernel_unit,
         render_links,
+        selection_schema: Some("ns-nova-selection-v1".to_owned()),
+        selection_owner_unit: project.entry_path.file_name().and_then(|_| {
+            project
+                .modules
+                .iter()
+                .find(|module| module.path == project.entry_path)
+                .map(|module| format!("cpu.{}", module.ast.unit))
+        }),
+        selection_bridge_unit: primary_data_unit.clone(),
+        selection_render_unit: primary_shader_unit.clone(),
+        selection_controls,
         cpu_units,
         data_units,
         shader_units,
@@ -1028,9 +1069,22 @@ fn render_ns_nova_manifest(manifest: &NsNovaManifest) -> String {
     if let Some(value) = &manifest.primary_kernel_unit {
         source.push_str(&format!("primary_kernel_unit = \"{}\"\n", escape(value)));
     }
+    if let Some(value) = &manifest.selection_schema {
+        source.push_str(&format!("selection_schema = \"{}\"\n", escape(value)));
+    }
+    if let Some(value) = &manifest.selection_owner_unit {
+        source.push_str(&format!("selection_owner_unit = \"{}\"\n", escape(value)));
+    }
+    if let Some(value) = &manifest.selection_bridge_unit {
+        source.push_str(&format!("selection_bridge_unit = \"{}\"\n", escape(value)));
+    }
+    if let Some(value) = &manifest.selection_render_unit {
+        source.push_str(&format!("selection_render_unit = \"{}\"\n", escape(value)));
+    }
     source.push_str(&format!(
-        "render_links = {}\ncpu_units = {}\ndata_units = {}\nshader_units = {}\nkernel_units = {}\n",
+        "render_links = {}\nselection_controls = {}\ncpu_units = {}\ndata_units = {}\nshader_units = {}\nkernel_units = {}\n",
         render_string_array(&manifest.render_links),
+        render_string_array(&manifest.selection_controls),
         render_string_array(&manifest.cpu_units),
         render_string_array(&manifest.data_units),
         render_string_array(&manifest.shader_units),
@@ -1065,6 +1119,12 @@ fn parse_ns_nova_manifest(source: &str, path: &Path) -> Result<NsNovaManifest, S
         primary_shader_unit: parse_optional_string(source, "primary_shader_unit"),
         primary_kernel_unit: parse_optional_string(source, "primary_kernel_unit"),
         render_links: parse_optional_string_array(source, "render_links").unwrap_or_default(),
+        selection_schema: parse_optional_string(source, "selection_schema"),
+        selection_owner_unit: parse_optional_string(source, "selection_owner_unit"),
+        selection_bridge_unit: parse_optional_string(source, "selection_bridge_unit"),
+        selection_render_unit: parse_optional_string(source, "selection_render_unit"),
+        selection_controls: parse_optional_string_array(source, "selection_controls")
+            .unwrap_or_default(),
         cpu_units: parse_optional_string_array(source, "cpu_units").unwrap_or_default(),
         data_units: parse_optional_string_array(source, "data_units").unwrap_or_default(),
         shader_units: parse_optional_string_array(source, "shader_units").unwrap_or_default(),
@@ -1189,6 +1249,17 @@ mod tests {
             primary_data_unit: Some("data.FabricPlane".to_owned()),
             primary_shader_unit: Some("shader.SurfaceShader".to_owned()),
             primary_kernel_unit: None,
+            selection_schema: Some("ns-nova-selection-v1".to_owned()),
+            selection_owner_unit: Some("cpu.Main".to_owned()),
+            selection_bridge_unit: Some("data.FabricPlane".to_owned()),
+            selection_render_unit: Some("shader.SurfaceShader".to_owned()),
+            selection_controls: vec![
+                "list".to_owned(),
+                "table".to_owned(),
+                "tree".to_owned(),
+                "inspector".to_owned(),
+                "outline".to_owned(),
+            ],
             render_links: vec![
                 "cpu.Main -> shader.SurfaceShader via data.FabricPlane".to_owned(),
                 "shader.SurfaceShader -> cpu.Main via data.FabricPlane".to_owned(),
