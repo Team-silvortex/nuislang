@@ -1676,6 +1676,24 @@ fn draw_control_panel_surface(
     put_text(
         &mut rows,
         panel_right.saturating_sub(26),
+        panel_top + 21,
+        &format!(
+            "link n{} m{}",
+            packet.scene_link_node_slot, packet.scene_link_mesh_slot
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 22,
+        &format!(
+            "mat{} lit{}",
+            packet.scene_link_material_slot, packet.scene_link_light_slot
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
         panel_top + 16,
         &format!(
             "pass s{} c{} x{}",
@@ -1711,6 +1729,15 @@ fn draw_control_panel_surface(
             "tgt k{} {:>2}x{:>2}",
             packet.target_kind, packet.target_width, packet.target_height
         ),
+    );
+    draw_scene_preview(
+        &mut rows,
+        viewport_left,
+        viewport_top,
+        viewport_right,
+        viewport_bottom,
+        &packet,
+        accent,
     );
     put_text(
         &mut rows,
@@ -2019,6 +2046,42 @@ fn draw_control_panel_surface(
         &format!(
             "cd {} md{}",
             packet.commit_durability, packet.commit_commit_mode
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 61,
+        &format!(
+            "sn {} ss{}",
+            packet.snapshot_kind, packet.snapshot_source_slot
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 62,
+        &format!(
+            "sr {} rm{}",
+            packet.snapshot_retention, packet.snapshot_replay_mode
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 63,
+        &format!(
+            "ck {} as{}",
+            packet.checkpoint_kind, packet.checkpoint_anchor_slot
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 64,
+        &format!(
+            "cr {} rm{}",
+            packet.checkpoint_rollback_depth, packet.checkpoint_resume_mode
         ),
     );
     if layer_hidden {
@@ -2989,6 +3052,216 @@ fn put_text(rows: &mut [Vec<char>], left: usize, y: usize, text: &str) {
     }
 }
 
+fn draw_scene_preview(
+    rows: &mut [Vec<char>],
+    viewport_left: usize,
+    viewport_top: usize,
+    viewport_right: usize,
+    viewport_bottom: usize,
+    packet: &BallPacket,
+    accent: char,
+) {
+    if viewport_right <= viewport_left + 6 || viewport_bottom <= viewport_top + 5 {
+        return;
+    }
+
+    let preview_left = viewport_left + 2;
+    let preview_top = viewport_top + 2;
+    let preview_right = viewport_right.saturating_sub(2);
+    let preview_bottom = viewport_bottom.saturating_sub(2);
+    let width = preview_right.saturating_sub(preview_left).max(6);
+    let ground_y = preview_bottom.saturating_sub(1);
+    let object_y = ground_y
+        .saturating_sub(2 + packet.node_depth.rem_euclid(2) as usize)
+        .saturating_sub(packet.transform_pivot.rem_euclid(2) as usize);
+    let scene_phase = packet.transform_translate
+        + packet.camera_orbit
+        + packet.scene_link_node_slot
+        + packet.frame_index;
+    let object_x = preview_left + scene_phase.rem_euclid(width as i64) as usize;
+    let light_x = preview_left + packet.light_range.rem_euclid(width as i64) as usize;
+    let light_y = preview_top + packet.scene_link_light_slot.rem_euclid(3) as usize;
+    let radius =
+        ((packet.transform_scale.abs() + packet.mesh_vertex_count.abs()) / 24).clamp(1, 4) as usize;
+    let glyph = match (packet.mesh_primitive + packet.material_shader_kind).rem_euclid(4) {
+        0 => '#',
+        1 => '@',
+        2 => '%',
+        _ => '&',
+    };
+    let shadow = if packet.layer_visibility == 0 {
+        ':'
+    } else {
+        '_'
+    };
+
+    for x in preview_left..=preview_right {
+        if x < rows[ground_y].len() {
+            rows[ground_y][x] = if x % 2 == 0 { '_' } else { '.' };
+        }
+    }
+
+    let shadow_left = object_x.saturating_sub(radius + 1).max(preview_left);
+    let shadow_right = (object_x + radius + 1).min(preview_right);
+    for x in shadow_left..=shadow_right {
+        if x < rows[ground_y].len() {
+            rows[ground_y][x] = shadow;
+        }
+    }
+
+    if packet.light_intensity > 0 {
+        if let Some(row) = rows.get_mut(light_y) {
+            let light_slot = light_x.min(row.len().saturating_sub(1));
+            if let Some(cell) = row.get_mut(light_slot) {
+                *cell = '*';
+            }
+        }
+        stamp_line(rows, light_x, light_y, object_x, object_y, '.');
+    }
+
+    match packet.mesh_primitive.rem_euclid(3) {
+        0 => {
+            let top_y = object_y.saturating_sub(radius);
+            let left_x = object_x.saturating_sub(radius).max(preview_left);
+            let right_x = (object_x + radius).min(preview_right);
+            stamp_line(rows, object_x, top_y, left_x, object_y + radius, glyph);
+            stamp_line(rows, object_x, top_y, right_x, object_y + radius, glyph);
+            stamp_line(
+                rows,
+                left_x,
+                object_y + radius,
+                right_x,
+                object_y + radius,
+                glyph,
+            );
+        }
+        1 => {
+            let left_x = object_x.saturating_sub(radius).max(preview_left);
+            let right_x = (object_x + radius).min(preview_right);
+            let top_y = object_y.saturating_sub(radius).max(preview_top);
+            let bottom_y = (object_y + radius).min(ground_y.saturating_sub(1));
+            draw_box(
+                rows, left_x, top_y, right_x, bottom_y, glyph, glyph, glyph, glyph, glyph, glyph,
+            );
+            if left_x + 1 < right_x && top_y + 1 < bottom_y {
+                fill_rect(
+                    rows,
+                    left_x + 1,
+                    top_y + 1,
+                    right_x - 1,
+                    bottom_y - 1,
+                    glyph,
+                );
+            }
+        }
+        _ => {
+            let top_y = object_y.saturating_sub(radius);
+            let bottom_y = (object_y + radius).min(ground_y.saturating_sub(1));
+            let left_x = object_x.saturating_sub(radius).max(preview_left);
+            let right_x = (object_x + radius).min(preview_right);
+            stamp_line(rows, object_x, top_y, left_x, object_y, glyph);
+            stamp_line(rows, object_x, top_y, right_x, object_y, glyph);
+            stamp_line(rows, left_x, object_y, object_x, bottom_y, glyph);
+            stamp_line(rows, right_x, object_y, object_x, bottom_y, glyph);
+        }
+    }
+
+    if let Some(row) = rows.get_mut(object_y.min(rows.len().saturating_sub(1))) {
+        let object_slot = object_x.min(row.len().saturating_sub(1));
+        if let Some(cell) = row.get_mut(object_slot) {
+            *cell = accent;
+        }
+    }
+
+    let link_label = format!(
+        "n{} t{} m{}",
+        packet.scene_link_node_slot, packet.scene_link_transform_slot, packet.scene_link_mesh_slot
+    );
+    put_text(rows, preview_left, preview_bottom, &link_label);
+    let material_label = format!(
+        "mat{} lit{} ly{} i{}",
+        packet.scene_link_material_slot,
+        packet.scene_link_light_slot,
+        packet.scene_link_layer_slot,
+        packet.instance_node_slot
+    );
+    put_text(
+        rows,
+        preview_left,
+        preview_bottom.saturating_sub(1),
+        &material_label,
+    );
+    let instance_label = format!(
+        "c{} s{} p{} l{}",
+        packet.instance_count,
+        packet.instance_stride,
+        packet.instance_phase.rem_euclid(10),
+        packet.instance_light_slot
+    );
+    put_text(rows, preview_left, preview_top, &instance_label);
+    let graph_label = format!(
+        "g{} l{} i{} a{}",
+        packet.scene_graph_node_count,
+        packet.scene_graph_link_count,
+        packet.scene_graph_instance_count,
+        packet.scene_graph_active_layer
+    );
+    put_text(
+        rows,
+        preview_left,
+        preview_top.saturating_add(1),
+        &graph_label,
+    );
+
+    let instance_count = packet.instance_count.clamp(1, 4) as usize;
+    let instance_stride = packet.instance_stride.abs().clamp(2, 6) as usize;
+    let mut last_x = object_x;
+    for idx in 1..instance_count {
+        let shifted_x = (object_x + idx * instance_stride)
+            .min(preview_right.saturating_sub(1))
+            .max(preview_left + 1);
+        let shifted_y = object_y
+            .saturating_add((packet.instance_phase + idx as i64).rem_euclid(2) as usize)
+            .min(ground_y.saturating_sub(1));
+        let ghost = match (packet.instance_material_slot + idx as i64).rem_euclid(3) {
+            0 => ':',
+            1 => ';',
+            _ => '+',
+        };
+        if let Some(row) = rows.get_mut(shifted_y) {
+            let shifted_slot = shifted_x.min(row.len().saturating_sub(1));
+            if let Some(cell) = row.get_mut(shifted_slot) {
+                *cell = ghost;
+            }
+        }
+        stamp_line(rows, last_x, object_y, shifted_x, shifted_y, '.');
+        last_x = shifted_x;
+    }
+
+    let root_y = preview_top
+        .saturating_add(packet.scene_graph_root_slot.rem_euclid(3) as usize)
+        .min(ground_y.saturating_sub(2));
+    let graph_span = packet.scene_graph_node_count.clamp(2, 6) as usize;
+    for idx in 0..graph_span {
+        let branch_x = preview_left
+            .saturating_add(2 + idx * 2)
+            .min(preview_right.saturating_sub(1));
+        if let Some(row) = rows.get_mut(root_y) {
+            let slot = branch_x.min(row.len().saturating_sub(1));
+            if let Some(cell) = row.get_mut(slot) {
+                *cell = if idx == 0 { '@' } else { '|' };
+            }
+        }
+        let depth_y = (root_y + 1 + idx.rem_euclid(2)).min(ground_y.saturating_sub(1));
+        if let Some(row) = rows.get_mut(depth_y) {
+            let slot = branch_x.min(row.len().saturating_sub(1));
+            if let Some(cell) = row.get_mut(slot) {
+                *cell = '.';
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 struct BallPacket {
     color_key: i64,
@@ -3050,6 +3323,23 @@ struct BallPacket {
     node_parent_id: i64,
     node_flags: i64,
     node_depth: i64,
+    scene_link_node_slot: i64,
+    scene_link_transform_slot: i64,
+    scene_link_mesh_slot: i64,
+    scene_link_material_slot: i64,
+    scene_link_light_slot: i64,
+    scene_link_layer_slot: i64,
+    instance_node_slot: i64,
+    instance_count: i64,
+    instance_stride: i64,
+    instance_phase: i64,
+    instance_material_slot: i64,
+    instance_light_slot: i64,
+    scene_graph_root_slot: i64,
+    scene_graph_node_count: i64,
+    scene_graph_link_count: i64,
+    scene_graph_instance_count: i64,
+    scene_graph_active_layer: i64,
     pass_stage: i64,
     pass_clear_mode: i64,
     pass_sample_count: i64,
@@ -3142,6 +3432,14 @@ struct BallPacket {
     commit_applied_slot: i64,
     commit_durability: i64,
     commit_commit_mode: i64,
+    snapshot_kind: i64,
+    snapshot_source_slot: i64,
+    snapshot_retention: i64,
+    snapshot_replay_mode: i64,
+    checkpoint_kind: i64,
+    checkpoint_anchor_slot: i64,
+    checkpoint_rollback_depth: i64,
+    checkpoint_resume_mode: i64,
     toggle_state: i64,
     focus_index: i64,
     progress_value: i64,
@@ -3261,6 +3559,23 @@ fn parse_ball_packet(value: &Value, op: &str) -> Result<BallPacket, String> {
                 node_parent_id: speed.round() as i64 % 4,
                 node_flags: color_key,
                 node_depth: 2,
+                scene_link_node_slot: color_key.rem_euclid(8),
+                scene_link_transform_slot: speed.round() as i64,
+                scene_link_mesh_slot: (radius_scale * 18.0).round() as i64,
+                scene_link_material_slot: color_key,
+                scene_link_light_slot: speed.round() as i64 % 3,
+                scene_link_layer_slot: 1,
+                instance_node_slot: color_key.rem_euclid(8),
+                instance_count: 3,
+                instance_stride: color_key.rem_euclid(5) + 2,
+                instance_phase: speed.round() as i64,
+                instance_material_slot: color_key,
+                instance_light_slot: speed.round() as i64 % 3,
+                scene_graph_root_slot: color_key.rem_euclid(8),
+                scene_graph_node_count: 6,
+                scene_graph_link_count: 3,
+                scene_graph_instance_count: 3,
+                scene_graph_active_layer: 1,
                 pass_stage: speed.round() as i64 % 3,
                 pass_clear_mode: color_key,
                 pass_sample_count: 4,
@@ -3353,6 +3668,14 @@ fn parse_ball_packet(value: &Value, op: &str) -> Result<BallPacket, String> {
                 commit_applied_slot: color_key.rem_euclid(6),
                 commit_durability: speed.round() as i64,
                 commit_commit_mode: color_key,
+                snapshot_kind: speed.round() as i64 % 3,
+                snapshot_source_slot: color_key.rem_euclid(6),
+                snapshot_retention: radius_scale.round() as i64 % 4,
+                snapshot_replay_mode: color_key,
+                checkpoint_kind: speed.round() as i64 % 3,
+                checkpoint_anchor_slot: color_key.rem_euclid(6),
+                checkpoint_rollback_depth: speed.round() as i64,
+                checkpoint_resume_mode: color_key,
                 toggle_state: if speed.round() as i64 % 2 == 0 { 0 } else { 1 },
                 focus_index: color_key.rem_euclid(3),
                 progress_value: speed.round() as i64,
@@ -3614,6 +3937,108 @@ fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket
         .map(|value| scalar_to_color_key(value, op))
         .transpose()?
         .unwrap_or(2);
+    let scene_link_node_slot =
+        find_packet_field(packet, &["node_slot"], &["scene_link"], &["node_slot"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(node_id);
+    let scene_link_transform_slot = find_packet_field(
+        packet,
+        &["transform_slot"],
+        &["scene_link"],
+        &["transform_slot"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(transform_translate);
+    let scene_link_mesh_slot =
+        find_packet_field(packet, &["mesh_slot"], &["scene_link"], &["mesh_slot"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(mesh_vertex_count);
+    let scene_link_material_slot = find_packet_field(
+        packet,
+        &["material_slot"],
+        &["scene_link"],
+        &["material_slot"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(material_albedo);
+    let scene_link_light_slot =
+        find_packet_field(packet, &["light_slot"], &["scene_link"], &["light_slot"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(light_kind);
+    let scene_link_layer_slot =
+        find_packet_field(packet, &["layer_slot"], &["scene_link"], &["layer_slot"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(layer_order);
+    let instance_node_slot =
+        find_packet_field(packet, &["node_slot"], &["instance"], &["node_slot"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(scene_link_node_slot);
+    let instance_count = find_packet_field(packet, &["count"], &["instance"], &["count"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(3);
+    let instance_stride = find_packet_field(packet, &["stride"], &["instance"], &["stride"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(2);
+    let instance_phase = find_packet_field(packet, &["phase"], &["instance"], &["phase"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or_else(|| scalar_to_color_key(speed, op).unwrap_or(0));
+    let instance_material_slot = find_packet_field(
+        packet,
+        &["material_slot"],
+        &["instance"],
+        &["material_slot"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(scene_link_material_slot);
+    let instance_light_slot =
+        find_packet_field(packet, &["light_slot"], &["instance"], &["light_slot"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(scene_link_light_slot);
+    let scene_graph_root_slot =
+        find_packet_field(packet, &["root_slot"], &["scene_graph"], &["root_slot"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(scene_link_node_slot);
+    let scene_graph_node_count =
+        find_packet_field(packet, &["node_count"], &["scene_graph"], &["node_count"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(6);
+    let scene_graph_link_count =
+        find_packet_field(packet, &["link_count"], &["scene_graph"], &["link_count"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(3);
+    let scene_graph_instance_count = find_packet_field(
+        packet,
+        &["instance_count"],
+        &["scene_graph"],
+        &["instance_count"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(instance_count);
+    let scene_graph_active_layer = find_packet_field(
+        packet,
+        &["active_layer"],
+        &["scene_graph"],
+        &["active_layer"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(scene_link_layer_slot);
     let pass_stage = find_packet_field(packet, &["stage"], &["pass"], &["stage"])
         .map(|value| scalar_to_color_key(value, op))
         .transpose()?
@@ -4051,6 +4476,48 @@ fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket
             .map(|value| scalar_to_color_key(value, op))
             .transpose()?
             .unwrap_or(accent);
+    let snapshot_kind = find_packet_field(packet, &["kind"], &["snapshot"], &["kind"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(contrast.rem_euclid(3));
+    let snapshot_source_slot =
+        find_packet_field(packet, &["source_slot"], &["snapshot"], &["source_slot"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(contrast);
+    let snapshot_retention =
+        find_packet_field(packet, &["retention"], &["snapshot"], &["retention"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(radius_scale.round() as i64 % 4);
+    let snapshot_replay_mode =
+        find_packet_field(packet, &["replay_mode"], &["snapshot"], &["replay_mode"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(accent);
+    let checkpoint_kind = find_packet_field(packet, &["kind"], &["checkpoint"], &["kind"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(contrast.rem_euclid(3));
+    let checkpoint_anchor_slot =
+        find_packet_field(packet, &["anchor_slot"], &["checkpoint"], &["anchor_slot"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(contrast);
+    let checkpoint_rollback_depth = find_packet_field(
+        packet,
+        &["rollback_depth"],
+        &["checkpoint"],
+        &["rollback_depth"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or_else(|| scalar_to_color_key(speed, op).unwrap_or(0));
+    let checkpoint_resume_mode =
+        find_packet_field(packet, &["resume_mode"], &["checkpoint"], &["resume_mode"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(accent);
     let color_min = find_slider_packet_field(packet, "color", "min")
         .map(|value| scalar_to_color_key(value, op))
         .transpose()?
@@ -4399,6 +4866,23 @@ fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket
         node_parent_id,
         node_flags,
         node_depth,
+        scene_link_node_slot,
+        scene_link_transform_slot,
+        scene_link_mesh_slot,
+        scene_link_material_slot,
+        scene_link_light_slot,
+        scene_link_layer_slot,
+        instance_node_slot,
+        instance_count,
+        instance_stride,
+        instance_phase,
+        instance_material_slot,
+        instance_light_slot,
+        scene_graph_root_slot,
+        scene_graph_node_count,
+        scene_graph_link_count,
+        scene_graph_instance_count,
+        scene_graph_active_layer,
         pass_stage,
         pass_clear_mode,
         pass_sample_count,
@@ -4491,6 +4975,14 @@ fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket
         commit_applied_slot,
         commit_durability,
         commit_commit_mode,
+        snapshot_kind,
+        snapshot_source_slot,
+        snapshot_retention,
+        snapshot_replay_mode,
+        checkpoint_kind,
+        checkpoint_anchor_slot,
+        checkpoint_rollback_depth,
+        checkpoint_resume_mode,
         toggle_state,
         focus_index,
         progress_value,

@@ -72,6 +72,12 @@ mod cpu Main {
       nova_transform_packet(packed_speed, panel_toggle_state, packed_radius, panel_focus_index);
     let panel_node: NovaNodePacket =
       nova_node_packet(panel_focus_index, panel_toggle_state, panel_accent, 2);
+    let panel_scene_link: NovaSceneLinkPacket =
+      nova_scene_link_packet(panel_focus_index, packed_speed, packed_radius, panel_accent, panel_toggle_state, 1);
+    let panel_instance: NovaInstancePacket =
+      nova_instance_packet(panel_focus_index, 3, color_delta + 2, frame_tick, panel_accent, panel_toggle_state);
+    let panel_scene_graph: NovaSceneGraphPacket =
+      nova_scene_graph_packet(panel_focus_index, 6 + panel_toggle_state, 3, 3, 1);
     let panel_pass: NovaPassPacket =
       nova_pass_packet(panel_toggle_state, panel_accent, 4, panel_focus_index);
     let panel_frame: NovaFramePacket =
@@ -219,6 +225,18 @@ mod cpu Main {
     let panel_mesh_vertices: i64 = nova_mesh_state_vertex_count(mesh_state);
     let panel_transform_scale: i64 = nova_transform_state_scale(transform_state);
     let panel_node_depth: i64 = nova_node_state_depth(node_state);
+    let scene_link_state: NovaSceneLinkState =
+      nova_scene_link_state(panel_scene_link);
+    let panel_scene_link_mesh: i64 =
+      nova_scene_link_state_mesh(scene_link_state);
+    let instance_state: NovaInstanceState =
+      nova_instance_state(panel_instance);
+    let panel_instance_count: i64 =
+      nova_instance_state_count(instance_state);
+    let scene_graph_state: NovaSceneGraphState =
+      nova_scene_graph_state(panel_scene_graph);
+    let panel_scene_graph_nodes: i64 =
+      nova_scene_graph_state_nodes(scene_graph_state);
     let panel_pass_samples: i64 = nova_pass_state_sample_count(pass_state);
     let panel_frame_exposure: i64 = nova_frame_state_exposure(frame_state);
     let panel_target_msaa: i64 = nova_target_state_multisample(target_state);
@@ -302,6 +320,18 @@ mod cpu Main {
       nova_commit_state(panel_commit);
     let panel_commit_applied: i64 =
       nova_commit_state_applied(commit_state);
+    let panel_snapshot: NovaSnapshotPacket =
+      nova_snapshot_packet(panel_toggle_state, panel_focus_index, radius_delta, panel_accent);
+    let snapshot_state: NovaSnapshotState =
+      nova_snapshot_state(panel_snapshot);
+    let panel_snapshot_source: i64 =
+      nova_snapshot_state_source(snapshot_state);
+    let panel_checkpoint: NovaCheckpointPacket =
+      nova_checkpoint_packet(panel_toggle_state, panel_focus_index, packed_speed, panel_accent);
+    let checkpoint_state: NovaCheckpointState =
+      nova_checkpoint_state(panel_checkpoint);
+    let panel_checkpoint_anchor: i64 =
+      nova_checkpoint_state_anchor(checkpoint_state);
     let list_selection_origin: i64 = nova_selection_state_origin(list_selection);
     let table_selection_origin: i64 = nova_selection_state_origin(table_selection);
     let tree_selection_origin: i64 = nova_selection_state_origin(tree_selection);
@@ -331,6 +361,9 @@ mod cpu Main {
       + panel_mesh_vertices
       + panel_transform_scale
       + panel_node_depth
+      + panel_scene_link_mesh
+      + panel_instance_count
+      + panel_scene_graph_nodes
       + panel_pass_samples
       + panel_frame_exposure
       + panel_target_msaa
@@ -354,6 +387,8 @@ mod cpu Main {
       + panel_outcome_final
       + panel_resolution_commit
       + panel_commit_applied
+      + panel_snapshot_source
+      + panel_checkpoint_anchor
       + list_selection_origin
       + table_selection_origin
       + tree_selection_origin
@@ -389,6 +424,9 @@ mod cpu Main {
       panel_mesh,
       panel_transform,
       panel_node,
+      panel_scene_link,
+      panel_instance,
+      panel_scene_graph,
       panel_pass,
       panel_frame,
       panel_target,
@@ -412,6 +450,8 @@ mod cpu Main {
       panel_outcome,
       panel_resolution,
       panel_commit,
+      panel_snapshot,
+      panel_checkpoint,
       panel_focus
     );
 

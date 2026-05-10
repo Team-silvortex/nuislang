@@ -1214,6 +1214,76 @@ fn lower_expr(
                 push_dep_edges(state, accent_name, &node_struct);
                 panel_group_nodes.push(node_struct.clone());
 
+                let scene_link_struct = next_name(state, "nova_panel_scene_link");
+                state.yir.nodes.push(Node {
+                    name: scene_link_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaSceneLinkPacket".to_owned(),
+                            format!("node_slot={focus_name}"),
+                            format!("transform_slot={speed_name}"),
+                            format!("mesh_slot={radius_name}"),
+                            format!("material_slot={accent_name}"),
+                            format!("light_slot={toggle_name}"),
+                            "layer_slot=1".to_owned(),
+                        ],
+                    },
+                });
+                push_dep_edges(state, focus_name, &scene_link_struct);
+                push_dep_edges(state, &speed_name, &scene_link_struct);
+                push_dep_edges(state, &radius_name, &scene_link_struct);
+                push_dep_edges(state, accent_name, &scene_link_struct);
+                push_dep_edges(state, toggle_name, &scene_link_struct);
+                panel_group_nodes.push(scene_link_struct.clone());
+
+                let instance_struct = next_name(state, "nova_panel_instance");
+                state.yir.nodes.push(Node {
+                    name: instance_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaInstancePacket".to_owned(),
+                            format!("node_slot={focus_name}"),
+                            "count=3".to_owned(),
+                            format!("stride={radius_name}"),
+                            format!("phase={speed_name}"),
+                            format!("material_slot={accent_name}"),
+                            format!("light_slot={toggle_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, focus_name, &instance_struct);
+                push_dep_edges(state, &radius_name, &instance_struct);
+                push_dep_edges(state, &speed_name, &instance_struct);
+                push_dep_edges(state, accent_name, &instance_struct);
+                push_dep_edges(state, toggle_name, &instance_struct);
+                panel_group_nodes.push(instance_struct.clone());
+
+                let scene_graph_struct = next_name(state, "nova_panel_scene_graph");
+                state.yir.nodes.push(Node {
+                    name: scene_graph_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaSceneGraphPacket".to_owned(),
+                            format!("root_slot={focus_name}"),
+                            "node_count=6".to_owned(),
+                            "link_count=3".to_owned(),
+                            "instance_count=3".to_owned(),
+                            "active_layer=1".to_owned(),
+                        ],
+                    },
+                });
+                push_dep_edges(state, focus_name, &scene_graph_struct);
+                panel_group_nodes.push(scene_graph_struct.clone());
+
                 let pass_struct = next_name(state, "nova_panel_pass");
                 state.yir.nodes.push(Node {
                     name: pass_struct.clone(),
@@ -1688,6 +1758,50 @@ fn lower_expr(
                 push_dep_edges(state, accent_name, &commit_struct);
                 panel_group_nodes.push(commit_struct.clone());
 
+                let snapshot_struct = next_name(state, "nova_panel_snapshot");
+                state.yir.nodes.push(Node {
+                    name: snapshot_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaSnapshotPacket".to_owned(),
+                            format!("kind={toggle_name}"),
+                            format!("source_slot={focus_name}"),
+                            format!("retention={radius_name}"),
+                            format!("replay_mode={accent_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &snapshot_struct);
+                push_dep_edges(state, focus_name, &snapshot_struct);
+                push_dep_edges(state, &radius_name, &snapshot_struct);
+                push_dep_edges(state, accent_name, &snapshot_struct);
+                panel_group_nodes.push(snapshot_struct.clone());
+
+                let checkpoint_struct = next_name(state, "nova_panel_checkpoint");
+                state.yir.nodes.push(Node {
+                    name: checkpoint_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaCheckpointPacket".to_owned(),
+                            format!("kind={toggle_name}"),
+                            format!("anchor_slot={focus_name}"),
+                            format!("rollback_depth={speed_name}"),
+                            format!("resume_mode={accent_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &checkpoint_struct);
+                push_dep_edges(state, focus_name, &checkpoint_struct);
+                push_dep_edges(state, &speed_name, &checkpoint_struct);
+                push_dep_edges(state, accent_name, &checkpoint_struct);
+                panel_group_nodes.push(checkpoint_struct.clone());
+
                 let focus_struct = next_name(state, "nova_panel_focus");
                 state.yir.nodes.push(Node {
                     name: focus_struct.clone(),
@@ -1731,6 +1845,9 @@ fn lower_expr(
                     format!("mesh={mesh_struct}"),
                     format!("transform={transform_struct}"),
                     format!("node={node_struct}"),
+                    format!("scene_link={scene_link_struct}"),
+                    format!("instance={instance_struct}"),
+                    format!("scene_graph={scene_graph_struct}"),
                     format!("pass={pass_struct}"),
                     format!("frame={frame_struct}"),
                     format!("target={target_struct}"),
@@ -1754,6 +1871,8 @@ fn lower_expr(
                     format!("outcome={outcome_struct}"),
                     format!("resolution={resolution_struct}"),
                     format!("commit={commit_struct}"),
+                    format!("snapshot={snapshot_struct}"),
+                    format!("checkpoint={checkpoint_struct}"),
                     format!("focus={focus_struct}"),
                 ]
             } else {

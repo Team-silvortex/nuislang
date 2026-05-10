@@ -5202,6 +5202,9 @@ mod tests {
                     let mesh: NovaMeshPacket = nova_mesh_packet(1, 12, 9, 8);
                     let transform: NovaTransformPacket = nova_transform_packet(12, 1, 9, 2);
                     let node: NovaNodePacket = nova_node_packet(2, 1, 8, 2);
+                    let scene_link: NovaSceneLinkPacket = nova_scene_link_packet(2, 12, 9, 8, 1, 1);
+                    let instance: NovaInstancePacket = nova_instance_packet(2, 3, 2, 1, 8, 1);
+                    let scene_graph: NovaSceneGraphPacket = nova_scene_graph_packet(2, 6, 3, 3, 1);
                     let pass: NovaPassPacket = nova_pass_packet(1, 8, 4, 2);
                     let frame: NovaFramePacket = nova_frame_packet(7, 1, 1, 9);
                     let target: NovaTargetPacket = nova_target_packet(1, 48, 18, 8);
@@ -5225,6 +5228,8 @@ mod tests {
                     let outcome: NovaOutcomePacket = nova_outcome_packet(1, 2, 3, 1);
                     let resolution: NovaResolutionPacket = nova_resolution_packet(1, 2, 3, 1);
                     let commit: NovaCommitPacket = nova_commit_packet(1, 2, 3, 1);
+                    let snapshot: NovaSnapshotPacket = nova_snapshot_packet(1, 2, 3, 1);
+                    let checkpoint: NovaCheckpointPacket = nova_checkpoint_packet(1, 2, 3, 1);
                     let focus: NovaFocusPacket = nova_focus_packet(2);
                     let packet: NovaPanelPacket = nova_panel_from_parts(
                         header,
@@ -5251,11 +5256,14 @@ mod tests {
                         scene,
                         camera,
                         material,
-                        light,
-                        mesh,
-                        transform,
-                        node,
-                        pass,
+                      light,
+                      mesh,
+                      transform,
+                      node,
+                      scene_link,
+                      instance,
+                      scene_graph,
+                      pass,
                         frame,
                         target,
                         frame_graph,
@@ -5278,6 +5286,8 @@ mod tests {
                       outcome,
                       resolution,
                       commit,
+                      snapshot,
+                      checkpoint,
                       focus
                     );
                   }
