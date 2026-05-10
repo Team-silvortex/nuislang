@@ -1063,6 +1063,338 @@ fn lower_expr(
                 push_dep_edges(state, &radius_name, &layer_struct);
                 panel_group_nodes.push(layer_struct.clone());
 
+                let scene_struct = next_name(state, "nova_panel_scene");
+                state.yir.nodes.push(Node {
+                    name: scene_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaScenePacket".to_owned(),
+                            "root_count=7".to_owned(),
+                            format!("active_camera={focus_name}"),
+                            "light_count=3".to_owned(),
+                            format!("animation_phase={toggle_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, focus_name, &scene_struct);
+                push_dep_edges(state, toggle_name, &scene_struct);
+                panel_group_nodes.push(scene_struct.clone());
+
+                let camera_struct = next_name(state, "nova_panel_camera");
+                state.yir.nodes.push(Node {
+                    name: camera_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaCameraPacket".to_owned(),
+                            format!("kind={toggle_name}"),
+                            format!("focus={focus_name}"),
+                            format!("zoom={speed_name}"),
+                            format!("orbit={radius_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &camera_struct);
+                push_dep_edges(state, focus_name, &camera_struct);
+                push_dep_edges(state, &speed_name, &camera_struct);
+                push_dep_edges(state, &radius_name, &camera_struct);
+                panel_group_nodes.push(camera_struct.clone());
+
+                let material_struct = next_name(state, "nova_panel_material");
+                state.yir.nodes.push(Node {
+                    name: material_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaMaterialPacket".to_owned(),
+                            format!("shader_kind={toggle_name}"),
+                            format!("albedo={accent_name}"),
+                            format!("roughness={speed_name}"),
+                            format!("emissive={radius_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &material_struct);
+                push_dep_edges(state, accent_name, &material_struct);
+                push_dep_edges(state, &speed_name, &material_struct);
+                push_dep_edges(state, &radius_name, &material_struct);
+                panel_group_nodes.push(material_struct.clone());
+
+                let light_struct = next_name(state, "nova_panel_light");
+                state.yir.nodes.push(Node {
+                    name: light_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaLightPacket".to_owned(),
+                            format!("kind={toggle_name}"),
+                            format!("intensity={speed_name}"),
+                            format!("range={radius_name}"),
+                            format!("reactive={accent_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &light_struct);
+                push_dep_edges(state, &speed_name, &light_struct);
+                push_dep_edges(state, &radius_name, &light_struct);
+                push_dep_edges(state, accent_name, &light_struct);
+                panel_group_nodes.push(light_struct.clone());
+
+                let mesh_struct = next_name(state, "nova_panel_mesh");
+                state.yir.nodes.push(Node {
+                    name: mesh_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaMeshPacket".to_owned(),
+                            format!("primitive={toggle_name}"),
+                            format!("vertex_count={speed_name}"),
+                            format!("index_count={radius_name}"),
+                            format!("skinning={accent_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &mesh_struct);
+                push_dep_edges(state, &speed_name, &mesh_struct);
+                push_dep_edges(state, &radius_name, &mesh_struct);
+                push_dep_edges(state, accent_name, &mesh_struct);
+                panel_group_nodes.push(mesh_struct.clone());
+
+                let transform_struct = next_name(state, "nova_panel_transform");
+                state.yir.nodes.push(Node {
+                    name: transform_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaTransformPacket".to_owned(),
+                            format!("translate={speed_name}"),
+                            format!("rotate={toggle_name}"),
+                            format!("scale={radius_name}"),
+                            format!("pivot={focus_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, &speed_name, &transform_struct);
+                push_dep_edges(state, toggle_name, &transform_struct);
+                push_dep_edges(state, &radius_name, &transform_struct);
+                push_dep_edges(state, focus_name, &transform_struct);
+                panel_group_nodes.push(transform_struct.clone());
+
+                let node_struct = next_name(state, "nova_panel_node");
+                state.yir.nodes.push(Node {
+                    name: node_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaNodePacket".to_owned(),
+                            format!("node_id={focus_name}"),
+                            format!("parent_id={toggle_name}"),
+                            format!("flags={accent_name}"),
+                            "depth=2".to_owned(),
+                        ],
+                    },
+                });
+                push_dep_edges(state, focus_name, &node_struct);
+                push_dep_edges(state, toggle_name, &node_struct);
+                push_dep_edges(state, accent_name, &node_struct);
+                panel_group_nodes.push(node_struct.clone());
+
+                let pass_struct = next_name(state, "nova_panel_pass");
+                state.yir.nodes.push(Node {
+                    name: pass_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaPassPacket".to_owned(),
+                            format!("stage={toggle_name}"),
+                            format!("clear_mode={accent_name}"),
+                            "sample_count=4".to_owned(),
+                            format!("debug_view={focus_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &pass_struct);
+                push_dep_edges(state, accent_name, &pass_struct);
+                push_dep_edges(state, focus_name, &pass_struct);
+                panel_group_nodes.push(pass_struct.clone());
+
+                let frame_struct = next_name(state, "nova_panel_frame");
+                state.yir.nodes.push(Node {
+                    name: frame_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaFramePacket".to_owned(),
+                            format!("frame_index={speed_name}"),
+                            format!("present_mode={toggle_name}"),
+                            "sync_interval=1".to_owned(),
+                            format!("exposure={radius_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, &speed_name, &frame_struct);
+                push_dep_edges(state, toggle_name, &frame_struct);
+                push_dep_edges(state, &radius_name, &frame_struct);
+                panel_group_nodes.push(frame_struct.clone());
+
+                let target_struct = next_name(state, "nova_panel_target");
+                state.yir.nodes.push(Node {
+                    name: target_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaTargetPacket".to_owned(),
+                            format!("kind={toggle_name}"),
+                            "width=48".to_owned(),
+                            "height=18".to_owned(),
+                            format!("multisample={accent_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &target_struct);
+                push_dep_edges(state, accent_name, &target_struct);
+                panel_group_nodes.push(target_struct.clone());
+
+                let frame_graph_struct = next_name(state, "nova_panel_frame_graph");
+                state.yir.nodes.push(Node {
+                    name: frame_graph_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaFrameGraphPacket".to_owned(),
+                            "passes=2".to_owned(),
+                            "targets=1".to_owned(),
+                            format!("present_stage={toggle_name}"),
+                            format!("debug_overlay={focus_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &frame_graph_struct);
+                push_dep_edges(state, focus_name, &frame_graph_struct);
+                panel_group_nodes.push(frame_graph_struct.clone());
+
+                let attachment_struct = next_name(state, "nova_panel_attachment");
+                state.yir.nodes.push(Node {
+                    name: attachment_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaAttachmentPacket".to_owned(),
+                            "slot=0".to_owned(),
+                            format!("format_kind={accent_name}"),
+                            format!("load_op={toggle_name}"),
+                            "store_op=1".to_owned(),
+                        ],
+                    },
+                });
+                push_dep_edges(state, accent_name, &attachment_struct);
+                push_dep_edges(state, toggle_name, &attachment_struct);
+                panel_group_nodes.push(attachment_struct.clone());
+
+                let pass_chain_struct = next_name(state, "nova_panel_pass_chain");
+                state.yir.nodes.push(Node {
+                    name: pass_chain_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaPassChainPacket".to_owned(),
+                            "stages=2".to_owned(),
+                            "fanout=1".to_owned(),
+                            format!("resolve_stage={toggle_name}"),
+                            format!("barrier_mode={accent_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &pass_chain_struct);
+                push_dep_edges(state, accent_name, &pass_chain_struct);
+                panel_group_nodes.push(pass_chain_struct.clone());
+
+                let barrier_struct = next_name(state, "nova_panel_barrier");
+                state.yir.nodes.push(Node {
+                    name: barrier_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaBarrierPacket".to_owned(),
+                            "scope=1".to_owned(),
+                            format!("source_stage={toggle_name}"),
+                            "target_stage=2".to_owned(),
+                            format!("flush_mode={accent_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &barrier_struct);
+                push_dep_edges(state, accent_name, &barrier_struct);
+                panel_group_nodes.push(barrier_struct.clone());
+
+                let resource_set_struct = next_name(state, "nova_panel_resource_set");
+                state.yir.nodes.push(Node {
+                    name: resource_set_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaResourceSetPacket".to_owned(),
+                            "buffers=2".to_owned(),
+                            "textures=1".to_owned(),
+                            "samplers=1".to_owned(),
+                            format!("residency={accent_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, accent_name, &resource_set_struct);
+                panel_group_nodes.push(resource_set_struct.clone());
+
+                let schedule_struct = next_name(state, "nova_panel_schedule");
+                state.yir.nodes.push(Node {
+                    name: schedule_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaSchedulePacket".to_owned(),
+                            "lanes=2".to_owned(),
+                            "queue_depth=4".to_owned(),
+                            format!("async_budget={radius_name}"),
+                            format!("tick_mode={toggle_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, &radius_name, &schedule_struct);
+                push_dep_edges(state, toggle_name, &schedule_struct);
+                panel_group_nodes.push(schedule_struct.clone());
+
                 let focus_struct = next_name(state, "nova_panel_focus");
                 state.yir.nodes.push(Node {
                     name: focus_struct.clone(),
@@ -1099,6 +1431,22 @@ fn lower_expr(
                     format!("surface={surface_struct}"),
                     format!("viewport={viewport_struct}"),
                     format!("layer={layer_struct}"),
+                    format!("scene={scene_struct}"),
+                    format!("camera={camera_struct}"),
+                    format!("material={material_struct}"),
+                    format!("light={light_struct}"),
+                    format!("mesh={mesh_struct}"),
+                    format!("transform={transform_struct}"),
+                    format!("node={node_struct}"),
+                    format!("pass={pass_struct}"),
+                    format!("frame={frame_struct}"),
+                    format!("target={target_struct}"),
+                    format!("frame_graph={frame_graph_struct}"),
+                    format!("attachment={attachment_struct}"),
+                    format!("pass_chain={pass_chain_struct}"),
+                    format!("barrier={barrier_struct}"),
+                    format!("resource_set={resource_set_struct}"),
+                    format!("schedule={schedule_struct}"),
                     format!("focus={focus_struct}"),
                 ]
             } else {
@@ -2589,24 +2937,28 @@ fn push_dep_edges(state: &mut LoweringState<'_>, from: &str, to: &str) {
             return;
         }
     }
-    state.yir.edges.push(Edge {
-        kind: EdgeKind::Dep,
-        from: from.to_owned(),
-        to: to.to_owned(),
-    });
+    push_unique_edge(state, EdgeKind::Dep, from, to);
 }
 
 fn push_xfer_edge(state: &mut LoweringState<'_>, from: &str, to: &str) {
-    state.yir.edges.push(Edge {
-        kind: EdgeKind::CrossDomainExchange,
-        from: from.to_owned(),
-        to: to.to_owned(),
-    });
+    push_unique_edge(state, EdgeKind::CrossDomainExchange, from, to);
 }
 
 fn push_lifetime_edge(state: &mut LoweringState<'_>, from: &str, to: &str) {
+    push_unique_edge(state, EdgeKind::Lifetime, from, to);
+}
+
+fn push_unique_edge(state: &mut LoweringState<'_>, kind: EdgeKind, from: &str, to: &str) {
+    let exists = state
+        .yir
+        .edges
+        .iter()
+        .any(|edge| edge.kind == kind && edge.from == from && edge.to == to);
+    if exists {
+        return;
+    }
     state.yir.edges.push(Edge {
-        kind: EdgeKind::Lifetime,
+        kind,
         from: from.to_owned(),
         to: to.to_owned(),
     });

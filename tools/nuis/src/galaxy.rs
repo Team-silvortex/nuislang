@@ -286,7 +286,10 @@ pub fn check(input: &Path) -> Result<CheckedGalaxy, String> {
             for (field, value) in [
                 ("render_owner_unit", profile.render_owner_unit.as_deref()),
                 ("render_bridge_unit", profile.render_bridge_unit.as_deref()),
-                ("render_surface_unit", profile.render_surface_unit.as_deref()),
+                (
+                    "render_surface_unit",
+                    profile.render_surface_unit.as_deref(),
+                ),
             ] {
                 if value.is_none() {
                     return Err(format!(

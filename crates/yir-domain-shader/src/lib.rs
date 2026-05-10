@@ -1592,6 +1592,222 @@ fn draw_control_panel_surface(
             packet.surface_density, packet.surface_elevation, packet.surface_grid
         ),
     );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 6,
+        &format!(
+            "scene r{} l{} a{}",
+            packet.scene_root_count, packet.scene_light_count, packet.scene_animation_phase
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 7,
+        &format!(
+            "cam k{} f{} z{}",
+            packet.camera_kind, packet.camera_focus, packet.camera_zoom
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 8,
+        &format!(
+            "mat s{} r{} e{}",
+            packet.material_shader_kind, packet.material_roughness, packet.material_emissive
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 9,
+        &format!(
+            "lit k{} i{} r{}",
+            packet.light_kind, packet.light_intensity, packet.light_range
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 10,
+        &format!(
+            "mesh p{} v{} i{}",
+            packet.mesh_primitive, packet.mesh_vertex_count, packet.mesh_index_count
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 11,
+        &format!("skin {:>3}", packet.mesh_skinning),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 12,
+        &format!(
+            "xform t{} r{} s{}",
+            packet.transform_translate, packet.transform_rotate, packet.transform_scale
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 13,
+        &format!("pivot {:>3}", packet.transform_pivot),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 14,
+        &format!(
+            "node {}<-{} d{}",
+            packet.node_id, packet.node_parent_id, packet.node_depth
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 15,
+        &format!("flags {:>3}", packet.node_flags),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 16,
+        &format!(
+            "pass s{} c{} x{}",
+            packet.pass_stage, packet.pass_clear_mode, packet.pass_sample_count
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 17,
+        &format!("dbg {:>3}", packet.pass_debug_view),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 18,
+        &format!(
+            "frm {:>3} pm{} v{}",
+            packet.frame_index, packet.frame_present_mode, packet.frame_sync_interval
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 19,
+        &format!("exp {:>3}", packet.frame_exposure),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 20,
+        &format!(
+            "tgt k{} {:>2}x{:>2}",
+            packet.target_kind, packet.target_width, packet.target_height
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 21,
+        &format!("msaa {:>2}", packet.target_multisample),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 22,
+        &format!(
+            "fg p{} t{} ps{}",
+            packet.frame_graph_passes, packet.frame_graph_targets, packet.frame_graph_present_stage
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 23,
+        &format!("ovr {:>3}", packet.frame_graph_debug_overlay),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 24,
+        &format!(
+            "att {} f{} l{} s{}",
+            packet.attachment_slot,
+            packet.attachment_format_kind,
+            packet.attachment_load_op,
+            packet.attachment_store_op
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 25,
+        &format!(
+            "pch s{} f{} r{}",
+            packet.pass_chain_stages, packet.pass_chain_fanout, packet.pass_chain_resolve_stage
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 26,
+        &format!("bar {:>3}", packet.pass_chain_barrier_mode),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 27,
+        &format!(
+            "sync {} {}>{}",
+            packet.barrier_scope, packet.barrier_source_stage, packet.barrier_target_stage
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 28,
+        &format!("flush {:>2}", packet.barrier_flush_mode),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 29,
+        &format!(
+            "rs b{} t{} s{}",
+            packet.resource_buffers, packet.resource_textures, packet.resource_samplers
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 30,
+        &format!("res {:>3}", packet.resource_residency),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 31,
+        &format!(
+            "sch l{} q{}",
+            packet.schedule_lanes, packet.schedule_queue_depth
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 32,
+        &format!(
+            "ab {:>3} tm{}",
+            packet.schedule_async_budget, packet.schedule_tick_mode
+        ),
+    );
     if layer_hidden {
         put_text(
             &mut rows,
@@ -1688,6 +1904,31 @@ fn draw_control_panel_surface(
             put_text(&mut rows, slider_right + 7, y, "off");
         }
     }
+
+    put_text(
+        &mut rows,
+        panel_left + 4,
+        panel_top + 12,
+        &format!(
+            "camera orbit {:>3}  albedo {:>3}",
+            packet.camera_orbit, packet.material_albedo
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_left + 4,
+        panel_top + 13,
+        &format!(
+            "scene roots {:>2}  active {:>2}",
+            packet.scene_root_count, packet.scene_active_camera
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_left + 4,
+        panel_top + 14,
+        &format!("light reactive {:>3}", packet.light_reactive),
+    );
 
     let progress_y = panel_top + 17;
     put_text(
@@ -2568,6 +2809,70 @@ struct BallPacket {
     layer_blend: i64,
     layer_visibility: i64,
     layer_clip: i64,
+    scene_root_count: i64,
+    scene_active_camera: i64,
+    scene_light_count: i64,
+    scene_animation_phase: i64,
+    camera_kind: i64,
+    camera_focus: i64,
+    camera_zoom: i64,
+    camera_orbit: i64,
+    material_shader_kind: i64,
+    material_albedo: i64,
+    material_roughness: i64,
+    material_emissive: i64,
+    light_kind: i64,
+    light_intensity: i64,
+    light_range: i64,
+    light_reactive: i64,
+    mesh_primitive: i64,
+    mesh_vertex_count: i64,
+    mesh_index_count: i64,
+    mesh_skinning: i64,
+    transform_translate: i64,
+    transform_rotate: i64,
+    transform_scale: i64,
+    transform_pivot: i64,
+    node_id: i64,
+    node_parent_id: i64,
+    node_flags: i64,
+    node_depth: i64,
+    pass_stage: i64,
+    pass_clear_mode: i64,
+    pass_sample_count: i64,
+    pass_debug_view: i64,
+    frame_index: i64,
+    frame_present_mode: i64,
+    frame_sync_interval: i64,
+    frame_exposure: i64,
+    target_kind: i64,
+    target_width: i64,
+    target_height: i64,
+    target_multisample: i64,
+    frame_graph_passes: i64,
+    frame_graph_targets: i64,
+    frame_graph_present_stage: i64,
+    frame_graph_debug_overlay: i64,
+    attachment_slot: i64,
+    attachment_format_kind: i64,
+    attachment_load_op: i64,
+    attachment_store_op: i64,
+    pass_chain_stages: i64,
+    pass_chain_fanout: i64,
+    pass_chain_resolve_stage: i64,
+    pass_chain_barrier_mode: i64,
+    barrier_scope: i64,
+    barrier_source_stage: i64,
+    barrier_target_stage: i64,
+    barrier_flush_mode: i64,
+    resource_buffers: i64,
+    resource_textures: i64,
+    resource_samplers: i64,
+    resource_residency: i64,
+    schedule_lanes: i64,
+    schedule_queue_depth: i64,
+    schedule_async_budget: i64,
+    schedule_tick_mode: i64,
     toggle_state: i64,
     focus_index: i64,
     progress_value: i64,
@@ -2659,6 +2964,70 @@ fn parse_ball_packet(value: &Value, op: &str) -> Result<BallPacket, String> {
                 layer_blend: speed.round() as i64 % 3,
                 layer_visibility: 1,
                 layer_clip: (radius_scale * 8.0).round() as i64,
+                scene_root_count: 7,
+                scene_active_camera: color_key.rem_euclid(3),
+                scene_light_count: 3,
+                scene_animation_phase: speed.round() as i64 % 4,
+                camera_kind: speed.round() as i64 % 3,
+                camera_focus: color_key.rem_euclid(6),
+                camera_zoom: speed.round() as i64,
+                camera_orbit: (radius_scale * 12.0).round() as i64,
+                material_shader_kind: speed.round() as i64 % 3,
+                material_albedo: color_key,
+                material_roughness: speed.round() as i64,
+                material_emissive: (radius_scale * 24.0).round() as i64,
+                light_kind: speed.round() as i64 % 3,
+                light_intensity: speed.round() as i64,
+                light_range: (radius_scale * 18.0).round() as i64,
+                light_reactive: color_key,
+                mesh_primitive: speed.round() as i64 % 3,
+                mesh_vertex_count: (speed.round() as i64).max(3),
+                mesh_index_count: (radius_scale * 18.0).round() as i64,
+                mesh_skinning: color_key,
+                transform_translate: speed.round() as i64,
+                transform_rotate: speed.round() as i64 % 4,
+                transform_scale: (radius_scale * 16.0).round() as i64,
+                transform_pivot: color_key.rem_euclid(6),
+                node_id: color_key.rem_euclid(8),
+                node_parent_id: speed.round() as i64 % 4,
+                node_flags: color_key,
+                node_depth: 2,
+                pass_stage: speed.round() as i64 % 3,
+                pass_clear_mode: color_key,
+                pass_sample_count: 4,
+                pass_debug_view: color_key.rem_euclid(6),
+                frame_index: speed.round() as i64,
+                frame_present_mode: color_key.rem_euclid(3),
+                frame_sync_interval: 1,
+                frame_exposure: (radius_scale * 24.0).round() as i64,
+                target_kind: color_key.rem_euclid(3),
+                target_width: 48,
+                target_height: 18,
+                target_multisample: color_key,
+                frame_graph_passes: 2,
+                frame_graph_targets: 1,
+                frame_graph_present_stage: speed.round() as i64 % 3,
+                frame_graph_debug_overlay: color_key.rem_euclid(6),
+                attachment_slot: 0,
+                attachment_format_kind: color_key,
+                attachment_load_op: speed.round() as i64 % 3,
+                attachment_store_op: 1,
+                pass_chain_stages: 2,
+                pass_chain_fanout: 1,
+                pass_chain_resolve_stage: speed.round() as i64 % 3,
+                pass_chain_barrier_mode: color_key,
+                barrier_scope: 1,
+                barrier_source_stage: speed.round() as i64 % 3,
+                barrier_target_stage: 2,
+                barrier_flush_mode: color_key,
+                resource_buffers: 2,
+                resource_textures: 1,
+                resource_samplers: 1,
+                resource_residency: color_key,
+                schedule_lanes: 2,
+                schedule_queue_depth: 4,
+                schedule_async_budget: (radius_scale * 24.0).round() as i64,
+                schedule_tick_mode: speed.round() as i64 % 3,
                 toggle_state: if speed.round() as i64 % 2 == 0 { 0 } else { 1 },
                 focus_index: color_key.rem_euclid(3),
                 progress_value: speed.round() as i64,
@@ -2797,6 +3166,309 @@ fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket
         .map(|value| scalar_to_color_key(value, op))
         .transpose()?
         .unwrap_or((radius_scale * 8.0).round() as i64);
+    let scene_root_count = find_packet_field(packet, &["root_count"], &["scene"], &["root_count"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(7);
+    let scene_active_camera =
+        find_packet_field(packet, &["active_camera"], &["scene"], &["active_camera"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(accent.rem_euclid(6));
+    let scene_light_count =
+        find_packet_field(packet, &["light_count"], &["scene"], &["light_count"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(3);
+    let scene_animation_phase = find_packet_field(
+        packet,
+        &["animation_phase"],
+        &["scene"],
+        &["animation_phase"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(contrast.rem_euclid(4));
+    let camera_kind = find_packet_field(packet, &["kind"], &["camera"], &["kind"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(contrast.rem_euclid(3));
+    let camera_focus = find_packet_field(packet, &["camera_focus"], &["camera"], &["focus"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(accent.rem_euclid(6));
+    let camera_zoom = find_packet_field(packet, &["zoom"], &["camera"], &["zoom"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or_else(|| scalar_to_color_key(speed, op).unwrap_or(0));
+    let camera_orbit = find_packet_field(packet, &["orbit"], &["camera"], &["orbit"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or((radius_scale * 12.0).round() as i64);
+    let material_shader_kind =
+        find_packet_field(packet, &["shader_kind"], &["material"], &["shader_kind"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(contrast.rem_euclid(3));
+    let material_albedo = find_packet_field(packet, &["albedo"], &["material"], &["albedo"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(accent);
+    let material_roughness =
+        find_packet_field(packet, &["roughness"], &["material"], &["roughness"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or_else(|| scalar_to_color_key(speed, op).unwrap_or(0));
+    let material_emissive = find_packet_field(packet, &["emissive"], &["material"], &["emissive"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or((radius_scale * 24.0).round() as i64);
+    let light_kind = find_packet_field(packet, &["kind"], &["light"], &["kind"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(contrast.rem_euclid(3));
+    let light_intensity = find_packet_field(packet, &["intensity"], &["light"], &["intensity"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or_else(|| scalar_to_color_key(speed, op).unwrap_or(0));
+    let light_range = find_packet_field(packet, &["range"], &["light"], &["range"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or((radius_scale * 18.0).round() as i64);
+    let light_reactive = find_packet_field(packet, &["reactive"], &["light"], &["reactive"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(accent);
+    let mesh_primitive = find_packet_field(packet, &["primitive"], &["mesh"], &["primitive"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(contrast.rem_euclid(3));
+    let mesh_vertex_count =
+        find_packet_field(packet, &["vertex_count"], &["mesh"], &["vertex_count"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or_else(|| scalar_to_color_key(speed, op).unwrap_or(3));
+    let mesh_index_count = find_packet_field(packet, &["index_count"], &["mesh"], &["index_count"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or((radius_scale * 18.0).round() as i64);
+    let mesh_skinning = find_packet_field(packet, &["skinning"], &["mesh"], &["skinning"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(accent);
+    let transform_translate =
+        find_packet_field(packet, &["translate"], &["transform"], &["translate"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or_else(|| scalar_to_color_key(speed, op).unwrap_or(0));
+    let transform_rotate = find_packet_field(packet, &["rotate"], &["transform"], &["rotate"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(contrast.rem_euclid(4));
+    let transform_scale = find_packet_field(packet, &["scale"], &["transform"], &["scale"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or((radius_scale * 16.0).round() as i64);
+    let transform_pivot = find_packet_field(packet, &["pivot"], &["transform"], &["pivot"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(accent.rem_euclid(6));
+    let node_id = find_packet_field(packet, &["node_id"], &["node"], &["node_id"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(accent.rem_euclid(8));
+    let node_parent_id = find_packet_field(packet, &["parent_id"], &["node"], &["parent_id"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(contrast.rem_euclid(4));
+    let node_flags = find_packet_field(packet, &["flags"], &["node"], &["flags"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(accent);
+    let node_depth = find_packet_field(packet, &["depth"], &["node"], &["depth"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(2);
+    let pass_stage = find_packet_field(packet, &["stage"], &["pass"], &["stage"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(contrast.rem_euclid(3));
+    let pass_clear_mode = find_packet_field(packet, &["clear_mode"], &["pass"], &["clear_mode"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(accent);
+    let pass_sample_count =
+        find_packet_field(packet, &["sample_count"], &["pass"], &["sample_count"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(4);
+    let pass_debug_view = find_packet_field(packet, &["debug_view"], &["pass"], &["debug_view"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(accent.rem_euclid(6));
+    let frame_index = find_packet_field(packet, &["frame_index"], &["frame"], &["frame_index"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or_else(|| scalar_to_color_key(speed, op).unwrap_or(0));
+    let frame_present_mode =
+        find_packet_field(packet, &["present_mode"], &["frame"], &["present_mode"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(accent.rem_euclid(3));
+    let frame_sync_interval =
+        find_packet_field(packet, &["sync_interval"], &["frame"], &["sync_interval"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(1);
+    let frame_exposure = find_packet_field(packet, &["exposure"], &["frame"], &["exposure"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or((radius_scale * 24.0).round() as i64);
+    let target_kind = find_packet_field(packet, &["kind"], &["target"], &["kind"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(accent.rem_euclid(3));
+    let target_width = find_packet_field(packet, &["width"], &["target"], &["width"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(48);
+    let target_height = find_packet_field(packet, &["height"], &["target"], &["height"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(18);
+    let target_multisample =
+        find_packet_field(packet, &["multisample"], &["target"], &["multisample"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(accent);
+    let frame_graph_passes = find_packet_field(packet, &["passes"], &["frame_graph"], &["passes"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(2);
+    let frame_graph_targets =
+        find_packet_field(packet, &["targets"], &["frame_graph"], &["targets"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(1);
+    let frame_graph_present_stage = find_packet_field(
+        packet,
+        &["present_stage"],
+        &["frame_graph"],
+        &["present_stage"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(contrast.rem_euclid(3));
+    let frame_graph_debug_overlay = find_packet_field(
+        packet,
+        &["debug_overlay"],
+        &["frame_graph"],
+        &["debug_overlay"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(accent.rem_euclid(6));
+    let attachment_slot = find_packet_field(packet, &["slot"], &["attachment"], &["slot"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(0);
+    let attachment_format_kind =
+        find_packet_field(packet, &["format_kind"], &["attachment"], &["format_kind"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(accent);
+    let attachment_load_op = find_packet_field(packet, &["load_op"], &["attachment"], &["load_op"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(contrast.rem_euclid(3));
+    let attachment_store_op =
+        find_packet_field(packet, &["store_op"], &["attachment"], &["store_op"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(1);
+    let pass_chain_stages = find_packet_field(packet, &["stages"], &["pass_chain"], &["stages"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(2);
+    let pass_chain_fanout = find_packet_field(packet, &["fanout"], &["pass_chain"], &["fanout"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(1);
+    let pass_chain_resolve_stage = find_packet_field(
+        packet,
+        &["resolve_stage"],
+        &["pass_chain"],
+        &["resolve_stage"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(contrast.rem_euclid(3));
+    let pass_chain_barrier_mode = find_packet_field(
+        packet,
+        &["barrier_mode"],
+        &["pass_chain"],
+        &["barrier_mode"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(accent);
+    let barrier_scope = find_packet_field(packet, &["scope"], &["barrier"], &["scope"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(1);
+    let barrier_source_stage =
+        find_packet_field(packet, &["source_stage"], &["barrier"], &["source_stage"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(contrast.rem_euclid(3));
+    let barrier_target_stage =
+        find_packet_field(packet, &["target_stage"], &["barrier"], &["target_stage"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(2);
+    let barrier_flush_mode =
+        find_packet_field(packet, &["flush_mode"], &["barrier"], &["flush_mode"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(accent);
+    let resource_buffers = find_packet_field(packet, &["buffers"], &["resource_set"], &["buffers"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(2);
+    let resource_textures =
+        find_packet_field(packet, &["textures"], &["resource_set"], &["textures"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(1);
+    let resource_samplers =
+        find_packet_field(packet, &["samplers"], &["resource_set"], &["samplers"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(1);
+    let resource_residency =
+        find_packet_field(packet, &["residency"], &["resource_set"], &["residency"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(accent);
+    let schedule_lanes = find_packet_field(packet, &["lanes"], &["schedule"], &["lanes"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(2);
+    let schedule_queue_depth =
+        find_packet_field(packet, &["queue_depth"], &["schedule"], &["queue_depth"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(4);
+    let schedule_async_budget =
+        find_packet_field(packet, &["async_budget"], &["schedule"], &["async_budget"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or((radius_scale * 24.0).round() as i64);
+    let schedule_tick_mode =
+        find_packet_field(packet, &["tick_mode"], &["schedule"], &["tick_mode"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(contrast.rem_euclid(3));
     let color_min = find_slider_packet_field(packet, "color", "min")
         .map(|value| scalar_to_color_key(value, op))
         .transpose()?
@@ -3117,6 +3789,70 @@ fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket
         layer_blend,
         layer_visibility,
         layer_clip,
+        scene_root_count,
+        scene_active_camera,
+        scene_light_count,
+        scene_animation_phase,
+        camera_kind,
+        camera_focus,
+        camera_zoom,
+        camera_orbit,
+        material_shader_kind,
+        material_albedo,
+        material_roughness,
+        material_emissive,
+        light_kind,
+        light_intensity,
+        light_range,
+        light_reactive,
+        mesh_primitive,
+        mesh_vertex_count,
+        mesh_index_count,
+        mesh_skinning,
+        transform_translate,
+        transform_rotate,
+        transform_scale,
+        transform_pivot,
+        node_id,
+        node_parent_id,
+        node_flags,
+        node_depth,
+        pass_stage,
+        pass_clear_mode,
+        pass_sample_count,
+        pass_debug_view,
+        frame_index,
+        frame_present_mode,
+        frame_sync_interval,
+        frame_exposure,
+        target_kind,
+        target_width,
+        target_height,
+        target_multisample,
+        frame_graph_passes,
+        frame_graph_targets,
+        frame_graph_present_stage,
+        frame_graph_debug_overlay,
+        attachment_slot,
+        attachment_format_kind,
+        attachment_load_op,
+        attachment_store_op,
+        pass_chain_stages,
+        pass_chain_fanout,
+        pass_chain_resolve_stage,
+        pass_chain_barrier_mode,
+        barrier_scope,
+        barrier_source_stage,
+        barrier_target_stage,
+        barrier_flush_mode,
+        resource_buffers,
+        resource_textures,
+        resource_samplers,
+        resource_residency,
+        schedule_lanes,
+        schedule_queue_depth,
+        schedule_async_budget,
+        schedule_tick_mode,
         toggle_state,
         focus_index,
         progress_value,

@@ -2405,6 +2405,778 @@ fn lower_call_expr_with_async(
                 ],
             })
         }
+        "nova_scene_packet" => {
+            let (root_count, active_camera, light_count, animation_phase) = match args {
+                [root_count, active_camera, light_count, animation_phase] => {
+                    (root_count, active_camera, light_count, animation_phase)
+                }
+                _ => return Err("nova_scene_packet(...) expects 4 args".to_owned()),
+            };
+            let root_count = lower_expr(
+                root_count,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let active_camera = lower_expr(
+                active_camera,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let light_count = lower_expr(
+                light_count,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let animation_phase = lower_expr(
+                animation_phase,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaScenePacket".to_owned(),
+                fields: vec![
+                    ("root_count".to_owned(), root_count),
+                    ("active_camera".to_owned(), active_camera),
+                    ("light_count".to_owned(), light_count),
+                    ("animation_phase".to_owned(), animation_phase),
+                ],
+            })
+        }
+        "nova_camera_packet" => {
+            let (kind, focus, zoom, orbit) = match args {
+                [kind, focus, zoom, orbit] => (kind, focus, zoom, orbit),
+                _ => return Err("nova_camera_packet(...) expects 4 args".to_owned()),
+            };
+            let kind = lower_expr(
+                kind,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let focus = lower_expr(
+                focus,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let zoom = lower_expr(
+                zoom,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let orbit = lower_expr(
+                orbit,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaCameraPacket".to_owned(),
+                fields: vec![
+                    ("kind".to_owned(), kind),
+                    ("focus".to_owned(), focus),
+                    ("zoom".to_owned(), zoom),
+                    ("orbit".to_owned(), orbit),
+                ],
+            })
+        }
+        "nova_material_packet" => {
+            let (shader_kind, albedo, roughness, emissive) = match args {
+                [shader_kind, albedo, roughness, emissive] => {
+                    (shader_kind, albedo, roughness, emissive)
+                }
+                _ => return Err("nova_material_packet(...) expects 4 args".to_owned()),
+            };
+            let shader_kind = lower_expr(
+                shader_kind,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let albedo = lower_expr(
+                albedo,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let roughness = lower_expr(
+                roughness,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let emissive = lower_expr(
+                emissive,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaMaterialPacket".to_owned(),
+                fields: vec![
+                    ("shader_kind".to_owned(), shader_kind),
+                    ("albedo".to_owned(), albedo),
+                    ("roughness".to_owned(), roughness),
+                    ("emissive".to_owned(), emissive),
+                ],
+            })
+        }
+        "nova_light_packet" => {
+            let (kind, intensity, range, reactive) = match args {
+                [kind, intensity, range, reactive] => (kind, intensity, range, reactive),
+                _ => return Err("nova_light_packet(...) expects 4 args".to_owned()),
+            };
+            let kind = lower_expr(
+                kind,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let intensity = lower_expr(
+                intensity,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let range = lower_expr(
+                range,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let reactive = lower_expr(
+                reactive,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaLightPacket".to_owned(),
+                fields: vec![
+                    ("kind".to_owned(), kind),
+                    ("intensity".to_owned(), intensity),
+                    ("range".to_owned(), range),
+                    ("reactive".to_owned(), reactive),
+                ],
+            })
+        }
+        "nova_mesh_packet" => {
+            let (primitive, vertex_count, index_count, skinning) = match args {
+                [primitive, vertex_count, index_count, skinning] => {
+                    (primitive, vertex_count, index_count, skinning)
+                }
+                _ => return Err("nova_mesh_packet(...) expects 4 args".to_owned()),
+            };
+            let primitive = lower_expr(
+                primitive,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let vertex_count = lower_expr(
+                vertex_count,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let index_count = lower_expr(
+                index_count,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let skinning = lower_expr(
+                skinning,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaMeshPacket".to_owned(),
+                fields: vec![
+                    ("primitive".to_owned(), primitive),
+                    ("vertex_count".to_owned(), vertex_count),
+                    ("index_count".to_owned(), index_count),
+                    ("skinning".to_owned(), skinning),
+                ],
+            })
+        }
+        "nova_transform_packet" => {
+            let (translate, rotate, scale, pivot) = match args {
+                [translate, rotate, scale, pivot] => (translate, rotate, scale, pivot),
+                _ => return Err("nova_transform_packet(...) expects 4 args".to_owned()),
+            };
+            let translate = lower_expr(
+                translate,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let rotate = lower_expr(
+                rotate,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let scale = lower_expr(
+                scale,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let pivot = lower_expr(
+                pivot,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaTransformPacket".to_owned(),
+                fields: vec![
+                    ("translate".to_owned(), translate),
+                    ("rotate".to_owned(), rotate),
+                    ("scale".to_owned(), scale),
+                    ("pivot".to_owned(), pivot),
+                ],
+            })
+        }
+        "nova_node_packet" => {
+            let (node_id, parent_id, flags, depth) = match args {
+                [node_id, parent_id, flags, depth] => (node_id, parent_id, flags, depth),
+                _ => return Err("nova_node_packet(...) expects 4 args".to_owned()),
+            };
+            let node_id = lower_expr(
+                node_id,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let parent_id = lower_expr(
+                parent_id,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let flags = lower_expr(
+                flags,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let depth = lower_expr(
+                depth,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaNodePacket".to_owned(),
+                fields: vec![
+                    ("node_id".to_owned(), node_id),
+                    ("parent_id".to_owned(), parent_id),
+                    ("flags".to_owned(), flags),
+                    ("depth".to_owned(), depth),
+                ],
+            })
+        }
+        "nova_pass_packet" => {
+            let (stage, clear_mode, sample_count, debug_view) = match args {
+                [stage, clear_mode, sample_count, debug_view] => {
+                    (stage, clear_mode, sample_count, debug_view)
+                }
+                _ => return Err("nova_pass_packet(...) expects 4 args".to_owned()),
+            };
+            let stage = lower_expr(
+                stage,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let clear_mode = lower_expr(
+                clear_mode,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let sample_count = lower_expr(
+                sample_count,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let debug_view = lower_expr(
+                debug_view,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaPassPacket".to_owned(),
+                fields: vec![
+                    ("stage".to_owned(), stage),
+                    ("clear_mode".to_owned(), clear_mode),
+                    ("sample_count".to_owned(), sample_count),
+                    ("debug_view".to_owned(), debug_view),
+                ],
+            })
+        }
+        "nova_frame_packet" => {
+            let (frame_index, present_mode, sync_interval, exposure) = match args {
+                [frame_index, present_mode, sync_interval, exposure] => {
+                    (frame_index, present_mode, sync_interval, exposure)
+                }
+                _ => return Err("nova_frame_packet(...) expects 4 args".to_owned()),
+            };
+            let frame_index = lower_expr(
+                frame_index,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let present_mode = lower_expr(
+                present_mode,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let sync_interval = lower_expr(
+                sync_interval,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let exposure = lower_expr(
+                exposure,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaFramePacket".to_owned(),
+                fields: vec![
+                    ("frame_index".to_owned(), frame_index),
+                    ("present_mode".to_owned(), present_mode),
+                    ("sync_interval".to_owned(), sync_interval),
+                    ("exposure".to_owned(), exposure),
+                ],
+            })
+        }
+        "nova_target_packet" => {
+            let (kind, width, height, multisample) = match args {
+                [kind, width, height, multisample] => (kind, width, height, multisample),
+                _ => return Err("nova_target_packet(...) expects 4 args".to_owned()),
+            };
+            let kind = lower_expr(
+                kind,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let width = lower_expr(
+                width,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let height = lower_expr(
+                height,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let multisample = lower_expr(
+                multisample,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaTargetPacket".to_owned(),
+                fields: vec![
+                    ("kind".to_owned(), kind),
+                    ("width".to_owned(), width),
+                    ("height".to_owned(), height),
+                    ("multisample".to_owned(), multisample),
+                ],
+            })
+        }
+        "nova_frame_graph_packet" => {
+            let (passes, targets, present_stage, debug_overlay) = match args {
+                [passes, targets, present_stage, debug_overlay] => {
+                    (passes, targets, present_stage, debug_overlay)
+                }
+                _ => return Err("nova_frame_graph_packet(...) expects 4 args".to_owned()),
+            };
+            let passes = lower_expr(
+                passes,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let targets = lower_expr(
+                targets,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let present_stage = lower_expr(
+                present_stage,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let debug_overlay = lower_expr(
+                debug_overlay,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaFrameGraphPacket".to_owned(),
+                fields: vec![
+                    ("passes".to_owned(), passes),
+                    ("targets".to_owned(), targets),
+                    ("present_stage".to_owned(), present_stage),
+                    ("debug_overlay".to_owned(), debug_overlay),
+                ],
+            })
+        }
+        "nova_attachment_packet" => {
+            let (slot, format_kind, load_op, store_op) = match args {
+                [slot, format_kind, load_op, store_op] => (slot, format_kind, load_op, store_op),
+                _ => return Err("nova_attachment_packet(...) expects 4 args".to_owned()),
+            };
+            let slot = lower_expr(
+                slot,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let format_kind = lower_expr(
+                format_kind,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let load_op = lower_expr(
+                load_op,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let store_op = lower_expr(
+                store_op,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaAttachmentPacket".to_owned(),
+                fields: vec![
+                    ("slot".to_owned(), slot),
+                    ("format_kind".to_owned(), format_kind),
+                    ("load_op".to_owned(), load_op),
+                    ("store_op".to_owned(), store_op),
+                ],
+            })
+        }
+        "nova_pass_chain_packet" => {
+            let (stages, fanout, resolve_stage, barrier_mode) = match args {
+                [stages, fanout, resolve_stage, barrier_mode] => {
+                    (stages, fanout, resolve_stage, barrier_mode)
+                }
+                _ => return Err("nova_pass_chain_packet(...) expects 4 args".to_owned()),
+            };
+            let stages = lower_expr(
+                stages,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let fanout = lower_expr(
+                fanout,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let resolve_stage = lower_expr(
+                resolve_stage,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let barrier_mode = lower_expr(
+                barrier_mode,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaPassChainPacket".to_owned(),
+                fields: vec![
+                    ("stages".to_owned(), stages),
+                    ("fanout".to_owned(), fanout),
+                    ("resolve_stage".to_owned(), resolve_stage),
+                    ("barrier_mode".to_owned(), barrier_mode),
+                ],
+            })
+        }
+        "nova_barrier_packet" => {
+            let (scope, source_stage, target_stage, flush_mode) = match args {
+                [scope, source_stage, target_stage, flush_mode] => {
+                    (scope, source_stage, target_stage, flush_mode)
+                }
+                _ => return Err("nova_barrier_packet(...) expects 4 args".to_owned()),
+            };
+            let scope = lower_expr(
+                scope,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let source_stage = lower_expr(
+                source_stage,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let target_stage = lower_expr(
+                target_stage,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let flush_mode = lower_expr(
+                flush_mode,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaBarrierPacket".to_owned(),
+                fields: vec![
+                    ("scope".to_owned(), scope),
+                    ("source_stage".to_owned(), source_stage),
+                    ("target_stage".to_owned(), target_stage),
+                    ("flush_mode".to_owned(), flush_mode),
+                ],
+            })
+        }
+        "nova_resource_set_packet" => {
+            let (buffers, textures, samplers, residency) = match args {
+                [buffers, textures, samplers, residency] => {
+                    (buffers, textures, samplers, residency)
+                }
+                _ => return Err("nova_resource_set_packet(...) expects 4 args".to_owned()),
+            };
+            let buffers = lower_expr(
+                buffers,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let textures = lower_expr(
+                textures,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let samplers = lower_expr(
+                samplers,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let residency = lower_expr(
+                residency,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaResourceSetPacket".to_owned(),
+                fields: vec![
+                    ("buffers".to_owned(), buffers),
+                    ("textures".to_owned(), textures),
+                    ("samplers".to_owned(), samplers),
+                    ("residency".to_owned(), residency),
+                ],
+            })
+        }
+        "nova_schedule_packet" => {
+            let (lanes, queue_depth, async_budget, tick_mode) = match args {
+                [lanes, queue_depth, async_budget, tick_mode] => {
+                    (lanes, queue_depth, async_budget, tick_mode)
+                }
+                _ => return Err("nova_schedule_packet(...) expects 4 args".to_owned()),
+            };
+            let lanes = lower_expr(
+                lanes,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let queue_depth = lower_expr(
+                queue_depth,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let async_budget = lower_expr(
+                async_budget,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let tick_mode = lower_expr(
+                tick_mode,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaSchedulePacket".to_owned(),
+                fields: vec![
+                    ("lanes".to_owned(), lanes),
+                    ("queue_depth".to_owned(), queue_depth),
+                    ("async_budget".to_owned(), async_budget),
+                    ("tick_mode".to_owned(), tick_mode),
+                ],
+            })
+        }
         "nova_slider_packet" => {
             let (value, min_value, max_value, step_value, disabled) = match args {
                 [value] => (value, None, None, None, None),
@@ -3354,10 +4126,10 @@ fn lower_call_expr_with_async(
             })
         }
         "nova_panel_from_parts" => {
-            let [header, sliders, toggle, progress, meter, button, text_input, select, checkbox, radio, textarea, tabs, list, table, tree, inspector, outline, theme, surface, viewport, layer, focus] =
+            let [header, sliders, toggle, progress, meter, button, text_input, select, checkbox, radio, textarea, tabs, list, table, tree, inspector, outline, theme, surface, viewport, layer, scene, camera, material, light, mesh, transform, node, pass, frame, target, frame_graph, attachment, pass_chain, barrier, resource_set, schedule, focus] =
                 args
             else {
-                return Err("nova_panel_from_parts(...) expects 22 args".to_owned());
+                return Err("nova_panel_from_parts(...) expects 38 args".to_owned());
             };
             let header = lower_expr(
                 header,
@@ -3527,6 +4299,134 @@ fn lower_call_expr_with_async(
                 struct_table,
                 Some(&named_type("NovaLayerPacket")),
             )?;
+            let scene = lower_expr(
+                scene,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaScenePacket")),
+            )?;
+            let camera = lower_expr(
+                camera,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaCameraPacket")),
+            )?;
+            let material = lower_expr(
+                material,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaMaterialPacket")),
+            )?;
+            let light = lower_expr(
+                light,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaLightPacket")),
+            )?;
+            let mesh = lower_expr(
+                mesh,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaMeshPacket")),
+            )?;
+            let transform = lower_expr(
+                transform,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaTransformPacket")),
+            )?;
+            let node = lower_expr(
+                node,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaNodePacket")),
+            )?;
+            let pass = lower_expr(
+                pass,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaPassPacket")),
+            )?;
+            let frame = lower_expr(
+                frame,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaFramePacket")),
+            )?;
+            let target = lower_expr(
+                target,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaTargetPacket")),
+            )?;
+            let frame_graph = lower_expr(
+                frame_graph,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaFrameGraphPacket")),
+            )?;
+            let attachment = lower_expr(
+                attachment,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaAttachmentPacket")),
+            )?;
+            let pass_chain = lower_expr(
+                pass_chain,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaPassChainPacket")),
+            )?;
+            let barrier = lower_expr(
+                barrier,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaBarrierPacket")),
+            )?;
+            let resource_set = lower_expr(
+                resource_set,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaResourceSetPacket")),
+            )?;
+            let schedule = lower_expr(
+                schedule,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaSchedulePacket")),
+            )?;
             let focus = lower_expr(
                 focus,
                 current_domain,
@@ -3559,6 +4459,22 @@ fn lower_call_expr_with_async(
                     ("surface".to_owned(), surface),
                     ("viewport".to_owned(), viewport),
                     ("layer".to_owned(), layer),
+                    ("scene".to_owned(), scene),
+                    ("camera".to_owned(), camera),
+                    ("material".to_owned(), material),
+                    ("light".to_owned(), light),
+                    ("mesh".to_owned(), mesh),
+                    ("transform".to_owned(), transform),
+                    ("node".to_owned(), node),
+                    ("pass".to_owned(), pass),
+                    ("frame".to_owned(), frame),
+                    ("target".to_owned(), target),
+                    ("frame_graph".to_owned(), frame_graph),
+                    ("attachment".to_owned(), attachment),
+                    ("pass_chain".to_owned(), pass_chain),
+                    ("barrier".to_owned(), barrier),
+                    ("resource_set".to_owned(), resource_set),
+                    ("schedule".to_owned(), schedule),
                     ("focus".to_owned(), focus),
                 ],
             })
@@ -4324,6 +5240,742 @@ fn lower_call_expr_with_async(
                 ],
             })
         }
+        "nova_scene_state" => {
+            let [packet] = args else {
+                return Err("nova_scene_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaScenePacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaSceneState".to_owned(),
+                fields: vec![
+                    (
+                        "root_count".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "root_count".to_owned(),
+                        },
+                    ),
+                    (
+                        "active_camera".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "active_camera".to_owned(),
+                        },
+                    ),
+                    (
+                        "light_count".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "light_count".to_owned(),
+                        },
+                    ),
+                    (
+                        "animation_phase".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "animation_phase".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_camera_state" => {
+            let [packet] = args else {
+                return Err("nova_camera_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaCameraPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaCameraState".to_owned(),
+                fields: vec![
+                    (
+                        "kind".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "kind".to_owned(),
+                        },
+                    ),
+                    (
+                        "focus".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "focus".to_owned(),
+                        },
+                    ),
+                    (
+                        "zoom".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "zoom".to_owned(),
+                        },
+                    ),
+                    (
+                        "orbit".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "orbit".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_material_state" => {
+            let [packet] = args else {
+                return Err("nova_material_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaMaterialPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaMaterialState".to_owned(),
+                fields: vec![
+                    (
+                        "shader_kind".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "shader_kind".to_owned(),
+                        },
+                    ),
+                    (
+                        "albedo".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "albedo".to_owned(),
+                        },
+                    ),
+                    (
+                        "roughness".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "roughness".to_owned(),
+                        },
+                    ),
+                    (
+                        "emissive".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "emissive".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_light_state" => {
+            let [packet] = args else {
+                return Err("nova_light_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaLightPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaLightState".to_owned(),
+                fields: vec![
+                    (
+                        "kind".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "kind".to_owned(),
+                        },
+                    ),
+                    (
+                        "intensity".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "intensity".to_owned(),
+                        },
+                    ),
+                    (
+                        "range".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "range".to_owned(),
+                        },
+                    ),
+                    (
+                        "reactive".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "reactive".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_mesh_state" => {
+            let [packet] = args else {
+                return Err("nova_mesh_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaMeshPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaMeshState".to_owned(),
+                fields: vec![
+                    (
+                        "primitive".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "primitive".to_owned(),
+                        },
+                    ),
+                    (
+                        "vertex_count".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "vertex_count".to_owned(),
+                        },
+                    ),
+                    (
+                        "index_count".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "index_count".to_owned(),
+                        },
+                    ),
+                    (
+                        "skinning".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "skinning".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_transform_state" => {
+            let [packet] = args else {
+                return Err("nova_transform_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaTransformPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaTransformState".to_owned(),
+                fields: vec![
+                    (
+                        "translate".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "translate".to_owned(),
+                        },
+                    ),
+                    (
+                        "rotate".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "rotate".to_owned(),
+                        },
+                    ),
+                    (
+                        "scale".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "scale".to_owned(),
+                        },
+                    ),
+                    (
+                        "pivot".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "pivot".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_node_state" => {
+            let [packet] = args else {
+                return Err("nova_node_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaNodePacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaNodeState".to_owned(),
+                fields: vec![
+                    (
+                        "node_id".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "node_id".to_owned(),
+                        },
+                    ),
+                    (
+                        "parent_id".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "parent_id".to_owned(),
+                        },
+                    ),
+                    (
+                        "flags".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "flags".to_owned(),
+                        },
+                    ),
+                    (
+                        "depth".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "depth".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_pass_state" => {
+            let [packet] = args else {
+                return Err("nova_pass_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaPassPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaPassState".to_owned(),
+                fields: vec![
+                    (
+                        "stage".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "stage".to_owned(),
+                        },
+                    ),
+                    (
+                        "clear_mode".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "clear_mode".to_owned(),
+                        },
+                    ),
+                    (
+                        "sample_count".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "sample_count".to_owned(),
+                        },
+                    ),
+                    (
+                        "debug_view".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "debug_view".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_frame_state" => {
+            let [packet] = args else {
+                return Err("nova_frame_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaFramePacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaFrameState".to_owned(),
+                fields: vec![
+                    (
+                        "frame_index".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "frame_index".to_owned(),
+                        },
+                    ),
+                    (
+                        "present_mode".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "present_mode".to_owned(),
+                        },
+                    ),
+                    (
+                        "sync_interval".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "sync_interval".to_owned(),
+                        },
+                    ),
+                    (
+                        "exposure".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "exposure".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_target_state" => {
+            let [packet] = args else {
+                return Err("nova_target_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaTargetPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaTargetState".to_owned(),
+                fields: vec![
+                    (
+                        "kind".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "kind".to_owned(),
+                        },
+                    ),
+                    (
+                        "width".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "width".to_owned(),
+                        },
+                    ),
+                    (
+                        "height".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "height".to_owned(),
+                        },
+                    ),
+                    (
+                        "multisample".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "multisample".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_frame_graph_state" => {
+            let [packet] = args else {
+                return Err("nova_frame_graph_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaFrameGraphPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaFrameGraphState".to_owned(),
+                fields: vec![
+                    (
+                        "passes".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "passes".to_owned(),
+                        },
+                    ),
+                    (
+                        "targets".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "targets".to_owned(),
+                        },
+                    ),
+                    (
+                        "present_stage".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "present_stage".to_owned(),
+                        },
+                    ),
+                    (
+                        "debug_overlay".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "debug_overlay".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_attachment_state" => {
+            let [packet] = args else {
+                return Err("nova_attachment_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaAttachmentPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaAttachmentState".to_owned(),
+                fields: vec![
+                    (
+                        "slot".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "slot".to_owned(),
+                        },
+                    ),
+                    (
+                        "format_kind".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "format_kind".to_owned(),
+                        },
+                    ),
+                    (
+                        "load_op".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "load_op".to_owned(),
+                        },
+                    ),
+                    (
+                        "store_op".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "store_op".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_pass_chain_state" => {
+            let [packet] = args else {
+                return Err("nova_pass_chain_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaPassChainPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaPassChainState".to_owned(),
+                fields: vec![
+                    (
+                        "stages".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "stages".to_owned(),
+                        },
+                    ),
+                    (
+                        "fanout".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "fanout".to_owned(),
+                        },
+                    ),
+                    (
+                        "resolve_stage".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "resolve_stage".to_owned(),
+                        },
+                    ),
+                    (
+                        "barrier_mode".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "barrier_mode".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_barrier_state" => {
+            let [packet] = args else {
+                return Err("nova_barrier_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaBarrierPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaBarrierState".to_owned(),
+                fields: vec![
+                    (
+                        "scope".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "scope".to_owned(),
+                        },
+                    ),
+                    (
+                        "source_stage".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "source_stage".to_owned(),
+                        },
+                    ),
+                    (
+                        "target_stage".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "target_stage".to_owned(),
+                        },
+                    ),
+                    (
+                        "flush_mode".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "flush_mode".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_resource_set_state" => {
+            let [packet] = args else {
+                return Err("nova_resource_set_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaResourceSetPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaResourceSetState".to_owned(),
+                fields: vec![
+                    (
+                        "buffers".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "buffers".to_owned(),
+                        },
+                    ),
+                    (
+                        "textures".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "textures".to_owned(),
+                        },
+                    ),
+                    (
+                        "samplers".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "samplers".to_owned(),
+                        },
+                    ),
+                    (
+                        "residency".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "residency".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_schedule_state" => {
+            let [packet] = args else {
+                return Err("nova_schedule_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaSchedulePacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaScheduleState".to_owned(),
+                fields: vec![
+                    (
+                        "lanes".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "lanes".to_owned(),
+                        },
+                    ),
+                    (
+                        "queue_depth".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "queue_depth".to_owned(),
+                        },
+                    ),
+                    (
+                        "async_budget".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "async_budget".to_owned(),
+                        },
+                    ),
+                    (
+                        "tick_mode".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "tick_mode".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
         "nova_selection_state" => {
             let [packet] = args else {
                 return Err("nova_selection_state(...) expects 1 arg".to_owned());
@@ -4463,6 +6115,70 @@ fn lower_call_expr_with_async(
         | "nova_layer_state_blend"
         | "nova_layer_state_visibility"
         | "nova_layer_state_clip"
+        | "nova_scene_state_root_count"
+        | "nova_scene_state_active_camera"
+        | "nova_scene_state_light_count"
+        | "nova_scene_state_animation_phase"
+        | "nova_camera_state_kind"
+        | "nova_camera_state_focus"
+        | "nova_camera_state_zoom"
+        | "nova_camera_state_orbit"
+        | "nova_material_state_shader_kind"
+        | "nova_material_state_albedo"
+        | "nova_material_state_roughness"
+        | "nova_material_state_emissive"
+        | "nova_light_state_kind"
+        | "nova_light_state_intensity"
+        | "nova_light_state_range"
+        | "nova_light_state_reactive"
+        | "nova_mesh_state_primitive"
+        | "nova_mesh_state_vertex_count"
+        | "nova_mesh_state_index_count"
+        | "nova_mesh_state_skinning"
+        | "nova_transform_state_translate"
+        | "nova_transform_state_rotate"
+        | "nova_transform_state_scale"
+        | "nova_transform_state_pivot"
+        | "nova_node_state_node_id"
+        | "nova_node_state_parent_id"
+        | "nova_node_state_flags"
+        | "nova_node_state_depth"
+        | "nova_pass_state_stage"
+        | "nova_pass_state_clear_mode"
+        | "nova_pass_state_sample_count"
+        | "nova_pass_state_debug_view"
+        | "nova_frame_state_frame_index"
+        | "nova_frame_state_present_mode"
+        | "nova_frame_state_sync_interval"
+        | "nova_frame_state_exposure"
+        | "nova_target_state_kind"
+        | "nova_target_state_width"
+        | "nova_target_state_height"
+        | "nova_target_state_multisample"
+        | "nova_frame_graph_state_passes"
+        | "nova_frame_graph_state_targets"
+        | "nova_frame_graph_state_present_stage"
+        | "nova_frame_graph_state_debug_overlay"
+        | "nova_attachment_state_slot"
+        | "nova_attachment_state_format_kind"
+        | "nova_attachment_state_load_op"
+        | "nova_attachment_state_store_op"
+        | "nova_pass_chain_state_stages"
+        | "nova_pass_chain_state_fanout"
+        | "nova_pass_chain_state_resolve_stage"
+        | "nova_pass_chain_state_barrier_mode"
+        | "nova_barrier_state_scope"
+        | "nova_barrier_state_source_stage"
+        | "nova_barrier_state_target_stage"
+        | "nova_barrier_state_flush_mode"
+        | "nova_resource_set_state_buffers"
+        | "nova_resource_set_state_textures"
+        | "nova_resource_set_state_samplers"
+        | "nova_resource_set_state_residency"
+        | "nova_schedule_state_lanes"
+        | "nova_schedule_state_queue_depth"
+        | "nova_schedule_state_async_budget"
+        | "nova_schedule_state_tick_mode"
         | "nova_selection_state_selected"
         | "nova_selection_state_span"
         | "nova_selection_state_mode"
@@ -4511,6 +6227,70 @@ fn lower_call_expr_with_async(
                 "nova_layer_state_blend" => ("NovaLayerState", "blend"),
                 "nova_layer_state_visibility" => ("NovaLayerState", "visibility"),
                 "nova_layer_state_clip" => ("NovaLayerState", "clip"),
+                "nova_scene_state_root_count" => ("NovaSceneState", "root_count"),
+                "nova_scene_state_active_camera" => ("NovaSceneState", "active_camera"),
+                "nova_scene_state_light_count" => ("NovaSceneState", "light_count"),
+                "nova_scene_state_animation_phase" => ("NovaSceneState", "animation_phase"),
+                "nova_camera_state_kind" => ("NovaCameraState", "kind"),
+                "nova_camera_state_focus" => ("NovaCameraState", "focus"),
+                "nova_camera_state_zoom" => ("NovaCameraState", "zoom"),
+                "nova_camera_state_orbit" => ("NovaCameraState", "orbit"),
+                "nova_material_state_shader_kind" => ("NovaMaterialState", "shader_kind"),
+                "nova_material_state_albedo" => ("NovaMaterialState", "albedo"),
+                "nova_material_state_roughness" => ("NovaMaterialState", "roughness"),
+                "nova_material_state_emissive" => ("NovaMaterialState", "emissive"),
+                "nova_light_state_kind" => ("NovaLightState", "kind"),
+                "nova_light_state_intensity" => ("NovaLightState", "intensity"),
+                "nova_light_state_range" => ("NovaLightState", "range"),
+                "nova_light_state_reactive" => ("NovaLightState", "reactive"),
+                "nova_mesh_state_primitive" => ("NovaMeshState", "primitive"),
+                "nova_mesh_state_vertex_count" => ("NovaMeshState", "vertex_count"),
+                "nova_mesh_state_index_count" => ("NovaMeshState", "index_count"),
+                "nova_mesh_state_skinning" => ("NovaMeshState", "skinning"),
+                "nova_transform_state_translate" => ("NovaTransformState", "translate"),
+                "nova_transform_state_rotate" => ("NovaTransformState", "rotate"),
+                "nova_transform_state_scale" => ("NovaTransformState", "scale"),
+                "nova_transform_state_pivot" => ("NovaTransformState", "pivot"),
+                "nova_node_state_node_id" => ("NovaNodeState", "node_id"),
+                "nova_node_state_parent_id" => ("NovaNodeState", "parent_id"),
+                "nova_node_state_flags" => ("NovaNodeState", "flags"),
+                "nova_node_state_depth" => ("NovaNodeState", "depth"),
+                "nova_pass_state_stage" => ("NovaPassState", "stage"),
+                "nova_pass_state_clear_mode" => ("NovaPassState", "clear_mode"),
+                "nova_pass_state_sample_count" => ("NovaPassState", "sample_count"),
+                "nova_pass_state_debug_view" => ("NovaPassState", "debug_view"),
+                "nova_frame_state_frame_index" => ("NovaFrameState", "frame_index"),
+                "nova_frame_state_present_mode" => ("NovaFrameState", "present_mode"),
+                "nova_frame_state_sync_interval" => ("NovaFrameState", "sync_interval"),
+                "nova_frame_state_exposure" => ("NovaFrameState", "exposure"),
+                "nova_target_state_kind" => ("NovaTargetState", "kind"),
+                "nova_target_state_width" => ("NovaTargetState", "width"),
+                "nova_target_state_height" => ("NovaTargetState", "height"),
+                "nova_target_state_multisample" => ("NovaTargetState", "multisample"),
+                "nova_frame_graph_state_passes" => ("NovaFrameGraphState", "passes"),
+                "nova_frame_graph_state_targets" => ("NovaFrameGraphState", "targets"),
+                "nova_frame_graph_state_present_stage" => ("NovaFrameGraphState", "present_stage"),
+                "nova_frame_graph_state_debug_overlay" => ("NovaFrameGraphState", "debug_overlay"),
+                "nova_attachment_state_slot" => ("NovaAttachmentState", "slot"),
+                "nova_attachment_state_format_kind" => ("NovaAttachmentState", "format_kind"),
+                "nova_attachment_state_load_op" => ("NovaAttachmentState", "load_op"),
+                "nova_attachment_state_store_op" => ("NovaAttachmentState", "store_op"),
+                "nova_pass_chain_state_stages" => ("NovaPassChainState", "stages"),
+                "nova_pass_chain_state_fanout" => ("NovaPassChainState", "fanout"),
+                "nova_pass_chain_state_resolve_stage" => ("NovaPassChainState", "resolve_stage"),
+                "nova_pass_chain_state_barrier_mode" => ("NovaPassChainState", "barrier_mode"),
+                "nova_barrier_state_scope" => ("NovaBarrierState", "scope"),
+                "nova_barrier_state_source_stage" => ("NovaBarrierState", "source_stage"),
+                "nova_barrier_state_target_stage" => ("NovaBarrierState", "target_stage"),
+                "nova_barrier_state_flush_mode" => ("NovaBarrierState", "flush_mode"),
+                "nova_resource_set_state_buffers" => ("NovaResourceSetState", "buffers"),
+                "nova_resource_set_state_textures" => ("NovaResourceSetState", "textures"),
+                "nova_resource_set_state_samplers" => ("NovaResourceSetState", "samplers"),
+                "nova_resource_set_state_residency" => ("NovaResourceSetState", "residency"),
+                "nova_schedule_state_lanes" => ("NovaScheduleState", "lanes"),
+                "nova_schedule_state_queue_depth" => ("NovaScheduleState", "queue_depth"),
+                "nova_schedule_state_async_budget" => ("NovaScheduleState", "async_budget"),
+                "nova_schedule_state_tick_mode" => ("NovaScheduleState", "tick_mode"),
                 "nova_selection_state_selected" => ("NovaSelectionState", "selected"),
                 "nova_selection_state_span" => ("NovaSelectionState", "span"),
                 "nova_selection_state_mode" => ("NovaSelectionState", "mode"),
@@ -5708,6 +7488,70 @@ fn builtin_struct_field_type(type_name: &str, field: &str) -> Option<NirTypeRef>
             "order" | "blend" | "visibility" | "clip" => Some(i64()),
             _ => None,
         },
+        "NovaScenePacket" => match field {
+            "root_count" | "active_camera" | "light_count" | "animation_phase" => Some(i64()),
+            _ => None,
+        },
+        "NovaCameraPacket" => match field {
+            "kind" | "focus" | "zoom" | "orbit" => Some(i64()),
+            _ => None,
+        },
+        "NovaMaterialPacket" => match field {
+            "shader_kind" | "albedo" | "roughness" | "emissive" => Some(i64()),
+            _ => None,
+        },
+        "NovaLightPacket" => match field {
+            "kind" | "intensity" | "range" | "reactive" => Some(i64()),
+            _ => None,
+        },
+        "NovaMeshPacket" => match field {
+            "primitive" | "vertex_count" | "index_count" | "skinning" => Some(i64()),
+            _ => None,
+        },
+        "NovaTransformPacket" => match field {
+            "translate" | "rotate" | "scale" | "pivot" => Some(i64()),
+            _ => None,
+        },
+        "NovaNodePacket" => match field {
+            "node_id" | "parent_id" | "flags" | "depth" => Some(i64()),
+            _ => None,
+        },
+        "NovaPassPacket" => match field {
+            "stage" | "clear_mode" | "sample_count" | "debug_view" => Some(i64()),
+            _ => None,
+        },
+        "NovaFramePacket" => match field {
+            "frame_index" | "present_mode" | "sync_interval" | "exposure" => Some(i64()),
+            _ => None,
+        },
+        "NovaTargetPacket" => match field {
+            "kind" | "width" | "height" | "multisample" => Some(i64()),
+            _ => None,
+        },
+        "NovaFrameGraphPacket" => match field {
+            "passes" | "targets" | "present_stage" | "debug_overlay" => Some(i64()),
+            _ => None,
+        },
+        "NovaAttachmentPacket" => match field {
+            "slot" | "format_kind" | "load_op" | "store_op" => Some(i64()),
+            _ => None,
+        },
+        "NovaPassChainPacket" => match field {
+            "stages" | "fanout" | "resolve_stage" | "barrier_mode" => Some(i64()),
+            _ => None,
+        },
+        "NovaBarrierPacket" => match field {
+            "scope" | "source_stage" | "target_stage" | "flush_mode" => Some(i64()),
+            _ => None,
+        },
+        "NovaResourceSetPacket" => match field {
+            "buffers" | "textures" | "samplers" | "residency" => Some(i64()),
+            _ => None,
+        },
+        "NovaSchedulePacket" => match field {
+            "lanes" | "queue_depth" | "async_budget" | "tick_mode" => Some(i64()),
+            _ => None,
+        },
         "NovaSliderPacket" => match field {
             "value" | "min" | "max" | "step" | "disabled" => Some(i64()),
             _ => None,
@@ -5802,6 +7646,22 @@ fn builtin_struct_field_type(type_name: &str, field: &str) -> Option<NirTypeRef>
             "surface" => Some(named("NovaSurfacePacket")),
             "viewport" => Some(named("NovaViewportPacket")),
             "layer" => Some(named("NovaLayerPacket")),
+            "scene" => Some(named("NovaScenePacket")),
+            "camera" => Some(named("NovaCameraPacket")),
+            "material" => Some(named("NovaMaterialPacket")),
+            "light" => Some(named("NovaLightPacket")),
+            "mesh" => Some(named("NovaMeshPacket")),
+            "transform" => Some(named("NovaTransformPacket")),
+            "node" => Some(named("NovaNodePacket")),
+            "pass" => Some(named("NovaPassPacket")),
+            "frame" => Some(named("NovaFramePacket")),
+            "target" => Some(named("NovaTargetPacket")),
+            "frame_graph" => Some(named("NovaFrameGraphPacket")),
+            "attachment" => Some(named("NovaAttachmentPacket")),
+            "pass_chain" => Some(named("NovaPassChainPacket")),
+            "barrier" => Some(named("NovaBarrierPacket")),
+            "resource_set" => Some(named("NovaResourceSetPacket")),
+            "schedule" => Some(named("NovaSchedulePacket")),
             "focus" => Some(named("NovaFocusPacket")),
             _ => None,
         },
@@ -5871,6 +7731,70 @@ fn builtin_struct_field_type(type_name: &str, field: &str) -> Option<NirTypeRef>
         },
         "NovaLayerState" => match field {
             "order" | "blend" | "visibility" | "clip" => Some(i64()),
+            _ => None,
+        },
+        "NovaSceneState" => match field {
+            "root_count" | "active_camera" | "light_count" | "animation_phase" => Some(i64()),
+            _ => None,
+        },
+        "NovaCameraState" => match field {
+            "kind" | "focus" | "zoom" | "orbit" => Some(i64()),
+            _ => None,
+        },
+        "NovaMaterialState" => match field {
+            "shader_kind" | "albedo" | "roughness" | "emissive" => Some(i64()),
+            _ => None,
+        },
+        "NovaLightState" => match field {
+            "kind" | "intensity" | "range" | "reactive" => Some(i64()),
+            _ => None,
+        },
+        "NovaMeshState" => match field {
+            "primitive" | "vertex_count" | "index_count" | "skinning" => Some(i64()),
+            _ => None,
+        },
+        "NovaTransformState" => match field {
+            "translate" | "rotate" | "scale" | "pivot" => Some(i64()),
+            _ => None,
+        },
+        "NovaNodeState" => match field {
+            "node_id" | "parent_id" | "flags" | "depth" => Some(i64()),
+            _ => None,
+        },
+        "NovaPassState" => match field {
+            "stage" | "clear_mode" | "sample_count" | "debug_view" => Some(i64()),
+            _ => None,
+        },
+        "NovaFrameState" => match field {
+            "frame_index" | "present_mode" | "sync_interval" | "exposure" => Some(i64()),
+            _ => None,
+        },
+        "NovaTargetState" => match field {
+            "kind" | "width" | "height" | "multisample" => Some(i64()),
+            _ => None,
+        },
+        "NovaFrameGraphState" => match field {
+            "passes" | "targets" | "present_stage" | "debug_overlay" => Some(i64()),
+            _ => None,
+        },
+        "NovaAttachmentState" => match field {
+            "slot" | "format_kind" | "load_op" | "store_op" => Some(i64()),
+            _ => None,
+        },
+        "NovaPassChainState" => match field {
+            "stages" | "fanout" | "resolve_stage" | "barrier_mode" => Some(i64()),
+            _ => None,
+        },
+        "NovaBarrierState" => match field {
+            "scope" | "source_stage" | "target_stage" | "flush_mode" => Some(i64()),
+            _ => None,
+        },
+        "NovaResourceSetState" => match field {
+            "buffers" | "textures" | "samplers" | "residency" => Some(i64()),
+            _ => None,
+        },
+        "NovaScheduleState" => match field {
+            "lanes" | "queue_depth" | "async_budget" | "tick_mode" => Some(i64()),
             _ => None,
         },
         "NovaSelectionState" => match field {
@@ -7305,6 +9229,462 @@ mod tests {
     }
 
     #[test]
+    fn lowers_nova_scene_state_contracts() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let scene: NovaScenePacket = nova_scene_packet(7, 2, 3, 1);
+                let camera: NovaCameraPacket = nova_camera_packet(1, 2, 12, 9);
+                let material: NovaMaterialPacket = nova_material_packet(1, 8, 3, 2);
+                let scene_state: NovaSceneState = nova_scene_state(scene);
+                let camera_state: NovaCameraState = nova_camera_state(camera);
+                let material_state: NovaMaterialState = nova_material_state(material);
+                let lights: i64 = nova_scene_state_light_count(scene_state);
+                let zoom: i64 = nova_camera_state_zoom(camera_state);
+                let emissive: i64 = nova_material_state_emissive(material_state);
+                return lights + zoom + emissive;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaSceneState" && type_name == "NovaSceneState",
+            _ => false,
+        }));
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaCameraState" && type_name == "NovaCameraState",
+            _ => false,
+        }));
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaMaterialState" && type_name == "NovaMaterialState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_light_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let light: NovaLightPacket = nova_light_packet(1, 12, 9, 8);
+                let state: NovaLightState = nova_light_state(light);
+                let intensity: i64 = nova_light_state_intensity(state);
+                return intensity;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaLightState" && type_name == "NovaLightState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_mesh_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let mesh: NovaMeshPacket = nova_mesh_packet(1, 12, 9, 8);
+                let state: NovaMeshState = nova_mesh_state(mesh);
+                let vertices: i64 = nova_mesh_state_vertex_count(state);
+                return vertices;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaMeshState" && type_name == "NovaMeshState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_transform_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let transform: NovaTransformPacket = nova_transform_packet(12, 1, 9, 2);
+                let state: NovaTransformState = nova_transform_state(transform);
+                let scale: i64 = nova_transform_state_scale(state);
+                return scale;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaTransformState" && type_name == "NovaTransformState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_node_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let node: NovaNodePacket = nova_node_packet(2, 1, 8, 2);
+                let state: NovaNodeState = nova_node_state(node);
+                let depth: i64 = nova_node_state_depth(state);
+                return depth;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaNodeState" && type_name == "NovaNodeState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_pass_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let pass: NovaPassPacket = nova_pass_packet(1, 8, 4, 2);
+                let state: NovaPassState = nova_pass_state(pass);
+                let samples: i64 = nova_pass_state_sample_count(state);
+                return samples;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaPassState" && type_name == "NovaPassState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_frame_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let frame: NovaFramePacket = nova_frame_packet(7, 1, 1, 9);
+                let state: NovaFrameState = nova_frame_state(frame);
+                let exposure: i64 = nova_frame_state_exposure(state);
+                return exposure;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaFrameState" && type_name == "NovaFrameState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_target_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let target: NovaTargetPacket = nova_target_packet(1, 48, 18, 8);
+                let state: NovaTargetState = nova_target_state(target);
+                let msaa: i64 = nova_target_state_multisample(state);
+                return msaa;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaTargetState" && type_name == "NovaTargetState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_frame_graph_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let frame_graph: NovaFrameGraphPacket = nova_frame_graph_packet(2, 1, 1, 2);
+                let state: NovaFrameGraphState = nova_frame_graph_state(frame_graph);
+                let passes: i64 = nova_frame_graph_state_passes(state);
+                return passes;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaFrameGraphState" && type_name == "NovaFrameGraphState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_attachment_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let attachment: NovaAttachmentPacket = nova_attachment_packet(0, 8, 1, 1);
+                let state: NovaAttachmentState = nova_attachment_state(attachment);
+                let format_kind: i64 = nova_attachment_state_format_kind(state);
+                return format_kind;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaAttachmentState" && type_name == "NovaAttachmentState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_pass_chain_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let pass_chain: NovaPassChainPacket = nova_pass_chain_packet(2, 1, 1, 8);
+                let state: NovaPassChainState = nova_pass_chain_state(pass_chain);
+                let stages: i64 = nova_pass_chain_state_stages(state);
+                return stages;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaPassChainState" && type_name == "NovaPassChainState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_barrier_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let barrier: NovaBarrierPacket = nova_barrier_packet(1, 1, 2, 8);
+                let state: NovaBarrierState = nova_barrier_state(barrier);
+                let flush_mode: i64 = nova_barrier_state_flush_mode(state);
+                return flush_mode;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaBarrierState" && type_name == "NovaBarrierState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_resource_set_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let resource_set: NovaResourceSetPacket = nova_resource_set_packet(2, 1, 1, 8);
+                let state: NovaResourceSetState = nova_resource_set_state(resource_set);
+                let residency: i64 = nova_resource_set_state_residency(state);
+                return residency;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaResourceSetState" && type_name == "NovaResourceSetState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_schedule_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let schedule: NovaSchedulePacket = nova_schedule_packet(2, 4, 9, 1);
+                let state: NovaScheduleState = nova_schedule_state(schedule);
+                let budget: i64 = nova_schedule_state_async_budget(state);
+                return budget;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaScheduleState" && type_name == "NovaScheduleState",
+            _ => false,
+        }));
+    }
+
+    #[test]
     fn lowers_nova_panel_from_parts_builder() {
         let module = parse_nuis_module(
             r#"
@@ -7335,6 +9715,22 @@ mod tests {
                 let surface: NovaSurfacePacket = nova_surface_packet(3, 2, 1, 4);
                 let viewport: NovaViewportPacket = nova_viewport_packet(2, 1, 48, 18);
                 let layer: NovaLayerPacket = nova_layer_packet(1, 2, 1, 0);
+                let scene: NovaScenePacket = nova_scene_packet(7, 2, 3, 1);
+                let camera: NovaCameraPacket = nova_camera_packet(1, 2, 12, 9);
+                let material: NovaMaterialPacket = nova_material_packet(1, 8, 3, 2);
+                let light: NovaLightPacket = nova_light_packet(1, 12, 9, 8);
+                let mesh: NovaMeshPacket = nova_mesh_packet(1, 12, 9, 8);
+                let transform: NovaTransformPacket = nova_transform_packet(12, 1, 9, 2);
+                let node: NovaNodePacket = nova_node_packet(2, 1, 8, 2);
+                let pass: NovaPassPacket = nova_pass_packet(1, 8, 4, 2);
+                let frame: NovaFramePacket = nova_frame_packet(7, 1, 1, 9);
+                let target: NovaTargetPacket = nova_target_packet(1, 48, 18, 8);
+                let frame_graph: NovaFrameGraphPacket = nova_frame_graph_packet(2, 1, 1, 2);
+                let attachment: NovaAttachmentPacket = nova_attachment_packet(0, 8, 1, 1);
+                let pass_chain: NovaPassChainPacket = nova_pass_chain_packet(2, 1, 1, 8);
+                let barrier: NovaBarrierPacket = nova_barrier_packet(1, 1, 2, 8);
+                let resource_set: NovaResourceSetPacket = nova_resource_set_packet(2, 1, 1, 8);
+                let schedule: NovaSchedulePacket = nova_schedule_packet(2, 4, 9, 1);
                 let focus: NovaFocusPacket = nova_focus_packet(2);
                 let panel: NovaPanelPacket = nova_panel_from_parts(
                   header,
@@ -7358,6 +9754,22 @@ mod tests {
                   surface,
                   viewport,
                   layer,
+                  scene,
+                  camera,
+                  material,
+                  light,
+                  mesh,
+                  transform,
+                  node,
+                  pass,
+                  frame,
+                  target,
+                  frame_graph,
+                  attachment,
+                  pass_chain,
+                  barrier,
+                  resource_set,
+                  schedule,
                   focus
                 );
                 return 1;

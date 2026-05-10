@@ -5195,6 +5195,22 @@ mod tests {
                     let surface: NovaSurfacePacket = nova_surface_packet(3, 2, 1, 4);
                     let viewport: NovaViewportPacket = nova_viewport_packet(2, 1, 48, 18);
                     let layer: NovaLayerPacket = nova_layer_packet(1, 2, 1, 0);
+                    let scene: NovaScenePacket = nova_scene_packet(7, 2, 3, 1);
+                    let camera: NovaCameraPacket = nova_camera_packet(1, 2, 12, 9);
+                    let material: NovaMaterialPacket = nova_material_packet(1, 8, 3, 2);
+                    let light: NovaLightPacket = nova_light_packet(1, 12, 9, 8);
+                    let mesh: NovaMeshPacket = nova_mesh_packet(1, 12, 9, 8);
+                    let transform: NovaTransformPacket = nova_transform_packet(12, 1, 9, 2);
+                    let node: NovaNodePacket = nova_node_packet(2, 1, 8, 2);
+                    let pass: NovaPassPacket = nova_pass_packet(1, 8, 4, 2);
+                    let frame: NovaFramePacket = nova_frame_packet(7, 1, 1, 9);
+                    let target: NovaTargetPacket = nova_target_packet(1, 48, 18, 8);
+                    let frame_graph: NovaFrameGraphPacket = nova_frame_graph_packet(2, 1, 1, 2);
+                    let attachment: NovaAttachmentPacket = nova_attachment_packet(0, 8, 1, 1);
+                    let pass_chain: NovaPassChainPacket = nova_pass_chain_packet(2, 1, 1, 8);
+                    let barrier: NovaBarrierPacket = nova_barrier_packet(1, 1, 2, 8);
+                    let resource_set: NovaResourceSetPacket = nova_resource_set_packet(2, 1, 1, 8);
+                    let schedule: NovaSchedulePacket = nova_schedule_packet(2, 4, 9, 1);
                     let focus: NovaFocusPacket = nova_focus_packet(2);
                     let packet: NovaPanelPacket = nova_panel_from_parts(
                         header,
@@ -5218,6 +5234,22 @@ mod tests {
                         surface,
                         viewport,
                         layer,
+                        scene,
+                        camera,
+                        material,
+                        light,
+                        mesh,
+                        transform,
+                        node,
+                        pass,
+                        frame,
+                        target,
+                        frame_graph,
+                        attachment,
+                        pass_chain,
+                        barrier,
+                        resource_set,
+                        schedule,
                         focus
                     );
                   }

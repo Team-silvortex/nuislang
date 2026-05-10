@@ -58,6 +58,38 @@ mod cpu Main {
       nova_viewport_packet(color_delta, speed_delta, 52, 20);
     let panel_layer: NovaLayerPacket =
       nova_layer_packet(1, panel_toggle_state, 1, radius_delta);
+    let panel_scene: NovaScenePacket =
+      nova_scene_packet(7, panel_focus_index, 3, frame_tick);
+    let panel_camera: NovaCameraPacket =
+      nova_camera_packet(panel_toggle_state, panel_focus_index, packed_speed, packed_radius);
+    let panel_material: NovaMaterialPacket =
+      nova_material_packet(panel_toggle_state, panel_accent, packed_speed, packed_radius);
+    let panel_light: NovaLightPacket =
+      nova_light_packet(panel_toggle_state, packed_speed, packed_radius, panel_accent);
+    let panel_mesh: NovaMeshPacket =
+      nova_mesh_packet(panel_toggle_state, packed_speed, packed_radius, panel_accent);
+    let panel_transform: NovaTransformPacket =
+      nova_transform_packet(packed_speed, panel_toggle_state, packed_radius, panel_focus_index);
+    let panel_node: NovaNodePacket =
+      nova_node_packet(panel_focus_index, panel_toggle_state, panel_accent, 2);
+    let panel_pass: NovaPassPacket =
+      nova_pass_packet(panel_toggle_state, panel_accent, 4, panel_focus_index);
+    let panel_frame: NovaFramePacket =
+      nova_frame_packet(frame_tick, panel_toggle_state, 1, packed_radius);
+    let panel_target: NovaTargetPacket =
+      nova_target_packet(panel_toggle_state, 48, 18, panel_accent);
+    let panel_frame_graph: NovaFrameGraphPacket =
+      nova_frame_graph_packet(2, 1, panel_toggle_state, panel_focus_index);
+    let panel_attachment: NovaAttachmentPacket =
+      nova_attachment_packet(0, panel_accent, panel_toggle_state, 1);
+    let panel_pass_chain: NovaPassChainPacket =
+      nova_pass_chain_packet(2, 1, panel_toggle_state, panel_accent);
+    let panel_barrier: NovaBarrierPacket =
+      nova_barrier_packet(1, panel_toggle_state, 2, panel_accent);
+    let panel_resource_set: NovaResourceSetPacket =
+      nova_resource_set_packet(2, 1, 1, panel_accent);
+    let panel_schedule: NovaSchedulePacket =
+      nova_schedule_packet(2, 4, packed_radius, panel_toggle_state);
     let slider_color: NovaSliderPacket =
       nova_slider_packet(packed_color, 0, 127, 4, 0);
     let slider_speed: NovaSliderPacket =
@@ -125,6 +157,24 @@ mod cpu Main {
     let surface_state: NovaSurfaceState = nova_surface_state(panel_surface);
     let viewport_state: NovaViewportState = nova_viewport_state(panel_viewport);
     let layer_state: NovaLayerState = nova_layer_state(panel_layer);
+    let scene_state: NovaSceneState = nova_scene_state(panel_scene);
+    let camera_state: NovaCameraState = nova_camera_state(panel_camera);
+    let material_state: NovaMaterialState = nova_material_state(panel_material);
+    let light_state: NovaLightState = nova_light_state(panel_light);
+    let mesh_state: NovaMeshState = nova_mesh_state(panel_mesh);
+    let transform_state: NovaTransformState = nova_transform_state(panel_transform);
+    let node_state: NovaNodeState = nova_node_state(panel_node);
+    let pass_state: NovaPassState = nova_pass_state(panel_pass);
+    let frame_state: NovaFrameState = nova_frame_state(panel_frame);
+    let target_state: NovaTargetState = nova_target_state(panel_target);
+    let frame_graph_state: NovaFrameGraphState = nova_frame_graph_state(panel_frame_graph);
+    let attachment_state: NovaAttachmentState = nova_attachment_state(panel_attachment);
+    let pass_chain_state: NovaPassChainState = nova_pass_chain_state(panel_pass_chain);
+    let barrier_state: NovaBarrierState = nova_barrier_state(panel_barrier);
+    let resource_set_state: NovaResourceSetState =
+      nova_resource_set_state(panel_resource_set);
+    let schedule_state: NovaScheduleState =
+      nova_schedule_state(panel_schedule);
     let list_selection: NovaSelectionState = nova_list_selection(panel_list);
     let table_selection: NovaSelectionState = nova_table_selection(panel_table);
     let tree_selection: NovaSelectionState = nova_tree_selection(panel_tree);
@@ -146,6 +196,28 @@ mod cpu Main {
     let panel_surface_density: i64 = nova_surface_state_density(surface_state);
     let panel_viewport_width: i64 = nova_viewport_state_width(viewport_state);
     let panel_layer_visibility: i64 = nova_layer_state_visibility(layer_state);
+    let panel_scene_lights: i64 = nova_scene_state_light_count(scene_state);
+    let panel_camera_zoom: i64 = nova_camera_state_zoom(camera_state);
+    let panel_material_emissive: i64 = nova_material_state_emissive(material_state);
+    let panel_light_intensity: i64 = nova_light_state_intensity(light_state);
+    let panel_mesh_vertices: i64 = nova_mesh_state_vertex_count(mesh_state);
+    let panel_transform_scale: i64 = nova_transform_state_scale(transform_state);
+    let panel_node_depth: i64 = nova_node_state_depth(node_state);
+    let panel_pass_samples: i64 = nova_pass_state_sample_count(pass_state);
+    let panel_frame_exposure: i64 = nova_frame_state_exposure(frame_state);
+    let panel_target_msaa: i64 = nova_target_state_multisample(target_state);
+    let panel_frame_graph_passes: i64 =
+      nova_frame_graph_state_passes(frame_graph_state);
+    let panel_attachment_format: i64 =
+      nova_attachment_state_format_kind(attachment_state);
+    let panel_pass_chain_stages: i64 =
+      nova_pass_chain_state_stages(pass_chain_state);
+    let panel_barrier_flush: i64 =
+      nova_barrier_state_flush_mode(barrier_state);
+    let panel_resource_residency: i64 =
+      nova_resource_set_state_residency(resource_set_state);
+    let panel_schedule_budget: i64 =
+      nova_schedule_state_async_budget(schedule_state);
     let list_selection_origin: i64 = nova_selection_state_origin(list_selection);
     let table_selection_origin: i64 = nova_selection_state_origin(table_selection);
     let tree_selection_origin: i64 = nova_selection_state_origin(tree_selection);
@@ -168,6 +240,22 @@ mod cpu Main {
       + panel_surface_density
       + panel_viewport_width
       + panel_layer_visibility
+      + panel_scene_lights
+      + panel_camera_zoom
+      + panel_material_emissive
+      + panel_light_intensity
+      + panel_mesh_vertices
+      + panel_transform_scale
+      + panel_node_depth
+      + panel_pass_samples
+      + panel_frame_exposure
+      + panel_target_msaa
+      + panel_frame_graph_passes
+      + panel_attachment_format
+      + panel_pass_chain_stages
+      + panel_barrier_flush
+      + panel_resource_residency
+      + panel_schedule_budget
       + list_selection_origin
       + table_selection_origin
       + tree_selection_origin
@@ -196,6 +284,22 @@ mod cpu Main {
       panel_surface,
       panel_viewport,
       panel_layer,
+      panel_scene,
+      panel_camera,
+      panel_material,
+      panel_light,
+      panel_mesh,
+      panel_transform,
+      panel_node,
+      panel_pass,
+      panel_frame,
+      panel_target,
+      panel_frame_graph,
+      panel_attachment,
+      panel_pass_chain,
+      panel_barrier,
+      panel_resource_set,
+      panel_schedule,
       panel_focus
     );
 
