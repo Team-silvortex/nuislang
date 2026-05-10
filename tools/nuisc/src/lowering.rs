@@ -979,6 +979,90 @@ fn lower_expr(
                 push_dep_edges(state, accent_name, &outline_struct);
                 panel_group_nodes.push(outline_struct.clone());
 
+                let theme_struct = next_name(state, "nova_panel_theme");
+                state.yir.nodes.push(Node {
+                    name: theme_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaThemePacket".to_owned(),
+                            format!("accent={accent_name}"),
+                            format!("surface={radius_name}"),
+                            format!("panel_mode={toggle_name}"),
+                            format!("contrast={speed_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, accent_name, &theme_struct);
+                push_dep_edges(state, &radius_name, &theme_struct);
+                push_dep_edges(state, toggle_name, &theme_struct);
+                push_dep_edges(state, &speed_name, &theme_struct);
+                panel_group_nodes.push(theme_struct.clone());
+
+                let surface_struct = next_name(state, "nova_panel_surface");
+                state.yir.nodes.push(Node {
+                    name: surface_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaSurfacePacket".to_owned(),
+                            format!("density={speed_name}"),
+                            format!("elevation={radius_name}"),
+                            format!("grid={toggle_name}"),
+                            format!("sheen={accent_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, &speed_name, &surface_struct);
+                push_dep_edges(state, &radius_name, &surface_struct);
+                push_dep_edges(state, toggle_name, &surface_struct);
+                push_dep_edges(state, accent_name, &surface_struct);
+                panel_group_nodes.push(surface_struct.clone());
+
+                let viewport_struct = next_name(state, "nova_panel_viewport");
+                state.yir.nodes.push(Node {
+                    name: viewport_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaViewportPacket".to_owned(),
+                            format!("origin_x={focus_name}"),
+                            format!("origin_y={toggle_name}"),
+                            "width=48".to_owned(),
+                            "height=18".to_owned(),
+                        ],
+                    },
+                });
+                push_dep_edges(state, focus_name, &viewport_struct);
+                push_dep_edges(state, toggle_name, &viewport_struct);
+                panel_group_nodes.push(viewport_struct.clone());
+
+                let layer_struct = next_name(state, "nova_panel_layer");
+                state.yir.nodes.push(Node {
+                    name: layer_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaLayerPacket".to_owned(),
+                            "order=1".to_owned(),
+                            format!("blend={toggle_name}"),
+                            "visibility=1".to_owned(),
+                            format!("clip={radius_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &layer_struct);
+                push_dep_edges(state, &radius_name, &layer_struct);
+                panel_group_nodes.push(layer_struct.clone());
+
                 let focus_struct = next_name(state, "nova_panel_focus");
                 state.yir.nodes.push(Node {
                     name: focus_struct.clone(),
@@ -1011,6 +1095,10 @@ fn lower_expr(
                     format!("tree={tree_struct}"),
                     format!("inspector={inspector_struct}"),
                     format!("outline={outline_struct}"),
+                    format!("theme={theme_struct}"),
+                    format!("surface={surface_struct}"),
+                    format!("viewport={viewport_struct}"),
+                    format!("layer={layer_struct}"),
                     format!("focus={focus_struct}"),
                 ]
             } else {

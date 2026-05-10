@@ -5191,9 +5191,13 @@ mod tests {
                     let tree: NovaTreePacket = nova_tree_packet(1, 6, 1, 8);
                     let inspector: NovaInspectorPacket = nova_inspector_packet(1, 4, 1, 8);
                     let outline: NovaOutlinePacket = nova_outline_packet(1, 6, 1, 8);
+                    let theme: NovaThemePacket = nova_theme_packet(8, 3, 1, 2);
+                    let surface: NovaSurfacePacket = nova_surface_packet(3, 2, 1, 4);
+                    let viewport: NovaViewportPacket = nova_viewport_packet(2, 1, 48, 18);
+                    let layer: NovaLayerPacket = nova_layer_packet(1, 2, 1, 0);
                     let focus: NovaFocusPacket = nova_focus_packet(2);
                     let packet: NovaPanelPacket = nova_panel_from_parts(
-                      header,
+                        header,
                       sliders,
                       toggle,
                       progress,
@@ -5207,10 +5211,14 @@ mod tests {
                       tabs,
                       list,
                       table,
-                      tree,
-                      inspector,
-                      outline,
-                      focus
+                        tree,
+                        inspector,
+                        outline,
+                        theme,
+                        surface,
+                        viewport,
+                        layer,
+                        focus
                     );
                   }
                 }

@@ -2217,6 +2217,194 @@ fn lower_call_expr_with_async(
                 ],
             })
         }
+        "nova_theme_packet" => {
+            let (accent, surface, panel_mode, contrast) = match args {
+                [accent, surface, panel_mode, contrast] => (accent, surface, panel_mode, contrast),
+                _ => return Err("nova_theme_packet(...) expects 4 args".to_owned()),
+            };
+            let accent = lower_expr(
+                accent,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let surface = lower_expr(
+                surface,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let panel_mode = lower_expr(
+                panel_mode,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let contrast = lower_expr(
+                contrast,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaThemePacket".to_owned(),
+                fields: vec![
+                    ("accent".to_owned(), accent),
+                    ("surface".to_owned(), surface),
+                    ("panel_mode".to_owned(), panel_mode),
+                    ("contrast".to_owned(), contrast),
+                ],
+            })
+        }
+        "nova_surface_packet" => {
+            let (density, elevation, grid, sheen) = match args {
+                [density, elevation, grid, sheen] => (density, elevation, grid, sheen),
+                _ => return Err("nova_surface_packet(...) expects 4 args".to_owned()),
+            };
+            let density = lower_expr(
+                density,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let elevation = lower_expr(
+                elevation,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let grid = lower_expr(
+                grid,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let sheen = lower_expr(
+                sheen,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaSurfacePacket".to_owned(),
+                fields: vec![
+                    ("density".to_owned(), density),
+                    ("elevation".to_owned(), elevation),
+                    ("grid".to_owned(), grid),
+                    ("sheen".to_owned(), sheen),
+                ],
+            })
+        }
+        "nova_viewport_packet" => {
+            let (origin_x, origin_y, width, height) = match args {
+                [origin_x, origin_y, width, height] => (origin_x, origin_y, width, height),
+                _ => return Err("nova_viewport_packet(...) expects 4 args".to_owned()),
+            };
+            let origin_x = lower_expr(
+                origin_x,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let origin_y = lower_expr(
+                origin_y,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let width = lower_expr(
+                width,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let height = lower_expr(
+                height,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaViewportPacket".to_owned(),
+                fields: vec![
+                    ("origin_x".to_owned(), origin_x),
+                    ("origin_y".to_owned(), origin_y),
+                    ("width".to_owned(), width),
+                    ("height".to_owned(), height),
+                ],
+            })
+        }
+        "nova_layer_packet" => {
+            let (order, blend, visibility, clip) = match args {
+                [order, blend, visibility, clip] => (order, blend, visibility, clip),
+                _ => return Err("nova_layer_packet(...) expects 4 args".to_owned()),
+            };
+            let order = lower_expr(
+                order,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let blend = lower_expr(
+                blend,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let visibility = lower_expr(
+                visibility,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let clip = lower_expr(
+                clip,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaLayerPacket".to_owned(),
+                fields: vec![
+                    ("order".to_owned(), order),
+                    ("blend".to_owned(), blend),
+                    ("visibility".to_owned(), visibility),
+                    ("clip".to_owned(), clip),
+                ],
+            })
+        }
         "nova_slider_packet" => {
             let (value, min_value, max_value, step_value, disabled) = match args {
                 [value] => (value, None, None, None, None),
@@ -3166,10 +3354,10 @@ fn lower_call_expr_with_async(
             })
         }
         "nova_panel_from_parts" => {
-            let [header, sliders, toggle, progress, meter, button, text_input, select, checkbox, radio, textarea, tabs, list, table, tree, inspector, outline, focus] =
+            let [header, sliders, toggle, progress, meter, button, text_input, select, checkbox, radio, textarea, tabs, list, table, tree, inspector, outline, theme, surface, viewport, layer, focus] =
                 args
             else {
-                return Err("nova_panel_from_parts(...) expects 18 args".to_owned());
+                return Err("nova_panel_from_parts(...) expects 22 args".to_owned());
             };
             let header = lower_expr(
                 header,
@@ -3307,6 +3495,38 @@ fn lower_call_expr_with_async(
                 struct_table,
                 Some(&named_type("NovaOutlinePacket")),
             )?;
+            let theme = lower_expr(
+                theme,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaThemePacket")),
+            )?;
+            let surface = lower_expr(
+                surface,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaSurfacePacket")),
+            )?;
+            let viewport = lower_expr(
+                viewport,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaViewportPacket")),
+            )?;
+            let layer = lower_expr(
+                layer,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaLayerPacket")),
+            )?;
             let focus = lower_expr(
                 focus,
                 current_domain,
@@ -3335,6 +3555,10 @@ fn lower_call_expr_with_async(
                     ("tree".to_owned(), tree),
                     ("inspector".to_owned(), inspector),
                     ("outline".to_owned(), outline),
+                    ("theme".to_owned(), theme),
+                    ("surface".to_owned(), surface),
+                    ("viewport".to_owned(), viewport),
+                    ("layer".to_owned(), layer),
                     ("focus".to_owned(), focus),
                 ],
             })
@@ -3916,6 +4140,190 @@ fn lower_call_expr_with_async(
                 ],
             })
         }
+        "nova_theme_state" => {
+            let [packet] = args else {
+                return Err("nova_theme_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaThemePacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaThemeState".to_owned(),
+                fields: vec![
+                    (
+                        "accent".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "accent".to_owned(),
+                        },
+                    ),
+                    (
+                        "surface".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "surface".to_owned(),
+                        },
+                    ),
+                    (
+                        "panel_mode".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "panel_mode".to_owned(),
+                        },
+                    ),
+                    (
+                        "contrast".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "contrast".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_surface_state" => {
+            let [packet] = args else {
+                return Err("nova_surface_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaSurfacePacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaSurfaceState".to_owned(),
+                fields: vec![
+                    (
+                        "density".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "density".to_owned(),
+                        },
+                    ),
+                    (
+                        "elevation".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "elevation".to_owned(),
+                        },
+                    ),
+                    (
+                        "grid".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "grid".to_owned(),
+                        },
+                    ),
+                    (
+                        "sheen".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "sheen".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_viewport_state" => {
+            let [packet] = args else {
+                return Err("nova_viewport_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaViewportPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaViewportState".to_owned(),
+                fields: vec![
+                    (
+                        "origin_x".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "origin_x".to_owned(),
+                        },
+                    ),
+                    (
+                        "origin_y".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "origin_y".to_owned(),
+                        },
+                    ),
+                    (
+                        "width".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "width".to_owned(),
+                        },
+                    ),
+                    (
+                        "height".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "height".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_layer_state" => {
+            let [packet] = args else {
+                return Err("nova_layer_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaLayerPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaLayerState".to_owned(),
+                fields: vec![
+                    (
+                        "order".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "order".to_owned(),
+                        },
+                    ),
+                    (
+                        "blend".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "blend".to_owned(),
+                        },
+                    ),
+                    (
+                        "visibility".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "visibility".to_owned(),
+                        },
+                    ),
+                    (
+                        "clip".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "clip".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
         "nova_selection_state" => {
             let [packet] = args else {
                 return Err("nova_selection_state(...) expects 1 arg".to_owned());
@@ -4039,6 +4447,22 @@ fn lower_call_expr_with_async(
         | "nova_inspector_state_selected"
         | "nova_outline_state_collapsed"
         | "nova_outline_state_selected"
+        | "nova_theme_state_accent"
+        | "nova_theme_state_surface"
+        | "nova_theme_state_panel_mode"
+        | "nova_theme_state_contrast"
+        | "nova_surface_state_density"
+        | "nova_surface_state_elevation"
+        | "nova_surface_state_grid"
+        | "nova_surface_state_sheen"
+        | "nova_viewport_state_origin_x"
+        | "nova_viewport_state_origin_y"
+        | "nova_viewport_state_width"
+        | "nova_viewport_state_height"
+        | "nova_layer_state_order"
+        | "nova_layer_state_blend"
+        | "nova_layer_state_visibility"
+        | "nova_layer_state_clip"
         | "nova_selection_state_selected"
         | "nova_selection_state_span"
         | "nova_selection_state_mode"
@@ -4071,6 +4495,22 @@ fn lower_call_expr_with_async(
                 "nova_inspector_state_selected" => ("NovaInspectorState", "selected"),
                 "nova_outline_state_collapsed" => ("NovaOutlineState", "collapsed"),
                 "nova_outline_state_selected" => ("NovaOutlineState", "selected"),
+                "nova_theme_state_accent" => ("NovaThemeState", "accent"),
+                "nova_theme_state_surface" => ("NovaThemeState", "surface"),
+                "nova_theme_state_panel_mode" => ("NovaThemeState", "panel_mode"),
+                "nova_theme_state_contrast" => ("NovaThemeState", "contrast"),
+                "nova_surface_state_density" => ("NovaSurfaceState", "density"),
+                "nova_surface_state_elevation" => ("NovaSurfaceState", "elevation"),
+                "nova_surface_state_grid" => ("NovaSurfaceState", "grid"),
+                "nova_surface_state_sheen" => ("NovaSurfaceState", "sheen"),
+                "nova_viewport_state_origin_x" => ("NovaViewportState", "origin_x"),
+                "nova_viewport_state_origin_y" => ("NovaViewportState", "origin_y"),
+                "nova_viewport_state_width" => ("NovaViewportState", "width"),
+                "nova_viewport_state_height" => ("NovaViewportState", "height"),
+                "nova_layer_state_order" => ("NovaLayerState", "order"),
+                "nova_layer_state_blend" => ("NovaLayerState", "blend"),
+                "nova_layer_state_visibility" => ("NovaLayerState", "visibility"),
+                "nova_layer_state_clip" => ("NovaLayerState", "clip"),
                 "nova_selection_state_selected" => ("NovaSelectionState", "selected"),
                 "nova_selection_state_span" => ("NovaSelectionState", "span"),
                 "nova_selection_state_mode" => ("NovaSelectionState", "mode"),
@@ -5252,6 +5692,22 @@ fn builtin_struct_field_type(type_name: &str, field: &str) -> Option<NirTypeRef>
             "accent" | "title_mode" => Some(i64()),
             _ => None,
         },
+        "NovaThemePacket" => match field {
+            "accent" | "surface" | "panel_mode" | "contrast" => Some(i64()),
+            _ => None,
+        },
+        "NovaSurfacePacket" => match field {
+            "density" | "elevation" | "grid" | "sheen" => Some(i64()),
+            _ => None,
+        },
+        "NovaViewportPacket" => match field {
+            "origin_x" | "origin_y" | "width" | "height" => Some(i64()),
+            _ => None,
+        },
+        "NovaLayerPacket" => match field {
+            "order" | "blend" | "visibility" | "clip" => Some(i64()),
+            _ => None,
+        },
         "NovaSliderPacket" => match field {
             "value" | "min" | "max" | "step" | "disabled" => Some(i64()),
             _ => None,
@@ -5342,6 +5798,10 @@ fn builtin_struct_field_type(type_name: &str, field: &str) -> Option<NirTypeRef>
             "tree" => Some(named("NovaTreePacket")),
             "inspector" => Some(named("NovaInspectorPacket")),
             "outline" => Some(named("NovaOutlinePacket")),
+            "theme" => Some(named("NovaThemePacket")),
+            "surface" => Some(named("NovaSurfacePacket")),
+            "viewport" => Some(named("NovaViewportPacket")),
+            "layer" => Some(named("NovaLayerPacket")),
             "focus" => Some(named("NovaFocusPacket")),
             _ => None,
         },
@@ -5395,6 +5855,22 @@ fn builtin_struct_field_type(type_name: &str, field: &str) -> Option<NirTypeRef>
         },
         "NovaOutlineState" => match field {
             "selected" | "items" | "collapsed" => Some(i64()),
+            _ => None,
+        },
+        "NovaThemeState" => match field {
+            "accent" | "surface" | "panel_mode" | "contrast" => Some(i64()),
+            _ => None,
+        },
+        "NovaSurfaceState" => match field {
+            "density" | "elevation" | "grid" | "sheen" => Some(i64()),
+            _ => None,
+        },
+        "NovaViewportState" => match field {
+            "origin_x" | "origin_y" | "width" | "height" => Some(i64()),
+            _ => None,
+        },
+        "NovaLayerState" => match field {
+            "order" | "blend" | "visibility" | "clip" => Some(i64()),
             _ => None,
         },
         "NovaSelectionState" => match field {
@@ -6180,6 +6656,7 @@ mod tests {
                 let tree: NovaTreePacket = nova_tree_packet(1, 6, 1, 7);
                 let inspector: NovaInspectorPacket = nova_inspector_packet(1, 4, 1, 7);
                 let outline: NovaOutlinePacket = nova_outline_packet(1, 6, 1, 7);
+                let theme: NovaThemePacket = nova_theme_packet(7, 3, 1, 2);
                 let selection: NovaSelectionPacket = nova_selection_packet(1, 6, 1, 4);
                 return 1;
               }
@@ -6315,6 +6792,14 @@ mod tests {
         ));
         assert!(matches!(
             function.body.get(15),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            }) if ty.render() == "NovaThemePacket" && type_name == "NovaThemePacket"
+        ));
+        assert!(matches!(
+            function.body.get(16),
             Some(NirStmt::Let {
                 ty: Some(ty),
                 value: NirExpr::StructLiteral { type_name, .. },
@@ -6717,6 +7202,109 @@ mod tests {
     }
 
     #[test]
+    fn lowers_nova_theme_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let theme: NovaThemePacket = nova_theme_packet(7, 3, 1, 2);
+                let state: NovaThemeState = nova_theme_state(theme);
+                let accent: i64 = nova_theme_state_accent(state);
+                let surface: i64 = nova_theme_state_surface(state);
+                let panel_mode: i64 = nova_theme_state_panel_mode(state);
+                let contrast: i64 = nova_theme_state_contrast(state);
+                return accent + surface + panel_mode + contrast;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            function.body.get(1),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            }) if ty.render() == "NovaThemeState" && type_name == "NovaThemeState"
+        ));
+        assert!(matches!(
+            function.body.get(2),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::FieldAccess { field, .. },
+                ..
+            }) if ty.render() == "i64" && field == "accent"
+        ));
+        assert!(matches!(
+            function.body.get(5),
+            Some(NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::FieldAccess { field, .. },
+                ..
+            }) if ty.render() == "i64" && field == "contrast"
+        ));
+    }
+
+    #[test]
+    fn lowers_nova_render_state_contracts() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let surface: NovaSurfacePacket = nova_surface_packet(3, 2, 1, 4);
+                let viewport: NovaViewportPacket = nova_viewport_packet(2, 1, 48, 18);
+                let layer: NovaLayerPacket = nova_layer_packet(1, 2, 1, 0);
+                let surface_state: NovaSurfaceState = nova_surface_state(surface);
+                let viewport_state: NovaViewportState = nova_viewport_state(viewport);
+                let layer_state: NovaLayerState = nova_layer_state(layer);
+                let density: i64 = nova_surface_state_density(surface_state);
+                let width: i64 = nova_viewport_state_width(viewport_state);
+                let visibility: i64 = nova_layer_state_visibility(layer_state);
+                return density + width + visibility;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaSurfaceState" && type_name == "NovaSurfaceState",
+            _ => false,
+        }));
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaViewportState" && type_name == "NovaViewportState",
+            _ => false,
+        }));
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaLayerState" && type_name == "NovaLayerState",
+            _ => false,
+        }));
+    }
+
+    #[test]
     fn lowers_nova_panel_from_parts_builder() {
         let module = parse_nuis_module(
             r#"
@@ -6743,6 +7331,10 @@ mod tests {
                 let tree: NovaTreePacket = nova_tree_packet(1, 6, 1, 8);
                 let inspector: NovaInspectorPacket = nova_inspector_packet(1, 4, 1, 8);
                 let outline: NovaOutlinePacket = nova_outline_packet(1, 6, 1, 8);
+                let theme: NovaThemePacket = nova_theme_packet(8, 3, 1, 2);
+                let surface: NovaSurfacePacket = nova_surface_packet(3, 2, 1, 4);
+                let viewport: NovaViewportPacket = nova_viewport_packet(2, 1, 48, 18);
+                let layer: NovaLayerPacket = nova_layer_packet(1, 2, 1, 0);
                 let focus: NovaFocusPacket = nova_focus_packet(2);
                 let panel: NovaPanelPacket = nova_panel_from_parts(
                   header,
@@ -6762,6 +7354,10 @@ mod tests {
                   tree,
                   inspector,
                   outline,
+                  theme,
+                  surface,
+                  viewport,
+                  layer,
                   focus
                 );
                 return 1;
@@ -6776,14 +7372,14 @@ mod tests {
             .iter()
             .find(|function| function.name == "main")
             .unwrap();
-        assert!(matches!(
-            function.body.get(21),
-            Some(NirStmt::Let {
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
                 ty: Some(ty),
                 value: NirExpr::StructLiteral { type_name, .. },
                 ..
-            }) if ty.render() == "NovaPanelPacket" && type_name == "NovaPanelPacket"
-        ));
+            } => ty.render() == "NovaPanelPacket" && type_name == "NovaPanelPacket",
+            _ => false,
+        }));
     }
 
     #[test]

@@ -27,11 +27,17 @@ struct NsNovaManifest {
     pub framework_schema: String,
     pub framework: String,
     pub project: String,
+    pub family_schema: Option<String>,
+    pub family_layers: Vec<String>,
     pub entry_cpu_unit: Option<String>,
     pub primary_data_unit: Option<String>,
     pub primary_shader_unit: Option<String>,
     pub primary_kernel_unit: Option<String>,
     pub render_links: Vec<String>,
+    pub render_schema: Option<String>,
+    pub render_owner_unit: Option<String>,
+    pub render_bridge_unit: Option<String>,
+    pub render_surface_unit: Option<String>,
     pub selection_schema: Option<String>,
     pub selection_owner_unit: Option<String>,
     pub selection_bridge_unit: Option<String>,
@@ -227,6 +233,9 @@ pub fn check(input: &Path) -> Result<CheckedGalaxy, String> {
             profile.primary_data_unit.as_deref(),
             profile.primary_shader_unit.as_deref(),
             profile.primary_kernel_unit.as_deref(),
+            profile.render_owner_unit.as_deref(),
+            profile.render_bridge_unit.as_deref(),
+            profile.render_surface_unit.as_deref(),
             profile.selection_owner_unit.as_deref(),
             profile.selection_bridge_unit.as_deref(),
             profile.selection_render_unit.as_deref(),
@@ -240,6 +249,51 @@ pub fn check(input: &Path) -> Result<CheckedGalaxy, String> {
                     profile_path.display(),
                     unit
                 ));
+            }
+        }
+        if let Some(schema) = profile.family_schema.as_deref() {
+            if schema != "ns-nova-family-v1" {
+                return Err(format!(
+                    "ns-nova profile `{}` has unsupported family_schema `{}`; expected `ns-nova-family-v1`",
+                    profile_path.display(),
+                    schema
+                ));
+            }
+            if profile.family_layers.is_empty() {
+                return Err(format!(
+                    "ns-nova profile `{}` enables family_schema but declares no `family_layers`",
+                    profile_path.display()
+                ));
+            }
+            for layer in &profile.family_layers {
+                if !matches!(layer.as_str(), "core" | "ui" | "scene") {
+                    return Err(format!(
+                        "ns-nova profile `{}` declares unsupported family layer `{}`",
+                        profile_path.display(),
+                        layer
+                    ));
+                }
+            }
+        }
+        if let Some(schema) = profile.render_schema.as_deref() {
+            if schema != "ns-nova-render-v1" {
+                return Err(format!(
+                    "ns-nova profile `{}` has unsupported render_schema `{}`; expected `ns-nova-render-v1`",
+                    profile_path.display(),
+                    schema
+                ));
+            }
+            for (field, value) in [
+                ("render_owner_unit", profile.render_owner_unit.as_deref()),
+                ("render_bridge_unit", profile.render_bridge_unit.as_deref()),
+                ("render_surface_unit", profile.render_surface_unit.as_deref()),
+            ] {
+                if value.is_none() {
+                    return Err(format!(
+                        "ns-nova profile `{}` enables render_schema but is missing `{field}`",
+                        profile_path.display()
+                    ));
+                }
             }
         }
         if let Some(schema) = profile.selection_schema.as_deref() {
@@ -834,11 +888,27 @@ fn default_ns_nova_manifest(project: &nuisc::project::LoadedProject) -> NsNovaMa
         framework_schema: "ns-nova-manifest-v1".to_owned(),
         framework: "ns-nova".to_owned(),
         project: "nuis.toml".to_owned(),
+        family_schema: Some("ns-nova-family-v1".to_owned()),
+        family_layers: if primary_shader_unit.is_some() {
+            vec!["core".to_owned(), "ui".to_owned()]
+        } else {
+            vec!["core".to_owned()]
+        },
         entry_cpu_unit,
         primary_data_unit: primary_data_unit.clone(),
         primary_shader_unit: primary_shader_unit.clone(),
         primary_kernel_unit,
         render_links,
+        render_schema: Some("ns-nova-render-v1".to_owned()),
+        render_owner_unit: project.entry_path.file_name().and_then(|_| {
+            project
+                .modules
+                .iter()
+                .find(|module| module.path == project.entry_path)
+                .map(|module| format!("cpu.{}", module.ast.unit))
+        }),
+        render_bridge_unit: primary_data_unit.clone(),
+        render_surface_unit: primary_shader_unit.clone(),
         selection_schema: Some("ns-nova-selection-v1".to_owned()),
         selection_owner_unit: project.entry_path.file_name().and_then(|_| {
             project
@@ -1057,6 +1127,9 @@ fn render_ns_nova_manifest(manifest: &NsNovaManifest) -> String {
         escape(&manifest.framework),
         escape(&manifest.project),
     );
+    if let Some(value) = &manifest.family_schema {
+        source.push_str(&format!("family_schema = \"{}\"\n", escape(value)));
+    }
     if let Some(value) = &manifest.entry_cpu_unit {
         source.push_str(&format!("entry_cpu_unit = \"{}\"\n", escape(value)));
     }
@@ -1068,6 +1141,18 @@ fn render_ns_nova_manifest(manifest: &NsNovaManifest) -> String {
     }
     if let Some(value) = &manifest.primary_kernel_unit {
         source.push_str(&format!("primary_kernel_unit = \"{}\"\n", escape(value)));
+    }
+    if let Some(value) = &manifest.render_schema {
+        source.push_str(&format!("render_schema = \"{}\"\n", escape(value)));
+    }
+    if let Some(value) = &manifest.render_owner_unit {
+        source.push_str(&format!("render_owner_unit = \"{}\"\n", escape(value)));
+    }
+    if let Some(value) = &manifest.render_bridge_unit {
+        source.push_str(&format!("render_bridge_unit = \"{}\"\n", escape(value)));
+    }
+    if let Some(value) = &manifest.render_surface_unit {
+        source.push_str(&format!("render_surface_unit = \"{}\"\n", escape(value)));
     }
     if let Some(value) = &manifest.selection_schema {
         source.push_str(&format!("selection_schema = \"{}\"\n", escape(value)));
@@ -1082,7 +1167,8 @@ fn render_ns_nova_manifest(manifest: &NsNovaManifest) -> String {
         source.push_str(&format!("selection_render_unit = \"{}\"\n", escape(value)));
     }
     source.push_str(&format!(
-        "render_links = {}\nselection_controls = {}\ncpu_units = {}\ndata_units = {}\nshader_units = {}\nkernel_units = {}\n",
+        "family_layers = {}\nrender_links = {}\nselection_controls = {}\ncpu_units = {}\ndata_units = {}\nshader_units = {}\nkernel_units = {}\n",
+        render_string_array(&manifest.family_layers),
         render_string_array(&manifest.render_links),
         render_string_array(&manifest.selection_controls),
         render_string_array(&manifest.cpu_units),
@@ -1114,11 +1200,17 @@ fn parse_ns_nova_manifest(source: &str, path: &Path) -> Result<NsNovaManifest, S
         framework_schema: parse_required_string(source, "framework_schema", path)?,
         framework: parse_required_string(source, "framework", path)?,
         project: parse_required_string(source, "project", path)?,
+        family_schema: parse_optional_string(source, "family_schema"),
+        family_layers: parse_optional_string_array(source, "family_layers").unwrap_or_default(),
         entry_cpu_unit: parse_optional_string(source, "entry_cpu_unit"),
         primary_data_unit: parse_optional_string(source, "primary_data_unit"),
         primary_shader_unit: parse_optional_string(source, "primary_shader_unit"),
         primary_kernel_unit: parse_optional_string(source, "primary_kernel_unit"),
         render_links: parse_optional_string_array(source, "render_links").unwrap_or_default(),
+        render_schema: parse_optional_string(source, "render_schema"),
+        render_owner_unit: parse_optional_string(source, "render_owner_unit"),
+        render_bridge_unit: parse_optional_string(source, "render_bridge_unit"),
+        render_surface_unit: parse_optional_string(source, "render_surface_unit"),
         selection_schema: parse_optional_string(source, "selection_schema"),
         selection_owner_unit: parse_optional_string(source, "selection_owner_unit"),
         selection_bridge_unit: parse_optional_string(source, "selection_bridge_unit"),
@@ -1245,10 +1337,16 @@ mod tests {
             framework_schema: "ns-nova-manifest-v1".to_owned(),
             framework: "ns-nova".to_owned(),
             project: "nuis.toml".to_owned(),
+            family_schema: Some("ns-nova-family-v1".to_owned()),
+            family_layers: vec!["core".to_owned(), "ui".to_owned()],
             entry_cpu_unit: Some("cpu.Main".to_owned()),
             primary_data_unit: Some("data.FabricPlane".to_owned()),
             primary_shader_unit: Some("shader.SurfaceShader".to_owned()),
             primary_kernel_unit: None,
+            render_schema: Some("ns-nova-render-v1".to_owned()),
+            render_owner_unit: Some("cpu.Main".to_owned()),
+            render_bridge_unit: Some("data.FabricPlane".to_owned()),
+            render_surface_unit: Some("shader.SurfaceShader".to_owned()),
             selection_schema: Some("ns-nova-selection-v1".to_owned()),
             selection_owner_unit: Some("cpu.Main".to_owned()),
             selection_bridge_unit: Some("data.FabricPlane".to_owned()),

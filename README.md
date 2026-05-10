@@ -81,7 +81,7 @@ High-signal implemented surfaces:
 * compile-cache inspection and pruning through `nuis`
 * AOT bundle generation for current CPU-only and macOS window-hosted demo paths
 * project-level host FFI contract indexing
-* `ns-nova` galaxy manifests with framework-level assembly metadata, including standard selection contract scaffolding
+* `ns-nova` framework manifests with family/render/selection assembly metadata for `core / ui / future scene` layering
 * `cpu/data/shader/kernel` result-family validation in `YIR`
 * task-style async primitives with `spawn / join / cancel / timeout / join_result`
 * core-level async/result metadata beginning to move into `yir-core`

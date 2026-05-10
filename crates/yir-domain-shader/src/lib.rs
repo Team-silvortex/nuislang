@@ -1421,15 +1421,38 @@ fn draw_control_panel_surface(
     );
     let progress_value = normalize_control_value(packet.progress_value, 0, packet.progress_max);
     let meter_value = normalize_control_value(packet.meter_value, 0, packet.meter_max);
-    let accent = control_panel_accent(packet.accent);
+    let accent = control_panel_accent(packet.accent, packet.contrast);
     let button_on = packet.button_state != 0;
     let toggle_disabled = packet.toggle_disabled != 0;
+    let viewport_shift_x = packet.viewport_x.rem_euclid(3) as usize;
+    let viewport_shift_y = packet.viewport_y.rem_euclid(2) as usize;
+    let viewport_width = packet.viewport_width.max(24) as usize;
+    let viewport_height = packet.viewport_height.max(12) as usize;
+    let layer_hidden = packet.layer_visibility == 0;
+    let blend_fill = match packet.layer_blend.rem_euclid(3) {
+        0 => '.',
+        1 => ':',
+        _ => ';',
+    };
 
     let mut rows = vec![vec![' '; width]; height];
+    fill_panel_background(
+        &mut rows,
+        packet.surface,
+        packet.contrast + packet.surface_density + packet.surface_sheen,
+    );
     let panel_left = 2usize;
     let panel_top = 1usize;
     let panel_right = width.saturating_sub(3);
     let panel_bottom = height.saturating_sub(2);
+    let viewport_left = (panel_left + 2 + viewport_shift_x).min(panel_right.saturating_sub(8));
+    let viewport_top = (panel_top + 5 + viewport_shift_y).min(panel_bottom.saturating_sub(8));
+    let viewport_right = (viewport_left + viewport_width)
+        .min(panel_right.saturating_sub(30))
+        .max(viewport_left + 8);
+    let viewport_bottom = (viewport_top + viewport_height)
+        .min(panel_bottom.saturating_sub(1))
+        .max(viewport_top + 6);
 
     draw_box(
         &mut rows,
@@ -1452,14 +1475,80 @@ fn draw_control_panel_surface(
         panel_bottom.saturating_sub(1),
         '.',
     );
+    draw_card(
+        &mut rows,
+        viewport_left,
+        viewport_top,
+        viewport_right,
+        viewport_bottom,
+        accent,
+        if packet.panel_mode.rem_euclid(2) == 0 {
+            blend_fill
+        } else {
+            if packet.surface_grid.rem_euclid(2) == 0 {
+                ':'
+            } else {
+                ';'
+            }
+        },
+    );
+    draw_card(
+        &mut rows,
+        panel_right.saturating_sub(29),
+        panel_top + 3,
+        panel_right.saturating_sub(2),
+        panel_top + 13,
+        accent,
+        ':',
+    );
+    draw_card(
+        &mut rows,
+        panel_right.saturating_sub(29),
+        panel_top + 14,
+        panel_right.saturating_sub(2),
+        panel_top + 20,
+        accent,
+        '.',
+    );
+    draw_card(
+        &mut rows,
+        panel_left + 2,
+        panel_bottom.saturating_sub(9),
+        panel_right.saturating_sub(30),
+        panel_bottom.saturating_sub(1),
+        accent,
+        if packet.layer_clip.rem_euclid(2) == 0 {
+            ':'
+        } else {
+            '.'
+        },
+    );
+    let status_bar_left = panel_left + 3;
+    let status_bar_right = panel_right.saturating_sub(4);
+    fill_rect(
+        &mut rows,
+        status_bar_left,
+        panel_top + 1,
+        status_bar_right,
+        panel_top + 1,
+        '=',
+    );
     put_text(
         &mut rows,
         panel_left + 3,
         panel_top + 2,
         if packet.header_title_mode.rem_euclid(2) == 0 {
-            "ns-nova control panel"
+            if packet.panel_mode.rem_euclid(2) == 0 {
+                "ns-nova control panel"
+            } else {
+                "ns-nova studio workspace"
+            }
         } else {
-            "ns-nova reactive controls"
+            if packet.panel_mode.rem_euclid(2) == 0 {
+                "ns-nova reactive controls"
+            } else {
+                "ns-nova reactive cockpit"
+            }
         },
     );
     put_text(
@@ -1468,6 +1557,49 @@ fn draw_control_panel_surface(
         panel_top + 3,
         "range / button / meter / text / select",
     );
+    put_text(
+        &mut rows,
+        panel_left + 34,
+        panel_top + 3,
+        "list / table / tree / inspector / outline",
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 2,
+        &format!(
+            "vp {}x{} @{},{}",
+            viewport_width, viewport_height, packet.viewport_x, packet.viewport_y
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 4,
+        &format!(
+            "layer o{} b{} {}",
+            packet.layer_order,
+            packet.layer_blend,
+            if layer_hidden { "hidden" } else { "live" }
+        ),
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(26),
+        panel_top + 5,
+        &format!(
+            "surf d{} e{} g{}",
+            packet.surface_density, packet.surface_elevation, packet.surface_grid
+        ),
+    );
+    if layer_hidden {
+        put_text(
+            &mut rows,
+            viewport_left + 3,
+            viewport_top + 2,
+            "layer hidden: overlay retained for debug",
+        );
+    }
     put_text(
         &mut rows,
         panel_right.saturating_sub(18),
@@ -1479,6 +1611,27 @@ fn draw_control_panel_surface(
         } else {
             "mode: idle"
         },
+    );
+    put_text(
+        &mut rows,
+        panel_left + 3,
+        panel_top + 1,
+        if packet.select_committed != 0 {
+            "nova scene live graph"
+        } else {
+            "nova scene staging graph"
+        },
+    );
+    put_text(
+        &mut rows,
+        panel_right.saturating_sub(28),
+        panel_top + 1,
+        &format!(
+            "theme s{} m{} c{}",
+            packet.surface.rem_euclid(10),
+            packet.panel_mode.rem_euclid(10),
+            packet.contrast.rem_euclid(10)
+        ),
     );
 
     let slider_left = panel_left + 16;
@@ -1537,6 +1690,12 @@ fn draw_control_panel_surface(
     }
 
     let progress_y = panel_top + 17;
+    put_text(
+        &mut rows,
+        panel_left + 3,
+        progress_y.saturating_sub(1),
+        "frame",
+    );
     put_text(&mut rows, panel_left + 3, progress_y, "PROGRESS");
     draw_slider(
         &mut rows,
@@ -1554,6 +1713,12 @@ fn draw_control_panel_surface(
     );
 
     let meter_y = panel_top + 19;
+    put_text(
+        &mut rows,
+        panel_left + 3,
+        meter_y.saturating_sub(1),
+        "energy",
+    );
     put_text(&mut rows, panel_left + 3, meter_y, "METER");
     draw_slider(
         &mut rows,
@@ -1614,6 +1779,12 @@ fn draw_control_panel_surface(
             _ if button_on => "SYNC ",
             _ => "HOLD ",
         },
+    );
+    put_text(
+        &mut rows,
+        button_left + 2,
+        button_bottom,
+        if button_on { "pulse" } else { "standby" },
     );
 
     let knob_center_x = panel_left + 8;
@@ -2164,12 +2335,13 @@ fn sphere_palette(color: i64) -> &'static [char] {
     }
 }
 
-fn control_panel_accent(color: i64) -> char {
-    match color.rem_euclid(4) {
+fn control_panel_accent(color: i64, contrast: i64) -> char {
+    match (color + contrast).rem_euclid(5) {
         0 => '#',
         1 => '*',
         2 => '@',
-        _ => '+',
+        3 => '+',
+        _ => '%',
     }
 }
 
@@ -2240,6 +2412,53 @@ fn draw_knob(
     stamp_line(rows, cx, cy, nx, ny, accent);
     if ny < rows.len() && nx < rows[ny].len() {
         rows[ny][nx] = accent;
+    }
+}
+
+fn fill_panel_background(rows: &mut [Vec<char>], surface: i64, contrast: i64) {
+    let palette = match (surface + contrast).rem_euclid(5) {
+        0 => [' ', '.', '.', ':'],
+        1 => [' ', '.', ':', '*'],
+        2 => [' ', '.', '`', '+'],
+        3 => [' ', '.', '.', '='],
+        _ => [' ', '·', '.', ':'],
+    };
+    for (y, row) in rows.iter_mut().enumerate() {
+        for (x, cell) in row.iter_mut().enumerate() {
+            let band = ((x / 7) + (y / 3)) % palette.len();
+            *cell = palette[band];
+        }
+    }
+}
+
+fn draw_card(
+    rows: &mut [Vec<char>],
+    left: usize,
+    top: usize,
+    right: usize,
+    bottom: usize,
+    accent: char,
+    fill: char,
+) {
+    if right <= left + 1 || bottom <= top + 1 {
+        return;
+    }
+    draw_box(
+        rows, left, top, right, bottom, '.', '.', '\'', '\'', '-', '|',
+    );
+    fill_rect(
+        rows,
+        left + 1,
+        top + 1,
+        right.saturating_sub(1),
+        bottom.saturating_sub(1),
+        fill,
+    );
+    if top < rows.len() && left + 2 < rows[top].len() {
+        rows[top][left + 2] = accent;
+    }
+    if top < rows.len() && right >= 2 && right - 2 < rows[top].len() {
+        rows[top][right - 2] = accent;
     }
 }
 
@@ -2334,6 +2553,21 @@ struct BallPacket {
     radius_step: i64,
     radius_disabled: i64,
     accent: i64,
+    surface: i64,
+    panel_mode: i64,
+    contrast: i64,
+    surface_density: i64,
+    surface_elevation: i64,
+    surface_grid: i64,
+    surface_sheen: i64,
+    viewport_x: i64,
+    viewport_y: i64,
+    viewport_width: i64,
+    viewport_height: i64,
+    layer_order: i64,
+    layer_blend: i64,
+    layer_visibility: i64,
+    layer_clip: i64,
     toggle_state: i64,
     focus_index: i64,
     progress_value: i64,
@@ -2410,6 +2644,21 @@ fn parse_ball_packet(value: &Value, op: &str) -> Result<BallPacket, String> {
                 radius_step: 3,
                 radius_disabled: 0,
                 accent: color_key,
+                surface: (radius_scale * 8.0).round() as i64,
+                panel_mode: if speed.round() as i64 % 2 == 0 { 0 } else { 1 },
+                contrast: speed.round() as i64,
+                surface_density: speed.round() as i64,
+                surface_elevation: (radius_scale * 16.0).round() as i64,
+                surface_grid: color_key.rem_euclid(3),
+                surface_sheen: color_key,
+                viewport_x: color_key.rem_euclid(4),
+                viewport_y: speed.round() as i64 % 3,
+                viewport_width: 48,
+                viewport_height: 18,
+                layer_order: 1,
+                layer_blend: speed.round() as i64 % 3,
+                layer_visibility: 1,
+                layer_clip: (radius_scale * 8.0).round() as i64,
                 toggle_state: if speed.round() as i64 % 2 == 0 { 0 } else { 1 },
                 focus_index: color_key.rem_euclid(3),
                 progress_value: speed.round() as i64,
@@ -2469,32 +2718,85 @@ fn parse_ball_packet(value: &Value, op: &str) -> Result<BallPacket, String> {
 
 fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket, String> {
     let color = find_slider_packet_value(packet, "color")
-        .or_else(|| find_packet_field(packet, &["color", "slider_color"], &["sliders"], &["color"]))
+        .or_else(|| find_flat_packet_field(packet, &["color", "slider_color"]))
         .ok_or_else(|| format!("{op} struct packet is missing `color` field"))?;
     let speed = find_slider_packet_value(packet, "speed")
-        .or_else(|| find_packet_field(packet, &["speed", "slider_speed"], &["sliders"], &["speed"]))
+        .or_else(|| find_flat_packet_field(packet, &["speed", "slider_speed"]))
         .ok_or_else(|| format!("{op} struct packet is missing `speed` field"))?;
     let radius_scale = find_slider_packet_value(packet, "radius")
-        .or_else(|| {
-            find_packet_field(
-                packet,
-                &["radius_scale", "slider_radius"],
-                &["sliders"],
-                &["radius"],
-            )
-        })
+        .or_else(|| find_flat_packet_field(packet, &["radius_scale", "slider_radius"]))
         .map(|value| scalar_to_f32(value, op))
         .transpose()?
         .unwrap_or(1.0);
     let accent = find_packet_field(
         packet,
         &["accent", "header_accent"],
-        &["header"],
+        &["theme", "header"],
         &["accent"],
     )
     .map(|value| scalar_to_color_key(value, op))
     .transpose()?
     .unwrap_or_else(|| scalar_to_color_key(color, op).unwrap_or(0));
+    let surface = find_packet_field(packet, &["theme_surface"], &["theme"], &["surface"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or((radius_scale * 8.0).round() as i64);
+    let panel_mode = find_packet_field(packet, &["panel_mode"], &["theme"], &["panel_mode"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(accent.rem_euclid(2));
+    let contrast = find_packet_field(packet, &["contrast"], &["theme"], &["contrast"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or_else(|| scalar_to_color_key(speed, op).unwrap_or(0));
+    let surface_density = find_packet_field(packet, &["density"], &["surface"], &["density"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or_else(|| scalar_to_color_key(speed, op).unwrap_or(0));
+    let surface_elevation = find_packet_field(packet, &["elevation"], &["surface"], &["elevation"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or((radius_scale * 16.0).round() as i64);
+    let surface_grid = find_packet_field(packet, &["grid"], &["surface"], &["grid"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(accent.rem_euclid(3));
+    let surface_sheen = find_packet_field(packet, &["sheen"], &["surface"], &["sheen"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(accent);
+    let viewport_x = find_packet_field(packet, &["origin_x"], &["viewport"], &["origin_x"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(accent.rem_euclid(4));
+    let viewport_y = find_packet_field(packet, &["origin_y"], &["viewport"], &["origin_y"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(contrast.rem_euclid(3));
+    let viewport_width = find_packet_field(packet, &["width"], &["viewport"], &["width"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(48);
+    let viewport_height = find_packet_field(packet, &["height"], &["viewport"], &["height"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(18);
+    let layer_order = find_packet_field(packet, &["order"], &["layer"], &["order"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(1);
+    let layer_blend = find_packet_field(packet, &["blend"], &["layer"], &["blend"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(contrast.rem_euclid(3));
+    let layer_visibility = find_packet_field(packet, &["visibility"], &["layer"], &["visibility"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(1);
+    let layer_clip = find_packet_field(packet, &["clip"], &["layer"], &["clip"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or((radius_scale * 8.0).round() as i64);
     let color_min = find_slider_packet_field(packet, "color", "min")
         .map(|value| scalar_to_color_key(value, op))
         .transpose()?
@@ -2800,6 +3102,21 @@ fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket
         radius_step,
         radius_disabled,
         accent,
+        surface,
+        panel_mode,
+        contrast,
+        surface_density,
+        surface_elevation,
+        surface_grid,
+        surface_sheen,
+        viewport_x,
+        viewport_y,
+        viewport_width,
+        viewport_height,
+        layer_order,
+        layer_blend,
+        layer_visibility,
+        layer_clip,
         toggle_state,
         focus_index,
         progress_value,
@@ -2882,6 +3199,14 @@ fn find_packet_field<'a>(
                     _ => None,
                 })
         })
+}
+
+fn find_flat_packet_field<'a>(packet: &'a StructValue, flat_names: &[&str]) -> Option<&'a Value> {
+    packet
+        .fields
+        .iter()
+        .find(|(name, _)| flat_names.iter().any(|candidate| name == candidate))
+        .map(|(_, value)| value)
 }
 
 fn find_slider_packet_value<'a>(packet: &'a StructValue, slider_name: &str) -> Option<&'a Value> {

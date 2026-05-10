@@ -23,6 +23,15 @@ Intended scope:
 * window/input/frame lifecycle abstractions
 * 2D UI, 3D scene, and game-style application driving built on the same GPU-native core
 
+Family structure:
+
+* `ns-nova-core`
+  shared render/runtime skeleton such as theme, surface, viewport, layer, and frame-facing contracts
+* `ns-nova-ui`
+  UI/widget/control framework built on top of the core render skeleton
+* `ns-nova-scene`
+  future 2D/3D scene/render-world framework built on the same core
+
 Design principles:
 
 * runtime-native and GPU-first, not a thin wrapper around software preview paths
@@ -34,7 +43,11 @@ Current state:
 * this repository now treats `ns-nova` as a standard-library/framework layer target, not as a separate future repository by default
 * the current real-time demo path in `window_controls_demo_project` is the execution direction `ns-nova` should eventually absorb and abstract
 * `nuis galaxy init --framework ns-nova` now emits an `ns-nova.toml` profile that carries framework-level assembly metadata, including the standard `ns-nova-selection-v1` selection contract for relational controls such as `list`, `table`, `tree`, `inspector`, and `outline`
+* `ns-nova.toml` now also carries `ns-nova-family-v1` and `ns-nova-render-v1` scaffolding so projects can declare whether they currently lean toward `core`, `ui`, or future `scene` layers
 
 See metadata:
 
 * [module.toml](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/module.toml)
+* [core/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/core/README.md)
+* [ui/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/ui/README.md)
+* [scene/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/scene/README.md)

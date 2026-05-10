@@ -50,6 +50,14 @@ mod cpu Main {
     let panel_focus_index: i64 = color_delta + speed_delta;
     let panel_header: NovaHeaderPacket =
       nova_header_packet(panel_accent, panel_focus_index);
+    let panel_theme: NovaThemePacket =
+      nova_theme_packet(panel_accent, packed_radius, panel_toggle_state, packed_speed);
+    let panel_surface: NovaSurfacePacket =
+      nova_surface_packet(packed_speed, packed_radius, panel_toggle_state, panel_accent);
+    let panel_viewport: NovaViewportPacket =
+      nova_viewport_packet(color_delta, speed_delta, 52, 20);
+    let panel_layer: NovaLayerPacket =
+      nova_layer_packet(1, panel_toggle_state, 1, radius_delta);
     let slider_color: NovaSliderPacket =
       nova_slider_packet(packed_color, 0, 127, 4, 0);
     let slider_speed: NovaSliderPacket =
@@ -113,6 +121,10 @@ mod cpu Main {
     let tree_state: NovaTreeState = nova_tree_state(panel_tree);
     let inspector_state: NovaInspectorState = nova_inspector_state(panel_inspector);
     let outline_state: NovaOutlineState = nova_outline_state(panel_outline);
+    let theme_state: NovaThemeState = nova_theme_state(panel_theme);
+    let surface_state: NovaSurfaceState = nova_surface_state(panel_surface);
+    let viewport_state: NovaViewportState = nova_viewport_state(panel_viewport);
+    let layer_state: NovaLayerState = nova_layer_state(panel_layer);
     let list_selection: NovaSelectionState = nova_list_selection(panel_list);
     let table_selection: NovaSelectionState = nova_table_selection(panel_table);
     let tree_selection: NovaSelectionState = nova_tree_selection(panel_tree);
@@ -130,6 +142,10 @@ mod cpu Main {
     let panel_tree_expanded: i64 = nova_tree_state_expanded(tree_state);
     let panel_inspector_pinned: i64 = nova_inspector_state_pinned(inspector_state);
     let panel_outline_collapsed: i64 = nova_outline_state_collapsed(outline_state);
+    let panel_theme_contrast: i64 = nova_theme_state_contrast(theme_state);
+    let panel_surface_density: i64 = nova_surface_state_density(surface_state);
+    let panel_viewport_width: i64 = nova_viewport_state_width(viewport_state);
+    let panel_layer_visibility: i64 = nova_layer_state_visibility(layer_state);
     let list_selection_origin: i64 = nova_selection_state_origin(list_selection);
     let table_selection_origin: i64 = nova_selection_state_origin(table_selection);
     let tree_selection_origin: i64 = nova_selection_state_origin(tree_selection);
@@ -148,6 +164,10 @@ mod cpu Main {
       + panel_tree_expanded
       + panel_inspector_pinned
       + panel_outline_collapsed
+      + panel_theme_contrast
+      + panel_surface_density
+      + panel_viewport_width
+      + panel_layer_visibility
       + list_selection_origin
       + table_selection_origin
       + tree_selection_origin
@@ -172,6 +192,10 @@ mod cpu Main {
       panel_tree,
       panel_inspector,
       panel_outline,
+      panel_theme,
+      panel_surface,
+      panel_viewport,
+      panel_layer,
       panel_focus
     );
 
