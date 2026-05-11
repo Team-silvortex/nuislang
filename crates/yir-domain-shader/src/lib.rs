@@ -3252,6 +3252,19 @@ fn draw_scene_preview(
         preview_top.saturating_add(4),
         &cluster_label,
     );
+    let visibility_label = format!(
+        "vs{} v{} o{} d{}",
+        packet.visibility_cluster_slot,
+        packet.visibility_visible_nodes,
+        packet.visibility_occlusion_mode,
+        packet.visibility_distance_band
+    );
+    put_text(
+        rows,
+        preview_left,
+        preview_top.saturating_add(5),
+        &visibility_label,
+    );
 
     let instance_count = packet.instance_count.clamp(1, 4) as usize;
     let instance_stride = packet.instance_stride.abs().clamp(2, 6) as usize;
@@ -3367,6 +3380,34 @@ fn draw_scene_preview(
         }
         stamp_line(rows, cluster_root_x, cluster_root_y, cx, cy, '~');
     }
+
+    let visibility_span = packet.visibility_visible_nodes.clamp(1, 5) as usize;
+    let vis_root_x = preview_left
+        .saturating_add(24 + packet.visibility_cluster_slot.rem_euclid(4) as usize)
+        .min(preview_right.saturating_sub(1));
+    let vis_root_y = root_y.saturating_add(2).min(ground_y.saturating_sub(1));
+    for idx in 0..visibility_span {
+        let vx = (vis_root_x + idx * 2).min(preview_right.saturating_sub(1));
+        let vy = (vis_root_y + idx.rem_euclid(2)).min(ground_y.saturating_sub(1));
+        let glyph = match (packet.visibility_mask + idx as i64).rem_euclid(4) {
+            0 => 'v',
+            1 => 'V',
+            2 => '^',
+            _ => '/',
+        };
+        if let Some(row) = rows.get_mut(vy) {
+            let slot = vx.min(row.len().saturating_sub(1));
+            if let Some(cell) = row.get_mut(slot) {
+                *cell = glyph;
+            }
+        }
+        let connector = if packet.visibility_occlusion_mode != 0 {
+            '!'
+        } else {
+            '.'
+        };
+        stamp_line(rows, cluster_root_x, cluster_root_y, vx, vy, connector);
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -3462,6 +3503,11 @@ struct BallPacket {
     scene_cluster_instance_group_slot: i64,
     scene_cluster_material_slot: i64,
     scene_cluster_layer_slot: i64,
+    visibility_cluster_slot: i64,
+    visibility_visible_nodes: i64,
+    visibility_occlusion_mode: i64,
+    visibility_distance_band: i64,
+    visibility_mask: i64,
     pass_stage: i64,
     pass_clear_mode: i64,
     pass_sample_count: i64,
@@ -3713,6 +3759,11 @@ fn parse_ball_packet(value: &Value, op: &str) -> Result<BallPacket, String> {
                 scene_cluster_instance_group_slot: 3,
                 scene_cluster_material_slot: color_key,
                 scene_cluster_layer_slot: 1,
+                visibility_cluster_slot: 3,
+                visibility_visible_nodes: 5,
+                visibility_occlusion_mode: 1,
+                visibility_distance_band: speed.round() as i64 % 4,
+                visibility_mask: 7,
                 pass_stage: speed.round() as i64 % 3,
                 pass_clear_mode: color_key,
                 pass_sample_count: 4,
@@ -4299,6 +4350,46 @@ fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket
             .map(|value| scalar_to_color_key(value, op))
             .transpose()?
             .unwrap_or(scene_graph_active_layer);
+    let visibility_cluster_slot = find_packet_field(
+        packet,
+        &["cluster_slot"],
+        &["scene_visibility"],
+        &["cluster_slot"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(scene_cluster_instance_group_slot);
+    let visibility_visible_nodes = find_packet_field(
+        packet,
+        &["visible_nodes"],
+        &["scene_visibility"],
+        &["visible_nodes"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(instance_group_visible_count);
+    let visibility_occlusion_mode = find_packet_field(
+        packet,
+        &["occlusion_mode"],
+        &["scene_visibility"],
+        &["occlusion_mode"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(scene_node_visibility);
+    let visibility_distance_band = find_packet_field(
+        packet,
+        &["distance_band"],
+        &["scene_visibility"],
+        &["distance_band"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(instance_group_phase_bias);
+    let visibility_mask = find_packet_field(packet, &["mask"], &["scene_visibility"], &["mask"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(7);
     let pass_stage = find_packet_field(packet, &["stage"], &["pass"], &["stage"])
         .map(|value| scalar_to_color_key(value, op))
         .transpose()?
@@ -5158,6 +5249,11 @@ fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket
         scene_cluster_instance_group_slot,
         scene_cluster_material_slot,
         scene_cluster_layer_slot,
+        visibility_cluster_slot,
+        visibility_visible_nodes,
+        visibility_occlusion_mode,
+        visibility_distance_band,
+        visibility_mask,
         pass_stage,
         pass_clear_mode,
         pass_sample_count,
