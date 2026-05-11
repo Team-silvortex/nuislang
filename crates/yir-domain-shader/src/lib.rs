@@ -3212,6 +3212,46 @@ fn draw_scene_preview(
         preview_top.saturating_add(1),
         &graph_label,
     );
+    let scene_node_label = format!(
+        "sn{} c{} s{} i{} v{}",
+        packet.scene_node_slot,
+        packet.scene_node_first_child_slot,
+        packet.scene_node_sibling_slot,
+        packet.scene_node_instance_slot,
+        packet.scene_node_visibility
+    );
+    put_text(
+        rows,
+        preview_left,
+        preview_top.saturating_add(2),
+        &scene_node_label,
+    );
+    let group_label = format!(
+        "ig{} g{} v{} p{}",
+        packet.instance_group_root_slot,
+        packet.instance_group_count,
+        packet.instance_group_visible_count,
+        packet.instance_group_phase_bias.rem_euclid(10)
+    );
+    put_text(
+        rows,
+        preview_left,
+        preview_top.saturating_add(3),
+        &group_label,
+    );
+    let cluster_label = format!(
+        "cl{} n{} g{} l{}",
+        packet.scene_cluster_root_slot,
+        packet.scene_cluster_node_budget,
+        packet.scene_cluster_instance_group_slot,
+        packet.scene_cluster_layer_slot
+    );
+    put_text(
+        rows,
+        preview_left,
+        preview_top.saturating_add(4),
+        &cluster_label,
+    );
 
     let instance_count = packet.instance_count.clamp(1, 4) as usize;
     let instance_stride = packet.instance_stride.abs().clamp(2, 6) as usize;
@@ -3259,6 +3299,73 @@ fn draw_scene_preview(
                 *cell = '.';
             }
         }
+    }
+
+    let node_y = root_y
+        .saturating_add(1 + packet.scene_node_slot.rem_euclid(2) as usize)
+        .min(ground_y.saturating_sub(1));
+    let child_x = preview_left
+        .saturating_add(3 + packet.scene_node_first_child_slot.rem_euclid(8) as usize)
+        .min(preview_right.saturating_sub(1));
+    let sibling_x = preview_left
+        .saturating_add(5 + packet.scene_node_sibling_slot.rem_euclid(8) as usize)
+        .min(preview_right.saturating_sub(1));
+    let node_glyph = if packet.scene_node_visibility != 0 {
+        '#'
+    } else {
+        'x'
+    };
+    if let Some(row) = rows.get_mut(node_y) {
+        let slot = child_x.min(row.len().saturating_sub(1));
+        if let Some(cell) = row.get_mut(slot) {
+            *cell = node_glyph;
+        }
+    }
+    stamp_line(rows, child_x, node_y, sibling_x, node_y, '=');
+
+    let group_visible = packet.instance_group_visible_count.clamp(1, 4) as usize;
+    let group_stride = (packet.instance_group_phase_bias.abs().clamp(2, 6)) as usize;
+    for idx in 0..group_visible {
+        let gx = preview_left
+            .saturating_add(10 + idx * group_stride)
+            .min(preview_right.saturating_sub(1));
+        let gy = root_y
+            .saturating_add(2 + idx.rem_euclid(2))
+            .min(ground_y.saturating_sub(1));
+        let glyph = match (packet.instance_group_material_slot + idx as i64).rem_euclid(3) {
+            0 => '*',
+            1 => '+',
+            _ => '%',
+        };
+        if let Some(row) = rows.get_mut(gy) {
+            let slot = gx.min(row.len().saturating_sub(1));
+            if let Some(cell) = row.get_mut(slot) {
+                *cell = glyph;
+            }
+        }
+        stamp_line(rows, child_x, node_y, gx, gy, ':');
+    }
+
+    let cluster_span = packet.scene_cluster_node_budget.clamp(2, 5) as usize;
+    let cluster_root_x = preview_left
+        .saturating_add(18 + packet.scene_cluster_root_slot.rem_euclid(4) as usize)
+        .min(preview_right.saturating_sub(1));
+    let cluster_root_y = root_y.saturating_add(1).min(ground_y.saturating_sub(1));
+    for idx in 0..cluster_span {
+        let cx = (cluster_root_x + idx * 2).min(preview_right.saturating_sub(1));
+        let cy = (cluster_root_y + idx.rem_euclid(2)).min(ground_y.saturating_sub(1));
+        let glyph = match (packet.scene_cluster_material_slot + idx as i64).rem_euclid(3) {
+            0 => 'o',
+            1 => '0',
+            _ => '8',
+        };
+        if let Some(row) = rows.get_mut(cy) {
+            let slot = cx.min(row.len().saturating_sub(1));
+            if let Some(cell) = row.get_mut(slot) {
+                *cell = glyph;
+            }
+        }
+        stamp_line(rows, cluster_root_x, cluster_root_y, cx, cy, '~');
     }
 }
 
@@ -3340,6 +3447,21 @@ struct BallPacket {
     scene_graph_link_count: i64,
     scene_graph_instance_count: i64,
     scene_graph_active_layer: i64,
+    scene_node_slot: i64,
+    scene_node_first_child_slot: i64,
+    scene_node_sibling_slot: i64,
+    scene_node_instance_slot: i64,
+    scene_node_visibility: i64,
+    instance_group_root_slot: i64,
+    instance_group_count: i64,
+    instance_group_visible_count: i64,
+    instance_group_phase_bias: i64,
+    instance_group_material_slot: i64,
+    scene_cluster_root_slot: i64,
+    scene_cluster_node_budget: i64,
+    scene_cluster_instance_group_slot: i64,
+    scene_cluster_material_slot: i64,
+    scene_cluster_layer_slot: i64,
     pass_stage: i64,
     pass_clear_mode: i64,
     pass_sample_count: i64,
@@ -3576,6 +3698,21 @@ fn parse_ball_packet(value: &Value, op: &str) -> Result<BallPacket, String> {
                 scene_graph_link_count: 3,
                 scene_graph_instance_count: 3,
                 scene_graph_active_layer: 1,
+                scene_node_slot: color_key.rem_euclid(8),
+                scene_node_first_child_slot: speed.round() as i64,
+                scene_node_sibling_slot: (radius_scale * 18.0).round() as i64,
+                scene_node_instance_slot: 3,
+                scene_node_visibility: 1,
+                instance_group_root_slot: 3,
+                instance_group_count: 4,
+                instance_group_visible_count: 3,
+                instance_group_phase_bias: speed.round() as i64,
+                instance_group_material_slot: color_key,
+                scene_cluster_root_slot: color_key.rem_euclid(8),
+                scene_cluster_node_budget: 6,
+                scene_cluster_instance_group_slot: 3,
+                scene_cluster_material_slot: color_key,
+                scene_cluster_layer_slot: 1,
                 pass_stage: speed.round() as i64 % 3,
                 pass_clear_mode: color_key,
                 pass_sample_count: 4,
@@ -4039,6 +4176,129 @@ fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket
     .map(|value| scalar_to_color_key(value, op))
     .transpose()?
     .unwrap_or(scene_link_layer_slot);
+    let scene_node_slot =
+        find_packet_field(packet, &["node_slot"], &["scene_node"], &["node_slot"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(scene_graph_root_slot);
+    let scene_node_first_child_slot = find_packet_field(
+        packet,
+        &["first_child_slot"],
+        &["scene_node"],
+        &["first_child_slot"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(scene_link_transform_slot);
+    let scene_node_sibling_slot = find_packet_field(
+        packet,
+        &["sibling_slot"],
+        &["scene_node"],
+        &["sibling_slot"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(scene_link_mesh_slot);
+    let scene_node_instance_slot = find_packet_field(
+        packet,
+        &["instance_slot"],
+        &["scene_node"],
+        &["instance_slot"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(3);
+    let scene_node_visibility =
+        find_packet_field(packet, &["visibility"], &["scene_node"], &["visibility"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(1);
+    let instance_group_root_slot = find_packet_field(
+        packet,
+        &["root_instance_slot"],
+        &["instance_group"],
+        &["root_instance_slot"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(scene_node_instance_slot);
+    let instance_group_count = find_packet_field(
+        packet,
+        &["group_count"],
+        &["instance_group"],
+        &["group_count"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(4);
+    let instance_group_visible_count = find_packet_field(
+        packet,
+        &["visible_count"],
+        &["instance_group"],
+        &["visible_count"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(instance_count);
+    let instance_group_phase_bias = find_packet_field(
+        packet,
+        &["phase_bias"],
+        &["instance_group"],
+        &["phase_bias"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(instance_phase);
+    let instance_group_material_slot = find_packet_field(
+        packet,
+        &["material_slot"],
+        &["instance_group"],
+        &["material_slot"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(instance_material_slot);
+    let scene_cluster_root_slot = find_packet_field(
+        packet,
+        &["root_node_slot"],
+        &["scene_cluster"],
+        &["root_node_slot"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(scene_node_slot);
+    let scene_cluster_node_budget = find_packet_field(
+        packet,
+        &["node_budget"],
+        &["scene_cluster"],
+        &["node_budget"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(scene_graph_node_count);
+    let scene_cluster_instance_group_slot = find_packet_field(
+        packet,
+        &["instance_group_slot"],
+        &["scene_cluster"],
+        &["instance_group_slot"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(instance_group_root_slot);
+    let scene_cluster_material_slot = find_packet_field(
+        packet,
+        &["material_slot"],
+        &["scene_cluster"],
+        &["material_slot"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(instance_group_material_slot);
+    let scene_cluster_layer_slot =
+        find_packet_field(packet, &["layer_slot"], &["scene_cluster"], &["layer_slot"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(scene_graph_active_layer);
     let pass_stage = find_packet_field(packet, &["stage"], &["pass"], &["stage"])
         .map(|value| scalar_to_color_key(value, op))
         .transpose()?
@@ -4883,6 +5143,21 @@ fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket
         scene_graph_link_count,
         scene_graph_instance_count,
         scene_graph_active_layer,
+        scene_node_slot,
+        scene_node_first_child_slot,
+        scene_node_sibling_slot,
+        scene_node_instance_slot,
+        scene_node_visibility,
+        instance_group_root_slot,
+        instance_group_count,
+        instance_group_visible_count,
+        instance_group_phase_bias,
+        instance_group_material_slot,
+        scene_cluster_root_slot,
+        scene_cluster_node_budget,
+        scene_cluster_instance_group_slot,
+        scene_cluster_material_slot,
+        scene_cluster_layer_slot,
         pass_stage,
         pass_clear_mode,
         pass_sample_count,

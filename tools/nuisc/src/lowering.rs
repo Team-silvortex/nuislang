@@ -1284,6 +1284,71 @@ fn lower_expr(
                 push_dep_edges(state, focus_name, &scene_graph_struct);
                 panel_group_nodes.push(scene_graph_struct.clone());
 
+                let scene_node_struct = next_name(state, "nova_panel_scene_node");
+                state.yir.nodes.push(Node {
+                    name: scene_node_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaSceneNodePacket".to_owned(),
+                            format!("node_slot={focus_name}"),
+                            format!("first_child_slot={speed_name}"),
+                            format!("sibling_slot={radius_name}"),
+                            "instance_slot=3".to_owned(),
+                            format!("visibility={toggle_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, focus_name, &scene_node_struct);
+                push_dep_edges(state, &speed_name, &scene_node_struct);
+                push_dep_edges(state, &radius_name, &scene_node_struct);
+                push_dep_edges(state, toggle_name, &scene_node_struct);
+                panel_group_nodes.push(scene_node_struct.clone());
+
+                let instance_group_struct = next_name(state, "nova_panel_instance_group");
+                state.yir.nodes.push(Node {
+                    name: instance_group_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaInstanceGroupPacket".to_owned(),
+                            "root_instance_slot=3".to_owned(),
+                            "group_count=4".to_owned(),
+                            "visible_count=3".to_owned(),
+                            format!("phase_bias={speed_name}"),
+                            format!("material_slot={accent_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, &speed_name, &instance_group_struct);
+                push_dep_edges(state, accent_name, &instance_group_struct);
+                panel_group_nodes.push(instance_group_struct.clone());
+
+                let scene_cluster_struct = next_name(state, "nova_panel_scene_cluster");
+                state.yir.nodes.push(Node {
+                    name: scene_cluster_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaSceneClusterPacket".to_owned(),
+                            format!("root_node_slot={focus_name}"),
+                            "node_budget=6".to_owned(),
+                            "instance_group_slot=3".to_owned(),
+                            format!("material_slot={accent_name}"),
+                            "layer_slot=1".to_owned(),
+                        ],
+                    },
+                });
+                push_dep_edges(state, focus_name, &scene_cluster_struct);
+                push_dep_edges(state, accent_name, &scene_cluster_struct);
+                panel_group_nodes.push(scene_cluster_struct.clone());
+
                 let pass_struct = next_name(state, "nova_panel_pass");
                 state.yir.nodes.push(Node {
                     name: pass_struct.clone(),
@@ -1848,6 +1913,9 @@ fn lower_expr(
                     format!("scene_link={scene_link_struct}"),
                     format!("instance={instance_struct}"),
                     format!("scene_graph={scene_graph_struct}"),
+                    format!("scene_node={scene_node_struct}"),
+                    format!("instance_group={instance_group_struct}"),
+                    format!("scene_cluster={scene_cluster_struct}"),
                     format!("pass={pass_struct}"),
                     format!("frame={frame_struct}"),
                     format!("target={target_struct}"),

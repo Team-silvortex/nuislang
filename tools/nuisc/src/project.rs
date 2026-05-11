@@ -5205,6 +5205,9 @@ mod tests {
                     let scene_link: NovaSceneLinkPacket = nova_scene_link_packet(2, 12, 9, 8, 1, 1);
                     let instance: NovaInstancePacket = nova_instance_packet(2, 3, 2, 1, 8, 1);
                     let scene_graph: NovaSceneGraphPacket = nova_scene_graph_packet(2, 6, 3, 3, 1);
+                    let scene_node: NovaSceneNodePacket = nova_scene_node_packet(2, 4, 5, 3, 1);
+                    let instance_group: NovaInstanceGroupPacket = nova_instance_group_packet(3, 4, 3, 1, 8);
+                    let scene_cluster: NovaSceneClusterPacket = nova_scene_cluster_packet(2, 6, 3, 8, 1);
                     let pass: NovaPassPacket = nova_pass_packet(1, 8, 4, 2);
                     let frame: NovaFramePacket = nova_frame_packet(7, 1, 1, 9);
                     let target: NovaTargetPacket = nova_target_packet(1, 48, 18, 8);
@@ -5263,6 +5266,9 @@ mod tests {
                       scene_link,
                       instance,
                       scene_graph,
+                      scene_node,
+                      instance_group,
+                      scene_cluster,
                       pass,
                         frame,
                         target,

@@ -2944,6 +2944,199 @@ fn lower_call_expr_with_async(
                 ],
             })
         }
+        "nova_scene_node_packet" => {
+            let (node_slot, first_child_slot, sibling_slot, instance_slot, visibility) = match args
+            {
+                [node_slot, first_child_slot, sibling_slot, instance_slot, visibility] => (
+                    node_slot,
+                    first_child_slot,
+                    sibling_slot,
+                    instance_slot,
+                    visibility,
+                ),
+                _ => return Err("nova_scene_node_packet(...) expects 5 args".to_owned()),
+            };
+            let node_slot = lower_expr(
+                node_slot,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let first_child_slot = lower_expr(
+                first_child_slot,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let sibling_slot = lower_expr(
+                sibling_slot,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let instance_slot = lower_expr(
+                instance_slot,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let visibility = lower_expr(
+                visibility,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaSceneNodePacket".to_owned(),
+                fields: vec![
+                    ("node_slot".to_owned(), node_slot),
+                    ("first_child_slot".to_owned(), first_child_slot),
+                    ("sibling_slot".to_owned(), sibling_slot),
+                    ("instance_slot".to_owned(), instance_slot),
+                    ("visibility".to_owned(), visibility),
+                ],
+            })
+        }
+        "nova_instance_group_packet" => {
+            let (root_instance_slot, group_count, visible_count, phase_bias, material_slot) =
+                match args {
+                    [root_instance_slot, group_count, visible_count, phase_bias, material_slot] => {
+                        (
+                            root_instance_slot,
+                            group_count,
+                            visible_count,
+                            phase_bias,
+                            material_slot,
+                        )
+                    }
+                    _ => return Err("nova_instance_group_packet(...) expects 5 args".to_owned()),
+                };
+            let root_instance_slot = lower_expr(
+                root_instance_slot,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let group_count = lower_expr(
+                group_count,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let visible_count = lower_expr(
+                visible_count,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let phase_bias = lower_expr(
+                phase_bias,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let material_slot = lower_expr(
+                material_slot,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaInstanceGroupPacket".to_owned(),
+                fields: vec![
+                    ("root_instance_slot".to_owned(), root_instance_slot),
+                    ("group_count".to_owned(), group_count),
+                    ("visible_count".to_owned(), visible_count),
+                    ("phase_bias".to_owned(), phase_bias),
+                    ("material_slot".to_owned(), material_slot),
+                ],
+            })
+        }
+        "nova_scene_cluster_packet" => {
+            let (root_node_slot, node_budget, instance_group_slot, material_slot, layer_slot) =
+                match args {
+                    [root_node_slot, node_budget, instance_group_slot, material_slot, layer_slot] => {
+                        (
+                            root_node_slot,
+                            node_budget,
+                            instance_group_slot,
+                            material_slot,
+                            layer_slot,
+                        )
+                    }
+                    _ => return Err("nova_scene_cluster_packet(...) expects 5 args".to_owned()),
+                };
+            let root_node_slot = lower_expr(
+                root_node_slot,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let node_budget = lower_expr(
+                node_budget,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let instance_group_slot = lower_expr(
+                instance_group_slot,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let material_slot = lower_expr(
+                material_slot,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let layer_slot = lower_expr(
+                layer_slot,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaSceneClusterPacket".to_owned(),
+                fields: vec![
+                    ("root_node_slot".to_owned(), root_node_slot),
+                    ("node_budget".to_owned(), node_budget),
+                    ("instance_group_slot".to_owned(), instance_group_slot),
+                    ("material_slot".to_owned(), material_slot),
+                    ("layer_slot".to_owned(), layer_slot),
+                ],
+            })
+        }
         "nova_pass_packet" => {
             let (stage, clear_mode, sample_count, debug_view) = match args {
                 [stage, clear_mode, sample_count, debug_view] => {
@@ -5100,10 +5293,10 @@ fn lower_call_expr_with_async(
             })
         }
         "nova_panel_from_parts" => {
-            let [header, sliders, toggle, progress, meter, button, text_input, select, checkbox, radio, textarea, tabs, list, table, tree, inspector, outline, theme, surface, viewport, layer, scene, camera, material, light, mesh, transform, node, scene_link, instance, scene_graph, pass, frame, target, frame_graph, attachment, pass_chain, barrier, resource_set, schedule, submission, queue, semaphore, timeline, fence, signal, event, dispatch, feedback, intent, reaction, outcome, resolution, commit, snapshot, checkpoint, focus] =
+            let [header, sliders, toggle, progress, meter, button, text_input, select, checkbox, radio, textarea, tabs, list, table, tree, inspector, outline, theme, surface, viewport, layer, scene, camera, material, light, mesh, transform, node, scene_link, instance, scene_graph, scene_node, instance_group, scene_cluster, pass, frame, target, frame_graph, attachment, pass_chain, barrier, resource_set, schedule, submission, queue, semaphore, timeline, fence, signal, event, dispatch, feedback, intent, reaction, outcome, resolution, commit, snapshot, checkpoint, focus] =
                 args
             else {
-                return Err("nova_panel_from_parts(...) expects 57 args".to_owned());
+                return Err("nova_panel_from_parts(...) expects 60 args".to_owned());
             };
             let header = lower_expr(
                 header,
@@ -5353,6 +5546,30 @@ fn lower_call_expr_with_async(
                 struct_table,
                 Some(&named_type("NovaSceneGraphPacket")),
             )?;
+            let scene_node = lower_expr(
+                scene_node,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaSceneNodePacket")),
+            )?;
+            let instance_group = lower_expr(
+                instance_group,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaInstanceGroupPacket")),
+            )?;
+            let scene_cluster = lower_expr(
+                scene_cluster,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaSceneClusterPacket")),
+            )?;
             let pass = lower_expr(
                 pass,
                 current_domain,
@@ -5595,6 +5812,9 @@ fn lower_call_expr_with_async(
                     ("scene_link".to_owned(), scene_link),
                     ("instance".to_owned(), instance),
                     ("scene_graph".to_owned(), scene_graph),
+                    ("scene_node".to_owned(), scene_node),
+                    ("instance_group".to_owned(), instance_group),
+                    ("scene_cluster".to_owned(), scene_cluster),
                     ("pass".to_owned(), pass),
                     ("frame".to_owned(), frame),
                     ("target".to_owned(), target),
@@ -6875,6 +7095,165 @@ fn lower_call_expr_with_async(
                         NirExpr::FieldAccess {
                             base: Box::new(packet),
                             field: "active_layer".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_scene_node_state" => {
+            let [packet] = args else {
+                return Err("nova_scene_node_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaSceneNodePacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaSceneNodeState".to_owned(),
+                fields: vec![
+                    (
+                        "node_slot".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "node_slot".to_owned(),
+                        },
+                    ),
+                    (
+                        "first_child_slot".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "first_child_slot".to_owned(),
+                        },
+                    ),
+                    (
+                        "sibling_slot".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "sibling_slot".to_owned(),
+                        },
+                    ),
+                    (
+                        "instance_slot".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "instance_slot".to_owned(),
+                        },
+                    ),
+                    (
+                        "visibility".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "visibility".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_instance_group_state" => {
+            let [packet] = args else {
+                return Err("nova_instance_group_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaInstanceGroupPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaInstanceGroupState".to_owned(),
+                fields: vec![
+                    (
+                        "root_instance_slot".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "root_instance_slot".to_owned(),
+                        },
+                    ),
+                    (
+                        "group_count".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "group_count".to_owned(),
+                        },
+                    ),
+                    (
+                        "visible_count".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "visible_count".to_owned(),
+                        },
+                    ),
+                    (
+                        "phase_bias".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "phase_bias".to_owned(),
+                        },
+                    ),
+                    (
+                        "material_slot".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "material_slot".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_scene_cluster_state" => {
+            let [packet] = args else {
+                return Err("nova_scene_cluster_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaSceneClusterPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaSceneClusterState".to_owned(),
+                fields: vec![
+                    (
+                        "root_node_slot".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "root_node_slot".to_owned(),
+                        },
+                    ),
+                    (
+                        "node_budget".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "node_budget".to_owned(),
+                        },
+                    ),
+                    (
+                        "instance_group_slot".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "instance_group_slot".to_owned(),
+                        },
+                    ),
+                    (
+                        "material_slot".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "material_slot".to_owned(),
+                        },
+                    ),
+                    (
+                        "layer_slot".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "layer_slot".to_owned(),
                         },
                     ),
                 ],
@@ -8214,6 +8593,21 @@ fn lower_call_expr_with_async(
         | "nova_scene_graph_state_links"
         | "nova_scene_graph_state_instances"
         | "nova_scene_graph_state_layer"
+        | "nova_scene_node_state_node"
+        | "nova_scene_node_state_first_child"
+        | "nova_scene_node_state_sibling"
+        | "nova_scene_node_state_instance"
+        | "nova_scene_node_state_visibility"
+        | "nova_instance_group_state_root"
+        | "nova_instance_group_state_groups"
+        | "nova_instance_group_state_visible"
+        | "nova_instance_group_state_phase_bias"
+        | "nova_instance_group_state_material"
+        | "nova_scene_cluster_state_root"
+        | "nova_scene_cluster_state_budget"
+        | "nova_scene_cluster_state_instance_group"
+        | "nova_scene_cluster_state_material"
+        | "nova_scene_cluster_state_layer"
         | "nova_pass_state_stage"
         | "nova_pass_state_clear_mode"
         | "nova_pass_state_sample_count"
@@ -8407,6 +8801,25 @@ fn lower_call_expr_with_async(
                 "nova_scene_graph_state_links" => ("NovaSceneGraphState", "link_count"),
                 "nova_scene_graph_state_instances" => ("NovaSceneGraphState", "instance_count"),
                 "nova_scene_graph_state_layer" => ("NovaSceneGraphState", "active_layer"),
+                "nova_scene_node_state_node" => ("NovaSceneNodeState", "node_slot"),
+                "nova_scene_node_state_first_child" => ("NovaSceneNodeState", "first_child_slot"),
+                "nova_scene_node_state_sibling" => ("NovaSceneNodeState", "sibling_slot"),
+                "nova_scene_node_state_instance" => ("NovaSceneNodeState", "instance_slot"),
+                "nova_scene_node_state_visibility" => ("NovaSceneNodeState", "visibility"),
+                "nova_instance_group_state_root" => {
+                    ("NovaInstanceGroupState", "root_instance_slot")
+                }
+                "nova_instance_group_state_groups" => ("NovaInstanceGroupState", "group_count"),
+                "nova_instance_group_state_visible" => ("NovaInstanceGroupState", "visible_count"),
+                "nova_instance_group_state_phase_bias" => ("NovaInstanceGroupState", "phase_bias"),
+                "nova_instance_group_state_material" => ("NovaInstanceGroupState", "material_slot"),
+                "nova_scene_cluster_state_root" => ("NovaSceneClusterState", "root_node_slot"),
+                "nova_scene_cluster_state_budget" => ("NovaSceneClusterState", "node_budget"),
+                "nova_scene_cluster_state_instance_group" => {
+                    ("NovaSceneClusterState", "instance_group_slot")
+                }
+                "nova_scene_cluster_state_material" => ("NovaSceneClusterState", "material_slot"),
+                "nova_scene_cluster_state_layer" => ("NovaSceneClusterState", "layer_slot"),
                 "nova_pass_state_stage" => ("NovaPassState", "stage"),
                 "nova_pass_state_clear_mode" => ("NovaPassState", "clear_mode"),
                 "nova_pass_state_sample_count" => ("NovaPassState", "sample_count"),
@@ -9749,6 +10162,25 @@ fn builtin_struct_field_type(type_name: &str, field: &str) -> Option<NirTypeRef>
             }
             _ => None,
         },
+        "NovaSceneNodePacket" => match field {
+            "node_slot" | "first_child_slot" | "sibling_slot" | "instance_slot" | "visibility" => {
+                Some(i64())
+            }
+            _ => None,
+        },
+        "NovaInstanceGroupPacket" => match field {
+            "root_instance_slot" | "group_count" | "visible_count" | "phase_bias"
+            | "material_slot" => Some(i64()),
+            _ => None,
+        },
+        "NovaSceneClusterPacket" => match field {
+            "root_node_slot"
+            | "node_budget"
+            | "instance_group_slot"
+            | "material_slot"
+            | "layer_slot" => Some(i64()),
+            _ => None,
+        },
         "NovaPassPacket" => match field {
             "stage" | "clear_mode" | "sample_count" | "debug_view" => Some(i64()),
             _ => None,
@@ -9953,6 +10385,9 @@ fn builtin_struct_field_type(type_name: &str, field: &str) -> Option<NirTypeRef>
             "scene_link" => Some(named("NovaSceneLinkPacket")),
             "instance" => Some(named("NovaInstancePacket")),
             "scene_graph" => Some(named("NovaSceneGraphPacket")),
+            "scene_node" => Some(named("NovaSceneNodePacket")),
+            "instance_group" => Some(named("NovaInstanceGroupPacket")),
+            "scene_cluster" => Some(named("NovaSceneClusterPacket")),
             "pass" => Some(named("NovaPassPacket")),
             "frame" => Some(named("NovaFramePacket")),
             "target" => Some(named("NovaTargetPacket")),
@@ -10092,6 +10527,25 @@ fn builtin_struct_field_type(type_name: &str, field: &str) -> Option<NirTypeRef>
             "root_slot" | "node_count" | "link_count" | "instance_count" | "active_layer" => {
                 Some(i64())
             }
+            _ => None,
+        },
+        "NovaSceneNodeState" => match field {
+            "node_slot" | "first_child_slot" | "sibling_slot" | "instance_slot" | "visibility" => {
+                Some(i64())
+            }
+            _ => None,
+        },
+        "NovaInstanceGroupState" => match field {
+            "root_instance_slot" | "group_count" | "visible_count" | "phase_bias"
+            | "material_slot" => Some(i64()),
+            _ => None,
+        },
+        "NovaSceneClusterState" => match field {
+            "root_node_slot"
+            | "node_budget"
+            | "instance_group_slot"
+            | "material_slot"
+            | "layer_slot" => Some(i64()),
             _ => None,
         },
         "NovaPassState" => match field {
@@ -11896,6 +12350,99 @@ mod tests {
     }
 
     #[test]
+    fn lowers_nova_scene_node_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let node: NovaSceneNodePacket = nova_scene_node_packet(1, 2, 3, 4, 1);
+                let state: NovaSceneNodeState = nova_scene_node_state(node);
+                let child: i64 = nova_scene_node_state_first_child(state);
+                return child;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaSceneNodeState" && type_name == "NovaSceneNodeState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_instance_group_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let group: NovaInstanceGroupPacket = nova_instance_group_packet(1, 4, 3, 2, 8);
+                let state: NovaInstanceGroupState = nova_instance_group_state(group);
+                let visible: i64 = nova_instance_group_state_visible(state);
+                return visible;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaInstanceGroupState" && type_name == "NovaInstanceGroupState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_scene_cluster_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let cluster: NovaSceneClusterPacket = nova_scene_cluster_packet(1, 6, 3, 8, 1);
+                let state: NovaSceneClusterState = nova_scene_cluster_state(cluster);
+                let budget: i64 = nova_scene_cluster_state_budget(state);
+                return budget;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaSceneClusterState" && type_name == "NovaSceneClusterState",
+            _ => false,
+        }));
+    }
+
+    #[test]
     fn lowers_nova_pass_state_contract() {
         let module = parse_nuis_module(
             r#"
@@ -12711,6 +13258,9 @@ mod tests {
                 let scene_link: NovaSceneLinkPacket = nova_scene_link_packet(2, 12, 9, 8, 1, 1);
                 let instance: NovaInstancePacket = nova_instance_packet(2, 3, 2, 1, 8, 1);
                 let scene_graph: NovaSceneGraphPacket = nova_scene_graph_packet(2, 6, 3, 3, 1);
+                let scene_node: NovaSceneNodePacket = nova_scene_node_packet(2, 4, 5, 3, 1);
+                let instance_group: NovaInstanceGroupPacket = nova_instance_group_packet(3, 4, 3, 1, 8);
+                let scene_cluster: NovaSceneClusterPacket = nova_scene_cluster_packet(2, 6, 3, 8, 1);
                 let pass: NovaPassPacket = nova_pass_packet(1, 8, 4, 2);
                 let frame: NovaFramePacket = nova_frame_packet(7, 1, 1, 9);
                 let target: NovaTargetPacket = nova_target_packet(1, 48, 18, 8);
@@ -12769,6 +13319,9 @@ mod tests {
                   scene_link,
                   instance,
                   scene_graph,
+                  scene_node,
+                  instance_group,
+                  scene_cluster,
                   pass,
                   frame,
                   target,
