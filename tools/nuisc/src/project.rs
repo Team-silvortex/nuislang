@@ -5209,6 +5209,7 @@ mod tests {
                     let instance_group: NovaInstanceGroupPacket = nova_instance_group_packet(3, 4, 3, 1, 8);
                     let scene_cluster: NovaSceneClusterPacket = nova_scene_cluster_packet(2, 6, 3, 8, 1);
                     let visibility: NovaVisibilityPacket = nova_visibility_packet(3, 5, 1, 2, 7);
+                    let cull: NovaCullPacket = nova_cull_packet(3, 4, 1, 2, 7);
                     let pass: NovaPassPacket = nova_pass_packet(1, 8, 4, 2);
                     let frame: NovaFramePacket = nova_frame_packet(7, 1, 1, 9);
                     let target: NovaTargetPacket = nova_target_packet(1, 48, 18, 8);
@@ -5271,6 +5272,7 @@ mod tests {
                       instance_group,
                       scene_cluster,
                       visibility,
+                      cull,
                       pass,
                         frame,
                         target,

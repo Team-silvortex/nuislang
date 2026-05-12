@@ -1370,6 +1370,27 @@ fn lower_expr(
                 push_dep_edges(state, &speed_name, &visibility_struct);
                 panel_group_nodes.push(visibility_struct.clone());
 
+                let cull_struct = next_name(state, "nova_panel_cull");
+                state.yir.nodes.push(Node {
+                    name: cull_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaCullPacket".to_owned(),
+                            "cluster_slot=3".to_owned(),
+                            "kept_nodes=4".to_owned(),
+                            format!("cull_mode={toggle_name}"),
+                            format!("lod_band={speed_name}"),
+                            "mask=7".to_owned(),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &cull_struct);
+                push_dep_edges(state, &speed_name, &cull_struct);
+                panel_group_nodes.push(cull_struct.clone());
+
                 let pass_struct = next_name(state, "nova_panel_pass");
                 state.yir.nodes.push(Node {
                     name: pass_struct.clone(),
@@ -1938,6 +1959,7 @@ fn lower_expr(
                     format!("instance_group={instance_group_struct}"),
                     format!("scene_cluster={scene_cluster_struct}"),
                     format!("scene_visibility={visibility_struct}"),
+                    format!("scene_cull={cull_struct}"),
                     format!("pass={pass_struct}"),
                     format!("frame={frame_struct}"),
                     format!("target={target_struct}"),

@@ -86,6 +86,8 @@ mod cpu Main {
       nova_scene_cluster_packet(panel_focus_index, 6, 3, panel_accent, 1);
     let panel_visibility: NovaVisibilityPacket =
       nova_visibility_packet(3, 5 + panel_toggle_state, panel_toggle_state, speed_delta, 7);
+    let panel_cull: NovaCullPacket =
+      nova_cull_packet(3, 4 + panel_toggle_state, panel_toggle_state, speed_delta, 7);
     let panel_pass: NovaPassPacket =
       nova_pass_packet(panel_toggle_state, panel_accent, 4, panel_focus_index);
     let panel_frame: NovaFramePacket =
@@ -261,6 +263,10 @@ mod cpu Main {
       nova_visibility_state(panel_visibility);
     let panel_visibility_nodes: i64 =
       nova_visibility_state_visible(visibility_state);
+    let cull_state: NovaCullState =
+      nova_cull_state(panel_cull);
+    let panel_cull_kept: i64 =
+      nova_cull_state_kept(cull_state);
     let panel_pass_samples: i64 = nova_pass_state_sample_count(pass_state);
     let panel_frame_exposure: i64 = nova_frame_state_exposure(frame_state);
     let panel_target_msaa: i64 = nova_target_state_multisample(target_state);
@@ -392,6 +398,7 @@ mod cpu Main {
       + panel_instance_group_visible
       + panel_scene_cluster_budget
       + panel_visibility_nodes
+      + panel_cull_kept
       + panel_pass_samples
       + panel_frame_exposure
       + panel_target_msaa
@@ -459,6 +466,7 @@ mod cpu Main {
       panel_instance_group,
       panel_scene_cluster,
       panel_visibility,
+      panel_cull,
       panel_pass,
       panel_frame,
       panel_target,
