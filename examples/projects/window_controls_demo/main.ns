@@ -88,6 +88,10 @@ mod cpu Main {
       nova_visibility_packet(3, 5 + panel_toggle_state, panel_toggle_state, speed_delta, 7);
     let panel_cull: NovaCullPacket =
       nova_cull_packet(3, 4 + panel_toggle_state, panel_toggle_state, speed_delta, 7);
+    let panel_lod: NovaLodPacket =
+      nova_lod_packet(3, 4, panel_toggle_state, packed_radius, panel_accent);
+    let panel_streaming: NovaStreamingPacket =
+      nova_streaming_packet(3, 2 + panel_toggle_state, panel_toggle_state, speed_delta, panel_accent);
     let panel_pass: NovaPassPacket =
       nova_pass_packet(panel_toggle_state, panel_accent, 4, panel_focus_index);
     let panel_frame: NovaFramePacket =
@@ -267,6 +271,14 @@ mod cpu Main {
       nova_cull_state(panel_cull);
     let panel_cull_kept: i64 =
       nova_cull_state_kept(cull_state);
+    let lod_state: NovaLodState =
+      nova_lod_state(panel_lod);
+    let panel_lod_active: i64 =
+      nova_lod_state_active(lod_state);
+    let streaming_state: NovaStreamingState =
+      nova_streaming_state(panel_streaming);
+    let panel_streaming_resident: i64 =
+      nova_streaming_state_resident(streaming_state);
     let panel_pass_samples: i64 = nova_pass_state_sample_count(pass_state);
     let panel_frame_exposure: i64 = nova_frame_state_exposure(frame_state);
     let panel_target_msaa: i64 = nova_target_state_multisample(target_state);
@@ -399,6 +411,8 @@ mod cpu Main {
       + panel_scene_cluster_budget
       + panel_visibility_nodes
       + panel_cull_kept
+      + panel_lod_active
+      + panel_streaming_resident
       + panel_pass_samples
       + panel_frame_exposure
       + panel_target_msaa
@@ -467,6 +481,8 @@ mod cpu Main {
       panel_scene_cluster,
       panel_visibility,
       panel_cull,
+      panel_lod,
+      panel_streaming,
       panel_pass,
       panel_frame,
       panel_target,

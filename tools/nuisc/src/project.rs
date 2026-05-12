@@ -5210,6 +5210,8 @@ mod tests {
                     let scene_cluster: NovaSceneClusterPacket = nova_scene_cluster_packet(2, 6, 3, 8, 1);
                     let visibility: NovaVisibilityPacket = nova_visibility_packet(3, 5, 1, 2, 7);
                     let cull: NovaCullPacket = nova_cull_packet(3, 4, 1, 2, 7);
+                    let lod: NovaLodPacket = nova_lod_packet(3, 4, 1, 9, 2);
+                    let streaming: NovaStreamingPacket = nova_streaming_packet(3, 2, 1, 6, 2);
                     let pass: NovaPassPacket = nova_pass_packet(1, 8, 4, 2);
                     let frame: NovaFramePacket = nova_frame_packet(7, 1, 1, 9);
                     let target: NovaTargetPacket = nova_target_packet(1, 48, 18, 8);
@@ -5270,10 +5272,12 @@ mod tests {
                       scene_graph,
                       scene_node,
                       instance_group,
-                      scene_cluster,
-                      visibility,
-                      cull,
-                      pass,
+                        scene_cluster,
+                        visibility,
+                        cull,
+                        lod,
+                        streaming,
+                        pass,
                         frame,
                         target,
                         frame_graph,

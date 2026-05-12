@@ -1391,6 +1391,50 @@ fn lower_expr(
                 push_dep_edges(state, &speed_name, &cull_struct);
                 panel_group_nodes.push(cull_struct.clone());
 
+                let lod_struct = next_name(state, "nova_panel_lod");
+                state.yir.nodes.push(Node {
+                    name: lod_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaLodPacket".to_owned(),
+                            "cluster_slot=3".to_owned(),
+                            "level_count=4".to_owned(),
+                            format!("active_level={toggle_name}"),
+                            format!("switch_distance={speed_name}"),
+                            format!("bias={accent_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &lod_struct);
+                push_dep_edges(state, &speed_name, &lod_struct);
+                push_dep_edges(state, accent_name, &lod_struct);
+                panel_group_nodes.push(lod_struct.clone());
+
+                let streaming_struct = next_name(state, "nova_panel_streaming");
+                state.yir.nodes.push(Node {
+                    name: streaming_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaStreamingPacket".to_owned(),
+                            "cluster_slot=3".to_owned(),
+                            "resident_levels=2".to_owned(),
+                            format!("prefetch_mode={toggle_name}"),
+                            format!("evict_budget={speed_name}"),
+                            format!("channel={accent_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &streaming_struct);
+                push_dep_edges(state, &speed_name, &streaming_struct);
+                push_dep_edges(state, accent_name, &streaming_struct);
+                panel_group_nodes.push(streaming_struct.clone());
+
                 let pass_struct = next_name(state, "nova_panel_pass");
                 state.yir.nodes.push(Node {
                     name: pass_struct.clone(),
@@ -1960,6 +2004,8 @@ fn lower_expr(
                     format!("scene_cluster={scene_cluster_struct}"),
                     format!("scene_visibility={visibility_struct}"),
                     format!("scene_cull={cull_struct}"),
+                    format!("scene_lod={lod_struct}"),
+                    format!("scene_streaming={streaming_struct}"),
                     format!("pass={pass_struct}"),
                     format!("frame={frame_struct}"),
                     format!("target={target_struct}"),

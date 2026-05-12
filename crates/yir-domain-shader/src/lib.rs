@@ -3275,6 +3275,32 @@ fn draw_scene_preview(
         preview_top.saturating_add(6),
         &cull_label,
     );
+    let lod_label = format!(
+        "ld{} n{} a{} s{}",
+        packet.lod_cluster_slot,
+        packet.lod_level_count,
+        packet.lod_active_level,
+        packet.lod_switch_distance
+    );
+    put_text(
+        rows,
+        preview_left,
+        preview_top.saturating_add(7),
+        &lod_label,
+    );
+    let streaming_label = format!(
+        "st{} r{} p{} e{}",
+        packet.streaming_cluster_slot,
+        packet.streaming_resident_levels,
+        packet.streaming_prefetch_mode,
+        packet.streaming_evict_budget
+    );
+    put_text(
+        rows,
+        preview_left,
+        preview_top.saturating_add(8),
+        &streaming_label,
+    );
 
     let instance_count = packet.instance_count.clamp(1, 4) as usize;
     let instance_stride = packet.instance_stride.abs().clamp(2, 6) as usize;
@@ -3442,6 +3468,60 @@ fn draw_scene_preview(
         let connector = if packet.cull_mode != 0 { '-' } else { '_' };
         stamp_line(rows, vis_root_x, vis_root_y, cx, cy, connector);
     }
+
+    let lod_span = packet.lod_level_count.clamp(1, 4) as usize;
+    let lod_root_x = preview_left
+        .saturating_add(36 + packet.lod_cluster_slot.rem_euclid(4) as usize)
+        .min(preview_right.saturating_sub(1));
+    let lod_root_y = root_y.min(ground_y.saturating_sub(1));
+    for idx in 0..lod_span {
+        let lx = (lod_root_x + idx * 2).min(preview_right.saturating_sub(1));
+        let ly = (lod_root_y + idx.rem_euclid(2)).min(ground_y.saturating_sub(1));
+        let glyph = if idx as i64 == packet.lod_active_level.rem_euclid(lod_span as i64) {
+            match packet.lod_bias.rem_euclid(3) {
+                0 => 'L',
+                1 => 'M',
+                _ => 'H',
+            }
+        } else {
+            '.'
+        };
+        if let Some(row) = rows.get_mut(ly) {
+            let slot = lx.min(row.len().saturating_sub(1));
+            if let Some(cell) = row.get_mut(slot) {
+                *cell = glyph;
+            }
+        }
+        stamp_line(rows, cull_root_x, cull_root_y, lx, ly, '=');
+    }
+
+    let streaming_span = packet.streaming_resident_levels.clamp(1, 4) as usize;
+    let streaming_root_x = preview_left
+        .saturating_add(42 + packet.streaming_cluster_slot.rem_euclid(4) as usize)
+        .min(preview_right.saturating_sub(1));
+    let streaming_root_y = root_y.saturating_add(1).min(ground_y.saturating_sub(1));
+    for idx in 0..streaming_span {
+        let sx = (streaming_root_x + idx * 2).min(preview_right.saturating_sub(1));
+        let sy = (streaming_root_y + idx.rem_euclid(2)).min(ground_y.saturating_sub(1));
+        let glyph = match (packet.streaming_channel + idx as i64).rem_euclid(4) {
+            0 => 's',
+            1 => '$',
+            2 => '~',
+            _ => '+',
+        };
+        if let Some(row) = rows.get_mut(sy) {
+            let slot = sx.min(row.len().saturating_sub(1));
+            if let Some(cell) = row.get_mut(slot) {
+                *cell = glyph;
+            }
+        }
+        let connector = if packet.streaming_prefetch_mode != 0 {
+            ':'
+        } else {
+            '.'
+        };
+        stamp_line(rows, lod_root_x, lod_root_y, sx, sy, connector);
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -3547,6 +3627,16 @@ struct BallPacket {
     cull_mode: i64,
     cull_lod_band: i64,
     cull_mask: i64,
+    lod_cluster_slot: i64,
+    lod_level_count: i64,
+    lod_active_level: i64,
+    lod_switch_distance: i64,
+    lod_bias: i64,
+    streaming_cluster_slot: i64,
+    streaming_resident_levels: i64,
+    streaming_prefetch_mode: i64,
+    streaming_evict_budget: i64,
+    streaming_channel: i64,
     pass_stage: i64,
     pass_clear_mode: i64,
     pass_sample_count: i64,
@@ -3808,6 +3898,16 @@ fn parse_ball_packet(value: &Value, op: &str) -> Result<BallPacket, String> {
                 cull_mode: speed.round() as i64 % 2,
                 cull_lod_band: speed.round() as i64 % 4,
                 cull_mask: 7,
+                lod_cluster_slot: 3,
+                lod_level_count: 4,
+                lod_active_level: speed.round() as i64 % 3,
+                lod_switch_distance: (radius_scale * 24.0).round() as i64,
+                lod_bias: color_key,
+                streaming_cluster_slot: 3,
+                streaming_resident_levels: 2,
+                streaming_prefetch_mode: speed.round() as i64 % 2,
+                streaming_evict_budget: (radius_scale * 16.0).round() as i64,
+                streaming_channel: color_key,
                 pass_stage: speed.round() as i64 % 3,
                 pass_clear_mode: color_key,
                 pass_sample_count: 4,
@@ -4460,6 +4560,75 @@ fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket
         .map(|value| scalar_to_color_key(value, op))
         .transpose()?
         .unwrap_or(visibility_mask);
+    let lod_cluster_slot =
+        find_packet_field(packet, &["cluster_slot"], &["scene_lod"], &["cluster_slot"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(cull_cluster_slot);
+    let lod_level_count =
+        find_packet_field(packet, &["level_count"], &["scene_lod"], &["level_count"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(4);
+    let lod_active_level =
+        find_packet_field(packet, &["active_level"], &["scene_lod"], &["active_level"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(cull_mode);
+    let lod_switch_distance = find_packet_field(
+        packet,
+        &["switch_distance"],
+        &["scene_lod"],
+        &["switch_distance"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(cull_lod_band);
+    let lod_bias = find_packet_field(packet, &["bias"], &["scene_lod"], &["bias"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(cull_mask);
+    let streaming_cluster_slot = find_packet_field(
+        packet,
+        &["cluster_slot"],
+        &["scene_streaming"],
+        &["cluster_slot"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(lod_cluster_slot);
+    let streaming_resident_levels = find_packet_field(
+        packet,
+        &["resident_levels"],
+        &["scene_streaming"],
+        &["resident_levels"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(2);
+    let streaming_prefetch_mode = find_packet_field(
+        packet,
+        &["prefetch_mode"],
+        &["scene_streaming"],
+        &["prefetch_mode"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(lod_active_level);
+    let streaming_evict_budget = find_packet_field(
+        packet,
+        &["evict_budget"],
+        &["scene_streaming"],
+        &["evict_budget"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(lod_switch_distance);
+    let streaming_channel =
+        find_packet_field(packet, &["channel"], &["scene_streaming"], &["channel"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(lod_bias);
     let pass_stage = find_packet_field(packet, &["stage"], &["pass"], &["stage"])
         .map(|value| scalar_to_color_key(value, op))
         .transpose()?
@@ -5329,6 +5498,16 @@ fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket
         cull_mode,
         cull_lod_band,
         cull_mask,
+        lod_cluster_slot,
+        lod_level_count,
+        lod_active_level,
+        lod_switch_distance,
+        lod_bias,
+        streaming_cluster_slot,
+        streaming_resident_levels,
+        streaming_prefetch_mode,
+        streaming_evict_budget,
+        streaming_channel,
         pass_stage,
         pass_clear_mode,
         pass_sample_count,

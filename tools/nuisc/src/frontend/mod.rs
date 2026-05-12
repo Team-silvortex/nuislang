@@ -3257,6 +3257,130 @@ fn lower_call_expr_with_async(
                 ],
             })
         }
+        "nova_lod_packet" => {
+            let (cluster_slot, level_count, active_level, switch_distance, bias) = match args {
+                [cluster_slot, level_count, active_level, switch_distance, bias] => (
+                    cluster_slot,
+                    level_count,
+                    active_level,
+                    switch_distance,
+                    bias,
+                ),
+                _ => return Err("nova_lod_packet(...) expects 5 args".to_owned()),
+            };
+            let cluster_slot = lower_expr(
+                cluster_slot,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let level_count = lower_expr(
+                level_count,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let active_level = lower_expr(
+                active_level,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let switch_distance = lower_expr(
+                switch_distance,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let bias = lower_expr(
+                bias,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaLodPacket".to_owned(),
+                fields: vec![
+                    ("cluster_slot".to_owned(), cluster_slot),
+                    ("level_count".to_owned(), level_count),
+                    ("active_level".to_owned(), active_level),
+                    ("switch_distance".to_owned(), switch_distance),
+                    ("bias".to_owned(), bias),
+                ],
+            })
+        }
+        "nova_streaming_packet" => {
+            let (cluster_slot, resident_levels, prefetch_mode, evict_budget, channel) = match args {
+                [cluster_slot, resident_levels, prefetch_mode, evict_budget, channel] => (
+                    cluster_slot,
+                    resident_levels,
+                    prefetch_mode,
+                    evict_budget,
+                    channel,
+                ),
+                _ => return Err("nova_streaming_packet(...) expects 5 args".to_owned()),
+            };
+            let cluster_slot = lower_expr(
+                cluster_slot,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let resident_levels = lower_expr(
+                resident_levels,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let prefetch_mode = lower_expr(
+                prefetch_mode,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let evict_budget = lower_expr(
+                evict_budget,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let channel = lower_expr(
+                channel,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaStreamingPacket".to_owned(),
+                fields: vec![
+                    ("cluster_slot".to_owned(), cluster_slot),
+                    ("resident_levels".to_owned(), resident_levels),
+                    ("prefetch_mode".to_owned(), prefetch_mode),
+                    ("evict_budget".to_owned(), evict_budget),
+                    ("channel".to_owned(), channel),
+                ],
+            })
+        }
         "nova_pass_packet" => {
             let (stage, clear_mode, sample_count, debug_view) = match args {
                 [stage, clear_mode, sample_count, debug_view] => {
@@ -5413,10 +5537,10 @@ fn lower_call_expr_with_async(
             })
         }
         "nova_panel_from_parts" => {
-            let [header, sliders, toggle, progress, meter, button, text_input, select, checkbox, radio, textarea, tabs, list, table, tree, inspector, outline, theme, surface, viewport, layer, scene, camera, material, light, mesh, transform, node, scene_link, instance, scene_graph, scene_node, instance_group, scene_cluster, visibility, cull, pass, frame, target, frame_graph, attachment, pass_chain, barrier, resource_set, schedule, submission, queue, semaphore, timeline, fence, signal, event, dispatch, feedback, intent, reaction, outcome, resolution, commit, snapshot, checkpoint, focus] =
+            let [header, sliders, toggle, progress, meter, button, text_input, select, checkbox, radio, textarea, tabs, list, table, tree, inspector, outline, theme, surface, viewport, layer, scene, camera, material, light, mesh, transform, node, scene_link, instance, scene_graph, scene_node, instance_group, scene_cluster, visibility, cull, lod, streaming, pass, frame, target, frame_graph, attachment, pass_chain, barrier, resource_set, schedule, submission, queue, semaphore, timeline, fence, signal, event, dispatch, feedback, intent, reaction, outcome, resolution, commit, snapshot, checkpoint, focus] =
                 args
             else {
-                return Err("nova_panel_from_parts(...) expects 62 args".to_owned());
+                return Err("nova_panel_from_parts(...) expects 64 args".to_owned());
             };
             let header = lower_expr(
                 header,
@@ -5706,6 +5830,22 @@ fn lower_call_expr_with_async(
                 struct_table,
                 Some(&named_type("NovaCullPacket")),
             )?;
+            let lod = lower_expr(
+                lod,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaLodPacket")),
+            )?;
+            let streaming = lower_expr(
+                streaming,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaStreamingPacket")),
+            )?;
             let pass = lower_expr(
                 pass,
                 current_domain,
@@ -5953,6 +6093,8 @@ fn lower_call_expr_with_async(
                     ("scene_cluster".to_owned(), scene_cluster),
                     ("scene_visibility".to_owned(), visibility),
                     ("scene_cull".to_owned(), cull),
+                    ("scene_lod".to_owned(), lod),
+                    ("scene_streaming".to_owned(), streaming),
                     ("pass".to_owned(), pass),
                     ("frame".to_owned(), frame),
                     ("target".to_owned(), target),
@@ -7503,6 +7645,112 @@ fn lower_call_expr_with_async(
                 ],
             })
         }
+        "nova_lod_state" => {
+            let [packet] = args else {
+                return Err("nova_lod_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaLodPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaLodState".to_owned(),
+                fields: vec![
+                    (
+                        "cluster_slot".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "cluster_slot".to_owned(),
+                        },
+                    ),
+                    (
+                        "level_count".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "level_count".to_owned(),
+                        },
+                    ),
+                    (
+                        "active_level".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "active_level".to_owned(),
+                        },
+                    ),
+                    (
+                        "switch_distance".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "switch_distance".to_owned(),
+                        },
+                    ),
+                    (
+                        "bias".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "bias".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_streaming_state" => {
+            let [packet] = args else {
+                return Err("nova_streaming_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaStreamingPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaStreamingState".to_owned(),
+                fields: vec![
+                    (
+                        "cluster_slot".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "cluster_slot".to_owned(),
+                        },
+                    ),
+                    (
+                        "resident_levels".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "resident_levels".to_owned(),
+                        },
+                    ),
+                    (
+                        "prefetch_mode".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "prefetch_mode".to_owned(),
+                        },
+                    ),
+                    (
+                        "evict_budget".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "evict_budget".to_owned(),
+                        },
+                    ),
+                    (
+                        "channel".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "channel".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
         "nova_pass_state" => {
             let [packet] = args else {
                 return Err("nova_pass_state(...) expects 1 arg".to_owned());
@@ -8862,6 +9110,16 @@ fn lower_call_expr_with_async(
         | "nova_cull_state_mode"
         | "nova_cull_state_lod"
         | "nova_cull_state_mask"
+        | "nova_lod_state_cluster"
+        | "nova_lod_state_levels"
+        | "nova_lod_state_active"
+        | "nova_lod_state_switch_distance"
+        | "nova_lod_state_bias"
+        | "nova_streaming_state_cluster"
+        | "nova_streaming_state_resident"
+        | "nova_streaming_state_prefetch"
+        | "nova_streaming_state_evict_budget"
+        | "nova_streaming_state_channel"
         | "nova_pass_state_stage"
         | "nova_pass_state_clear_mode"
         | "nova_pass_state_sample_count"
@@ -9084,6 +9342,16 @@ fn lower_call_expr_with_async(
                 "nova_cull_state_mode" => ("NovaCullState", "cull_mode"),
                 "nova_cull_state_lod" => ("NovaCullState", "lod_band"),
                 "nova_cull_state_mask" => ("NovaCullState", "mask"),
+                "nova_lod_state_cluster" => ("NovaLodState", "cluster_slot"),
+                "nova_lod_state_levels" => ("NovaLodState", "level_count"),
+                "nova_lod_state_active" => ("NovaLodState", "active_level"),
+                "nova_lod_state_switch_distance" => ("NovaLodState", "switch_distance"),
+                "nova_lod_state_bias" => ("NovaLodState", "bias"),
+                "nova_streaming_state_cluster" => ("NovaStreamingState", "cluster_slot"),
+                "nova_streaming_state_resident" => ("NovaStreamingState", "resident_levels"),
+                "nova_streaming_state_prefetch" => ("NovaStreamingState", "prefetch_mode"),
+                "nova_streaming_state_evict_budget" => ("NovaStreamingState", "evict_budget"),
+                "nova_streaming_state_channel" => ("NovaStreamingState", "channel"),
                 "nova_pass_state_stage" => ("NovaPassState", "stage"),
                 "nova_pass_state_clear_mode" => ("NovaPassState", "clear_mode"),
                 "nova_pass_state_sample_count" => ("NovaPassState", "sample_count"),
@@ -10455,6 +10723,18 @@ fn builtin_struct_field_type(type_name: &str, field: &str) -> Option<NirTypeRef>
             "cluster_slot" | "kept_nodes" | "cull_mode" | "lod_band" | "mask" => Some(i64()),
             _ => None,
         },
+        "NovaLodPacket" => match field {
+            "cluster_slot" | "level_count" | "active_level" | "switch_distance" | "bias" => {
+                Some(i64())
+            }
+            _ => None,
+        },
+        "NovaStreamingPacket" => match field {
+            "cluster_slot" | "resident_levels" | "prefetch_mode" | "evict_budget" | "channel" => {
+                Some(i64())
+            }
+            _ => None,
+        },
         "NovaPassPacket" => match field {
             "stage" | "clear_mode" | "sample_count" | "debug_view" => Some(i64()),
             _ => None,
@@ -10664,6 +10944,8 @@ fn builtin_struct_field_type(type_name: &str, field: &str) -> Option<NirTypeRef>
             "scene_cluster" => Some(named("NovaSceneClusterPacket")),
             "scene_visibility" => Some(named("NovaVisibilityPacket")),
             "scene_cull" => Some(named("NovaCullPacket")),
+            "scene_lod" => Some(named("NovaLodPacket")),
+            "scene_streaming" => Some(named("NovaStreamingPacket")),
             "pass" => Some(named("NovaPassPacket")),
             "frame" => Some(named("NovaFramePacket")),
             "target" => Some(named("NovaTargetPacket")),
@@ -10832,6 +11114,18 @@ fn builtin_struct_field_type(type_name: &str, field: &str) -> Option<NirTypeRef>
         },
         "NovaCullState" => match field {
             "cluster_slot" | "kept_nodes" | "cull_mode" | "lod_band" | "mask" => Some(i64()),
+            _ => None,
+        },
+        "NovaLodState" => match field {
+            "cluster_slot" | "level_count" | "active_level" | "switch_distance" | "bias" => {
+                Some(i64())
+            }
+            _ => None,
+        },
+        "NovaStreamingState" => match field {
+            "cluster_slot" | "resident_levels" | "prefetch_mode" | "evict_budget" | "channel" => {
+                Some(i64())
+            }
             _ => None,
         },
         "NovaPassState" => match field {
@@ -12791,6 +13085,68 @@ mod tests {
     }
 
     #[test]
+    fn lowers_nova_lod_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let lod: NovaLodPacket = nova_lod_packet(3, 4, 1, 9, 2);
+                let state: NovaLodState = nova_lod_state(lod);
+                let active: i64 = nova_lod_state_active(state);
+                return active;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaLodState" && type_name == "NovaLodState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_streaming_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let streaming: NovaStreamingPacket = nova_streaming_packet(3, 2, 1, 6, 2);
+                let state: NovaStreamingState = nova_streaming_state(streaming);
+                let resident: i64 = nova_streaming_state_resident(state);
+                return resident;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaStreamingState" && type_name == "NovaStreamingState",
+            _ => false,
+        }));
+    }
+
+    #[test]
     fn lowers_nova_pass_state_contract() {
         let module = parse_nuis_module(
             r#"
@@ -13611,6 +13967,8 @@ mod tests {
                 let scene_cluster: NovaSceneClusterPacket = nova_scene_cluster_packet(2, 6, 3, 8, 1);
                 let visibility: NovaVisibilityPacket = nova_visibility_packet(3, 5, 1, 2, 7);
                 let cull: NovaCullPacket = nova_cull_packet(3, 4, 1, 2, 7);
+                let lod: NovaLodPacket = nova_lod_packet(3, 4, 1, 9, 2);
+                let streaming: NovaStreamingPacket = nova_streaming_packet(3, 2, 1, 6, 2);
                 let pass: NovaPassPacket = nova_pass_packet(1, 8, 4, 2);
                 let frame: NovaFramePacket = nova_frame_packet(7, 1, 1, 9);
                 let target: NovaTargetPacket = nova_target_packet(1, 48, 18, 8);
@@ -13674,7 +14032,9 @@ mod tests {
                       scene_cluster,
                       visibility,
                       cull,
-                      pass,
+                  lod,
+                  streaming,
+                  pass,
                   frame,
                   target,
                   frame_graph,
