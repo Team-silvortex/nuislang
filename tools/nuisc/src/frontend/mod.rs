@@ -3381,6 +3381,507 @@ fn lower_call_expr_with_async(
                 ],
             })
         }
+        "nova_residency_packet" => {
+            let (cluster_slot, committed_levels, residency_mode, spill_budget, residency_mask) =
+                match args {
+                    [cluster_slot, committed_levels, residency_mode, spill_budget, residency_mask] => {
+                        (
+                            cluster_slot,
+                            committed_levels,
+                            residency_mode,
+                            spill_budget,
+                            residency_mask,
+                        )
+                    }
+                    _ => return Err("nova_residency_packet(...) expects 5 args".to_owned()),
+                };
+            let cluster_slot = lower_expr(
+                cluster_slot,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let committed_levels = lower_expr(
+                committed_levels,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let residency_mode = lower_expr(
+                residency_mode,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let spill_budget = lower_expr(
+                spill_budget,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let residency_mask = lower_expr(
+                residency_mask,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaResidencyPacket".to_owned(),
+                fields: vec![
+                    ("cluster_slot".to_owned(), cluster_slot),
+                    ("committed_levels".to_owned(), committed_levels),
+                    ("residency_mode".to_owned(), residency_mode),
+                    ("spill_budget".to_owned(), spill_budget),
+                    ("residency_mask".to_owned(), residency_mask),
+                ],
+            })
+        }
+        "nova_eviction_packet" => {
+            let (cluster_slot, evicted_levels, eviction_mode, reclaim_budget, eviction_mask) =
+                match args {
+                    [cluster_slot, evicted_levels, eviction_mode, reclaim_budget, eviction_mask] => {
+                        (
+                            cluster_slot,
+                            evicted_levels,
+                            eviction_mode,
+                            reclaim_budget,
+                            eviction_mask,
+                        )
+                    }
+                    _ => return Err("nova_eviction_packet(...) expects 5 args".to_owned()),
+                };
+            let cluster_slot = lower_expr(
+                cluster_slot,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let evicted_levels = lower_expr(
+                evicted_levels,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let eviction_mode = lower_expr(
+                eviction_mode,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let reclaim_budget = lower_expr(
+                reclaim_budget,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let eviction_mask = lower_expr(
+                eviction_mask,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaEvictionPacket".to_owned(),
+                fields: vec![
+                    ("cluster_slot".to_owned(), cluster_slot),
+                    ("evicted_levels".to_owned(), evicted_levels),
+                    ("eviction_mode".to_owned(), eviction_mode),
+                    ("reclaim_budget".to_owned(), reclaim_budget),
+                    ("eviction_mask".to_owned(), eviction_mask),
+                ],
+            })
+        }
+        "nova_prefetch_packet" => {
+            let (cluster_slot, requested_levels, prefetch_window, warm_budget, prefetch_mask) =
+                match args {
+                    [cluster_slot, requested_levels, prefetch_window, warm_budget, prefetch_mask] => {
+                        (
+                            cluster_slot,
+                            requested_levels,
+                            prefetch_window,
+                            warm_budget,
+                            prefetch_mask,
+                        )
+                    }
+                    _ => return Err("nova_prefetch_packet(...) expects 5 args".to_owned()),
+                };
+            let cluster_slot = lower_expr(
+                cluster_slot,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let requested_levels = lower_expr(
+                requested_levels,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let prefetch_window = lower_expr(
+                prefetch_window,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let warm_budget = lower_expr(
+                warm_budget,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let prefetch_mask = lower_expr(
+                prefetch_mask,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaPrefetchPacket".to_owned(),
+                fields: vec![
+                    ("cluster_slot".to_owned(), cluster_slot),
+                    ("requested_levels".to_owned(), requested_levels),
+                    ("prefetch_window".to_owned(), prefetch_window),
+                    ("warm_budget".to_owned(), warm_budget),
+                    ("prefetch_mask".to_owned(), prefetch_mask),
+                ],
+            })
+        }
+        "nova_budget_packet" => {
+            let (cluster_slot, total_budget, used_budget, headroom, budget_policy) = match args {
+                [cluster_slot, total_budget, used_budget, headroom, budget_policy] => (
+                    cluster_slot,
+                    total_budget,
+                    used_budget,
+                    headroom,
+                    budget_policy,
+                ),
+                _ => return Err("nova_budget_packet(...) expects 5 args".to_owned()),
+            };
+            let cluster_slot = lower_expr(
+                cluster_slot,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let total_budget = lower_expr(
+                total_budget,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let used_budget = lower_expr(
+                used_budget,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let headroom = lower_expr(
+                headroom,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let budget_policy = lower_expr(
+                budget_policy,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaBudgetPacket".to_owned(),
+                fields: vec![
+                    ("cluster_slot".to_owned(), cluster_slot),
+                    ("total_budget".to_owned(), total_budget),
+                    ("used_budget".to_owned(), used_budget),
+                    ("headroom".to_owned(), headroom),
+                    ("budget_policy".to_owned(), budget_policy),
+                ],
+            })
+        }
+        "nova_pressure_packet" => {
+            let (cluster_slot, pressure_level, saturation, throttled, pressure_mask) = match args {
+                [cluster_slot, pressure_level, saturation, throttled, pressure_mask] => (
+                    cluster_slot,
+                    pressure_level,
+                    saturation,
+                    throttled,
+                    pressure_mask,
+                ),
+                _ => return Err("nova_pressure_packet(...) expects 5 args".to_owned()),
+            };
+            let cluster_slot = lower_expr(
+                cluster_slot,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let pressure_level = lower_expr(
+                pressure_level,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let saturation = lower_expr(
+                saturation,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let throttled = lower_expr(
+                throttled,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let pressure_mask = lower_expr(
+                pressure_mask,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaPressurePacket".to_owned(),
+                fields: vec![
+                    ("cluster_slot".to_owned(), cluster_slot),
+                    ("pressure_level".to_owned(), pressure_level),
+                    ("saturation".to_owned(), saturation),
+                    ("throttled".to_owned(), throttled),
+                    ("pressure_mask".to_owned(), pressure_mask),
+                ],
+            })
+        }
+        "nova_thermal_packet" => {
+            let (cluster_slot, thermal_level, cooling_mode, throttled, thermal_mask) = match args {
+                [cluster_slot, thermal_level, cooling_mode, throttled, thermal_mask] => (
+                    cluster_slot,
+                    thermal_level,
+                    cooling_mode,
+                    throttled,
+                    thermal_mask,
+                ),
+                _ => return Err("nova_thermal_packet(...) expects 5 args".to_owned()),
+            };
+            let cluster_slot = lower_expr(
+                cluster_slot,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let thermal_level = lower_expr(
+                thermal_level,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let cooling_mode = lower_expr(
+                cooling_mode,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let throttled = lower_expr(
+                throttled,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let thermal_mask = lower_expr(
+                thermal_mask,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaThermalPacket".to_owned(),
+                fields: vec![
+                    ("cluster_slot".to_owned(), cluster_slot),
+                    ("thermal_level".to_owned(), thermal_level),
+                    ("cooling_mode".to_owned(), cooling_mode),
+                    ("throttled".to_owned(), throttled),
+                    ("thermal_mask".to_owned(), thermal_mask),
+                ],
+            })
+        }
+        "nova_power_packet" => {
+            let (cluster_slot, power_level, source_mode, capped, power_mask) = match args {
+                [cluster_slot, power_level, source_mode, capped, power_mask] => {
+                    (cluster_slot, power_level, source_mode, capped, power_mask)
+                }
+                _ => return Err("nova_power_packet(...) expects 5 args".to_owned()),
+            };
+            let cluster_slot = lower_expr(
+                cluster_slot,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let power_level = lower_expr(
+                power_level,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let source_mode = lower_expr(
+                source_mode,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let capped = lower_expr(
+                capped,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let power_mask = lower_expr(
+                power_mask,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaPowerPacket".to_owned(),
+                fields: vec![
+                    ("cluster_slot".to_owned(), cluster_slot),
+                    ("power_level".to_owned(), power_level),
+                    ("source_mode".to_owned(), source_mode),
+                    ("capped".to_owned(), capped),
+                    ("power_mask".to_owned(), power_mask),
+                ],
+            })
+        }
+        "nova_latency_packet" => {
+            let (cluster_slot, frame_latency, input_latency, jitter, latency_mask) = match args {
+                [cluster_slot, frame_latency, input_latency, jitter, latency_mask] => (
+                    cluster_slot,
+                    frame_latency,
+                    input_latency,
+                    jitter,
+                    latency_mask,
+                ),
+                _ => return Err("nova_latency_packet(...) expects 5 args".to_owned()),
+            };
+            let cluster_slot = lower_expr(
+                cluster_slot,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let frame_latency = lower_expr(
+                frame_latency,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let input_latency = lower_expr(
+                input_latency,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let jitter = lower_expr(
+                jitter,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let latency_mask = lower_expr(
+                latency_mask,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaLatencyPacket".to_owned(),
+                fields: vec![
+                    ("cluster_slot".to_owned(), cluster_slot),
+                    ("frame_latency".to_owned(), frame_latency),
+                    ("input_latency".to_owned(), input_latency),
+                    ("jitter".to_owned(), jitter),
+                    ("latency_mask".to_owned(), latency_mask),
+                ],
+            })
+        }
         "nova_pass_packet" => {
             let (stage, clear_mode, sample_count, debug_view) = match args {
                 [stage, clear_mode, sample_count, debug_view] => {
@@ -5537,10 +6038,10 @@ fn lower_call_expr_with_async(
             })
         }
         "nova_panel_from_parts" => {
-            let [header, sliders, toggle, progress, meter, button, text_input, select, checkbox, radio, textarea, tabs, list, table, tree, inspector, outline, theme, surface, viewport, layer, scene, camera, material, light, mesh, transform, node, scene_link, instance, scene_graph, scene_node, instance_group, scene_cluster, visibility, cull, lod, streaming, pass, frame, target, frame_graph, attachment, pass_chain, barrier, resource_set, schedule, submission, queue, semaphore, timeline, fence, signal, event, dispatch, feedback, intent, reaction, outcome, resolution, commit, snapshot, checkpoint, focus] =
+            let [header, sliders, toggle, progress, meter, button, text_input, select, checkbox, radio, textarea, tabs, list, table, tree, inspector, outline, theme, surface, viewport, layer, scene, camera, material, light, mesh, transform, node, scene_link, instance, scene_graph, scene_node, instance_group, scene_cluster, visibility, cull, lod, streaming, residency, eviction, prefetch, budget, pressure, thermal, power, latency, pass, frame, target, frame_graph, attachment, pass_chain, barrier, resource_set, schedule, submission, queue, semaphore, timeline, fence, signal, event, dispatch, feedback, intent, reaction, outcome, resolution, commit, snapshot, checkpoint, focus] =
                 args
             else {
-                return Err("nova_panel_from_parts(...) expects 64 args".to_owned());
+                return Err("nova_panel_from_parts(...) expects 72 args".to_owned());
             };
             let header = lower_expr(
                 header,
@@ -5846,6 +6347,70 @@ fn lower_call_expr_with_async(
                 struct_table,
                 Some(&named_type("NovaStreamingPacket")),
             )?;
+            let residency = lower_expr(
+                residency,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaResidencyPacket")),
+            )?;
+            let eviction = lower_expr(
+                eviction,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaEvictionPacket")),
+            )?;
+            let prefetch = lower_expr(
+                prefetch,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaPrefetchPacket")),
+            )?;
+            let budget = lower_expr(
+                budget,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaBudgetPacket")),
+            )?;
+            let pressure = lower_expr(
+                pressure,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaPressurePacket")),
+            )?;
+            let thermal = lower_expr(
+                thermal,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaThermalPacket")),
+            )?;
+            let power = lower_expr(
+                power,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaPowerPacket")),
+            )?;
+            let latency = lower_expr(
+                latency,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaLatencyPacket")),
+            )?;
             let pass = lower_expr(
                 pass,
                 current_domain,
@@ -6095,6 +6660,14 @@ fn lower_call_expr_with_async(
                     ("scene_cull".to_owned(), cull),
                     ("scene_lod".to_owned(), lod),
                     ("scene_streaming".to_owned(), streaming),
+                    ("scene_residency".to_owned(), residency),
+                    ("scene_eviction".to_owned(), eviction),
+                    ("scene_prefetch".to_owned(), prefetch),
+                    ("scene_budget".to_owned(), budget),
+                    ("scene_pressure".to_owned(), pressure),
+                    ("scene_thermal".to_owned(), thermal),
+                    ("scene_power".to_owned(), power),
+                    ("scene_latency".to_owned(), latency),
                     ("pass".to_owned(), pass),
                     ("frame".to_owned(), frame),
                     ("target".to_owned(), target),
@@ -7751,6 +8324,430 @@ fn lower_call_expr_with_async(
                 ],
             })
         }
+        "nova_residency_state" => {
+            let [packet] = args else {
+                return Err("nova_residency_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaResidencyPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaResidencyState".to_owned(),
+                fields: vec![
+                    (
+                        "cluster_slot".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "cluster_slot".to_owned(),
+                        },
+                    ),
+                    (
+                        "committed_levels".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "committed_levels".to_owned(),
+                        },
+                    ),
+                    (
+                        "residency_mode".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "residency_mode".to_owned(),
+                        },
+                    ),
+                    (
+                        "spill_budget".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "spill_budget".to_owned(),
+                        },
+                    ),
+                    (
+                        "residency_mask".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "residency_mask".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_eviction_state" => {
+            let [packet] = args else {
+                return Err("nova_eviction_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaEvictionPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaEvictionState".to_owned(),
+                fields: vec![
+                    (
+                        "cluster_slot".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "cluster_slot".to_owned(),
+                        },
+                    ),
+                    (
+                        "evicted_levels".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "evicted_levels".to_owned(),
+                        },
+                    ),
+                    (
+                        "eviction_mode".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "eviction_mode".to_owned(),
+                        },
+                    ),
+                    (
+                        "reclaim_budget".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "reclaim_budget".to_owned(),
+                        },
+                    ),
+                    (
+                        "eviction_mask".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "eviction_mask".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_prefetch_state" => {
+            let [packet] = args else {
+                return Err("nova_prefetch_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaPrefetchPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaPrefetchState".to_owned(),
+                fields: vec![
+                    (
+                        "cluster_slot".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "cluster_slot".to_owned(),
+                        },
+                    ),
+                    (
+                        "requested_levels".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "requested_levels".to_owned(),
+                        },
+                    ),
+                    (
+                        "prefetch_window".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "prefetch_window".to_owned(),
+                        },
+                    ),
+                    (
+                        "warm_budget".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "warm_budget".to_owned(),
+                        },
+                    ),
+                    (
+                        "prefetch_mask".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "prefetch_mask".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_budget_state" => {
+            let [packet] = args else {
+                return Err("nova_budget_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaBudgetPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaBudgetState".to_owned(),
+                fields: vec![
+                    (
+                        "cluster_slot".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "cluster_slot".to_owned(),
+                        },
+                    ),
+                    (
+                        "total_budget".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "total_budget".to_owned(),
+                        },
+                    ),
+                    (
+                        "used_budget".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "used_budget".to_owned(),
+                        },
+                    ),
+                    (
+                        "headroom".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "headroom".to_owned(),
+                        },
+                    ),
+                    (
+                        "budget_policy".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "budget_policy".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_pressure_state" => {
+            let [packet] = args else {
+                return Err("nova_pressure_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaPressurePacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaPressureState".to_owned(),
+                fields: vec![
+                    (
+                        "cluster_slot".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "cluster_slot".to_owned(),
+                        },
+                    ),
+                    (
+                        "pressure_level".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "pressure_level".to_owned(),
+                        },
+                    ),
+                    (
+                        "saturation".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "saturation".to_owned(),
+                        },
+                    ),
+                    (
+                        "throttled".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "throttled".to_owned(),
+                        },
+                    ),
+                    (
+                        "pressure_mask".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "pressure_mask".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_thermal_state" => {
+            let [packet] = args else {
+                return Err("nova_thermal_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaThermalPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaThermalState".to_owned(),
+                fields: vec![
+                    (
+                        "cluster_slot".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "cluster_slot".to_owned(),
+                        },
+                    ),
+                    (
+                        "thermal_level".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "thermal_level".to_owned(),
+                        },
+                    ),
+                    (
+                        "cooling_mode".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "cooling_mode".to_owned(),
+                        },
+                    ),
+                    (
+                        "throttled".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "throttled".to_owned(),
+                        },
+                    ),
+                    (
+                        "thermal_mask".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "thermal_mask".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_power_state" => {
+            let [packet] = args else {
+                return Err("nova_power_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaPowerPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaPowerState".to_owned(),
+                fields: vec![
+                    (
+                        "cluster_slot".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "cluster_slot".to_owned(),
+                        },
+                    ),
+                    (
+                        "power_level".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "power_level".to_owned(),
+                        },
+                    ),
+                    (
+                        "source_mode".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "source_mode".to_owned(),
+                        },
+                    ),
+                    (
+                        "capped".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "capped".to_owned(),
+                        },
+                    ),
+                    (
+                        "power_mask".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "power_mask".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_latency_state" => {
+            let [packet] = args else {
+                return Err("nova_latency_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaLatencyPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaLatencyState".to_owned(),
+                fields: vec![
+                    (
+                        "cluster_slot".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "cluster_slot".to_owned(),
+                        },
+                    ),
+                    (
+                        "frame_latency".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "frame_latency".to_owned(),
+                        },
+                    ),
+                    (
+                        "input_latency".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "input_latency".to_owned(),
+                        },
+                    ),
+                    (
+                        "jitter".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "jitter".to_owned(),
+                        },
+                    ),
+                    (
+                        "latency_mask".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "latency_mask".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
         "nova_pass_state" => {
             let [packet] = args else {
                 return Err("nova_pass_state(...) expects 1 arg".to_owned());
@@ -9120,6 +10117,46 @@ fn lower_call_expr_with_async(
         | "nova_streaming_state_prefetch"
         | "nova_streaming_state_evict_budget"
         | "nova_streaming_state_channel"
+        | "nova_residency_state_cluster"
+        | "nova_residency_state_committed"
+        | "nova_residency_state_mode"
+        | "nova_residency_state_spill_budget"
+        | "nova_residency_state_mask"
+        | "nova_eviction_state_cluster"
+        | "nova_eviction_state_evicted"
+        | "nova_eviction_state_mode"
+        | "nova_eviction_state_reclaim_budget"
+        | "nova_eviction_state_mask"
+        | "nova_prefetch_state_cluster"
+        | "nova_prefetch_state_requested"
+        | "nova_prefetch_state_window"
+        | "nova_prefetch_state_warm_budget"
+        | "nova_prefetch_state_mask"
+        | "nova_budget_state_cluster"
+        | "nova_budget_state_total"
+        | "nova_budget_state_used"
+        | "nova_budget_state_headroom"
+        | "nova_budget_state_policy"
+        | "nova_pressure_state_cluster"
+        | "nova_pressure_state_level"
+        | "nova_pressure_state_saturation"
+        | "nova_pressure_state_throttled"
+        | "nova_pressure_state_mask"
+        | "nova_thermal_state_cluster"
+        | "nova_thermal_state_level"
+        | "nova_thermal_state_cooling"
+        | "nova_thermal_state_throttled"
+        | "nova_thermal_state_mask"
+        | "nova_power_state_cluster"
+        | "nova_power_state_level"
+        | "nova_power_state_source"
+        | "nova_power_state_capped"
+        | "nova_power_state_mask"
+        | "nova_latency_state_cluster"
+        | "nova_latency_state_frame"
+        | "nova_latency_state_input"
+        | "nova_latency_state_jitter"
+        | "nova_latency_state_mask"
         | "nova_pass_state_stage"
         | "nova_pass_state_clear_mode"
         | "nova_pass_state_sample_count"
@@ -9352,6 +10389,46 @@ fn lower_call_expr_with_async(
                 "nova_streaming_state_prefetch" => ("NovaStreamingState", "prefetch_mode"),
                 "nova_streaming_state_evict_budget" => ("NovaStreamingState", "evict_budget"),
                 "nova_streaming_state_channel" => ("NovaStreamingState", "channel"),
+                "nova_residency_state_cluster" => ("NovaResidencyState", "cluster_slot"),
+                "nova_residency_state_committed" => ("NovaResidencyState", "committed_levels"),
+                "nova_residency_state_mode" => ("NovaResidencyState", "residency_mode"),
+                "nova_residency_state_spill_budget" => ("NovaResidencyState", "spill_budget"),
+                "nova_residency_state_mask" => ("NovaResidencyState", "residency_mask"),
+                "nova_eviction_state_cluster" => ("NovaEvictionState", "cluster_slot"),
+                "nova_eviction_state_evicted" => ("NovaEvictionState", "evicted_levels"),
+                "nova_eviction_state_mode" => ("NovaEvictionState", "eviction_mode"),
+                "nova_eviction_state_reclaim_budget" => ("NovaEvictionState", "reclaim_budget"),
+                "nova_eviction_state_mask" => ("NovaEvictionState", "eviction_mask"),
+                "nova_prefetch_state_cluster" => ("NovaPrefetchState", "cluster_slot"),
+                "nova_prefetch_state_requested" => ("NovaPrefetchState", "requested_levels"),
+                "nova_prefetch_state_window" => ("NovaPrefetchState", "prefetch_window"),
+                "nova_prefetch_state_warm_budget" => ("NovaPrefetchState", "warm_budget"),
+                "nova_prefetch_state_mask" => ("NovaPrefetchState", "prefetch_mask"),
+                "nova_budget_state_cluster" => ("NovaBudgetState", "cluster_slot"),
+                "nova_budget_state_total" => ("NovaBudgetState", "total_budget"),
+                "nova_budget_state_used" => ("NovaBudgetState", "used_budget"),
+                "nova_budget_state_headroom" => ("NovaBudgetState", "headroom"),
+                "nova_budget_state_policy" => ("NovaBudgetState", "budget_policy"),
+                "nova_pressure_state_cluster" => ("NovaPressureState", "cluster_slot"),
+                "nova_pressure_state_level" => ("NovaPressureState", "pressure_level"),
+                "nova_pressure_state_saturation" => ("NovaPressureState", "saturation"),
+                "nova_pressure_state_throttled" => ("NovaPressureState", "throttled"),
+                "nova_pressure_state_mask" => ("NovaPressureState", "pressure_mask"),
+                "nova_thermal_state_cluster" => ("NovaThermalState", "cluster_slot"),
+                "nova_thermal_state_level" => ("NovaThermalState", "thermal_level"),
+                "nova_thermal_state_cooling" => ("NovaThermalState", "cooling_mode"),
+                "nova_thermal_state_throttled" => ("NovaThermalState", "throttled"),
+                "nova_thermal_state_mask" => ("NovaThermalState", "thermal_mask"),
+                "nova_power_state_cluster" => ("NovaPowerState", "cluster_slot"),
+                "nova_power_state_level" => ("NovaPowerState", "power_level"),
+                "nova_power_state_source" => ("NovaPowerState", "source_mode"),
+                "nova_power_state_capped" => ("NovaPowerState", "capped"),
+                "nova_power_state_mask" => ("NovaPowerState", "power_mask"),
+                "nova_latency_state_cluster" => ("NovaLatencyState", "cluster_slot"),
+                "nova_latency_state_frame" => ("NovaLatencyState", "frame_latency"),
+                "nova_latency_state_input" => ("NovaLatencyState", "input_latency"),
+                "nova_latency_state_jitter" => ("NovaLatencyState", "jitter"),
+                "nova_latency_state_mask" => ("NovaLatencyState", "latency_mask"),
                 "nova_pass_state_stage" => ("NovaPassState", "stage"),
                 "nova_pass_state_clear_mode" => ("NovaPassState", "clear_mode"),
                 "nova_pass_state_sample_count" => ("NovaPassState", "sample_count"),
@@ -10735,6 +11812,49 @@ fn builtin_struct_field_type(type_name: &str, field: &str) -> Option<NirTypeRef>
             }
             _ => None,
         },
+        "NovaResidencyPacket" => match field {
+            "cluster_slot" | "committed_levels" | "residency_mode" | "spill_budget"
+            | "residency_mask" => Some(i64()),
+            _ => None,
+        },
+        "NovaEvictionPacket" => match field {
+            "cluster_slot" | "evicted_levels" | "eviction_mode" | "reclaim_budget"
+            | "eviction_mask" => Some(i64()),
+            _ => None,
+        },
+        "NovaPrefetchPacket" => match field {
+            "cluster_slot" | "requested_levels" | "prefetch_window" | "warm_budget"
+            | "prefetch_mask" => Some(i64()),
+            _ => None,
+        },
+        "NovaBudgetPacket" => match field {
+            "cluster_slot" | "total_budget" | "used_budget" | "headroom" | "budget_policy" => {
+                Some(i64())
+            }
+            _ => None,
+        },
+        "NovaPressurePacket" => match field {
+            "cluster_slot" | "pressure_level" | "saturation" | "throttled" | "pressure_mask" => {
+                Some(i64())
+            }
+            _ => None,
+        },
+        "NovaThermalPacket" => match field {
+            "cluster_slot" | "thermal_level" | "cooling_mode" | "throttled" | "thermal_mask" => {
+                Some(i64())
+            }
+            _ => None,
+        },
+        "NovaPowerPacket" => match field {
+            "cluster_slot" | "power_level" | "source_mode" | "capped" | "power_mask" => Some(i64()),
+            _ => None,
+        },
+        "NovaLatencyPacket" => match field {
+            "cluster_slot" | "frame_latency" | "input_latency" | "jitter" | "latency_mask" => {
+                Some(i64())
+            }
+            _ => None,
+        },
         "NovaPassPacket" => match field {
             "stage" | "clear_mode" | "sample_count" | "debug_view" => Some(i64()),
             _ => None,
@@ -10946,6 +12066,14 @@ fn builtin_struct_field_type(type_name: &str, field: &str) -> Option<NirTypeRef>
             "scene_cull" => Some(named("NovaCullPacket")),
             "scene_lod" => Some(named("NovaLodPacket")),
             "scene_streaming" => Some(named("NovaStreamingPacket")),
+            "scene_residency" => Some(named("NovaResidencyPacket")),
+            "scene_eviction" => Some(named("NovaEvictionPacket")),
+            "scene_prefetch" => Some(named("NovaPrefetchPacket")),
+            "scene_budget" => Some(named("NovaBudgetPacket")),
+            "scene_pressure" => Some(named("NovaPressurePacket")),
+            "scene_thermal" => Some(named("NovaThermalPacket")),
+            "scene_power" => Some(named("NovaPowerPacket")),
+            "scene_latency" => Some(named("NovaLatencyPacket")),
             "pass" => Some(named("NovaPassPacket")),
             "frame" => Some(named("NovaFramePacket")),
             "target" => Some(named("NovaTargetPacket")),
@@ -11124,6 +12252,49 @@ fn builtin_struct_field_type(type_name: &str, field: &str) -> Option<NirTypeRef>
         },
         "NovaStreamingState" => match field {
             "cluster_slot" | "resident_levels" | "prefetch_mode" | "evict_budget" | "channel" => {
+                Some(i64())
+            }
+            _ => None,
+        },
+        "NovaResidencyState" => match field {
+            "cluster_slot" | "committed_levels" | "residency_mode" | "spill_budget"
+            | "residency_mask" => Some(i64()),
+            _ => None,
+        },
+        "NovaEvictionState" => match field {
+            "cluster_slot" | "evicted_levels" | "eviction_mode" | "reclaim_budget"
+            | "eviction_mask" => Some(i64()),
+            _ => None,
+        },
+        "NovaPrefetchState" => match field {
+            "cluster_slot" | "requested_levels" | "prefetch_window" | "warm_budget"
+            | "prefetch_mask" => Some(i64()),
+            _ => None,
+        },
+        "NovaBudgetState" => match field {
+            "cluster_slot" | "total_budget" | "used_budget" | "headroom" | "budget_policy" => {
+                Some(i64())
+            }
+            _ => None,
+        },
+        "NovaPressureState" => match field {
+            "cluster_slot" | "pressure_level" | "saturation" | "throttled" | "pressure_mask" => {
+                Some(i64())
+            }
+            _ => None,
+        },
+        "NovaThermalState" => match field {
+            "cluster_slot" | "thermal_level" | "cooling_mode" | "throttled" | "thermal_mask" => {
+                Some(i64())
+            }
+            _ => None,
+        },
+        "NovaPowerState" => match field {
+            "cluster_slot" | "power_level" | "source_mode" | "capped" | "power_mask" => Some(i64()),
+            _ => None,
+        },
+        "NovaLatencyState" => match field {
+            "cluster_slot" | "frame_latency" | "input_latency" | "jitter" | "latency_mask" => {
                 Some(i64())
             }
             _ => None,
@@ -13147,6 +14318,254 @@ mod tests {
     }
 
     #[test]
+    fn lowers_nova_residency_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let residency: NovaResidencyPacket = nova_residency_packet(3, 2, 1, 6, 7);
+                let state: NovaResidencyState = nova_residency_state(residency);
+                let committed: i64 = nova_residency_state_committed(state);
+                return committed;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaResidencyState" && type_name == "NovaResidencyState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_eviction_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let eviction: NovaEvictionPacket = nova_eviction_packet(3, 1, 1, 5, 6);
+                let state: NovaEvictionState = nova_eviction_state(eviction);
+                let evicted: i64 = nova_eviction_state_evicted(state);
+                return evicted;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaEvictionState" && type_name == "NovaEvictionState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_prefetch_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let prefetch: NovaPrefetchPacket = nova_prefetch_packet(3, 2, 1, 5, 5);
+                let state: NovaPrefetchState = nova_prefetch_state(prefetch);
+                let requested: i64 = nova_prefetch_state_requested(state);
+                return requested;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaPrefetchState" && type_name == "NovaPrefetchState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_budget_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let budget: NovaBudgetPacket = nova_budget_packet(3, 12, 7, 5, 1);
+                let state: NovaBudgetState = nova_budget_state(budget);
+                let total: i64 = nova_budget_state_total(state);
+                return total;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaBudgetState" && type_name == "NovaBudgetState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_pressure_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let pressure: NovaPressurePacket = nova_pressure_packet(3, 2, 7, 1, 6);
+                let state: NovaPressureState = nova_pressure_state(pressure);
+                let level: i64 = nova_pressure_state_level(state);
+                return level;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaPressureState" && type_name == "NovaPressureState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_thermal_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let thermal: NovaThermalPacket = nova_thermal_packet(3, 2, 1, 1, 6);
+                let state: NovaThermalState = nova_thermal_state(thermal);
+                let level: i64 = nova_thermal_state_level(state);
+                return level;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaThermalState" && type_name == "NovaThermalState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_power_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let power: NovaPowerPacket = nova_power_packet(3, 2, 1, 1, 6);
+                let state: NovaPowerState = nova_power_state(power);
+                let level: i64 = nova_power_state_level(state);
+                return level;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaPowerState" && type_name == "NovaPowerState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_latency_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let latency: NovaLatencyPacket = nova_latency_packet(3, 4, 2, 1, 7);
+                let state: NovaLatencyState = nova_latency_state(latency);
+                let frame: i64 = nova_latency_state_frame(state);
+                return frame;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaLatencyState" && type_name == "NovaLatencyState",
+            _ => false,
+        }));
+    }
+
+    #[test]
     fn lowers_nova_pass_state_contract() {
         let module = parse_nuis_module(
             r#"
@@ -13969,6 +15388,14 @@ mod tests {
                 let cull: NovaCullPacket = nova_cull_packet(3, 4, 1, 2, 7);
                 let lod: NovaLodPacket = nova_lod_packet(3, 4, 1, 9, 2);
                 let streaming: NovaStreamingPacket = nova_streaming_packet(3, 2, 1, 6, 2);
+                let residency: NovaResidencyPacket = nova_residency_packet(3, 2, 1, 6, 7);
+                let eviction: NovaEvictionPacket = nova_eviction_packet(3, 1, 1, 5, 6);
+                let prefetch: NovaPrefetchPacket = nova_prefetch_packet(3, 2, 1, 5, 5);
+                let budget: NovaBudgetPacket = nova_budget_packet(3, 12, 7, 5, 1);
+                let pressure: NovaPressurePacket = nova_pressure_packet(3, 2, 7, 1, 6);
+                let thermal: NovaThermalPacket = nova_thermal_packet(3, 2, 1, 1, 6);
+                let power: NovaPowerPacket = nova_power_packet(3, 2, 1, 1, 6);
+                let latency: NovaLatencyPacket = nova_latency_packet(3, 4, 2, 1, 7);
                 let pass: NovaPassPacket = nova_pass_packet(1, 8, 4, 2);
                 let frame: NovaFramePacket = nova_frame_packet(7, 1, 1, 9);
                 let target: NovaTargetPacket = nova_target_packet(1, 48, 18, 8);
@@ -14031,9 +15458,17 @@ mod tests {
                       instance_group,
                       scene_cluster,
                       visibility,
-                      cull,
-                  lod,
+                  cull,
+                        lod,
                   streaming,
+                  residency,
+                  eviction,
+                  prefetch,
+                  budget,
+                  pressure,
+                  thermal,
+                  power,
+                  latency,
                   pass,
                   frame,
                   target,

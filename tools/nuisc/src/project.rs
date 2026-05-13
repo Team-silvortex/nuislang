@@ -5212,6 +5212,14 @@ mod tests {
                     let cull: NovaCullPacket = nova_cull_packet(3, 4, 1, 2, 7);
                     let lod: NovaLodPacket = nova_lod_packet(3, 4, 1, 9, 2);
                     let streaming: NovaStreamingPacket = nova_streaming_packet(3, 2, 1, 6, 2);
+                    let residency: NovaResidencyPacket = nova_residency_packet(3, 2, 1, 6, 7);
+                    let eviction: NovaEvictionPacket = nova_eviction_packet(3, 1, 1, 5, 6);
+                    let prefetch: NovaPrefetchPacket = nova_prefetch_packet(3, 2, 1, 5, 5);
+                    let budget: NovaBudgetPacket = nova_budget_packet(3, 12, 7, 5, 1);
+                    let pressure: NovaPressurePacket = nova_pressure_packet(3, 2, 7, 1, 6);
+                    let thermal: NovaThermalPacket = nova_thermal_packet(3, 2, 1, 1, 6);
+                    let power: NovaPowerPacket = nova_power_packet(3, 2, 1, 1, 6);
+                    let latency: NovaLatencyPacket = nova_latency_packet(3, 4, 2, 1, 7);
                     let pass: NovaPassPacket = nova_pass_packet(1, 8, 4, 2);
                     let frame: NovaFramePacket = nova_frame_packet(7, 1, 1, 9);
                     let target: NovaTargetPacket = nova_target_packet(1, 48, 18, 8);
@@ -5277,6 +5285,14 @@ mod tests {
                         cull,
                         lod,
                         streaming,
+                        residency,
+                        eviction,
+                        prefetch,
+                        budget,
+                        pressure,
+                        thermal,
+                        power,
+                        latency,
                         pass,
                         frame,
                         target,

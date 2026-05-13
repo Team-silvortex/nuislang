@@ -92,6 +92,22 @@ mod cpu Main {
       nova_lod_packet(3, 4, panel_toggle_state, packed_radius, panel_accent);
     let panel_streaming: NovaStreamingPacket =
       nova_streaming_packet(3, 2 + panel_toggle_state, panel_toggle_state, speed_delta, panel_accent);
+    let panel_residency: NovaResidencyPacket =
+      nova_residency_packet(3, 2 + panel_toggle_state, panel_toggle_state, packed_radius, 7);
+    let panel_eviction: NovaEvictionPacket =
+      nova_eviction_packet(3, panel_toggle_state, panel_toggle_state, speed_delta, 6);
+    let panel_prefetch: NovaPrefetchPacket =
+      nova_prefetch_packet(3, 2 + panel_toggle_state, panel_toggle_state, speed_delta, 5);
+    let panel_budget: NovaBudgetPacket =
+      nova_budget_packet(3, 12 + panel_toggle_state, speed_delta, packed_radius, panel_toggle_state);
+    let panel_pressure: NovaPressurePacket =
+      nova_pressure_packet(3, 2 + panel_toggle_state, packed_radius, panel_toggle_state, 6);
+    let panel_thermal: NovaThermalPacket =
+      nova_thermal_packet(3, 2 + panel_toggle_state, panel_toggle_state, panel_toggle_state, 6);
+    let panel_power: NovaPowerPacket =
+      nova_power_packet(3, 2 + panel_toggle_state, panel_toggle_state, panel_toggle_state, 6);
+    let panel_latency: NovaLatencyPacket =
+      nova_latency_packet(3, 4 + panel_toggle_state, 2 + panel_toggle_state, panel_toggle_state, 7);
     let panel_pass: NovaPassPacket =
       nova_pass_packet(panel_toggle_state, panel_accent, 4, panel_focus_index);
     let panel_frame: NovaFramePacket =
@@ -279,6 +295,38 @@ mod cpu Main {
       nova_streaming_state(panel_streaming);
     let panel_streaming_resident: i64 =
       nova_streaming_state_resident(streaming_state);
+    let residency_state: NovaResidencyState =
+      nova_residency_state(panel_residency);
+    let panel_residency_committed: i64 =
+      nova_residency_state_committed(residency_state);
+    let eviction_state: NovaEvictionState =
+      nova_eviction_state(panel_eviction);
+    let panel_eviction_levels: i64 =
+      nova_eviction_state_evicted(eviction_state);
+    let prefetch_state: NovaPrefetchState =
+      nova_prefetch_state(panel_prefetch);
+    let panel_prefetch_requested: i64 =
+      nova_prefetch_state_requested(prefetch_state);
+    let budget_state: NovaBudgetState =
+      nova_budget_state(panel_budget);
+    let panel_budget_total: i64 =
+      nova_budget_state_total(budget_state);
+    let pressure_state: NovaPressureState =
+      nova_pressure_state(panel_pressure);
+    let panel_pressure_level: i64 =
+      nova_pressure_state_level(pressure_state);
+    let thermal_state: NovaThermalState =
+      nova_thermal_state(panel_thermal);
+    let panel_thermal_level: i64 =
+      nova_thermal_state_level(thermal_state);
+    let power_state: NovaPowerState =
+      nova_power_state(panel_power);
+    let panel_power_level: i64 =
+      nova_power_state_level(power_state);
+    let latency_state: NovaLatencyState =
+      nova_latency_state(panel_latency);
+    let panel_latency_frame: i64 =
+      nova_latency_state_frame(latency_state);
     let panel_pass_samples: i64 = nova_pass_state_sample_count(pass_state);
     let panel_frame_exposure: i64 = nova_frame_state_exposure(frame_state);
     let panel_target_msaa: i64 = nova_target_state_multisample(target_state);
@@ -413,6 +461,14 @@ mod cpu Main {
       + panel_cull_kept
       + panel_lod_active
       + panel_streaming_resident
+      + panel_residency_committed
+      + panel_eviction_levels
+      + panel_prefetch_requested
+      + panel_budget_total
+      + panel_pressure_level
+      + panel_thermal_level
+      + panel_power_level
+      + panel_latency_frame
       + panel_pass_samples
       + panel_frame_exposure
       + panel_target_msaa
@@ -483,6 +539,14 @@ mod cpu Main {
       panel_cull,
       panel_lod,
       panel_streaming,
+      panel_residency,
+      panel_eviction,
+      panel_prefetch,
+      panel_budget,
+      panel_pressure,
+      panel_thermal,
+      panel_power,
+      panel_latency,
       panel_pass,
       panel_frame,
       panel_target,

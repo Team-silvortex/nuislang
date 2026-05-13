@@ -3301,6 +3301,107 @@ fn draw_scene_preview(
         preview_top.saturating_add(8),
         &streaming_label,
     );
+    let residency_label = format!(
+        "rs{} c{} m{} s{}",
+        packet.residency_cluster_slot,
+        packet.residency_committed_levels,
+        packet.residency_mode,
+        packet.residency_spill_budget
+    );
+    put_text(
+        rows,
+        preview_left,
+        preview_top.saturating_add(9),
+        &residency_label,
+    );
+    let eviction_label = format!(
+        "ev{} n{} m{} r{}",
+        packet.eviction_cluster_slot,
+        packet.eviction_levels,
+        packet.eviction_mode,
+        packet.eviction_reclaim_budget
+    );
+    put_text(
+        rows,
+        preview_left,
+        preview_top.saturating_add(10),
+        &eviction_label,
+    );
+    let prefetch_label = format!(
+        "pf{} q{} w{} b{}",
+        packet.prefetch_cluster_slot,
+        packet.prefetch_requested_levels,
+        packet.prefetch_window,
+        packet.prefetch_warm_budget
+    );
+    put_text(
+        rows,
+        preview_left,
+        preview_top.saturating_add(11),
+        &prefetch_label,
+    );
+    let budget_label = format!(
+        "bg{} t{} u{} h{}",
+        packet.budget_cluster_slot, packet.budget_total, packet.budget_used, packet.budget_headroom
+    );
+    put_text(
+        rows,
+        preview_left,
+        preview_top.saturating_add(12),
+        &budget_label,
+    );
+    let pressure_label = format!(
+        "pr{} l{} s{} t{}",
+        packet.pressure_cluster_slot,
+        packet.pressure_level,
+        packet.pressure_saturation,
+        packet.pressure_throttled
+    );
+    put_text(
+        rows,
+        preview_left,
+        preview_top.saturating_add(13),
+        &pressure_label,
+    );
+    let thermal_label = format!(
+        "th{} l{} c{} t{}",
+        packet.thermal_cluster_slot,
+        packet.thermal_level,
+        packet.thermal_cooling_mode,
+        packet.thermal_throttled
+    );
+    put_text(
+        rows,
+        preview_left,
+        preview_top.saturating_add(14),
+        &thermal_label,
+    );
+    let power_label = format!(
+        "pw{} l{} s{} c{}",
+        packet.power_cluster_slot,
+        packet.power_level,
+        packet.power_source_mode,
+        packet.power_capped
+    );
+    put_text(
+        rows,
+        preview_left,
+        preview_top.saturating_add(15),
+        &power_label,
+    );
+    let latency_label = format!(
+        "lt{} f{} i{} j{}",
+        packet.latency_cluster_slot,
+        packet.latency_frame,
+        packet.latency_input,
+        packet.latency_jitter
+    );
+    put_text(
+        rows,
+        preview_left,
+        preview_top.saturating_add(16),
+        &latency_label,
+    );
 
     let instance_count = packet.instance_count.clamp(1, 4) as usize;
     let instance_stride = packet.instance_stride.abs().clamp(2, 6) as usize;
@@ -3522,6 +3623,214 @@ fn draw_scene_preview(
         };
         stamp_line(rows, lod_root_x, lod_root_y, sx, sy, connector);
     }
+
+    let residency_span = packet.residency_committed_levels.clamp(1, 4) as usize;
+    let residency_root_x = preview_left
+        .saturating_add(48 + packet.residency_cluster_slot.rem_euclid(4) as usize)
+        .min(preview_right.saturating_sub(1));
+    let residency_root_y = root_y.min(ground_y.saturating_sub(1));
+    for idx in 0..residency_span {
+        let rx = (residency_root_x + idx * 2).min(preview_right.saturating_sub(1));
+        let ry = (residency_root_y + idx.rem_euclid(2)).min(ground_y.saturating_sub(1));
+        let glyph = match (packet.residency_mask + idx as i64).rem_euclid(4) {
+            0 => 'r',
+            1 => 'R',
+            2 => '#',
+            _ => '%',
+        };
+        if let Some(row) = rows.get_mut(ry) {
+            let slot = rx.min(row.len().saturating_sub(1));
+            if let Some(cell) = row.get_mut(slot) {
+                *cell = glyph;
+            }
+        }
+        let connector = if packet.residency_mode != 0 { ';' } else { ',' };
+        stamp_line(rows, streaming_root_x, streaming_root_y, rx, ry, connector);
+    }
+
+    let eviction_span = packet.eviction_levels.clamp(1, 4) as usize;
+    let eviction_root_x = preview_left
+        .saturating_add(54 + packet.eviction_cluster_slot.rem_euclid(4) as usize)
+        .min(preview_right.saturating_sub(1));
+    let eviction_root_y = root_y.saturating_add(1).min(ground_y.saturating_sub(1));
+    for idx in 0..eviction_span {
+        let ex = (eviction_root_x + idx * 2).min(preview_right.saturating_sub(1));
+        let ey = (eviction_root_y + idx.rem_euclid(2)).min(ground_y.saturating_sub(1));
+        let glyph = match (packet.eviction_mask + idx as i64).rem_euclid(4) {
+            0 => 'e',
+            1 => 'E',
+            2 => 'x',
+            _ => 'X',
+        };
+        if let Some(row) = rows.get_mut(ey) {
+            let slot = ex.min(row.len().saturating_sub(1));
+            if let Some(cell) = row.get_mut(slot) {
+                *cell = glyph;
+            }
+        }
+        let connector = if packet.eviction_mode != 0 { '!' } else { ':' };
+        stamp_line(rows, residency_root_x, residency_root_y, ex, ey, connector);
+    }
+
+    let prefetch_span = packet.prefetch_requested_levels.clamp(1, 4) as usize;
+    let prefetch_root_x = preview_left
+        .saturating_add(60 + packet.prefetch_cluster_slot.rem_euclid(4) as usize)
+        .min(preview_right.saturating_sub(1));
+    let prefetch_root_y = root_y.min(ground_y.saturating_sub(1));
+    for idx in 0..prefetch_span {
+        let px = (prefetch_root_x + idx * 2).min(preview_right.saturating_sub(1));
+        let py = (prefetch_root_y + idx.rem_euclid(2)).min(ground_y.saturating_sub(1));
+        let glyph = match (packet.prefetch_mask + idx as i64).rem_euclid(4) {
+            0 => 'p',
+            1 => 'P',
+            2 => '?',
+            _ => '*',
+        };
+        if let Some(row) = rows.get_mut(py) {
+            let slot = px.min(row.len().saturating_sub(1));
+            if let Some(cell) = row.get_mut(slot) {
+                *cell = glyph;
+            }
+        }
+        let connector = if packet.prefetch_window != 0 {
+            '/'
+        } else {
+            '.'
+        };
+        stamp_line(rows, eviction_root_x, eviction_root_y, px, py, connector);
+    }
+
+    let budget_span = packet.budget_total.clamp(1, 4) as usize;
+    let budget_root_x = preview_left
+        .saturating_add(66 + packet.budget_cluster_slot.rem_euclid(4) as usize)
+        .min(preview_right.saturating_sub(1));
+    let budget_root_y = root_y.saturating_add(1).min(ground_y.saturating_sub(1));
+    for idx in 0..budget_span {
+        let bx = (budget_root_x + idx * 2).min(preview_right.saturating_sub(1));
+        let by = (budget_root_y + idx.rem_euclid(2)).min(ground_y.saturating_sub(1));
+        let glyph = match (packet.budget_policy + idx as i64).rem_euclid(4) {
+            0 => 'b',
+            1 => 'B',
+            2 => '=',
+            _ => '+',
+        };
+        if let Some(row) = rows.get_mut(by) {
+            let slot = bx.min(row.len().saturating_sub(1));
+            if let Some(cell) = row.get_mut(slot) {
+                *cell = glyph;
+            }
+        }
+        let connector = if packet.budget_used > packet.budget_headroom {
+            '!'
+        } else {
+            '-'
+        };
+        stamp_line(rows, prefetch_root_x, prefetch_root_y, bx, by, connector);
+    }
+
+    let pressure_span = packet.pressure_level.clamp(1, 4) as usize;
+    let pressure_root_x = preview_left
+        .saturating_add(72 + packet.pressure_cluster_slot.rem_euclid(4) as usize)
+        .min(preview_right.saturating_sub(1));
+    let pressure_root_y = root_y.min(ground_y.saturating_sub(1));
+    for idx in 0..pressure_span {
+        let px = (pressure_root_x + idx * 2).min(preview_right.saturating_sub(1));
+        let py = (pressure_root_y + idx.rem_euclid(2)).min(ground_y.saturating_sub(1));
+        let glyph = match (packet.pressure_mask + idx as i64).rem_euclid(4) {
+            0 => 'p',
+            1 => '!',
+            2 => '^',
+            _ => 'P',
+        };
+        if let Some(row) = rows.get_mut(py) {
+            let slot = px.min(row.len().saturating_sub(1));
+            if let Some(cell) = row.get_mut(slot) {
+                *cell = glyph;
+            }
+        }
+        let connector = if packet.pressure_throttled != 0 {
+            '!'
+        } else {
+            '~'
+        };
+        stamp_line(rows, budget_root_x, budget_root_y, px, py, connector);
+    }
+
+    let thermal_span = packet.thermal_level.clamp(1, 4) as usize;
+    let thermal_root_x = preview_left
+        .saturating_add(78 + packet.thermal_cluster_slot.rem_euclid(4) as usize)
+        .min(preview_right.saturating_sub(1));
+    let thermal_root_y = root_y.saturating_add(1).min(ground_y.saturating_sub(1));
+    for idx in 0..thermal_span {
+        let tx = (thermal_root_x + idx * 2).min(preview_right.saturating_sub(1));
+        let ty = (thermal_root_y + idx.rem_euclid(2)).min(ground_y.saturating_sub(1));
+        let glyph = match (packet.thermal_mask + idx as i64).rem_euclid(4) {
+            0 => 't',
+            1 => 'T',
+            2 => '*',
+            _ => '!',
+        };
+        if let Some(row) = rows.get_mut(ty) {
+            let slot = tx.min(row.len().saturating_sub(1));
+            if let Some(cell) = row.get_mut(slot) {
+                *cell = glyph;
+            }
+        }
+        let connector = if packet.thermal_throttled != 0 {
+            '#'
+        } else {
+            '~'
+        };
+        stamp_line(rows, pressure_root_x, pressure_root_y, tx, ty, connector);
+    }
+
+    let power_span = packet.power_level.clamp(1, 4) as usize;
+    let power_root_x = preview_left
+        .saturating_add(84 + packet.power_cluster_slot.rem_euclid(4) as usize)
+        .min(preview_right.saturating_sub(1));
+    let power_root_y = root_y.min(ground_y.saturating_sub(1));
+    for idx in 0..power_span {
+        let px = (power_root_x + idx * 2).min(preview_right.saturating_sub(1));
+        let py = (power_root_y + idx.rem_euclid(2)).min(ground_y.saturating_sub(1));
+        let glyph = match (packet.power_mask + idx as i64).rem_euclid(4) {
+            0 => 'w',
+            1 => 'W',
+            2 => '=',
+            _ => '!',
+        };
+        if let Some(row) = rows.get_mut(py) {
+            let slot = px.min(row.len().saturating_sub(1));
+            if let Some(cell) = row.get_mut(slot) {
+                *cell = glyph;
+            }
+        }
+        let connector = if packet.power_capped != 0 { '=' } else { '-' };
+        stamp_line(rows, thermal_root_x, thermal_root_y, px, py, connector);
+    }
+
+    let latency_span = packet.latency_frame.clamp(1, 4) as usize;
+    let latency_root_x = preview_left
+        .saturating_add(90 + packet.latency_cluster_slot.rem_euclid(4) as usize)
+        .min(preview_right.saturating_sub(1));
+    let latency_root_y = root_y.saturating_add(1).min(ground_y.saturating_sub(1));
+    for idx in 0..latency_span {
+        let lx = (latency_root_x + idx * 2).min(preview_right.saturating_sub(1));
+        let ly = (latency_root_y + idx.rem_euclid(2)).min(ground_y.saturating_sub(1));
+        let glyph = match (packet.latency_mask + idx as i64).rem_euclid(4) {
+            0 => 'l',
+            1 => 'L',
+            2 => '~',
+            _ => '!',
+        };
+        if let Some(row) = rows.get_mut(ly) {
+            let slot = lx.min(row.len().saturating_sub(1));
+            if let Some(cell) = row.get_mut(slot) {
+                *cell = glyph;
+            }
+        }
+        let connector = if packet.latency_jitter != 0 { '~' } else { '.' };
+        stamp_line(rows, power_root_x, power_root_y, lx, ly, connector);
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -3637,6 +3946,46 @@ struct BallPacket {
     streaming_prefetch_mode: i64,
     streaming_evict_budget: i64,
     streaming_channel: i64,
+    residency_cluster_slot: i64,
+    residency_committed_levels: i64,
+    residency_mode: i64,
+    residency_spill_budget: i64,
+    residency_mask: i64,
+    eviction_cluster_slot: i64,
+    eviction_levels: i64,
+    eviction_mode: i64,
+    eviction_reclaim_budget: i64,
+    eviction_mask: i64,
+    prefetch_cluster_slot: i64,
+    prefetch_requested_levels: i64,
+    prefetch_window: i64,
+    prefetch_warm_budget: i64,
+    prefetch_mask: i64,
+    budget_cluster_slot: i64,
+    budget_total: i64,
+    budget_used: i64,
+    budget_headroom: i64,
+    budget_policy: i64,
+    pressure_cluster_slot: i64,
+    pressure_level: i64,
+    pressure_saturation: i64,
+    pressure_throttled: i64,
+    pressure_mask: i64,
+    thermal_cluster_slot: i64,
+    thermal_level: i64,
+    thermal_cooling_mode: i64,
+    thermal_throttled: i64,
+    thermal_mask: i64,
+    power_cluster_slot: i64,
+    power_level: i64,
+    power_source_mode: i64,
+    power_capped: i64,
+    power_mask: i64,
+    latency_cluster_slot: i64,
+    latency_frame: i64,
+    latency_input: i64,
+    latency_jitter: i64,
+    latency_mask: i64,
     pass_stage: i64,
     pass_clear_mode: i64,
     pass_sample_count: i64,
@@ -3908,6 +4257,46 @@ fn parse_ball_packet(value: &Value, op: &str) -> Result<BallPacket, String> {
                 streaming_prefetch_mode: speed.round() as i64 % 2,
                 streaming_evict_budget: (radius_scale * 16.0).round() as i64,
                 streaming_channel: color_key,
+                residency_cluster_slot: 3,
+                residency_committed_levels: 2,
+                residency_mode: speed.round() as i64 % 2,
+                residency_spill_budget: (radius_scale * 24.0).round() as i64,
+                residency_mask: 7,
+                eviction_cluster_slot: 3,
+                eviction_levels: speed.round() as i64 % 2,
+                eviction_mode: speed.round() as i64 % 2,
+                eviction_reclaim_budget: (radius_scale * 12.0).round() as i64,
+                eviction_mask: 6,
+                prefetch_cluster_slot: 3,
+                prefetch_requested_levels: 2,
+                prefetch_window: speed.round() as i64 % 2,
+                prefetch_warm_budget: (radius_scale * 10.0).round() as i64,
+                prefetch_mask: 5,
+                budget_cluster_slot: 3,
+                budget_total: 12,
+                budget_used: (radius_scale * 8.0).round() as i64,
+                budget_headroom: 5,
+                budget_policy: speed.round() as i64 % 2,
+                pressure_cluster_slot: 3,
+                pressure_level: 2,
+                pressure_saturation: (radius_scale * 10.0).round() as i64,
+                pressure_throttled: speed.round() as i64 % 2,
+                pressure_mask: 6,
+                thermal_cluster_slot: 3,
+                thermal_level: 2,
+                thermal_cooling_mode: speed.round() as i64 % 2,
+                thermal_throttled: speed.round() as i64 % 2,
+                thermal_mask: 6,
+                power_cluster_slot: 3,
+                power_level: 2,
+                power_source_mode: speed.round() as i64 % 2,
+                power_capped: speed.round() as i64 % 2,
+                power_mask: 6,
+                latency_cluster_slot: 3,
+                latency_frame: 4,
+                latency_input: 2,
+                latency_jitter: speed.round() as i64 % 2,
+                latency_mask: 7,
                 pass_stage: speed.round() as i64 % 3,
                 pass_clear_mode: color_key,
                 pass_sample_count: 4,
@@ -4629,6 +5018,331 @@ fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket
             .map(|value| scalar_to_color_key(value, op))
             .transpose()?
             .unwrap_or(lod_bias);
+    let residency_cluster_slot = find_packet_field(
+        packet,
+        &["cluster_slot"],
+        &["scene_residency"],
+        &["cluster_slot"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(streaming_cluster_slot);
+    let residency_committed_levels = find_packet_field(
+        packet,
+        &["committed_levels"],
+        &["scene_residency"],
+        &["committed_levels"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(streaming_resident_levels);
+    let residency_mode = find_packet_field(
+        packet,
+        &["residency_mode"],
+        &["scene_residency"],
+        &["residency_mode"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(streaming_prefetch_mode);
+    let residency_spill_budget = find_packet_field(
+        packet,
+        &["spill_budget"],
+        &["scene_residency"],
+        &["spill_budget"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(streaming_evict_budget);
+    let residency_mask = find_packet_field(
+        packet,
+        &["residency_mask"],
+        &["scene_residency"],
+        &["residency_mask"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(streaming_channel);
+    let eviction_cluster_slot = find_packet_field(
+        packet,
+        &["cluster_slot"],
+        &["scene_eviction"],
+        &["cluster_slot"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(residency_cluster_slot);
+    let eviction_levels = find_packet_field(
+        packet,
+        &["evicted_levels"],
+        &["scene_eviction"],
+        &["evicted_levels"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(residency_mode);
+    let eviction_mode = find_packet_field(
+        packet,
+        &["eviction_mode"],
+        &["scene_eviction"],
+        &["eviction_mode"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(residency_mode);
+    let eviction_reclaim_budget = find_packet_field(
+        packet,
+        &["reclaim_budget"],
+        &["scene_eviction"],
+        &["reclaim_budget"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(residency_spill_budget);
+    let eviction_mask = find_packet_field(
+        packet,
+        &["eviction_mask"],
+        &["scene_eviction"],
+        &["eviction_mask"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(residency_mask);
+    let prefetch_cluster_slot = find_packet_field(
+        packet,
+        &["cluster_slot"],
+        &["scene_prefetch"],
+        &["cluster_slot"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(eviction_cluster_slot);
+    let prefetch_requested_levels = find_packet_field(
+        packet,
+        &["requested_levels"],
+        &["scene_prefetch"],
+        &["requested_levels"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(streaming_resident_levels);
+    let prefetch_window = find_packet_field(
+        packet,
+        &["prefetch_window"],
+        &["scene_prefetch"],
+        &["prefetch_window"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(streaming_prefetch_mode);
+    let prefetch_warm_budget = find_packet_field(
+        packet,
+        &["warm_budget"],
+        &["scene_prefetch"],
+        &["warm_budget"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(eviction_reclaim_budget);
+    let prefetch_mask = find_packet_field(
+        packet,
+        &["prefetch_mask"],
+        &["scene_prefetch"],
+        &["prefetch_mask"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(eviction_mask);
+    let budget_cluster_slot = find_packet_field(
+        packet,
+        &["cluster_slot"],
+        &["scene_budget"],
+        &["cluster_slot"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(prefetch_cluster_slot);
+    let budget_total = find_packet_field(
+        packet,
+        &["total_budget"],
+        &["scene_budget"],
+        &["total_budget"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(12);
+    let budget_used = find_packet_field(
+        packet,
+        &["used_budget"],
+        &["scene_budget"],
+        &["used_budget"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(prefetch_warm_budget);
+    let budget_headroom =
+        find_packet_field(packet, &["headroom"], &["scene_budget"], &["headroom"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(prefetch_requested_levels);
+    let budget_policy = find_packet_field(
+        packet,
+        &["budget_policy"],
+        &["scene_budget"],
+        &["budget_policy"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(prefetch_window);
+    let pressure_cluster_slot = find_packet_field(
+        packet,
+        &["cluster_slot"],
+        &["scene_pressure"],
+        &["cluster_slot"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(budget_cluster_slot);
+    let pressure_level = find_packet_field(
+        packet,
+        &["pressure_level"],
+        &["scene_pressure"],
+        &["pressure_level"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(2);
+    let pressure_saturation = find_packet_field(
+        packet,
+        &["saturation"],
+        &["scene_pressure"],
+        &["saturation"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(budget_used);
+    let pressure_throttled =
+        find_packet_field(packet, &["throttled"], &["scene_pressure"], &["throttled"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(budget_policy);
+    let pressure_mask = find_packet_field(
+        packet,
+        &["pressure_mask"],
+        &["scene_pressure"],
+        &["pressure_mask"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(budget_headroom);
+    let thermal_cluster_slot = find_packet_field(
+        packet,
+        &["cluster_slot"],
+        &["scene_thermal"],
+        &["cluster_slot"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(pressure_cluster_slot);
+    let thermal_level = find_packet_field(
+        packet,
+        &["thermal_level"],
+        &["scene_thermal"],
+        &["thermal_level"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(pressure_level);
+    let thermal_cooling_mode = find_packet_field(
+        packet,
+        &["cooling_mode"],
+        &["scene_thermal"],
+        &["cooling_mode"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(pressure_throttled);
+    let thermal_throttled =
+        find_packet_field(packet, &["throttled"], &["scene_thermal"], &["throttled"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(pressure_throttled);
+    let thermal_mask = find_packet_field(
+        packet,
+        &["thermal_mask"],
+        &["scene_thermal"],
+        &["thermal_mask"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(pressure_mask);
+    let power_cluster_slot = find_packet_field(
+        packet,
+        &["cluster_slot"],
+        &["scene_power"],
+        &["cluster_slot"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(thermal_cluster_slot);
+    let power_level =
+        find_packet_field(packet, &["power_level"], &["scene_power"], &["power_level"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(thermal_level);
+    let power_source_mode =
+        find_packet_field(packet, &["source_mode"], &["scene_power"], &["source_mode"])
+            .map(|value| scalar_to_color_key(value, op))
+            .transpose()?
+            .unwrap_or(thermal_cooling_mode);
+    let power_capped = find_packet_field(packet, &["capped"], &["scene_power"], &["capped"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(thermal_throttled);
+    let power_mask = find_packet_field(packet, &["power_mask"], &["scene_power"], &["power_mask"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(thermal_mask);
+    let latency_cluster_slot = find_packet_field(
+        packet,
+        &["cluster_slot"],
+        &["scene_latency"],
+        &["cluster_slot"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(power_cluster_slot);
+    let latency_frame = find_packet_field(
+        packet,
+        &["frame_latency"],
+        &["scene_latency"],
+        &["frame_latency"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(4);
+    let latency_input = find_packet_field(
+        packet,
+        &["input_latency"],
+        &["scene_latency"],
+        &["input_latency"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(2);
+    let latency_jitter = find_packet_field(packet, &["jitter"], &["scene_latency"], &["jitter"])
+        .map(|value| scalar_to_color_key(value, op))
+        .transpose()?
+        .unwrap_or(power_capped);
+    let latency_mask = find_packet_field(
+        packet,
+        &["latency_mask"],
+        &["scene_latency"],
+        &["latency_mask"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(power_mask);
     let pass_stage = find_packet_field(packet, &["stage"], &["pass"], &["stage"])
         .map(|value| scalar_to_color_key(value, op))
         .transpose()?
@@ -5508,6 +6222,46 @@ fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket
         streaming_prefetch_mode,
         streaming_evict_budget,
         streaming_channel,
+        residency_cluster_slot,
+        residency_committed_levels,
+        residency_mode,
+        residency_spill_budget,
+        residency_mask,
+        eviction_cluster_slot,
+        eviction_levels,
+        eviction_mode,
+        eviction_reclaim_budget,
+        eviction_mask,
+        prefetch_cluster_slot,
+        prefetch_requested_levels,
+        prefetch_window,
+        prefetch_warm_budget,
+        prefetch_mask,
+        budget_cluster_slot,
+        budget_total,
+        budget_used,
+        budget_headroom,
+        budget_policy,
+        pressure_cluster_slot,
+        pressure_level,
+        pressure_saturation,
+        pressure_throttled,
+        pressure_mask,
+        thermal_cluster_slot,
+        thermal_level,
+        thermal_cooling_mode,
+        thermal_throttled,
+        thermal_mask,
+        power_cluster_slot,
+        power_level,
+        power_source_mode,
+        power_capped,
+        power_mask,
+        latency_cluster_slot,
+        latency_frame,
+        latency_input,
+        latency_jitter,
+        latency_mask,
         pass_stage,
         pass_clear_mode,
         pass_sample_count,

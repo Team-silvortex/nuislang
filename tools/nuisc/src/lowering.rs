@@ -1435,6 +1435,170 @@ fn lower_expr(
                 push_dep_edges(state, accent_name, &streaming_struct);
                 panel_group_nodes.push(streaming_struct.clone());
 
+                let residency_struct = next_name(state, "nova_panel_residency");
+                state.yir.nodes.push(Node {
+                    name: residency_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaResidencyPacket".to_owned(),
+                            "cluster_slot=3".to_owned(),
+                            "committed_levels=2".to_owned(),
+                            format!("residency_mode={toggle_name}"),
+                            format!("spill_budget={speed_name}"),
+                            "residency_mask=7".to_owned(),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &residency_struct);
+                push_dep_edges(state, &speed_name, &residency_struct);
+                panel_group_nodes.push(residency_struct.clone());
+
+                let eviction_struct = next_name(state, "nova_panel_eviction");
+                state.yir.nodes.push(Node {
+                    name: eviction_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaEvictionPacket".to_owned(),
+                            "cluster_slot=3".to_owned(),
+                            "evicted_levels=1".to_owned(),
+                            format!("eviction_mode={toggle_name}"),
+                            format!("reclaim_budget={speed_name}"),
+                            "eviction_mask=6".to_owned(),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &eviction_struct);
+                push_dep_edges(state, &speed_name, &eviction_struct);
+                panel_group_nodes.push(eviction_struct.clone());
+
+                let prefetch_struct = next_name(state, "nova_panel_prefetch");
+                state.yir.nodes.push(Node {
+                    name: prefetch_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaPrefetchPacket".to_owned(),
+                            "cluster_slot=3".to_owned(),
+                            "requested_levels=2".to_owned(),
+                            format!("prefetch_window={toggle_name}"),
+                            format!("warm_budget={speed_name}"),
+                            "prefetch_mask=5".to_owned(),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &prefetch_struct);
+                push_dep_edges(state, &speed_name, &prefetch_struct);
+                panel_group_nodes.push(prefetch_struct.clone());
+
+                let budget_struct = next_name(state, "nova_panel_budget");
+                state.yir.nodes.push(Node {
+                    name: budget_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaBudgetPacket".to_owned(),
+                            "cluster_slot=3".to_owned(),
+                            "total_budget=12".to_owned(),
+                            format!("used_budget={speed_name}"),
+                            "headroom=5".to_owned(),
+                            format!("budget_policy={toggle_name}"),
+                        ],
+                    },
+                });
+                push_dep_edges(state, &speed_name, &budget_struct);
+                push_dep_edges(state, toggle_name, &budget_struct);
+                panel_group_nodes.push(budget_struct.clone());
+
+                let pressure_struct = next_name(state, "nova_panel_pressure");
+                state.yir.nodes.push(Node {
+                    name: pressure_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaPressurePacket".to_owned(),
+                            "cluster_slot=3".to_owned(),
+                            "pressure_level=2".to_owned(),
+                            "saturation=7".to_owned(),
+                            format!("throttled={toggle_name}"),
+                            "pressure_mask=6".to_owned(),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &pressure_struct);
+                panel_group_nodes.push(pressure_struct.clone());
+
+                let thermal_struct = next_name(state, "nova_panel_thermal");
+                state.yir.nodes.push(Node {
+                    name: thermal_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaThermalPacket".to_owned(),
+                            "cluster_slot=3".to_owned(),
+                            "thermal_level=2".to_owned(),
+                            format!("cooling_mode={toggle_name}"),
+                            format!("throttled={toggle_name}"),
+                            "thermal_mask=6".to_owned(),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &thermal_struct);
+                panel_group_nodes.push(thermal_struct.clone());
+
+                let power_struct = next_name(state, "nova_panel_power");
+                state.yir.nodes.push(Node {
+                    name: power_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaPowerPacket".to_owned(),
+                            "cluster_slot=3".to_owned(),
+                            "power_level=2".to_owned(),
+                            format!("source_mode={toggle_name}"),
+                            format!("capped={toggle_name}"),
+                            "power_mask=6".to_owned(),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &power_struct);
+                panel_group_nodes.push(power_struct.clone());
+
+                let latency_struct = next_name(state, "nova_panel_latency");
+                state.yir.nodes.push(Node {
+                    name: latency_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaLatencyPacket".to_owned(),
+                            "cluster_slot=3".to_owned(),
+                            "frame_latency=4".to_owned(),
+                            "input_latency=2".to_owned(),
+                            format!("jitter={toggle_name}"),
+                            "latency_mask=7".to_owned(),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &latency_struct);
+                panel_group_nodes.push(latency_struct.clone());
+
                 let pass_struct = next_name(state, "nova_panel_pass");
                 state.yir.nodes.push(Node {
                     name: pass_struct.clone(),
@@ -2006,6 +2170,14 @@ fn lower_expr(
                     format!("scene_cull={cull_struct}"),
                     format!("scene_lod={lod_struct}"),
                     format!("scene_streaming={streaming_struct}"),
+                    format!("scene_residency={residency_struct}"),
+                    format!("scene_eviction={eviction_struct}"),
+                    format!("scene_prefetch={prefetch_struct}"),
+                    format!("scene_budget={budget_struct}"),
+                    format!("scene_pressure={pressure_struct}"),
+                    format!("scene_thermal={thermal_struct}"),
+                    format!("scene_power={power_struct}"),
+                    format!("scene_latency={latency_struct}"),
                     format!("pass={pass_struct}"),
                     format!("frame={frame_struct}"),
                     format!("target={target_struct}"),
