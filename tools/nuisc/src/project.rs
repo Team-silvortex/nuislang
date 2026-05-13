@@ -5220,6 +5220,8 @@ mod tests {
                     let thermal: NovaThermalPacket = nova_thermal_packet(3, 2, 1, 1, 6);
                     let power: NovaPowerPacket = nova_power_packet(3, 2, 1, 1, 6);
                     let latency: NovaLatencyPacket = nova_latency_packet(3, 4, 2, 1, 7);
+                    let frame_pacing: NovaFramePacingPacket = nova_frame_pacing_packet(3, 4, 1, 1, 7);
+                    let jank: NovaJankPacket = nova_jank_packet(3, 2, 1, 4, 7);
                     let pass: NovaPassPacket = nova_pass_packet(1, 8, 4, 2);
                     let frame: NovaFramePacket = nova_frame_packet(7, 1, 1, 9);
                     let target: NovaTargetPacket = nova_target_packet(1, 48, 18, 8);
@@ -5293,6 +5295,8 @@ mod tests {
                         thermal,
                         power,
                         latency,
+                        frame_pacing,
+                        jank,
                         pass,
                         frame,
                         target,

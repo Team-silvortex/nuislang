@@ -1599,6 +1599,46 @@ fn lower_expr(
                 push_dep_edges(state, toggle_name, &latency_struct);
                 panel_group_nodes.push(latency_struct.clone());
 
+                let frame_pacing_struct = next_name(state, "nova_panel_frame_pacing");
+                state.yir.nodes.push(Node {
+                    name: frame_pacing_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaFramePacingPacket".to_owned(),
+                            "cluster_slot=3".to_owned(),
+                            "cadence=4".to_owned(),
+                            "variance=1".to_owned(),
+                            format!("vsync_mode={toggle_name}"),
+                            "pacing_mask=7".to_owned(),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &frame_pacing_struct);
+                panel_group_nodes.push(frame_pacing_struct.clone());
+
+                let jank_struct = next_name(state, "nova_panel_jank");
+                state.yir.nodes.push(Node {
+                    name: jank_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaJankPacket".to_owned(),
+                            "cluster_slot=3".to_owned(),
+                            "spikes=2".to_owned(),
+                            format!("severity={toggle_name}"),
+                            "recovery=4".to_owned(),
+                            "jank_mask=7".to_owned(),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &jank_struct);
+                panel_group_nodes.push(jank_struct.clone());
+
                 let pass_struct = next_name(state, "nova_panel_pass");
                 state.yir.nodes.push(Node {
                     name: pass_struct.clone(),
@@ -2178,6 +2218,8 @@ fn lower_expr(
                     format!("scene_thermal={thermal_struct}"),
                     format!("scene_power={power_struct}"),
                     format!("scene_latency={latency_struct}"),
+                    format!("scene_frame_pacing={frame_pacing_struct}"),
+                    format!("scene_jank={jank_struct}"),
                     format!("pass={pass_struct}"),
                     format!("frame={frame_struct}"),
                     format!("target={target_struct}"),

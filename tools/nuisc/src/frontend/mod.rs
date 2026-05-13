@@ -3882,6 +3882,122 @@ fn lower_call_expr_with_async(
                 ],
             })
         }
+        "nova_frame_pacing_packet" => {
+            let (cluster_slot, cadence, variance, vsync_mode, pacing_mask) = match args {
+                [cluster_slot, cadence, variance, vsync_mode, pacing_mask] => {
+                    (cluster_slot, cadence, variance, vsync_mode, pacing_mask)
+                }
+                _ => return Err("nova_frame_pacing_packet(...) expects 5 args".to_owned()),
+            };
+            let cluster_slot = lower_expr(
+                cluster_slot,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let cadence = lower_expr(
+                cadence,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let variance = lower_expr(
+                variance,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let vsync_mode = lower_expr(
+                vsync_mode,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let pacing_mask = lower_expr(
+                pacing_mask,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaFramePacingPacket".to_owned(),
+                fields: vec![
+                    ("cluster_slot".to_owned(), cluster_slot),
+                    ("cadence".to_owned(), cadence),
+                    ("variance".to_owned(), variance),
+                    ("vsync_mode".to_owned(), vsync_mode),
+                    ("pacing_mask".to_owned(), pacing_mask),
+                ],
+            })
+        }
+        "nova_jank_packet" => {
+            let (cluster_slot, spikes, severity, recovery, jank_mask) = match args {
+                [cluster_slot, spikes, severity, recovery, jank_mask] => {
+                    (cluster_slot, spikes, severity, recovery, jank_mask)
+                }
+                _ => return Err("nova_jank_packet(...) expects 5 args".to_owned()),
+            };
+            let cluster_slot = lower_expr(
+                cluster_slot,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let spikes = lower_expr(
+                spikes,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let severity = lower_expr(
+                severity,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let recovery = lower_expr(
+                recovery,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let jank_mask = lower_expr(
+                jank_mask,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaJankPacket".to_owned(),
+                fields: vec![
+                    ("cluster_slot".to_owned(), cluster_slot),
+                    ("spikes".to_owned(), spikes),
+                    ("severity".to_owned(), severity),
+                    ("recovery".to_owned(), recovery),
+                    ("jank_mask".to_owned(), jank_mask),
+                ],
+            })
+        }
         "nova_pass_packet" => {
             let (stage, clear_mode, sample_count, debug_view) = match args {
                 [stage, clear_mode, sample_count, debug_view] => {
@@ -6038,10 +6154,10 @@ fn lower_call_expr_with_async(
             })
         }
         "nova_panel_from_parts" => {
-            let [header, sliders, toggle, progress, meter, button, text_input, select, checkbox, radio, textarea, tabs, list, table, tree, inspector, outline, theme, surface, viewport, layer, scene, camera, material, light, mesh, transform, node, scene_link, instance, scene_graph, scene_node, instance_group, scene_cluster, visibility, cull, lod, streaming, residency, eviction, prefetch, budget, pressure, thermal, power, latency, pass, frame, target, frame_graph, attachment, pass_chain, barrier, resource_set, schedule, submission, queue, semaphore, timeline, fence, signal, event, dispatch, feedback, intent, reaction, outcome, resolution, commit, snapshot, checkpoint, focus] =
+            let [header, sliders, toggle, progress, meter, button, text_input, select, checkbox, radio, textarea, tabs, list, table, tree, inspector, outline, theme, surface, viewport, layer, scene, camera, material, light, mesh, transform, node, scene_link, instance, scene_graph, scene_node, instance_group, scene_cluster, visibility, cull, lod, streaming, residency, eviction, prefetch, budget, pressure, thermal, power, latency, frame_pacing, jank, pass, frame, target, frame_graph, attachment, pass_chain, barrier, resource_set, schedule, submission, queue, semaphore, timeline, fence, signal, event, dispatch, feedback, intent, reaction, outcome, resolution, commit, snapshot, checkpoint, focus] =
                 args
             else {
-                return Err("nova_panel_from_parts(...) expects 72 args".to_owned());
+                return Err("nova_panel_from_parts(...) expects 74 args".to_owned());
             };
             let header = lower_expr(
                 header,
@@ -6411,6 +6527,22 @@ fn lower_call_expr_with_async(
                 struct_table,
                 Some(&named_type("NovaLatencyPacket")),
             )?;
+            let frame_pacing = lower_expr(
+                frame_pacing,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaFramePacingPacket")),
+            )?;
+            let jank = lower_expr(
+                jank,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaJankPacket")),
+            )?;
             let pass = lower_expr(
                 pass,
                 current_domain,
@@ -6668,6 +6800,8 @@ fn lower_call_expr_with_async(
                     ("scene_thermal".to_owned(), thermal),
                     ("scene_power".to_owned(), power),
                     ("scene_latency".to_owned(), latency),
+                    ("scene_frame_pacing".to_owned(), frame_pacing),
+                    ("scene_jank".to_owned(), jank),
                     ("pass".to_owned(), pass),
                     ("frame".to_owned(), frame),
                     ("target".to_owned(), target),
@@ -8748,6 +8882,112 @@ fn lower_call_expr_with_async(
                 ],
             })
         }
+        "nova_frame_pacing_state" => {
+            let [packet] = args else {
+                return Err("nova_frame_pacing_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaFramePacingPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaFramePacingState".to_owned(),
+                fields: vec![
+                    (
+                        "cluster_slot".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "cluster_slot".to_owned(),
+                        },
+                    ),
+                    (
+                        "cadence".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "cadence".to_owned(),
+                        },
+                    ),
+                    (
+                        "variance".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "variance".to_owned(),
+                        },
+                    ),
+                    (
+                        "vsync_mode".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "vsync_mode".to_owned(),
+                        },
+                    ),
+                    (
+                        "pacing_mask".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "pacing_mask".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
+        "nova_jank_state" => {
+            let [packet] = args else {
+                return Err("nova_jank_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaJankPacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaJankState".to_owned(),
+                fields: vec![
+                    (
+                        "cluster_slot".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "cluster_slot".to_owned(),
+                        },
+                    ),
+                    (
+                        "spikes".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "spikes".to_owned(),
+                        },
+                    ),
+                    (
+                        "severity".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "severity".to_owned(),
+                        },
+                    ),
+                    (
+                        "recovery".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "recovery".to_owned(),
+                        },
+                    ),
+                    (
+                        "jank_mask".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "jank_mask".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
         "nova_pass_state" => {
             let [packet] = args else {
                 return Err("nova_pass_state(...) expects 1 arg".to_owned());
@@ -10157,6 +10397,16 @@ fn lower_call_expr_with_async(
         | "nova_latency_state_input"
         | "nova_latency_state_jitter"
         | "nova_latency_state_mask"
+        | "nova_frame_pacing_state_cluster"
+        | "nova_frame_pacing_state_cadence"
+        | "nova_frame_pacing_state_variance"
+        | "nova_frame_pacing_state_vsync"
+        | "nova_frame_pacing_state_mask"
+        | "nova_jank_state_cluster"
+        | "nova_jank_state_spikes"
+        | "nova_jank_state_severity"
+        | "nova_jank_state_recovery"
+        | "nova_jank_state_mask"
         | "nova_pass_state_stage"
         | "nova_pass_state_clear_mode"
         | "nova_pass_state_sample_count"
@@ -10429,6 +10679,16 @@ fn lower_call_expr_with_async(
                 "nova_latency_state_input" => ("NovaLatencyState", "input_latency"),
                 "nova_latency_state_jitter" => ("NovaLatencyState", "jitter"),
                 "nova_latency_state_mask" => ("NovaLatencyState", "latency_mask"),
+                "nova_frame_pacing_state_cluster" => ("NovaFramePacingState", "cluster_slot"),
+                "nova_frame_pacing_state_cadence" => ("NovaFramePacingState", "cadence"),
+                "nova_frame_pacing_state_variance" => ("NovaFramePacingState", "variance"),
+                "nova_frame_pacing_state_vsync" => ("NovaFramePacingState", "vsync_mode"),
+                "nova_frame_pacing_state_mask" => ("NovaFramePacingState", "pacing_mask"),
+                "nova_jank_state_cluster" => ("NovaJankState", "cluster_slot"),
+                "nova_jank_state_spikes" => ("NovaJankState", "spikes"),
+                "nova_jank_state_severity" => ("NovaJankState", "severity"),
+                "nova_jank_state_recovery" => ("NovaJankState", "recovery"),
+                "nova_jank_state_mask" => ("NovaJankState", "jank_mask"),
                 "nova_pass_state_stage" => ("NovaPassState", "stage"),
                 "nova_pass_state_clear_mode" => ("NovaPassState", "clear_mode"),
                 "nova_pass_state_sample_count" => ("NovaPassState", "sample_count"),
@@ -11855,6 +12115,14 @@ fn builtin_struct_field_type(type_name: &str, field: &str) -> Option<NirTypeRef>
             }
             _ => None,
         },
+        "NovaFramePacingPacket" => match field {
+            "cluster_slot" | "cadence" | "variance" | "vsync_mode" | "pacing_mask" => Some(i64()),
+            _ => None,
+        },
+        "NovaJankPacket" => match field {
+            "cluster_slot" | "spikes" | "severity" | "recovery" | "jank_mask" => Some(i64()),
+            _ => None,
+        },
         "NovaPassPacket" => match field {
             "stage" | "clear_mode" | "sample_count" | "debug_view" => Some(i64()),
             _ => None,
@@ -12074,6 +12342,8 @@ fn builtin_struct_field_type(type_name: &str, field: &str) -> Option<NirTypeRef>
             "scene_thermal" => Some(named("NovaThermalPacket")),
             "scene_power" => Some(named("NovaPowerPacket")),
             "scene_latency" => Some(named("NovaLatencyPacket")),
+            "scene_frame_pacing" => Some(named("NovaFramePacingPacket")),
+            "scene_jank" => Some(named("NovaJankPacket")),
             "pass" => Some(named("NovaPassPacket")),
             "frame" => Some(named("NovaFramePacket")),
             "target" => Some(named("NovaTargetPacket")),
@@ -12297,6 +12567,14 @@ fn builtin_struct_field_type(type_name: &str, field: &str) -> Option<NirTypeRef>
             "cluster_slot" | "frame_latency" | "input_latency" | "jitter" | "latency_mask" => {
                 Some(i64())
             }
+            _ => None,
+        },
+        "NovaFramePacingState" => match field {
+            "cluster_slot" | "cadence" | "variance" | "vsync_mode" | "pacing_mask" => Some(i64()),
+            _ => None,
+        },
+        "NovaJankState" => match field {
+            "cluster_slot" | "spikes" | "severity" | "recovery" | "jank_mask" => Some(i64()),
             _ => None,
         },
         "NovaPassState" => match field {
@@ -14566,6 +14844,68 @@ mod tests {
     }
 
     #[test]
+    fn lowers_nova_frame_pacing_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let pacing: NovaFramePacingPacket = nova_frame_pacing_packet(3, 4, 1, 1, 7);
+                let state: NovaFramePacingState = nova_frame_pacing_state(pacing);
+                let cadence: i64 = nova_frame_pacing_state_cadence(state);
+                return cadence;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaFramePacingState" && type_name == "NovaFramePacingState",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn lowers_nova_jank_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let jank: NovaJankPacket = nova_jank_packet(3, 2, 1, 4, 7);
+                let state: NovaJankState = nova_jank_state(jank);
+                let spikes: i64 = nova_jank_state_spikes(state);
+                return spikes;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaJankState" && type_name == "NovaJankState",
+            _ => false,
+        }));
+    }
+
+    #[test]
     fn lowers_nova_pass_state_contract() {
         let module = parse_nuis_module(
             r#"
@@ -15396,6 +15736,8 @@ mod tests {
                 let thermal: NovaThermalPacket = nova_thermal_packet(3, 2, 1, 1, 6);
                 let power: NovaPowerPacket = nova_power_packet(3, 2, 1, 1, 6);
                 let latency: NovaLatencyPacket = nova_latency_packet(3, 4, 2, 1, 7);
+                let frame_pacing: NovaFramePacingPacket = nova_frame_pacing_packet(3, 4, 1, 1, 7);
+                let jank: NovaJankPacket = nova_jank_packet(3, 2, 1, 4, 7);
                 let pass: NovaPassPacket = nova_pass_packet(1, 8, 4, 2);
                 let frame: NovaFramePacket = nova_frame_packet(7, 1, 1, 9);
                 let target: NovaTargetPacket = nova_target_packet(1, 48, 18, 8);
@@ -15469,6 +15811,8 @@ mod tests {
                   thermal,
                   power,
                   latency,
+                  frame_pacing,
+                  jank,
                   pass,
                   frame,
                   target,
