@@ -72,6 +72,9 @@ pub enum CommandKind {
     ProjectStatus {
         input: PathBuf,
     },
+    ProjectDoctor {
+        input: PathBuf,
+    },
     ProjectLockAbi {
         input: PathBuf,
     },
@@ -378,12 +381,15 @@ where
         "project-status" => Ok(CommandKind::ProjectStatus {
             input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
         }),
+        "project-doctor" => Ok(CommandKind::ProjectDoctor {
+            input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
+        }),
         "project-lock-abi" => Ok(CommandKind::ProjectLockAbi {
             input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
         }),
         "galaxy" => parse_galaxy_args(args),
         other => Err(format!(
-            "unknown nuis command `{other}`; expected `help`, `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `release-check`, `check`, `build`, `dump-ast`, `dump-nir`, `dump-yir`, `rc`, `project-status`, `project-lock-abi`, or `galaxy`"
+            "unknown nuis command `{other}`; expected `help`, `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `release-check`, `check`, `build`, `dump-ast`, `dump-nir`, `dump-yir`, `rc`, `project-status`, `project-doctor`, `project-lock-abi`, or `galaxy`"
         )),
     }
 }

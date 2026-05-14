@@ -1,0 +1,47 @@
+mod cpu Main {
+  fn build_selection(focus: i64, mode: i64) -> NovaSelectionPacket {
+    return nova_selection_packet(focus, 6, mode, 9);
+  }
+
+  fn build_slider_group(color: i64, speed: i64, radius: i64) -> NovaSliderGroupPacket {
+    let slider_color: NovaSliderPacket = nova_slider_packet(color, 0, 127, 4, 0);
+    let slider_speed: NovaSliderPacket = nova_slider_packet(speed, 0, 63, 2, 1);
+    let slider_radius: NovaSliderPacket = nova_slider_packet(radius, 0, 127, 3, 0);
+    return nova_slider_group_packet(slider_color, slider_speed, slider_radius);
+  }
+
+  fn summarize_selection(selection: NovaSelectionPacket) -> i64 {
+    let state: NovaSelectionState = nova_selection_state(selection);
+    return nova_selection_state_selected(state) + nova_selection_state_mode(state);
+  }
+
+  fn summarize_controls(
+    sliders: NovaSliderGroupPacket,
+    list: NovaListPacket,
+    table: NovaTablePacket,
+    tree: NovaTreePacket
+  ) -> i64 {
+    let list_state: NovaListState = nova_list_state(list);
+    let table_state: NovaTableState = nova_table_state(table);
+    let tree_state: NovaTreeState = nova_tree_state(tree);
+    return sliders.speed.value +
+      nova_list_state_selected(list_state) +
+      nova_table_state_selected_row(table_state) +
+      nova_tree_state_selected(tree_state);
+  }
+
+  fn main() {
+    let selection: NovaSelectionPacket = build_selection(3, 1);
+    let selection_state: NovaSelectionState = nova_selection_state(selection);
+    let sliders: NovaSliderGroupPacket = build_slider_group(88, 22, 96);
+    let selected: i64 = nova_selection_state_selected(selection_state);
+    let mode: i64 = nova_selection_state_mode(selection_state);
+    let list: NovaListPacket = nova_list_packet(selected, 5, 84, 1);
+    let table: NovaTablePacket = nova_table_packet(4, 3, selected, 0);
+    let tree: NovaTreePacket = nova_tree_packet(selected, 6, mode, 84);
+
+    let summary: i64 =
+      summarize_selection(selection) + summarize_controls(sliders, list, table, tree);
+    print(summary);
+  }
+}

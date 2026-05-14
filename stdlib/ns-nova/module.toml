@@ -13,3 +13,15 @@ surfaces = [
   "gpu-ui-and-3d-runtime"
 ]
 
+source_modules = [
+  "core/theme_surface.ns",
+  "core/frame_runtime.ns",
+  "core/window_controls_runtime_recipe.ns",
+  "ui/panel_selection.ns",
+  "ui/panel_blueprint.ns",
+  "ui/window_controls_recipe.ns",
+  "scene/scene_runtime.ns",
+  "scene/efficiency_runtime.ns",
+  "scene/scene_blueprint.ns",
+  "scene/window_controls_scene_recipe.ns"
+]

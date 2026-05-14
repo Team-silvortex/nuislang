@@ -1,0 +1,143 @@
+mod cpu Main {
+  struct RuntimeSeeds {
+    accent: i64,
+    toggle: i64,
+    focus: i64,
+    radius: i64,
+    speed: i64
+  }
+
+  fn build_runtime_seeds(accent: i64, toggle: i64, focus: i64, radius: i64, speed: i64) -> RuntimeSeeds {
+    return RuntimeSeeds {
+      accent: accent,
+      toggle: toggle,
+      focus: focus,
+      radius: radius,
+      speed: speed
+    };
+  }
+
+  fn build_render_chain(seeds: RuntimeSeeds) -> NovaTimelinePacket {
+    let pass: NovaPassPacket =
+      nova_pass_packet(seeds.toggle, seeds.accent, 4, seeds.focus);
+    let frame: NovaFramePacket =
+      nova_frame_packet(seeds.focus, seeds.toggle, 1, seeds.radius);
+    let target: NovaTargetPacket =
+      nova_target_packet(seeds.toggle, 48, 18, seeds.accent);
+    let frame_graph: NovaFrameGraphPacket =
+      nova_frame_graph_packet(2, 1, seeds.toggle, seeds.focus);
+    let attachment: NovaAttachmentPacket =
+      nova_attachment_packet(0, seeds.accent, seeds.toggle, 1);
+    let pass_chain: NovaPassChainPacket =
+      nova_pass_chain_packet(2, 1, seeds.toggle, seeds.accent);
+    let barrier: NovaBarrierPacket =
+      nova_barrier_packet(1, seeds.toggle, 2, seeds.accent);
+    let resource_set: NovaResourceSetPacket =
+      nova_resource_set_packet(2, 1, 1, seeds.accent);
+    let schedule: NovaSchedulePacket =
+      nova_schedule_packet(2, 4, seeds.radius, seeds.toggle);
+    let submission: NovaSubmissionPacket =
+      nova_submission_packet(2, 1, seeds.toggle, seeds.accent);
+    let queue: NovaQueuePacket =
+      nova_queue_packet(seeds.toggle, 2, seeds.radius, seeds.accent);
+    let semaphore: NovaSemaphorePacket =
+      nova_semaphore_packet(1, 2, seeds.toggle, seeds.accent);
+    let timeline: NovaTimelinePacket =
+      nova_timeline_packet(seeds.radius, 1, 0, seeds.accent);
+
+    let pass_state: NovaPassState = nova_pass_state(pass);
+    let frame_state: NovaFrameState = nova_frame_state(frame);
+    let target_state: NovaTargetState = nova_target_state(target);
+    let frame_graph_state: NovaFrameGraphState = nova_frame_graph_state(frame_graph);
+    let attachment_state: NovaAttachmentState = nova_attachment_state(attachment);
+    let pass_chain_state: NovaPassChainState = nova_pass_chain_state(pass_chain);
+    let barrier_state: NovaBarrierState = nova_barrier_state(barrier);
+    let resource_set_state: NovaResourceSetState = nova_resource_set_state(resource_set);
+    let schedule_state: NovaScheduleState = nova_schedule_state(schedule);
+    let submission_state: NovaSubmissionState = nova_submission_state(submission);
+    let queue_state: NovaQueueState = nova_queue_state(queue);
+    let semaphore_state: NovaSemaphoreState = nova_semaphore_state(semaphore);
+    let timeline_state: NovaTimelineState = nova_timeline_state(timeline);
+
+    print(
+      nova_pass_state_sample_count(pass_state) +
+      nova_frame_state_exposure(frame_state) +
+      nova_target_state_multisample(target_state) +
+      nova_frame_graph_state_passes(frame_graph_state) +
+      nova_attachment_state_format_kind(attachment_state) +
+      nova_pass_chain_state_stages(pass_chain_state) +
+      nova_barrier_state_flush_mode(barrier_state) +
+      nova_resource_set_state_residency(resource_set_state) +
+      nova_schedule_state_async_budget(schedule_state) +
+      nova_submission_state_batches(submission_state) +
+      nova_queue_state_budget(queue_state) +
+      nova_semaphore_state_scope(semaphore_state) +
+      nova_timeline_state_epoch(timeline_state)
+    );
+
+    return timeline;
+  }
+
+  fn build_feedback_chain(seeds: RuntimeSeeds) -> NovaCommitPacket {
+    let fence: NovaFencePacket =
+      nova_fence_packet(seeds.toggle, 0, seeds.accent, 1);
+    let signal: NovaSignalPacket =
+      nova_signal_packet(seeds.toggle, 2, 3, seeds.accent);
+    let event: NovaEventPacket =
+      nova_event_packet(seeds.toggle, 2, 3, seeds.accent);
+    let dispatch: NovaDispatchPacket =
+      nova_dispatch_packet(seeds.toggle, 2, 3, seeds.accent);
+    let feedback: NovaFeedbackPacket =
+      nova_feedback_packet(seeds.toggle, seeds.speed, seeds.radius, seeds.accent);
+    let intent: NovaIntentPacket =
+      nova_intent_packet(seeds.toggle, seeds.focus, seeds.speed, seeds.accent);
+    let reaction: NovaReactionPacket =
+      nova_reaction_packet(seeds.toggle, seeds.focus, seeds.radius, seeds.accent);
+    let outcome: NovaOutcomePacket =
+      nova_outcome_packet(seeds.toggle, seeds.focus, seeds.speed, seeds.accent);
+    let resolution: NovaResolutionPacket =
+      nova_resolution_packet(seeds.toggle, seeds.focus, seeds.radius, seeds.accent);
+    let commit: NovaCommitPacket =
+      nova_commit_packet(seeds.toggle, seeds.focus, seeds.speed, seeds.accent);
+
+    let fence_state: NovaFenceState = nova_fence_state(fence);
+    let signal_state: NovaSignalState = nova_signal_state(signal);
+    let event_state: NovaEventState = nova_event_state(event);
+    let dispatch_state: NovaDispatchState = nova_dispatch_state(dispatch);
+    let feedback_state: NovaFeedbackState = nova_feedback_state(feedback);
+    let intent_state: NovaIntentState = nova_intent_state(intent);
+    let reaction_state: NovaReactionState = nova_reaction_state(reaction);
+    let outcome_state: NovaOutcomeState = nova_outcome_state(outcome);
+    let resolution_state: NovaResolutionState = nova_resolution_state(resolution);
+    let commit_state: NovaCommitState = nova_commit_state(commit);
+
+    print(
+      nova_fence_state_scope(fence_state) +
+      nova_signal_state_phase(signal_state) +
+      nova_event_state_route(event_state) +
+      nova_dispatch_state_lane(dispatch_state) +
+      nova_feedback_state_status(feedback_state) +
+      nova_intent_state_target(intent_state) +
+      nova_reaction_state_result(reaction_state) +
+      nova_outcome_state_final(outcome_state) +
+      nova_resolution_state_commit(resolution_state) +
+      nova_commit_state_applied(commit_state)
+    );
+
+    return commit;
+  }
+
+  fn summarize_runtime(commit: NovaCommitPacket, timeline: NovaTimelinePacket) -> i64 {
+    let commit_state: NovaCommitState = nova_commit_state(commit);
+    let timeline_state: NovaTimelineState = nova_timeline_state(timeline);
+    return nova_commit_state_applied(commit_state) +
+      nova_timeline_state_epoch(timeline_state);
+  }
+
+  fn main() {
+    let seeds: RuntimeSeeds = build_runtime_seeds(84, 1, 7, 48, 12);
+    let timeline: NovaTimelinePacket = build_render_chain(seeds);
+    let commit: NovaCommitPacket = build_feedback_chain(seeds);
+    print(summarize_runtime(commit, timeline));
+  }
+}

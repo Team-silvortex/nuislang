@@ -1,0 +1,90 @@
+mod cpu Main {
+  fn main() {
+    let pass: NovaPassPacket = nova_pass_packet(1, 84, 4, 2);
+    let frame: NovaFramePacket = nova_frame_packet(7, 1, 1, 48);
+    let target: NovaTargetPacket = nova_target_packet(1, 64, 24, 84);
+    let frame_graph: NovaFrameGraphPacket = nova_frame_graph_packet(2, 1, 1, 2);
+    let attachment: NovaAttachmentPacket = nova_attachment_packet(0, 84, 1, 1);
+    let pass_chain: NovaPassChainPacket = nova_pass_chain_packet(2, 1, 1, 84);
+    let barrier: NovaBarrierPacket = nova_barrier_packet(1, 1, 2, 84);
+    let resource_set: NovaResourceSetPacket = nova_resource_set_packet(2, 1, 1, 84);
+    let schedule: NovaSchedulePacket = nova_schedule_packet(2, 4, 48, 1);
+    let submission: NovaSubmissionPacket = nova_submission_packet(2, 1, 1, 84);
+    let queue: NovaQueuePacket = nova_queue_packet(1, 2, 48, 84);
+    let semaphore: NovaSemaphorePacket = nova_semaphore_packet(1, 2, 1, 84);
+    let timeline: NovaTimelinePacket = nova_timeline_packet(48, 1, 0, 84);
+    let fence: NovaFencePacket = nova_fence_packet(1, 0, 84, 1);
+    let signal: NovaSignalPacket = nova_signal_packet(1, 2, 3, 84);
+    let event: NovaEventPacket = nova_event_packet(1, 2, 3, 84);
+    let dispatch: NovaDispatchPacket = nova_dispatch_packet(1, 2, 3, 84);
+    let feedback: NovaFeedbackPacket = nova_feedback_packet(1, 12, 4, 84);
+    let intent: NovaIntentPacket = nova_intent_packet(1, 2, 12, 84);
+    let reaction: NovaReactionPacket = nova_reaction_packet(1, 2, 4, 84);
+    let outcome: NovaOutcomePacket = nova_outcome_packet(1, 2, 12, 84);
+    let resolution: NovaResolutionPacket = nova_resolution_packet(1, 2, 4, 84);
+    let commit: NovaCommitPacket = nova_commit_packet(1, 2, 12, 84);
+    let snapshot: NovaSnapshotPacket = nova_snapshot_packet(1, 2, 12, 84);
+    let checkpoint: NovaCheckpointPacket = nova_checkpoint_packet(1, 2, 4, 84);
+
+    let pass_state: NovaPassState = nova_pass_state(pass);
+    let frame_state: NovaFrameState = nova_frame_state(frame);
+    let target_state: NovaTargetState = nova_target_state(target);
+    let frame_graph_state: NovaFrameGraphState = nova_frame_graph_state(frame_graph);
+    let attachment_state: NovaAttachmentState = nova_attachment_state(attachment);
+    let pass_chain_state: NovaPassChainState = nova_pass_chain_state(pass_chain);
+    let barrier_state: NovaBarrierState = nova_barrier_state(barrier);
+    let resource_set_state: NovaResourceSetState = nova_resource_set_state(resource_set);
+    let schedule_state: NovaScheduleState = nova_schedule_state(schedule);
+    let submission_state: NovaSubmissionState = nova_submission_state(submission);
+    let queue_state: NovaQueueState = nova_queue_state(queue);
+    let semaphore_state: NovaSemaphoreState = nova_semaphore_state(semaphore);
+    let timeline_state: NovaTimelineState = nova_timeline_state(timeline);
+    let fence_state: NovaFenceState = nova_fence_state(fence);
+    let signal_state: NovaSignalState = nova_signal_state(signal);
+    let event_state: NovaEventState = nova_event_state(event);
+    let dispatch_state: NovaDispatchState = nova_dispatch_state(dispatch);
+    let feedback_state: NovaFeedbackState = nova_feedback_state(feedback);
+    let intent_state: NovaIntentState = nova_intent_state(intent);
+    let reaction_state: NovaReactionState = nova_reaction_state(reaction);
+    let outcome_state: NovaOutcomeState = nova_outcome_state(outcome);
+    let resolution_state: NovaResolutionState = nova_resolution_state(resolution);
+    let commit_state: NovaCommitState = nova_commit_state(commit);
+    let snapshot_state: NovaSnapshotState = nova_snapshot_state(snapshot);
+    let checkpoint_state: NovaCheckpointState = nova_checkpoint_state(checkpoint);
+
+    let sample_count: i64 = nova_pass_state_sample_count(pass_state);
+    let exposure: i64 = nova_frame_state_exposure(frame_state);
+    let multisample: i64 = nova_target_state_multisample(target_state);
+    let passes: i64 = nova_frame_graph_state_passes(frame_graph_state);
+    let format_kind: i64 = nova_attachment_state_format_kind(attachment_state);
+    let stages: i64 = nova_pass_chain_state_stages(pass_chain_state);
+    let flush_mode: i64 = nova_barrier_state_flush_mode(barrier_state);
+    let residency: i64 = nova_resource_set_state_residency(resource_set_state);
+    let async_budget: i64 = nova_schedule_state_async_budget(schedule_state);
+    let batches: i64 = nova_submission_state_batches(submission_state);
+    let queue_budget: i64 = nova_queue_state_budget(queue_state);
+    let semaphore_scope: i64 = nova_semaphore_state_scope(semaphore_state);
+    let timeline_epoch: i64 = nova_timeline_state_epoch(timeline_state);
+    let fence_scope: i64 = nova_fence_state_scope(fence_state);
+    let signal_phase: i64 = nova_signal_state_phase(signal_state);
+    let event_route: i64 = nova_event_state_route(event_state);
+    let dispatch_lane: i64 = nova_dispatch_state_lane(dispatch_state);
+    let feedback_status: i64 = nova_feedback_state_status(feedback_state);
+    let intent_target: i64 = nova_intent_state_target(intent_state);
+    let reaction_result: i64 = nova_reaction_state_result(reaction_state);
+    let outcome_final: i64 = nova_outcome_state_final(outcome_state);
+    let resolution_commit: i64 = nova_resolution_state_commit(resolution_state);
+    let commit_applied: i64 = nova_commit_state_applied(commit_state);
+    let snapshot_source: i64 = nova_snapshot_state_source(snapshot_state);
+    let checkpoint_anchor: i64 = nova_checkpoint_state_anchor(checkpoint_state);
+
+    print(
+      sample_count + exposure + multisample + passes + format_kind + stages +
+      flush_mode + residency + async_budget + batches + queue_budget +
+      semaphore_scope + timeline_epoch + fence_scope + signal_phase +
+      event_route + dispatch_lane + feedback_status + intent_target +
+      reaction_result + outcome_final + resolution_commit + commit_applied +
+      snapshot_source + checkpoint_anchor
+    );
+  }
+}

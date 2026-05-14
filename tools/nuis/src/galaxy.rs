@@ -27,6 +27,9 @@ struct NsNovaManifest {
     pub framework_schema: String,
     pub framework: String,
     pub project: String,
+    pub stdlib_schema: Option<String>,
+    pub stdlib_manifest: Option<String>,
+    pub stdlib_sources: Vec<String>,
     pub family_schema: Option<String>,
     pub family_layers: Vec<String>,
     pub entry_cpu_unit: Option<String>,
@@ -162,6 +165,34 @@ pub struct GalaxyDoctorReport {
     pub lock_status: String,
     pub lock_error: Option<String>,
     pub dependencies: Vec<GalaxyDoctorDependency>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NsNovaProfileSummary {
+    pub path: PathBuf,
+    pub framework_schema: String,
+    pub framework: String,
+    pub stdlib_schema: Option<String>,
+    pub stdlib_manifest: Option<String>,
+    pub stdlib_sources: Vec<String>,
+    pub family_schema: Option<String>,
+    pub family_layers: Vec<String>,
+    pub render_schema: Option<String>,
+    pub render_owner_unit: Option<String>,
+    pub render_bridge_unit: Option<String>,
+    pub render_surface_unit: Option<String>,
+    pub selection_schema: Option<String>,
+    pub selection_owner_unit: Option<String>,
+    pub selection_bridge_unit: Option<String>,
+    pub selection_render_unit: Option<String>,
+    pub selection_controls: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NsNovaStdlibSummary {
+    pub path: PathBuf,
+    pub source_modules: Vec<PathBuf>,
+    pub missing_modules: Vec<PathBuf>,
 }
 
 pub fn init(input: &Path, framework: Option<&str>) -> Result<PathBuf, String> {
@@ -726,6 +757,60 @@ pub fn doctor_project(input: &Path) -> Result<GalaxyDoctorReport, String> {
     })
 }
 
+pub fn inspect_ns_nova_profile(input: &Path) -> Result<Option<NsNovaProfileSummary>, String> {
+    let project = nuisc::project::load_project(input)?;
+    let path = project.root.join("ns-nova.toml");
+    if !path.exists() {
+        return Ok(None);
+    }
+    let source = fs::read_to_string(&path)
+        .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
+    let profile = parse_ns_nova_manifest(&source, &path)?;
+    Ok(Some(NsNovaProfileSummary {
+        path,
+        framework_schema: profile.framework_schema,
+        framework: profile.framework,
+        stdlib_schema: profile.stdlib_schema,
+        stdlib_manifest: profile.stdlib_manifest,
+        stdlib_sources: profile.stdlib_sources,
+        family_schema: profile.family_schema,
+        family_layers: profile.family_layers,
+        render_schema: profile.render_schema,
+        render_owner_unit: profile.render_owner_unit,
+        render_bridge_unit: profile.render_bridge_unit,
+        render_surface_unit: profile.render_surface_unit,
+        selection_schema: profile.selection_schema,
+        selection_owner_unit: profile.selection_owner_unit,
+        selection_bridge_unit: profile.selection_bridge_unit,
+        selection_render_unit: profile.selection_render_unit,
+        selection_controls: profile.selection_controls,
+    }))
+}
+
+pub fn inspect_ns_nova_stdlib(root: &Path) -> Result<Option<NsNovaStdlibSummary>, String> {
+    let path = root.join("stdlib/ns-nova/module.toml");
+    if !path.exists() {
+        return Ok(None);
+    }
+    let source = fs::read_to_string(&path)
+        .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
+    let modules = parse_optional_string_array(&source, "source_modules").unwrap_or_default();
+    let mut source_modules = Vec::new();
+    let mut missing_modules = Vec::new();
+    for item in modules {
+        let module_path = root.join("stdlib/ns-nova").join(item);
+        if !module_path.exists() {
+            missing_modules.push(module_path.clone());
+        }
+        source_modules.push(module_path);
+    }
+    Ok(Some(NsNovaStdlibSummary {
+        path,
+        source_modules,
+        missing_modules,
+    }))
+}
+
 pub fn local_root() -> PathBuf {
     nuis_home_root().join("galaxy")
 }
@@ -887,10 +972,29 @@ fn default_ns_nova_manifest(project: &nuisc::project::LoadedProject) -> NsNovaMa
         "inspector".to_owned(),
         "outline".to_owned(),
     ];
+    let stdlib_sources = inspect_ns_nova_stdlib(std::path::Path::new("."))
+        .ok()
+        .flatten()
+        .map(|summary| {
+            let stdlib_root = std::path::Path::new(".").join("stdlib/ns-nova");
+            summary
+                .source_modules
+                .into_iter()
+                .filter_map(|path| {
+                    path.strip_prefix(&stdlib_root)
+                        .ok()
+                        .map(|relative| relative.display().to_string())
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
     NsNovaManifest {
         framework_schema: "ns-nova-manifest-v1".to_owned(),
         framework: "ns-nova".to_owned(),
         project: "nuis.toml".to_owned(),
+        stdlib_schema: Some("ns-nova-stdlib-v1".to_owned()),
+        stdlib_manifest: Some("stdlib/ns-nova/module.toml".to_owned()),
+        stdlib_sources,
         family_schema: Some("ns-nova-family-v1".to_owned()),
         family_layers: if primary_shader_unit.is_some() {
             vec!["core".to_owned(), "ui".to_owned()]
@@ -1130,6 +1234,12 @@ fn render_ns_nova_manifest(manifest: &NsNovaManifest) -> String {
         escape(&manifest.framework),
         escape(&manifest.project),
     );
+    if let Some(value) = &manifest.stdlib_schema {
+        source.push_str(&format!("stdlib_schema = \"{}\"\n", escape(value)));
+    }
+    if let Some(value) = &manifest.stdlib_manifest {
+        source.push_str(&format!("stdlib_manifest = \"{}\"\n", escape(value)));
+    }
     if let Some(value) = &manifest.family_schema {
         source.push_str(&format!("family_schema = \"{}\"\n", escape(value)));
     }
@@ -1170,7 +1280,8 @@ fn render_ns_nova_manifest(manifest: &NsNovaManifest) -> String {
         source.push_str(&format!("selection_render_unit = \"{}\"\n", escape(value)));
     }
     source.push_str(&format!(
-        "family_layers = {}\nrender_links = {}\nselection_controls = {}\ncpu_units = {}\ndata_units = {}\nshader_units = {}\nkernel_units = {}\n",
+        "stdlib_sources = {}\nfamily_layers = {}\nrender_links = {}\nselection_controls = {}\ncpu_units = {}\ndata_units = {}\nshader_units = {}\nkernel_units = {}\n",
+        render_string_array(&manifest.stdlib_sources),
         render_string_array(&manifest.family_layers),
         render_string_array(&manifest.render_links),
         render_string_array(&manifest.selection_controls),
@@ -1203,6 +1314,9 @@ fn parse_ns_nova_manifest(source: &str, path: &Path) -> Result<NsNovaManifest, S
         framework_schema: parse_required_string(source, "framework_schema", path)?,
         framework: parse_required_string(source, "framework", path)?,
         project: parse_required_string(source, "project", path)?,
+        stdlib_schema: parse_optional_string(source, "stdlib_schema"),
+        stdlib_manifest: parse_optional_string(source, "stdlib_manifest"),
+        stdlib_sources: parse_optional_string_array(source, "stdlib_sources").unwrap_or_default(),
         family_schema: parse_optional_string(source, "family_schema"),
         family_layers: parse_optional_string_array(source, "family_layers").unwrap_or_default(),
         entry_cpu_unit: parse_optional_string(source, "entry_cpu_unit"),
@@ -1253,27 +1367,46 @@ fn parse_optional_string(source: &str, key: &str) -> Option<String> {
 
 fn parse_optional_string_array(source: &str, key: &str) -> Option<Vec<String>> {
     let prefix = format!("{key} = ");
-    for raw in source.lines() {
-        let line = raw.trim();
+    let lines = source.lines().collect::<Vec<_>>();
+    let mut index = 0usize;
+    while index < lines.len() {
+        let line = lines[index].trim();
         if let Some(rest) = line.strip_prefix(&prefix) {
             let value = rest.trim();
-            if !(value.starts_with('[') && value.ends_with(']')) {
+            if value.starts_with('[') && value.ends_with(']') {
+                let inner = &value[1..value.len() - 1];
+                if inner.trim().is_empty() {
+                    return Some(Vec::new());
+                }
+                let mut items = Vec::new();
+                for item in inner.split(',') {
+                    let item = item.trim();
+                    if !(item.starts_with('"') && item.ends_with('"') && item.len() >= 2) {
+                        return None;
+                    }
+                    items.push(item[1..item.len() - 1].to_owned());
+                }
+                return Some(items);
+            }
+            if !value.starts_with('[') {
                 return None;
             }
-            let inner = &value[1..value.len() - 1];
-            if inner.trim().is_empty() {
-                return Some(Vec::new());
-            }
             let mut items = Vec::new();
-            for item in inner.split(',') {
-                let item = item.trim();
+            index += 1;
+            while index < lines.len() {
+                let item = lines[index].trim().trim_end_matches(',').trim();
+                if item == "]" {
+                    return Some(items);
+                }
                 if !(item.starts_with('"') && item.ends_with('"') && item.len() >= 2) {
                     return None;
                 }
                 items.push(item[1..item.len() - 1].to_owned());
+                index += 1;
             }
-            return Some(items);
+            return None;
         }
+        index += 1;
     }
     None
 }
@@ -1340,6 +1473,12 @@ mod tests {
             framework_schema: "ns-nova-manifest-v1".to_owned(),
             framework: "ns-nova".to_owned(),
             project: "nuis.toml".to_owned(),
+            stdlib_schema: Some("ns-nova-stdlib-v1".to_owned()),
+            stdlib_manifest: Some("stdlib/ns-nova/module.toml".to_owned()),
+            stdlib_sources: vec![
+                "core/theme_surface.ns".to_owned(),
+                "ui/panel_selection.ns".to_owned(),
+            ],
             family_schema: Some("ns-nova-family-v1".to_owned()),
             family_layers: vec!["core".to_owned(), "ui".to_owned()],
             entry_cpu_unit: Some("cpu.Main".to_owned()),

@@ -44,6 +44,7 @@ Current state:
 * the current real-time demo path in `window_controls_demo_project` is the execution direction `ns-nova` should eventually absorb and abstract
 * `nuis galaxy init --framework ns-nova` now emits an `ns-nova.toml` profile that carries framework-level assembly metadata, including the standard `ns-nova-selection-v1` selection contract for relational controls such as `list`, `table`, `tree`, `inspector`, and `outline`
 * `ns-nova.toml` now also carries `ns-nova-family-v1` and `ns-nova-render-v1` scaffolding so projects can declare whether they currently lean toward `core`, `ui`, or future `scene` layers
+* the `stdlib/ns-nova/*` tree now starts carrying real `.ns` source modules as canonical builder/state examples, even though full crate-style import wiring is not finished yet
 
 See metadata:
 
@@ -51,3 +52,22 @@ See metadata:
 * [core/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/core/README.md)
 * [ui/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/ui/README.md)
 * [scene/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/scene/README.md)
+
+First source modules:
+
+* [core/theme_surface.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/core/theme_surface.ns)
+* [core/frame_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/core/frame_runtime.ns)
+* [core/window_controls_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/core/window_controls_runtime_recipe.ns)
+* [ui/panel_selection.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/ui/panel_selection.ns)
+* [ui/panel_blueprint.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/ui/panel_blueprint.ns)
+* [ui/window_controls_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/ui/window_controls_recipe.ns)
+* [scene/scene_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/scene/scene_runtime.ns)
+* [scene/efficiency_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/scene/efficiency_runtime.ns)
+* [scene/scene_blueprint.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/scene/scene_blueprint.ns)
+* [scene/window_controls_scene_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/scene/window_controls_scene_recipe.ns)
+
+Current limitation:
+
+* these files are the first canonical `ns-nova` source assets inside `stdlib`
+* they are not yet imported automatically through a crate-like `use ns-nova ...` flow
+* today they should be read as library-source anchors and compileable templates while project/dependency import management catches up

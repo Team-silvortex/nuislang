@@ -5221,6 +5221,7 @@ mod tests {
                     let power: NovaPowerPacket = nova_power_packet(3, 2, 1, 1, 6);
                     let latency: NovaLatencyPacket = nova_latency_packet(3, 4, 2, 1, 7);
                     let frame_pacing: NovaFramePacingPacket = nova_frame_pacing_packet(3, 4, 1, 1, 7);
+                    let frame_variance: NovaFrameVariancePacket = nova_frame_variance_packet(3, 2, 1, 4, 7);
                     let jank: NovaJankPacket = nova_jank_packet(3, 2, 1, 4, 7);
                     let pass: NovaPassPacket = nova_pass_packet(1, 8, 4, 2);
                     let frame: NovaFramePacket = nova_frame_packet(7, 1, 1, 9);
@@ -5296,6 +5297,7 @@ mod tests {
                         power,
                         latency,
                         frame_pacing,
+                        frame_variance,
                         jank,
                         pass,
                         frame,

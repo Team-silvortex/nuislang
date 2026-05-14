@@ -1,0 +1,46 @@
+mod cpu Main {
+  fn main() {
+    let header: NovaHeaderPacket = nova_header_packet(84, 2);
+    let slider_a: NovaSliderPacket = nova_slider_packet(48, 0, 127, 4, 0);
+    let slider_b: NovaSliderPacket = nova_slider_packet(16, 0, 63, 2, 1);
+    let slider_c: NovaSliderPacket = nova_slider_packet(72, 0, 127, 3, 0);
+    let sliders: NovaSliderGroupPacket =
+      nova_slider_group_packet(slider_a, slider_b, slider_c);
+    let toggle: NovaTogglePacket = nova_toggle_packet(1, 0);
+    let text_input: NovaTextInputPacket =
+      nova_text_input_packet(48, 2, 96, 0, 1);
+    let selection: NovaSelectionPacket = nova_selection_packet(2, 6, 1, 9);
+    let selection_state: NovaSelectionState = nova_selection_state(selection);
+    let selected: i64 = nova_selection_state_selected(selection_state);
+    let mode: i64 = nova_selection_state_mode(selection_state);
+    let list: NovaListPacket = nova_list_packet(selected, 5, 84, 1);
+    let table: NovaTablePacket = nova_table_packet(4, 3, selected, 0);
+    let tree: NovaTreePacket = nova_tree_packet(selected, 6, mode, 84);
+    let inspector: NovaInspectorPacket =
+      nova_inspector_packet(selected, 4, mode, 84);
+    let outline: NovaOutlinePacket =
+      nova_outline_packet(selected, 6, mode, 84);
+
+    let slider_state: NovaSliderState = nova_slider_state(slider_b);
+    let text_input_state: NovaTextInputState = nova_text_input_state(text_input);
+    let list_state: NovaListState = nova_list_state(list);
+    let table_state: NovaTableState = nova_table_state(table);
+    let tree_state: NovaTreeState = nova_tree_state(tree);
+    let inspector_state: NovaInspectorState = nova_inspector_state(inspector);
+    let outline_state: NovaOutlineState = nova_outline_state(outline);
+
+    let slider_disabled: i64 = nova_slider_state_disabled(slider_state);
+    let input_dirty: i64 = nova_text_input_state_dirty(text_input_state);
+    let list_dense: i64 = nova_list_state_dense(list_state);
+    let table_row: i64 = nova_table_state_selected_row(table_state);
+    let tree_expanded: i64 = nova_tree_state_expanded(tree_state);
+    let inspector_pinned: i64 = nova_inspector_state_pinned(inspector_state);
+    let outline_collapsed: i64 = nova_outline_state_collapsed(outline_state);
+
+    print(
+      slider_disabled + input_dirty + list_dense + table_row + tree_expanded +
+      inspector_pinned + outline_collapsed + selected + header.accent + sliders.speed.value +
+      toggle.live
+    );
+  }
+}

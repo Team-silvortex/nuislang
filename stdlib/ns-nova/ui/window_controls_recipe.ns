@@ -1,0 +1,95 @@
+mod cpu Main {
+  struct PanelSeeds {
+    color: i64,
+    speed: i64,
+    radius: i64,
+    accent: i64,
+    toggle: i64,
+    focus: i64
+  }
+
+  fn pack_panel_seeds(color: i64, speed: i64, radius: i64, tick: i64) -> PanelSeeds {
+    let backing: ref Buffer = alloc_buffer(3, 0);
+    let copy: WindowMut<i64> = data_copy_window(backing, 0, 3);
+    let copy_color: WindowMut<i64> = data_write_window(copy, 0, color);
+    let copy_speed: WindowMut<i64> = data_write_window(copy_color, 1, speed);
+    let copy_radius: WindowMut<i64> = data_write_window(copy_speed, 2, radius);
+    let frozen: Window<i64> = data_freeze_window(copy_radius);
+
+    let packed_color: i64 = data_read_window(frozen, 0);
+    let packed_speed: i64 = data_read_window(frozen, 1);
+    let packed_radius: i64 = data_read_window(frozen, 2);
+
+    return PanelSeeds {
+      color: packed_color,
+      speed: packed_speed,
+      radius: packed_radius,
+      accent: packed_color + radius,
+      toggle: tick,
+      focus: color + speed
+    };
+  }
+
+  fn build_relational_selection(seeds: PanelSeeds) -> NovaSelectionPacket {
+    return nova_selection_packet(seeds.focus, 6, seeds.toggle, 9);
+  }
+
+  fn build_relational_controls(
+    selection: NovaSelectionPacket,
+    seeds: PanelSeeds
+  ) -> NovaOutlinePacket {
+    let selection_state: NovaSelectionState = nova_selection_state(selection);
+    let selected: i64 = nova_selection_state_selected(selection_state);
+    let mode: i64 = nova_selection_state_mode(selection_state);
+    return nova_outline_packet(selected, 6, mode, seeds.accent);
+  }
+
+  fn summarize_panel(seeds: PanelSeeds) -> i64 {
+    let header: NovaHeaderPacket = nova_header_packet(seeds.accent, seeds.focus);
+    let slider_color: NovaSliderPacket = nova_slider_packet(seeds.color, 0, 127, 4, 0);
+    let slider_speed: NovaSliderPacket =
+      nova_slider_packet(seeds.speed, 0, 63, 2, seeds.toggle);
+    let slider_radius: NovaSliderPacket =
+      nova_slider_packet(seeds.radius, 0, 127, 3, seeds.radius);
+    let sliders: NovaSliderGroupPacket =
+      nova_slider_group_packet(slider_color, slider_speed, slider_radius);
+    let toggle: NovaTogglePacket = nova_toggle_packet(seeds.toggle, seeds.radius);
+    let text_input: NovaTextInputPacket =
+      nova_text_input_packet(seeds.color, seeds.focus, seeds.radius, 0, 1);
+
+    let selection: NovaSelectionPacket = build_relational_selection(seeds);
+    let selection_state: NovaSelectionState = nova_selection_state(selection);
+    let selected: i64 = nova_selection_state_selected(selection_state);
+    let mode: i64 = nova_selection_state_mode(selection_state);
+    let list: NovaListPacket = nova_list_packet(selected, 5, seeds.accent, seeds.toggle);
+    let table: NovaTablePacket = nova_table_packet(4, 3, selected, seeds.radius);
+    let tree: NovaTreePacket = nova_tree_packet(selected, 6, mode, seeds.accent);
+    let inspector: NovaInspectorPacket =
+      nova_inspector_packet(selected, 4, mode, seeds.accent);
+    let outline: NovaOutlinePacket = build_relational_controls(selection, seeds);
+
+    let slider_state: NovaSliderState = nova_slider_state(slider_speed);
+    let text_input_state: NovaTextInputState = nova_text_input_state(text_input);
+    let list_state: NovaListState = nova_list_state(list);
+    let table_state: NovaTableState = nova_table_state(table);
+    let tree_state: NovaTreeState = nova_tree_state(tree);
+    let inspector_state: NovaInspectorState = nova_inspector_state(inspector);
+    let outline_state: NovaOutlineState = nova_outline_state(outline);
+
+    return header.accent +
+      sliders.speed.value +
+      toggle.live +
+      nova_slider_state_disabled(slider_state) +
+      nova_text_input_state_dirty(text_input_state) +
+      nova_list_state_dense(list_state) +
+      nova_table_state_selected_row(table_state) +
+      nova_tree_state_expanded(tree_state) +
+      nova_inspector_state_pinned(inspector_state) +
+      nova_outline_state_collapsed(outline_state);
+  }
+
+  fn main() {
+    let seeds: PanelSeeds = pack_panel_seeds(104, 18, 96, 1);
+    print(summarize_panel(seeds));
+  }
+}

@@ -1,0 +1,105 @@
+mod cpu Main {
+  struct SceneSeeds {
+    color: i64,
+    speed: i64,
+    radius: i64,
+    accent: i64,
+    toggle: i64,
+    focus: i64
+  }
+
+  fn build_scene_seeds(color: i64, speed: i64, radius: i64, tick: i64) -> SceneSeeds {
+    return SceneSeeds {
+      color: color,
+      speed: speed,
+      radius: radius,
+      accent: color + radius,
+      toggle: tick,
+      focus: color + speed
+    };
+  }
+
+  fn build_scene_link_bundle(seeds: SceneSeeds) -> NovaSceneLinkPacket {
+    return nova_scene_link_packet(
+      seeds.focus,
+      seeds.speed,
+      seeds.radius,
+      seeds.accent,
+      seeds.toggle,
+      1
+    );
+  }
+
+  fn summarize_scene_runtime(seeds: SceneSeeds) -> i64 {
+    let scene: NovaScenePacket = nova_scene_packet(7, seeds.focus, 3, seeds.toggle);
+    let camera: NovaCameraPacket =
+      nova_camera_packet(seeds.toggle, seeds.focus, seeds.speed, seeds.radius);
+    let material: NovaMaterialPacket =
+      nova_material_packet(seeds.toggle, seeds.accent, seeds.speed, seeds.radius);
+    let light: NovaLightPacket =
+      nova_light_packet(seeds.toggle, seeds.speed, seeds.radius, seeds.accent);
+    let mesh: NovaMeshPacket =
+      nova_mesh_packet(seeds.toggle, seeds.speed, seeds.radius, seeds.accent);
+    let transform: NovaTransformPacket =
+      nova_transform_packet(seeds.speed, seeds.toggle, seeds.radius, seeds.focus);
+    let node: NovaNodePacket =
+      nova_node_packet(seeds.focus, seeds.toggle, seeds.accent, 2);
+    let link: NovaSceneLinkPacket = build_scene_link_bundle(seeds);
+    let graph: NovaSceneGraphPacket =
+      nova_scene_graph_packet(seeds.focus, 6 + seeds.toggle, 3, 3, 1);
+    let instance_group: NovaInstanceGroupPacket =
+      nova_instance_group_packet(3, 4, 3, seeds.toggle, seeds.accent);
+    let cluster: NovaSceneClusterPacket =
+      nova_scene_cluster_packet(seeds.focus, 6, 3, seeds.accent, 1);
+    let visibility: NovaVisibilityPacket =
+      nova_visibility_packet(3, 5 + seeds.toggle, seeds.toggle, seeds.speed, 7);
+    let cull: NovaCullPacket =
+      nova_cull_packet(3, 4 + seeds.toggle, seeds.toggle, seeds.speed, 7);
+    let lod: NovaLodPacket =
+      nova_lod_packet(3, 4, seeds.toggle, seeds.radius, seeds.accent);
+    let streaming: NovaStreamingPacket =
+      nova_streaming_packet(3, 2 + seeds.toggle, seeds.toggle, seeds.speed, seeds.accent);
+    let budget: NovaBudgetPacket =
+      nova_budget_packet(3, 12 + seeds.toggle, seeds.speed, seeds.radius, seeds.toggle);
+
+    let scene_state: NovaSceneState = nova_scene_state(scene);
+    let camera_state: NovaCameraState = nova_camera_state(camera);
+    let material_state: NovaMaterialState = nova_material_state(material);
+    let light_state: NovaLightState = nova_light_state(light);
+    let mesh_state: NovaMeshState = nova_mesh_state(mesh);
+    let transform_state: NovaTransformState = nova_transform_state(transform);
+    let node_state: NovaNodeState = nova_node_state(node);
+    let link_state: NovaSceneLinkState = nova_scene_link_state(link);
+    let graph_state: NovaSceneGraphState = nova_scene_graph_state(graph);
+    let instance_group_state: NovaInstanceGroupState =
+      nova_instance_group_state(instance_group);
+    let cluster_state: NovaSceneClusterState = nova_scene_cluster_state(cluster);
+    let visibility_state: NovaVisibilityState = nova_visibility_state(visibility);
+    let cull_state: NovaCullState = nova_cull_state(cull);
+    let lod_state: NovaLodState = nova_lod_state(lod);
+    let streaming_state: NovaStreamingState = nova_streaming_state(streaming);
+    let budget_state: NovaBudgetState = nova_budget_state(budget);
+
+    return nova_scene_state_light_count(scene_state) +
+      nova_camera_state_zoom(camera_state) +
+      nova_material_state_emissive(material_state) +
+      nova_light_state_intensity(light_state) +
+      nova_mesh_state_vertex_count(mesh_state) +
+      nova_transform_state_scale(transform_state) +
+      nova_node_state_depth(node_state) +
+      nova_scene_link_state_mesh(link_state) +
+      nova_scene_graph_state_nodes(graph_state) +
+      nova_instance_group_state_visible(instance_group_state) +
+      nova_scene_cluster_state_budget(cluster_state) +
+      nova_visibility_state_visible(visibility_state) +
+      nova_cull_state_kept(cull_state) +
+      nova_lod_state_active(lod_state) +
+      nova_streaming_state_resident(streaming_state) +
+      nova_budget_state_total(budget_state);
+  }
+
+  fn main() {
+    let seeds: SceneSeeds = build_scene_seeds(104, 18, 96, 1);
+    print(summarize_scene_runtime(seeds));
+  }
+}

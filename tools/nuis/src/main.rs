@@ -108,6 +108,7 @@ fn run() -> Result<(), String> {
             run_nuis_rc(&args)?;
         }
         cli::CommandKind::ProjectStatus { input } => handle_project_status(input)?,
+        cli::CommandKind::ProjectDoctor { input } => handle_project_doctor(input)?,
         cli::CommandKind::ProjectLockAbi { input } => handle_project_lock_abi(input)?,
         cli::CommandKind::Galaxy(command) => handle_galaxy(command)?,
     }
@@ -290,6 +291,305 @@ fn handle_project_status(input: std::path::PathBuf) -> Result<(), String> {
             println!("  galaxy_lock_path: {}", lock_path.display());
         }
     }
+    Ok(())
+}
+
+fn handle_project_doctor(input: std::path::PathBuf) -> Result<(), String> {
+    let project = nuisc::project::load_project(&input)?;
+    let resolution = nuisc::project::resolve_project_abi(&project)?;
+    let galaxy_manifest_path = project.root.join("galaxy.toml");
+    let galaxy_manifest_exists = galaxy_manifest_path.exists();
+    let galaxy_check = if galaxy_manifest_exists {
+        Some(galaxy::check(&project.root))
+    } else {
+        None
+    };
+    let galaxy_check_invalid = matches!(galaxy_check.as_ref(), Some(Err(_)));
+    let galaxy_doctor = galaxy::doctor_project(&project.root)?;
+    let nova_profile = galaxy::inspect_ns_nova_profile(&project.root)?;
+    let nova_stdlib = galaxy::inspect_ns_nova_stdlib(std::path::Path::new("."))?;
+    let lock_status = galaxy_doctor.lock_status.clone();
+    let lock_error = galaxy_doctor.lock_error.clone();
+    let deps_len = galaxy_doctor.dependencies.len();
+    let mut any_local_missing = false;
+    let mut any_lock_missing = false;
+    let mut any_install_missing = false;
+
+    println!("project doctor: {}", project.manifest.name);
+    println!("  root: {}", project.root.display());
+    println!("  manifest: {}", project.manifest_path.display());
+    println!("  entry: {}", project.manifest.entry);
+    println!("  modules: {}", project.modules.len());
+    println!("  links: {}", project.manifest.links.len());
+    println!(
+        "  abi_mode: {}",
+        if resolution.explicit {
+            "explicit"
+        } else {
+            "auto-recommended"
+        }
+    );
+    for item in &resolution.requirements {
+        println!("  abi: {}={}", item.domain, item.abi);
+    }
+
+    println!(
+        "  galaxy_manifest: {}",
+        if galaxy_manifest_exists {
+            galaxy_manifest_path.display().to_string()
+        } else {
+            "<missing>".to_owned()
+        }
+    );
+    match galaxy_check {
+        Some(Ok(checked)) => {
+            println!("  galaxy_check: ok");
+            println!("  galaxy_package_kind: {}", checked.manifest.package_kind);
+            println!(
+                "  galaxy_framework: {}",
+                checked.manifest.framework.as_deref().unwrap_or("<none>")
+            );
+            println!("  galaxy_include_files: {}", checked.include_files.len());
+        }
+        Some(Err(error)) => {
+            println!("  galaxy_check: invalid");
+            println!("  galaxy_error: {}", error);
+        }
+        None => {
+            println!("  galaxy_check: skipped");
+        }
+    }
+
+    println!("  galaxy_lock: {}", galaxy_doctor.lock_status);
+    println!("  galaxy_lock_path: {}", galaxy_doctor.lock_path.display());
+    if let Some(error) = galaxy_doctor.lock_error {
+        println!("  galaxy_lock_error: {}", error);
+    }
+    println!("  galaxy_deps_root: {}", galaxy_doctor.deps_root.display());
+    println!(
+        "  galaxy_local_registry: {}",
+        galaxy_doctor.local_registry_root.display()
+    );
+    println!(
+        "  galaxy_dependencies: {}",
+        galaxy_doctor.dependencies.len()
+    );
+    for dependency in galaxy_doctor.dependencies {
+        any_local_missing |= !dependency.local_available;
+        any_lock_missing |= !dependency.locked;
+        any_install_missing |= !dependency.installed;
+        println!(
+            "  dep: {}={} local={} lock={} installed={}",
+            dependency.name,
+            dependency.version,
+            yes_no(dependency.local_available),
+            yes_no(dependency.locked),
+            yes_no(dependency.installed)
+        );
+    }
+
+    match nova_profile.as_ref() {
+        Some(profile) => {
+            println!("  ns_nova_profile: {}", profile.path.display());
+            println!("  ns_nova_framework: {}", profile.framework);
+            println!("  ns_nova_framework_schema: {}", profile.framework_schema);
+            println!(
+                "  ns_nova_stdlib_schema: {}",
+                profile.stdlib_schema.as_deref().unwrap_or("<none>")
+            );
+            println!(
+                "  ns_nova_stdlib_manifest_ref: {}",
+                profile.stdlib_manifest.as_deref().unwrap_or("<none>")
+            );
+            println!(
+                "  ns_nova_stdlib_declared_sources: {}",
+                profile.stdlib_sources.len()
+            );
+            println!(
+                "  ns_nova_family_schema: {}",
+                profile.family_schema.as_deref().unwrap_or("<none>")
+            );
+            println!(
+                "  ns_nova_family_layers: {}",
+                if profile.family_layers.is_empty() {
+                    "<none>".to_owned()
+                } else {
+                    profile.family_layers.join(", ")
+                }
+            );
+            println!(
+                "  ns_nova_render_schema: {}",
+                profile.render_schema.as_deref().unwrap_or("<none>")
+            );
+            println!(
+                "  ns_nova_render_units: owner={} bridge={} surface={}",
+                profile.render_owner_unit.as_deref().unwrap_or("<none>"),
+                profile.render_bridge_unit.as_deref().unwrap_or("<none>"),
+                profile.render_surface_unit.as_deref().unwrap_or("<none>")
+            );
+            println!(
+                "  ns_nova_selection_schema: {}",
+                profile.selection_schema.as_deref().unwrap_or("<none>")
+            );
+            println!(
+                "  ns_nova_selection_units: owner={} bridge={} render={}",
+                profile.selection_owner_unit.as_deref().unwrap_or("<none>"),
+                profile.selection_bridge_unit.as_deref().unwrap_or("<none>"),
+                profile.selection_render_unit.as_deref().unwrap_or("<none>")
+            );
+            println!(
+                "  ns_nova_selection_controls: {}",
+                if profile.selection_controls.is_empty() {
+                    "<none>".to_owned()
+                } else {
+                    profile.selection_controls.join(", ")
+                }
+            );
+        }
+        None => {
+            println!("  ns_nova_profile: <missing>");
+        }
+    }
+    match nova_stdlib.as_ref() {
+        Some(summary) => {
+            println!("  ns_nova_stdlib_manifest: {}", summary.path.display());
+            println!("  ns_nova_stdlib_sources: {}", summary.source_modules.len());
+            println!(
+                "  ns_nova_stdlib_missing_sources: {}",
+                summary.missing_modules.len()
+            );
+            for path in &summary.missing_modules {
+                println!("  ns_nova_stdlib_missing: {}", path.display());
+            }
+        }
+        None => {
+            println!("  ns_nova_stdlib_manifest: <missing>");
+        }
+    }
+
+    let mut next_steps = Vec::new();
+    if !galaxy_manifest_exists {
+        next_steps.push(
+            "run `nuis galaxy init <project-dir>` if you want to package or share this project"
+                .to_owned(),
+        );
+    }
+    if let Some(profile) = nova_profile.as_ref() {
+        if !galaxy_manifest_exists {
+            next_steps.push(
+                "run `nuis galaxy init <project-dir> --framework ns-nova` if this project should be packaged as an `ns-nova` framework project".to_owned(),
+            );
+        }
+        if profile.family_schema.as_deref() == Some("ns-nova-family-v1")
+            && profile.family_layers.is_empty()
+        {
+            next_steps.push(
+                "fill `family_layers` in `ns-nova.toml` so the framework contract says whether this project is using `core`, `ui`, or `scene`".to_owned(),
+            );
+        }
+        if profile.render_schema.as_deref() == Some("ns-nova-render-v1")
+            && (profile.render_owner_unit.is_none()
+                || profile.render_bridge_unit.is_none()
+                || profile.render_surface_unit.is_none())
+        {
+            next_steps.push(
+                "fill `render_owner_unit`, `render_bridge_unit`, and `render_surface_unit` in `ns-nova.toml` to complete the render contract".to_owned(),
+            );
+        }
+        if profile.selection_schema.as_deref() == Some("ns-nova-selection-v1")
+            && (profile.selection_owner_unit.is_none()
+                || profile.selection_bridge_unit.is_none()
+                || profile.selection_render_unit.is_none()
+                || profile.selection_controls.is_empty())
+        {
+            next_steps.push(
+                "fill the `selection_*` units and `selection_controls` in `ns-nova.toml` to complete the shared selection contract".to_owned(),
+            );
+        }
+        if profile.stdlib_schema.as_deref() == Some("ns-nova-stdlib-v1")
+            && (profile.stdlib_manifest.is_none() || profile.stdlib_sources.is_empty())
+        {
+            next_steps.push(
+                "fill `stdlib_manifest` and `stdlib_sources` in `ns-nova.toml` so the framework profile points at its canonical stdlib source assets".to_owned(),
+            );
+        }
+    } else if nova_stdlib.is_some() {
+        next_steps.push(
+            "add `ns-nova.toml` if this project should carry explicit `ns-nova` framework metadata alongside the shared stdlib source asset catalog".to_owned(),
+        );
+    }
+    if let Some(summary) = nova_stdlib.as_ref() {
+        if summary.source_modules.is_empty() {
+            next_steps.push(
+                "fill `source_modules` in `stdlib/ns-nova/module.toml` so the framework declares its canonical `ns` source assets".to_owned(),
+            );
+        }
+        if !summary.missing_modules.is_empty() {
+            next_steps.push(
+                "some `ns-nova` source modules declared in `stdlib/ns-nova/module.toml` are missing on disk; add them or remove stale entries from `source_modules`".to_owned(),
+            );
+        }
+        if let Some(profile) = nova_profile.as_ref() {
+            if profile.stdlib_sources.len() != summary.source_modules.len() {
+                next_steps.push(
+                    "refresh `ns-nova.toml` so its `stdlib_sources` count matches `stdlib/ns-nova/module.toml`".to_owned(),
+                );
+            }
+        }
+    }
+    match lock_status.as_str() {
+        "missing" if deps_len > 0 => {
+            next_steps.push(
+                "run `nuis galaxy lock-deps <project-dir>` to create `nuis.galaxy.lock`".to_owned(),
+            );
+        }
+        "invalid" => {
+            next_steps.push(
+                "run `nuis galaxy verify-lock <project-dir>` after fixing the lock or regenerate it with `nuis galaxy lock-deps <project-dir>`".to_owned(),
+            );
+        }
+        _ => {}
+    }
+    if any_lock_missing && deps_len > 0 && lock_status == "ok" {
+        next_steps.push(
+            "run `nuis galaxy lock-deps <project-dir>` to refresh the lock so it matches the manifest".to_owned(),
+        );
+    }
+    if any_install_missing && lock_status == "ok" {
+        next_steps.push(
+            "run `nuis galaxy sync-deps <project-dir>` to materialize locked galaxy dependencies under `.nuis/deps/galaxy`".to_owned(),
+        );
+    }
+    if any_local_missing && deps_len > 0 {
+        next_steps.push(
+            "some galaxy deps are not available locally; use `nuis galaxy list` to inspect the local registry or publish/install the missing packages first".to_owned(),
+        );
+    }
+    if galaxy_check_invalid {
+        next_steps.push(
+            "run `nuis galaxy check <project-dir>` after fixing `galaxy.toml` or framework profile issues".to_owned(),
+        );
+    }
+    if !resolution.explicit {
+        next_steps.push(
+            "run `nuis project-lock-abi <project-dir>` if you want to freeze the current ABI recommendations".to_owned(),
+        );
+    }
+    if next_steps.is_empty() {
+        println!("  next_steps: none");
+    } else {
+        println!("  next_steps: {}", next_steps.len());
+        for step in next_steps {
+            println!("  next: {}", step);
+        }
+    }
+    if let Some(error) = lock_error {
+        println!(
+            "  note: lock verification failed before suggestions were computed: {}",
+            error
+        );
+    }
+
     Ok(())
 }
 
@@ -576,6 +876,7 @@ fn print_help() {
     );
     println!("  nuis rc <status|start|stop|track|projects|versions> [...]");
     println!("  nuis project-status [project-dir|nuis.toml]");
+    println!("  nuis project-doctor [project-dir|nuis.toml]");
     println!("  nuis project-lock-abi [project-dir|nuis.toml]");
     println!("  nuis galaxy init [project-dir] [--framework <name>]");
     println!("  nuis galaxy check [project-dir|galaxy.toml]");
@@ -703,4 +1004,73 @@ fn find_abi_block_span(source: &str) -> Option<(usize, usize)> {
         offset += line.len();
     }
     start.map(|s| (s, source.len()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::handle_check;
+    use std::{
+        fs,
+        path::{Path, PathBuf},
+    };
+
+    fn repo_root() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .expect("repo root")
+    }
+
+    fn load_ns_nova_source_modules(root: &Path) -> Vec<String> {
+        let module_path = root.join("stdlib/ns-nova/module.toml");
+        let source = fs::read_to_string(&module_path)
+            .unwrap_or_else(|error| panic!("{}: {error}", module_path.display()));
+        let mut inside = false;
+        let mut modules = Vec::new();
+        for raw_line in source.lines() {
+            let line = raw_line.trim();
+            if !inside {
+                if line.starts_with("source_modules") && line.contains('[') {
+                    inside = true;
+                }
+                continue;
+            }
+            if line.starts_with(']') {
+                break;
+            }
+            let entry = line.trim_end_matches(',').trim();
+            if entry.is_empty() {
+                continue;
+            }
+            let entry = entry.trim_matches('"');
+            if !entry.is_empty() {
+                modules.push(format!("stdlib/ns-nova/{entry}"));
+            }
+        }
+        assert!(
+            !modules.is_empty(),
+            "{} did not declare any source_modules",
+            module_path.display()
+        );
+        modules
+    }
+
+    #[test]
+    fn checks_ns_nova_stdlib_source_modules() {
+        std::thread::Builder::new()
+            .name("nuis-stdlib-smoke".to_owned())
+            .stack_size(64 * 1024 * 1024)
+            .spawn(|| {
+                let root = repo_root();
+                for relative in load_ns_nova_source_modules(&root) {
+                    let input = root.join(relative);
+                    handle_check(input.clone()).unwrap_or_else(|error| {
+                        panic!("failed to check {}: {error}", input.display())
+                    });
+                }
+            })
+            .expect("spawn stdlib smoke thread")
+            .join()
+            .expect("join stdlib smoke thread");
+    }
 }

@@ -1,0 +1,80 @@
+mod cpu Main {
+  fn build_scene_link(
+    node_slot: i64,
+    transform_slot: i64,
+    mesh_slot: i64,
+    material_slot: i64,
+    light_slot: i64,
+    layer_slot: i64
+  ) -> NovaSceneLinkPacket {
+    return nova_scene_link_packet(
+      node_slot,
+      transform_slot,
+      mesh_slot,
+      material_slot,
+      light_slot,
+      layer_slot
+    );
+  }
+
+  fn build_cluster(
+    root_node: i64,
+    node_budget: i64,
+    instance_group: i64,
+    material_slot: i64,
+    layer_slot: i64
+  ) -> NovaSceneClusterPacket {
+    return nova_scene_cluster_packet(
+      root_node,
+      node_budget,
+      instance_group,
+      material_slot,
+      layer_slot
+    );
+  }
+
+  fn summarize_scene_link(link: NovaSceneLinkPacket) -> i64 {
+    let state: NovaSceneLinkState = nova_scene_link_state(link);
+    return nova_scene_link_state_node(state) +
+      nova_scene_link_state_mesh(state) +
+      nova_scene_link_state_material(state);
+  }
+
+  fn summarize_cluster_runtime(
+    cluster: NovaSceneClusterPacket,
+    visibility: NovaVisibilityPacket,
+    cull: NovaCullPacket,
+    lod: NovaLodPacket
+  ) -> i64 {
+    let cluster_state: NovaSceneClusterState = nova_scene_cluster_state(cluster);
+    let visibility_state: NovaVisibilityState = nova_visibility_state(visibility);
+    let cull_state: NovaCullState = nova_cull_state(cull);
+    let lod_state: NovaLodState = nova_lod_state(lod);
+
+    return nova_scene_cluster_state_budget(cluster_state) +
+      nova_visibility_state_visible(visibility_state) +
+      nova_cull_state_kept(cull_state) +
+      nova_lod_state_active(lod_state);
+  }
+
+  fn main() {
+    let link: NovaSceneLinkPacket = build_scene_link(2, 12, 48, 84, 1, 0);
+    let instance_group: NovaInstanceGroupPacket =
+      nova_instance_group_packet(3, 4, 3, 1, 84);
+    let cluster: NovaSceneClusterPacket = build_cluster(2, 6, 3, 84, 1);
+    let visibility: NovaVisibilityPacket = nova_visibility_packet(3, 5, 1, 2, 7);
+    let cull: NovaCullPacket = nova_cull_packet(3, 4, 1, 2, 7);
+    let lod: NovaLodPacket = nova_lod_packet(3, 4, 1, 48, 84);
+
+    let instance_group_state: NovaInstanceGroupState =
+      nova_instance_group_state(instance_group);
+    let grouped_visible: i64 =
+      nova_instance_group_state_visible(instance_group_state);
+    let summary: i64 =
+      summarize_scene_link(link) +
+      summarize_cluster_runtime(cluster, visibility, cull, lod) +
+      grouped_visible;
+
+    print(summary);
+  }
+}

@@ -21,6 +21,28 @@ Concrete directions already visible in this repository:
 * `NovaLayerPacket`
 * project-level render owner / bridge / surface roles inside `ns-nova.toml`
 
+Current source anchor:
+
+* [theme_surface.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/core/theme_surface.ns)
+* [frame_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/core/frame_runtime.ns)
+* [window_controls_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/core/window_controls_runtime_recipe.ns)
+
+This file is intentionally small and compileable on its own. It is the first step toward
+turning `ns-nova-core` from pure framework contract text into real `ns` source assets.
+
+`frame_runtime.ns` adds the next layer up:
+
+* pass / frame / target / frame-graph orchestration
+* queue / semaphore / timeline / fence signaling
+* dispatch / feedback / intent / reaction / commit / snapshot style runtime contracts
+
+`window_controls_runtime_recipe.ns` is the first project-shaped extraction from the
+runtime half of `window_controls_demo`:
+
+* seed struct for stable per-frame knobs
+* grouped render-chain helper and grouped feedback-chain helper
+* a small proof that `ns-nova-core` can already hold reusable orchestration recipes
+
 This layer should stay:
 
 * renderer-oriented

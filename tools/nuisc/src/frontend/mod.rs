@@ -3998,6 +3998,71 @@ fn lower_call_expr_with_async(
                 ],
             })
         }
+        "nova_frame_variance_packet" => {
+            let (cluster_slot, frame_variance, input_variance, burst_mode, variance_mask) =
+                match args {
+                    [cluster_slot, frame_variance, input_variance, burst_mode, variance_mask] => (
+                        cluster_slot,
+                        frame_variance,
+                        input_variance,
+                        burst_mode,
+                        variance_mask,
+                    ),
+                    _ => {
+                        return Err("nova_frame_variance_packet(...) expects 5 args".to_owned());
+                    }
+                };
+            let cluster_slot = lower_expr(
+                cluster_slot,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let frame_variance = lower_expr(
+                frame_variance,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let input_variance = lower_expr(
+                input_variance,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let burst_mode = lower_expr(
+                burst_mode,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let variance_mask = lower_expr(
+                variance_mask,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaFrameVariancePacket".to_owned(),
+                fields: vec![
+                    ("cluster_slot".to_owned(), cluster_slot),
+                    ("frame_variance".to_owned(), frame_variance),
+                    ("input_variance".to_owned(), input_variance),
+                    ("burst_mode".to_owned(), burst_mode),
+                    ("variance_mask".to_owned(), variance_mask),
+                ],
+            })
+        }
         "nova_pass_packet" => {
             let (stage, clear_mode, sample_count, debug_view) = match args {
                 [stage, clear_mode, sample_count, debug_view] => {
@@ -6154,10 +6219,10 @@ fn lower_call_expr_with_async(
             })
         }
         "nova_panel_from_parts" => {
-            let [header, sliders, toggle, progress, meter, button, text_input, select, checkbox, radio, textarea, tabs, list, table, tree, inspector, outline, theme, surface, viewport, layer, scene, camera, material, light, mesh, transform, node, scene_link, instance, scene_graph, scene_node, instance_group, scene_cluster, visibility, cull, lod, streaming, residency, eviction, prefetch, budget, pressure, thermal, power, latency, frame_pacing, jank, pass, frame, target, frame_graph, attachment, pass_chain, barrier, resource_set, schedule, submission, queue, semaphore, timeline, fence, signal, event, dispatch, feedback, intent, reaction, outcome, resolution, commit, snapshot, checkpoint, focus] =
+            let [header, sliders, toggle, progress, meter, button, text_input, select, checkbox, radio, textarea, tabs, list, table, tree, inspector, outline, theme, surface, viewport, layer, scene, camera, material, light, mesh, transform, node, scene_link, instance, scene_graph, scene_node, instance_group, scene_cluster, visibility, cull, lod, streaming, residency, eviction, prefetch, budget, pressure, thermal, power, latency, frame_pacing, frame_variance, jank, pass, frame, target, frame_graph, attachment, pass_chain, barrier, resource_set, schedule, submission, queue, semaphore, timeline, fence, signal, event, dispatch, feedback, intent, reaction, outcome, resolution, commit, snapshot, checkpoint, focus] =
                 args
             else {
-                return Err("nova_panel_from_parts(...) expects 74 args".to_owned());
+                return Err("nova_panel_from_parts(...) expects 75 args".to_owned());
             };
             let header = lower_expr(
                 header,
@@ -6535,6 +6600,14 @@ fn lower_call_expr_with_async(
                 struct_table,
                 Some(&named_type("NovaFramePacingPacket")),
             )?;
+            let frame_variance = lower_expr(
+                frame_variance,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaFrameVariancePacket")),
+            )?;
             let jank = lower_expr(
                 jank,
                 current_domain,
@@ -6801,6 +6874,7 @@ fn lower_call_expr_with_async(
                     ("scene_power".to_owned(), power),
                     ("scene_latency".to_owned(), latency),
                     ("scene_frame_pacing".to_owned(), frame_pacing),
+                    ("scene_frame_variance".to_owned(), frame_variance),
                     ("scene_jank".to_owned(), jank),
                     ("pass".to_owned(), pass),
                     ("frame".to_owned(), frame),
@@ -8988,6 +9062,59 @@ fn lower_call_expr_with_async(
                 ],
             })
         }
+        "nova_frame_variance_state" => {
+            let [packet] = args else {
+                return Err("nova_frame_variance_state(...) expects 1 arg".to_owned());
+            };
+            let packet = lower_expr(
+                packet,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&named_type("NovaFrameVariancePacket")),
+            )?;
+            Ok(NirExpr::StructLiteral {
+                type_name: "NovaFrameVarianceState".to_owned(),
+                fields: vec![
+                    (
+                        "cluster_slot".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "cluster_slot".to_owned(),
+                        },
+                    ),
+                    (
+                        "frame_variance".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "frame_variance".to_owned(),
+                        },
+                    ),
+                    (
+                        "input_variance".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "input_variance".to_owned(),
+                        },
+                    ),
+                    (
+                        "burst_mode".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet.clone()),
+                            field: "burst_mode".to_owned(),
+                        },
+                    ),
+                    (
+                        "variance_mask".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(packet),
+                            field: "variance_mask".to_owned(),
+                        },
+                    ),
+                ],
+            })
+        }
         "nova_pass_state" => {
             let [packet] = args else {
                 return Err("nova_pass_state(...) expects 1 arg".to_owned());
@@ -10407,6 +10534,11 @@ fn lower_call_expr_with_async(
         | "nova_jank_state_severity"
         | "nova_jank_state_recovery"
         | "nova_jank_state_mask"
+        | "nova_frame_variance_state_cluster"
+        | "nova_frame_variance_state_frame"
+        | "nova_frame_variance_state_input"
+        | "nova_frame_variance_state_burst"
+        | "nova_frame_variance_state_mask"
         | "nova_pass_state_stage"
         | "nova_pass_state_clear_mode"
         | "nova_pass_state_sample_count"
@@ -10689,6 +10821,11 @@ fn lower_call_expr_with_async(
                 "nova_jank_state_severity" => ("NovaJankState", "severity"),
                 "nova_jank_state_recovery" => ("NovaJankState", "recovery"),
                 "nova_jank_state_mask" => ("NovaJankState", "jank_mask"),
+                "nova_frame_variance_state_cluster" => ("NovaFrameVarianceState", "cluster_slot"),
+                "nova_frame_variance_state_frame" => ("NovaFrameVarianceState", "frame_variance"),
+                "nova_frame_variance_state_input" => ("NovaFrameVarianceState", "input_variance"),
+                "nova_frame_variance_state_burst" => ("NovaFrameVarianceState", "burst_mode"),
+                "nova_frame_variance_state_mask" => ("NovaFrameVarianceState", "variance_mask"),
                 "nova_pass_state_stage" => ("NovaPassState", "stage"),
                 "nova_pass_state_clear_mode" => ("NovaPassState", "clear_mode"),
                 "nova_pass_state_sample_count" => ("NovaPassState", "sample_count"),
@@ -12123,6 +12260,11 @@ fn builtin_struct_field_type(type_name: &str, field: &str) -> Option<NirTypeRef>
             "cluster_slot" | "spikes" | "severity" | "recovery" | "jank_mask" => Some(i64()),
             _ => None,
         },
+        "NovaFrameVariancePacket" => match field {
+            "cluster_slot" | "frame_variance" | "input_variance" | "burst_mode"
+            | "variance_mask" => Some(i64()),
+            _ => None,
+        },
         "NovaPassPacket" => match field {
             "stage" | "clear_mode" | "sample_count" | "debug_view" => Some(i64()),
             _ => None,
@@ -12343,6 +12485,7 @@ fn builtin_struct_field_type(type_name: &str, field: &str) -> Option<NirTypeRef>
             "scene_power" => Some(named("NovaPowerPacket")),
             "scene_latency" => Some(named("NovaLatencyPacket")),
             "scene_frame_pacing" => Some(named("NovaFramePacingPacket")),
+            "scene_frame_variance" => Some(named("NovaFrameVariancePacket")),
             "scene_jank" => Some(named("NovaJankPacket")),
             "pass" => Some(named("NovaPassPacket")),
             "frame" => Some(named("NovaFramePacket")),
@@ -12575,6 +12718,11 @@ fn builtin_struct_field_type(type_name: &str, field: &str) -> Option<NirTypeRef>
         },
         "NovaJankState" => match field {
             "cluster_slot" | "spikes" | "severity" | "recovery" | "jank_mask" => Some(i64()),
+            _ => None,
+        },
+        "NovaFrameVarianceState" => match field {
+            "cluster_slot" | "frame_variance" | "input_variance" | "burst_mode"
+            | "variance_mask" => Some(i64()),
             _ => None,
         },
         "NovaPassState" => match field {
@@ -14906,6 +15054,37 @@ mod tests {
     }
 
     #[test]
+    fn lowers_nova_frame_variance_state_contract() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let variance: NovaFrameVariancePacket = nova_frame_variance_packet(3, 2, 1, 4, 7);
+                let state: NovaFrameVarianceState = nova_frame_variance_state(variance);
+                let frame: i64 = nova_frame_variance_state_frame(state);
+                return frame;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::StructLiteral { type_name, .. },
+                ..
+            } => ty.render() == "NovaFrameVarianceState" && type_name == "NovaFrameVarianceState",
+            _ => false,
+        }));
+    }
+
+    #[test]
     fn lowers_nova_pass_state_contract() {
         let module = parse_nuis_module(
             r#"
@@ -15737,6 +15916,7 @@ mod tests {
                 let power: NovaPowerPacket = nova_power_packet(3, 2, 1, 1, 6);
                 let latency: NovaLatencyPacket = nova_latency_packet(3, 4, 2, 1, 7);
                 let frame_pacing: NovaFramePacingPacket = nova_frame_pacing_packet(3, 4, 1, 1, 7);
+                let frame_variance: NovaFrameVariancePacket = nova_frame_variance_packet(3, 2, 1, 4, 7);
                 let jank: NovaJankPacket = nova_jank_packet(3, 2, 1, 4, 7);
                 let pass: NovaPassPacket = nova_pass_packet(1, 8, 4, 2);
                 let frame: NovaFramePacket = nova_frame_packet(7, 1, 1, 9);
@@ -15812,6 +15992,7 @@ mod tests {
                   power,
                   latency,
                   frame_pacing,
+                  frame_variance,
                   jank,
                   pass,
                   frame,

@@ -1,0 +1,20 @@
+mod cpu Main {
+  fn main() {
+    let theme: NovaThemePacket = nova_theme_packet(96, 48, 1, 12);
+    let surface: NovaSurfacePacket = nova_surface_packet(12, 48, 1, 96);
+    let viewport: NovaViewportPacket = nova_viewport_packet(2, 3, 64, 24);
+    let layer: NovaLayerPacket = nova_layer_packet(1, 1, 0, 4);
+
+    let theme_state: NovaThemeState = nova_theme_state(theme);
+    let surface_state: NovaSurfaceState = nova_surface_state(surface);
+    let viewport_state: NovaViewportState = nova_viewport_state(viewport);
+    let layer_state: NovaLayerState = nova_layer_state(layer);
+
+    let accent: i64 = nova_theme_state_accent(theme_state);
+    let surface_density: i64 = nova_surface_state_density(surface_state);
+    let viewport_width: i64 = nova_viewport_state_width(viewport_state);
+    let layer_visibility: i64 = nova_layer_state_visibility(layer_state);
+
+    print(accent + surface_density + viewport_width + layer_visibility);
+  }
+}

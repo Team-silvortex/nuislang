@@ -1,0 +1,57 @@
+mod cpu Main {
+  fn main() {
+    let scene: NovaScenePacket = nova_scene_packet(7, 2, 3, 1);
+    let camera: NovaCameraPacket = nova_camera_packet(1, 2, 12, 48);
+    let material: NovaMaterialPacket = nova_material_packet(1, 84, 12, 48);
+    let light: NovaLightPacket = nova_light_packet(1, 12, 48, 84);
+    let mesh: NovaMeshPacket = nova_mesh_packet(1, 12, 48, 84);
+    let transform: NovaTransformPacket = nova_transform_packet(12, 1, 48, 2);
+    let node: NovaNodePacket = nova_node_packet(2, 1, 84, 3);
+    let link: NovaSceneLinkPacket = nova_scene_link_packet(2, 12, 48, 84, 1, 0);
+    let graph: NovaSceneGraphPacket = nova_scene_graph_packet(2, 6, 3, 3, 1);
+    let cluster: NovaSceneClusterPacket = nova_scene_cluster_packet(2, 6, 3, 84, 1);
+    let visibility: NovaVisibilityPacket = nova_visibility_packet(3, 5, 1, 2, 7);
+    let cull: NovaCullPacket = nova_cull_packet(3, 4, 1, 2, 7);
+    let lod: NovaLodPacket = nova_lod_packet(3, 4, 1, 48, 84);
+    let streaming: NovaStreamingPacket = nova_streaming_packet(3, 2, 1, 2, 84);
+    let budget: NovaBudgetPacket = nova_budget_packet(3, 12, 2, 48, 1);
+
+    let scene_state: NovaSceneState = nova_scene_state(scene);
+    let camera_state: NovaCameraState = nova_camera_state(camera);
+    let material_state: NovaMaterialState = nova_material_state(material);
+    let light_state: NovaLightState = nova_light_state(light);
+    let mesh_state: NovaMeshState = nova_mesh_state(mesh);
+    let transform_state: NovaTransformState = nova_transform_state(transform);
+    let node_state: NovaNodeState = nova_node_state(node);
+    let link_state: NovaSceneLinkState = nova_scene_link_state(link);
+    let graph_state: NovaSceneGraphState = nova_scene_graph_state(graph);
+    let cluster_state: NovaSceneClusterState = nova_scene_cluster_state(cluster);
+    let visibility_state: NovaVisibilityState = nova_visibility_state(visibility);
+    let cull_state: NovaCullState = nova_cull_state(cull);
+    let lod_state: NovaLodState = nova_lod_state(lod);
+    let streaming_state: NovaStreamingState = nova_streaming_state(streaming);
+    let budget_state: NovaBudgetState = nova_budget_state(budget);
+
+    let scene_root: i64 = nova_scene_state_root_count(scene_state);
+    let camera_focus: i64 = nova_camera_state_focus(camera_state);
+    let material_shader: i64 = nova_material_state_shader_kind(material_state);
+    let light_range: i64 = nova_light_state_range(light_state);
+    let mesh_vertices: i64 = nova_mesh_state_vertex_count(mesh_state);
+    let transform_scale: i64 = nova_transform_state_scale(transform_state);
+    let node_depth: i64 = nova_node_state_depth(node_state);
+    let link_material: i64 = nova_scene_link_state_material(link_state);
+    let graph_nodes: i64 = nova_scene_graph_state_nodes(graph_state);
+    let cluster_budget: i64 = nova_scene_cluster_state_budget(cluster_state);
+    let visible: i64 = nova_visibility_state_visible(visibility_state);
+    let kept: i64 = nova_cull_state_kept(cull_state);
+    let active_lod: i64 = nova_lod_state_active(lod_state);
+    let resident: i64 = nova_streaming_state_resident(streaming_state);
+    let total_budget: i64 = nova_budget_state_total(budget_state);
+
+    print(
+      scene_root + camera_focus + material_shader + light_range + mesh_vertices +
+      transform_scale + node_depth + link_material + graph_nodes + cluster_budget +
+      visible + kept + active_lod + resident + total_budget
+    );
+  }
+}

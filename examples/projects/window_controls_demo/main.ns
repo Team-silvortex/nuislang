@@ -110,6 +110,8 @@ mod cpu Main {
       nova_latency_packet(3, 4 + panel_toggle_state, 2 + panel_toggle_state, panel_toggle_state, 7);
     let panel_frame_pacing: NovaFramePacingPacket =
       nova_frame_pacing_packet(3, 4 + panel_toggle_state, panel_toggle_state, panel_toggle_state, 7);
+    let panel_frame_variance: NovaFrameVariancePacket =
+      nova_frame_variance_packet(3, 2 + panel_toggle_state, panel_toggle_state, 4 + speed_delta, 7);
     let panel_jank: NovaJankPacket =
       nova_jank_packet(3, 1 + panel_toggle_state, speed_delta, 4 + panel_toggle_state, 7);
     let panel_pass: NovaPassPacket =
@@ -335,6 +337,10 @@ mod cpu Main {
       nova_frame_pacing_state(panel_frame_pacing);
     let panel_frame_pacing_cadence: i64 =
       nova_frame_pacing_state_cadence(frame_pacing_state);
+    let frame_variance_state: NovaFrameVarianceState =
+      nova_frame_variance_state(panel_frame_variance);
+    let panel_frame_variance_frame: i64 =
+      nova_frame_variance_state_frame(frame_variance_state);
     let jank_state: NovaJankState =
       nova_jank_state(panel_jank);
     let panel_jank_spikes: i64 =
@@ -482,6 +488,7 @@ mod cpu Main {
       + panel_power_level
       + panel_latency_frame
       + panel_frame_pacing_cadence
+      + panel_frame_variance_frame
       + panel_jank_spikes
       + panel_pass_samples
       + panel_frame_exposure
@@ -562,6 +569,7 @@ mod cpu Main {
       panel_power,
       panel_latency,
       panel_frame_pacing,
+      panel_frame_variance,
       panel_jank,
       panel_pass,
       panel_frame,

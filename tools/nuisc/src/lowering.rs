@@ -1619,6 +1619,26 @@ fn lower_expr(
                 push_dep_edges(state, toggle_name, &frame_pacing_struct);
                 panel_group_nodes.push(frame_pacing_struct.clone());
 
+                let frame_variance_struct = next_name(state, "nova_panel_frame_variance");
+                state.yir.nodes.push(Node {
+                    name: frame_variance_struct.clone(),
+                    resource: "cpu0".to_owned(),
+                    op: Operation {
+                        module: "cpu".to_owned(),
+                        instruction: "struct".to_owned(),
+                        args: vec![
+                            "NovaFrameVariancePacket".to_owned(),
+                            "cluster_slot=3".to_owned(),
+                            "frame_variance=2".to_owned(),
+                            format!("input_variance={toggle_name}"),
+                            "burst_mode=4".to_owned(),
+                            "variance_mask=7".to_owned(),
+                        ],
+                    },
+                });
+                push_dep_edges(state, toggle_name, &frame_variance_struct);
+                panel_group_nodes.push(frame_variance_struct.clone());
+
                 let jank_struct = next_name(state, "nova_panel_jank");
                 state.yir.nodes.push(Node {
                     name: jank_struct.clone(),
@@ -2219,6 +2239,7 @@ fn lower_expr(
                     format!("scene_power={power_struct}"),
                     format!("scene_latency={latency_struct}"),
                     format!("scene_frame_pacing={frame_pacing_struct}"),
+                    format!("scene_frame_variance={frame_variance_struct}"),
                     format!("scene_jank={jank_struct}"),
                     format!("pass={pass_struct}"),
                     format!("frame={frame_struct}"),

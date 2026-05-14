@@ -1,0 +1,61 @@
+mod cpu Main {
+  fn main() {
+    let cluster: NovaSceneClusterPacket = nova_scene_cluster_packet(2, 6, 3, 84, 1);
+    let visibility: NovaVisibilityPacket = nova_visibility_packet(3, 5, 1, 2, 7);
+    let cull: NovaCullPacket = nova_cull_packet(3, 4, 1, 2, 7);
+    let lod: NovaLodPacket = nova_lod_packet(3, 4, 1, 48, 84);
+    let streaming: NovaStreamingPacket = nova_streaming_packet(3, 2, 1, 2, 84);
+    let residency: NovaResidencyPacket = nova_residency_packet(3, 2, 1, 48, 7);
+    let eviction: NovaEvictionPacket = nova_eviction_packet(3, 1, 1, 2, 6);
+    let prefetch: NovaPrefetchPacket = nova_prefetch_packet(3, 2, 1, 2, 5);
+    let budget: NovaBudgetPacket = nova_budget_packet(3, 12, 2, 48, 1);
+    let pressure: NovaPressurePacket = nova_pressure_packet(3, 2, 48, 1, 6);
+    let thermal: NovaThermalPacket = nova_thermal_packet(3, 2, 1, 1, 6);
+    let power: NovaPowerPacket = nova_power_packet(3, 2, 1, 1, 6);
+    let latency: NovaLatencyPacket = nova_latency_packet(3, 4, 2, 1, 7);
+    let frame_pacing: NovaFramePacingPacket = nova_frame_pacing_packet(3, 4, 1, 1, 7);
+    let frame_variance: NovaFrameVariancePacket = nova_frame_variance_packet(3, 2, 1, 4, 7);
+    let jank: NovaJankPacket = nova_jank_packet(3, 1, 2, 4, 7);
+
+    let cluster_state: NovaSceneClusterState = nova_scene_cluster_state(cluster);
+    let visibility_state: NovaVisibilityState = nova_visibility_state(visibility);
+    let cull_state: NovaCullState = nova_cull_state(cull);
+    let lod_state: NovaLodState = nova_lod_state(lod);
+    let streaming_state: NovaStreamingState = nova_streaming_state(streaming);
+    let residency_state: NovaResidencyState = nova_residency_state(residency);
+    let eviction_state: NovaEvictionState = nova_eviction_state(eviction);
+    let prefetch_state: NovaPrefetchState = nova_prefetch_state(prefetch);
+    let budget_state: NovaBudgetState = nova_budget_state(budget);
+    let pressure_state: NovaPressureState = nova_pressure_state(pressure);
+    let thermal_state: NovaThermalState = nova_thermal_state(thermal);
+    let power_state: NovaPowerState = nova_power_state(power);
+    let latency_state: NovaLatencyState = nova_latency_state(latency);
+    let frame_pacing_state: NovaFramePacingState = nova_frame_pacing_state(frame_pacing);
+    let frame_variance_state: NovaFrameVarianceState =
+      nova_frame_variance_state(frame_variance);
+    let jank_state: NovaJankState = nova_jank_state(jank);
+
+    let cluster_budget: i64 = nova_scene_cluster_state_budget(cluster_state);
+    let visible: i64 = nova_visibility_state_visible(visibility_state);
+    let kept: i64 = nova_cull_state_kept(cull_state);
+    let active_lod: i64 = nova_lod_state_active(lod_state);
+    let resident: i64 = nova_streaming_state_resident(streaming_state);
+    let committed: i64 = nova_residency_state_committed(residency_state);
+    let evicted: i64 = nova_eviction_state_evicted(eviction_state);
+    let requested: i64 = nova_prefetch_state_requested(prefetch_state);
+    let total_budget: i64 = nova_budget_state_total(budget_state);
+    let pressure_level: i64 = nova_pressure_state_level(pressure_state);
+    let thermal_level: i64 = nova_thermal_state_level(thermal_state);
+    let power_level: i64 = nova_power_state_level(power_state);
+    let frame_latency: i64 = nova_latency_state_frame(latency_state);
+    let cadence: i64 = nova_frame_pacing_state_cadence(frame_pacing_state);
+    let frame_burst: i64 = nova_frame_variance_state_frame(frame_variance_state);
+    let spikes: i64 = nova_jank_state_spikes(jank_state);
+
+    print(
+      cluster_budget + visible + kept + active_lod + resident + committed +
+      evicted + requested + total_budget + pressure_level + thermal_level +
+      power_level + frame_latency + cadence + frame_burst + spikes
+    );
+  }
+}

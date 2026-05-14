@@ -3402,6 +3402,19 @@ fn draw_scene_preview(
         preview_top.saturating_add(17),
         &frame_pacing_label,
     );
+    let frame_variance_label = format!(
+        "fv{} f{} i{} b{}",
+        packet.frame_variance_cluster_slot,
+        packet.frame_variance_frame,
+        packet.frame_variance_input,
+        packet.frame_variance_burst
+    );
+    put_text(
+        rows,
+        preview_left,
+        preview_top.saturating_add(18),
+        &frame_variance_label,
+    );
     let jank_label = format!(
         "jk{} s{} v{} r{}",
         packet.jank_cluster_slot, packet.jank_spikes, packet.jank_severity, packet.jank_recovery
@@ -3409,7 +3422,7 @@ fn draw_scene_preview(
     put_text(
         rows,
         preview_left,
-        preview_top.saturating_add(18),
+        preview_top.saturating_add(19),
         &jank_label,
     );
     let latency_label = format!(
@@ -3883,9 +3896,44 @@ fn draw_scene_preview(
         stamp_line(rows, latency_root_x, latency_root_y, fx, fy, connector);
     }
 
+    let frame_variance_span = packet.frame_variance_frame.clamp(1, 4) as usize;
+    let frame_variance_root_x = preview_left
+        .saturating_add(99 + packet.frame_variance_cluster_slot.rem_euclid(4) as usize)
+        .min(preview_right.saturating_sub(1));
+    let frame_variance_root_y = root_y.saturating_add(1).min(ground_y.saturating_sub(1));
+    for idx in 0..frame_variance_span {
+        let vx = (frame_variance_root_x + idx * 2).min(preview_right.saturating_sub(1));
+        let vy = (frame_variance_root_y + idx.rem_euclid(2)).min(ground_y.saturating_sub(1));
+        let glyph = match (packet.frame_variance_mask + idx as i64).rem_euclid(4) {
+            0 => 'v',
+            1 => 'V',
+            2 => '/',
+            _ => '!',
+        };
+        if let Some(row) = rows.get_mut(vy) {
+            let slot = vx.min(row.len().saturating_sub(1));
+            if let Some(cell) = row.get_mut(slot) {
+                *cell = glyph;
+            }
+        }
+        let connector = if packet.frame_variance_burst != 0 {
+            '/'
+        } else {
+            ':'
+        };
+        stamp_line(
+            rows,
+            frame_pacing_root_x,
+            frame_pacing_root_y,
+            vx,
+            vy,
+            connector,
+        );
+    }
+
     let jank_span = packet.jank_spikes.clamp(1, 4) as usize;
     let jank_root_x = preview_left
-        .saturating_add(102 + packet.jank_cluster_slot.rem_euclid(4) as usize)
+        .saturating_add(105 + packet.jank_cluster_slot.rem_euclid(4) as usize)
         .min(preview_right.saturating_sub(1));
     let jank_root_y = root_y.saturating_add(2).min(ground_y.saturating_sub(1));
     for idx in 0..jank_span {
@@ -3906,8 +3954,8 @@ fn draw_scene_preview(
         let connector = if packet.jank_recovery != 0 { '^' } else { ':' };
         stamp_line(
             rows,
-            frame_pacing_root_x,
-            frame_pacing_root_y,
+            frame_variance_root_x,
+            frame_variance_root_y,
             jx,
             jy,
             connector,
@@ -4073,6 +4121,11 @@ struct BallPacket {
     frame_pacing_variance: i64,
     frame_pacing_vsync_mode: i64,
     frame_pacing_mask: i64,
+    frame_variance_cluster_slot: i64,
+    frame_variance_frame: i64,
+    frame_variance_input: i64,
+    frame_variance_burst: i64,
+    frame_variance_mask: i64,
     jank_cluster_slot: i64,
     jank_spikes: i64,
     jank_severity: i64,
@@ -4394,6 +4447,11 @@ fn parse_ball_packet(value: &Value, op: &str) -> Result<BallPacket, String> {
                 frame_pacing_variance: speed.round() as i64 % 2,
                 frame_pacing_vsync_mode: speed.round() as i64 % 2,
                 frame_pacing_mask: 7,
+                frame_variance_cluster_slot: 3,
+                frame_variance_frame: 2,
+                frame_variance_input: speed.round() as i64 % 2,
+                frame_variance_burst: 4,
+                frame_variance_mask: 7,
                 jank_cluster_slot: 3,
                 jank_spikes: 1 + speed.round() as i64 % 2,
                 jank_severity: speed.round() as i64 % 3,
@@ -5486,6 +5544,51 @@ fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket
     .map(|value| scalar_to_color_key(value, op))
     .transpose()?
     .unwrap_or(latency_mask);
+    let frame_variance_cluster_slot = find_packet_field(
+        packet,
+        &["cluster_slot"],
+        &["scene_frame_variance"],
+        &["cluster_slot"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(frame_pacing_cluster_slot);
+    let frame_variance_frame = find_packet_field(
+        packet,
+        &["frame_variance"],
+        &["scene_frame_variance"],
+        &["frame_variance"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(frame_pacing_variance.max(1));
+    let frame_variance_input = find_packet_field(
+        packet,
+        &["input_variance"],
+        &["scene_frame_variance"],
+        &["input_variance"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(latency_input);
+    let frame_variance_burst = find_packet_field(
+        packet,
+        &["burst_mode"],
+        &["scene_frame_variance"],
+        &["burst_mode"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(frame_pacing_cadence);
+    let frame_variance_mask = find_packet_field(
+        packet,
+        &["variance_mask"],
+        &["scene_frame_variance"],
+        &["variance_mask"],
+    )
+    .map(|value| scalar_to_color_key(value, op))
+    .transpose()?
+    .unwrap_or(frame_pacing_mask);
     let jank_cluster_slot = find_packet_field(
         packet,
         &["cluster_slot"],
@@ -5494,23 +5597,23 @@ fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket
     )
     .map(|value| scalar_to_color_key(value, op))
     .transpose()?
-    .unwrap_or(frame_pacing_cluster_slot);
+    .unwrap_or(frame_variance_cluster_slot);
     let jank_spikes = find_packet_field(packet, &["spikes"], &["scene_jank"], &["spikes"])
         .map(|value| scalar_to_color_key(value, op))
         .transpose()?
-        .unwrap_or(1 + frame_pacing_variance.rem_euclid(2));
+        .unwrap_or(1 + frame_variance_frame.rem_euclid(2));
     let jank_severity = find_packet_field(packet, &["severity"], &["scene_jank"], &["severity"])
         .map(|value| scalar_to_color_key(value, op))
         .transpose()?
-        .unwrap_or(frame_pacing_variance);
+        .unwrap_or(frame_variance_frame);
     let jank_recovery = find_packet_field(packet, &["recovery"], &["scene_jank"], &["recovery"])
         .map(|value| scalar_to_color_key(value, op))
         .transpose()?
-        .unwrap_or(frame_pacing_cadence);
+        .unwrap_or(frame_variance_burst);
     let jank_mask = find_packet_field(packet, &["jank_mask"], &["scene_jank"], &["jank_mask"])
         .map(|value| scalar_to_color_key(value, op))
         .transpose()?
-        .unwrap_or(frame_pacing_mask);
+        .unwrap_or(frame_variance_mask);
     let pass_stage = find_packet_field(packet, &["stage"], &["pass"], &["stage"])
         .map(|value| scalar_to_color_key(value, op))
         .transpose()?
@@ -6435,6 +6538,11 @@ fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket
         frame_pacing_variance,
         frame_pacing_vsync_mode,
         frame_pacing_mask,
+        frame_variance_cluster_slot,
+        frame_variance_frame,
+        frame_variance_input,
+        frame_variance_burst,
+        frame_variance_mask,
         jank_cluster_slot,
         jank_spikes,
         jank_severity,
