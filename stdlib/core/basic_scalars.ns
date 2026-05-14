@@ -1,0 +1,26 @@
+mod cpu Main {
+  struct ScalarPair {
+    lhs: i64,
+    rhs: i64
+  }
+
+  fn build_pair(base: i64, delta: i64) -> ScalarPair {
+    return ScalarPair {
+      lhs: base,
+      rhs: base + delta
+    };
+  }
+
+  fn pair_sum(pair: ScalarPair) -> i64 {
+    return pair.lhs + pair.rhs;
+  }
+
+  fn summarize_scalars(base: i64, delta: i64) -> i64 {
+    let pair: ScalarPair = build_pair(base, delta);
+    return pair_sum(pair) + delta;
+  }
+
+  fn main() {
+    print(summarize_scalars(12, 5));
+  }
+}

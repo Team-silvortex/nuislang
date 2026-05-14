@@ -1,12 +1,13 @@
 ---
 
-# YIR Reference Index
+# YIR Reference Overview
 
 ## Draft Reference v0.01
 
 ---
 
-The current `YIR` reference is split into two working documents:
+The current `YIR` reference is split into two working documents plus this
+overview:
 
 * [YIR LangRef](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-langref.md)
 * [YIR Tools Reference](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-tools-reference.md)
@@ -17,6 +18,8 @@ This split is intentional:
   verifier-visible semantics
 * `YIR Tools Reference` tracks current reference executors, LLVM lowering, AOT
   packaging, and preview/export tooling
+* this file is the index and role map for those two references, not a second
+  full specification layer
 
 Both documents are expected to evolve together with the implementation.
 

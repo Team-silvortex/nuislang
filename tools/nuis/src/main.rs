@@ -851,48 +851,64 @@ fn handle_galaxy(command: cli::GalaxyCommand) -> Result<(), String> {
 fn print_help() {
     println!("nuis toolchain frontdoor");
     println!("usage:");
-    println!("  nuis status");
-    println!("  nuis registry");
-    println!("  nuis fmt [input.ns|project-dir|nuis.toml]");
-    println!("  nuis bindings <input.ns|project-dir|nuis.toml>");
-    println!("  nuis check [input.ns|project-dir|nuis.toml]");
+    println!();
+    println!("  general:");
+    println!("    nuis status");
+    println!("    nuis registry");
+    println!("    nuis fmt [input.ns|project-dir|nuis.toml]");
+    println!("    nuis bindings <input.ns|project-dir|nuis.toml>");
+    println!();
+    println!("  build and inspect:");
+    println!("    nuis check [input.ns|project-dir|nuis.toml]");
     println!(
-        "  nuis build [--verbose-cache] [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] <output-dir>"
+        "    nuis build [--verbose-cache] [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] <output-dir>"
     );
-    println!("  nuis dump-ast [input.ns|project-dir|nuis.toml]");
-    println!("  nuis dump-nir [input.ns|project-dir|nuis.toml]");
-    println!("  nuis dump-yir [input.ns|project-dir|nuis.toml]");
-    println!("  nuis pack-nustar <package-id> <output.nustar>");
-    println!("  nuis inspect-nustar <input.nustar>");
-    println!("  nuis loader-contract <package-id>");
-    println!("  nuis verify-build-manifest <nuis.build.manifest.toml>");
+    println!("    nuis dump-ast [input.ns|project-dir|nuis.toml]");
+    println!("    nuis dump-nir [input.ns|project-dir|nuis.toml]");
+    println!("    nuis dump-yir [input.ns|project-dir|nuis.toml]");
+    println!("    nuis verify-build-manifest <nuis.build.manifest.toml>");
+    println!();
+    println!("  project workflow:");
+    println!("    nuis project-doctor [project-dir|nuis.toml]");
+    println!("    nuis project-status [project-dir|nuis.toml]");
+    println!("    nuis project-lock-abi [project-dir|nuis.toml]");
+    println!();
+    println!("  cache:");
     println!(
-        "  nuis cache-status [--all] [--verbose-cache] [--json] [input.ns|project-dir|nuis.toml]"
+        "    nuis cache-status [--all] [--verbose-cache] [--json] [input.ns|project-dir|nuis.toml]"
     );
-    println!("  nuis clean-cache [--all] [--json] [input.ns|project-dir|nuis.toml]");
-    println!("  nuis cache-prune [--all] [--keep N] [--json] [input.ns|project-dir|nuis.toml]");
+    println!("    nuis clean-cache [--all] [--json] [input.ns|project-dir|nuis.toml]");
     println!(
-        "  nuis release-check [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] [output-dir]"
+        "    nuis cache-prune [--all] [--keep N] [--json] [input.ns|project-dir|nuis.toml]"
     );
-    println!("  nuis rc <status|start|stop|track|projects|versions> [...]");
-    println!("  nuis project-status [project-dir|nuis.toml]");
-    println!("  nuis project-doctor [project-dir|nuis.toml]");
-    println!("  nuis project-lock-abi [project-dir|nuis.toml]");
-    println!("  nuis galaxy init [project-dir] [--framework <name>]");
-    println!("  nuis galaxy check [project-dir|galaxy.toml]");
-    println!("  nuis galaxy pack [project-dir|galaxy.toml] [output.galaxy]");
-    println!("  nuis galaxy inspect <input.galaxy>");
-    println!("  nuis galaxy publish-local [project-dir|galaxy.toml] [output.galaxy]");
-    println!("  nuis galaxy list");
-    println!("  nuis galaxy install-local <name> [version] [output-dir]");
-    println!("  nuis galaxy install-deps [project-dir|nuis.toml]");
-    println!("  nuis galaxy doctor [project-dir|nuis.toml]");
-    println!("  nuis galaxy sync-deps [project-dir|nuis.toml]");
-    println!("  nuis galaxy lock-deps [project-dir|nuis.toml]");
-    println!("  nuis galaxy verify-lock [project-dir|nuis.toml]");
-    println!("  nuis galaxy inspect-local <name> [version]");
-    println!("  nuis galaxy verify-local <name> [version]");
-    println!("  nuis galaxy remove-local <name> [version]");
+    println!();
+    println!("  release and package:");
+    println!(
+        "    nuis release-check [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] [output-dir]"
+    );
+    println!("    nuis pack-nustar <package-id> <output.nustar>");
+    println!("    nuis inspect-nustar <input.nustar>");
+    println!("    nuis loader-contract <package-id>");
+    println!();
+    println!("  galaxy and framework projects:");
+    println!("    nuis galaxy init [project-dir] [--framework <name>]");
+    println!("    nuis galaxy check [project-dir|galaxy.toml]");
+    println!("    nuis galaxy doctor [project-dir|nuis.toml]");
+    println!("    nuis galaxy lock-deps [project-dir|nuis.toml]");
+    println!("    nuis galaxy sync-deps [project-dir|nuis.toml]");
+    println!("    nuis galaxy verify-lock [project-dir|nuis.toml]");
+    println!("    nuis galaxy install-deps [project-dir|nuis.toml]");
+    println!("    nuis galaxy pack [project-dir|galaxy.toml] [output.galaxy]");
+    println!("    nuis galaxy inspect <input.galaxy>");
+    println!("    nuis galaxy publish-local [project-dir|galaxy.toml] [output.galaxy]");
+    println!("    nuis galaxy list");
+    println!("    nuis galaxy install-local <name> [version] [output-dir]");
+    println!("    nuis galaxy inspect-local <name> [version]");
+    println!("    nuis galaxy verify-local <name> [version]");
+    println!("    nuis galaxy remove-local <name> [version]");
+    println!();
+    println!("  other:");
+    println!("    nuis rc <status|start|stop|track|projects|versions> [...]");
 }
 
 fn run_nuis_rc(args: &[String]) -> Result<(), String> {
@@ -1021,8 +1037,8 @@ mod tests {
             .expect("repo root")
     }
 
-    fn load_ns_nova_source_modules(root: &Path) -> Vec<String> {
-        let module_path = root.join("stdlib/ns-nova/module.toml");
+    fn load_stdlib_source_modules(root: &Path, module_dir: &str) -> Vec<String> {
+        let module_path = root.join("stdlib").join(module_dir).join("module.toml");
         let source = fs::read_to_string(&module_path)
             .unwrap_or_else(|error| panic!("{}: {error}", module_path.display()));
         let mut inside = false;
@@ -1044,7 +1060,7 @@ mod tests {
             }
             let entry = entry.trim_matches('"');
             if !entry.is_empty() {
-                modules.push(format!("stdlib/ns-nova/{entry}"));
+                modules.push(format!("stdlib/{module_dir}/{entry}"));
             }
         }
         assert!(
@@ -1056,17 +1072,19 @@ mod tests {
     }
 
     #[test]
-    fn checks_ns_nova_stdlib_source_modules() {
+    fn checks_stdlib_source_modules() {
         std::thread::Builder::new()
             .name("nuis-stdlib-smoke".to_owned())
             .stack_size(64 * 1024 * 1024)
             .spawn(|| {
                 let root = repo_root();
-                for relative in load_ns_nova_source_modules(&root) {
-                    let input = root.join(relative);
-                    handle_check(input.clone()).unwrap_or_else(|error| {
-                        panic!("failed to check {}: {error}", input.display())
-                    });
+                for module_dir in ["core", "std", "ns-nova"] {
+                    for relative in load_stdlib_source_modules(&root, module_dir) {
+                        let input = root.join(relative);
+                        handle_check(input.clone()).unwrap_or_else(|error| {
+                            panic!("failed to check {}: {error}", input.display())
+                        });
+                    }
                 }
             })
             .expect("spawn stdlib smoke thread")

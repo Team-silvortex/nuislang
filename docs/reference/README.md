@@ -1,0 +1,43 @@
+# Reference Docs
+
+This folder is the current implementation-facing reference layer.
+
+If you want to understand what is true in the repository today, this is usually
+the best documentation layer to read first after the top-level
+[README.md](/Users/Shared/chroot/dev/nuislang/README.md).
+
+## Reading Order
+
+Start in this order:
+
+* [yir-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-reference.md)
+  overview/index for the current `YIR` reference set
+* [yir-langref.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-langref.md)
+  graph meaning, execution semantics, domain families, and verifier-visible
+  rules
+* [yir-tools-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-tools-reference.md)
+  workflow commands, compiler/tool boundaries, packaging, cache, and inspection
+  behavior
+
+If your question is specifically “what command should I run next for this
+project?”, start with
+[yir-tools-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-tools-reference.md).
+
+## Boundary
+
+Use this folder for:
+
+* current semantic behavior
+* current tool behavior
+* current workflow and packaging surfaces
+
+Do not treat this folder as:
+
+* the handwritten grammar source of truth
+* long-range architecture argument
+* historical archive
+
+For those, see:
+
+* [docs/grammar/README.md](/Users/Shared/chroot/dev/nuislang/docs/grammar/README.md)
+* [docs/historical/README.md](/Users/Shared/chroot/dev/nuislang/docs/historical/README.md)

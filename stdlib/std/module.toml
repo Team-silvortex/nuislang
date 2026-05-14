@@ -12,3 +12,9 @@ surfaces = [
   "project-utility-surfaces"
 ]
 
+source_modules = [
+  "window_runtime.ns",
+  "pipe_runtime.ns",
+  "fabric_runtime.ns",
+  "handle_table_runtime.ns"
+]

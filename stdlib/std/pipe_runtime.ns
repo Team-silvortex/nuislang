@@ -1,0 +1,31 @@
+mod cpu Main {
+  struct PipeSummary {
+    source: i64,
+    roundtrip: i64,
+    frozen_slot: i64
+  }
+
+  fn build_pipe_summary(source: i64) -> PipeSummary {
+    data_bind_core(1);
+    let handles: HandleTable = data_handle_table("host=cpu0", "fabric=fabric0");
+    let pipe: Pipe<i64> = data_output_pipe(source);
+    let roundtrip: i64 = data_input_pipe(pipe);
+    let ready: Marker = data_marker("std_pipe_ready");
+    let view: Window<i64> = data_immutable_window(source, 0, 1);
+
+    return PipeSummary {
+      source: source,
+      roundtrip: roundtrip,
+      frozen_slot: data_read_window(view, 0)
+    };
+  }
+
+  fn summarize_pipe_runtime(source: i64) -> i64 {
+    let summary: PipeSummary = build_pipe_summary(source);
+    return summary.source + summary.roundtrip + summary.frozen_slot;
+  }
+
+  fn main() {
+    print(summarize_pipe_runtime(42));
+  }
+}

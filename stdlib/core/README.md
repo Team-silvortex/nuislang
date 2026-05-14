@@ -2,6 +2,15 @@
 
 `core` is the smallest stable layer of the `nuis` standard library.
 
+## Current Status
+
+At the current repository stage, `core` is still mostly a layout/contract
+layer, but it now also has its first small checked-in `.ns` source set.
+
+That is intentional: the layer is still small and conservative, but we have now
+started checking in the first canonical source modules for simple scalar and
+struct patterns.
+
 Intended scope:
 
 * primitive source-level value vocabulary
@@ -21,7 +30,18 @@ Planned direction:
 * stable struct/result/option-like source patterns once the frontend library/import model settles
 * the lowest shared contracts for CPU/data/shader/kernel-facing source code
 
+First source modules:
+
+* [basic_scalars.ns](/Users/Shared/chroot/dev/nuislang/stdlib/core/basic_scalars.ns)
+* [struct_patterns.ns](/Users/Shared/chroot/dev/nuislang/stdlib/core/struct_patterns.ns)
+* [math_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/core/math_runtime.ns)
+* [ref_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/core/ref_runtime.ns)
+
+What is not true yet:
+
+* `core` is not yet a populated importable source module tree
+* `core` is still intentionally much thinner than `ns-nova`
+
 See metadata:
 
 * [module.toml](/Users/Shared/chroot/dev/nuislang/stdlib/core/module.toml)
-

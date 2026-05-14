@@ -12,3 +12,9 @@ surfaces = [
   "prelude.structural-source-contracts"
 ]
 
+source_modules = [
+  "basic_scalars.ns",
+  "struct_patterns.ns",
+  "math_runtime.ns",
+  "ref_runtime.ns"
+]

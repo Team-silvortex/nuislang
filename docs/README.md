@@ -13,9 +13,8 @@ The docs are currently split into two broad categories:
 
 If you want to understand the repository as it exists today, start here:
 
-* [reference/yir-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-reference.md)
-* [reference/yir-langref.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-langref.md)
-* [reference/yir-tools-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-tools-reference.md)
+* [reference/README.md](/Users/Shared/chroot/dev/nuislang/docs/reference/README.md)
+* [repo-layout.md](/Users/Shared/chroot/dev/nuislang/docs/repo-layout.md)
 
 Those files are the closest to “current implementation truth”.
 
@@ -23,9 +22,7 @@ Those files are the closest to “current implementation truth”.
 
 Use these when you want parser/frontend context:
 
-* [grammar/nuislang.bnf](/Users/Shared/chroot/dev/nuislang/docs/grammar/nuislang.bnf)
-* [grammar/nuis.pest](/Users/Shared/chroot/dev/nuislang/docs/grammar/nuis.pest)
-* [grammar/nuis-ir.md](/Users/Shared/chroot/dev/nuislang/docs/grammar/nuis-ir.md)
+* [grammar/README.md](/Users/Shared/chroot/dev/nuislang/docs/grammar/README.md)
 
 ## Design / Spec Direction
 

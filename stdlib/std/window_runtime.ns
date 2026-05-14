@@ -1,0 +1,31 @@
+mod cpu Main {
+  struct PackedTriple {
+    first: i64,
+    second: i64,
+    third: i64
+  }
+
+  fn pack_triple(first: i64, second: i64, third: i64) -> PackedTriple {
+    let backing: ref Buffer = alloc_buffer(3, 0);
+    let copy: WindowMut<i64> = data_copy_window(backing, 0, 3);
+    let copy_first: WindowMut<i64> = data_write_window(copy, 0, first);
+    let copy_second: WindowMut<i64> = data_write_window(copy_first, 1, second);
+    let copy_third: WindowMut<i64> = data_write_window(copy_second, 2, third);
+    let frozen: Window<i64> = data_freeze_window(copy_third);
+
+    return PackedTriple {
+      first: data_read_window(frozen, 0),
+      second: data_read_window(frozen, 1),
+      third: data_read_window(frozen, 2)
+    };
+  }
+
+  fn summarize_packed_triple(first: i64, second: i64, third: i64) -> i64 {
+    let packed: PackedTriple = pack_triple(first, second, third);
+    return packed.first + packed.second + packed.third;
+  }
+
+  fn main() {
+    print(summarize_packed_triple(9, 18, 27));
+  }
+}

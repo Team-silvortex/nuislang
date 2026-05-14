@@ -98,14 +98,21 @@ These examples are intentionally supposed to fail.
 * [data_invalid_move_window.yir](/Users/Shared/chroot/dev/nuislang/examples/invalid/yir/data_invalid_move_window.yir)
 * [data_move_source_reuse_invalid.yir](/Users/Shared/chroot/dev/nuislang/examples/invalid/yir/data_move_source_reuse_invalid.yir)
 
-## Legacy Names Kept For Continuity
+## Historical Bridge Examples
 
 These files still matter, but their names reflect older architecture wording.
 
 * [nsnova_ball_frame.yir](/Users/Shared/chroot/dev/nuislang/examples/legacy/nsnova_ball_frame.yir)
-  kept because it was an important bridge demo during the `ns-nova` discussion
+  historical bridge from early `ns-nova` naming into the current
+  `window_controls_demo` routes; prefer
+  [examples/ns/demos/window_controls_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/window_controls_demo.ns),
+  [examples/projects/window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo),
+  or [examples/yir/demos/window_controls_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/demos/window_controls_demo.yir)
 * [npu_tensor_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/legacy/npu_tensor_demo.yir)
-  kept as a historical bridge from older `npu` naming into the newer `kernel` surface
+  historical bridge from older `npu` naming into the newer `kernel` surface;
+  prefer [examples/yir/kernel/kernel_auto_broadcast_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/kernel/kernel_auto_broadcast_demo.yir),
+  [examples/yir/kernel/kernel_topk_axis_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/kernel/kernel_topk_axis_demo.yir),
+  or [examples/projects/kernel_tensor_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/kernel_tensor_demo)
 
 ## Output Bundles
 

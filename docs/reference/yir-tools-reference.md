@@ -60,6 +60,7 @@ Current reference commands:
 * `clean-cache [--all] [--json] [input]`
 * `cache-prune [--all] [--keep N] [--json] [input]`
 * `project-status <input.ns|project-dir|nuis.toml>`
+* `project-doctor <project-dir|nuis.toml>`
 * `project-lock-abi <project-dir|nuis.toml>`
 * `release-check <input> <output-dir>`
 * `check <input.ns>`
@@ -110,8 +111,65 @@ The front-door workflow is now project-aware:
 
 * `check`, `build`, `dump-ast`, `dump-nir`, `dump-yir`, `bindings`, and cache commands all accept single-file `.ns`, project directories, or direct `nuis.toml` inputs where applicable
 * `project-status` prints the resolved project graph, effective ABI mode, and per-domain ABI target details
+* `project-doctor` prints a higher-level health summary covering project ABI state, `galaxy.toml`, `nuis.galaxy.lock`, dependency materialization state, `ns-nova.toml`, and current `stdlib/ns-nova` source-asset visibility
 * `project-lock-abi` materializes the currently recommended host-matching ABI set into the project manifest
 * `verify-build-manifest` now reports CPU target metadata including ABI, machine arch/os, object format, calling ABI, clang triple, and cross-build flag
+
+### Recommended Project Management Flow
+
+For the current repository shape, the most useful front-door sequence is:
+
+```text
+project-doctor
+  -> project-status
+  -> project-lock-abi    (when ABI is still auto-resolved)
+  -> check
+  -> build
+```
+
+Read that as:
+
+* `project-doctor`
+  first health check; use this when you want to know whether a project is
+  missing `galaxy.toml`, `nuis.galaxy.lock`, synced deps, or `ns-nova`
+  framework metadata
+* `project-status`
+  structural and ABI-resolution view of the project itself
+* `project-lock-abi`
+  optional materialization step once you want the current host-matching ABI set
+  written into the manifest
+* `check`
+  semantic/project validation
+* `build`
+  artifact generation
+
+For framework/package-aware projects, the current companion `galaxy` flow is:
+
+```text
+galaxy init
+  -> galaxy check
+  -> galaxy lock-deps
+  -> galaxy sync-deps
+  -> project-doctor
+```
+
+Typical commands:
+
+```bash
+cargo run -p nuis -- project-doctor examples/projects/window_controls_demo
+cargo run -p nuis -- project-status examples/projects/window_controls_demo
+cargo run -p nuis -- project-lock-abi examples/projects/window_controls_demo
+
+cargo run -p nuis -- galaxy init examples/projects/window_controls_demo --framework ns-nova
+cargo run -p nuis -- galaxy check examples/projects/window_controls_demo
+cargo run -p nuis -- galaxy lock-deps examples/projects/window_controls_demo
+cargo run -p nuis -- galaxy sync-deps examples/projects/window_controls_demo
+```
+
+Important current distinction:
+
+* `project-*` commands answer “is this `nuis` project healthy and buildable?”
+* `galaxy *` commands answer “is this project packaged, locked, and dependency-synced as a shareable package/framework project?”
 
 ## Build Override Notes
 

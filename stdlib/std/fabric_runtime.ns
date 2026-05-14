@@ -1,0 +1,30 @@
+mod cpu Main {
+  struct FabricSummary {
+    source: i64,
+    roundtrip: i64,
+    tag: i64
+  }
+
+  fn build_fabric_summary(source: i64, tag: i64) -> FabricSummary {
+    data_bind_core(2);
+    let handles: HandleTable = data_handle_table("host=cpu0", "fabric=fabric0");
+    let ready: Marker = data_marker("std_fabric_ready");
+    let pipe: Pipe<i64> = data_output_pipe(source);
+    let roundtrip: i64 = data_input_pipe(pipe);
+
+    return FabricSummary {
+      source: source,
+      roundtrip: roundtrip,
+      tag: tag
+    };
+  }
+
+  fn summarize_fabric(source: i64, tag: i64) -> i64 {
+    let summary: FabricSummary = build_fabric_summary(source, tag);
+    return summary.source + summary.roundtrip + summary.tag;
+  }
+
+  fn main() {
+    print(summarize_fabric(33, 7));
+  }
+}

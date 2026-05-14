@@ -44,6 +44,7 @@ Current responsibility split:
 Recommended first commands:
 
 ```bash
+cargo run -p nuis -- project-doctor examples/projects/window_controls_demo
 cargo run -p nuis -- check examples/projects/window_controls_demo
 cargo run -p nuis -- project-status examples/projects/window_controls_demo
 cargo run -p nuis -- build examples/projects/window_controls_demo examples/bins/window_controls_demo_project
@@ -97,6 +98,7 @@ Start here:
 * [examples/bins/README.md](/Users/Shared/chroot/dev/nuislang/examples/bins/README.md)
 * [stdlib/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/README.md)
 * [docs/README.md](/Users/Shared/chroot/dev/nuislang/docs/README.md)
+* [docs/repo-layout.md](/Users/Shared/chroot/dev/nuislang/docs/repo-layout.md)
 
 Recommended current examples:
 
@@ -133,6 +135,7 @@ For current reality, stay with:
 
 * [README.md](/Users/Shared/chroot/dev/nuislang/README.md)
 * [docs/README.md](/Users/Shared/chroot/dev/nuislang/docs/README.md)
+* [docs/repo-layout.md](/Users/Shared/chroot/dev/nuislang/docs/repo-layout.md)
 * [docs/reference/yir-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-reference.md)
 * [docs/reference/yir-langref.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-langref.md)
 * [docs/reference/yir-tools-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-tools-reference.md)

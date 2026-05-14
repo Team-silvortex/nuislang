@@ -1,0 +1,31 @@
+mod cpu Main {
+  struct HandleSummary {
+    route: i64,
+    slot: i64
+  }
+
+  fn build_handle_summary(route: i64, slot: i64) -> HandleSummary {
+    data_bind_core(1);
+    let handles: HandleTable = data_handle_table("host=cpu0", "fabric=fabric0");
+    let ready: Marker = data_marker("std_handles_ready");
+    let backing: ref Buffer = alloc_buffer(2, 0);
+    let copy: WindowMut<i64> = data_copy_window(backing, 0, 2);
+    let copy_route: WindowMut<i64> = data_write_window(copy, 0, route);
+    let copy_slot: WindowMut<i64> = data_write_window(copy_route, 1, slot);
+    let frozen: Window<i64> = data_freeze_window(copy_slot);
+
+    return HandleSummary {
+      route: data_read_window(frozen, 0),
+      slot: data_read_window(frozen, 1)
+    };
+  }
+
+  fn summarize_handles(route: i64, slot: i64) -> i64 {
+    let summary: HandleSummary = build_handle_summary(route, slot);
+    return summary.route + summary.slot;
+  }
+
+  fn main() {
+    print(summarize_handles(5, 12));
+  }
+}

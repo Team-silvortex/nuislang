@@ -1,0 +1,35 @@
+mod cpu Main {
+  struct ToggleState {
+    enabled: i64,
+    level: i64
+  }
+
+  struct Metrics {
+    warm: i64,
+    hot: i64
+  }
+
+  fn build_toggle(seed: i64, boost: i64) -> ToggleState {
+    return ToggleState {
+      enabled: seed,
+      level: seed + boost
+    };
+  }
+
+  fn build_metrics(toggle: ToggleState, radius: i64) -> Metrics {
+    return Metrics {
+      warm: toggle.enabled + radius,
+      hot: toggle.level + radius
+    };
+  }
+
+  fn summarize_struct_patterns(seed: i64, boost: i64, radius: i64) -> i64 {
+    let toggle: ToggleState = build_toggle(seed, boost);
+    let metrics: Metrics = build_metrics(toggle, radius);
+    return metrics.warm + metrics.hot;
+  }
+
+  fn main() {
+    print(summarize_struct_patterns(1, 7, 12));
+  }
+}

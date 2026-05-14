@@ -90,6 +90,23 @@ Recommended starting point:
   data-plane graph. The data profile markers are now validated per link
   direction, so a `cpu <-> shader` fabric only needs its own sync pair.
 
+`window_controls_demo` is also the current migration source for the first
+checked-in `ns-nova` stdlib recipes. The relationship today is:
+
+* runtime orchestration patterns are being extracted into
+  [stdlib/ns-nova/core/window_controls_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/core/window_controls_runtime_recipe.ns)
+* UI/selection/control assembly patterns are being extracted into
+  [stdlib/ns-nova/ui/window_controls_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/ui/window_controls_recipe.ns)
+* scene/render-world assembly patterns are being extracted into
+  [stdlib/ns-nova/scene/window_controls_scene_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/scene/window_controls_scene_recipe.ns)
+
+What still remains demo-local on purpose:
+
+* the full end-to-end one-file assembly of all those routes together
+* project-specific host/window wiring
+* the exact demo tuning constants and packet mixes used to stress the current
+  `ns -> NIR -> YIR -> build` chain
+
 Also included:
 
 * [kernel_tensor_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/kernel_tensor_demo)
@@ -102,6 +119,25 @@ Also included:
   `kernel_profile_bind_core/kernel_profile_queue_depth/kernel_profile_batch_lanes`.
   Its `FabricPlane` now only declares the `cpu_to_kernel/kernel_to_cpu` sync
   markers required by that route.
+
+## Migration Map
+
+Current project examples and `stdlib/ns-nova` play different roles:
+
+* `examples/projects/*`
+  canonical end-to-end project workflow and the most realistic current build
+  path
+* `stdlib/ns-nova/*`
+  the first reusable builder/helper/recipe source assets being extracted from
+  those projects
+
+Read them together like this:
+
+* start with [window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo)
+  when you want the current real project route
+* jump to [stdlib/ns-nova/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/README.md)
+  when you want to see which pieces have already started to move out of the
+  demo and into reusable source assets
 
 Use:
 

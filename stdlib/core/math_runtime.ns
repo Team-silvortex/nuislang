@@ -1,0 +1,27 @@
+mod cpu Main {
+  struct MathSummary {
+    sum: i64,
+    diff: i64,
+    mixed: i64
+  }
+
+  fn build_math_summary(lhs: i64, rhs: i64, bias: i64) -> MathSummary {
+    let sum: i64 = lhs + rhs;
+    let diff: i64 = lhs - rhs;
+    let mixed: i64 = sum + bias;
+    return MathSummary {
+      sum: sum,
+      diff: diff,
+      mixed: mixed
+    };
+  }
+
+  fn summarize_math(lhs: i64, rhs: i64, bias: i64) -> i64 {
+    let summary: MathSummary = build_math_summary(lhs, rhs, bias);
+    return summary.sum + summary.diff + summary.mixed;
+  }
+
+  fn main() {
+    print(summarize_math(21, 9, 4));
+  }
+}

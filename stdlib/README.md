@@ -1,21 +1,20 @@
 # `nuis` Standard Library
 
-The `nuis` standard library is now organized into three top-level modules:
+This directory is the repository's standard-library layout and source-asset
+staging area.
+
+It is not yet a crate-like automatically imported library tree, but it is no
+longer just empty scaffolding either.
+
+The current top-level modules are:
 
 * [core](/Users/Shared/chroot/dev/nuislang/stdlib/core/README.md)
-  the smallest semantics-first base surface; future home of primitive value types,
-  platform-neutral traits, ownership-oriented helpers, and the lowest stable source-level contracts
+  smallest semantics-first base surface and long-lived source contracts
 * [std](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
-  the practical systems layer built on `core`; future home of collections,
-  I/O-facing facades, data-plane helpers, host integration helpers, and common workflow utilities
+  practical systems/helper layer built on `core`
 * [ns-nova](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/README.md)
-  the rendering/application framework layer; future home of the engine-style GPU runtime surface
-  that turns `nuis` heterogeneous execution and inline shader capability into a native cross-platform
-  2D/3D rendering framework
-
-This directory currently defines structure and intent, not a fully implemented importable source library yet.
-That is deliberate: the current frontend still centers on executable entry modules, while the standard-library
-level is being stabilized first as a repository/module contract.
+  rendering/application framework layer and the first place where real checked-in
+  `.ns` source modules are already accumulating
 
 ## Relationship
 
@@ -40,6 +39,32 @@ At the current repo stage:
 * the repository still does not have a crate-like automatic source import flow for those modules yet
 * the live implementation focus is still on `nuis / nuisc / YIR / nustar`
 * the standard-library split is nevertheless important now, because it already informs how future APIs should be grouped and what should or should not leak across layers
+
+Current asset reality by layer:
+
+* `core`
+  now has its first canonical checked-in `.ns` module set
+* `std`
+  now has its first canonical checked-in `.ns` module set
+* `ns-nova`
+  first real source-asset layer; currently declared through
+  [stdlib/ns-nova/module.toml](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/module.toml)
+  with `10` checked-in source modules
+
+Current checked-in source modules by layer:
+
+* `core`
+  - [basic_scalars.ns](/Users/Shared/chroot/dev/nuislang/stdlib/core/basic_scalars.ns)
+  - [struct_patterns.ns](/Users/Shared/chroot/dev/nuislang/stdlib/core/struct_patterns.ns)
+  - [math_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/core/math_runtime.ns)
+  - [ref_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/core/ref_runtime.ns)
+* `std`
+  - [window_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/window_runtime.ns)
+  - [pipe_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/pipe_runtime.ns)
+  - [fabric_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/fabric_runtime.ns)
+  - [handle_table_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/handle_table_runtime.ns)
+* `ns-nova`
+  - see [stdlib/ns-nova/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/README.md)
 
 ## Read In This Order
 
