@@ -39,7 +39,7 @@ Use:
 ```bash
 cargo run -p yir-run -- examples/yir/demos/hello_yir.yir
 cargo run -p yir-run -- examples/yir/demos/window_controls_demo.yir
-cargo run -p yir-pack-aot -- examples/yir/demos/window_controls_demo.yir examples/bins/window_controls_demo 4
+cargo run -p yir-pack-aot -- examples/yir/demos/window_controls_demo.yir /tmp/window_controls_demo_yir 4
 ```
 
 Also useful while comparing handwritten graphs against the `.ns` pipeline:
@@ -55,6 +55,5 @@ Current reading guidance:
 * prefer `examples/projects/*` when you want the current canonical end-to-end workflow
 * use the invalid examples to understand verifier boundaries, especially for memory, data-plane, and ownership-sensitive paths
 
-Generated bundle:
-
-* [examples/bins/window_controls_demo/window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/bins/window_controls_demo/window_controls_demo)
+When you want a native artifact from a handwritten graph, rebuild it into a
+local output directory such as `/tmp/window_controls_demo_yir`.

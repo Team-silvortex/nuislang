@@ -113,13 +113,13 @@ Generated build outputs live under:
 
 * [examples/bins](/Users/Shared/chroot/dev/nuislang/examples/bins)
 
-Use the bundle folder whose name matches the source path you care about:
+Current checked-in canonical bundles:
 
 * [window_controls_demo_project](/Users/Shared/chroot/dev/nuislang/examples/bins/window_controls_demo_project/window_controls_demo)
   canonical multi-file project route
 * [kernel_tensor_demo_project](/Users/Shared/chroot/dev/nuislang/examples/bins/kernel_tensor_demo_project/kernel_tensor_demo)
   canonical kernel-project route
-* [window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/bins/window_controls_demo/window_controls_demo)
-  handwritten `YIR` route kept as a direct backend reference
-* [window_controls_demo_ns](/Users/Shared/chroot/dev/nuislang/examples/bins/window_controls_demo_ns/window_controls_demo)
-  single-file `.ns` route kept as a parser/lowering reference
+
+Single-file `.ns` and handwritten `YIR` demo routes are still useful source
+examples, but their generated bundles are now treated as local rebuild outputs
+instead of checked-in reference artifacts.

@@ -13,5 +13,5 @@ Useful commands:
 
 ```bash
 cargo run -p nuis -- check examples/ns/demos/window_controls_demo.ns
-cargo run -p nuis -- build examples/ns/demos/window_controls_demo.ns examples/bins/window_controls_demo_ns
+cargo run -p nuis -- build examples/ns/demos/window_controls_demo.ns /tmp/window_controls_demo_ns
 ```

@@ -42,7 +42,7 @@ cargo run -p nuis -- dump-ast examples/ns/core/hello_world.ns
 cargo run -p nuis -- dump-nir examples/ns/types/hello_ref_struct.ns
 cargo run -p nuis -- dump-yir examples/ns/data/hello_data.ns
 cargo run -p nuis -- build examples/ns/data/hello_instantiate.ns /tmp/nuis_hello_instantiate
-cargo run -p nuis -- build examples/ns/demos/window_controls_demo.ns examples/bins/window_controls_demo_ns
+cargo run -p nuis -- build examples/ns/demos/window_controls_demo.ns /tmp/window_controls_demo_ns
 ```
 
 Project route is now preferred once a demo spans multiple domains or needs

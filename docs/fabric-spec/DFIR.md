@@ -3,8 +3,17 @@ Fabric IR Algebra (legacy filename: `DFIR.md`, v0.44.b-aligned draft)
 > This file keeps its historical filename for now, but the project terminology
 > has moved from `DFIR` to `Fabric IR`.
 >
+> Historical status note: this draft is no longer a line-by-line description of
+> the current repository behavior.
+>
 > Scope note: this document describes the `nuis`-side Fabric semantics / ABI
 > surface. It does not define the external `yalivia` project.
+>
+> When this file disagrees with current verifier behavior, prefer:
+>
+> * [docs/reference/yir-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-reference.md)
+> * [docs/reference/yir-langref.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-langref.md)
+> * [docs/grammar/nuis-ir.md](/Users/Shared/chroot/dev/nuislang/docs/grammar/nuis-ir.md)
 
 1 Primitive Set
 
