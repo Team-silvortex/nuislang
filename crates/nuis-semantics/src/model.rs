@@ -62,10 +62,41 @@ pub struct AstParam {
     pub ty: AstTypeRef,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TestClockDomain {
+    Monotonic,
+    Wall,
+    Global,
+}
+
+impl TestClockDomain {
+    pub fn parse(raw: &str) -> Option<Self> {
+        match raw {
+            "monotonic" => Some(Self::Monotonic),
+            "wall" => Some(Self::Wall),
+            "global" => Some(Self::Global),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Monotonic => "monotonic",
+            Self::Wall => "wall",
+            Self::Global => "global",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AstFunction {
     pub name: String,
     pub test_name: Option<String>,
+    pub test_ignored: bool,
+    pub test_should_fail: bool,
+    pub test_reason: Option<String>,
+    pub test_timeout_ms: Option<i64>,
+    pub test_clock_domain: Option<TestClockDomain>,
     pub is_async: bool,
     pub params: Vec<AstParam>,
     pub return_type: Option<AstTypeRef>,
@@ -582,6 +613,11 @@ pub struct NirParam {
 pub struct NirFunction {
     pub name: String,
     pub test_name: Option<String>,
+    pub test_ignored: bool,
+    pub test_should_fail: bool,
+    pub test_reason: Option<String>,
+    pub test_timeout_ms: Option<i64>,
+    pub test_clock_domain: Option<TestClockDomain>,
     pub is_async: bool,
     pub params: Vec<NirParam>,
     pub return_type: Option<NirTypeRef>,

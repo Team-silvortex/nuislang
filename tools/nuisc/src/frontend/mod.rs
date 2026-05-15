@@ -192,6 +192,11 @@ fn lower_function(
     Ok(NirFunction {
         name: function.name.clone(),
         test_name: function.test_name.clone(),
+        test_ignored: function.test_ignored,
+        test_should_fail: function.test_should_fail,
+        test_reason: function.test_reason.clone(),
+        test_timeout_ms: function.test_timeout_ms,
+        test_clock_domain: function.test_clock_domain.clone(),
         is_async: function.is_async,
         params: function.params.iter().map(lower_param).collect(),
         return_type: function.return_type.as_ref().map(lower_type_ref),
@@ -12956,6 +12961,53 @@ fn validate_test_function_signature(
             return_type.render()
         ));
     }
+    if function.test_ignored && function.test_should_fail {
+        return Err(format!(
+            "test function `{}` ({}) cannot be both `ignored` and `should_fail` in the current MVP",
+            function.name, label
+        ));
+    }
+    if function.test_reason.is_some() && !function.test_should_fail {
+        return Err(format!(
+            "test function `{}` ({}) can only use `reason=\"...\"` together with `should_fail=true` in the current MVP",
+            function.name, label
+        ));
+    }
+    if let Some(timeout_ms) = function.test_timeout_ms {
+        if timeout_ms <= 0 {
+            return Err(format!(
+                "test function `{}` ({}) must use `timeout_ms` > 0, found `{}`",
+                function.name, label, timeout_ms
+            ));
+        }
+    }
+    if let Some(clock_domain) = function.test_clock_domain {
+        if function.test_timeout_ms.is_none() {
+            return Err(format!(
+                "test function `{}` ({}) can only use `clock_domain=\"...\"` together with `timeout_ms=...` in the current MVP",
+                function.name, label
+            ));
+        }
+        if clock_domain == nuis_semantics::model::TestClockDomain::Wall && function.is_async {
+            return Err(format!(
+                "test function `{}` ({}) cannot use `clock_domain=\"wall\"` on `async fn` in the current MVP; use `monotonic` or `global`",
+                function.name, label
+            ));
+        }
+        if !matches!(
+            clock_domain,
+            nuis_semantics::model::TestClockDomain::Monotonic
+                | nuis_semantics::model::TestClockDomain::Wall
+                | nuis_semantics::model::TestClockDomain::Global
+        ) {
+            return Err(format!(
+                "test function `{}` ({}) uses unsupported `clock_domain=\"{}\"`; expected `monotonic`, `wall`, or `global`",
+                function.name,
+                label,
+                clock_domain.as_str()
+            ));
+        }
+    }
     Ok(())
 }
 
@@ -12990,7 +13042,7 @@ mod tests {
     use super::parse_nuis_ast;
     use super::parse_nuis_module;
     use nuis_semantics::model::{
-        NirDataFlowState, NirExpr, NirKernelFlowState, NirShaderFlowState, NirStmt,
+        NirDataFlowState, NirExpr, NirKernelFlowState, NirShaderFlowState, NirStmt, TestClockDomain,
     };
 
     #[test]
@@ -12998,7 +13050,7 @@ mod tests {
         let ast = parse_nuis_ast(
             r#"
             mod cpu Main {
-              test "smoke_add" fn add_test() -> i64 {
+              test("smoke_add") fn add_test() -> i64 {
                 return 1;
               }
             }
@@ -13019,7 +13071,7 @@ mod tests {
         let ast = parse_nuis_ast(
             r#"
             mod cpu Main {
-              test fn smoke_add() -> i64 {
+              test() fn smoke_add() -> i64 {
                 return 1;
               }
             }
@@ -13033,6 +13085,57 @@ mod tests {
             .find(|function| function.name == "smoke_add")
             .unwrap();
         assert_eq!(function.test_name.as_deref(), Some("smoke_add"));
+        assert!(!function.test_ignored);
+        assert!(!function.test_should_fail);
+    }
+
+    #[test]
+    fn parses_test_function_modifiers_into_ast() {
+        let ast = parse_nuis_ast(
+            r#"
+            mod cpu Main {
+              test("smoke_add", ignored=true, should_fail=true) fn smoke_add() -> i64 {
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = ast
+            .functions
+            .iter()
+            .find(|function| function.name == "smoke_add")
+            .unwrap();
+        assert_eq!(function.test_name.as_deref(), Some("smoke_add"));
+        assert!(function.test_ignored);
+        assert!(function.test_should_fail);
+    }
+
+    #[test]
+    fn parses_test_function_call_syntax_into_ast() {
+        let ast = parse_nuis_ast(
+            r#"
+            mod cpu Main {
+              test("smoke_add", ignored=true, should_fail=true, reason="must reject zero", timeout_ms=25, clock_domain="wall") fn smoke_add() -> i64 {
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = ast
+            .functions
+            .iter()
+            .find(|function| function.name == "smoke_add")
+            .unwrap();
+        assert_eq!(function.test_name.as_deref(), Some("smoke_add"));
+        assert!(function.test_ignored);
+        assert!(function.test_should_fail);
+        assert_eq!(function.test_reason.as_deref(), Some("must reject zero"));
+        assert_eq!(function.test_timeout_ms, Some(25));
+        assert_eq!(function.test_clock_domain, Some(TestClockDomain::Wall));
     }
 
     #[test]
@@ -13040,7 +13143,7 @@ mod tests {
         let module = parse_nuis_module(
             r#"
             mod cpu Main {
-              test "smoke_add" fn smoke_add() -> i64 {
+              test("smoke_add") fn smoke_add() -> i64 {
                 return 1;
               }
 
@@ -13058,6 +13161,81 @@ mod tests {
             .find(|function| function.name == "smoke_add")
             .unwrap();
         assert_eq!(function.test_name.as_deref(), Some("smoke_add"));
+        assert!(!function.test_ignored);
+        assert!(!function.test_should_fail);
+    }
+
+    #[test]
+    fn lowers_test_function_modifiers_into_nir() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              test(ignored=true, should_fail=true) fn smoke_add() -> i64 {
+                return 0;
+              }
+
+              fn main() -> i64 {
+                return 1;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(
+            module.contains("cannot be both `ignored` and `should_fail`"),
+            "unexpected error: {module}"
+        );
+    }
+
+    #[test]
+    fn lowers_test_function_call_syntax_into_nir() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              test("smoke_add", reason="kept for docs") fn smoke_add() -> i64 {
+                return 1;
+              }
+
+              fn main() -> i64 {
+                return 1;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(module.contains("can only use `reason=\"...\"` together with `should_fail=true`"));
+    }
+
+    #[test]
+    fn lowers_test_function_reason_into_nir() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              test("smoke_add", should_fail=true, reason="must reject zero", timeout_ms=25, clock_domain="monotonic") fn smoke_add() -> i64 {
+                return 0;
+              }
+
+              fn main() -> i64 {
+                return 1;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "smoke_add")
+            .unwrap();
+        assert_eq!(function.test_name.as_deref(), Some("smoke_add"));
+        assert!(!function.test_ignored);
+        assert!(function.test_should_fail);
+        assert_eq!(function.test_reason.as_deref(), Some("must reject zero"));
+        assert_eq!(function.test_timeout_ms, Some(25));
+        assert_eq!(function.test_clock_domain, Some(TestClockDomain::Monotonic));
     }
 
     #[test]
@@ -13065,11 +13243,11 @@ mod tests {
         parse_nuis_module(
             r#"
             mod cpu Main {
-              test fn smoke_bool() -> bool {
+              test() fn smoke_bool() -> bool {
                 return true;
               }
 
-              test async fn smoke_i64() -> i64 {
+              test() async fn smoke_i64() -> i64 {
                 return 1;
               }
 
@@ -13087,7 +13265,7 @@ mod tests {
         let error = parse_nuis_module(
             r#"
             mod cpu Main {
-              test fn smoke(value: i64) -> i64 {
+              test() fn smoke(value: i64) -> i64 {
                 return value;
               }
 
@@ -13107,7 +13285,7 @@ mod tests {
         let error = parse_nuis_module(
             r#"
             mod cpu Main {
-              test fn smoke() -> String {
+              test() fn smoke() -> String {
                 return "nope";
               }
 
@@ -13123,11 +13301,109 @@ mod tests {
     }
 
     #[test]
+    fn rejects_test_function_with_conflicting_modifiers() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              test(ignored=true, should_fail=true) fn smoke() -> i64 {
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("cannot be both `ignored` and `should_fail`"));
+    }
+
+    #[test]
+    fn rejects_test_reason_without_should_fail() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              test("smoke", reason="must reject zero") fn smoke() -> i64 {
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("can only use `reason=\"...\"` together with `should_fail=true`"));
+    }
+
+    #[test]
+    fn rejects_non_positive_test_timeout() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              test("smoke", timeout_ms=0) fn smoke() -> i64 {
+                return 1;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("must use `timeout_ms` > 0"));
+    }
+
+    #[test]
+    fn rejects_test_clock_domain_without_timeout() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              test("smoke", clock_domain="wall") fn smoke() -> i64 {
+                return 1;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(
+            error.contains("can only use `clock_domain=\"...\"` together with `timeout_ms=...`")
+        );
+    }
+
+    #[test]
+    fn rejects_unknown_test_clock_domain() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              test("smoke", timeout_ms=25, clock_domain="gpu_global") fn smoke() -> i64 {
+                return 1;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("unsupported `clock_domain=\"gpu_global\"`"));
+    }
+
+    #[test]
+    fn rejects_wall_clock_domain_on_async_tests() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              test("slow_async", timeout_ms=25, clock_domain="wall") async fn slow_async() -> i64 {
+                return 1;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("cannot use `clock_domain=\"wall\"` on `async fn`"));
+    }
+
+    #[test]
     fn rejects_test_function_outside_cpu_domain() {
         let error = parse_nuis_module(
             r#"
             mod shader SurfaceShader {
-              test fn smoke() -> i64 {
+              test() fn smoke() -> i64 {
                 return 1;
               }
 
@@ -13140,6 +13416,22 @@ mod tests {
         .unwrap_err();
 
         assert!(error.contains("only supported in `mod cpu`"));
+    }
+
+    #[test]
+    fn rejects_legacy_test_prefix_syntax() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              test fn smoke() -> i64 {
+                return 1;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("test declarations now require `test(...) fn ...`"));
     }
 
     #[test]

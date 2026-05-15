@@ -46,7 +46,25 @@ pub fn render_ast(module: &AstModule) -> String {
         let test_prefix = function
             .test_name
             .as_ref()
-            .map(|name| format!("test \"{}\" ", name))
+            .map(|name| {
+                let mut parts = vec![format!("\"{}\"", name)];
+                if function.test_ignored {
+                    parts.push("ignored=true".to_owned());
+                }
+                if function.test_should_fail {
+                    parts.push("should_fail=true".to_owned());
+                }
+                if let Some(reason) = &function.test_reason {
+                    parts.push(format!("reason=\"{}\"", reason));
+                }
+                if let Some(timeout_ms) = function.test_timeout_ms {
+                    parts.push(format!("timeout_ms={timeout_ms}"));
+                }
+                if let Some(clock_domain) = &function.test_clock_domain {
+                    parts.push(format!("clock_domain=\"{}\"", clock_domain.as_str()));
+                }
+                format!("test({}) ", parts.join(", "))
+            })
             .unwrap_or_default();
         let async_prefix = if function.is_async { "async " } else { "" };
         out.push_str(&format!(
@@ -151,7 +169,25 @@ pub fn render_nir(module: &NirModule) -> String {
         let test_prefix = function
             .test_name
             .as_ref()
-            .map(|name| format!("test \"{}\" ", name))
+            .map(|name| {
+                let mut parts = vec![format!("\"{}\"", name)];
+                if function.test_ignored {
+                    parts.push("ignored=true".to_owned());
+                }
+                if function.test_should_fail {
+                    parts.push("should_fail=true".to_owned());
+                }
+                if let Some(reason) = &function.test_reason {
+                    parts.push(format!("reason=\"{}\"", reason));
+                }
+                if let Some(timeout_ms) = function.test_timeout_ms {
+                    parts.push(format!("timeout_ms={timeout_ms}"));
+                }
+                if let Some(clock_domain) = &function.test_clock_domain {
+                    parts.push(format!("clock_domain=\"{}\"", clock_domain.as_str()));
+                }
+                format!("test({}) ", parts.join(", "))
+            })
             .unwrap_or_default();
         let async_prefix = if function.is_async { "async " } else { "" };
         out.push_str(&format!(

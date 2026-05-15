@@ -1420,6 +1420,12 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
     }
 
     let ret = state.last_cpu_value.unwrap_or_else(|| "0".to_owned());
+    let dynamic_extern_decls = render_dynamic_extern_decls(module);
+    let dynamic_extern_block = if dynamic_extern_decls.is_empty() {
+        String::new()
+    } else {
+        format!("{}\n\n", dynamic_extern_decls.join("\n"))
+    };
 
     Ok(format!(
         "; yir version: {}\n\
@@ -1441,13 +1447,72 @@ declare i64 @HostRenderCurves__color_bias(i64)\n\
 declare i64 @HostRenderCurves__speed_curve(i64)\n\
 declare i64 @HostRenderCurves__radius_curve(i64)\n\
 declare i64 @HostRenderCurves__mix_tick(i64, i64)\n\
-declare i64 @HostMath__speed_curve(i64)\n\n\
+declare i64 @HostMath__speed_curve(i64)\n\
+{}\n\
 define i64 @nuis_yir_entry() {{\n{}\n  ret i64 {}\n}}\n",
         module.version,
         state.globals.join("\n"),
+        dynamic_extern_block,
         state.body.join("\n"),
         ret
     ))
+}
+
+fn render_dynamic_extern_decls(module: &YirModule) -> Vec<String> {
+    let builtin_symbols = [
+        "malloc",
+        "free",
+        "puts",
+        "nuis_debug_print_bool",
+        "nuis_debug_print_i32",
+        "nuis_debug_print_i64",
+        "nuis_debug_print_f32",
+        "nuis_debug_print_f64",
+        "host_color_bias",
+        "host_speed_curve",
+        "host_radius_curve",
+        "host_mix_tick",
+        "HostRenderCurves__color_bias",
+        "HostRenderCurves__speed_curve",
+        "HostRenderCurves__radius_curve",
+        "HostRenderCurves__mix_tick",
+        "HostMath__speed_curve",
+    ];
+    let mut declared = BTreeMap::<String, usize>::new();
+    for node in &module.nodes {
+        if node.op.module != "cpu" || node.op.instruction != "extern_call_i64" {
+            continue;
+        }
+        if node.op.args.len() < 2 {
+            continue;
+        }
+        let abi = node.op.args[0].as_str();
+        if abi != "c" && abi != "nurs" {
+            continue;
+        }
+        let symbol = node.op.args[1].clone();
+        if builtin_symbols
+            .iter()
+            .any(|builtin| builtin == &symbol.as_str())
+        {
+            continue;
+        }
+        let arity = node.op.args.len().saturating_sub(2);
+        declared.entry(symbol).or_insert(arity);
+    }
+    declared
+        .into_iter()
+        .map(|(symbol, arity)| {
+            let signature = if arity == 0 {
+                String::new()
+            } else {
+                std::iter::repeat_n("i64", arity)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            };
+            format!("declare i64 @{symbol}({signature})")
+        })
+        .collect()
 }
 
 fn get_i64<'a>(registers: &'a BTreeMap<String, LlvmValueRef>, name: &str) -> Option<&'a str> {
@@ -1663,4 +1728,42 @@ fn topological_order(module: &YirModule) -> Result<Vec<String>, String> {
     }
 
     Ok(order)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::emit_module;
+    use yir_core::{Edge, EdgeKind, Node, Operation, Resource, ResourceKind, YirModule};
+
+    #[test]
+    fn emits_dynamic_declare_for_cpu_extern_calls() {
+        let mut module = YirModule::new("0.1");
+        module.resources.push(Resource {
+            name: "cpu0".to_owned(),
+            kind: ResourceKind::parse("cpu.main"),
+        });
+        module.nodes.push(Node {
+            name: "arg0".to_owned(),
+            resource: "cpu0".to_owned(),
+            op: Operation::parse("cpu.const_i64", vec!["100000".to_owned()]).unwrap(),
+        });
+        module.nodes.push(Node {
+            name: "sleep_call".to_owned(),
+            resource: "cpu0".to_owned(),
+            op: Operation::parse(
+                "cpu.extern_call_i64",
+                vec!["c".to_owned(), "usleep".to_owned(), "arg0".to_owned()],
+            )
+            .unwrap(),
+        });
+        module.edges.push(Edge {
+            kind: EdgeKind::Dep,
+            from: "arg0".to_owned(),
+            to: "sleep_call".to_owned(),
+        });
+
+        let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
+        assert!(llvm_ir.contains("declare i64 @usleep(i64)"));
+        assert!(llvm_ir.contains("call i64 @usleep(i64"));
+    }
 }

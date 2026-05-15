@@ -52,6 +52,11 @@ pub enum CommandKind {
     },
     Test {
         input: PathBuf,
+        list: bool,
+        ignored_only: bool,
+        include_ignored: bool,
+        exact: bool,
+        filter: Option<String>,
     },
     Build {
         input: PathBuf,
@@ -329,9 +334,46 @@ where
         "check" => Ok(CommandKind::Check {
             input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
         }),
-        "test" => Ok(CommandKind::Test {
-            input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
-        }),
+        "test" => {
+            let mut list = false;
+            let mut ignored_only = false;
+            let mut include_ignored = false;
+            let mut exact = false;
+            let mut positional = Vec::new();
+            while let Some(arg) = args.next() {
+                if arg == "--list" {
+                    list = true;
+                } else if arg == "--ignored" {
+                    ignored_only = true;
+                } else if arg == "--include-ignored" {
+                    include_ignored = true;
+                } else if arg == "--exact" {
+                    exact = true;
+                } else {
+                    positional.push(arg);
+                }
+            }
+            if ignored_only && include_ignored {
+                return Err(
+                    "usage: nuis test [--list] [--ignored|--include-ignored] [--exact] [input.ns|project-dir|nuis.toml] [filter]"
+                        .to_owned(),
+                );
+            }
+            if positional.len() > 2 {
+                return Err(
+                    "usage: nuis test [--list] [--ignored|--include-ignored] [--exact] [input.ns|project-dir|nuis.toml] [filter]"
+                        .to_owned(),
+                );
+            }
+            Ok(CommandKind::Test {
+                input: PathBuf::from(positional.first().cloned().unwrap_or_else(|| ".".to_owned())),
+                list,
+                ignored_only,
+                include_ignored,
+                exact,
+                filter: positional.get(1).cloned(),
+            })
+        }
         "build" => {
             let mut verbose_cache = false;
             let mut cpu_abi = None;

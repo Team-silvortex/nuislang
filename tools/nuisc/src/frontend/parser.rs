@@ -1,6 +1,6 @@
 use nuis_semantics::model::{
     AstBinaryOp, AstExpr, AstExternFunction, AstExternInterface, AstFunction, AstModule, AstParam,
-    AstStmt, AstStructDef, AstStructField, AstTypeRef,
+    AstStmt, AstStructDef, AstStructField, AstTypeRef, TestClockDomain,
 };
 
 use super::lexer::{describe_token, Token};
@@ -151,18 +151,24 @@ impl Parser {
     }
 
     fn parse_function(&mut self) -> Result<AstFunction, String> {
-        let declared_test_name = if self.peek_word("test") {
+        let (
+            declared_test_name,
+            test_ignored,
+            test_should_fail,
+            test_reason,
+            test_timeout_ms,
+            test_clock_domain,
+        ) = if self.peek_word("test") {
             self.expect_word("test")?;
-            match self.tokens.get(self.cursor) {
-                Some(Token::String(value)) => {
-                    let label = value.clone();
-                    self.cursor += 1;
-                    Some(label)
-                }
-                _ => Some(String::new()),
+            if !self.peek_symbol('(') {
+                return Err(
+                    "test declarations now require `test(...) fn ...`; the older bare-prefix `test ... fn ...` syntax has been retired"
+                        .to_owned(),
+                );
             }
+            self.parse_test_decl_call_syntax()?
         } else {
-            None
+            (None, false, false, None, None, None)
         };
         let is_async = if self.peek_word("async") {
             self.expect_word("async")?;
@@ -204,10 +210,156 @@ impl Parser {
         Ok(AstFunction {
             name,
             test_name,
+            test_ignored,
+            test_should_fail,
+            test_reason,
+            test_timeout_ms,
+            test_clock_domain,
             is_async,
             params,
             return_type,
             body,
+        })
+    }
+
+    fn parse_test_decl_call_syntax(
+        &mut self,
+    ) -> Result<
+        (
+            Option<String>,
+            bool,
+            bool,
+            Option<String>,
+            Option<i64>,
+            Option<TestClockDomain>,
+        ),
+        String,
+    > {
+        self.expect_symbol('(')?;
+        let mut label = Some(String::new());
+        let mut ignored = false;
+        let mut should_fail = false;
+        let mut reason = None;
+        let mut timeout_ms = None;
+        let mut clock_domain = None;
+        while !self.peek_symbol(')') {
+            match self.next() {
+                Some(Token::String(value)) => {
+                    label = Some(value);
+                }
+                Some(Token::Word(word)) => {
+                    if self.peek_symbol('=') {
+                        self.expect_symbol('=')?;
+                        match word.as_str() {
+                            "ignored" => ignored = self.parse_test_meta_bool()?,
+                            "should_fail" => should_fail = self.parse_test_meta_bool()?,
+                            "reason" => reason = Some(self.parse_test_meta_string()?),
+                            "timeout_ms" => timeout_ms = Some(self.parse_test_meta_int()?),
+                            "clock_domain" => clock_domain = Some(self.parse_test_clock_domain()?),
+                            _ => {
+                                return Err(format!(
+                                    "unknown test metadata key `{word}` in `test(...)`"
+                                ))
+                            }
+                        }
+                    } else {
+                        match word.as_str() {
+                            "ignored" => ignored = true,
+                            "should_fail" => should_fail = true,
+                            "reason" => {
+                                return Err(
+                                    "test metadata key `reason` expects `reason=\"...\"` in `test(...)`"
+                                        .to_owned(),
+                                )
+                            }
+                            "timeout_ms" => {
+                                return Err(
+                                    "test metadata key `timeout_ms` expects `timeout_ms=<integer>` in `test(...)`"
+                                        .to_owned(),
+                                )
+                            }
+                            "clock_domain" => {
+                                return Err(
+                                    "test metadata key `clock_domain` expects `clock_domain=\"...\"` in `test(...)`"
+                                        .to_owned(),
+                                )
+                            }
+                            _ => {
+                                return Err(format!(
+                                    "unknown test metadata flag `{word}` in `test(...)`"
+                                ))
+                            }
+                        }
+                    }
+                }
+                Some(other) => {
+                    return Err(format!(
+                        "expected string label or test metadata in `test(...)`, found {}",
+                        describe_token(&other)
+                    ))
+                }
+                None => return Err("unterminated `test(...)` declaration".to_owned()),
+            }
+            if self.peek_symbol(',') {
+                self.expect_symbol(',')?;
+            } else {
+                break;
+            }
+        }
+        self.expect_symbol(')')?;
+        Ok((
+            label,
+            ignored,
+            should_fail,
+            reason,
+            timeout_ms,
+            clock_domain,
+        ))
+    }
+
+    fn parse_test_meta_bool(&mut self) -> Result<bool, String> {
+        match self.next() {
+            Some(Token::Word(word)) if word == "true" => Ok(true),
+            Some(Token::Word(word)) if word == "false" => Ok(false),
+            Some(other) => Err(format!(
+                "expected `true` or `false` in test metadata, found {}",
+                describe_token(&other)
+            )),
+            None => {
+                Err("expected `true` or `false` in test metadata, found end of input".to_owned())
+            }
+        }
+    }
+
+    fn parse_test_meta_string(&mut self) -> Result<String, String> {
+        match self.next() {
+            Some(Token::String(value)) => Ok(value),
+            Some(other) => Err(format!(
+                "expected string literal in test metadata, found {}",
+                describe_token(&other)
+            )),
+            None => Err("expected string literal in test metadata, found end of input".to_owned()),
+        }
+    }
+
+    fn parse_test_meta_int(&mut self) -> Result<i64, String> {
+        match self.next() {
+            Some(Token::Integer(value)) => Ok(value),
+            Some(other) => Err(format!(
+                "expected integer literal in test metadata, found {}",
+                describe_token(&other)
+            )),
+            None => Err("expected integer literal in test metadata, found end of input".to_owned()),
+        }
+    }
+
+    fn parse_test_clock_domain(&mut self) -> Result<TestClockDomain, String> {
+        let raw = self.parse_test_meta_string()?;
+        TestClockDomain::parse(&raw).ok_or_else(|| {
+            format!(
+                "unsupported `clock_domain=\"{}\"`; expected `monotonic`, `wall`, or `global`",
+                raw
+            )
         })
     }
 

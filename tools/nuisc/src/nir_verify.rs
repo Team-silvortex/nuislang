@@ -966,6 +966,11 @@ mod tests {
             functions: vec![NirFunction {
                 name: "main".to_owned(),
                 test_name: None,
+                test_ignored: false,
+                test_should_fail: false,
+                test_reason: None,
+                test_timeout_ms: None,
+                test_clock_domain: None,
                 is_async: false,
                 params: vec![],
                 return_type: None,

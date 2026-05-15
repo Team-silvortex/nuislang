@@ -5,9 +5,9 @@ use std::{
     collections::BTreeSet,
     fs,
     path::{Path, PathBuf},
-    process::Command,
+    process::{Child, Command, ExitStatus},
     thread,
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 use nuis_semantics::model::{AstExpr, AstFunction, AstModule, AstStmt, AstTypeRef};
@@ -103,7 +103,14 @@ fn run() -> Result<(), String> {
             target,
         } => handle_release_check(input, output_dir, cpu_abi, target)?,
         cli::CommandKind::Check { input } => handle_check(input)?,
-        cli::CommandKind::Test { input } => handle_test(input)?,
+        cli::CommandKind::Test {
+            input,
+            list,
+            ignored_only,
+            include_ignored,
+            exact,
+            filter,
+        } => handle_test(input, list, ignored_only, include_ignored, exact, filter)?,
         cli::CommandKind::Build {
             input,
             output_dir,
@@ -160,64 +167,85 @@ fn handle_check(input: std::path::PathBuf) -> Result<(), String> {
     Ok(())
 }
 
-fn handle_test(input: std::path::PathBuf) -> Result<(), String> {
+fn handle_test(
+    input: std::path::PathBuf,
+    list: bool,
+    ignored_only: bool,
+    include_ignored: bool,
+    exact: bool,
+    filter: Option<String>,
+) -> Result<(), String> {
     if nuisc::project::is_project_input(&input) {
         let project = nuisc::project::load_project(&input)?;
         println!("test: checking project {}", project.manifest.name);
         handle_check(input.clone())?;
+        let mut paths = project
+            .modules
+            .iter()
+            .map(|module| module.path.clone())
+            .collect::<BTreeSet<_>>();
         let mut collected = 0usize;
-        for module in &project.modules {
-            let nir = nuisc::frontend::lower_ast_to_nir(&module.ast)?;
-            let tests = nuisc::frontend::collect_nir_tests(&nir);
-            if !tests.is_empty() {
-                println!(
-                    "  discovered language tests: {} in {}",
-                    tests.len(),
-                    module.path.display()
-                );
-                for function in &tests {
-                    println!(
-                        "    test_fn: {} ({})",
-                        function.name,
-                        function.test_name.as_deref().unwrap_or(&function.name)
-                    );
-                }
-                collected += tests.len();
-            }
-        }
         if project.manifest.tests.is_empty() {
             println!("  no explicit tests declared");
-            println!("  collected language tests: {}", collected);
-            println!("  result: project check passed");
-            return Ok(());
+        } else {
+            println!("  declared tests: {}", project.manifest.tests.len());
+            for relative in &project.manifest.tests {
+                paths.insert(project.root.join(relative));
+            }
         }
-        println!("  declared tests: {}", project.manifest.tests.len());
         let mut passed = 0usize;
         let mut failed = 0usize;
-        for relative in &project.manifest.tests {
-            let path = project.root.join(relative);
-            println!("  test: {}", path.display());
-            let report = run_language_tests_for_source_file(&path)?;
+        let mut skipped = 0usize;
+        for path in paths {
+            let report = run_language_tests_for_source_file(
+                &path,
+                filter.as_deref(),
+                list,
+                ignored_only,
+                include_ignored,
+                exact,
+            )?;
             collected += report.collected;
             passed += report.passed;
             failed += report.failed;
+            skipped += report.skipped;
         }
         println!("  collected language tests: {}", collected);
-        println!("  executed language tests: {}", passed + failed);
+        if list {
+            println!("  listed language tests: {}", collected);
+            return Ok(());
+        }
+        println!("  executed language tests: {}", passed + failed + skipped);
         println!("  passed: {}", passed);
         println!("  failed: {}", failed);
+        println!("  skipped: {}", skipped);
         if failed > 0 {
             return Err(format!(
                 "project test run failed: {failed} language test(s) failed"
             ));
         }
-        println!("  result: all declared tests passed");
+        if collected == 0 {
+            println!("  result: project check passed");
+        } else {
+            println!("  result: all discovered language tests passed");
+        }
         Ok(())
     } else {
         println!("test: {}", input.display());
-        let report = run_language_tests_for_source_file(&input)?;
+        let report = run_language_tests_for_source_file(
+            &input,
+            filter.as_deref(),
+            list,
+            ignored_only,
+            include_ignored,
+            exact,
+        )?;
         if report.collected == 0 {
             handle_check(input.clone())?;
+        }
+        if list {
+            println!("  listed language tests: {}", report.collected);
+            return Ok(());
         }
         if report.failed > 0 {
             return Err(format!(
@@ -234,56 +262,177 @@ struct LanguageTestRunReport {
     collected: usize,
     passed: usize,
     failed: usize,
+    skipped: usize,
 }
 
-fn run_language_tests_for_source_file(path: &Path) -> Result<LanguageTestRunReport, String> {
+struct TestVerdict {
+    status: &'static str,
+    counted_pass: bool,
+    note: Option<String>,
+}
+
+fn run_language_tests_for_source_file(
+    path: &Path,
+    filter: Option<&str>,
+    list_only: bool,
+    ignored_only: bool,
+    include_ignored: bool,
+    exact: bool,
+) -> Result<LanguageTestRunReport, String> {
     let source = std::fs::read_to_string(path)
         .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
     let ast = nuisc::frontend::parse_nuis_ast(&source)?;
     let nir = nuisc::frontend::lower_ast_to_nir(&ast)?;
     let tests = nuisc::frontend::collect_nir_tests(&nir);
-    println!("  collected language tests: {}", tests.len());
+    let matched = ast
+        .functions
+        .iter()
+        .filter(|function| function.test_name.is_some())
+        .filter(|function| {
+            test_matches_filter(
+                function.name.as_str(),
+                function.test_name.as_deref(),
+                filter,
+                exact,
+            )
+        })
+        .filter(|function| {
+            test_matches_ignored_mode(function.test_ignored, ignored_only, include_ignored)
+        })
+        .collect::<Vec<_>>();
+    if !matched.is_empty() {
+        println!("  source: {}", path.display());
+    }
+    println!("  collected language tests: {}", matched.len());
     for function in &tests {
-        println!(
+        if !test_matches_filter(
+            function.name.as_str(),
+            function.test_name.as_deref(),
+            filter,
+            exact,
+        ) {
+            continue;
+        }
+        if !test_matches_ignored_mode(function.test_ignored, ignored_only, include_ignored) {
+            continue;
+        }
+        let mut line = format!(
             "  test_fn: {} ({})",
             function.name,
             function.test_name.as_deref().unwrap_or(&function.name)
         );
+        if function.test_ignored {
+            line.push_str(" [ignored]");
+        }
+        if function.test_should_fail {
+            line.push_str(" [should_fail]");
+        }
+        if let Some(reason) = &function.test_reason {
+            line.push_str(&format!(" [reason: {}]", reason));
+        }
+        if let Some(timeout_ms) = function.test_timeout_ms {
+            line.push_str(&format!(" [timeout_ms: {}]", timeout_ms));
+        }
+        if let Some(clock_domain) = &function.test_clock_domain {
+            line.push_str(&format!(" [clock_domain: {}]", clock_domain.as_str()));
+        }
+        println!("{line}");
+    }
+    if list_only {
+        return Ok(LanguageTestRunReport {
+            collected: matched.len(),
+            passed: 0,
+            failed: 0,
+            skipped: 0,
+        });
     }
     let mut passed = 0usize;
     let mut failed = 0usize;
-    for function in ast
-        .functions
-        .iter()
-        .filter(|function| function.test_name.is_some())
-    {
-        let ok = execute_language_test(path, &ast, function)?;
+    let mut skipped = 0usize;
+    for function in matched {
+        let verdict = execute_language_test(path, &ast, function, ignored_only || include_ignored)?;
         println!(
             "  {} {}",
-            if ok { "PASS" } else { "FAIL" },
+            verdict.status,
             function.test_name.as_deref().unwrap_or(&function.name)
         );
-        if ok {
+        if let Some(reason) = &function.test_reason {
+            println!("    reason: {}", reason);
+        }
+        if let Some(note) = &verdict.note {
+            println!("    note: {}", note);
+        }
+        if verdict.status == "SKIP" {
+            skipped += 1;
+        } else if verdict.counted_pass {
             passed += 1;
         } else {
             failed += 1;
         }
     }
-    println!("  executed language tests: {}", passed + failed);
+    println!("  executed language tests: {}", passed + failed + skipped);
     println!("  passed: {}", passed);
     println!("  failed: {}", failed);
+    println!("  skipped: {}", skipped);
     Ok(LanguageTestRunReport {
-        collected: tests.len(),
+        collected: tests
+            .iter()
+            .filter(|function| {
+                test_matches_filter(
+                    function.name.as_str(),
+                    function.test_name.as_deref(),
+                    filter,
+                    exact,
+                )
+            })
+            .filter(|function| {
+                test_matches_ignored_mode(function.test_ignored, ignored_only, include_ignored)
+            })
+            .count(),
         passed,
         failed,
+        skipped,
     })
+}
+
+fn test_matches_ignored_mode(
+    test_ignored: bool,
+    ignored_only: bool,
+    include_ignored: bool,
+) -> bool {
+    if ignored_only {
+        test_ignored
+    } else if include_ignored {
+        true
+    } else {
+        !test_ignored
+    }
+}
+
+fn test_matches_filter(name: &str, label: Option<&str>, filter: Option<&str>, exact: bool) -> bool {
+    let Some(filter) = filter else {
+        return true;
+    };
+    if exact {
+        name == filter || label.map(|label| label == filter).unwrap_or(false)
+    } else {
+        name.contains(filter) || label.map(|label| label.contains(filter)).unwrap_or(false)
+    }
 }
 
 fn execute_language_test(
     input_path: &Path,
     ast: &AstModule,
     test_function: &AstFunction,
-) -> Result<bool, String> {
+    run_ignored: bool,
+) -> Result<TestVerdict, String> {
+    if test_function.test_ignored && !run_ignored {
+        return Ok(TestVerdict {
+            status: "SKIP",
+            counted_pass: false,
+            note: None,
+        });
+    }
     let harness_ast = build_test_harness_module(ast, test_function);
     let artifacts = nuisc::pipeline::compile_ast(harness_ast)?;
     let output_dir = temp_test_output_dir(
@@ -303,10 +452,102 @@ fn execute_language_test(
         &artifacts.llvm_ir,
         &cpu_target,
     )?;
-    let status = Command::new(&written.binary_path)
-        .status()
+    let mut child = Command::new(&written.binary_path)
+        .spawn()
         .map_err(|error| format!("failed to run `{}`: {error}", written.binary_path))?;
-    Ok(status.code().unwrap_or_default() != 0)
+    let raw_outcome = wait_for_test_child(
+        &mut child,
+        test_function.test_timeout_ms,
+        test_function.test_clock_domain,
+    )?;
+    let (status, counted_pass, note) = match raw_outcome {
+        RawTestOutcome::Completed(status) => {
+            let raw_ok = status.code().unwrap_or_default() != 0;
+            if test_function.test_should_fail {
+                if raw_ok {
+                    ("XPASS", false, None)
+                } else {
+                    ("XFAIL", true, None)
+                }
+            } else if raw_ok {
+                ("PASS", true, None)
+            } else {
+                ("FAIL", false, None)
+            }
+        }
+        RawTestOutcome::TimedOut(timeout_ms) => {
+            let note = Some(format!("timed out after {} ms", timeout_ms));
+            if test_function.test_should_fail {
+                ("XFAIL", true, note)
+            } else {
+                ("TIMEOUT", false, note)
+            }
+        }
+    };
+    Ok(TestVerdict {
+        status,
+        counted_pass,
+        note,
+    })
+}
+
+enum RawTestOutcome {
+    Completed(ExitStatus),
+    TimedOut(i64),
+}
+
+fn wait_for_test_child(
+    child: &mut Child,
+    timeout_ms: Option<i64>,
+    clock_domain: Option<nuis_semantics::model::TestClockDomain>,
+) -> Result<RawTestOutcome, String> {
+    let Some(timeout_ms) = timeout_ms else {
+        let status = child
+            .wait()
+            .map_err(|error| format!("failed to wait for test process: {error}"))?;
+        return Ok(RawTestOutcome::Completed(status));
+    };
+    let timeout_ms_u64 = u64::try_from(timeout_ms)
+        .map_err(|_| format!("invalid negative timeout_ms `{timeout_ms}` reached runner"))?;
+    let clock_domain = clock_domain.unwrap_or(nuis_semantics::model::TestClockDomain::Monotonic);
+    let monotonic_deadline = matches!(
+        clock_domain,
+        nuis_semantics::model::TestClockDomain::Monotonic
+            | nuis_semantics::model::TestClockDomain::Global
+    )
+    .then(|| Instant::now() + Duration::from_millis(timeout_ms_u64));
+    let wall_deadline = if clock_domain == nuis_semantics::model::TestClockDomain::Wall {
+        Some(
+            SystemTime::now()
+                .checked_add(Duration::from_millis(timeout_ms_u64))
+                .ok_or_else(|| "failed to compute wall-clock test deadline".to_owned())?,
+        )
+    } else {
+        None
+    };
+    loop {
+        if let Some(status) = child
+            .try_wait()
+            .map_err(|error| format!("failed to poll test process: {error}"))?
+        {
+            return Ok(RawTestOutcome::Completed(status));
+        }
+        let timed_out = if let Some(deadline) = monotonic_deadline {
+            Instant::now() >= deadline
+        } else if let Some(deadline) = wall_deadline {
+            SystemTime::now() >= deadline
+        } else {
+            false
+        };
+        if timed_out {
+            child
+                .kill()
+                .map_err(|error| format!("failed to kill timed out test process: {error}"))?;
+            let _ = child.wait();
+            return Ok(RawTestOutcome::TimedOut(timeout_ms));
+        }
+        thread::sleep(Duration::from_millis(1));
+    }
 }
 
 fn build_test_harness_module(ast: &AstModule, test_function: &AstFunction) -> AstModule {
@@ -362,6 +603,11 @@ fn build_test_main_function(test_function: &AstFunction) -> AstFunction {
     AstFunction {
         name: "main".to_owned(),
         test_name: None,
+        test_ignored: false,
+        test_should_fail: false,
+        test_reason: None,
+        test_timeout_ms: None,
+        test_clock_domain: None,
         is_async: test_function.is_async,
         params: vec![],
         return_type: Some(i64_type_ref()),
@@ -1169,7 +1415,9 @@ fn print_help() {
     println!();
     println!("  build and inspect:");
     println!("    nuis check [input.ns|project-dir|nuis.toml]");
-    println!("    nuis test [input.ns|project-dir|nuis.toml]");
+    println!(
+        "    nuis test [--list] [--ignored|--include-ignored] [--exact] [input.ns|project-dir|nuis.toml] [filter]"
+    );
     println!(
         "    nuis build [--verbose-cache] [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] <output-dir>"
     );
@@ -1332,10 +1580,14 @@ fn find_abi_block_span(source: &str) -> Option<(usize, usize)> {
 
 #[cfg(test)]
 mod tests {
-    use super::{handle_check, handle_test};
+    use super::{
+        handle_check, handle_test, run_language_tests_for_source_file, wait_for_test_child,
+        RawTestOutcome,
+    };
     use std::{
         env, fs,
         path::{Path, PathBuf},
+        process::Command,
         time::{SystemTime, UNIX_EPOCH},
     };
 
@@ -1450,6 +1702,282 @@ mod cpu Main {
 "#,
         )
         .expect("write smoke");
-        handle_test(manifest).expect("project tests pass");
+        handle_test(manifest, false, false, false, false, None).expect("project tests pass");
+    }
+
+    #[test]
+    fn language_test_runner_tracks_ignored_and_should_fail() {
+        let dir = temp_dir("language_test_flags");
+        let input = dir.join("flags.ns");
+        fs::write(
+            &input,
+            r#"
+mod cpu Main {
+  test(ignored=true) fn skipped_case() -> i64 {
+    return 1;
+  }
+
+  test(should_fail=true, reason="must reject zero") fn expected_failure() -> i64 {
+    return 0;
+  }
+
+  test(should_fail=true) fn unexpected_pass() -> i64 {
+    return 1;
+  }
+}
+"#,
+        )
+        .expect("write language test file");
+
+        let report = run_language_tests_for_source_file(&input, None, false, false, false, false)
+            .expect("language tests should run");
+        assert_eq!(report.collected, 2);
+        assert_eq!(report.passed, 1);
+        assert_eq!(report.failed, 1);
+        assert_eq!(report.skipped, 0);
+    }
+
+    #[test]
+    fn language_test_runner_can_run_ignored_tests() {
+        let dir = temp_dir("language_test_run_ignored");
+        let input = dir.join("ignored.ns");
+        fs::write(
+            &input,
+            r#"
+mod cpu Main {
+  test(ignored=true) fn skipped_case() -> i64 {
+    return 1;
+  }
+
+  test(should_fail=true, reason="must reject zero") fn expected_failure() -> i64 {
+    return 0;
+  }
+}
+"#,
+        )
+        .expect("write language test file");
+
+        let report = run_language_tests_for_source_file(&input, None, false, true, false, false)
+            .expect("ignored language tests should run");
+        assert_eq!(report.collected, 1);
+        assert_eq!(report.passed, 1);
+        assert_eq!(report.failed, 0);
+        assert_eq!(report.skipped, 0);
+    }
+
+    #[test]
+    fn language_test_runner_can_include_ignored_tests() {
+        let dir = temp_dir("language_test_include_ignored");
+        let input = dir.join("include_ignored.ns");
+        fs::write(
+            &input,
+            r#"
+mod cpu Main {
+  test(ignored=true) fn skipped_case() -> i64 {
+    return 1;
+  }
+
+  test(should_fail=true, reason="must reject zero") fn expected_failure() -> i64 {
+    return 0;
+  }
+
+  test(should_fail=true) fn unexpected_pass() -> i64 {
+    return 1;
+  }
+}
+"#,
+        )
+        .expect("write language test file");
+
+        let report = run_language_tests_for_source_file(&input, None, false, false, true, false)
+            .expect("all language tests should run");
+        assert_eq!(report.collected, 3);
+        assert_eq!(report.passed, 2);
+        assert_eq!(report.failed, 1);
+        assert_eq!(report.skipped, 0);
+    }
+
+    #[test]
+    fn language_test_runner_can_filter_exactly() {
+        let dir = temp_dir("language_test_exact");
+        let input = dir.join("exact.ns");
+        fs::write(
+            &input,
+            r#"
+mod cpu Main {
+  test("smoke_add") fn smoke_add_impl() -> i64 {
+    return 1;
+  }
+
+  test() fn smoke_add_extra() -> i64 {
+    return 1;
+  }
+}
+"#,
+        )
+        .expect("write language test file");
+
+        let report = run_language_tests_for_source_file(
+            &input,
+            Some("smoke_add"),
+            false,
+            false,
+            false,
+            true,
+        )
+        .expect("exact filter should run");
+        assert_eq!(report.collected, 1);
+        assert_eq!(report.passed, 1);
+        assert_eq!(report.failed, 0);
+        assert_eq!(report.skipped, 0);
+    }
+
+    #[test]
+    fn language_test_runner_can_filter_ignored_tests_exactly() {
+        let dir = temp_dir("language_test_exact_ignored");
+        let input = dir.join("exact_ignored.ns");
+        fs::write(
+            &input,
+            r#"
+mod cpu Main {
+  test("smoke_skip", ignored=true) fn skipped_impl() -> i64 {
+    return 1;
+  }
+
+  test(ignored=true) fn skipped_extra() -> i64 {
+    return 1;
+  }
+}
+"#,
+        )
+        .expect("write language test file");
+
+        let report = run_language_tests_for_source_file(
+            &input,
+            Some("smoke_skip"),
+            false,
+            true,
+            false,
+            true,
+        )
+        .expect("exact ignored filter should run");
+        assert_eq!(report.collected, 1);
+        assert_eq!(report.passed, 1);
+        assert_eq!(report.failed, 0);
+        assert_eq!(report.skipped, 0);
+    }
+
+    #[test]
+    fn language_test_runner_accepts_should_fail_reason() {
+        let dir = temp_dir("language_test_reason");
+        let input = dir.join("reason.ns");
+        fs::write(
+            &input,
+            r#"
+mod cpu Main {
+  test("expected_failure", should_fail=true, reason="must reject zero") fn expected_failure() -> i64 {
+    return 0;
+  }
+}
+"#,
+        )
+        .expect("write language test file");
+
+        let report = run_language_tests_for_source_file(&input, None, false, false, false, false)
+            .expect("reason-bearing language tests should run");
+        assert_eq!(report.collected, 1);
+        assert_eq!(report.passed, 1);
+        assert_eq!(report.failed, 0);
+        assert_eq!(report.skipped, 0);
+    }
+
+    #[test]
+    fn timeout_helper_marks_child_as_timed_out() {
+        let mut child = Command::new("/bin/sh")
+            .arg("-c")
+            .arg("sleep 1")
+            .spawn()
+            .expect("spawn sleep child");
+        let outcome = wait_for_test_child(
+            &mut child,
+            Some(10),
+            Some(nuis_semantics::model::TestClockDomain::Monotonic),
+        )
+        .expect("timeout helper should work");
+        match outcome {
+            RawTestOutcome::TimedOut(timeout_ms) => assert_eq!(timeout_ms, 10),
+            RawTestOutcome::Completed(status) => {
+                panic!("expected timeout, child exited with {:?}", status.code())
+            }
+        }
+    }
+
+    #[test]
+    fn timeout_helper_supports_wall_clock_domain() {
+        let mut child = Command::new("/bin/sh")
+            .arg("-c")
+            .arg("sleep 1")
+            .spawn()
+            .expect("spawn sleep child");
+        let outcome = wait_for_test_child(
+            &mut child,
+            Some(10),
+            Some(nuis_semantics::model::TestClockDomain::Wall),
+        )
+        .expect("wall-clock timeout helper should work");
+        match outcome {
+            RawTestOutcome::TimedOut(timeout_ms) => assert_eq!(timeout_ms, 10),
+            RawTestOutcome::Completed(status) => {
+                panic!("expected timeout, child exited with {:?}", status.code())
+            }
+        }
+    }
+
+    #[test]
+    fn language_test_runner_times_out_end_to_end() {
+        let dir = temp_dir("language_test_timeout");
+        let input = dir.join("timeout.ns");
+        fs::write(
+            &input,
+            r#"
+mod cpu Main {
+  extern "c" fn usleep(usec: i64) -> i32;
+
+  test("slow_async", timeout_ms=25) async fn slow_async() -> i64 {
+    let _slept: i32 = usleep(100000);
+    return 1;
+  }
+}
+"#,
+        )
+        .expect("write timeout test file");
+
+        let report = run_language_tests_for_source_file(&input, None, false, false, false, false)
+            .expect("timeout language test should run");
+        assert_eq!(report.collected, 1);
+        assert_eq!(report.passed, 0);
+        assert_eq!(report.failed, 1);
+        assert_eq!(report.skipped, 0);
+    }
+
+    #[test]
+    fn timeout_helper_supports_global_clock_domain() {
+        let mut child = Command::new("/bin/sh")
+            .arg("-c")
+            .arg("sleep 1")
+            .spawn()
+            .expect("spawn sleep child");
+        let outcome = wait_for_test_child(
+            &mut child,
+            Some(10),
+            Some(nuis_semantics::model::TestClockDomain::Global),
+        )
+        .expect("global-clock timeout helper should work");
+        match outcome {
+            RawTestOutcome::TimedOut(timeout_ms) => assert_eq!(timeout_ms, 10),
+            RawTestOutcome::Completed(status) => {
+                panic!("expected timeout, child exited with {:?}", status.code())
+            }
+        }
     }
 }

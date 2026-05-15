@@ -47,8 +47,23 @@ Recommended first commands:
 cargo run -p nuis -- project-doctor examples/projects/window_controls_demo
 cargo run -p nuis -- check examples/projects/window_controls_demo
 cargo run -p nuis -- test examples/projects/window_controls_demo
+cargo run -p nuis -- test --list examples/projects/window_controls_demo
+cargo run -p nuis -- test --ignored examples/projects/window_controls_demo
+cargo run -p nuis -- test --include-ignored examples/projects/window_controls_demo
+cargo run -p nuis -- test --exact examples/projects/window_controls_demo smoke_add
+cargo run -p nuis -- test --ignored --exact examples/projects/window_controls_demo smoke_skip
 cargo run -p nuis -- project-status examples/projects/window_controls_demo
 cargo run -p nuis -- build examples/projects/window_controls_demo examples/bins/window_controls_demo_project
+```
+
+Current language-level test declarations use:
+
+```ns
+test("smoke_add") fn smoke_add() -> i64 { return 1; }
+test(ignored=true) fn skipped_case() -> i64 { return 1; }
+test(should_fail=true) fn expected_failure() -> i64 { return 0; }
+test("expected_failure", should_fail=true, reason="must reject zero") fn expected_failure() -> i64 { return 0; }
+test("slow_async", timeout_ms=25, clock_domain="global") async fn slow_async() -> i64 { return 1; }
 ```
 
 Useful inspection commands:

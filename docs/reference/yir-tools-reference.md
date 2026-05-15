@@ -64,7 +64,7 @@ Current reference commands:
 * `project-lock-abi <project-dir|nuis.toml>`
 * `release-check <input> <output-dir>`
 * `check <input.ns|project-dir|nuis.toml>`
-* `test <input.ns|project-dir|nuis.toml>`
+* `test [--list] [--ignored|--include-ignored] [--exact] <input.ns|project-dir|nuis.toml> [filter]`
 * `build <input.ns|project-dir|nuis.toml> <output-dir>`
 * `build --cpu-abi <abi> <input> <output-dir>`
 * `build --target <triple> <input> <output-dir>`
@@ -114,7 +114,7 @@ The front-door workflow is now project-aware:
 * `project-status` prints the resolved project graph, declared `tests = [...]`, effective ABI mode, and per-domain ABI target details
 * `project-doctor` prints a higher-level health summary covering project ABI state, declared/missing test inputs, `galaxy.toml`, `nuis.galaxy.lock`, dependency materialization state, `ns-nova.toml`, and current `stdlib/ns-nova` source-asset visibility
 * `project-lock-abi` materializes the currently recommended host-matching ABI set into the project manifest
-* `test` runs `check` first, then walks explicit `tests = [...]` entries from `nuis.toml` when present
+* `test` runs `check` first, collects language-level `test fn` declarations, can list them with `--list`, can restrict execution to a substring filter on the test function name or declared label, supports `--exact`, supports `--ignored` / `--include-ignored`, and currently understands the MVP metadata `ignored`, `should_fail`, `reason`, `timeout_ms`, and `clock_domain`
 * `verify-build-manifest` now reports CPU target metadata including ABI, machine arch/os, object format, calling ABI, clang triple, and cross-build flag
 
 ### Recommended Project Management Flow
@@ -144,7 +144,9 @@ Read that as:
 * `check`
   semantic/project validation
 * `test`
-  front-door validation pass for a single `.ns` input or a project manifest; on projects it runs `check` first and then checks each declared test input from `tests = [...]`
+  front-door test pass for a single `.ns` input or a project manifest; it can list discovered language-level tests, filter them by substring or exact test name/label, and execute the current MVP runner for `mod cpu` tests with `() -> bool|i64`. By default `ignored` tests are omitted from execution, `--ignored` runs only them, and `--include-ignored` runs them alongside normal tests. Current status labels are `PASS`, `FAIL`, `SKIP`, `XFAIL`, and `XPASS`.
+  Test declarations now use `test(...) fn ...`, for example `test("smoke_add", ignored=true) fn smoke_add() -> i64 { ... }`, `test("expected_failure", should_fail=true, reason="must reject zero") fn expected_failure() -> i64 { ... }`, or `test("slow_async", timeout_ms=25, clock_domain="global") async fn slow_async() -> i64 { ... }`.
+  `clock_domain` currently accepts `monotonic`, `wall`, and `global`. In the current front-door runner, `global` is provisionally mapped onto the host monotonic clock so async tests can start expressing cross-domain timing intent without waiting for a full runtime-wide clock bridge.
 * `build`
   artifact generation
 
@@ -165,6 +167,12 @@ cargo run -p nuis -- project-doctor examples/projects/window_controls_demo
 cargo run -p nuis -- project-status examples/projects/window_controls_demo
 cargo run -p nuis -- project-lock-abi examples/projects/window_controls_demo
 cargo run -p nuis -- test examples/projects/window_controls_demo
+cargo run -p nuis -- test --list examples/projects/window_controls_demo
+cargo run -p nuis -- test --ignored examples/projects/window_controls_demo
+cargo run -p nuis -- test --include-ignored examples/projects/window_controls_demo
+cargo run -p nuis -- test examples/projects/window_controls_demo smoke
+cargo run -p nuis -- test --exact examples/projects/window_controls_demo smoke_add
+cargo run -p nuis -- test --ignored --exact examples/projects/window_controls_demo smoke_skip
 
 cargo run -p nuis -- galaxy init examples/projects/window_controls_demo --framework ns-nova
 cargo run -p nuis -- galaxy check examples/projects/window_controls_demo
