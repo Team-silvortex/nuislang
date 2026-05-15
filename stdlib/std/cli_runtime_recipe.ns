@@ -1,0 +1,106 @@
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+  extern "c" fn host_env_has(key_handle: i64) -> i64;
+  extern "c" fn host_cwd_handle() -> i64;
+  extern "c" fn host_stdout_write(text_handle: i64) -> i64;
+  extern "c" fn host_diag_emit(label_handle: i64, span_handle: i64, severity: i64) -> i64;
+  extern "c" fn host_config_open(scope_handle: i64) -> i64;
+  extern "c" fn host_config_get(config_handle: i64, key_handle: i64) -> i64;
+  extern "c" fn host_config_close(config_handle: i64) -> i64;
+  extern "c" fn host_cache_open(name_handle: i64) -> i64;
+  extern "c" fn host_cache_lookup(cache_handle: i64, key_handle: i64) -> i64;
+  extern "c" fn host_cache_store(cache_handle: i64, key_handle: i64, value_handle: i64) -> i64;
+  extern "c" fn host_cache_close(cache_handle: i64) -> i64;
+  extern "c" fn host_monotonic_time_ns() -> i64;
+
+  struct CliSeed {
+    env_key_handle: i64,
+    text_handle: i64,
+    config_scope_handle: i64,
+    config_key_handle: i64,
+    cache_name_handle: i64,
+    cache_key_handle: i64
+  }
+
+  struct CliRuntimeSummary {
+    argv_count: i64,
+    env_present: i64,
+    cwd_handle: i64,
+    config_value_handle: i64,
+    cache_hit_handle: i64,
+    io_code: i64,
+    diag_code: i64,
+    tick_ns: i64
+  }
+
+  fn build_seed(
+    env_key_handle: i64,
+    text_handle: i64,
+    config_scope_handle: i64,
+    config_key_handle: i64,
+    cache_name_handle: i64,
+    cache_key_handle: i64
+  ) -> CliSeed {
+    return CliSeed {
+      env_key_handle: env_key_handle,
+      text_handle: text_handle,
+      config_scope_handle: config_scope_handle,
+      config_key_handle: config_key_handle,
+      cache_name_handle: cache_name_handle,
+      cache_key_handle: cache_key_handle
+    };
+  }
+
+  fn summarize_runtime(seed: CliSeed) -> CliRuntimeSummary {
+    let config_handle: i64 = host_config_open(seed.config_scope_handle);
+    let config_value_handle: i64 = host_config_get(config_handle, seed.config_key_handle);
+    let config_close_code: i64 = host_config_close(config_handle);
+
+    let cache_handle: i64 = host_cache_open(seed.cache_name_handle);
+    let cache_hit_handle: i64 = host_cache_lookup(cache_handle, seed.cache_key_handle);
+    let cache_store_code: i64 = host_cache_store(cache_handle, seed.cache_key_handle, config_value_handle);
+    let cache_close_code: i64 = host_cache_close(cache_handle);
+
+    return CliRuntimeSummary {
+      argv_count: host_argv_count(),
+      env_present: host_env_has(seed.env_key_handle),
+      cwd_handle: host_cwd_handle(),
+      config_value_handle: config_value_handle + config_close_code,
+      cache_hit_handle: cache_hit_handle + cache_store_code + cache_close_code,
+      io_code: host_stdout_write(seed.text_handle),
+      diag_code: host_diag_emit(seed.text_handle, 0, 1),
+      tick_ns: host_monotonic_time_ns()
+    };
+  }
+
+  fn summarize_cli_recipe(
+    env_key_handle: i64,
+    text_handle: i64,
+    config_scope_handle: i64,
+    config_key_handle: i64,
+    cache_name_handle: i64,
+    cache_key_handle: i64
+  ) -> i64 {
+    let seed: CliSeed = build_seed(
+      env_key_handle,
+      text_handle,
+      config_scope_handle,
+      config_key_handle,
+      cache_name_handle,
+      cache_key_handle
+    );
+    let summary: CliRuntimeSummary = summarize_runtime(seed);
+    return summary.argv_count
+      + summary.env_present
+      + summary.cwd_handle
+      + summary.config_value_handle
+      + summary.cache_hit_handle
+      + summary.io_code
+      + summary.diag_code
+      + summary.tick_ns;
+  }
+
+  fn main() {
+    print(summarize_cli_recipe(1701, 1901, 1401, 29, 1607, 41));
+  }
+}

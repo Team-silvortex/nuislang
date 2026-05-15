@@ -1,0 +1,30 @@
+mod cpu Main {
+  extern "c" fn host_env_has(key_handle: i64) -> i64;
+  extern "c" fn host_env_get(key_handle: i64) -> i64;
+
+  struct EnvProbe {
+    key_handle: i64,
+    present: i64,
+    value_handle: i64
+  }
+
+  fn probe_env(key_handle: i64) -> EnvProbe {
+    let present: i64 = host_env_has(key_handle);
+    let value_handle: i64 = host_env_get(key_handle);
+    return EnvProbe {
+      key_handle: key_handle,
+      present: present,
+      value_handle: value_handle
+    };
+  }
+
+  fn summarize_env(primary_key: i64, fallback_key: i64) -> i64 {
+    let primary: EnvProbe = probe_env(primary_key);
+    let fallback: EnvProbe = probe_env(fallback_key);
+    return primary.present + fallback.present + primary.value_handle + fallback.value_handle;
+  }
+
+  fn main() {
+    print(summarize_env(101, 202));
+  }
+}

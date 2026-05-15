@@ -1,0 +1,27 @@
+mod cpu Main {
+  extern "c" fn host_text_len(text_handle: i64) -> i64;
+  extern "c" fn host_text_concat_len(lhs_handle: i64, rhs_handle: i64) -> i64;
+
+  struct HostText {
+    handle: i64,
+    len: i64
+  }
+
+  fn build_host_text(handle: i64) -> HostText {
+    return HostText {
+      handle: handle,
+      len: host_text_len(handle)
+    };
+  }
+
+  fn summarize_host_text(lhs_handle: i64, rhs_handle: i64) -> i64 {
+    let lhs: HostText = build_host_text(lhs_handle);
+    let rhs: HostText = build_host_text(rhs_handle);
+    let merged_len: i64 = host_text_concat_len(lhs.handle, rhs.handle);
+    return lhs.len + rhs.len + merged_len;
+  }
+
+  fn main() {
+    print(summarize_host_text(11, 19));
+  }
+}

@@ -1,0 +1,30 @@
+mod cpu Main {
+  extern "c" fn host_dir_open(path_handle: i64) -> i64;
+  extern "c" fn host_dir_entry_count(dir_handle: i64) -> i64;
+  extern "c" fn host_dir_close(dir_handle: i64) -> i64;
+
+  struct DirectoryHandle {
+    handle: i64,
+    entry_count: i64,
+    close_code: i64
+  }
+
+  fn open_directory(path_handle: i64) -> DirectoryHandle {
+    let handle: i64 = host_dir_open(path_handle);
+    let entry_count: i64 = host_dir_entry_count(handle);
+    return DirectoryHandle {
+      handle: handle,
+      entry_count: entry_count,
+      close_code: host_dir_close(handle)
+    };
+  }
+
+  fn summarize_directory(path_handle: i64) -> i64 {
+    let dir: DirectoryHandle = open_directory(path_handle);
+    return dir.handle + dir.entry_count + dir.close_code;
+  }
+
+  fn main() {
+    print(summarize_directory(307));
+  }
+}

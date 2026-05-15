@@ -1,0 +1,28 @@
+mod cpu Main {
+  extern "c" fn host_cwd_handle() -> i64;
+  extern "c" fn host_cwd_len() -> i64;
+  extern "c" fn host_chdir(path_handle: i64) -> i64;
+
+  struct CurrentDirectory {
+    handle: i64,
+    len: i64,
+    chdir_code: i64
+  }
+
+  fn read_current_directory(path_handle: i64) -> CurrentDirectory {
+    return CurrentDirectory {
+      handle: host_cwd_handle(),
+      len: host_cwd_len(),
+      chdir_code: host_chdir(path_handle)
+    };
+  }
+
+  fn summarize_current_directory(path_handle: i64) -> i64 {
+    let cwd: CurrentDirectory = read_current_directory(path_handle);
+    return cwd.handle + cwd.len + cwd.chdir_code;
+  }
+
+  fn main() {
+    print(summarize_current_directory(907));
+  }
+}

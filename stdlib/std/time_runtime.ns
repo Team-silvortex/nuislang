@@ -1,0 +1,28 @@
+mod cpu Main {
+  extern "c" fn host_wall_time_ns() -> i64;
+  extern "c" fn host_monotonic_time_ns() -> i64;
+  extern "c" fn host_sleep_ns(duration_ns: i64) -> i64;
+
+  struct TimeSample {
+    wall_ns: i64,
+    monotonic_ns: i64,
+    slept_ns: i64
+  }
+
+  fn capture_time_sample(duration_ns: i64) -> TimeSample {
+    return TimeSample {
+      wall_ns: host_wall_time_ns(),
+      monotonic_ns: host_monotonic_time_ns(),
+      slept_ns: host_sleep_ns(duration_ns)
+    };
+  }
+
+  fn summarize_time_sample(duration_ns: i64) -> i64 {
+    let sample: TimeSample = capture_time_sample(duration_ns);
+    return sample.wall_ns + sample.monotonic_ns + sample.slept_ns;
+  }
+
+  fn main() {
+    print(summarize_time_sample(1000));
+  }
+}

@@ -94,6 +94,7 @@ fn run() -> Result<(), String> {
             target,
         } => handle_release_check(input, output_dir, cpu_abi, target)?,
         cli::CommandKind::Check { input } => handle_check(input)?,
+        cli::CommandKind::Test { input } => handle_test(input)?,
         cli::CommandKind::Build {
             input,
             output_dir,
@@ -150,6 +151,32 @@ fn handle_check(input: std::path::PathBuf) -> Result<(), String> {
     Ok(())
 }
 
+fn handle_test(input: std::path::PathBuf) -> Result<(), String> {
+    if nuisc::project::is_project_input(&input) {
+        let project = nuisc::project::load_project(&input)?;
+        println!("test: checking project {}", project.manifest.name);
+        handle_check(input.clone())?;
+        if project.manifest.tests.is_empty() {
+            println!("  no explicit tests declared");
+            println!("  result: project check passed");
+            return Ok(());
+        }
+        println!("  declared tests: {}", project.manifest.tests.len());
+        for relative in &project.manifest.tests {
+            let path = project.root.join(relative);
+            println!("  test: {}", path.display());
+            handle_check(path)?;
+        }
+        println!("  result: all declared tests passed");
+        Ok(())
+    } else {
+        println!("test: {}", input.display());
+        handle_check(input.clone())?;
+        println!("  result: passed");
+        Ok(())
+    }
+}
+
 fn handle_build(
     input: std::path::PathBuf,
     output_dir: std::path::PathBuf,
@@ -186,6 +213,12 @@ fn handle_project_status(input: std::path::PathBuf) -> Result<(), String> {
     let project = nuisc::project::load_project(&input)?;
     let resolution = nuisc::project::resolve_project_abi(&project)?;
     let galaxy_lock_status = galaxy::verify_project_lock(&input);
+    let declared_tests = project
+        .manifest
+        .tests
+        .iter()
+        .map(|relative| project.root.join(relative))
+        .collect::<Vec<_>>();
     let mut domains = project
         .modules
         .iter()
@@ -210,6 +243,14 @@ fn handle_project_status(input: std::path::PathBuf) -> Result<(), String> {
     println!("  entry: {}", project.manifest.entry);
     println!("  modules: {}", project.modules.len());
     println!("  links: {}", project.manifest.links.len());
+    println!("  tests: {}", declared_tests.len());
+    for path in &declared_tests {
+        println!(
+            "  test: {} exists={}",
+            path.display(),
+            yes_no(path.exists())
+        );
+    }
     println!(
         "  domains: {}",
         domains.into_iter().collect::<Vec<_>>().join(", ")
@@ -297,6 +338,17 @@ fn handle_project_status(input: std::path::PathBuf) -> Result<(), String> {
 fn handle_project_doctor(input: std::path::PathBuf) -> Result<(), String> {
     let project = nuisc::project::load_project(&input)?;
     let resolution = nuisc::project::resolve_project_abi(&project)?;
+    let declared_tests = project
+        .manifest
+        .tests
+        .iter()
+        .map(|relative| project.root.join(relative))
+        .collect::<Vec<_>>();
+    let missing_tests = declared_tests
+        .iter()
+        .filter(|path| !path.exists())
+        .cloned()
+        .collect::<Vec<_>>();
     let galaxy_manifest_path = project.root.join("galaxy.toml");
     let galaxy_manifest_exists = galaxy_manifest_path.exists();
     let galaxy_check = if galaxy_manifest_exists {
@@ -321,6 +373,15 @@ fn handle_project_doctor(input: std::path::PathBuf) -> Result<(), String> {
     println!("  entry: {}", project.manifest.entry);
     println!("  modules: {}", project.modules.len());
     println!("  links: {}", project.manifest.links.len());
+    println!("  tests_declared: {}", declared_tests.len());
+    println!("  tests_missing: {}", missing_tests.len());
+    for path in &declared_tests {
+        println!(
+            "  test: {} exists={}",
+            path.display(),
+            yes_no(path.exists())
+        );
+    }
     println!(
         "  abi_mode: {}",
         if resolution.explicit {
@@ -573,6 +634,16 @@ fn handle_project_doctor(input: std::path::PathBuf) -> Result<(), String> {
     if !resolution.explicit {
         next_steps.push(
             "run `nuis project-lock-abi <project-dir>` if you want to freeze the current ABI recommendations".to_owned(),
+        );
+    }
+    if declared_tests.is_empty() {
+        next_steps.push(
+            "add `tests = [\"tests/smoke.ns\"]` to `nuis.toml` once you want `nuis test <project-dir>` to run explicit project test inputs".to_owned(),
+        );
+    }
+    if !missing_tests.is_empty() {
+        next_steps.push(
+            "some declared project tests are missing on disk; add those `.ns` files or remove stale entries from `tests = [...]` in `nuis.toml`".to_owned(),
         );
     }
     if next_steps.is_empty() {
@@ -860,6 +931,7 @@ fn print_help() {
     println!();
     println!("  build and inspect:");
     println!("    nuis check [input.ns|project-dir|nuis.toml]");
+    println!("    nuis test [input.ns|project-dir|nuis.toml]");
     println!(
         "    nuis build [--verbose-cache] [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] <output-dir>"
     );
@@ -878,9 +950,7 @@ fn print_help() {
         "    nuis cache-status [--all] [--verbose-cache] [--json] [input.ns|project-dir|nuis.toml]"
     );
     println!("    nuis clean-cache [--all] [--json] [input.ns|project-dir|nuis.toml]");
-    println!(
-        "    nuis cache-prune [--all] [--keep N] [--json] [input.ns|project-dir|nuis.toml]"
-    );
+    println!("    nuis cache-prune [--all] [--keep N] [--json] [input.ns|project-dir|nuis.toml]");
     println!();
     println!("  release and package:");
     println!(
@@ -1024,10 +1094,11 @@ fn find_abi_block_span(source: &str) -> Option<(usize, usize)> {
 
 #[cfg(test)]
 mod tests {
-    use super::handle_check;
+    use super::{handle_check, handle_test};
     use std::{
-        fs,
+        env, fs,
         path::{Path, PathBuf},
+        time::{SystemTime, UNIX_EPOCH},
     };
 
     fn repo_root() -> PathBuf {
@@ -1090,5 +1161,57 @@ mod tests {
             .expect("spawn stdlib smoke thread")
             .join()
             .expect("join stdlib smoke thread");
+    }
+
+    fn temp_dir(label: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time")
+            .as_nanos();
+        let dir = env::temp_dir().join(format!("nuis_{label}_{}_{}", std::process::id(), nanos));
+        fs::create_dir_all(&dir).expect("create temp dir");
+        dir
+    }
+
+    #[test]
+    fn test_command_checks_declared_project_tests() {
+        let dir = temp_dir("project_tests");
+        let manifest = dir.join("nuis.toml");
+        let entry = dir.join("main.ns");
+        let tests_dir = dir.join("tests");
+        fs::create_dir_all(&tests_dir).expect("create tests dir");
+        let smoke = tests_dir.join("smoke.ns");
+        fs::write(
+            &manifest,
+            r#"
+name = "smoke_project"
+entry = "main.ns"
+tests = ["tests/smoke.ns"]
+"#,
+        )
+        .expect("write manifest");
+        fs::write(
+            &entry,
+            r#"
+mod cpu Main {
+  fn main() {
+    print(1);
+  }
+}
+"#,
+        )
+        .expect("write entry");
+        fs::write(
+            &smoke,
+            r#"
+mod cpu Main {
+  fn main() {
+    print(2);
+  }
+}
+"#,
+        )
+        .expect("write smoke");
+        handle_test(manifest).expect("project tests pass");
     }
 }

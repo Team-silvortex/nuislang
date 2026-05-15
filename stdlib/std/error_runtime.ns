@@ -1,0 +1,30 @@
+mod cpu Main {
+  extern "c" fn host_error_code(kind_handle: i64) -> i64;
+  extern "c" fn host_error_message(kind_handle: i64) -> i64;
+  extern "c" fn host_error_severity(kind_handle: i64) -> i64;
+
+  struct ErrorRecord {
+    kind_handle: i64,
+    code: i64,
+    message_handle: i64,
+    severity: i64
+  }
+
+  fn build_error(kind_handle: i64) -> ErrorRecord {
+    return ErrorRecord {
+      kind_handle: kind_handle,
+      code: host_error_code(kind_handle),
+      message_handle: host_error_message(kind_handle),
+      severity: host_error_severity(kind_handle)
+    };
+  }
+
+  fn summarize_error(kind_handle: i64) -> i64 {
+    let err: ErrorRecord = build_error(kind_handle);
+    return err.code + err.message_handle + err.severity;
+  }
+
+  fn main() {
+    print(summarize_error(1101));
+  }
+}

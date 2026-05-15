@@ -1,0 +1,33 @@
+mod cpu Main {
+  extern "c" fn host_cache_open(name_handle: i64) -> i64;
+  extern "c" fn host_cache_lookup(cache_handle: i64, key_handle: i64) -> i64;
+  extern "c" fn host_cache_store(cache_handle: i64, key_handle: i64, value_handle: i64) -> i64;
+  extern "c" fn host_cache_close(cache_handle: i64) -> i64;
+
+  struct CacheRecord {
+    handle: i64,
+    hit_handle: i64,
+    store_code: i64,
+    close_code: i64
+  }
+
+  fn update_cache(name_handle: i64, key_handle: i64, value_handle: i64) -> CacheRecord {
+    let handle: i64 = host_cache_open(name_handle);
+    let hit_handle: i64 = host_cache_lookup(handle, key_handle);
+    return CacheRecord {
+      handle: handle,
+      hit_handle: hit_handle,
+      store_code: host_cache_store(handle, key_handle, value_handle),
+      close_code: host_cache_close(handle)
+    };
+  }
+
+  fn summarize_cache(name_handle: i64, key_handle: i64, value_handle: i64) -> i64 {
+    let cache: CacheRecord = update_cache(name_handle, key_handle, value_handle);
+    return cache.handle + cache.hit_handle + cache.store_code + cache.close_code;
+  }
+
+  fn main() {
+    print(summarize_cache(1607, 41, 777));
+  }
+}

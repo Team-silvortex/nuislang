@@ -1,0 +1,30 @@
+mod cpu Main {
+  extern "c" fn host_tty_isatty(fd: i64) -> i64;
+  extern "c" fn host_tty_width(fd: i64) -> i64;
+  extern "c" fn host_tty_height(fd: i64) -> i64;
+
+  struct TtyInfo {
+    fd: i64,
+    is_tty: i64,
+    width: i64,
+    height: i64
+  }
+
+  fn inspect_tty(fd: i64) -> TtyInfo {
+    return TtyInfo {
+      fd: fd,
+      is_tty: host_tty_isatty(fd),
+      width: host_tty_width(fd),
+      height: host_tty_height(fd)
+    };
+  }
+
+  fn summarize_tty(fd: i64) -> i64 {
+    let tty: TtyInfo = inspect_tty(fd);
+    return tty.fd + tty.is_tty + tty.width + tty.height;
+  }
+
+  fn main() {
+    print(summarize_tty(1));
+  }
+}

@@ -63,8 +63,9 @@ Current reference commands:
 * `project-doctor <project-dir|nuis.toml>`
 * `project-lock-abi <project-dir|nuis.toml>`
 * `release-check <input> <output-dir>`
-* `check <input.ns>`
-* `build <input.ns> <output-dir>`
+* `check <input.ns|project-dir|nuis.toml>`
+* `test <input.ns|project-dir|nuis.toml>`
+* `build <input.ns|project-dir|nuis.toml> <output-dir>`
 * `build --cpu-abi <abi> <input> <output-dir>`
 * `build --target <triple> <input> <output-dir>`
 * `dump-ast <input.ns>`
@@ -109,10 +110,11 @@ Current loading-contract direction is:
 
 The front-door workflow is now project-aware:
 
-* `check`, `build`, `dump-ast`, `dump-nir`, `dump-yir`, `bindings`, and cache commands all accept single-file `.ns`, project directories, or direct `nuis.toml` inputs where applicable
-* `project-status` prints the resolved project graph, effective ABI mode, and per-domain ABI target details
-* `project-doctor` prints a higher-level health summary covering project ABI state, `galaxy.toml`, `nuis.galaxy.lock`, dependency materialization state, `ns-nova.toml`, and current `stdlib/ns-nova` source-asset visibility
+* `check`, `test`, `build`, `dump-ast`, `dump-nir`, `dump-yir`, `bindings`, and cache commands all accept single-file `.ns`, project directories, or direct `nuis.toml` inputs where applicable
+* `project-status` prints the resolved project graph, declared `tests = [...]`, effective ABI mode, and per-domain ABI target details
+* `project-doctor` prints a higher-level health summary covering project ABI state, declared/missing test inputs, `galaxy.toml`, `nuis.galaxy.lock`, dependency materialization state, `ns-nova.toml`, and current `stdlib/ns-nova` source-asset visibility
 * `project-lock-abi` materializes the currently recommended host-matching ABI set into the project manifest
+* `test` runs `check` first, then walks explicit `tests = [...]` entries from `nuis.toml` when present
 * `verify-build-manifest` now reports CPU target metadata including ABI, machine arch/os, object format, calling ABI, clang triple, and cross-build flag
 
 ### Recommended Project Management Flow
@@ -124,6 +126,7 @@ project-doctor
   -> project-status
   -> project-lock-abi    (when ABI is still auto-resolved)
   -> check
+  -> test
   -> build
 ```
 
@@ -140,6 +143,8 @@ Read that as:
   written into the manifest
 * `check`
   semantic/project validation
+* `test`
+  front-door validation pass for a single `.ns` input or a project manifest; on projects it runs `check` first and then checks each declared test input from `tests = [...]`
 * `build`
   artifact generation
 
@@ -159,6 +164,7 @@ Typical commands:
 cargo run -p nuis -- project-doctor examples/projects/window_controls_demo
 cargo run -p nuis -- project-status examples/projects/window_controls_demo
 cargo run -p nuis -- project-lock-abi examples/projects/window_controls_demo
+cargo run -p nuis -- test examples/projects/window_controls_demo
 
 cargo run -p nuis -- galaxy init examples/projects/window_controls_demo --framework ns-nova
 cargo run -p nuis -- galaxy check examples/projects/window_controls_demo

@@ -1,0 +1,30 @@
+mod cpu Main {
+  extern "c" fn host_stat_mtime_ns(path_handle: i64) -> i64;
+  extern "c" fn host_stat_ctime_ns(path_handle: i64) -> i64;
+  extern "c" fn host_stat_mode(path_handle: i64) -> i64;
+
+  struct StatRecord {
+    path_handle: i64,
+    mode: i64,
+    mtime_ns: i64,
+    ctime_ns: i64
+  }
+
+  fn read_stat(path_handle: i64) -> StatRecord {
+    return StatRecord {
+      path_handle: path_handle,
+      mode: host_stat_mode(path_handle),
+      mtime_ns: host_stat_mtime_ns(path_handle),
+      ctime_ns: host_stat_ctime_ns(path_handle)
+    };
+  }
+
+  fn summarize_stat(path_handle: i64) -> i64 {
+    let stat: StatRecord = read_stat(path_handle);
+    return stat.mode + stat.mtime_ns + stat.ctime_ns;
+  }
+
+  fn main() {
+    print(summarize_stat(419));
+  }
+}

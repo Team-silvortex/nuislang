@@ -1,0 +1,110 @@
+mod cpu Main {
+  extern "c" fn host_cwd_handle() -> i64;
+  extern "c" fn host_temp_dir_handle() -> i64;
+  extern "c" fn host_temp_file_handle(prefix_handle: i64) -> i64;
+  extern "c" fn host_cache_open(name_handle: i64) -> i64;
+  extern "c" fn host_cache_lookup(cache_handle: i64, key_handle: i64) -> i64;
+  extern "c" fn host_cache_store(cache_handle: i64, key_handle: i64, value_handle: i64) -> i64;
+  extern "c" fn host_cache_close(cache_handle: i64) -> i64;
+  extern "c" fn host_subprocess_spawn(program_handle: i64, argv_handle: i64, env_handle: i64) -> i64;
+  extern "c" fn host_subprocess_signal(process_handle: i64, signal: i64) -> i64;
+  extern "c" fn host_subprocess_join(process_handle: i64) -> i64;
+  extern "c" fn host_monotonic_time_ns() -> i64;
+
+  struct AutomationSeed {
+    prefix_handle: i64,
+    cache_name_handle: i64,
+    cache_key_handle: i64,
+    program_handle: i64,
+    argv_handle: i64,
+    env_handle: i64
+  }
+
+  struct AutomationSummary {
+    cwd_handle: i64,
+    temp_dir_handle: i64,
+    temp_file_handle: i64,
+    cache_hit_handle: i64,
+    cache_store_code: i64,
+    process_handle: i64,
+    signal_code: i64,
+    join_code: i64,
+    tick_ns: i64
+  }
+
+  fn build_seed(
+    prefix_handle: i64,
+    cache_name_handle: i64,
+    cache_key_handle: i64,
+    program_handle: i64,
+    argv_handle: i64,
+    env_handle: i64
+  ) -> AutomationSeed {
+    return AutomationSeed {
+      prefix_handle: prefix_handle,
+      cache_name_handle: cache_name_handle,
+      cache_key_handle: cache_key_handle,
+      program_handle: program_handle,
+      argv_handle: argv_handle,
+      env_handle: env_handle
+    };
+  }
+
+  fn summarize_runtime(seed: AutomationSeed) -> AutomationSummary {
+    let cache_handle: i64 = host_cache_open(seed.cache_name_handle);
+    let cache_hit_handle: i64 = host_cache_lookup(cache_handle, seed.cache_key_handle);
+    let temp_file_handle: i64 = host_temp_file_handle(seed.prefix_handle);
+    let cache_store_code: i64 = host_cache_store(cache_handle, seed.cache_key_handle, temp_file_handle);
+    let cache_close_code: i64 = host_cache_close(cache_handle);
+
+    let process_handle: i64 = host_subprocess_spawn(
+      seed.program_handle,
+      seed.argv_handle,
+      seed.env_handle
+    );
+
+    return AutomationSummary {
+      cwd_handle: host_cwd_handle(),
+      temp_dir_handle: host_temp_dir_handle(),
+      temp_file_handle: temp_file_handle,
+      cache_hit_handle: cache_hit_handle + cache_close_code,
+      cache_store_code: cache_store_code,
+      process_handle: process_handle,
+      signal_code: host_subprocess_signal(process_handle, 0),
+      join_code: host_subprocess_join(process_handle),
+      tick_ns: host_monotonic_time_ns()
+    };
+  }
+
+  fn summarize_automation_recipe(
+    prefix_handle: i64,
+    cache_name_handle: i64,
+    cache_key_handle: i64,
+    program_handle: i64,
+    argv_handle: i64,
+    env_handle: i64
+  ) -> i64 {
+    let seed: AutomationSeed = build_seed(
+      prefix_handle,
+      cache_name_handle,
+      cache_key_handle,
+      program_handle,
+      argv_handle,
+      env_handle
+    );
+    let summary: AutomationSummary = summarize_runtime(seed);
+    return summary.cwd_handle
+      + summary.temp_dir_handle
+      + summary.temp_file_handle
+      + summary.cache_hit_handle
+      + summary.cache_store_code
+      + summary.process_handle
+      + summary.signal_code
+      + summary.join_code
+      + summary.tick_ns;
+  }
+
+  fn main() {
+    print(summarize_automation_recipe(2401, 1607, 41, 2503, 29, 7));
+  }
+}

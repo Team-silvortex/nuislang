@@ -16,5 +16,6 @@ source_modules = [
   "basic_scalars.ns",
   "struct_patterns.ns",
   "math_runtime.ns",
-  "ref_runtime.ns"
+  "ref_runtime.ns",
+  "value_blueprint.ns"
 ]

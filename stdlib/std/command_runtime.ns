@@ -1,0 +1,29 @@
+mod cpu Main {
+  extern "c" fn host_command_spawn(program_handle: i64, argv_handle: i64) -> i64;
+  extern "c" fn host_command_status(command_handle: i64) -> i64;
+  extern "c" fn host_command_wait(command_handle: i64) -> i64;
+
+  struct CommandHandle {
+    handle: i64,
+    status: i64,
+    wait_code: i64
+  }
+
+  fn launch_command(program_handle: i64, argv_handle: i64) -> CommandHandle {
+    let handle: i64 = host_command_spawn(program_handle, argv_handle);
+    return CommandHandle {
+      handle: handle,
+      status: host_command_status(handle),
+      wait_code: host_command_wait(handle)
+    };
+  }
+
+  fn summarize_command(program_handle: i64, argv_handle: i64) -> i64 {
+    let command: CommandHandle = launch_command(program_handle, argv_handle);
+    return command.handle + command.status + command.wait_code;
+  }
+
+  fn main() {
+    print(summarize_command(401, 17));
+  }
+}

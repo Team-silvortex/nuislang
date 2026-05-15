@@ -1,0 +1,26 @@
+mod cpu Main {
+  extern "c" fn host_stdin_read(buffer_handle: i64, len: i64) -> i64;
+
+  struct StdinRead {
+    requested_len: i64,
+    read_len: i64
+  }
+
+  fn read_stdin_once(requested_len: i64) -> StdinRead {
+    let backing: ref Buffer = alloc_buffer(requested_len, 0);
+    let read_len: i64 = host_stdin_read(backing, requested_len);
+    return StdinRead {
+      requested_len: requested_len,
+      read_len: read_len
+    };
+  }
+
+  fn summarize_stdin_once(requested_len: i64) -> i64 {
+    let read: StdinRead = read_stdin_once(requested_len);
+    return read.requested_len + read.read_len;
+  }
+
+  fn main() {
+    print(summarize_stdin_once(32));
+  }
+}

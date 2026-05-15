@@ -1,0 +1,30 @@
+mod cpu Main {
+  extern "c" fn host_config_open(scope_handle: i64) -> i64;
+  extern "c" fn host_config_get(config_handle: i64, key_handle: i64) -> i64;
+  extern "c" fn host_config_close(config_handle: i64) -> i64;
+
+  struct ConfigHandle {
+    handle: i64,
+    value_handle: i64,
+    close_code: i64
+  }
+
+  fn open_config(scope_handle: i64, key_handle: i64) -> ConfigHandle {
+    let handle: i64 = host_config_open(scope_handle);
+    let value_handle: i64 = host_config_get(handle, key_handle);
+    return ConfigHandle {
+      handle: handle,
+      value_handle: value_handle,
+      close_code: host_config_close(handle)
+    };
+  }
+
+  fn summarize_config(scope_handle: i64, key_handle: i64) -> i64 {
+    let config: ConfigHandle = open_config(scope_handle, key_handle);
+    return config.handle + config.value_handle + config.close_code;
+  }
+
+  fn main() {
+    print(summarize_config(1401, 29));
+  }
+}

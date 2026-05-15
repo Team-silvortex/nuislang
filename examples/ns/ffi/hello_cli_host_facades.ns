@@ -1,0 +1,270 @@
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+  extern "c" fn host_env_has(key_handle: i64) -> i64;
+  extern "c" fn host_cwd_handle() -> i64;
+  extern "c" fn host_temp_dir_handle() -> i64;
+  extern "c" fn host_temp_file_handle(prefix_handle: i64) -> i64;
+  extern "c" fn host_monotonic_time_ns() -> i64;
+  extern "c" fn host_stdout_write(text_handle: i64) -> i64;
+  extern "c" fn host_diag_emit(label_handle: i64, span_handle: i64, severity: i64) -> i64;
+  extern "c" fn host_config_open(scope_handle: i64) -> i64;
+  extern "c" fn host_config_get(config_handle: i64, key_handle: i64) -> i64;
+  extern "c" fn host_config_close(config_handle: i64) -> i64;
+  extern "c" fn host_cache_open(name_handle: i64) -> i64;
+  extern "c" fn host_cache_lookup(cache_handle: i64, key_handle: i64) -> i64;
+  extern "c" fn host_cache_store(cache_handle: i64, key_handle: i64, value_handle: i64) -> i64;
+  extern "c" fn host_cache_close(cache_handle: i64) -> i64;
+  extern "c" fn host_subprocess_spawn(program_handle: i64, argv_handle: i64, env_handle: i64) -> i64;
+  extern "c" fn host_subprocess_signal(process_handle: i64, signal: i64) -> i64;
+  extern "c" fn host_subprocess_join(process_handle: i64) -> i64;
+  extern "c" fn host_path_join_len(lhs_handle: i64, rhs_handle: i64) -> i64;
+  extern "c" fn host_fs_exists(path_handle: i64) -> i64;
+  extern "c" fn host_fs_size(path_handle: i64) -> i64;
+  extern "c" fn host_json_pair_len(key_handle: i64, value_handle: i64) -> i64;
+  extern "c" fn host_json_object_len(field_count: i64) -> i64;
+
+  struct CliSeed {
+    env_key_handle: i64,
+    text_handle: i64,
+    config_scope_handle: i64,
+    config_key_handle: i64,
+    cache_name_handle: i64,
+    cache_key_handle: i64
+  }
+
+  struct ReportSeed {
+    base_path_handle: i64,
+    child_path_handle: i64,
+    label_handle: i64,
+    key_handle: i64,
+    value_handle: i64
+  }
+
+  struct AutomationSeed {
+    prefix_handle: i64,
+    cache_name_handle: i64,
+    cache_key_handle: i64,
+    program_handle: i64,
+    argv_handle: i64,
+    env_handle: i64
+  }
+
+  struct CliSummary {
+    argc: i64,
+    env_present: i64,
+    cwd_handle: i64,
+    config_value_handle: i64,
+    cache_hit_handle: i64,
+    stdout_code: i64,
+    diag_code: i64,
+    tick_ns: i64
+  }
+
+  struct ReportSummary {
+    joined_len: i64,
+    exists: i64,
+    size: i64,
+    json_len: i64,
+    diag_code: i64,
+    stdout_code: i64
+  }
+
+  struct AutomationSummary {
+    cwd_handle: i64,
+    temp_dir_handle: i64,
+    temp_file_handle: i64,
+    cache_hit_handle: i64,
+    cache_store_code: i64,
+    process_handle: i64,
+    signal_code: i64,
+    join_code: i64,
+    tick_ns: i64
+  }
+
+  fn build_cli_seed(
+    env_key_handle: i64,
+    text_handle: i64,
+    config_scope_handle: i64,
+    config_key_handle: i64,
+    cache_name_handle: i64,
+    cache_key_handle: i64
+  ) -> CliSeed {
+    return CliSeed {
+      env_key_handle: env_key_handle,
+      text_handle: text_handle,
+      config_scope_handle: config_scope_handle,
+      config_key_handle: config_key_handle,
+      cache_name_handle: cache_name_handle,
+      cache_key_handle: cache_key_handle
+    };
+  }
+
+  fn build_report_seed(
+    base_path_handle: i64,
+    child_path_handle: i64,
+    label_handle: i64,
+    key_handle: i64,
+    value_handle: i64
+  ) -> ReportSeed {
+    return ReportSeed {
+      base_path_handle: base_path_handle,
+      child_path_handle: child_path_handle,
+      label_handle: label_handle,
+      key_handle: key_handle,
+      value_handle: value_handle
+    };
+  }
+
+  fn build_automation_seed(
+    prefix_handle: i64,
+    cache_name_handle: i64,
+    cache_key_handle: i64,
+    program_handle: i64,
+    argv_handle: i64,
+    env_handle: i64
+  ) -> AutomationSeed {
+    return AutomationSeed {
+      prefix_handle: prefix_handle,
+      cache_name_handle: cache_name_handle,
+      cache_key_handle: cache_key_handle,
+      program_handle: program_handle,
+      argv_handle: argv_handle,
+      env_handle: env_handle
+    };
+  }
+
+  fn summarize_cli(seed: CliSeed) -> CliSummary {
+    let config_handle: i64 = host_config_open(seed.config_scope_handle);
+    let config_value_handle: i64 = host_config_get(config_handle, seed.config_key_handle);
+    let config_close_code: i64 = host_config_close(config_handle);
+
+    let cache_handle: i64 = host_cache_open(seed.cache_name_handle);
+    let cache_hit_handle: i64 = host_cache_lookup(cache_handle, seed.cache_key_handle);
+    let cache_store_code: i64 = host_cache_store(cache_handle, seed.cache_key_handle, config_value_handle);
+    let cache_close_code: i64 = host_cache_close(cache_handle);
+
+    return CliSummary {
+      argc: host_argv_count(),
+      env_present: host_env_has(seed.env_key_handle),
+      cwd_handle: host_cwd_handle(),
+      config_value_handle: config_value_handle + config_close_code,
+      cache_hit_handle: cache_hit_handle + cache_store_code + cache_close_code,
+      stdout_code: host_stdout_write(seed.text_handle),
+      diag_code: host_diag_emit(seed.text_handle, 0, 1),
+      tick_ns: host_monotonic_time_ns()
+    };
+  }
+
+  fn summarize_report(seed: ReportSeed) -> ReportSummary {
+    let joined_len: i64 = host_path_join_len(seed.base_path_handle, seed.child_path_handle);
+    let exists: i64 = host_fs_exists(seed.base_path_handle);
+    let size: i64 = host_fs_size(seed.base_path_handle);
+    let json_pair_len: i64 = host_json_pair_len(seed.key_handle, seed.value_handle);
+    let json_object_len: i64 = host_json_object_len(2);
+    return ReportSummary {
+      joined_len: joined_len,
+      exists: exists,
+      size: size,
+      json_len: json_pair_len + json_object_len,
+      diag_code: host_diag_emit(seed.label_handle, joined_len, 1),
+      stdout_code: host_stdout_write(seed.label_handle)
+    };
+  }
+
+  fn summarize_automation(seed: AutomationSeed) -> AutomationSummary {
+    let cache_handle: i64 = host_cache_open(seed.cache_name_handle);
+    let cache_hit_handle: i64 = host_cache_lookup(cache_handle, seed.cache_key_handle);
+    let temp_file_handle: i64 = host_temp_file_handle(seed.prefix_handle);
+    let cache_store_code: i64 = host_cache_store(cache_handle, seed.cache_key_handle, temp_file_handle);
+    let cache_close_code: i64 = host_cache_close(cache_handle);
+    let process_handle: i64 = host_subprocess_spawn(
+      seed.program_handle,
+      seed.argv_handle,
+      seed.env_handle
+    );
+    return AutomationSummary {
+      cwd_handle: host_cwd_handle(),
+      temp_dir_handle: host_temp_dir_handle(),
+      temp_file_handle: temp_file_handle,
+      cache_hit_handle: cache_hit_handle + cache_close_code,
+      cache_store_code: cache_store_code,
+      process_handle: process_handle,
+      signal_code: host_subprocess_signal(process_handle, 0),
+      join_code: host_subprocess_join(process_handle),
+      tick_ns: host_monotonic_time_ns()
+    };
+  }
+
+  fn summarize_cli_snapshot(
+    env_key_handle: i64,
+    text_handle: i64,
+    config_scope_handle: i64,
+    config_key_handle: i64,
+    cache_name_handle: i64,
+    cache_key_handle: i64,
+    base_path_handle: i64,
+    child_path_handle: i64,
+    json_key_handle: i64,
+    json_value_handle: i64,
+    temp_prefix_handle: i64,
+    program_handle: i64,
+    argv_handle: i64,
+    env_handle: i64
+  ) -> i64 {
+    let cli_seed: CliSeed = build_cli_seed(
+      env_key_handle,
+      text_handle,
+      config_scope_handle,
+      config_key_handle,
+      cache_name_handle,
+      cache_key_handle
+    );
+    let report_seed: ReportSeed = build_report_seed(
+      base_path_handle,
+      child_path_handle,
+      text_handle,
+      json_key_handle,
+      json_value_handle
+    );
+    let automation_seed: AutomationSeed = build_automation_seed(
+      temp_prefix_handle,
+      cache_name_handle,
+      cache_key_handle,
+      program_handle,
+      argv_handle,
+      env_handle
+    );
+    let cli: CliSummary = summarize_cli(cli_seed);
+    let report: ReportSummary = summarize_report(report_seed);
+    let automation: AutomationSummary = summarize_automation(automation_seed);
+    return cli.argc
+      + cli.env_present
+      + cli.cwd_handle
+      + cli.config_value_handle
+      + cli.cache_hit_handle
+      + cli.stdout_code
+      + cli.diag_code
+      + cli.tick_ns
+      + report.joined_len
+      + report.exists
+      + report.size
+      + report.json_len
+      + report.diag_code
+      + report.stdout_code
+      + automation.cwd_handle
+      + automation.temp_dir_handle
+      + automation.temp_file_handle
+      + automation.cache_hit_handle
+      + automation.cache_store_code
+      + automation.process_handle
+      + automation.signal_code
+      + automation.join_code
+      + automation.tick_ns;
+  }
+
+  fn main() {
+    print(
+      summarize_cli_snapshot(1701, 1901, 1401, 29, 1607, 41, 2001, 37, 2207, 2309, 2401, 2503, 29, 7)
+    );
+  }
+}

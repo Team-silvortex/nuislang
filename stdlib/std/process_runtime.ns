@@ -1,0 +1,30 @@
+mod cpu Main {
+  extern "c" fn host_process_id() -> i64;
+  extern "c" fn host_process_status() -> i64;
+  extern "c" fn host_process_exit_code(status: i64) -> i64;
+
+  struct ProcessStatus {
+    pid: i64,
+    status: i64,
+    exit_code: i64
+  }
+
+  fn capture_process_status() -> ProcessStatus {
+    let pid: i64 = host_process_id();
+    let status: i64 = host_process_status();
+    return ProcessStatus {
+      pid: pid,
+      status: status,
+      exit_code: host_process_exit_code(status)
+    };
+  }
+
+  fn summarize_process_status() -> i64 {
+    let process: ProcessStatus = capture_process_status();
+    return process.pid + process.status + process.exit_code;
+  }
+
+  fn main() {
+    print(summarize_process_status());
+  }
+}

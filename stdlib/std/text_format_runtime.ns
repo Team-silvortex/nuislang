@@ -1,0 +1,30 @@
+mod cpu Main {
+  extern "c" fn host_text_format_i64(pattern_handle: i64, value: i64) -> i64;
+  extern "c" fn host_text_format_pair(pattern_handle: i64, lhs: i64, rhs: i64) -> i64;
+  extern "c" fn host_text_measure(text_handle: i64) -> i64;
+
+  struct FormattedText {
+    single_handle: i64,
+    pair_handle: i64,
+    measured_len: i64
+  }
+
+  fn build_formatted_text(pattern_handle: i64, value: i64, lhs: i64, rhs: i64) -> FormattedText {
+    let single_handle: i64 = host_text_format_i64(pattern_handle, value);
+    let pair_handle: i64 = host_text_format_pair(pattern_handle, lhs, rhs);
+    return FormattedText {
+      single_handle: single_handle,
+      pair_handle: pair_handle,
+      measured_len: host_text_measure(pair_handle)
+    };
+  }
+
+  fn summarize_formatted_text(pattern_handle: i64, value: i64, lhs: i64, rhs: i64) -> i64 {
+    let text: FormattedText = build_formatted_text(pattern_handle, value, lhs, rhs);
+    return text.single_handle + text.pair_handle + text.measured_len;
+  }
+
+  fn main() {
+    print(summarize_formatted_text(811, 13, 5, 8));
+  }
+}

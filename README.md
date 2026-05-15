@@ -46,6 +46,7 @@ Recommended first commands:
 ```bash
 cargo run -p nuis -- project-doctor examples/projects/window_controls_demo
 cargo run -p nuis -- check examples/projects/window_controls_demo
+cargo run -p nuis -- test examples/projects/window_controls_demo
 cargo run -p nuis -- project-status examples/projects/window_controls_demo
 cargo run -p nuis -- build examples/projects/window_controls_demo examples/bins/window_controls_demo_project
 ```

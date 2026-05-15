@@ -1,0 +1,28 @@
+mod cpu Main {
+  extern "c" fn host_temp_dir_handle() -> i64;
+  extern "c" fn host_temp_path_len() -> i64;
+  extern "c" fn host_temp_file_handle(prefix_handle: i64) -> i64;
+
+  struct TempLocation {
+    dir_handle: i64,
+    path_len: i64,
+    file_handle: i64
+  }
+
+  fn allocate_temp_location(prefix_handle: i64) -> TempLocation {
+    return TempLocation {
+      dir_handle: host_temp_dir_handle(),
+      path_len: host_temp_path_len(),
+      file_handle: host_temp_file_handle(prefix_handle)
+    };
+  }
+
+  fn summarize_temp_location(prefix_handle: i64) -> i64 {
+    let temp: TempLocation = allocate_temp_location(prefix_handle);
+    return temp.dir_handle + temp.path_len + temp.file_handle;
+  }
+
+  fn main() {
+    print(summarize_temp_location(1003));
+  }
+}

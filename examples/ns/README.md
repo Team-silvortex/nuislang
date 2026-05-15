@@ -16,24 +16,37 @@ Subdirectories:
 * [memory](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/README.md)
 * [demos](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/README.md)
 
-Recommended starting points:
+Read these examples in roughly five bands:
 
-* [hello_world.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/core/hello_world.ns)
-  minimal `mod cpu Main`
-* [hello_ref_struct.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/types/hello_ref_struct.ns)
-  `struct` plus `ref` fields
-* [hello_data.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/data/hello_data.ns)
-  first front-end `data` link surface
-* [hello_instantiate.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/data/hello_instantiate.ns)
-  `cpu`-side instantiation of another domain unit
-* [hello_ffi.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_ffi.ns)
-  first `extern "nurs" interface` CPU-side host bridge example
-* [hello_c_ffi.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_c_ffi.ns)
-  same minimal host bridge path through explicit `extern "c"`
-* [window_controls_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/window_controls_demo.ns)
-  current front-end `cpu + data + shader` real-time control/render demo, now with `extern "nurs" interface` host curve hooks
-* [projects/window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo)
-  current recommended multi-file project form once the demo grows beyond a single source file
+* basic language and expression shape
+  - [hello_world.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/core/hello_world.ns)
+    minimal `mod cpu Main`
+  - [hello_if.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/core/hello_if.ns)
+    current conditional shape
+* type and ownership shape
+  - [hello_ref_struct.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/types/hello_ref_struct.ns)
+    `struct` plus `ref` fields
+  - [hello_borrow_end.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_borrow_end.ns)
+    explicit local lifetime closure
+* data-path examples
+  - [hello_data.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/data/hello_data.ns)
+    first front-end `data` link surface
+  - [hello_data_window.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/data/hello_data_window.ns)
+    local mutable `WindowMut<T>` and frozen `Window<T>` path
+  - [hello_instantiate.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/data/hello_instantiate.ns)
+    `cpu`-side instantiation of another domain unit
+* host facade examples
+  - [hello_ffi.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_ffi.ns)
+    first `extern "nurs" interface` CPU-side host bridge example
+  - [hello_c_ffi.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_c_ffi.ns)
+    lower-level explicit `extern "c"` host route
+  - [hello_cli_host_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_cli_host_facades.ns)
+    tooling-shaped host example aligned with current `std` CLI/report/automation recipe thinking
+* end-to-end demo path
+  - [window_controls_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/window_controls_demo.ns)
+    current single-file `cpu + data + shader` real-time control/render demo
+  - [projects/window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo)
+    current recommended multi-file project form once the demo grows beyond a single source file
 
 Use:
 
@@ -53,10 +66,11 @@ cargo run -p nuis -- check examples/projects/window_controls_demo
 cargo run -p nuis -- project-status examples/projects/window_controls_demo
 ```
 
-Current source-language notes worth keeping in mind while reading these files:
+Current reading notes:
 
 * `mod` is a top-level builtin declaration, not a nested construct
 * `cpu` is currently the only domain that can declare `async fn`
 * current explicit task-style async surface is intentionally small:
   `spawn`, `join`, `cancel`, `timeout`, `join_result`, and `task_*`
 * cross-domain interaction is expected to route through project links and `mod data`, not direct nested mod definitions
+* current `ffi` examples are also where the host-backed `std` direction is easiest to see in source form before full import wiring exists

@@ -1,0 +1,55 @@
+mod cpu Main {
+  struct RouteSeed {
+    source: i64,
+    offset: i64,
+    len: i64
+  }
+
+  struct RouteSummary {
+    packed: i64,
+    roundtrip: i64,
+    echoed: i64
+  }
+
+  fn build_seed(source: i64, offset: i64, len: i64) -> RouteSeed {
+    return RouteSeed {
+      source: source,
+      offset: offset,
+      len: len
+    };
+  }
+
+  fn pack_window(seed: RouteSeed) -> i64 {
+    let backing: ref Buffer = alloc_buffer(3, 0);
+    let copy: WindowMut<i64> = data_copy_window(backing, 0, 3);
+    let copy_source: WindowMut<i64> = data_write_window(copy, 0, seed.source);
+    let copy_offset: WindowMut<i64> = data_write_window(copy_source, 1, seed.offset);
+    let copy_len: WindowMut<i64> = data_write_window(copy_offset, 2, seed.len);
+    let frozen: Window<i64> = data_freeze_window(copy_len);
+    return data_read_window(frozen, 0) +
+      data_read_window(frozen, 1) +
+      data_read_window(frozen, 2);
+  }
+
+  fn route_pipe(seed: RouteSeed) -> i64 {
+    data_bind_core(1);
+    let handles: HandleTable = data_handle_table("host=cpu0", "fabric=fabric0");
+    let ready: Marker = data_marker("std_recipe_ready");
+    let pipe: Pipe<i64> = data_output_pipe(seed.source);
+    return data_input_pipe(pipe);
+  }
+
+  fn summarize_route(source: i64, offset: i64, len: i64) -> i64 {
+    let seed: RouteSeed = build_seed(source, offset, len);
+    let summary: RouteSummary = RouteSummary {
+      packed: pack_window(seed),
+      roundtrip: route_pipe(seed),
+      echoed: source
+    };
+    return summary.packed + summary.roundtrip + summary.echoed;
+  }
+
+  fn main() {
+    print(summarize_route(18, 2, 4));
+  }
+}

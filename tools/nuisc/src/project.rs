@@ -17,6 +17,7 @@ pub struct NuisProjectManifest {
     pub name: String,
     pub entry: String,
     pub modules: Vec<String>,
+    pub tests: Vec<String>,
     pub links: Vec<ProjectLink>,
     pub abi_requirements: Vec<ProjectAbiRequirement>,
     pub galaxy_dependencies: Vec<ProjectGalaxyDependency>,
@@ -4723,6 +4724,7 @@ fn parse_project_manifest(source: &str, path: &Path) -> Result<NuisProjectManife
     let name = parse_required_string(source, "name", path)?;
     let entry = parse_required_string(source, "entry", path)?;
     let modules = parse_optional_string_array(source, "modules").unwrap_or_default();
+    let tests = parse_optional_string_array(source, "tests").unwrap_or_default();
     let links = parse_optional_link_array(source, "links").unwrap_or_default();
     let abi_requirements = parse_optional_abi_array(source, "abi").unwrap_or_default();
     let galaxy_dependencies =
@@ -4731,6 +4733,7 @@ fn parse_project_manifest(source: &str, path: &Path) -> Result<NuisProjectManife
         name,
         entry,
         modules,
+        tests,
         links,
         abi_requirements,
         galaxy_dependencies,
@@ -4874,6 +4877,7 @@ mod tests {
                 name: "test".to_owned(),
                 entry: "main.ns".to_owned(),
                 modules: vec![],
+                tests: vec![],
                 links: vec![],
                 abi_requirements: vec![],
                 galaxy_dependencies: vec![],
@@ -5999,5 +6003,22 @@ mod tests {
 
         let selected = recommend_abi_profile_for_host(&manifest).unwrap();
         assert_eq!(selected, "shader.host-match.v1");
+    }
+
+    #[test]
+    fn parses_project_tests_array() {
+        let manifest = parse_project_manifest(
+            r#"
+name = "sample"
+entry = "main.ns"
+tests = ["tests/smoke.ns", "tests/data.ns"]
+"#,
+            Path::new("nuis.toml"),
+        )
+        .unwrap();
+        assert_eq!(
+            manifest.tests,
+            vec!["tests/smoke.ns".to_owned(), "tests/data.ns".to_owned()]
+        );
     }
 }

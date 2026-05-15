@@ -1,0 +1,33 @@
+mod cpu Main {
+  extern "c" fn host_kv_open(namespace_handle: i64) -> i64;
+  extern "c" fn host_kv_put(store_handle: i64, key_handle: i64, value_handle: i64) -> i64;
+  extern "c" fn host_kv_get(store_handle: i64, key_handle: i64) -> i64;
+  extern "c" fn host_kv_close(store_handle: i64) -> i64;
+
+  struct KvRecord {
+    handle: i64,
+    put_code: i64,
+    value_handle: i64,
+    close_code: i64
+  }
+
+  fn update_kv(namespace_handle: i64, key_handle: i64, value_handle: i64) -> KvRecord {
+    let handle: i64 = host_kv_open(namespace_handle);
+    let put_code: i64 = host_kv_put(handle, key_handle, value_handle);
+    return KvRecord {
+      handle: handle,
+      put_code: put_code,
+      value_handle: host_kv_get(handle, key_handle),
+      close_code: host_kv_close(handle)
+    };
+  }
+
+  fn summarize_kv(namespace_handle: i64, key_handle: i64, value_handle: i64) -> i64 {
+    let record: KvRecord = update_kv(namespace_handle, key_handle, value_handle);
+    return record.handle + record.put_code + record.value_handle + record.close_code;
+  }
+
+  fn main() {
+    print(summarize_kv(1503, 31, 901));
+  }
+}

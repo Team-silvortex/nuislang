@@ -1,0 +1,39 @@
+mod cpu Main {
+  struct ValueSeed {
+    base: i64,
+    delta: i64,
+    bias: i64
+  }
+
+  struct ValueSummary {
+    pair_sum: i64,
+    mixed: i64
+  }
+
+  fn build_seed(base: i64, delta: i64, bias: i64) -> ValueSeed {
+    return ValueSeed {
+      base: base,
+      delta: delta,
+      bias: bias
+    };
+  }
+
+  fn build_summary(seed: ValueSeed) -> ValueSummary {
+    let lhs: i64 = seed.base;
+    let rhs: i64 = seed.base + seed.delta;
+    return ValueSummary {
+      pair_sum: lhs + rhs,
+      mixed: lhs + rhs + seed.bias
+    };
+  }
+
+  fn summarize_values(base: i64, delta: i64, bias: i64) -> i64 {
+    let seed: ValueSeed = build_seed(base, delta, bias);
+    let summary: ValueSummary = build_summary(seed);
+    return summary.pair_sum + summary.mixed;
+  }
+
+  fn main() {
+    print(summarize_values(10, 6, 3));
+  }
+}

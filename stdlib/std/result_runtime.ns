@@ -1,0 +1,30 @@
+mod cpu Main {
+  extern "c" fn host_result_is_ok(tag_handle: i64) -> i64;
+  extern "c" fn host_result_value(tag_handle: i64) -> i64;
+  extern "c" fn host_result_error(tag_handle: i64) -> i64;
+
+  struct ResultRecord {
+    tag_handle: i64,
+    is_ok: i64,
+    value_handle: i64,
+    error_handle: i64
+  }
+
+  fn read_result(tag_handle: i64) -> ResultRecord {
+    return ResultRecord {
+      tag_handle: tag_handle,
+      is_ok: host_result_is_ok(tag_handle),
+      value_handle: host_result_value(tag_handle),
+      error_handle: host_result_error(tag_handle)
+    };
+  }
+
+  fn summarize_result(tag_handle: i64) -> i64 {
+    let result: ResultRecord = read_result(tag_handle);
+    return result.is_ok + result.value_handle + result.error_handle;
+  }
+
+  fn main() {
+    print(summarize_result(1207));
+  }
+}

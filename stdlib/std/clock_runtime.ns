@@ -1,0 +1,30 @@
+mod cpu Main {
+  extern "c" fn host_clock_domain_id() -> i64;
+  extern "c" fn host_clock_epoch_ns() -> i64;
+  extern "c" fn host_clock_scale_ppm() -> i64;
+
+  struct GlobalClockScale {
+    domain_id: i64,
+    epoch_ns: i64,
+    tick: i64,
+    scale_ppm: i64
+  }
+
+  fn capture_global_clock() -> GlobalClockScale {
+    return GlobalClockScale {
+      domain_id: host_clock_domain_id(),
+      epoch_ns: host_clock_epoch_ns(),
+      tick: cpu_tick_i64(0, 1),
+      scale_ppm: host_clock_scale_ppm()
+    };
+  }
+
+  fn summarize_global_clock(bias: i64) -> i64 {
+    let clock: GlobalClockScale = capture_global_clock();
+    return clock.domain_id + clock.epoch_ns + clock.tick + clock.scale_ppm + bias;
+  }
+
+  fn main() {
+    print(summarize_global_clock(1));
+  }
+}

@@ -4,6 +4,7 @@ This folder contains CPU host-bridge examples:
 
 * `hello_ffi.ns`
 * `hello_c_ffi.ns`
+* `hello_cli_host_facades.ns`
 
 Reading guidance:
 
@@ -11,6 +12,15 @@ Reading guidance:
   current `extern "nurs" interface`-style host bridge
 * `hello_c_ffi.ns`
   plain `extern "c"` route kept as the lower-level baseline
+* `hello_cli_host_facades.ns`
+  a tooling-oriented `extern "c"` example that groups argv/env/cwd/stdout/diagnostic
+  style host facades in one place; it now mirrors both
+  [cli_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_runtime_recipe.ns)
+  ,
+  [report_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/report_runtime_recipe.ns)
+  , and
+  [automation_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/automation_runtime_recipe.ns)
+  from the current `stdlib/std` host-backed tooling direction
 
 Current note:
 
