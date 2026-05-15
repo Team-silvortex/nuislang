@@ -43,10 +43,15 @@ pub fn render_ast(module: &AstModule) -> String {
             .as_ref()
             .map(|ty| format!(" -> {}", render_ast_type(ty)))
             .unwrap_or_default();
+        let test_prefix = function
+            .test_name
+            .as_ref()
+            .map(|name| format!("test \"{}\" ", name))
+            .unwrap_or_default();
         let async_prefix = if function.is_async { "async " } else { "" };
         out.push_str(&format!(
-            "  {}fn {}({}){}\n",
-            async_prefix, function.name, params, return_suffix
+            "  {}{}fn {}({}){}\n",
+            test_prefix, async_prefix, function.name, params, return_suffix
         ));
         for stmt in &function.body {
             match stmt {
@@ -143,10 +148,15 @@ pub fn render_nir(module: &NirModule) -> String {
             .as_ref()
             .map(|ty| format!(" -> {}", render_nir_type(ty)))
             .unwrap_or_default();
+        let test_prefix = function
+            .test_name
+            .as_ref()
+            .map(|name| format!("test \"{}\" ", name))
+            .unwrap_or_default();
         let async_prefix = if function.is_async { "async " } else { "" };
         out.push_str(&format!(
-            "  {}fn {}({}){}\n",
-            async_prefix, function.name, params, return_suffix
+            "  {}{}fn {}({}){}\n",
+            test_prefix, async_prefix, function.name, params, return_suffix
         ));
         for stmt in &function.body {
             match stmt {

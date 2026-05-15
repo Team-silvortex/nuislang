@@ -9,4 +9,5 @@ readme.workspace = true
 description = "Front-door workflow tool for the Nuis toolchain."
 
 [dependencies]
+nuis-semantics = { path = "../../crates/nuis-semantics" }
 nuisc = { path = "../nuisc" }

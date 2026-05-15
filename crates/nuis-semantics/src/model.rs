@@ -65,6 +65,7 @@ pub struct AstParam {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AstFunction {
     pub name: String,
+    pub test_name: Option<String>,
     pub is_async: bool,
     pub params: Vec<AstParam>,
     pub return_type: Option<AstTypeRef>,
@@ -580,6 +581,7 @@ pub struct NirParam {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NirFunction {
     pub name: String,
+    pub test_name: Option<String>,
     pub is_async: bool,
     pub params: Vec<NirParam>,
     pub return_type: Option<NirTypeRef>,

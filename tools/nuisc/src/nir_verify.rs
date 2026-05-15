@@ -965,6 +965,7 @@ mod tests {
             structs: vec![],
             functions: vec![NirFunction {
                 name: "main".to_owned(),
+                test_name: None,
                 is_async: false,
                 params: vec![],
                 return_type: None,

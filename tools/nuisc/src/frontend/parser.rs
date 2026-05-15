@@ -151,6 +151,19 @@ impl Parser {
     }
 
     fn parse_function(&mut self) -> Result<AstFunction, String> {
+        let declared_test_name = if self.peek_word("test") {
+            self.expect_word("test")?;
+            match self.tokens.get(self.cursor) {
+                Some(Token::String(value)) => {
+                    let label = value.clone();
+                    self.cursor += 1;
+                    Some(label)
+                }
+                _ => Some(String::new()),
+            }
+        } else {
+            None
+        };
         let is_async = if self.peek_word("async") {
             self.expect_word("async")?;
             true
@@ -159,6 +172,13 @@ impl Parser {
         };
         self.expect_word("fn")?;
         let name = self.expect_ident()?;
+        let test_name = declared_test_name.map(|label| {
+            if label.is_empty() {
+                name.clone()
+            } else {
+                label
+            }
+        });
         self.expect_symbol('(')?;
         let params = if self.peek_symbol(')') {
             Vec::new()
@@ -183,6 +203,7 @@ impl Parser {
 
         Ok(AstFunction {
             name,
+            test_name,
             is_async,
             params,
             return_type,

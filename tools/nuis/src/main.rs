@@ -1,7 +1,16 @@
 mod cli;
 mod galaxy;
 
-use std::{collections::BTreeSet, fs, thread};
+use std::{
+    collections::BTreeSet,
+    fs,
+    path::{Path, PathBuf},
+    process::Command,
+    thread,
+    time::{SystemTime, UNIX_EPOCH},
+};
+
+use nuis_semantics::model::{AstExpr, AstFunction, AstModule, AstStmt, AstTypeRef};
 
 fn main() {
     let result = thread::Builder::new()
@@ -156,24 +165,253 @@ fn handle_test(input: std::path::PathBuf) -> Result<(), String> {
         let project = nuisc::project::load_project(&input)?;
         println!("test: checking project {}", project.manifest.name);
         handle_check(input.clone())?;
+        let mut collected = 0usize;
+        for module in &project.modules {
+            let nir = nuisc::frontend::lower_ast_to_nir(&module.ast)?;
+            let tests = nuisc::frontend::collect_nir_tests(&nir);
+            if !tests.is_empty() {
+                println!(
+                    "  discovered language tests: {} in {}",
+                    tests.len(),
+                    module.path.display()
+                );
+                for function in &tests {
+                    println!(
+                        "    test_fn: {} ({})",
+                        function.name,
+                        function.test_name.as_deref().unwrap_or(&function.name)
+                    );
+                }
+                collected += tests.len();
+            }
+        }
         if project.manifest.tests.is_empty() {
             println!("  no explicit tests declared");
+            println!("  collected language tests: {}", collected);
             println!("  result: project check passed");
             return Ok(());
         }
         println!("  declared tests: {}", project.manifest.tests.len());
+        let mut passed = 0usize;
+        let mut failed = 0usize;
         for relative in &project.manifest.tests {
             let path = project.root.join(relative);
             println!("  test: {}", path.display());
-            handle_check(path)?;
+            let report = run_language_tests_for_source_file(&path)?;
+            collected += report.collected;
+            passed += report.passed;
+            failed += report.failed;
+        }
+        println!("  collected language tests: {}", collected);
+        println!("  executed language tests: {}", passed + failed);
+        println!("  passed: {}", passed);
+        println!("  failed: {}", failed);
+        if failed > 0 {
+            return Err(format!(
+                "project test run failed: {failed} language test(s) failed"
+            ));
         }
         println!("  result: all declared tests passed");
         Ok(())
     } else {
         println!("test: {}", input.display());
-        handle_check(input.clone())?;
+        let report = run_language_tests_for_source_file(&input)?;
+        if report.collected == 0 {
+            handle_check(input.clone())?;
+        }
+        if report.failed > 0 {
+            return Err(format!(
+                "test run failed: {} language test(s) failed",
+                report.failed
+            ));
+        }
         println!("  result: passed");
         Ok(())
+    }
+}
+
+struct LanguageTestRunReport {
+    collected: usize,
+    passed: usize,
+    failed: usize,
+}
+
+fn run_language_tests_for_source_file(path: &Path) -> Result<LanguageTestRunReport, String> {
+    let source = std::fs::read_to_string(path)
+        .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
+    let ast = nuisc::frontend::parse_nuis_ast(&source)?;
+    let nir = nuisc::frontend::lower_ast_to_nir(&ast)?;
+    let tests = nuisc::frontend::collect_nir_tests(&nir);
+    println!("  collected language tests: {}", tests.len());
+    for function in &tests {
+        println!(
+            "  test_fn: {} ({})",
+            function.name,
+            function.test_name.as_deref().unwrap_or(&function.name)
+        );
+    }
+    let mut passed = 0usize;
+    let mut failed = 0usize;
+    for function in ast
+        .functions
+        .iter()
+        .filter(|function| function.test_name.is_some())
+    {
+        let ok = execute_language_test(path, &ast, function)?;
+        println!(
+            "  {} {}",
+            if ok { "PASS" } else { "FAIL" },
+            function.test_name.as_deref().unwrap_or(&function.name)
+        );
+        if ok {
+            passed += 1;
+        } else {
+            failed += 1;
+        }
+    }
+    println!("  executed language tests: {}", passed + failed);
+    println!("  passed: {}", passed);
+    println!("  failed: {}", failed);
+    Ok(LanguageTestRunReport {
+        collected: tests.len(),
+        passed,
+        failed,
+    })
+}
+
+fn execute_language_test(
+    input_path: &Path,
+    ast: &AstModule,
+    test_function: &AstFunction,
+) -> Result<bool, String> {
+    let harness_ast = build_test_harness_module(ast, test_function);
+    let artifacts = nuisc::pipeline::compile_ast(harness_ast)?;
+    let output_dir = temp_test_output_dir(
+        test_function
+            .test_name
+            .as_deref()
+            .unwrap_or(&test_function.name),
+    );
+    let cpu_target =
+        nuisc::aot::resolve_cpu_build_target(Path::new("nustar-packages"), None, None, None)?;
+    let written = nuisc::aot::write_and_link(
+        input_path,
+        &output_dir,
+        &artifacts.ast,
+        &artifacts.nir,
+        &artifacts.yir,
+        &artifacts.llvm_ir,
+        &cpu_target,
+    )?;
+    let status = Command::new(&written.binary_path)
+        .status()
+        .map_err(|error| format!("failed to run `{}`: {error}", written.binary_path))?;
+    Ok(status.code().unwrap_or_default() != 0)
+}
+
+fn build_test_harness_module(ast: &AstModule, test_function: &AstFunction) -> AstModule {
+    let mut harness = ast.clone();
+    harness.functions.retain(|function| function.name != "main");
+    harness
+        .functions
+        .push(build_test_main_function(test_function));
+    harness
+}
+
+fn build_test_main_function(test_function: &AstFunction) -> AstFunction {
+    let test_call = AstExpr::Call {
+        callee: test_function.name.clone(),
+        args: vec![],
+    };
+    let body = match test_function.return_type.as_ref() {
+        Some(return_type) if return_type.name == "bool" && !return_type.is_ref => {
+            let value_expr = if test_function.is_async {
+                AstExpr::Await(Box::new(test_call))
+            } else {
+                test_call
+            };
+            vec![
+                AstStmt::Let {
+                    name: "passed".to_owned(),
+                    ty: Some(bool_type_ref()),
+                    value: value_expr,
+                },
+                AstStmt::If {
+                    condition: AstExpr::Var("passed".to_owned()),
+                    then_body: vec![AstStmt::Return(Some(AstExpr::Int(1)))],
+                    else_body: vec![AstStmt::Return(Some(AstExpr::Int(0)))],
+                },
+            ]
+        }
+        _ => {
+            let value_expr = if test_function.is_async {
+                AstExpr::Await(Box::new(test_call))
+            } else {
+                test_call
+            };
+            vec![
+                AstStmt::Let {
+                    name: "status".to_owned(),
+                    ty: Some(i64_type_ref()),
+                    value: value_expr,
+                },
+                AstStmt::Return(Some(AstExpr::Var("status".to_owned()))),
+            ]
+        }
+    };
+    AstFunction {
+        name: "main".to_owned(),
+        test_name: None,
+        is_async: test_function.is_async,
+        params: vec![],
+        return_type: Some(i64_type_ref()),
+        body,
+    }
+}
+
+fn i64_type_ref() -> AstTypeRef {
+    AstTypeRef {
+        name: "i64".to_owned(),
+        generic_args: vec![],
+        is_optional: false,
+        is_ref: false,
+    }
+}
+
+fn bool_type_ref() -> AstTypeRef {
+    AstTypeRef {
+        name: "bool".to_owned(),
+        generic_args: vec![],
+        is_optional: false,
+        is_ref: false,
+    }
+}
+
+fn temp_test_output_dir(label: &str) -> PathBuf {
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after unix epoch")
+        .as_nanos();
+    std::env::temp_dir().join(format!(
+        "nuis-test-runner-{}-{}",
+        sanitize_test_label(label),
+        stamp
+    ))
+}
+
+fn sanitize_test_label(label: &str) -> String {
+    let mut out = String::new();
+    for ch in label.chars() {
+        if ch.is_ascii_alphanumeric() {
+            out.push(ch);
+        } else {
+            out.push('-');
+        }
+    }
+    if out.is_empty() {
+        "test".to_owned()
+    } else {
+        out
     }
 }
 

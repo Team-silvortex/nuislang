@@ -60,6 +60,10 @@ pub fn compile_source_path(path: &Path) -> Result<PipelineArtifacts, String> {
 
 pub fn compile_source(source: &str) -> Result<PipelineArtifacts, String> {
     let ast = crate::frontend::parse_nuis_ast(source)?;
+    compile_ast(ast)
+}
+
+pub fn compile_ast(ast: AstModule) -> Result<PipelineArtifacts, String> {
     let nir = crate::frontend::lower_ast_to_nir(&ast)?;
     crate::nir_verify::verify_nir_module(&nir)?;
     let lowering_manifest =

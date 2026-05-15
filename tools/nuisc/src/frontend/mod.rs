@@ -159,6 +159,14 @@ pub fn parse_nuis_module(input: &str) -> Result<NirModule, String> {
     lower_ast_to_nir(&ast)
 }
 
+pub fn collect_nir_tests<'a>(module: &'a NirModule) -> Vec<&'a NirFunction> {
+    module
+        .functions
+        .iter()
+        .filter(|function| function.test_name.is_some())
+        .collect()
+}
+
 #[derive(Clone)]
 struct FunctionSignature {
     abi: String,
@@ -183,6 +191,7 @@ fn lower_function(
 
     Ok(NirFunction {
         name: function.name.clone(),
+        test_name: function.test_name.clone(),
         is_async: function.is_async,
         params: function.params.iter().map(lower_param).collect(),
         return_type: function.return_type.as_ref().map(lower_type_ref),
@@ -12854,6 +12863,9 @@ fn validate_declared_nir_types(module: &NirModule) -> Result<(), String> {
         }
     }
     for function in &module.functions {
+        if function.test_name.is_some() {
+            validate_test_function_signature(module, function)?;
+        }
         if function.is_async && module.domain != "cpu" {
             return Err(format!(
                 "mod {} {} cannot declare `async fn {}` yet; async entry is currently only supported in `mod cpu` while {} logic must stay AOT/synchronous and interact through explicit profile/data contracts",
@@ -12913,6 +12925,40 @@ fn validate_declared_nir_types(module: &NirModule) -> Result<(), String> {
     Ok(())
 }
 
+fn validate_test_function_signature(
+    module: &NirModule,
+    function: &NirFunction,
+) -> Result<(), String> {
+    let label = function.test_name.as_deref().unwrap_or(&function.name);
+    if module.domain != "cpu" {
+        return Err(format!(
+            "test function `{}::{}` ({}) is only supported in `mod cpu` for now",
+            module.unit, function.name, label
+        ));
+    }
+    if !function.params.is_empty() {
+        return Err(format!(
+            "test function `{}` ({}) cannot take parameters in the current front-door runner shape",
+            function.name, label
+        ));
+    }
+    let Some(return_type) = function.return_type.as_ref() else {
+        return Err(format!(
+            "test function `{}` ({}) must return `bool` or `i64` in the current MVP",
+            function.name, label
+        ));
+    };
+    if !(return_type.is_bool_scalar() || return_type.is_integer_scalar()) {
+        return Err(format!(
+            "test function `{}` ({}) must return `bool` or integer scalar, found `{}`",
+            function.name,
+            label,
+            return_type.render()
+        ));
+    }
+    Ok(())
+}
+
 fn validate_type_ref(ty: &NirTypeRef) -> Result<(), String> {
     ty.validate_container_contract()
         .map_err(|error| format!("invalid type `{}`: {error}", ty.render()))
@@ -12941,10 +12987,160 @@ fn render_type_name(ty: &NirTypeRef) -> String {
 
 #[cfg(test)]
 mod tests {
+    use super::parse_nuis_ast;
     use super::parse_nuis_module;
     use nuis_semantics::model::{
         NirDataFlowState, NirExpr, NirKernelFlowState, NirShaderFlowState, NirStmt,
     };
+
+    #[test]
+    fn parses_test_function_with_explicit_label_into_ast() {
+        let ast = parse_nuis_ast(
+            r#"
+            mod cpu Main {
+              test "smoke_add" fn add_test() -> i64 {
+                return 1;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = ast
+            .functions
+            .iter()
+            .find(|function| function.name == "add_test")
+            .unwrap();
+        assert_eq!(function.test_name.as_deref(), Some("smoke_add"));
+    }
+
+    #[test]
+    fn parses_test_function_without_explicit_label_into_ast() {
+        let ast = parse_nuis_ast(
+            r#"
+            mod cpu Main {
+              test fn smoke_add() -> i64 {
+                return 1;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = ast
+            .functions
+            .iter()
+            .find(|function| function.name == "smoke_add")
+            .unwrap();
+        assert_eq!(function.test_name.as_deref(), Some("smoke_add"));
+    }
+
+    #[test]
+    fn lowers_test_function_label_into_nir() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              test "smoke_add" fn smoke_add() -> i64 {
+                return 1;
+              }
+
+              fn main() -> i64 {
+                return 1;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "smoke_add")
+            .unwrap();
+        assert_eq!(function.test_name.as_deref(), Some("smoke_add"));
+    }
+
+    #[test]
+    fn accepts_bool_and_i64_test_functions() {
+        parse_nuis_module(
+            r#"
+            mod cpu Main {
+              test fn smoke_bool() -> bool {
+                return true;
+              }
+
+              test async fn smoke_i64() -> i64 {
+                return 1;
+              }
+
+              fn main() -> i64 {
+                return 1;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn rejects_test_function_with_parameters() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              test fn smoke(value: i64) -> i64 {
+                return value;
+              }
+
+              fn main() -> i64 {
+                return 1;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("cannot take parameters"));
+    }
+
+    #[test]
+    fn rejects_test_function_with_unsupported_return_type() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              test fn smoke() -> String {
+                return "nope";
+              }
+
+              fn main() -> i64 {
+                return 1;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("must return `bool` or integer scalar"));
+    }
+
+    #[test]
+    fn rejects_test_function_outside_cpu_domain() {
+        let error = parse_nuis_module(
+            r#"
+            mod shader SurfaceShader {
+              test fn smoke() -> i64 {
+                return 1;
+              }
+
+              fn main() -> i64 {
+                return 1;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("only supported in `mod cpu`"));
+    }
 
     #[test]
     fn infers_struct_field_type_from_shared_type_helper() {
