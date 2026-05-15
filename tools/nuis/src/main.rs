@@ -269,6 +269,7 @@ struct TestVerdict {
     status: &'static str,
     counted_pass: bool,
     note: Option<String>,
+    resolved_clock_domain: Option<&'static str>,
 }
 
 fn run_language_tests_for_source_file(
@@ -359,6 +360,9 @@ fn run_language_tests_for_source_file(
         if let Some(reason) = &function.test_reason {
             println!("    reason: {}", reason);
         }
+        if let Some(clock_domain) = verdict.resolved_clock_domain {
+            println!("    clock_domain: {}", clock_domain);
+        }
         if let Some(note) = &verdict.note {
             println!("    note: {}", note);
         }
@@ -431,6 +435,7 @@ fn execute_language_test(
             status: "SKIP",
             counted_pass: false,
             note: None,
+            resolved_clock_domain: None,
         });
     }
     let harness_ast = build_test_harness_module(ast, test_function);
@@ -455,10 +460,13 @@ fn execute_language_test(
     let mut child = Command::new(&written.binary_path)
         .spawn()
         .map_err(|error| format!("failed to run `{}`: {error}", written.binary_path))?;
+    let resolved_clock_domain = test_function
+        .test_timeout_ms
+        .map(|_| resolve_runner_clock_domain(test_function.test_clock_domain));
     let raw_outcome = wait_for_test_child(
         &mut child,
         test_function.test_timeout_ms,
-        test_function.test_clock_domain,
+        resolved_clock_domain,
     )?;
     let (status, counted_pass, note) = match raw_outcome {
         RawTestOutcome::Completed(status) => {
@@ -488,6 +496,7 @@ fn execute_language_test(
         status,
         counted_pass,
         note,
+        resolved_clock_domain: resolved_clock_domain.map(|domain| domain.as_str()),
     })
 }
 
@@ -547,6 +556,17 @@ fn wait_for_test_child(
             return Ok(RawTestOutcome::TimedOut(timeout_ms));
         }
         thread::sleep(Duration::from_millis(1));
+    }
+}
+
+fn resolve_runner_clock_domain(
+    declared: Option<nuis_semantics::model::TestClockDomain>,
+) -> nuis_semantics::model::TestClockDomain {
+    match declared.unwrap_or(nuis_semantics::model::TestClockDomain::Monotonic) {
+        nuis_semantics::model::TestClockDomain::Global => {
+            nuis_semantics::model::TestClockDomain::Monotonic
+        }
+        other => other,
     }
 }
 
@@ -1581,8 +1601,8 @@ fn find_abi_block_span(source: &str) -> Option<(usize, usize)> {
 #[cfg(test)]
 mod tests {
     use super::{
-        handle_check, handle_test, run_language_tests_for_source_file, wait_for_test_child,
-        RawTestOutcome,
+        handle_check, handle_test, resolve_runner_clock_domain, run_language_tests_for_source_file,
+        wait_for_test_child, RawTestOutcome,
     };
     use std::{
         env, fs,
@@ -1979,5 +1999,12 @@ mod cpu Main {
                 panic!("expected timeout, child exited with {:?}", status.code())
             }
         }
+    }
+
+    #[test]
+    fn resolves_global_clock_domain_to_monotonic_runner_clock() {
+        let resolved =
+            resolve_runner_clock_domain(Some(nuis_semantics::model::TestClockDomain::Global));
+        assert_eq!(resolved, nuis_semantics::model::TestClockDomain::Monotonic);
     }
 }

@@ -146,7 +146,7 @@ Read that as:
 * `test`
   front-door test pass for a single `.ns` input or a project manifest; it can list discovered language-level tests, filter them by substring or exact test name/label, and execute the current MVP runner for `mod cpu` tests with `() -> bool|i64`. By default `ignored` tests are omitted from execution, `--ignored` runs only them, and `--include-ignored` runs them alongside normal tests. Current status labels are `PASS`, `FAIL`, `SKIP`, `XFAIL`, and `XPASS`.
   Test declarations now use `test(...) fn ...`, for example `test("smoke_add", ignored=true) fn smoke_add() -> i64 { ... }`, `test("expected_failure", should_fail=true, reason="must reject zero") fn expected_failure() -> i64 { ... }`, or `test("slow_async", timeout_ms=25, clock_domain="global") async fn slow_async() -> i64 { ... }`.
-  `clock_domain` currently accepts `monotonic`, `wall`, and `global`. In the current front-door runner, `global` is provisionally mapped onto the host monotonic clock so async tests can start expressing cross-domain timing intent without waiting for a full runtime-wide clock bridge.
+  `clock_domain` currently accepts `monotonic`, `wall`, and `global`. In the current front-door runner, `global` is provisionally mapped onto the host monotonic clock so async tests can start expressing cross-domain timing intent without waiting for a full runtime-wide clock bridge. `nuis test` also prints the resolved runner clock domain during execution so this mapping is visible in test output.
 * `build`
   artifact generation
 
