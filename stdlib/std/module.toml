@@ -27,6 +27,7 @@ source_modules = [
   "io_runtime.ns",
   "time_runtime.ns",
   "clock_runtime.ns",
+  "clock_domain_runtime.ns",
   "command_runtime.ns",
   "subprocess_runtime.ns",
   "fs_metadata_runtime.ns",
@@ -46,6 +47,7 @@ source_modules = [
   "config_runtime.ns",
   "kv_runtime.ns",
   "cache_runtime.ns",
+  "clock_test_recipe.ns",
   "cli_runtime_recipe.ns",
   "report_runtime_recipe.ns",
   "automation_runtime_recipe.ns"

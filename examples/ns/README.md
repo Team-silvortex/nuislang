@@ -42,6 +42,8 @@ Read these examples in roughly five bands:
     lower-level explicit `extern "c"` host route
   - [hello_cli_host_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_cli_host_facades.ns)
     tooling-shaped host example aligned with current `std` CLI/report/automation recipe thinking
+  - [hello_clock_test_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_clock_test_facades.ns)
+    clock/timing host example aligned with current `std` clock/test recipe and `nuis test` timeout semantics
 * end-to-end demo path
   - [window_controls_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/window_controls_demo.ns)
     current single-file `cpu + data + shader` real-time control/render demo

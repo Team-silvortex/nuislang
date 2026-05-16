@@ -66,6 +66,7 @@ Facade modules:
 * time and clock
   - [time_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/time_runtime.ns)
   - [clock_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/clock_runtime.ns)
+  - [clock_domain_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/clock_domain_runtime.ns)
 * error and reporting
   - [error_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/error_runtime.ns)
   - [result_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/result_runtime.ns)
@@ -85,6 +86,8 @@ Recipe modules:
   - [report_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/report_runtime_recipe.ns)
 * automation/workflow tooling
   - [automation_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/automation_runtime_recipe.ns)
+* clock/test timing alignment
+  - [clock_test_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/clock_test_recipe.ns)
 
 Current boundaries:
 
@@ -103,6 +106,14 @@ Current boundaries:
   wall/monotonic time facades and a more explicit global clock-scale contract;
   both are still host-backed staging APIs rather than a finalized cross-domain
   timing standard
+* current clock/test alignment also includes a small recipe that mirrors the
+  front-door runner's current `global -> monotonic` timeout resolution; this
+  is a staging contract for async test semantics rather than a final cross-domain
+  clock bridge
+* `clock_domain_runtime.ns` is the current canonical place where the staging
+  clock-domain code mapping is written down explicitly: `0 = monotonic`,
+  `1 = wall`, `2 = global`, with `global` currently resolving to `monotonic`
+  inside the front-door test runner
 * current `command/subprocess` direction is likewise a host-backed facade over
   opaque process handles and integer status codes; it is useful for CLI/tooling
   experiments but not yet a finalized portable process-management contract

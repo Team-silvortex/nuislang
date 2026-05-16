@@ -1,0 +1,70 @@
+mod cpu Main {
+  extern "c" fn usleep(usec: i64) -> i32;
+  extern "c" fn host_wall_time_ns() -> i64;
+  extern "c" fn host_monotonic_time_ns() -> i64;
+  extern "c" fn host_clock_domain_id() -> i64;
+  extern "c" fn host_clock_epoch_ns() -> i64;
+  extern "c" fn host_clock_scale_ppm() -> i64;
+
+  struct ClockTestSeed {
+    bias: i64
+  }
+
+  struct ClockTestSummary {
+    declared_domain: i64,
+    resolved_domain: i64,
+    wall_ns: i64,
+    monotonic_ns: i64,
+    global_domain_id: i64,
+    global_epoch_ns: i64,
+    global_tick: i64,
+    global_scale_ppm: i64
+  }
+
+  fn build_seed(bias: i64) -> ClockTestSeed {
+    return ClockTestSeed {
+      bias: bias
+    };
+  }
+
+  fn summarize_clock_bridge(seed: ClockTestSeed) -> ClockTestSummary {
+    return ClockTestSummary {
+      declared_domain: 2,
+      resolved_domain: 0,
+      wall_ns: host_wall_time_ns(),
+      monotonic_ns: host_monotonic_time_ns(),
+      global_domain_id: host_clock_domain_id() + seed.bias,
+      global_epoch_ns: host_clock_epoch_ns(),
+      global_tick: cpu_tick_i64(0, 1),
+      global_scale_ppm: host_clock_scale_ppm()
+    };
+  }
+
+  fn summarize_clock_snapshot(bias: i64) -> i64 {
+    let seed: ClockTestSeed = build_seed(bias);
+    let summary: ClockTestSummary = summarize_clock_bridge(seed);
+    return summary.declared_domain
+      + summary.resolved_domain
+      + summary.wall_ns
+      + summary.monotonic_ns
+      + summary.global_domain_id
+      + summary.global_epoch_ns
+      + summary.global_tick
+      + summary.global_scale_ppm;
+  }
+
+  test(
+    "slow_global_timeout",
+    should_fail=true,
+    reason="demonstrates global clock timeout resolution",
+    timeout_ms=25,
+    clock_domain="global"
+  ) async fn slow_global_timeout() -> i64 {
+    let _slept: i32 = usleep(100000);
+    return 1;
+  }
+
+  fn main() -> i64 {
+    return summarize_clock_snapshot(1);
+  }
+}

@@ -70,7 +70,8 @@ Current asset types:
 * `core`
   facade modules plus a first small blueprint layer
 * `std`
-  host-backed facade modules plus recipe modules for CLI, reporting, and automation
+  host-backed facade modules plus recipe modules for CLI, reporting, automation,
+  and early clock/test timing alignment
 * `ns-nova`
   framework-oriented runtime/blueprint/recipe modules across `core`, `ui`, and `scene`
 

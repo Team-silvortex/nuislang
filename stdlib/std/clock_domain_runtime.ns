@@ -1,0 +1,30 @@
+mod cpu Main {
+  struct ClockDomainCodes {
+    monotonic: i64,
+    wall: i64,
+    global: i64,
+    resolved_global: i64
+  }
+
+  fn capture_clock_domain_codes() -> ClockDomainCodes {
+    return ClockDomainCodes {
+      monotonic: 0,
+      wall: 1,
+      global: 2,
+      resolved_global: 0
+    };
+  }
+
+  fn summarize_clock_domain_runtime(bias: i64) -> i64 {
+    let codes: ClockDomainCodes = capture_clock_domain_codes();
+    return codes.monotonic
+      + codes.wall
+      + codes.global
+      + codes.resolved_global
+      + bias;
+  }
+
+  fn main() {
+    print(summarize_clock_domain_runtime(1));
+  }
+}
