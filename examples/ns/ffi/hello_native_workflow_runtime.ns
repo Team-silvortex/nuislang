@@ -1,0 +1,81 @@
+mod cpu Main {
+  extern "c" fn host_cwd_handle() -> i64;
+  extern "c" fn host_dir_open(path_handle: i64) -> i64;
+  extern "c" fn host_dir_entry_count(dir_handle: i64) -> i64;
+  extern "c" fn host_dir_close(dir_handle: i64) -> i64;
+  extern "c" fn host_temp_dir_handle() -> i64;
+  extern "c" fn host_temp_file_handle(prefix_handle: i64) -> i64;
+  extern "c" fn host_stdout_write(text_handle: i64) -> i64;
+  extern "c" fn host_stdout_flush() -> i64;
+  extern "c" fn host_process_id() -> i64;
+  extern "c" fn host_command_spawn(program_handle: i64, argv_handle: i64) -> i64;
+  extern "c" fn host_command_status(command_handle: i64) -> i64;
+  extern "c" fn host_command_wait(command_handle: i64) -> i64;
+  extern "c" fn host_subprocess_spawn(program_handle: i64, argv_handle: i64, env_handle: i64) -> i64;
+  extern "c" fn host_subprocess_signal(process_handle: i64, signal: i64) -> i64;
+  extern "c" fn host_subprocess_join(process_handle: i64) -> i64;
+
+  struct NativeWorkflowSnapshot {
+    cwd_handle: i64,
+    dir_handle: i64,
+    dir_entry_count: i64,
+    dir_close_code: i64,
+    temp_dir_handle: i64,
+    temp_file_handle: i64,
+    stdout_code: i64,
+    flush_code: i64,
+    pid: i64,
+    command_handle: i64,
+    command_status: i64,
+    command_wait: i64,
+    child_handle: i64,
+    child_signal: i64,
+    child_join: i64
+  }
+
+  fn capture_native_workflow_snapshot(prefix_handle: i64) -> NativeWorkflowSnapshot {
+    let cwd_handle: i64 = host_cwd_handle();
+    let dir_handle: i64 = host_dir_open(cwd_handle);
+    let dir_entry_count: i64 = host_dir_entry_count(dir_handle);
+    let dir_close_code: i64 = host_dir_close(dir_handle);
+    let temp_dir_handle: i64 = host_temp_dir_handle();
+    let temp_file_handle: i64 = host_temp_file_handle(prefix_handle);
+    let command_handle: i64 = host_command_spawn(temp_dir_handle, 0);
+    let child_handle: i64 = host_subprocess_spawn(temp_file_handle, 0, 0);
+
+    return NativeWorkflowSnapshot {
+      cwd_handle: cwd_handle,
+      dir_handle: dir_handle,
+      dir_entry_count: dir_entry_count,
+      dir_close_code: dir_close_code,
+      temp_dir_handle: temp_dir_handle,
+      temp_file_handle: temp_file_handle,
+      stdout_code: host_stdout_write(cwd_handle),
+      flush_code: host_stdout_flush(),
+      pid: host_process_id(),
+      command_handle: command_handle,
+      command_status: host_command_status(command_handle),
+      command_wait: host_command_wait(command_handle),
+      child_handle: child_handle,
+      child_signal: host_subprocess_signal(child_handle, 0),
+      child_join: host_subprocess_join(child_handle)
+    };
+  }
+
+  fn summarize_native_workflow(prefix_handle: i64) -> i64 {
+    let snapshot: NativeWorkflowSnapshot = capture_native_workflow_snapshot(prefix_handle);
+    return snapshot.dir_entry_count
+      + snapshot.dir_close_code
+      + snapshot.stdout_code
+      + snapshot.flush_code
+      + snapshot.pid
+      + snapshot.command_status
+      + snapshot.command_wait
+      + snapshot.child_signal
+      + snapshot.child_join;
+  }
+
+  fn main() -> i64 {
+    return summarize_native_workflow(2401);
+  }
+}

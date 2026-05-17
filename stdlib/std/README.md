@@ -126,7 +126,10 @@ Current boundaries:
   like a contract rather than a pair of unexplained integers
 * current `command/subprocess` direction is likewise a host-backed facade over
   opaque process handles and integer status codes; it is useful for CLI/tooling
-  experiments but not yet a finalized portable process-management contract
+  experiments but not yet a finalized portable process-management contract;
+  the current native-backed AOT shim now treats `program_handle` as the main
+  shell command text, `argv_handle` as a raw shell argument-tail text handle,
+  and `env_handle` as a raw `KEY=VALUE ...` environment-prefix text handle
 * current `metadata/directory/stat` direction is also still a host-backed file
   system facade; it is enough to sketch CLI and tooling flows, but not yet a
   finalized portable filesystem standard library contract

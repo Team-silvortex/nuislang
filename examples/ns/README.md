@@ -42,6 +42,11 @@ Read these examples in roughly five bands:
     lower-level explicit `extern "c"` host route
   - [hello_cli_host_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_cli_host_facades.ns)
     tooling-shaped host example aligned with current `std` CLI/report/automation recipe thinking
+  - [hello_native_cli_runtime.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_native_cli_runtime.ns)
+    repo-local native CLI example aligned with the current AOT-backed `std` host shim batch
+  - [hello_native_workflow_runtime.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_native_workflow_runtime.ns)
+    repo-local native workflow example aligned with the current AOT-backed `std`
+    directory/temp/process/command/subprocess shim batch
   - [hello_clock_test_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_clock_test_facades.ns)
     clock/timing host example aligned with current `std` clock/test recipe and `nuis test` timeout semantics
 * end-to-end demo path

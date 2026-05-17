@@ -940,6 +940,7 @@ fn c_shim_source(ast: &AstModule) -> String {
 #include <sys/ioctl.h>
 #include <dirent.h>
 #include <signal.h>
+#include <sys/wait.h>
 
 extern int64_t nuis_yir_entry(void);
 
@@ -950,9 +951,13 @@ static int64_t nuis_host_text_len = 0;
 static DIR* nuis_host_dir_slots[256];
 static int64_t nuis_host_dir_entry_counts[256];
 static int64_t nuis_host_dir_len = 0;
+static pid_t nuis_host_command_pids[256];
 static int64_t nuis_host_command_status_slots[256];
+static int nuis_host_command_done[256];
 static int64_t nuis_host_command_len = 0;
+static pid_t nuis_host_subprocess_pids[256];
 static int64_t nuis_host_subprocess_status_slots[256];
+static int nuis_host_subprocess_done[256];
 static int64_t nuis_host_subprocess_len = 0;
 
 static int64_t nuis_host_text_register(const char* text) {
@@ -1235,50 +1240,124 @@ static int64_t nuis_host_process_status(void) {
 }
 
 static int64_t nuis_host_process_exit_code(int64_t status) {
+    int raw = (int)status;
+    if (WIFEXITED(raw)) return (int64_t)WEXITSTATUS(raw);
+    if (WIFSIGNALED(raw)) return (int64_t)(128 + WTERMSIG(raw));
     return status;
 }
 
-static int64_t nuis_host_command_spawn(int64_t program_handle, int64_t argv_handle) {
-    (void)argv_handle;
+static char* nuis_host_build_shell_command(
+    int64_t program_handle,
+    int64_t argv_handle,
+    int64_t env_handle
+) {
     const char* program = nuis_host_text_lookup(program_handle);
-    if (program == NULL || program[0] == '\0') return 0;
+    const char* argv_text = nuis_host_text_lookup(argv_handle);
+    const char* env_text = nuis_host_text_lookup(env_handle);
+    if (program == NULL || program[0] == '\0') return NULL;
+    int has_argv = argv_text != NULL && argv_text[0] != '\0';
+    int has_env = env_text != NULL && env_text[0] != '\0';
+    size_t program_len = strlen(program);
+    size_t argv_len = has_argv ? strlen(argv_text) : 0;
+    size_t env_len = has_env ? strlen(env_text) : 0;
+    size_t total = program_len + 1;
+    if (has_argv) total += 1 + argv_len;
+    if (has_env) total += 4 + env_len + 1;
+    char* command = (char*)malloc(total);
+    if (command == NULL) return NULL;
+    if (has_env) {
+        if (has_argv) {
+            snprintf(command, total, "env %s %s %s", env_text, program, argv_text);
+        } else {
+            snprintf(command, total, "env %s %s", env_text, program);
+        }
+    } else if (has_argv) {
+        snprintf(command, total, "%s %s", program, argv_text);
+    } else {
+        snprintf(command, total, "%s", program);
+    }
+    return command;
+}
+
+static pid_t nuis_host_spawn_shell(char* program) {
+    if (program == NULL || program[0] == '\0') return -1;
+    pid_t pid = fork();
+    if (pid < 0) return -1;
+    if (pid == 0) {
+        execl("/bin/sh", "sh", "-c", program, (char*)NULL);
+        _exit(127);
+    }
+    return pid;
+}
+
+static int64_t nuis_host_command_spawn(int64_t program_handle, int64_t argv_handle) {
     if (nuis_host_command_len >= 256) return 0;
-    int status = system(program);
-    nuis_host_command_status_slots[nuis_host_command_len] = (int64_t)status;
+    char* command = nuis_host_build_shell_command(program_handle, argv_handle, 0);
+    pid_t pid = nuis_host_spawn_shell(command);
+    free(command);
+    if (pid < 0) return 0;
+    nuis_host_command_pids[nuis_host_command_len] = pid;
+    nuis_host_command_status_slots[nuis_host_command_len] = 0;
+    nuis_host_command_done[nuis_host_command_len] = 0;
     nuis_host_command_len += 1;
     return nuis_host_command_len;
 }
 
 static int64_t nuis_host_command_status(int64_t command_handle) {
     if (command_handle <= 0 || command_handle > nuis_host_command_len) return 0;
-    return nuis_host_command_status_slots[command_handle - 1];
+    int64_t idx = command_handle - 1;
+    if (nuis_host_command_done[idx]) return nuis_host_command_status_slots[idx];
+    int status = 0;
+    pid_t result = waitpid(nuis_host_command_pids[idx], &status, WNOHANG);
+    if (result == nuis_host_command_pids[idx]) {
+        nuis_host_command_done[idx] = 1;
+        nuis_host_command_status_slots[idx] = (int64_t)status;
+    }
+    return nuis_host_command_status_slots[idx];
 }
 
 static int64_t nuis_host_command_wait(int64_t command_handle) {
-    return nuis_host_command_status(command_handle);
+    if (command_handle <= 0 || command_handle > nuis_host_command_len) return 0;
+    int64_t idx = command_handle - 1;
+    if (nuis_host_command_done[idx]) return nuis_host_command_status_slots[idx];
+    int status = 0;
+    pid_t result = waitpid(nuis_host_command_pids[idx], &status, 0);
+    if (result < 0) return 0;
+    nuis_host_command_done[idx] = 1;
+    nuis_host_command_status_slots[idx] = (int64_t)status;
+    return nuis_host_command_status_slots[idx];
 }
 
 static int64_t nuis_host_subprocess_spawn(int64_t program_handle, int64_t argv_handle, int64_t env_handle) {
-    (void)argv_handle;
-    (void)env_handle;
-    const char* program = nuis_host_text_lookup(program_handle);
-    if (program == NULL || program[0] == '\0') return 0;
     if (nuis_host_subprocess_len >= 256) return 0;
-    int status = system(program);
-    nuis_host_subprocess_status_slots[nuis_host_subprocess_len] = (int64_t)status;
+    char* command = nuis_host_build_shell_command(program_handle, argv_handle, env_handle);
+    pid_t pid = nuis_host_spawn_shell(command);
+    free(command);
+    if (pid < 0) return 0;
+    nuis_host_subprocess_pids[nuis_host_subprocess_len] = pid;
+    nuis_host_subprocess_status_slots[nuis_host_subprocess_len] = 0;
+    nuis_host_subprocess_done[nuis_host_subprocess_len] = 0;
     nuis_host_subprocess_len += 1;
     return nuis_host_subprocess_len;
 }
 
 static int64_t nuis_host_subprocess_signal(int64_t process_handle, int64_t signal) {
-    (void)process_handle;
-    (void)signal;
-    return 1;
+    if (process_handle <= 0 || process_handle > nuis_host_subprocess_len) return 0;
+    int64_t idx = process_handle - 1;
+    if (nuis_host_subprocess_done[idx]) return 0;
+    return kill(nuis_host_subprocess_pids[idx], (int)signal) == 0 ? 1 : 0;
 }
 
 static int64_t nuis_host_subprocess_join(int64_t process_handle) {
     if (process_handle <= 0 || process_handle > nuis_host_subprocess_len) return 0;
-    return nuis_host_subprocess_status_slots[process_handle - 1];
+    int64_t idx = process_handle - 1;
+    if (nuis_host_subprocess_done[idx]) return nuis_host_subprocess_status_slots[idx];
+    int status = 0;
+    pid_t result = waitpid(nuis_host_subprocess_pids[idx], &status, 0);
+    if (result < 0) return 0;
+    nuis_host_subprocess_done[idx] = 1;
+    nuis_host_subprocess_status_slots[idx] = (int64_t)status;
+    return nuis_host_subprocess_status_slots[idx];
 }
 
 static int64_t nuis_host_wall_time_ns(void) {
@@ -2032,6 +2111,8 @@ mod tests {
         assert!(shim.contains("return nuis_host_dir_open(path_handle);"));
         assert!(shim.contains("return nuis_host_temp_file_handle(prefix_handle);"));
         assert!(shim.contains("return nuis_host_command_spawn(program_handle, argv_handle);"));
+        assert!(shim.contains("static char* nuis_host_build_shell_command("));
+        assert!(shim.contains("env %s %s %s"));
     }
 
     #[test]
