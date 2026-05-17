@@ -1186,12 +1186,12 @@ fn parse_manifest(source: &str, path: &Path) -> Result<NustarPackageManifest, St
         .unwrap_or_else(|| format!("{domain_family}.clock.local.v1"));
     let clock_kind =
         parse_optional_string(source, "clock_kind").unwrap_or_else(|| "local-monotonic".to_owned());
-    let clock_epoch_kind =
-        parse_optional_string(source, "clock_epoch_kind").unwrap_or_else(|| "domain-epoch".to_owned());
+    let clock_epoch_kind = parse_optional_string(source, "clock_epoch_kind")
+        .unwrap_or_else(|| "domain-epoch".to_owned());
     let clock_resolution =
         parse_optional_string(source, "clock_resolution").unwrap_or_else(|| "tick:1ns".to_owned());
-    let clock_bridge_default = parse_optional_string(source, "clock_bridge_default")
-        .unwrap_or_else(|| "self".to_owned());
+    let clock_bridge_default =
+        parse_optional_string(source, "clock_bridge_default").unwrap_or_else(|| "self".to_owned());
     let profiles = parse_string_array(source, "profiles", path)?;
     let resource_families = parse_string_array(source, "resource_families", path)?;
     let unit_types = parse_optional_string_array(source, "unit_types").unwrap_or_default();

@@ -697,6 +697,132 @@ pub enum NirGlmEffect {
     LifetimeEnd,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NirExprEffectClass {
+    Pure,
+    LocalReadOnly,
+    HostReadOnly,
+    DomainReadOnly,
+    AsyncOpaque,
+    CallOpaque,
+    DomainOpaque,
+    Stateful,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NirHostReadSurface {
+    SchedulerLane,
+    InputChannel,
+    ClockTick,
+    RenderDescriptor,
+}
+
+impl NirHostReadSurface {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::SchedulerLane => "scheduler_lane",
+            Self::InputChannel => "input_channel",
+            Self::ClockTick => "clock_tick",
+            Self::RenderDescriptor => "render_descriptor",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NirHostSchedulerBridgeKind {
+    HostMainLane,
+    WorkerLane,
+}
+
+impl NirHostSchedulerBridgeKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::HostMainLane => "host_main_lane",
+            Self::WorkerLane => "worker_lane",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NirHostSchedulerBridge {
+    pub kind: NirHostSchedulerBridgeKind,
+    pub lane: i64,
+}
+
+impl NirHostSchedulerBridge {
+    pub fn from_cpu_bind_core(lane: i64) -> Self {
+        Self {
+            kind: if lane == 0 {
+                NirHostSchedulerBridgeKind::HostMainLane
+            } else {
+                NirHostSchedulerBridgeKind::WorkerLane
+            },
+            lane,
+        }
+    }
+
+    pub fn resolved_source(self) -> &'static str {
+        "cpu_bind_core_lane"
+    }
+
+    pub fn host_surface(self) -> NirHostReadSurface {
+        NirHostReadSurface::SchedulerLane
+    }
+
+    pub fn as_str(self) -> &'static str {
+        self.kind.as_str()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NirHostTimingBridge {
+    MonotonicTick,
+    WallDeadline,
+    GlobalToMonotonicTickBridge,
+}
+
+impl NirHostTimingBridge {
+    pub fn from_test_clock_domain(domain: TestClockDomain) -> Self {
+        match domain {
+            TestClockDomain::Monotonic => Self::MonotonicTick,
+            TestClockDomain::Wall => Self::WallDeadline,
+            TestClockDomain::Global => Self::GlobalToMonotonicTickBridge,
+        }
+    }
+
+    pub fn resolved_domain(self) -> TestClockDomain {
+        match self {
+            Self::MonotonicTick => TestClockDomain::Monotonic,
+            Self::WallDeadline => TestClockDomain::Wall,
+            Self::GlobalToMonotonicTickBridge => TestClockDomain::Monotonic,
+        }
+    }
+
+    pub fn resolved_source(self) -> &'static str {
+        match self {
+            Self::MonotonicTick => "host_monotonic_deadline",
+            Self::WallDeadline => "host_wall_deadline",
+            Self::GlobalToMonotonicTickBridge => "host_monotonic_deadline",
+        }
+    }
+
+    pub fn host_surface(self) -> NirHostReadSurface {
+        match self {
+            Self::MonotonicTick => NirHostReadSurface::ClockTick,
+            Self::WallDeadline => NirHostReadSurface::ClockTick,
+            Self::GlobalToMonotonicTickBridge => NirHostReadSurface::ClockTick,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::MonotonicTick => "monotonic_tick",
+            Self::WallDeadline => "wall_deadline",
+            Self::GlobalToMonotonicTickBridge => "global_to_monotonic_tick_bridge",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NirGlmAccess {
     pub class: NirGlmValueClass,
@@ -1343,6 +1469,127 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
     }
 }
 
+pub fn nir_expr_effect_class(expr: &NirExpr) -> NirExprEffectClass {
+    match expr {
+        NirExpr::Null
+        | NirExpr::Bool(_)
+        | NirExpr::Text(_)
+        | NirExpr::Int(_)
+        | NirExpr::Var(_)
+        | NirExpr::StructLiteral { .. }
+        | NirExpr::FieldAccess { .. }
+        | NirExpr::Binary { .. }
+        | NirExpr::IsNull(_) => NirExprEffectClass::Pure,
+        NirExpr::Borrow(_)
+        | NirExpr::BorrowEnd(_)
+        | NirExpr::LoadValue(_)
+        | NirExpr::LoadNext(_)
+        | NirExpr::BufferLen(_)
+        | NirExpr::LoadAt { .. } => NirExprEffectClass::LocalReadOnly,
+        NirExpr::Await(_) => NirExprEffectClass::AsyncOpaque,
+        NirExpr::Call { .. } | NirExpr::MethodCall { .. } => NirExprEffectClass::CallOpaque,
+        NirExpr::Instantiate { .. } => NirExprEffectClass::DomainOpaque,
+        NirExpr::CpuBindCore(_)
+        | NirExpr::CpuInputI64 { .. }
+        | NirExpr::CpuTickI64 { .. }
+        | NirExpr::ShaderTarget { .. }
+        | NirExpr::ShaderViewport { .. }
+        | NirExpr::ShaderPipeline { .. }
+        | NirExpr::ShaderInlineWgsl { .. } => NirExprEffectClass::HostReadOnly,
+        NirExpr::DataBindCore(_)
+        | NirExpr::DataMarker(_)
+        | NirExpr::DataHandleTable(_)
+        | NirExpr::DataResult { .. }
+        | NirExpr::DataReady(_)
+        | NirExpr::DataMoved(_)
+        | NirExpr::DataWindowed(_)
+        | NirExpr::DataValue(_)
+        | NirExpr::DataCopyWindow { .. }
+        | NirExpr::DataReadWindow { .. }
+        | NirExpr::DataImmutableWindow { .. }
+        | NirExpr::DataFreezeWindow(_)
+        | NirExpr::DataInputPipe(_)
+        | NirExpr::ShaderProfileTargetRef { .. }
+        | NirExpr::ShaderProfileViewportRef { .. }
+        | NirExpr::ShaderProfilePipelineRef { .. }
+        | NirExpr::ShaderProfileVertexCountRef { .. }
+        | NirExpr::ShaderProfileInstanceCountRef { .. }
+        | NirExpr::ShaderProfilePacketColorSlotRef { .. }
+        | NirExpr::ShaderProfilePacketSpeedSlotRef { .. }
+        | NirExpr::ShaderProfilePacketRadiusSlotRef { .. }
+        | NirExpr::ShaderProfilePacketTagRef { .. }
+        | NirExpr::ShaderProfileMaterialModeRef { .. }
+        | NirExpr::ShaderProfilePassKindRef { .. }
+        | NirExpr::ShaderProfilePacketFieldCountRef { .. }
+        | NirExpr::ShaderProfileColorSeed { .. }
+        | NirExpr::ShaderProfileSpeedSeed { .. }
+        | NirExpr::ShaderProfileRadiusSeed { .. }
+        | NirExpr::ShaderProfilePacket { .. }
+        | NirExpr::DataProfileBindCoreRef { .. }
+        | NirExpr::DataProfileWindowOffsetRef { .. }
+        | NirExpr::DataProfileUplinkLenRef { .. }
+        | NirExpr::DataProfileDownlinkLenRef { .. }
+        | NirExpr::DataProfileHandleTableRef { .. }
+        | NirExpr::DataProfileMarkerRef { .. }
+        | NirExpr::KernelProfileBindCoreRef { .. }
+        | NirExpr::KernelProfileQueueDepthRef { .. }
+        | NirExpr::KernelProfileBatchLanesRef { .. }
+        | NirExpr::KernelResult { .. }
+        | NirExpr::KernelConfigReady(_)
+        | NirExpr::KernelValue(_)
+        | NirExpr::ShaderResult { .. } => NirExprEffectClass::DomainReadOnly,
+        NirExpr::CpuWindow { .. }
+        | NirExpr::CpuSpawn { .. }
+        | NirExpr::CpuJoin(_)
+        | NirExpr::CpuCancel(_)
+        | NirExpr::CpuJoinResult(_)
+        | NirExpr::CpuTaskCompleted(_)
+        | NirExpr::CpuTaskTimedOut(_)
+        | NirExpr::CpuTaskCancelled(_)
+        | NirExpr::CpuTaskValue(_)
+        | NirExpr::CpuTimeout { .. }
+        | NirExpr::CpuPresentFrame(_)
+        | NirExpr::ShaderPassReady(_)
+        | NirExpr::ShaderFrameReady(_)
+        | NirExpr::ShaderValue(_)
+        | NirExpr::ShaderBeginPass { .. }
+        | NirExpr::ShaderDrawInstanced { .. }
+        | NirExpr::ShaderProfileRender { .. } => NirExprEffectClass::Stateful,
+        NirExpr::Move(_)
+        | NirExpr::AllocNode { .. }
+        | NirExpr::AllocBuffer { .. }
+        | NirExpr::StoreValue { .. }
+        | NirExpr::StoreNext { .. }
+        | NirExpr::StoreAt { .. }
+        | NirExpr::DataOutputPipe(_)
+        | NirExpr::DataWriteWindow { .. }
+        | NirExpr::DataProfileSendUplink { .. }
+        | NirExpr::DataProfileSendDownlink { .. }
+        | NirExpr::CpuExternCall { .. }
+        | NirExpr::Free(_) => NirExprEffectClass::Stateful,
+    }
+}
+
+pub fn nir_host_read_surface(expr: &NirExpr) -> Option<NirHostReadSurface> {
+    match expr {
+        NirExpr::CpuBindCore(_) => Some(NirHostReadSurface::SchedulerLane),
+        NirExpr::CpuInputI64 { .. } => Some(NirHostReadSurface::InputChannel),
+        NirExpr::CpuTickI64 { .. } => Some(NirHostReadSurface::ClockTick),
+        NirExpr::ShaderTarget { .. }
+        | NirExpr::ShaderViewport { .. }
+        | NirExpr::ShaderPipeline { .. }
+        | NirExpr::ShaderInlineWgsl { .. } => Some(NirHostReadSurface::RenderDescriptor),
+        _ => None,
+    }
+}
+
+pub fn nir_host_scheduler_bridge(expr: &NirExpr) -> Option<NirHostSchedulerBridge> {
+    match expr {
+        NirExpr::CpuBindCore(lane) => Some(NirHostSchedulerBridge::from_cpu_bind_core(*lane)),
+        _ => None,
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct YirNode {
     pub kind: String,
@@ -1364,8 +1611,10 @@ pub struct NustarPackage {
 #[cfg(test)]
 mod tests {
     use super::{
-        NirContainerKind, NirDataFlowState, NirKernelFlowState, NirResultFamily, NirResultStage,
-        NirShaderFlowState, NirTypeRef, NirWindowMode,
+        nir_expr_effect_class, nir_host_read_surface, nir_host_scheduler_bridge, NirContainerKind,
+        NirDataFlowState, NirExpr, NirExprEffectClass, NirHostReadSurface, NirHostSchedulerBridge,
+        NirHostSchedulerBridgeKind, NirHostTimingBridge, NirKernelFlowState, NirResultFamily,
+        NirResultStage, NirShaderFlowState, NirTypeRef, NirWindowMode, TestClockDomain,
     };
 
     fn named(name: &str) -> NirTypeRef {
@@ -1451,5 +1700,171 @@ mod tests {
             .unwrap_err();
         assert!(error.contains("config_ready"));
         assert!(error.contains("integer scalar"));
+    }
+
+    #[test]
+    fn classifies_scalar_binary_as_pure() {
+        assert_eq!(
+            nir_expr_effect_class(&NirExpr::Binary {
+                op: super::NirBinaryOp::Add,
+                lhs: Box::new(NirExpr::Int(2)),
+                rhs: Box::new(NirExpr::Int(3)),
+            }),
+            NirExprEffectClass::Pure
+        );
+    }
+
+    #[test]
+    fn classifies_borrow_as_read_only() {
+        assert_eq!(
+            nir_expr_effect_class(&NirExpr::Borrow(Box::new(NirExpr::Var("head".to_owned())))),
+            NirExprEffectClass::LocalReadOnly
+        );
+    }
+
+    #[test]
+    fn classifies_profile_ref_as_domain_read_only() {
+        assert_eq!(
+            nir_expr_effect_class(&NirExpr::ShaderProfileVertexCountRef {
+                unit: "Main".to_owned(),
+            }),
+            NirExprEffectClass::DomainReadOnly
+        );
+    }
+
+    #[test]
+    fn classifies_host_tick_as_host_read_only() {
+        assert_eq!(
+            nir_expr_effect_class(&NirExpr::CpuTickI64 { start: 0, step: 1 }),
+            NirExprEffectClass::HostReadOnly
+        );
+        assert_eq!(
+            nir_host_read_surface(&NirExpr::CpuTickI64 { start: 0, step: 1 }),
+            Some(NirHostReadSurface::ClockTick)
+        );
+    }
+
+    #[test]
+    fn reports_render_descriptor_host_surface() {
+        assert_eq!(
+            nir_host_read_surface(&NirExpr::ShaderViewport {
+                width: 640,
+                height: 360,
+            }),
+            Some(NirHostReadSurface::RenderDescriptor)
+        );
+    }
+
+    #[test]
+    fn reports_scheduler_and_input_host_surfaces() {
+        assert_eq!(
+            nir_host_read_surface(&NirExpr::CpuBindCore(0)),
+            Some(NirHostReadSurface::SchedulerLane)
+        );
+        assert_eq!(
+            nir_host_read_surface(&NirExpr::CpuInputI64 {
+                channel: "speed".to_owned(),
+                default: 4,
+                min: None,
+                max: None,
+                step: None,
+            }),
+            Some(NirHostReadSurface::InputChannel)
+        );
+    }
+
+    #[test]
+    fn resolves_host_main_scheduler_lane_bridge() {
+        let bridge = nir_host_scheduler_bridge(&NirExpr::CpuBindCore(0))
+            .expect("cpu.bind_core(0) should expose a scheduler bridge");
+        assert_eq!(
+            bridge,
+            NirHostSchedulerBridge {
+                kind: NirHostSchedulerBridgeKind::HostMainLane,
+                lane: 0,
+            }
+        );
+        assert_eq!(bridge.as_str(), "host_main_lane");
+        assert_eq!(bridge.resolved_source(), "cpu_bind_core_lane");
+        assert_eq!(bridge.host_surface(), NirHostReadSurface::SchedulerLane);
+    }
+
+    #[test]
+    fn resolves_worker_scheduler_lane_bridge() {
+        let bridge = nir_host_scheduler_bridge(&NirExpr::CpuBindCore(3))
+            .expect("cpu.bind_core(3) should expose a scheduler bridge");
+        assert_eq!(
+            bridge,
+            NirHostSchedulerBridge {
+                kind: NirHostSchedulerBridgeKind::WorkerLane,
+                lane: 3,
+            }
+        );
+        assert_eq!(bridge.as_str(), "worker_lane");
+        assert_eq!(bridge.resolved_source(), "cpu_bind_core_lane");
+        assert_eq!(bridge.host_surface(), NirHostReadSurface::SchedulerLane);
+    }
+
+    #[test]
+    fn resolves_global_timing_bridge_to_monotonic_tick() {
+        let bridge = NirHostTimingBridge::from_test_clock_domain(TestClockDomain::Global);
+        assert_eq!(bridge, NirHostTimingBridge::GlobalToMonotonicTickBridge);
+        assert_eq!(bridge.resolved_domain(), TestClockDomain::Monotonic);
+        assert_eq!(bridge.resolved_source(), "host_monotonic_deadline");
+        assert_eq!(bridge.host_surface(), NirHostReadSurface::ClockTick);
+        assert_eq!(bridge.as_str(), "global_to_monotonic_tick_bridge");
+    }
+
+    #[test]
+    fn resolves_wall_timing_bridge_to_wall_deadline() {
+        let bridge = NirHostTimingBridge::from_test_clock_domain(TestClockDomain::Wall);
+        assert_eq!(bridge, NirHostTimingBridge::WallDeadline);
+        assert_eq!(bridge.resolved_domain(), TestClockDomain::Wall);
+        assert_eq!(bridge.resolved_source(), "host_wall_deadline");
+        assert_eq!(bridge.host_surface(), NirHostReadSurface::ClockTick);
+        assert_eq!(bridge.as_str(), "wall_deadline");
+    }
+
+    #[test]
+    fn classifies_call_as_opaque() {
+        assert_eq!(
+            nir_expr_effect_class(&NirExpr::Call {
+                callee: "compute".to_owned(),
+                args: vec![],
+            }),
+            NirExprEffectClass::CallOpaque
+        );
+    }
+
+    #[test]
+    fn classifies_await_as_async_opaque() {
+        assert_eq!(
+            nir_expr_effect_class(&NirExpr::Await(Box::new(NirExpr::Var("task".to_owned())))),
+            NirExprEffectClass::AsyncOpaque
+        );
+    }
+
+    #[test]
+    fn classifies_instantiate_as_domain_opaque() {
+        assert_eq!(
+            nir_expr_effect_class(&NirExpr::Instantiate {
+                domain: "data".to_owned(),
+                unit: "Pipe".to_owned(),
+            }),
+            NirExprEffectClass::DomainOpaque
+        );
+    }
+
+    #[test]
+    fn classifies_extern_call_as_stateful() {
+        assert_eq!(
+            nir_expr_effect_class(&NirExpr::CpuExternCall {
+                abi: "c".to_owned(),
+                interface: None,
+                callee: "host_side_effect".to_owned(),
+                args: vec![],
+            }),
+            NirExprEffectClass::Stateful
+        );
     }
 }

@@ -13497,7 +13497,9 @@ mod tests {
         )
         .unwrap_err();
 
-        assert!(error.contains("can only use `clock_policy=\"bridge\"` together with `clock_domain=\"global\"`"));
+        assert!(error.contains(
+            "can only use `clock_policy=\"bridge\"` together with `clock_domain=\"global\"`"
+        ));
     }
 
     #[test]

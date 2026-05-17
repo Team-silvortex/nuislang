@@ -18,6 +18,15 @@ Start in this order:
 * [yir-tools-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-tools-reference.md)
   workflow commands, compiler/tool boundaries, packaging, cache, and inspection
   behavior
+* [nir-memory-model.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nir-memory-model.md)
+  current `NIR`-level ownership, borrow, move, and verifier-enforced aliasing
+  rules
+* [nir-optimization-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nir-optimization-contract.md)
+  current `NIR` optimization safety boundary, including canonical pure /
+  read-only / stateful expression classes
+* [host-read-bridge.md](/Users/Shared/chroot/dev/nuislang/docs/reference/host-read-bridge.md)
+  current bridge between compiler-recognized host reads and `std` host facade
+  modules
 
 If your question is specifically “what command should I run next for this
 project?”, start with

@@ -127,6 +127,10 @@ Current boundaries:
 * current `stdin/line-input/tty` direction is also still a host-backed terminal
   facade; it is enough to sketch command-line interaction flows, but not yet a
   finalized portable terminal standard library contract
+* current compiler-facing host-read recognition is narrower than the full `std`
+  facade surface; only a small builtin set is currently classified as
+  `HostReadOnly`, while most explicit `host_*` facade calls still lower through
+  conservative `cpu.extern_call_*` paths
 * current `json/text-format` direction is also still a host-backed formatting
   facade; it is enough to sketch machine-readable and human-readable output
   flows, but not yet a finalized native text/serialization standard library
@@ -145,3 +149,4 @@ Current boundaries:
 See metadata:
 
 * [module.toml](/Users/Shared/chroot/dev/nuislang/stdlib/std/module.toml)
+* [host-read-bridge.md](/Users/Shared/chroot/dev/nuislang/docs/reference/host-read-bridge.md)

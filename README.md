@@ -70,10 +70,12 @@ test("slow_async", timeout_ms=25, clock_domain="global", clock_policy="bridge") 
 When a timed test uses `clock_domain`, `nuis test` now shows both the declared
 domain and the runner-resolved domain in execution output, including the current
 canonical staging codes. In the current MVP, `global (2)` still resolves to the
-host monotonic clock `monotonic (0)`, and the output also reports the current
-host deadline source such as `host_monotonic_deadline` or `host_wall_deadline`.
-The current explicit way to acknowledge that bridge is
-`clock_policy="bridge"` alongside `clock_domain="global"`.
+host monotonic clock `monotonic (0)`. The output now also reports the canonical
+bridge name, such as `global_to_monotonic_tick_bridge`, the resolved compiler-
+known host-read surface such as `clock_tick`, together with the host deadline
+source such as `host_monotonic_deadline` or `host_wall_deadline`. The current
+explicit way to acknowledge that bridge is `clock_policy="bridge"` alongside
+`clock_domain="global"`.
 
 Useful inspection commands:
 

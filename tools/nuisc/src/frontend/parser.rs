@@ -377,12 +377,8 @@ impl Parser {
 
     fn parse_test_clock_policy(&mut self) -> Result<TestClockPolicy, String> {
         let raw = self.parse_test_meta_string()?;
-        TestClockPolicy::parse(&raw).ok_or_else(|| {
-            format!(
-                "unsupported `clock_policy=\"{}\"`; expected `bridge`",
-                raw
-            )
-        })
+        TestClockPolicy::parse(&raw)
+            .ok_or_else(|| format!("unsupported `clock_policy=\"{}\"`; expected `bridge`", raw))
     }
 
     fn parse_param_list(&mut self) -> Result<Vec<AstParam>, String> {

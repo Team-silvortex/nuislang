@@ -15,7 +15,8 @@ pub fn compile_source_path(path: &Path) -> Result<PipelineArtifacts, String> {
     if crate::project::is_project_input(path) {
         let project = crate::project::load_project(path)?;
         let ast = crate::frontend::parse_nuis_ast(&project.entry_source)?;
-        let nir = crate::frontend::lower_ast_to_nir(&ast)?;
+        let mut nir = crate::frontend::lower_ast_to_nir(&ast)?;
+        crate::optimize::simplify_nir_module(&mut nir);
         crate::nir_verify::verify_nir_module(&nir)?;
         let lowering_manifest =
             crate::registry::load_manifest_for_domain(Path::new("nustar-packages"), &nir.domain)?;
@@ -64,7 +65,8 @@ pub fn compile_source(source: &str) -> Result<PipelineArtifacts, String> {
 }
 
 pub fn compile_ast(ast: AstModule) -> Result<PipelineArtifacts, String> {
-    let nir = crate::frontend::lower_ast_to_nir(&ast)?;
+    let mut nir = crate::frontend::lower_ast_to_nir(&ast)?;
+    crate::optimize::simplify_nir_module(&mut nir);
     crate::nir_verify::verify_nir_module(&nir)?;
     let lowering_manifest =
         crate::registry::load_manifest_for_domain(Path::new("nustar-packages"), &nir.domain)?;

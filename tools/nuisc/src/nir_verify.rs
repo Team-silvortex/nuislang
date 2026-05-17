@@ -102,6 +102,7 @@ fn verify_stmt(
 ) -> Result<(), String> {
     match stmt {
         NirStmt::Let { name, value, .. } | NirStmt::Const { name, value, .. } => {
+            ensure_binding_can_be_rebound(name, borrows, borrow_bindings)?;
             borrows.remove(name);
             borrow_bindings.remove(name);
             data_bindings.remove(name);
@@ -189,6 +190,28 @@ fn merge_branch_state(
     *borrows = merged_borrows;
 }
 
+fn ensure_binding_can_be_rebound(
+    name: &str,
+    borrows: &BTreeMap<String, usize>,
+    borrow_bindings: &BTreeMap<String, String>,
+) -> Result<(), String> {
+    if borrows.get(name).copied().unwrap_or(0) > 0 {
+        return Err(format!(
+            "nir verify: cannot rebind `{}` while borrow(s) are active",
+            name
+        ));
+    }
+    if let Some(source) = borrow_bindings.get(name) {
+        if borrows.get(source).copied().unwrap_or(0) > 0 {
+            return Err(format!(
+                "nir verify: cannot rebind borrow alias `{}` while borrow of `{}` is active",
+                name, source
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn note_binding_effects(
     expr: &NirExpr,
     binding_name: &str,
@@ -221,7 +244,10 @@ fn note_binding_effects(
                 } else {
                     borrows.insert(source.clone(), next);
                 }
-                if binding_name != "_" {
+                if let NirExpr::Var(alias_name) = inner.as_ref() {
+                    borrow_bindings.remove(alias_name);
+                }
+                if binding_name != "_" && binding_name != source {
                     borrow_bindings.remove(binding_name);
                 }
             }
@@ -1251,6 +1277,92 @@ mod tests {
 
         let error = verify_nir_module(&module).unwrap_err();
         assert!(error.contains("cannot end borrow"));
+    }
+
+    #[test]
+    fn rebind_of_owner_while_borrowed_is_rejected() {
+        let module = module_with_body(vec![
+            NirStmt::Let {
+                name: "head".to_owned(),
+                ty: None,
+                value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                    value: Box::new(NirExpr::Int(10)),
+                    next: Box::new(NirExpr::Null),
+                })),
+            },
+            NirStmt::Let {
+                name: "head_ref".to_owned(),
+                ty: None,
+                value: NirExpr::Borrow(Box::new(NirExpr::Var("head".to_owned()))),
+            },
+            NirStmt::Let {
+                name: "head".to_owned(),
+                ty: None,
+                value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                    value: Box::new(NirExpr::Int(11)),
+                    next: Box::new(NirExpr::Null),
+                })),
+            },
+        ]);
+
+        let error = verify_nir_module(&module).unwrap_err();
+        assert!(error.contains("cannot rebind `head` while borrow(s) are active"));
+    }
+
+    #[test]
+    fn rebind_of_borrow_alias_while_active_is_rejected() {
+        let module = module_with_body(vec![
+            NirStmt::Let {
+                name: "head".to_owned(),
+                ty: None,
+                value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                    value: Box::new(NirExpr::Int(10)),
+                    next: Box::new(NirExpr::Null),
+                })),
+            },
+            NirStmt::Let {
+                name: "head_ref".to_owned(),
+                ty: None,
+                value: NirExpr::Borrow(Box::new(NirExpr::Var("head".to_owned()))),
+            },
+            NirStmt::Let {
+                name: "head_ref".to_owned(),
+                ty: None,
+                value: NirExpr::Null,
+            },
+        ]);
+
+        let error = verify_nir_module(&module).unwrap_err();
+        assert!(error.contains("cannot rebind borrow alias `head_ref`"));
+    }
+
+    #[test]
+    fn borrow_alias_can_be_rebound_after_borrow_end() {
+        let module = module_with_body(vec![
+            NirStmt::Let {
+                name: "head".to_owned(),
+                ty: None,
+                value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                    value: Box::new(NirExpr::Int(10)),
+                    next: Box::new(NirExpr::Null),
+                })),
+            },
+            NirStmt::Let {
+                name: "head_ref".to_owned(),
+                ty: None,
+                value: NirExpr::Borrow(Box::new(NirExpr::Var("head".to_owned()))),
+            },
+            NirStmt::Expr(NirExpr::BorrowEnd(Box::new(NirExpr::Var(
+                "head_ref".to_owned(),
+            )))),
+            NirStmt::Let {
+                name: "head_ref".to_owned(),
+                ty: None,
+                value: NirExpr::Null,
+            },
+        ]);
+
+        verify_nir_module(&module).unwrap();
     }
 
     #[test]

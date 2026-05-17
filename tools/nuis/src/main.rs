@@ -270,6 +270,8 @@ struct TestVerdict {
     counted_pass: bool,
     note: Option<String>,
     clock_policy: Option<&'static str>,
+    resolved_clock_bridge: Option<&'static str>,
+    resolved_clock_surface: Option<&'static str>,
     declared_clock_domain: Option<&'static str>,
     declared_clock_domain_code: Option<i64>,
     resolved_clock_domain: Option<&'static str>,
@@ -280,6 +282,7 @@ struct TestVerdict {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct RunnerClockResolution {
     domain: nuis_semantics::model::TestClockDomain,
+    bridge: nuis_semantics::model::NirHostTimingBridge,
     source: &'static str,
 }
 
@@ -377,6 +380,12 @@ fn run_language_tests_for_source_file(
         if let Some(clock_policy) = verdict.clock_policy {
             println!("    clock_policy: {}", clock_policy);
         }
+        if let Some(clock_bridge) = verdict.resolved_clock_bridge {
+            println!("    resolved_clock_bridge: {}", clock_bridge);
+        }
+        if let Some(clock_surface) = verdict.resolved_clock_surface {
+            println!("    resolved_clock_surface: {}", clock_surface);
+        }
         if let Some(clock_domain) = verdict.declared_clock_domain {
             let code = verdict
                 .declared_clock_domain_code
@@ -467,6 +476,8 @@ fn execute_language_test(
             counted_pass: false,
             note: None,
             clock_policy: None,
+            resolved_clock_bridge: None,
+            resolved_clock_surface: None,
             declared_clock_domain: None,
             declared_clock_domain_code: None,
             resolved_clock_domain: None,
@@ -533,7 +544,11 @@ fn execute_language_test(
         status,
         counted_pass,
         note,
-        clock_policy: test_function.test_clock_policy.map(|policy| policy.as_str()),
+        clock_policy: test_function
+            .test_clock_policy
+            .map(|policy| policy.as_str()),
+        resolved_clock_bridge: resolved_clock.map(|clock| clock.bridge.as_str()),
+        resolved_clock_surface: resolved_clock.map(|clock| clock.bridge.host_surface().as_str()),
         declared_clock_domain: declared_clock_domain.map(|domain| domain.as_str()),
         declared_clock_domain_code: declared_clock_domain.map(|domain| domain.code()),
         resolved_clock_domain: resolved_clock.map(|clock| clock.domain.as_str()),
@@ -604,19 +619,12 @@ fn wait_for_test_child(
 fn resolve_runner_clock_domain(
     declared: Option<nuis_semantics::model::TestClockDomain>,
 ) -> RunnerClockResolution {
-    match declared.unwrap_or(nuis_semantics::model::TestClockDomain::Monotonic) {
-        nuis_semantics::model::TestClockDomain::Monotonic => RunnerClockResolution {
-            domain: nuis_semantics::model::TestClockDomain::Monotonic,
-            source: "host_monotonic_deadline",
-        },
-        nuis_semantics::model::TestClockDomain::Wall => RunnerClockResolution {
-            domain: nuis_semantics::model::TestClockDomain::Wall,
-            source: "host_wall_deadline",
-        },
-        nuis_semantics::model::TestClockDomain::Global => RunnerClockResolution {
-            domain: nuis_semantics::model::TestClockDomain::Monotonic,
-            source: "host_monotonic_deadline",
-        },
+    let declared = declared.unwrap_or(nuis_semantics::model::TestClockDomain::Monotonic);
+    let bridge = nuis_semantics::model::NirHostTimingBridge::from_test_clock_domain(declared);
+    RunnerClockResolution {
+        domain: bridge.resolved_domain(),
+        bridge,
+        source: bridge.resolved_source(),
     }
 }
 
@@ -2056,7 +2064,18 @@ mod cpu Main {
     fn resolves_global_clock_domain_to_monotonic_runner_clock() {
         let resolved =
             resolve_runner_clock_domain(Some(nuis_semantics::model::TestClockDomain::Global));
-        assert_eq!(resolved.domain, nuis_semantics::model::TestClockDomain::Monotonic);
+        assert_eq!(
+            resolved.domain,
+            nuis_semantics::model::TestClockDomain::Monotonic
+        );
+        assert_eq!(
+            resolved.bridge,
+            nuis_semantics::model::NirHostTimingBridge::GlobalToMonotonicTickBridge
+        );
+        assert_eq!(
+            resolved.bridge.host_surface(),
+            nuis_semantics::model::NirHostReadSurface::ClockTick
+        );
         assert_eq!(resolved.source, "host_monotonic_deadline");
     }
 
@@ -2064,8 +2083,37 @@ mod cpu Main {
     fn resolves_wall_clock_domain_to_wall_runner_clock_source() {
         let resolved =
             resolve_runner_clock_domain(Some(nuis_semantics::model::TestClockDomain::Wall));
-        assert_eq!(resolved.domain, nuis_semantics::model::TestClockDomain::Wall);
+        assert_eq!(
+            resolved.domain,
+            nuis_semantics::model::TestClockDomain::Wall
+        );
+        assert_eq!(
+            resolved.bridge,
+            nuis_semantics::model::NirHostTimingBridge::WallDeadline
+        );
+        assert_eq!(
+            resolved.bridge.host_surface(),
+            nuis_semantics::model::NirHostReadSurface::ClockTick
+        );
         assert_eq!(resolved.source, "host_wall_deadline");
+    }
+
+    #[test]
+    fn resolves_default_clock_domain_to_monotonic_tick_bridge() {
+        let resolved = resolve_runner_clock_domain(None);
+        assert_eq!(
+            resolved.domain,
+            nuis_semantics::model::TestClockDomain::Monotonic
+        );
+        assert_eq!(
+            resolved.bridge,
+            nuis_semantics::model::NirHostTimingBridge::MonotonicTick
+        );
+        assert_eq!(
+            resolved.bridge.host_surface(),
+            nuis_semantics::model::NirHostReadSurface::ClockTick
+        );
+        assert_eq!(resolved.source, "host_monotonic_deadline");
     }
 
     #[test]

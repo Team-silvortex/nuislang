@@ -9,6 +9,7 @@ pub mod frontend;
 pub mod lowering;
 pub mod nir_verify;
 pub mod nustar_binary;
+pub mod optimize;
 pub mod pipeline;
 pub mod project;
 pub mod registry;
