@@ -1,0 +1,50 @@
+mod cpu Main {
+  extern "c" fn host_argv_at(index: i64) -> i64;
+  extern "c" fn host_stdout_write(text_handle: i64) -> i64;
+  extern "c" fn host_stdout_flush() -> i64;
+  extern "c" fn host_file_open(path_handle: i64, flags: i64) -> i64;
+  extern "c" fn host_file_read(file_handle: i64, buffer_handle: i64, len: i64) -> i64;
+  extern "c" fn host_file_close(file_handle: i64) -> i64;
+  extern "c" fn host_stdin_read(buffer_handle: i64, len: i64) -> i64;
+
+  struct NativeInputToolSummary {
+    path_handle: i64,
+    stdout_code: i64,
+    flush_code: i64,
+    file_handle: i64,
+    file_read_len: i64,
+    file_close_code: i64,
+    stdin_read_len: i64
+  }
+
+  fn run_input_tool(read_len: i64) -> NativeInputToolSummary {
+    let path_handle: i64 = host_argv_at(1);
+    let file_handle: i64 = host_file_open(path_handle, 0);
+    let file_backing: ref Buffer = alloc_buffer(read_len, 0);
+    let stdin_backing: ref Buffer = alloc_buffer(read_len, 0);
+    let file_read_len: i64 = host_file_read(file_handle, file_backing, read_len);
+    let stdin_read_len: i64 = host_stdin_read(stdin_backing, read_len);
+    return NativeInputToolSummary {
+      path_handle: path_handle,
+      stdout_code: host_stdout_write(path_handle),
+      flush_code: host_stdout_flush(),
+      file_handle: file_handle,
+      file_read_len: file_read_len,
+      file_close_code: host_file_close(file_handle),
+      stdin_read_len: stdin_read_len
+    };
+  }
+
+  fn summarize_input_tool(read_len: i64) -> i64 {
+    let summary: NativeInputToolSummary = run_input_tool(read_len);
+    return summary.stdout_code
+      + summary.flush_code
+      + summary.file_read_len
+      + summary.file_close_code
+      + summary.stdin_read_len;
+  }
+
+  fn main() -> i64 {
+    return summarize_input_tool(64);
+  }
+}

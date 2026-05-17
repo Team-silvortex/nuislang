@@ -86,6 +86,9 @@ Recipe modules:
   - [report_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/report_runtime_recipe.ns)
 * automation/workflow tooling
   - [automation_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/automation_runtime_recipe.ns)
+* shell-oriented command bridge
+  - [command_shell_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_shell_recipe.ns)
+  - [command_text_builder_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_text_builder_recipe.ns)
 * clock/test timing alignment
   - [clock_test_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/clock_test_recipe.ns)
 
@@ -102,6 +105,9 @@ Current boundaries:
   placeholder shape
 * current string/file direction is still host-backed and opaque; there is not
   yet a first-class native `String` or file-path/file-descriptor standard type
+* a small native-backed `host_text_concat` bridge now exists for staging
+  shell-oriented command text assembly; it is intentionally narrow and is not
+  yet a full native string model
 * current CLI-facing `argv/env/process` direction is also still host-backed and
   opaque; it is a facade over handles and status integers, not yet a stable
   native command-line/runtime API
@@ -129,7 +135,11 @@ Current boundaries:
   experiments but not yet a finalized portable process-management contract;
   the current native-backed AOT shim now treats `program_handle` as the main
   shell command text, `argv_handle` as a raw shell argument-tail text handle,
-  and `env_handle` as a raw `KEY=VALUE ...` environment-prefix text handle
+  and `env_handle` as a raw `KEY=VALUE ...` environment-prefix text handle;
+  [command_shell_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_shell_recipe.ns)
+  is the canonical source-level staging recipe for that bridge, and native
+  direct-exit observers now exist for `command_wait_exit` and
+  `subprocess_join_exit`
 * current `metadata/directory/stat` direction is also still a host-backed file
   system facade; it is enough to sketch CLI and tooling flows, but not yet a
   finalized portable filesystem standard library contract

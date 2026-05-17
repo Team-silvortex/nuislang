@@ -1,0 +1,91 @@
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+  extern "c" fn host_argv_at(index: i64) -> i64;
+  extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
+  extern "c" fn host_stdout_write(text_handle: i64) -> i64;
+  extern "c" fn host_stdout_flush() -> i64;
+  extern "c" fn host_command_spawn(program_handle: i64, argv_handle: i64) -> i64;
+  extern "c" fn host_command_wait_exit(command_handle: i64) -> i64;
+  extern "c" fn host_subprocess_spawn(program_handle: i64, argv_handle: i64, env_handle: i64) -> i64;
+  extern "c" fn host_subprocess_join_exit(process_handle: i64) -> i64;
+
+  struct ToolRunSummary {
+    program_handle: i64,
+    argv_tail_handle: i64,
+    env_prefix_handle: i64,
+    stdout_code: i64,
+    flush_code: i64,
+    command_exit: i64,
+    child_exit: i64
+  }
+
+  fn build_argv_tail(
+    first_arg_handle: i64,
+    second_arg_handle: i64,
+    third_arg_handle: i64
+  ) -> i64 {
+    let spaced_first: i64 = host_text_concat(first_arg_handle, " ");
+    let first_two: i64 = host_text_concat(spaced_first, second_arg_handle);
+    let spaced_two: i64 = host_text_concat(first_two, " ");
+    return host_text_concat(spaced_two, third_arg_handle);
+  }
+
+  fn build_env_prefix(env_key_handle: i64, env_value_handle: i64) -> i64 {
+    let keyed: i64 = host_text_concat(env_key_handle, "=");
+    return host_text_concat(keyed, env_value_handle);
+  }
+
+  fn print_usage() -> i64 {
+    let program_name: i64 = host_argv_at(0);
+    let usage_line: i64 = host_text_concat(
+      program_name,
+      " <program> <arg1> <arg2> <arg3>"
+    );
+    return host_stdout_write(usage_line) + host_stdout_flush();
+  }
+
+  fn run_tool(env_key_handle: i64, env_value_handle: i64) -> ToolRunSummary {
+    let program_handle: i64 = host_argv_at(1);
+    let first_arg_handle: i64 = host_argv_at(2);
+    let second_arg_handle: i64 = host_argv_at(3);
+    let third_arg_handle: i64 = host_argv_at(4);
+    let argv_tail_handle: i64 = build_argv_tail(
+      first_arg_handle,
+      second_arg_handle,
+      third_arg_handle
+    );
+    let env_prefix_handle: i64 = build_env_prefix(env_key_handle, env_value_handle);
+    let command_handle: i64 = host_command_spawn(program_handle, argv_tail_handle);
+    let child_handle: i64 = host_subprocess_spawn(
+      program_handle,
+      argv_tail_handle,
+      env_prefix_handle
+    );
+    return ToolRunSummary {
+      program_handle: program_handle,
+      argv_tail_handle: argv_tail_handle,
+      env_prefix_handle: env_prefix_handle,
+      stdout_code: host_stdout_write(program_handle),
+      flush_code: host_stdout_flush(),
+      command_exit: host_command_wait_exit(command_handle),
+      child_exit: host_subprocess_join_exit(child_handle)
+    };
+  }
+
+  fn summarize_tool(env_key_handle: i64, env_value_handle: i64) -> i64 {
+    let summary: ToolRunSummary = run_tool(env_key_handle, env_value_handle);
+    return summary.stdout_code
+      + summary.flush_code
+      + summary.command_exit
+      + summary.child_exit;
+  }
+
+  fn main() -> i64 {
+    let argc: i64 = host_argv_count();
+    if argc < 5 {
+      return 64 + print_usage();
+    } else {
+      return summarize_tool("NUIS_TOOL_FLAG", "1");
+    }
+  }
+}

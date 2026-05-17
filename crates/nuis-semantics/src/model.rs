@@ -196,6 +196,9 @@ pub enum AstBinaryOp {
     Sub,
     Mul,
     Div,
+    Eq,
+    Lt,
+    Gt,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1126,6 +1129,9 @@ pub enum NirBinaryOp {
     Sub,
     Mul,
     Div,
+    Eq,
+    Lt,
+    Gt,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

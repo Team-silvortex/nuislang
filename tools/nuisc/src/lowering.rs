@@ -3148,6 +3148,9 @@ fn lower_expr(
                 NirBinaryOp::Sub => "sub",
                 NirBinaryOp::Mul => "mul",
                 NirBinaryOp::Div => "div",
+                NirBinaryOp::Eq => "eq",
+                NirBinaryOp::Lt => "lt",
+                NirBinaryOp::Gt => "gt",
             };
             let name = next_name(state, instruction);
             state.yir.nodes.push(Node {

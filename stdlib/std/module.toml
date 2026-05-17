@@ -50,5 +50,7 @@ source_modules = [
   "clock_test_recipe.ns",
   "cli_runtime_recipe.ns",
   "report_runtime_recipe.ns",
-  "automation_runtime_recipe.ns"
+  "automation_runtime_recipe.ns",
+  "command_shell_recipe.ns",
+  "command_text_builder_recipe.ns"
 ]

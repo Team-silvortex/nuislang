@@ -1033,6 +1033,9 @@ fn fold_int_binary(op: NirBinaryOp, lhs: i64, rhs: i64) -> Option<i64> {
         NirBinaryOp::Sub => Some(lhs - rhs),
         NirBinaryOp::Mul => Some(lhs * rhs),
         NirBinaryOp::Div => (rhs != 0).then_some(lhs / rhs),
+        NirBinaryOp::Eq => Some((lhs == rhs) as i64),
+        NirBinaryOp::Lt => Some((lhs < rhs) as i64),
+        NirBinaryOp::Gt => Some((lhs > rhs) as i64),
     }
 }
 

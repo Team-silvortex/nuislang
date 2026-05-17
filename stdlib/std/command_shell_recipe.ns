@@ -1,0 +1,91 @@
+mod cpu Main {
+  extern "c" fn host_command_spawn(program_handle: i64, argv_handle: i64) -> i64;
+  extern "c" fn host_command_status(command_handle: i64) -> i64;
+  extern "c" fn host_command_wait(command_handle: i64) -> i64;
+  extern "c" fn host_command_wait_exit(command_handle: i64) -> i64;
+  extern "c" fn host_subprocess_spawn(program_handle: i64, argv_handle: i64, env_handle: i64) -> i64;
+  extern "c" fn host_subprocess_signal(process_handle: i64, signal: i64) -> i64;
+  extern "c" fn host_subprocess_join(process_handle: i64) -> i64;
+  extern "c" fn host_subprocess_join_exit(process_handle: i64) -> i64;
+
+  struct ShellCommandSeed {
+    program_handle: i64,
+    argv_tail_handle: i64,
+    env_prefix_handle: i64
+  }
+
+  struct ShellCommandSummary {
+    command_handle: i64,
+    command_status_raw: i64,
+    command_wait_raw: i64,
+    command_wait_exit: i64,
+    child_handle: i64,
+    child_signal: i64,
+    child_join_raw: i64,
+    child_join_exit: i64
+  }
+
+  fn build_seed(
+    program_handle: i64,
+    argv_tail_handle: i64,
+    env_prefix_handle: i64
+  ) -> ShellCommandSeed {
+    return ShellCommandSeed {
+      program_handle: program_handle,
+      argv_tail_handle: argv_tail_handle,
+      env_prefix_handle: env_prefix_handle
+    };
+  }
+
+  fn summarize_runtime(seed: ShellCommandSeed) -> ShellCommandSummary {
+    let command_handle: i64 = host_command_spawn(
+      seed.program_handle,
+      seed.argv_tail_handle
+    );
+    let command_status_raw: i64 = host_command_status(command_handle);
+    let command_wait_raw: i64 = host_command_wait(command_handle);
+    let command_wait_exit: i64 = host_command_wait_exit(command_handle);
+    let child_handle: i64 = host_subprocess_spawn(
+      seed.program_handle,
+      seed.argv_tail_handle,
+      seed.env_prefix_handle
+    );
+    let child_signal: i64 = host_subprocess_signal(child_handle, 0);
+    let child_join_raw: i64 = host_subprocess_join(child_handle);
+    let child_join_exit: i64 = host_subprocess_join_exit(child_handle);
+
+    return ShellCommandSummary {
+      command_handle: command_handle,
+      command_status_raw: command_status_raw,
+      command_wait_raw: command_wait_raw,
+      command_wait_exit: command_wait_exit,
+      child_handle: child_handle,
+      child_signal: child_signal,
+      child_join_raw: child_join_raw,
+      child_join_exit: child_join_exit
+    };
+  }
+
+  fn summarize_command_shell_recipe(
+    program_handle: i64,
+    argv_tail_handle: i64,
+    env_prefix_handle: i64
+  ) -> i64 {
+    let seed: ShellCommandSeed = build_seed(
+      program_handle,
+      argv_tail_handle,
+      env_prefix_handle
+    );
+    let summary: ShellCommandSummary = summarize_runtime(seed);
+    return summary.command_handle
+      + summary.command_status_raw
+      + summary.command_wait_exit
+      + summary.child_handle
+      + summary.child_signal
+      + summary.child_join_exit;
+  }
+
+  fn main() {
+    print(summarize_command_shell_recipe(2503, 2504, 2505));
+  }
+}

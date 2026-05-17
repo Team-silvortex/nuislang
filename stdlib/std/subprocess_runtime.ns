@@ -2,11 +2,13 @@ mod cpu Main {
   extern "c" fn host_subprocess_spawn(program_handle: i64, argv_handle: i64, env_handle: i64) -> i64;
   extern "c" fn host_subprocess_signal(process_handle: i64, signal: i64) -> i64;
   extern "c" fn host_subprocess_join(process_handle: i64) -> i64;
+  extern "c" fn host_subprocess_join_exit(process_handle: i64) -> i64;
 
   struct SubprocessHandle {
     handle: i64,
     signal_result: i64,
-    join_code: i64
+    join_code: i64,
+    join_exit: i64
   }
 
   fn launch_subprocess(program_handle: i64, argv_handle: i64, env_handle: i64) -> SubprocessHandle {
@@ -14,13 +16,14 @@ mod cpu Main {
     return SubprocessHandle {
       handle: handle,
       signal_result: host_subprocess_signal(handle, 0),
-      join_code: host_subprocess_join(handle)
+      join_code: host_subprocess_join(handle),
+      join_exit: host_subprocess_join_exit(handle)
     };
   }
 
   fn summarize_subprocess(program_handle: i64, argv_handle: i64, env_handle: i64) -> i64 {
     let process: SubprocessHandle = launch_subprocess(program_handle, argv_handle, env_handle);
-    return process.handle + process.signal_result + process.join_code;
+    return process.handle + process.signal_result + process.join_code + process.join_exit;
   }
 
   fn main() {

@@ -1,0 +1,97 @@
+mod cpu Main {
+  extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
+
+  struct CommandTextSeed {
+    command_handle: i64,
+    first_arg_handle: i64,
+    second_arg_handle: i64,
+    third_arg_handle: i64,
+    env_key_handle: i64,
+    env_value_handle: i64
+  }
+
+  struct CommandTextSummary {
+    argv_tail_handle: i64,
+    env_prefix_handle: i64,
+    combined_shell_handle: i64
+  }
+
+  fn build_seed(
+    command_handle: i64,
+    first_arg_handle: i64,
+    second_arg_handle: i64,
+    third_arg_handle: i64,
+    env_key_handle: i64,
+    env_value_handle: i64
+  ) -> CommandTextSeed {
+    return CommandTextSeed {
+      command_handle: command_handle,
+      first_arg_handle: first_arg_handle,
+      second_arg_handle: second_arg_handle,
+      third_arg_handle: third_arg_handle,
+      env_key_handle: env_key_handle,
+      env_value_handle: env_value_handle
+    };
+  }
+
+  fn build_argv_tail(first_arg_handle: i64, second_arg_handle: i64, third_arg_handle: i64) -> i64 {
+    let spaced_first: i64 = host_text_concat(first_arg_handle, " ");
+    let first_two: i64 = host_text_concat(spaced_first, second_arg_handle);
+    let spaced_two: i64 = host_text_concat(first_two, " ");
+    return host_text_concat(spaced_two, third_arg_handle);
+  }
+
+  fn build_env_prefix(env_key_handle: i64, env_value_handle: i64) -> i64 {
+    let keyed: i64 = host_text_concat(env_key_handle, "=");
+    return host_text_concat(keyed, env_value_handle);
+  }
+
+  fn summarize_runtime(seed: CommandTextSeed) -> CommandTextSummary {
+    let argv_tail_handle: i64 = build_argv_tail(
+      seed.first_arg_handle,
+      seed.second_arg_handle,
+      seed.third_arg_handle
+    );
+    let env_prefix_handle: i64 = build_env_prefix(seed.env_key_handle, seed.env_value_handle);
+    let shell_command: i64 = host_text_concat(seed.command_handle, " ");
+    let combined_shell_handle: i64 = host_text_concat(shell_command, argv_tail_handle);
+    return CommandTextSummary {
+      argv_tail_handle: argv_tail_handle,
+      env_prefix_handle: env_prefix_handle,
+      combined_shell_handle: combined_shell_handle
+    };
+  }
+
+  fn summarize_command_text_builder_recipe(
+    command_handle: i64,
+    first_arg_handle: i64,
+    second_arg_handle: i64,
+    third_arg_handle: i64,
+    env_key_handle: i64,
+    env_value_handle: i64
+  ) -> i64 {
+    let seed: CommandTextSeed = build_seed(
+      command_handle,
+      first_arg_handle,
+      second_arg_handle,
+      third_arg_handle,
+      env_key_handle,
+      env_value_handle
+    );
+    let summary: CommandTextSummary = summarize_runtime(seed);
+    return summary.argv_tail_handle + summary.env_prefix_handle + summary.combined_shell_handle;
+  }
+
+  fn main() {
+    print(
+      summarize_command_text_builder_recipe(
+        "/bin/echo",
+        "hello",
+        "from",
+        "nuis",
+        "NUIS_FLAG",
+        "1"
+      )
+    );
+  }
+}

@@ -1008,6 +1008,20 @@ static int64_t nuis_host_text_len_value(int64_t handle) {
     return (int64_t)strlen(nuis_host_text_lookup(handle));
 }
 
+static int64_t nuis_host_text_concat(int64_t lhs_handle, int64_t rhs_handle) {
+    const char* lhs = nuis_host_text_lookup(lhs_handle);
+    const char* rhs = nuis_host_text_lookup(rhs_handle);
+    size_t lhs_len = lhs != NULL ? strlen(lhs) : 0;
+    size_t rhs_len = rhs != NULL ? strlen(rhs) : 0;
+    size_t total = lhs_len + rhs_len + 1;
+    char* buffer = (char*)malloc(total);
+    if (buffer == NULL) return 0;
+    snprintf(buffer, total, "%s%s", lhs != NULL ? lhs : "", rhs != NULL ? rhs : "");
+    int64_t handle = nuis_host_text_register(buffer);
+    free(buffer);
+    return handle;
+}
+
 static int64_t nuis_host_file_open(int64_t path_handle, int64_t flags) {
     const char* path = nuis_host_text_lookup(path_handle);
     if (path == NULL || path[0] == '\0') return 0;
@@ -1328,6 +1342,11 @@ static int64_t nuis_host_command_wait(int64_t command_handle) {
     return nuis_host_command_status_slots[idx];
 }
 
+static int64_t nuis_host_command_wait_exit(int64_t command_handle) {
+    int64_t raw = nuis_host_command_wait(command_handle);
+    return nuis_host_process_exit_code(raw);
+}
+
 static int64_t nuis_host_subprocess_spawn(int64_t program_handle, int64_t argv_handle, int64_t env_handle) {
     if (nuis_host_subprocess_len >= 256) return 0;
     char* command = nuis_host_build_shell_command(program_handle, argv_handle, env_handle);
@@ -1358,6 +1377,11 @@ static int64_t nuis_host_subprocess_join(int64_t process_handle) {
     nuis_host_subprocess_done[idx] = 1;
     nuis_host_subprocess_status_slots[idx] = (int64_t)status;
     return nuis_host_subprocess_status_slots[idx];
+}
+
+static int64_t nuis_host_subprocess_join_exit(int64_t process_handle) {
+    int64_t raw = nuis_host_subprocess_join(process_handle);
+    return nuis_host_process_exit_code(raw);
 }
 
 static int64_t nuis_host_wall_time_ns(void) {
@@ -1498,6 +1522,12 @@ fn render_host_ffi_stub(symbol: &str, function: AstExternFunction) -> String {
         format!(
             "    return nuis_host_text_len_value({});",
             arg_name(0, &function)
+        )
+    } else if symbol == "host_text_concat" {
+        format!(
+            "    return nuis_host_text_concat({}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function)
         )
     } else if symbol == "host_file_open" {
         format!(
@@ -1647,6 +1677,11 @@ fn render_host_ffi_stub(symbol: &str, function: AstExternFunction) -> String {
             "    return nuis_host_command_wait({});",
             arg_name(0, &function)
         )
+    } else if symbol == "host_command_wait_exit" {
+        format!(
+            "    return nuis_host_command_wait_exit({});",
+            arg_name(0, &function)
+        )
     } else if symbol == "host_subprocess_spawn" {
         format!(
             "    return nuis_host_subprocess_spawn({}, {}, {});",
@@ -1663,6 +1698,11 @@ fn render_host_ffi_stub(symbol: &str, function: AstExternFunction) -> String {
     } else if symbol == "host_subprocess_join" {
         format!(
             "    return nuis_host_subprocess_join({});",
+            arg_name(0, &function)
+        )
+    } else if symbol == "host_subprocess_join_exit" {
+        format!(
+            "    return nuis_host_subprocess_join_exit({});",
             arg_name(0, &function)
         )
     } else if symbol == "host_wall_time_ns" {
@@ -2113,6 +2153,94 @@ mod tests {
         assert!(shim.contains("return nuis_host_command_spawn(program_handle, argv_handle);"));
         assert!(shim.contains("static char* nuis_host_build_shell_command("));
         assert!(shim.contains("env %s %s %s"));
+    }
+
+    #[test]
+    fn c_shim_source_includes_native_command_and_subprocess_exit_hooks() {
+        fn i64_ty() -> AstTypeRef {
+            AstTypeRef {
+                name: "i64".to_owned(),
+                generic_args: Vec::new(),
+                is_optional: false,
+                is_ref: false,
+            }
+        }
+
+        let ast = AstModule {
+            uses: Vec::new(),
+            domain: "cpu".to_owned(),
+            unit: "Main".to_owned(),
+            externs: vec![
+                AstExternFunction {
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_command_wait_exit".to_owned(),
+                    params: vec![nuis_semantics::model::AstParam {
+                        name: "command_handle".to_owned(),
+                        ty: i64_ty(),
+                    }],
+                    return_type: i64_ty(),
+                },
+                AstExternFunction {
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_subprocess_join_exit".to_owned(),
+                    params: vec![nuis_semantics::model::AstParam {
+                        name: "process_handle".to_owned(),
+                        ty: i64_ty(),
+                    }],
+                    return_type: i64_ty(),
+                },
+            ],
+            extern_interfaces: Vec::new(),
+            structs: Vec::new(),
+            functions: Vec::new(),
+        };
+        let shim = c_shim_source(&ast);
+        assert!(shim.contains("static int64_t nuis_host_command_wait_exit("));
+        assert!(shim.contains("static int64_t nuis_host_subprocess_join_exit("));
+        assert!(shim.contains("return nuis_host_command_wait_exit(command_handle);"));
+        assert!(shim.contains("return nuis_host_subprocess_join_exit(process_handle);"));
+    }
+
+    #[test]
+    fn c_shim_source_includes_native_text_concat_hook() {
+        fn i64_ty() -> AstTypeRef {
+            AstTypeRef {
+                name: "i64".to_owned(),
+                generic_args: Vec::new(),
+                is_optional: false,
+                is_ref: false,
+            }
+        }
+
+        let ast = AstModule {
+            uses: Vec::new(),
+            domain: "cpu".to_owned(),
+            unit: "Main".to_owned(),
+            externs: vec![AstExternFunction {
+                abi: "c".to_owned(),
+                interface: None,
+                name: "host_text_concat".to_owned(),
+                params: vec![
+                    nuis_semantics::model::AstParam {
+                        name: "lhs_handle".to_owned(),
+                        ty: i64_ty(),
+                    },
+                    nuis_semantics::model::AstParam {
+                        name: "rhs_handle".to_owned(),
+                        ty: i64_ty(),
+                    },
+                ],
+                return_type: i64_ty(),
+            }],
+            extern_interfaces: Vec::new(),
+            structs: Vec::new(),
+            functions: Vec::new(),
+        };
+        let shim = c_shim_source(&ast);
+        assert!(shim.contains("static int64_t nuis_host_text_concat("));
+        assert!(shim.contains("return nuis_host_text_concat(lhs_handle, rhs_handle);"));
     }
 
     #[test]

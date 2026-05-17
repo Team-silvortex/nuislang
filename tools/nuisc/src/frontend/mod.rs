@@ -712,7 +712,11 @@ fn lower_binary_expr_with_async(
     let rhs_ty = infer_nir_expr_type(&lowered_rhs, bindings, signatures, struct_table)
         .ok_or_else(|| "cannot infer binary rhs type".to_owned())?;
     let result_ty = binary_result_type(*op, &lhs_ty, &rhs_ty)?;
-    if !compatible_types(&lhs_ty, &result_ty) || !compatible_types(&rhs_ty, &result_ty) {
+    if matches!(
+        op,
+        AstBinaryOp::Add | AstBinaryOp::Sub | AstBinaryOp::Mul | AstBinaryOp::Div
+    ) && (!compatible_types(&lhs_ty, &result_ty) || !compatible_types(&rhs_ty, &result_ty))
+    {
         return Err(format!(
             "binary operands must agree on type, found `{}` and `{}`",
             lhs_ty.render(),
@@ -725,6 +729,9 @@ fn lower_binary_expr_with_async(
             AstBinaryOp::Sub => NirBinaryOp::Sub,
             AstBinaryOp::Mul => NirBinaryOp::Mul,
             AstBinaryOp::Div => NirBinaryOp::Div,
+            AstBinaryOp::Eq => NirBinaryOp::Eq,
+            AstBinaryOp::Lt => NirBinaryOp::Lt,
+            AstBinaryOp::Gt => NirBinaryOp::Gt,
         },
         lhs: Box::new(lowered_lhs),
         rhs: Box::new(lowered_rhs),
@@ -736,23 +743,46 @@ fn binary_result_type(
     lhs: &NirTypeRef,
     rhs: &NirTypeRef,
 ) -> Result<NirTypeRef, String> {
-    if !compatible_types(lhs, rhs) {
-        return Err(format!(
-            "binary `{}` expects matching operand types, found `{}` and `{}`",
-            render_binary_op(op),
-            lhs.render(),
-            rhs.render()
-        ));
+    match op {
+        AstBinaryOp::Add | AstBinaryOp::Sub | AstBinaryOp::Mul | AstBinaryOp::Div => {
+            if !compatible_types(lhs, rhs) {
+                return Err(format!(
+                    "binary `{}` expects matching operand types, found `{}` and `{}`",
+                    render_binary_op(op),
+                    lhs.render(),
+                    rhs.render()
+                ));
+            }
+            if !lhs.is_numeric_scalar() || !rhs.is_numeric_scalar() {
+                return Err(format!(
+                    "binary `{}` currently expects numeric scalar operands, found `{}` and `{}`",
+                    render_binary_op(op),
+                    lhs.render(),
+                    rhs.render()
+                ));
+            }
+            Ok(lhs.clone())
+        }
+        AstBinaryOp::Eq | AstBinaryOp::Lt | AstBinaryOp::Gt => {
+            if !compatible_types(lhs, rhs) {
+                return Err(format!(
+                    "binary `{}` expects matching operand types, found `{}` and `{}`",
+                    render_binary_op(op),
+                    lhs.render(),
+                    rhs.render()
+                ));
+            }
+            if !lhs.is_integer_scalar() || !rhs.is_integer_scalar() {
+                return Err(format!(
+                    "binary `{}` currently expects integer scalar operands, found `{}` and `{}`",
+                    render_binary_op(op),
+                    lhs.render(),
+                    rhs.render()
+                ));
+            }
+            Ok(bool_type())
+        }
     }
-    if !lhs.is_numeric_scalar() || !rhs.is_numeric_scalar() {
-        return Err(format!(
-            "binary `{}` currently expects numeric scalar operands, found `{}` and `{}`",
-            render_binary_op(op),
-            lhs.render(),
-            rhs.render()
-        ));
-    }
-    Ok(lhs.clone())
 }
 
 fn render_binary_op(op: AstBinaryOp) -> &'static str {
@@ -761,6 +791,9 @@ fn render_binary_op(op: AstBinaryOp) -> &'static str {
         AstBinaryOp::Sub => "-",
         AstBinaryOp::Mul => "*",
         AstBinaryOp::Div => "/",
+        AstBinaryOp::Eq => "==",
+        AstBinaryOp::Lt => "<",
+        AstBinaryOp::Gt => ">",
     }
 }
 

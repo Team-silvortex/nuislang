@@ -44,6 +44,18 @@ Read these examples in roughly five bands:
     tooling-shaped host example aligned with current `std` CLI/report/automation recipe thinking
   - [hello_native_cli_runtime.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_native_cli_runtime.ns)
     repo-local native CLI example aligned with the current AOT-backed `std` host shim batch
+  - [hello_native_command_runtime.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_native_command_runtime.ns)
+    repo-local native command example aligned with the current shell-oriented
+    `program/argv/env` handle bridge in the AOT-backed `std` host shim batch
+  - [hello_native_input_tool.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_native_input_tool.ns)
+    repo-local native input-driven example that reads one file path from `argv`
+    and combines native file/stdin byte counts into its own result
+  - [hello_native_cli_pipeline.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_native_cli_pipeline.ns)
+    repo-local native pipeline example that combines input-driven reads with a
+    child command/subprocess step in one front-door flow
+  - [hello_native_tool_runner.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_native_tool_runner.ns)
+    repo-local native tool-shaped example that launches a child command and
+    decides its own result from direct-exit observers
   - [hello_native_workflow_runtime.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_native_workflow_runtime.ns)
     repo-local native workflow example aligned with the current AOT-backed `std`
     directory/temp/process/command/subprocess shim batch

@@ -892,6 +892,9 @@ fn render_ast_binary_op(op: AstBinaryOp) -> &'static str {
         AstBinaryOp::Sub => "-",
         AstBinaryOp::Mul => "*",
         AstBinaryOp::Div => "/",
+        AstBinaryOp::Eq => "==",
+        AstBinaryOp::Lt => "<",
+        AstBinaryOp::Gt => ">",
     }
 }
 
@@ -901,6 +904,9 @@ fn render_nir_binary_op(op: NirBinaryOp) -> &'static str {
         NirBinaryOp::Sub => "-",
         NirBinaryOp::Mul => "*",
         NirBinaryOp::Div => "/",
+        NirBinaryOp::Eq => "==",
+        NirBinaryOp::Lt => "<",
+        NirBinaryOp::Gt => ">",
     }
 }
 

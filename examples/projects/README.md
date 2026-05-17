@@ -119,6 +119,20 @@ Also included:
   `kernel_profile_bind_core/kernel_profile_queue_depth/kernel_profile_batch_lanes`.
   Its `FabricPlane` now only declares the `cpu_to_kernel/kernel_to_cpu` sync
   markers required by that route.
+* [native_cli_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/native_cli_pipeline_demo)
+  one-file `cpu`-only native CLI/tooling demo:
+  `main.ns`
+  showing the current project-form AOT host-backed path for
+  `argv`, `stdout`, `file`, `stdin`, `command`, and `subprocess`.
+  This is the repo's current canonical project-shaped sample for the native
+  `input -> process -> child command -> exit code` pipeline.
+* [native_tool_runner_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/native_tool_runner_demo)
+  one-file `cpu`-only command runner demo:
+  `main.ns`
+  showing the current project-form AOT host-backed path for
+  `argv`, `stdout`, `command`, `subprocess`, and direct exit observers.
+  This is the lighter-weight sibling route when you want a native tool runner
+  without the extra file/stdin input path.
 
 ## Migration Map
 
@@ -150,6 +164,10 @@ cargo run -p nuis -- dump-yir examples/projects/window_controls_demo
 cargo run -p nuis -- build examples/projects/window_controls_demo examples/bins/window_controls_demo_project
 cargo run -p nuis -- check examples/projects/kernel_tensor_demo
 cargo run -p nuis -- build examples/projects/kernel_tensor_demo examples/bins/kernel_tensor_demo_project
+cargo run -p nuis -- check examples/projects/native_cli_pipeline_demo
+cargo run -p nuis -- build examples/projects/native_cli_pipeline_demo /private/tmp/native_cli_pipeline_demo_out
+cargo run -p nuis -- check examples/projects/native_tool_runner_demo
+cargo run -p nuis -- build examples/projects/native_tool_runner_demo /private/tmp/native_tool_runner_demo_out
 ```
 
 Generated outputs to expect from a project build:
