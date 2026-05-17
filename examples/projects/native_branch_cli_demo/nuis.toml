@@ -1,0 +1,6 @@
+name = "native_branch_cli_demo"
+entry = "main.ns"
+
+abi = [
+  "cpu=cpu.arm64.apple_aapcs64",
+]

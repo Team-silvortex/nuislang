@@ -1,0 +1,22 @@
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+
+  fn main() -> i64 {
+    let argc: i64 = host_argv_count();
+    if argc < 2 {
+      let usage_text = "usage: native_branch_cli_demo <arg>";
+      let usage: String = usage_text;
+      let exit_base: i64 = 60;
+      let exit_code: i64 = exit_base + 4;
+      print(usage);
+      return exit_code;
+    } else {
+      let ok_text = "native_branch_cli_demo: ok";
+      let ok_message: String = ok_text;
+      let ok_base: i64 = 0;
+      let ok_code: i64 = ok_base + 0;
+      print(ok_message);
+      return ok_code;
+    }
+  }
+}

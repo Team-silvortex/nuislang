@@ -1,6 +1,9 @@
 use std::{collections::BTreeMap, path::Path};
 
-use nuis_semantics::model::{NirBinaryOp, NirExpr, NirFunction, NirModule, NirStmt};
+use nuis_semantics::model::{
+    nir_expr_effect_class, NirBinaryOp, NirExpr, NirExprEffectClass, NirFunction, NirModule,
+    NirStmt,
+};
 use yir_core::{
     Edge, EdgeKind, Node, Operation, Resource, ResourceKind, SemanticOp, TaskLifecycleState,
     YirModule, YirResultRole, YirResultState,
@@ -3245,6 +3248,11 @@ enum LoweredIfOutcome {
     Returned(String),
 }
 
+enum PreparedTerminalBranch {
+    Return(NirExpr),
+    PrintReturn { print: NirExpr, returned: NirExpr },
+}
+
 fn lower_if_pair(
     condition_name: String,
     then_body: &[NirStmt],
@@ -3253,48 +3261,65 @@ fn lower_if_pair(
     bindings: &BTreeMap<String, String>,
 ) -> Result<LoweredIfOutcome, String> {
     if then_body.len() != 1 || else_body.len() != 1 {
-        if then_body.len() == 1 && else_body.is_empty() {
-            if let NirStmt::Return(Some(value)) = &then_body[0] {
-                let lowered = lower_expr(value, state, bindings)?;
-                lower_guard_return(condition_name, lowered, state);
+        if else_body.is_empty() {
+            if let Some(then_branch) = prepare_terminal_branch(then_body) {
+                match then_branch {
+                    PreparedTerminalBranch::Return(value) => {
+                        let lowered = lower_expr(&value, state, bindings)?;
+                        lower_guard_return(condition_name, lowered, state);
+                    }
+                    PreparedTerminalBranch::PrintReturn { print, returned } => {
+                        let print_name = lower_expr(&print, state, bindings)?;
+                        let return_name = lower_expr(&returned, state, bindings)?;
+                        lower_guard_print_return(condition_name, print_name, return_name, state);
+                    }
+                }
                 return Ok(LoweredIfOutcome::Continued);
             }
         }
-        if then_body.len() == 2 && else_body.is_empty() {
-            if let (NirStmt::Print(value), NirStmt::Return(Some(returned))) =
-                (&then_body[0], &then_body[1])
-            {
-                let print_name = lower_expr(value, state, bindings)?;
-                let return_name = lower_expr(returned, state, bindings)?;
-                lower_guard_print_return(condition_name, print_name, return_name, state);
-                return Ok(LoweredIfOutcome::Continued);
-            }
-        }
-        if then_body.len() == 2 && else_body.len() == 2 {
-            if let (
-                NirStmt::Print(then_print),
-                NirStmt::Return(Some(then_return)),
-                NirStmt::Print(else_print),
-                NirStmt::Return(Some(else_return)),
-            ) = (&then_body[0], &then_body[1], &else_body[0], &else_body[1])
-            {
-                let then_print_name = lower_expr(then_print, state, bindings)?;
-                let then_return_name = lower_expr(then_return, state, bindings)?;
-                let else_print_name = lower_expr(else_print, state, bindings)?;
-                let else_return_name = lower_expr(else_return, state, bindings)?;
-                lower_branch_print_return(
-                    condition_name,
-                    then_print_name,
-                    then_return_name,
-                    else_print_name,
-                    else_return_name,
-                    state,
-                );
-                return Ok(LoweredIfOutcome::Continued);
+        if let (Some(then_branch), Some(else_branch)) = (
+            prepare_terminal_branch(then_body),
+            prepare_terminal_branch(else_body),
+        ) {
+            match (then_branch, else_branch) {
+                (
+                    PreparedTerminalBranch::PrintReturn {
+                        print: then_print,
+                        returned: then_return,
+                    },
+                    PreparedTerminalBranch::PrintReturn {
+                        print: else_print,
+                        returned: else_return,
+                    },
+                ) => {
+                    let then_print_name = lower_expr(&then_print, state, bindings)?;
+                    let then_return_name = lower_expr(&then_return, state, bindings)?;
+                    let else_print_name = lower_expr(&else_print, state, bindings)?;
+                    let else_return_name = lower_expr(&else_return, state, bindings)?;
+                    lower_branch_print_return(
+                        condition_name,
+                        then_print_name,
+                        then_return_name,
+                        else_print_name,
+                        else_return_name,
+                        state,
+                    );
+                    return Ok(LoweredIfOutcome::Continued);
+                }
+                (
+                    PreparedTerminalBranch::Return(lhs),
+                    PreparedTerminalBranch::Return(rhs),
+                ) => {
+                    let lhs_name = lower_expr(&lhs, state, bindings)?;
+                    let rhs_name = lower_expr(&rhs, state, bindings)?;
+                    let selected = lower_select(condition_name, lhs_name, rhs_name, state)?;
+                    return Ok(LoweredIfOutcome::Returned(selected));
+                }
+                _ => {}
             }
         }
         return Err(
-            "minimal nuisc lowering currently only supports `if` where both branches contain exactly one statement"
+            "minimal nuisc lowering currently only supports `if` as matching `print`, matching `let/const`, `return <expr>`, or small terminal branches like `print(...); return ...`"
                 .to_owned(),
         );
     }
@@ -3365,6 +3390,111 @@ fn lower_if_pair(
             "minimal nuisc lowering currently only supports `if` branches as matching `print`, matching `let/const`, or `return <expr>`"
                 .to_owned(),
         ),
+    }
+}
+
+fn prepare_terminal_branch(stmts: &[NirStmt]) -> Option<PreparedTerminalBranch> {
+    match stmts {
+        [NirStmt::Return(Some(value))] => Some(PreparedTerminalBranch::Return(value.clone())),
+        [NirStmt::Print(print), NirStmt::Return(Some(returned))] => {
+            Some(PreparedTerminalBranch::PrintReturn {
+                print: print.clone(),
+                returned: returned.clone(),
+            })
+        }
+        [binding @ (NirStmt::Let { .. } | NirStmt::Const { .. }), tail @ ..] => {
+            let (name, value) = extract_pure_branch_binding(binding)?;
+            let prepared = prepare_terminal_branch(tail)?;
+            Some(substitute_prepared_terminal_branch(
+                prepared, &name, &value,
+            ))
+        }
+        _ => None,
+    }
+}
+
+fn extract_pure_branch_binding(stmt: &NirStmt) -> Option<(String, NirExpr)> {
+    let (name, value) = match stmt {
+        NirStmt::Let { name, value, .. } | NirStmt::Const { name, value, .. } => {
+            (name.clone(), value.clone())
+        }
+        _ => return None,
+    };
+    if nir_expr_effect_class(&value) != NirExprEffectClass::Pure {
+        return None;
+    }
+    Some((name, value))
+}
+
+fn substitute_branch_binding(expr: &NirExpr, binding_name: &str, binding_value: &NirExpr) -> NirExpr {
+    match expr {
+        NirExpr::Var(name) if name == binding_name => binding_value.clone(),
+        NirExpr::Await(inner) => {
+            NirExpr::Await(Box::new(substitute_branch_binding(inner, binding_name, binding_value)))
+        }
+        NirExpr::Call { callee, args } => NirExpr::Call {
+            callee: callee.clone(),
+            args: args
+                .iter()
+                .map(|arg| substitute_branch_binding(arg, binding_name, binding_value))
+                .collect(),
+        },
+        NirExpr::MethodCall {
+            receiver,
+            method,
+            args,
+        } => NirExpr::MethodCall {
+            receiver: Box::new(substitute_branch_binding(
+                receiver,
+                binding_name,
+                binding_value,
+            )),
+            method: method.clone(),
+            args: args
+                .iter()
+                .map(|arg| substitute_branch_binding(arg, binding_name, binding_value))
+                .collect(),
+        },
+        NirExpr::StructLiteral { type_name, fields } => NirExpr::StructLiteral {
+            type_name: type_name.clone(),
+            fields: fields
+                .iter()
+                .map(|(field, value)| {
+                    (
+                        field.clone(),
+                        substitute_branch_binding(value, binding_name, binding_value),
+                    )
+                })
+                .collect(),
+        },
+        NirExpr::FieldAccess { base, field } => NirExpr::FieldAccess {
+            base: Box::new(substitute_branch_binding(base, binding_name, binding_value)),
+            field: field.clone(),
+        },
+        NirExpr::Binary { op, lhs, rhs } => NirExpr::Binary {
+            op: *op,
+            lhs: Box::new(substitute_branch_binding(lhs, binding_name, binding_value)),
+            rhs: Box::new(substitute_branch_binding(rhs, binding_name, binding_value)),
+        },
+        _ => expr.clone(),
+    }
+}
+
+fn substitute_prepared_terminal_branch(
+    branch: PreparedTerminalBranch,
+    binding_name: &str,
+    binding_value: &NirExpr,
+) -> PreparedTerminalBranch {
+    match branch {
+        PreparedTerminalBranch::Return(returned) => PreparedTerminalBranch::Return(
+            substitute_branch_binding(&returned, binding_name, binding_value),
+        ),
+        PreparedTerminalBranch::PrintReturn { print, returned } => {
+            PreparedTerminalBranch::PrintReturn {
+                print: substitute_branch_binding(&print, binding_name, binding_value),
+                returned: substitute_branch_binding(&returned, binding_name, binding_value),
+            }
+        }
     }
 }
 
@@ -4261,5 +4391,35 @@ mod tests {
         assert_eq!(completed.op.args, vec![join_result.name.clone()]);
         assert_eq!(timed_out.op.args, vec![join_result.name.clone()]);
         assert_eq!(value.op.args, vec![join_result.name.clone()]);
+    }
+
+    #[test]
+    fn lowers_pure_branch_local_binding_into_guard_print_return() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              extern "c" fn host_argv_count() -> i64;
+
+              fn main() -> i64 {
+                let argc: i64 = host_argv_count();
+                if argc < 2 {
+                  let usage_text = "usage";
+                  let usage: String = usage_text;
+                  let exit_base: i64 = 60;
+                  let exit_code: i64 = exit_base + 4;
+                  print(usage);
+                  return exit_code;
+                }
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+        assert!(yir.nodes.iter().any(|node| {
+            node.op.module == "cpu" && node.op.instruction == "guard_print_return"
+        }));
     }
 }

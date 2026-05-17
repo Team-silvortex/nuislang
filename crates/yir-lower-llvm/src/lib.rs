@@ -31,6 +31,7 @@ struct LlvmLoweringState {
     next_global: usize,
     next_block: usize,
     last_cpu_value: Option<String>,
+    ends_with_terminal_return: bool,
 }
 
 fn lower_cpu_literal_node(node: &Node, state: &mut LlvmLoweringState) -> bool {
@@ -251,6 +252,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
         next_global: 0,
         next_block: 0,
         last_cpu_value: None,
+        ends_with_terminal_return: false,
     };
 
     for node_name in topological_order(module)? {
@@ -301,6 +303,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
         let mut next_block = &mut state.next_block;
         let _next_global = &mut state.next_global;
         let last_cpu_value = &mut state.last_cpu_value;
+        state.ends_with_terminal_return = false;
 
         match (node.op.module.as_str(), node.op.instruction.as_str()) {
             ("cpu", "text")
@@ -1381,9 +1384,8 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
             }
             ("cpu", "print") => {
                 if let Some(input) = get_cstr(&registers, &node.op.args[0]) {
-                    body.push(format!(
-                        "  %print_str_{next_reg} = call i32 @puts(ptr {input})"
-                    ));
+                    let print_reg = fresh_reg(&mut next_reg);
+                    body.push(format!("  {print_reg} = call i32 @puts(ptr {input})"));
                     *last_cpu_value = Some("0".to_owned());
                 } else if let Some(input) = get_i64(&registers, &node.op.args[0]) {
                     body.push(format!("  call void @nuis_debug_print_i64(i64 {input})"));
@@ -1488,7 +1490,8 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 ));
                 body.push(format!("{then_label}:"));
                 if let Some(input) = coerce_to_cstr(&print_value, &mut body, &mut next_reg) {
-                    body.push(format!("  %print_str_{next_reg} = call i32 @puts(ptr {input})"));
+                    let print_reg = fresh_reg(&mut next_reg);
+                    body.push(format!("  {print_reg} = call i32 @puts(ptr {input})"));
                 } else if let Some(input) = coerce_to_i64(&print_value, &mut body, &mut next_reg) {
                     body.push(format!("  call void @nuis_debug_print_i64(i64 {input})"));
                 } else {
@@ -1561,7 +1564,8 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 if let Some(input) =
                     coerce_to_cstr(&then_print_value, &mut body, &mut next_reg)
                 {
-                    body.push(format!("  %print_str_{next_reg} = call i32 @puts(ptr {input})"));
+                    let print_reg = fresh_reg(&mut next_reg);
+                    body.push(format!("  {print_reg} = call i32 @puts(ptr {input})"));
                 } else if let Some(input) =
                     coerce_to_i64(&then_print_value, &mut body, &mut next_reg)
                 {
@@ -1577,7 +1581,8 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 if let Some(input) =
                     coerce_to_cstr(&else_print_value, &mut body, &mut next_reg)
                 {
-                    body.push(format!("  %print_str_{next_reg} = call i32 @puts(ptr {input})"));
+                    let print_reg = fresh_reg(&mut next_reg);
+                    body.push(format!("  {print_reg} = call i32 @puts(ptr {input})"));
                 } else if let Some(input) =
                     coerce_to_i64(&else_print_value, &mut body, &mut next_reg)
                 {
@@ -1589,6 +1594,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                     ));
                 }
                 body.push(format!("  ret i64 {else_returned}"));
+                state.ends_with_terminal_return = true;
             }
             _ => {
                 body.push(format!(
@@ -1607,6 +1613,11 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
         String::new()
     } else {
         format!("{}\n\n", dynamic_extern_decls.join("\n"))
+    };
+    let entry_body = if state.ends_with_terminal_return {
+        state.body.join("\n")
+    } else {
+        format!("{}\n  ret i64 {}", state.body.join("\n"), ret)
     };
 
     Ok(format!(
@@ -1632,12 +1643,11 @@ declare i64 @HostRenderCurves__radius_curve(i64)\n\
 declare i64 @HostRenderCurves__mix_tick(i64, i64)\n\
 declare i64 @HostMath__speed_curve(i64)\n\
 {}\n\
-define i64 @nuis_yir_entry() {{\n{}\n  ret i64 {}\n}}\n",
+define i64 @nuis_yir_entry() {{\n{}\n}}\n",
         module.version,
         state.globals.join("\n"),
         dynamic_extern_block,
-        state.body.join("\n"),
-        ret
+        entry_body
     ))
 }
 

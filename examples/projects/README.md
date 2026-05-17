@@ -133,6 +133,12 @@ Also included:
   `argv`, `stdout`, `command`, `subprocess`, and direct exit observers.
   This is the lighter-weight sibling route when you want a native tool runner
   without the extra file/stdin input path.
+* [native_branch_cli_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/native_branch_cli_demo)
+  one-file `cpu`-only branch/usage demo:
+  `main.ns`
+  showing the current project-form real CPU control-flow half-step for
+  `if { print(...); return ... } else { print(...); return ... }`.
+  This is the smallest canonical sample for native CLI usage/error vs ok paths.
 
 ## Migration Map
 
@@ -168,6 +174,8 @@ cargo run -p nuis -- check examples/projects/native_cli_pipeline_demo
 cargo run -p nuis -- build examples/projects/native_cli_pipeline_demo /private/tmp/native_cli_pipeline_demo_out
 cargo run -p nuis -- check examples/projects/native_tool_runner_demo
 cargo run -p nuis -- build examples/projects/native_tool_runner_demo /private/tmp/native_tool_runner_demo_out
+cargo run -p nuis -- check examples/projects/native_branch_cli_demo
+cargo run -p nuis -- build examples/projects/native_branch_cli_demo /private/tmp/native_branch_cli_demo_out
 ```
 
 Generated outputs to expect from a project build:

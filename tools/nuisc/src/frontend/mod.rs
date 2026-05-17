@@ -340,46 +340,50 @@ fn lower_stmt_with_async(
             condition,
             then_body,
             else_body,
-        } => NirStmt::If {
-            condition: lower_expr_with_async(
-                condition,
-                current_domain,
-                current_function_is_async,
-                bindings,
-                signatures,
-                struct_table,
-                Some(&bool_type()),
-                false,
-            )?,
-            then_body: then_body
-                .iter()
-                .map(|stmt| {
-                    lower_stmt_with_async(
-                        stmt,
-                        current_domain,
-                        current_function_is_async,
-                        &mut bindings.clone(),
-                        return_type,
-                        signatures,
-                        struct_table,
-                    )
-                })
-                .collect::<Result<Vec<_>, _>>()?,
-            else_body: else_body
-                .iter()
-                .map(|stmt| {
-                    lower_stmt_with_async(
-                        stmt,
-                        current_domain,
-                        current_function_is_async,
-                        &mut bindings.clone(),
-                        return_type,
-                        signatures,
-                        struct_table,
-                    )
-                })
-                .collect::<Result<Vec<_>, _>>()?,
-        },
+        } => {
+            let mut then_bindings = bindings.clone();
+            let mut else_bindings = bindings.clone();
+            NirStmt::If {
+                condition: lower_expr_with_async(
+                    condition,
+                    current_domain,
+                    current_function_is_async,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    Some(&bool_type()),
+                    false,
+                )?,
+                then_body: then_body
+                    .iter()
+                    .map(|stmt| {
+                        lower_stmt_with_async(
+                            stmt,
+                            current_domain,
+                            current_function_is_async,
+                            &mut then_bindings,
+                            return_type,
+                            signatures,
+                            struct_table,
+                        )
+                    })
+                    .collect::<Result<Vec<_>, _>>()?,
+                else_body: else_body
+                    .iter()
+                    .map(|stmt| {
+                        lower_stmt_with_async(
+                            stmt,
+                            current_domain,
+                            current_function_is_async,
+                            &mut else_bindings,
+                            return_type,
+                            signatures,
+                            struct_table,
+                        )
+                    })
+                    .collect::<Result<Vec<_>, _>>()?,
+            }
+        }
         AstStmt::Expr(expr) => NirStmt::Expr(lower_expr_with_async(
             expr,
             current_domain,
