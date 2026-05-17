@@ -94,6 +94,12 @@ Current boundaries:
 * `std` is not yet a populated importable source module tree
 * `std` is still much thinner than the future practical systems layer it is
   meant to become
+* a first small native-backed AOT batch now exists in the compiler shim for:
+  `argv`, `env`, `cwd`, `stdout/stderr`, `host_text_len`, basic
+  `path/fs/stat`, `file/stdin/tty`, `directory/temp`, simple
+  `process/command/subprocess`, and `wall/monotonic/sleep` time helpers, so
+  those facades are beginning to become real host integration rather than pure
+  placeholder shape
 * current string/file direction is still host-backed and opaque; there is not
   yet a first-class native `String` or file-path/file-descriptor standard type
 * current CLI-facing `argv/env/process` direction is also still host-backed and

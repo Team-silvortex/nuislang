@@ -930,8 +930,377 @@ fn c_shim_source(ast: &AstModule) -> String {
     out.push_str(
         r#"#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <limits.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <time.h>
+#include <sys/stat.h>
+#include <sys/ioctl.h>
+#include <dirent.h>
+#include <signal.h>
 
 extern int64_t nuis_yir_entry(void);
+
+static int nuis_argc = 0;
+static char** nuis_argv = NULL;
+static char* nuis_host_text_slots[4096];
+static int64_t nuis_host_text_len = 0;
+static DIR* nuis_host_dir_slots[256];
+static int64_t nuis_host_dir_entry_counts[256];
+static int64_t nuis_host_dir_len = 0;
+static int64_t nuis_host_command_status_slots[256];
+static int64_t nuis_host_command_len = 0;
+static int64_t nuis_host_subprocess_status_slots[256];
+static int64_t nuis_host_subprocess_len = 0;
+
+static int64_t nuis_host_text_register(const char* text) {
+    if (text == NULL) return 0;
+    if (nuis_host_text_len >= 4096) return 0;
+    size_t size = strlen(text) + 1;
+    char* copy = (char*)malloc(size);
+    if (copy == NULL) return 0;
+    memcpy(copy, text, size);
+    nuis_host_text_slots[nuis_host_text_len] = copy;
+    nuis_host_text_len += 1;
+    return nuis_host_text_len;
+}
+
+static const char* nuis_host_text_lookup(int64_t handle) {
+    static char fallback[64];
+    if (handle > 0 && handle <= nuis_host_text_len && nuis_host_text_slots[handle - 1] != NULL) {
+        return nuis_host_text_slots[handle - 1];
+    }
+    if (handle == 0) return "";
+    snprintf(fallback, sizeof(fallback), "%lld", (long long)handle);
+    return fallback;
+}
+
+static int64_t nuis_host_argv_count(void) {
+    return (int64_t)nuis_argc;
+}
+
+static int64_t nuis_host_argv_at(int64_t index) {
+    if (index < 0 || index >= nuis_argc || nuis_argv == NULL) return 0;
+    return nuis_host_text_register(nuis_argv[index]);
+}
+
+static int64_t nuis_host_env_has(int64_t key_handle) {
+    const char* key = nuis_host_text_lookup(key_handle);
+    const char* value = getenv(key);
+    return value != NULL ? 1 : 0;
+}
+
+static int64_t nuis_host_env_get(int64_t key_handle) {
+    const char* key = nuis_host_text_lookup(key_handle);
+    const char* value = getenv(key);
+    if (value == NULL) return 0;
+    return nuis_host_text_register(value);
+}
+
+static int64_t nuis_host_text_len_value(int64_t handle) {
+    return (int64_t)strlen(nuis_host_text_lookup(handle));
+}
+
+static int64_t nuis_host_file_open(int64_t path_handle, int64_t flags) {
+    const char* path = nuis_host_text_lookup(path_handle);
+    if (path == NULL || path[0] == '\0') return 0;
+    int fd = open(path, (int)flags, 0644);
+    return fd >= 0 ? (int64_t)fd : 0;
+}
+
+static int64_t nuis_host_file_read(int64_t file_handle, int64_t buffer_handle, int64_t len) {
+    (void)buffer_handle;
+    if (file_handle < 0 || len <= 0) return 0;
+    char scratch[4096];
+    size_t read_len = (size_t)len;
+    if (read_len > sizeof(scratch)) read_len = sizeof(scratch);
+    ssize_t got = read((int)file_handle, scratch, read_len);
+    return got > 0 ? (int64_t)got : 0;
+}
+
+static int64_t nuis_host_file_close(int64_t file_handle) {
+    if (file_handle < 0) return 0;
+    return close((int)file_handle) == 0 ? 1 : 0;
+}
+
+static int64_t nuis_host_dir_open(int64_t path_handle) {
+    const char* path = nuis_host_text_lookup(path_handle);
+    if (path == NULL || path[0] == '\0') return 0;
+    if (nuis_host_dir_len >= 256) return 0;
+    DIR* dir = opendir(path);
+    if (dir == NULL) return 0;
+    int64_t count = 0;
+    struct dirent* entry = NULL;
+    while ((entry = readdir(dir)) != NULL) {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) continue;
+        count += 1;
+    }
+    rewinddir(dir);
+    nuis_host_dir_slots[nuis_host_dir_len] = dir;
+    nuis_host_dir_entry_counts[nuis_host_dir_len] = count;
+    nuis_host_dir_len += 1;
+    return nuis_host_dir_len;
+}
+
+static int64_t nuis_host_dir_entry_count(int64_t dir_handle) {
+    if (dir_handle <= 0 || dir_handle > nuis_host_dir_len) return 0;
+    return nuis_host_dir_entry_counts[dir_handle - 1];
+}
+
+static int64_t nuis_host_dir_close(int64_t dir_handle) {
+    if (dir_handle <= 0 || dir_handle > nuis_host_dir_len) return 0;
+    DIR* dir = nuis_host_dir_slots[dir_handle - 1];
+    if (dir == NULL) return 0;
+    nuis_host_dir_slots[dir_handle - 1] = NULL;
+    return closedir(dir) == 0 ? 1 : 0;
+}
+
+static int64_t nuis_host_stdin_read(int64_t buffer_handle, int64_t len) {
+    (void)buffer_handle;
+    if (len <= 0) return 0;
+    char scratch[4096];
+    size_t read_len = (size_t)len;
+    if (read_len > sizeof(scratch)) read_len = sizeof(scratch);
+    ssize_t got = read(STDIN_FILENO, scratch, read_len);
+    return got > 0 ? (int64_t)got : 0;
+}
+
+static int64_t nuis_host_stdout_write(int64_t handle) {
+    const char* text = nuis_host_text_lookup(handle);
+    size_t len = strlen(text);
+    if (len == 0) return 0;
+    return (int64_t)fwrite(text, 1, len, stdout);
+}
+
+static int64_t nuis_host_stderr_write(int64_t handle) {
+    const char* text = nuis_host_text_lookup(handle);
+    size_t len = strlen(text);
+    if (len == 0) return 0;
+    return (int64_t)fwrite(text, 1, len, stderr);
+}
+
+static int64_t nuis_host_stdout_flush(void) {
+    return fflush(stdout) == 0 ? 1 : 0;
+}
+
+static int64_t nuis_host_stderr_flush(void) {
+    return fflush(stderr) == 0 ? 1 : 0;
+}
+
+static int64_t nuis_host_tty_isatty(int64_t fd) {
+    return isatty((int)fd) ? 1 : 0;
+}
+
+static int64_t nuis_host_tty_width(int64_t fd) {
+    struct winsize ws;
+    if (ioctl((int)fd, TIOCGWINSZ, &ws) != 0) return 0;
+    return (int64_t)ws.ws_col;
+}
+
+static int64_t nuis_host_tty_height(int64_t fd) {
+    struct winsize ws;
+    if (ioctl((int)fd, TIOCGWINSZ, &ws) != 0) return 0;
+    return (int64_t)ws.ws_row;
+}
+
+static int64_t nuis_host_cwd_handle(void) {
+    char buffer[PATH_MAX];
+    if (getcwd(buffer, sizeof(buffer)) == NULL) return 0;
+    return nuis_host_text_register(buffer);
+}
+
+static int64_t nuis_host_cwd_len_value(void) {
+    return nuis_host_text_len_value(nuis_host_cwd_handle());
+}
+
+static int64_t nuis_host_temp_dir_handle(void) {
+    const char* tmp = getenv("TMPDIR");
+    if (tmp == NULL || tmp[0] == '\0') tmp = "/tmp";
+    return nuis_host_text_register(tmp);
+}
+
+static int64_t nuis_host_temp_path_len(void) {
+    return nuis_host_text_len_value(nuis_host_temp_dir_handle());
+}
+
+static int64_t nuis_host_temp_file_handle(int64_t prefix_handle) {
+    const char* prefix = nuis_host_text_lookup(prefix_handle);
+    const char* tmp = getenv("TMPDIR");
+    if (tmp == NULL || tmp[0] == '\0') tmp = "/tmp";
+    char buffer[PATH_MAX];
+    snprintf(buffer, sizeof(buffer), "%s/%sXXXXXX", tmp, (prefix != NULL && prefix[0] != '\0') ? prefix : "nuis");
+    int fd = mkstemp(buffer);
+    if (fd < 0) return 0;
+    close(fd);
+    return nuis_host_text_register(buffer);
+}
+
+static int64_t nuis_host_chdir_value(int64_t path_handle) {
+    const char* path = nuis_host_text_lookup(path_handle);
+    if (path == NULL || path[0] == '\0') return 0;
+    return chdir(path) == 0 ? 1 : 0;
+}
+
+static int64_t nuis_host_path_join_len(int64_t lhs_handle, int64_t rhs_handle) {
+    const char* lhs = nuis_host_text_lookup(lhs_handle);
+    const char* rhs = nuis_host_text_lookup(rhs_handle);
+    size_t lhs_len = strlen(lhs);
+    size_t rhs_len = strlen(rhs);
+    size_t needs_sep = (lhs_len > 0 && rhs_len > 0 && lhs[lhs_len - 1] != '/') ? 1 : 0;
+    return (int64_t)(lhs_len + needs_sep + rhs_len);
+}
+
+static int64_t nuis_host_path_is_absolute(int64_t path_handle) {
+    const char* path = nuis_host_text_lookup(path_handle);
+    return (path != NULL && path[0] == '/') ? 1 : 0;
+}
+
+static int64_t nuis_host_path_basename(int64_t path_handle) {
+    const char* path = nuis_host_text_lookup(path_handle);
+    size_t len = strlen(path);
+    while (len > 1 && path[len - 1] == '/') {
+        len -= 1;
+    }
+    size_t start = len;
+    while (start > 0 && path[start - 1] != '/') {
+        start -= 1;
+    }
+    size_t slice_len = len - start;
+    char buffer[PATH_MAX];
+    if (slice_len >= sizeof(buffer)) slice_len = sizeof(buffer) - 1;
+    memcpy(buffer, path + start, slice_len);
+    buffer[slice_len] = '\0';
+    return nuis_host_text_register(buffer);
+}
+
+static int64_t nuis_host_fs_exists(int64_t path_handle) {
+    const char* path = nuis_host_text_lookup(path_handle);
+    struct stat st;
+    return stat(path, &st) == 0 ? 1 : 0;
+}
+
+static int64_t nuis_host_fs_kind(int64_t path_handle) {
+    const char* path = nuis_host_text_lookup(path_handle);
+    struct stat st;
+    if (stat(path, &st) != 0) return 0;
+    if (S_ISREG(st.st_mode)) return 1;
+    if (S_ISDIR(st.st_mode)) return 2;
+    return 3;
+}
+
+static int64_t nuis_host_fs_size(int64_t path_handle) {
+    const char* path = nuis_host_text_lookup(path_handle);
+    struct stat st;
+    if (stat(path, &st) != 0) return 0;
+    return (int64_t)st.st_size;
+}
+
+static int64_t nuis_host_stat_mode(int64_t path_handle) {
+    const char* path = nuis_host_text_lookup(path_handle);
+    struct stat st;
+    if (stat(path, &st) != 0) return 0;
+    return (int64_t)st.st_mode;
+}
+
+static int64_t nuis_host_stat_mtime_ns(int64_t path_handle) {
+    const char* path = nuis_host_text_lookup(path_handle);
+    struct stat st;
+    if (stat(path, &st) != 0) return 0;
+#if defined(__APPLE__)
+    return (int64_t)st.st_mtimespec.tv_sec * 1000000000LL + (int64_t)st.st_mtimespec.tv_nsec;
+#else
+    return (int64_t)st.st_mtim.tv_sec * 1000000000LL + (int64_t)st.st_mtim.tv_nsec;
+#endif
+}
+
+static int64_t nuis_host_stat_ctime_ns(int64_t path_handle) {
+    const char* path = nuis_host_text_lookup(path_handle);
+    struct stat st;
+    if (stat(path, &st) != 0) return 0;
+#if defined(__APPLE__)
+    return (int64_t)st.st_ctimespec.tv_sec * 1000000000LL + (int64_t)st.st_ctimespec.tv_nsec;
+#else
+    return (int64_t)st.st_ctim.tv_sec * 1000000000LL + (int64_t)st.st_ctim.tv_nsec;
+#endif
+}
+
+static int64_t nuis_host_process_id(void) {
+    return (int64_t)getpid();
+}
+
+static int64_t nuis_host_process_status(void) {
+    return 0;
+}
+
+static int64_t nuis_host_process_exit_code(int64_t status) {
+    return status;
+}
+
+static int64_t nuis_host_command_spawn(int64_t program_handle, int64_t argv_handle) {
+    (void)argv_handle;
+    const char* program = nuis_host_text_lookup(program_handle);
+    if (program == NULL || program[0] == '\0') return 0;
+    if (nuis_host_command_len >= 256) return 0;
+    int status = system(program);
+    nuis_host_command_status_slots[nuis_host_command_len] = (int64_t)status;
+    nuis_host_command_len += 1;
+    return nuis_host_command_len;
+}
+
+static int64_t nuis_host_command_status(int64_t command_handle) {
+    if (command_handle <= 0 || command_handle > nuis_host_command_len) return 0;
+    return nuis_host_command_status_slots[command_handle - 1];
+}
+
+static int64_t nuis_host_command_wait(int64_t command_handle) {
+    return nuis_host_command_status(command_handle);
+}
+
+static int64_t nuis_host_subprocess_spawn(int64_t program_handle, int64_t argv_handle, int64_t env_handle) {
+    (void)argv_handle;
+    (void)env_handle;
+    const char* program = nuis_host_text_lookup(program_handle);
+    if (program == NULL || program[0] == '\0') return 0;
+    if (nuis_host_subprocess_len >= 256) return 0;
+    int status = system(program);
+    nuis_host_subprocess_status_slots[nuis_host_subprocess_len] = (int64_t)status;
+    nuis_host_subprocess_len += 1;
+    return nuis_host_subprocess_len;
+}
+
+static int64_t nuis_host_subprocess_signal(int64_t process_handle, int64_t signal) {
+    (void)process_handle;
+    (void)signal;
+    return 1;
+}
+
+static int64_t nuis_host_subprocess_join(int64_t process_handle) {
+    if (process_handle <= 0 || process_handle > nuis_host_subprocess_len) return 0;
+    return nuis_host_subprocess_status_slots[process_handle - 1];
+}
+
+static int64_t nuis_host_wall_time_ns(void) {
+    struct timespec ts;
+    if (clock_gettime(CLOCK_REALTIME, &ts) != 0) return 0;
+    return (int64_t)ts.tv_sec * 1000000000LL + (int64_t)ts.tv_nsec;
+}
+
+static int64_t nuis_host_monotonic_time_ns(void) {
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) return 0;
+    return (int64_t)ts.tv_sec * 1000000000LL + (int64_t)ts.tv_nsec;
+}
+
+static int64_t nuis_host_sleep_ns(int64_t duration_ns) {
+    if (duration_ns <= 0) return 0;
+    struct timespec req;
+    req.tv_sec = duration_ns / 1000000000LL;
+    req.tv_nsec = duration_ns % 1000000000LL;
+    nanosleep(&req, NULL);
+    return duration_ns;
+}
 
 void nuis_debug_print_i64(int64_t value) {
     printf("%lld\n", (long long)value);
@@ -980,7 +1349,9 @@ int64_t host_mix_tick(int64_t base, int64_t tick) {
     out.push_str(
         r#"
 
-int main(void) {
+int main(int argc, char** argv) {
+    nuis_argc = argc;
+    nuis_argv = argv;
     return (int)nuis_yir_entry();
 }
 "#,
@@ -991,7 +1362,9 @@ int main(void) {
 fn collect_host_ffi_symbols(ast: &AstModule) -> BTreeMap<String, AstExternFunction> {
     let mut out = BTreeMap::new();
     for function in &ast.externs {
-        out.insert(function.name.clone(), function.clone());
+        if function.name.starts_with("host_") {
+            out.insert(function.name.clone(), function.clone());
+        }
     }
     for interface in &ast.extern_interfaces {
         for method in &interface.methods {
@@ -1034,6 +1407,191 @@ fn render_host_ffi_stub(symbol: &str, function: AstExternFunction) -> String {
             arg_name(0, &function),
             arg_name(1, &function)
         )
+    } else if symbol == "host_argv_count" {
+        "    return nuis_host_argv_count();".to_owned()
+    } else if symbol == "host_argv_at" {
+        format!("    return nuis_host_argv_at({});", arg_name(0, &function))
+    } else if symbol == "host_env_has" {
+        format!("    return nuis_host_env_has({});", arg_name(0, &function))
+    } else if symbol == "host_env_get" {
+        format!("    return nuis_host_env_get({});", arg_name(0, &function))
+    } else if symbol == "host_text_len" {
+        format!(
+            "    return nuis_host_text_len_value({});",
+            arg_name(0, &function)
+        )
+    } else if symbol == "host_file_open" {
+        format!(
+            "    return nuis_host_file_open({}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function)
+        )
+    } else if symbol == "host_file_read" {
+        format!(
+            "    return nuis_host_file_read({}, {}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function),
+            arg_name(2, &function)
+        )
+    } else if symbol == "host_file_close" {
+        format!(
+            "    return nuis_host_file_close({});",
+            arg_name(0, &function)
+        )
+    } else if symbol == "host_dir_open" {
+        format!("    return nuis_host_dir_open({});", arg_name(0, &function))
+    } else if symbol == "host_dir_entry_count" {
+        format!(
+            "    return nuis_host_dir_entry_count({});",
+            arg_name(0, &function)
+        )
+    } else if symbol == "host_dir_close" {
+        format!(
+            "    return nuis_host_dir_close({});",
+            arg_name(0, &function)
+        )
+    } else if symbol == "host_stdin_read" {
+        format!(
+            "    return nuis_host_stdin_read({}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function)
+        )
+    } else if symbol == "host_stdout_write" {
+        format!(
+            "    return nuis_host_stdout_write({});",
+            arg_name(0, &function)
+        )
+    } else if symbol == "host_stderr_write" {
+        format!(
+            "    return nuis_host_stderr_write({});",
+            arg_name(0, &function)
+        )
+    } else if symbol == "host_stdout_flush" {
+        "    return nuis_host_stdout_flush();".to_owned()
+    } else if symbol == "host_stderr_flush" {
+        "    return nuis_host_stderr_flush();".to_owned()
+    } else if symbol == "host_tty_isatty" {
+        format!(
+            "    return nuis_host_tty_isatty({});",
+            arg_name(0, &function)
+        )
+    } else if symbol == "host_tty_width" {
+        format!(
+            "    return nuis_host_tty_width({});",
+            arg_name(0, &function)
+        )
+    } else if symbol == "host_tty_height" {
+        format!(
+            "    return nuis_host_tty_height({});",
+            arg_name(0, &function)
+        )
+    } else if symbol == "host_cwd_handle" {
+        "    return nuis_host_cwd_handle();".to_owned()
+    } else if symbol == "host_cwd_len" {
+        "    return nuis_host_cwd_len_value();".to_owned()
+    } else if symbol == "host_temp_dir_handle" {
+        "    return nuis_host_temp_dir_handle();".to_owned()
+    } else if symbol == "host_temp_path_len" {
+        "    return nuis_host_temp_path_len();".to_owned()
+    } else if symbol == "host_temp_file_handle" {
+        format!(
+            "    return nuis_host_temp_file_handle({});",
+            arg_name(0, &function)
+        )
+    } else if symbol == "host_chdir" {
+        format!(
+            "    return nuis_host_chdir_value({});",
+            arg_name(0, &function)
+        )
+    } else if symbol == "host_path_join_len" {
+        format!(
+            "    return nuis_host_path_join_len({}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function)
+        )
+    } else if symbol == "host_path_is_absolute" {
+        format!(
+            "    return nuis_host_path_is_absolute({});",
+            arg_name(0, &function)
+        )
+    } else if symbol == "host_path_basename" {
+        format!(
+            "    return nuis_host_path_basename({});",
+            arg_name(0, &function)
+        )
+    } else if symbol == "host_fs_exists" {
+        format!(
+            "    return nuis_host_fs_exists({});",
+            arg_name(0, &function)
+        )
+    } else if symbol == "host_fs_kind" {
+        format!("    return nuis_host_fs_kind({});", arg_name(0, &function))
+    } else if symbol == "host_fs_size" {
+        format!("    return nuis_host_fs_size({});", arg_name(0, &function))
+    } else if symbol == "host_stat_mode" {
+        format!(
+            "    return nuis_host_stat_mode({});",
+            arg_name(0, &function)
+        )
+    } else if symbol == "host_stat_mtime_ns" {
+        format!(
+            "    return nuis_host_stat_mtime_ns({});",
+            arg_name(0, &function)
+        )
+    } else if symbol == "host_stat_ctime_ns" {
+        format!(
+            "    return nuis_host_stat_ctime_ns({});",
+            arg_name(0, &function)
+        )
+    } else if symbol == "host_process_id" {
+        "    return nuis_host_process_id();".to_owned()
+    } else if symbol == "host_process_status" {
+        "    return nuis_host_process_status();".to_owned()
+    } else if symbol == "host_process_exit_code" {
+        format!(
+            "    return nuis_host_process_exit_code({});",
+            arg_name(0, &function)
+        )
+    } else if symbol == "host_command_spawn" {
+        format!(
+            "    return nuis_host_command_spawn({}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function)
+        )
+    } else if symbol == "host_command_status" {
+        format!(
+            "    return nuis_host_command_status({});",
+            arg_name(0, &function)
+        )
+    } else if symbol == "host_command_wait" {
+        format!(
+            "    return nuis_host_command_wait({});",
+            arg_name(0, &function)
+        )
+    } else if symbol == "host_subprocess_spawn" {
+        format!(
+            "    return nuis_host_subprocess_spawn({}, {}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function),
+            arg_name(2, &function)
+        )
+    } else if symbol == "host_subprocess_signal" {
+        format!(
+            "    return nuis_host_subprocess_signal({}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function)
+        )
+    } else if symbol == "host_subprocess_join" {
+        format!(
+            "    return nuis_host_subprocess_join({});",
+            arg_name(0, &function)
+        )
+    } else if symbol == "host_wall_time_ns" {
+        "    return nuis_host_wall_time_ns();".to_owned()
+    } else if symbol == "host_monotonic_time_ns" {
+        "    return nuis_host_monotonic_time_ns();".to_owned()
+    } else if symbol == "host_sleep_ns" {
+        format!("    return nuis_host_sleep_ns({});", arg_name(0, &function))
     } else {
         render_generic_host_ffi_body(&function)
     };
@@ -1085,9 +1643,11 @@ fn c_type_for_ast_type(ty: &AstTypeRef) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::{
-        resolve_cpu_build_target_from_abi, verify_build_manifest, BuildManifestCacheInfo,
-        BuildManifestContext, BuildManifestProjectInfo, CompileArtifacts, CpuBuildTarget,
+        c_shim_source, resolve_cpu_build_target_from_abi, verify_build_manifest,
+        BuildManifestCacheInfo, BuildManifestContext, BuildManifestProjectInfo, CompileArtifacts,
+        CpuBuildTarget,
     };
+    use nuis_semantics::model::{AstExternFunction, AstModule, AstTypeRef};
     use std::{
         fs,
         path::PathBuf,
@@ -1233,5 +1793,277 @@ mod tests {
         assert_eq!(report.cpu_target_calling_abi, cpu_target.calling_abi);
         assert_eq!(report.cpu_target_clang, cpu_target.clang_target);
         assert!(report.cpu_target_cross);
+    }
+
+    #[test]
+    fn c_shim_source_includes_native_cli_runtime_hooks() {
+        fn i64_ty() -> AstTypeRef {
+            AstTypeRef {
+                name: "i64".to_owned(),
+                generic_args: Vec::new(),
+                is_optional: false,
+                is_ref: false,
+            }
+        }
+
+        let ast = AstModule {
+            uses: Vec::new(),
+            domain: "cpu".to_owned(),
+            unit: "Main".to_owned(),
+            externs: vec![
+                AstExternFunction {
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_argv_count".to_owned(),
+                    params: Vec::new(),
+                    return_type: i64_ty(),
+                },
+                AstExternFunction {
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_cwd_handle".to_owned(),
+                    params: Vec::new(),
+                    return_type: i64_ty(),
+                },
+                AstExternFunction {
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_monotonic_time_ns".to_owned(),
+                    params: Vec::new(),
+                    return_type: i64_ty(),
+                },
+            ],
+            extern_interfaces: Vec::new(),
+            structs: Vec::new(),
+            functions: Vec::new(),
+        };
+        let shim = c_shim_source(&ast);
+        assert!(shim.contains("int main(int argc, char** argv)"));
+        assert!(shim.contains("nuis_argc = argc;"));
+        assert!(shim.contains("return nuis_host_argv_count();"));
+        assert!(shim.contains("return nuis_host_cwd_handle();"));
+        assert!(shim.contains("return nuis_host_monotonic_time_ns();"));
+    }
+
+    #[test]
+    fn c_shim_source_includes_native_env_path_and_stat_hooks() {
+        fn i64_ty() -> AstTypeRef {
+            AstTypeRef {
+                name: "i64".to_owned(),
+                generic_args: Vec::new(),
+                is_optional: false,
+                is_ref: false,
+            }
+        }
+
+        let ast = AstModule {
+            uses: Vec::new(),
+            domain: "cpu".to_owned(),
+            unit: "Main".to_owned(),
+            externs: vec![
+                AstExternFunction {
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_env_has".to_owned(),
+                    params: vec![nuis_semantics::model::AstParam {
+                        name: "key_handle".to_owned(),
+                        ty: i64_ty(),
+                    }],
+                    return_type: i64_ty(),
+                },
+                AstExternFunction {
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_path_basename".to_owned(),
+                    params: vec![nuis_semantics::model::AstParam {
+                        name: "path_handle".to_owned(),
+                        ty: i64_ty(),
+                    }],
+                    return_type: i64_ty(),
+                },
+                AstExternFunction {
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_stat_mode".to_owned(),
+                    params: vec![nuis_semantics::model::AstParam {
+                        name: "path_handle".to_owned(),
+                        ty: i64_ty(),
+                    }],
+                    return_type: i64_ty(),
+                },
+            ],
+            extern_interfaces: Vec::new(),
+            structs: Vec::new(),
+            functions: Vec::new(),
+        };
+        let shim = c_shim_source(&ast);
+        assert!(shim.contains("return nuis_host_env_has(key_handle);"));
+        assert!(shim.contains("return nuis_host_path_basename(path_handle);"));
+        assert!(shim.contains("return nuis_host_stat_mode(path_handle);"));
+    }
+
+    #[test]
+    fn c_shim_source_includes_native_file_stdin_and_tty_hooks() {
+        fn i64_ty() -> AstTypeRef {
+            AstTypeRef {
+                name: "i64".to_owned(),
+                generic_args: Vec::new(),
+                is_optional: false,
+                is_ref: false,
+            }
+        }
+
+        let ast = AstModule {
+            uses: Vec::new(),
+            domain: "cpu".to_owned(),
+            unit: "Main".to_owned(),
+            externs: vec![
+                AstExternFunction {
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_file_open".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "path_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "flags".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                },
+                AstExternFunction {
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_stdin_read".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "buffer_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "len".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                },
+                AstExternFunction {
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_tty_width".to_owned(),
+                    params: vec![nuis_semantics::model::AstParam {
+                        name: "fd".to_owned(),
+                        ty: i64_ty(),
+                    }],
+                    return_type: i64_ty(),
+                },
+            ],
+            extern_interfaces: Vec::new(),
+            structs: Vec::new(),
+            functions: Vec::new(),
+        };
+        let shim = c_shim_source(&ast);
+        assert!(shim.contains("return nuis_host_file_open(path_handle, flags);"));
+        assert!(shim.contains("return nuis_host_stdin_read(buffer_handle, len);"));
+        assert!(shim.contains("return nuis_host_tty_width(fd);"));
+    }
+
+    #[test]
+    fn c_shim_source_includes_native_directory_temp_and_process_hooks() {
+        fn i64_ty() -> AstTypeRef {
+            AstTypeRef {
+                name: "i64".to_owned(),
+                generic_args: Vec::new(),
+                is_optional: false,
+                is_ref: false,
+            }
+        }
+
+        let ast = AstModule {
+            uses: Vec::new(),
+            domain: "cpu".to_owned(),
+            unit: "Main".to_owned(),
+            externs: vec![
+                AstExternFunction {
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_dir_open".to_owned(),
+                    params: vec![nuis_semantics::model::AstParam {
+                        name: "path_handle".to_owned(),
+                        ty: i64_ty(),
+                    }],
+                    return_type: i64_ty(),
+                },
+                AstExternFunction {
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_temp_file_handle".to_owned(),
+                    params: vec![nuis_semantics::model::AstParam {
+                        name: "prefix_handle".to_owned(),
+                        ty: i64_ty(),
+                    }],
+                    return_type: i64_ty(),
+                },
+                AstExternFunction {
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_command_spawn".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "program_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "argv_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                },
+            ],
+            extern_interfaces: Vec::new(),
+            structs: Vec::new(),
+            functions: Vec::new(),
+        };
+        let shim = c_shim_source(&ast);
+        assert!(shim.contains("return nuis_host_dir_open(path_handle);"));
+        assert!(shim.contains("return nuis_host_temp_file_handle(prefix_handle);"));
+        assert!(shim.contains("return nuis_host_command_spawn(program_handle, argv_handle);"));
+    }
+
+    #[test]
+    fn c_shim_source_leaves_plain_system_externs_unstubbed() {
+        fn ty(name: &str) -> AstTypeRef {
+            AstTypeRef {
+                name: name.to_owned(),
+                generic_args: Vec::new(),
+                is_optional: false,
+                is_ref: false,
+            }
+        }
+
+        let ast = AstModule {
+            uses: Vec::new(),
+            domain: "cpu".to_owned(),
+            unit: "Main".to_owned(),
+            externs: vec![AstExternFunction {
+                abi: "c".to_owned(),
+                interface: None,
+                name: "usleep".to_owned(),
+                params: vec![nuis_semantics::model::AstParam {
+                    name: "usec".to_owned(),
+                    ty: ty("i64"),
+                }],
+                return_type: ty("i32"),
+            }],
+            extern_interfaces: Vec::new(),
+            structs: Vec::new(),
+            functions: Vec::new(),
+        };
+        let shim = c_shim_source(&ast);
+        assert!(!shim.contains("int32_t usleep("));
     }
 }
