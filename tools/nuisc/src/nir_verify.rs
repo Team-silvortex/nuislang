@@ -971,6 +971,7 @@ mod tests {
                 test_reason: None,
                 test_timeout_ms: None,
                 test_clock_domain: None,
+                test_clock_policy: None,
                 is_async: false,
                 params: vec![],
                 return_type: None,

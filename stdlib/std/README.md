@@ -114,6 +114,10 @@ Current boundaries:
   clock-domain code mapping is written down explicitly: `0 = monotonic`,
   `1 = wall`, `2 = global`, with `global` currently resolving to `monotonic`
   inside the front-door test runner
+* `clock_test_recipe.ns` and the FFI-facing clock test example now mirror that
+  canonical mapping using the more explicit field names
+  `declared_global_code` and `resolved_global_code`, so the bridge summary reads
+  like a contract rather than a pair of unexplained integers
 * current `command/subprocess` direction is likewise a host-backed facade over
   opaque process handles and integer status codes; it is useful for CLI/tooling
   experiments but not yet a finalized portable process-management contract

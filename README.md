@@ -38,6 +38,7 @@ Current responsibility split:
 * `nuis` is the main workflow surface for `check`, `build`, caches, projects, and package inspection.
 * `nuisc` is the compiler/scheduler core that consumes `.ns` or project inputs and emits `NIR`, `YIR`, LLVM IR, and AOT outputs.
 * `nustar` packages are where per-domain ABI support, default lanes, frontend/lowering entrypoints, and package contracts are registered.
+* `nustar` packages are also starting to declare per-domain clock contracts such as `clock_domain_id`, `clock_kind`, `clock_epoch_kind`, `clock_resolution`, and `clock_bridge_default`.
 
 ## Quick Start
 
@@ -63,8 +64,16 @@ test("smoke_add") fn smoke_add() -> i64 { return 1; }
 test(ignored=true) fn skipped_case() -> i64 { return 1; }
 test(should_fail=true) fn expected_failure() -> i64 { return 0; }
 test("expected_failure", should_fail=true, reason="must reject zero") fn expected_failure() -> i64 { return 0; }
-test("slow_async", timeout_ms=25, clock_domain="global") async fn slow_async() -> i64 { return 1; }
+test("slow_async", timeout_ms=25, clock_domain="global", clock_policy="bridge") async fn slow_async() -> i64 { return 1; }
 ```
+
+When a timed test uses `clock_domain`, `nuis test` now shows both the declared
+domain and the runner-resolved domain in execution output, including the current
+canonical staging codes. In the current MVP, `global (2)` still resolves to the
+host monotonic clock `monotonic (0)`, and the output also reports the current
+host deadline source such as `host_monotonic_deadline` or `host_wall_deadline`.
+The current explicit way to acknowledge that bridge is
+`clock_policy="bridge"` alongside `clock_domain="global"`.
 
 Useful inspection commands:
 

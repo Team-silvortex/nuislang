@@ -63,6 +63,9 @@ pub fn render_ast(module: &AstModule) -> String {
                 if let Some(clock_domain) = &function.test_clock_domain {
                     parts.push(format!("clock_domain=\"{}\"", clock_domain.as_str()));
                 }
+                if let Some(clock_policy) = &function.test_clock_policy {
+                    parts.push(format!("clock_policy=\"{}\"", clock_policy.as_str()));
+                }
                 format!("test({}) ", parts.join(", "))
             })
             .unwrap_or_default();
@@ -185,6 +188,9 @@ pub fn render_nir(module: &NirModule) -> String {
                 }
                 if let Some(clock_domain) = &function.test_clock_domain {
                     parts.push(format!("clock_domain=\"{}\"", clock_domain.as_str()));
+                }
+                if let Some(clock_policy) = &function.test_clock_policy {
+                    parts.push(format!("clock_policy=\"{}\"", clock_policy.as_str()));
                 }
                 format!("test({}) ", parts.join(", "))
             })

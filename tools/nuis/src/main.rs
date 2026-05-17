@@ -269,7 +269,18 @@ struct TestVerdict {
     status: &'static str,
     counted_pass: bool,
     note: Option<String>,
+    clock_policy: Option<&'static str>,
+    declared_clock_domain: Option<&'static str>,
+    declared_clock_domain_code: Option<i64>,
     resolved_clock_domain: Option<&'static str>,
+    resolved_clock_domain_code: Option<i64>,
+    resolved_clock_source: Option<&'static str>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct RunnerClockResolution {
+    domain: nuis_semantics::model::TestClockDomain,
+    source: &'static str,
 }
 
 fn run_language_tests_for_source_file(
@@ -337,6 +348,9 @@ fn run_language_tests_for_source_file(
         if let Some(clock_domain) = &function.test_clock_domain {
             line.push_str(&format!(" [clock_domain: {}]", clock_domain.as_str()));
         }
+        if let Some(clock_policy) = &function.test_clock_policy {
+            line.push_str(&format!(" [clock_policy: {}]", clock_policy.as_str()));
+        }
         println!("{line}");
     }
     if list_only {
@@ -360,8 +374,25 @@ fn run_language_tests_for_source_file(
         if let Some(reason) = &function.test_reason {
             println!("    reason: {}", reason);
         }
+        if let Some(clock_policy) = verdict.clock_policy {
+            println!("    clock_policy: {}", clock_policy);
+        }
+        if let Some(clock_domain) = verdict.declared_clock_domain {
+            let code = verdict
+                .declared_clock_domain_code
+                .map(|code| format!(" ({code})"))
+                .unwrap_or_default();
+            println!("    declared_clock_domain: {}{}", clock_domain, code);
+        }
         if let Some(clock_domain) = verdict.resolved_clock_domain {
-            println!("    clock_domain: {}", clock_domain);
+            let code = verdict
+                .resolved_clock_domain_code
+                .map(|code| format!(" ({code})"))
+                .unwrap_or_default();
+            println!("    resolved_clock_domain: {}{}", clock_domain, code);
+        }
+        if let Some(source) = verdict.resolved_clock_source {
+            println!("    resolved_clock_source: {}", source);
         }
         if let Some(note) = &verdict.note {
             println!("    note: {}", note);
@@ -435,7 +466,12 @@ fn execute_language_test(
             status: "SKIP",
             counted_pass: false,
             note: None,
+            clock_policy: None,
+            declared_clock_domain: None,
+            declared_clock_domain_code: None,
             resolved_clock_domain: None,
+            resolved_clock_domain_code: None,
+            resolved_clock_source: None,
         });
     }
     let harness_ast = build_test_harness_module(ast, test_function);
@@ -460,13 +496,14 @@ fn execute_language_test(
     let mut child = Command::new(&written.binary_path)
         .spawn()
         .map_err(|error| format!("failed to run `{}`: {error}", written.binary_path))?;
-    let resolved_clock_domain = test_function
+    let declared_clock_domain = test_function.test_clock_domain;
+    let resolved_clock = test_function
         .test_timeout_ms
-        .map(|_| resolve_runner_clock_domain(test_function.test_clock_domain));
+        .map(|_| resolve_runner_clock_domain(declared_clock_domain));
     let raw_outcome = wait_for_test_child(
         &mut child,
         test_function.test_timeout_ms,
-        resolved_clock_domain,
+        resolved_clock.map(|clock| clock.domain),
     )?;
     let (status, counted_pass, note) = match raw_outcome {
         RawTestOutcome::Completed(status) => {
@@ -496,7 +533,12 @@ fn execute_language_test(
         status,
         counted_pass,
         note,
-        resolved_clock_domain: resolved_clock_domain.map(|domain| domain.as_str()),
+        clock_policy: test_function.test_clock_policy.map(|policy| policy.as_str()),
+        declared_clock_domain: declared_clock_domain.map(|domain| domain.as_str()),
+        declared_clock_domain_code: declared_clock_domain.map(|domain| domain.code()),
+        resolved_clock_domain: resolved_clock.map(|clock| clock.domain.as_str()),
+        resolved_clock_domain_code: resolved_clock.map(|clock| clock.domain.code()),
+        resolved_clock_source: resolved_clock.map(|clock| clock.source),
     })
 }
 
@@ -561,12 +603,20 @@ fn wait_for_test_child(
 
 fn resolve_runner_clock_domain(
     declared: Option<nuis_semantics::model::TestClockDomain>,
-) -> nuis_semantics::model::TestClockDomain {
+) -> RunnerClockResolution {
     match declared.unwrap_or(nuis_semantics::model::TestClockDomain::Monotonic) {
-        nuis_semantics::model::TestClockDomain::Global => {
-            nuis_semantics::model::TestClockDomain::Monotonic
-        }
-        other => other,
+        nuis_semantics::model::TestClockDomain::Monotonic => RunnerClockResolution {
+            domain: nuis_semantics::model::TestClockDomain::Monotonic,
+            source: "host_monotonic_deadline",
+        },
+        nuis_semantics::model::TestClockDomain::Wall => RunnerClockResolution {
+            domain: nuis_semantics::model::TestClockDomain::Wall,
+            source: "host_wall_deadline",
+        },
+        nuis_semantics::model::TestClockDomain::Global => RunnerClockResolution {
+            domain: nuis_semantics::model::TestClockDomain::Monotonic,
+            source: "host_monotonic_deadline",
+        },
     }
 }
 
@@ -628,6 +678,7 @@ fn build_test_main_function(test_function: &AstFunction) -> AstFunction {
         test_reason: None,
         test_timeout_ms: None,
         test_clock_domain: None,
+        test_clock_policy: None,
         is_async: test_function.is_async,
         params: vec![],
         return_type: Some(i64_type_ref()),
@@ -2005,6 +2056,42 @@ mod cpu Main {
     fn resolves_global_clock_domain_to_monotonic_runner_clock() {
         let resolved =
             resolve_runner_clock_domain(Some(nuis_semantics::model::TestClockDomain::Global));
-        assert_eq!(resolved, nuis_semantics::model::TestClockDomain::Monotonic);
+        assert_eq!(resolved.domain, nuis_semantics::model::TestClockDomain::Monotonic);
+        assert_eq!(resolved.source, "host_monotonic_deadline");
+    }
+
+    #[test]
+    fn resolves_wall_clock_domain_to_wall_runner_clock_source() {
+        let resolved =
+            resolve_runner_clock_domain(Some(nuis_semantics::model::TestClockDomain::Wall));
+        assert_eq!(resolved.domain, nuis_semantics::model::TestClockDomain::Wall);
+        assert_eq!(resolved.source, "host_wall_deadline");
+    }
+
+    #[test]
+    fn language_test_runner_prints_clock_policy_metadata() {
+        let dir = temp_dir("language_test_clock_policy");
+        let input = dir.join("clock_policy.ns");
+        fs::write(
+            &input,
+            r#"
+mod cpu Main {
+  extern "c" fn usleep(usec: i64) -> i32;
+
+  test("slow_global", should_fail=true, reason="bridge policy demo", timeout_ms=25, clock_domain="global", clock_policy="bridge") async fn slow_global() -> i64 {
+    let _slept: i32 = usleep(100000);
+    return 1;
+  }
+}
+"#,
+        )
+        .expect("write clock policy test file");
+
+        let report = run_language_tests_for_source_file(&input, None, false, false, false, false)
+            .expect("clock policy language test should run");
+        assert_eq!(report.collected, 1);
+        assert_eq!(report.passed, 1);
+        assert_eq!(report.failed, 0);
+        assert_eq!(report.skipped, 0);
     }
 }

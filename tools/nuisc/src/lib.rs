@@ -117,6 +117,11 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 if !manifest.default_lanes.is_empty() {
                     println!("  default_lanes: {}", manifest.default_lanes.join(", "));
                 }
+                println!("  clock_domain_id: {}", manifest.clock_domain_id);
+                println!("  clock_kind: {}", manifest.clock_kind);
+                println!("  clock_epoch_kind: {}", manifest.clock_epoch_kind);
+                println!("  clock_resolution: {}", manifest.clock_resolution);
+                println!("  clock_bridge_default: {}", manifest.clock_bridge_default);
                 println!("  profiles: {}", manifest.profiles.join(", "));
                 println!(
                     "  resource_families: {}",
@@ -398,6 +403,14 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     binary.manifest.default_lanes.join(", ")
                 );
             }
+            println!("  clock_domain_id: {}", binary.manifest.clock_domain_id);
+            println!("  clock_kind: {}", binary.manifest.clock_kind);
+            println!("  clock_epoch_kind: {}", binary.manifest.clock_epoch_kind);
+            println!("  clock_resolution: {}", binary.manifest.clock_resolution);
+            println!(
+                "  clock_bridge_default: {}",
+                binary.manifest.clock_bridge_default
+            );
             println!("  format_version: {}", binary.format_version);
             println!("  abi: {}", binary.abi_tag);
             println!("  machine_arch: {}", binary.machine_arch);

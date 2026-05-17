@@ -86,6 +86,34 @@ impl TestClockDomain {
             Self::Global => "global",
         }
     }
+
+    pub fn code(self) -> i64 {
+        match self {
+            Self::Monotonic => 0,
+            Self::Wall => 1,
+            Self::Global => 2,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TestClockPolicy {
+    Bridge,
+}
+
+impl TestClockPolicy {
+    pub fn parse(raw: &str) -> Option<Self> {
+        match raw {
+            "bridge" => Some(Self::Bridge),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Bridge => "bridge",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -97,6 +125,7 @@ pub struct AstFunction {
     pub test_reason: Option<String>,
     pub test_timeout_ms: Option<i64>,
     pub test_clock_domain: Option<TestClockDomain>,
+    pub test_clock_policy: Option<TestClockPolicy>,
     pub is_async: bool,
     pub params: Vec<AstParam>,
     pub return_type: Option<AstTypeRef>,
@@ -618,6 +647,7 @@ pub struct NirFunction {
     pub test_reason: Option<String>,
     pub test_timeout_ms: Option<i64>,
     pub test_clock_domain: Option<TestClockDomain>,
+    pub test_clock_policy: Option<TestClockPolicy>,
     pub is_async: bool,
     pub params: Vec<NirParam>,
     pub return_type: Option<NirTypeRef>,

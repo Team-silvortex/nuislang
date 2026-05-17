@@ -197,6 +197,7 @@ fn lower_function(
         test_reason: function.test_reason.clone(),
         test_timeout_ms: function.test_timeout_ms,
         test_clock_domain: function.test_clock_domain.clone(),
+        test_clock_policy: function.test_clock_policy,
         is_async: function.is_async,
         params: function.params.iter().map(lower_param).collect(),
         return_type: function.return_type.as_ref().map(lower_type_ref),
@@ -13008,6 +13009,22 @@ fn validate_test_function_signature(
             ));
         }
     }
+    if let Some(clock_policy) = function.test_clock_policy {
+        if function.test_timeout_ms.is_none() {
+            return Err(format!(
+                "test function `{}` ({}) can only use `clock_policy=\"...\"` together with `timeout_ms=...` in the current MVP",
+                function.name, label
+            ));
+        }
+        if function.test_clock_domain != Some(nuis_semantics::model::TestClockDomain::Global) {
+            return Err(format!(
+                "test function `{}` ({}) can only use `clock_policy=\"{}\"` together with `clock_domain=\"global\"` in the current MVP",
+                function.name,
+                label,
+                clock_policy.as_str()
+            ));
+        }
+    }
     Ok(())
 }
 
@@ -13042,7 +13059,8 @@ mod tests {
     use super::parse_nuis_ast;
     use super::parse_nuis_module;
     use nuis_semantics::model::{
-        NirDataFlowState, NirExpr, NirKernelFlowState, NirShaderFlowState, NirStmt, TestClockDomain,
+        NirDataFlowState, NirExpr, NirKernelFlowState, NirShaderFlowState, NirStmt,
+        TestClockDomain, TestClockPolicy,
     };
 
     #[test]
@@ -13136,6 +13154,7 @@ mod tests {
         assert_eq!(function.test_reason.as_deref(), Some("must reject zero"));
         assert_eq!(function.test_timeout_ms, Some(25));
         assert_eq!(function.test_clock_domain, Some(TestClockDomain::Wall));
+        assert_eq!(function.test_clock_policy, None);
     }
 
     #[test]
@@ -13236,6 +13255,55 @@ mod tests {
         assert_eq!(function.test_reason.as_deref(), Some("must reject zero"));
         assert_eq!(function.test_timeout_ms, Some(25));
         assert_eq!(function.test_clock_domain, Some(TestClockDomain::Monotonic));
+        assert_eq!(function.test_clock_policy, None);
+    }
+
+    #[test]
+    fn parses_test_clock_policy_into_ast() {
+        let ast = parse_nuis_ast(
+            r#"
+            mod cpu Main {
+              test("slow_global", timeout_ms=25, clock_domain="global", clock_policy="bridge") async fn slow_global() -> i64 {
+                return 1;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = ast
+            .functions
+            .iter()
+            .find(|function| function.name == "slow_global")
+            .unwrap();
+        assert_eq!(function.test_clock_domain, Some(TestClockDomain::Global));
+        assert_eq!(function.test_clock_policy, Some(TestClockPolicy::Bridge));
+    }
+
+    #[test]
+    fn lowers_test_clock_policy_into_nir() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              test("slow_global", timeout_ms=25, clock_domain="global", clock_policy="bridge") async fn slow_global() -> i64 {
+                return 1;
+              }
+
+              fn main() -> i64 {
+                return 1;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "slow_global")
+            .unwrap();
+        assert_eq!(function.test_clock_domain, Some(TestClockDomain::Global));
+        assert_eq!(function.test_clock_policy, Some(TestClockPolicy::Bridge));
     }
 
     #[test]
@@ -13396,6 +13464,40 @@ mod tests {
         .unwrap_err();
 
         assert!(error.contains("cannot use `clock_domain=\"wall\"` on `async fn`"));
+    }
+
+    #[test]
+    fn rejects_test_clock_policy_without_timeout() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              test("slow_global", clock_policy="bridge") async fn slow_global() -> i64 {
+                return 1;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(
+            error.contains("can only use `clock_policy=\"...\"` together with `timeout_ms=...`")
+        );
+    }
+
+    #[test]
+    fn rejects_test_clock_policy_without_global_domain() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              test("slow_mono", timeout_ms=25, clock_domain="monotonic", clock_policy="bridge") async fn slow_mono() -> i64 {
+                return 1;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("can only use `clock_policy=\"bridge\"` together with `clock_domain=\"global\"`"));
     }
 
     #[test]

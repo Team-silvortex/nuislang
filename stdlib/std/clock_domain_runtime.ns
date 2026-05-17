@@ -6,12 +6,25 @@ mod cpu Main {
     resolved_global: i64
   }
 
+  struct ClockDomainBridgeCodes {
+    declared_global_code: i64,
+    resolved_global_code: i64
+  }
+
   fn capture_clock_domain_codes() -> ClockDomainCodes {
     return ClockDomainCodes {
       monotonic: 0,
       wall: 1,
       global: 2,
       resolved_global: 0
+    };
+  }
+
+  fn capture_clock_domain_bridge_codes() -> ClockDomainBridgeCodes {
+    let codes: ClockDomainCodes = capture_clock_domain_codes();
+    return ClockDomainBridgeCodes {
+      declared_global_code: codes.global,
+      resolved_global_code: codes.resolved_global
     };
   }
 
@@ -24,7 +37,14 @@ mod cpu Main {
       + bias;
   }
 
+  fn summarize_clock_domain_bridge(bias: i64) -> i64 {
+    let bridge: ClockDomainBridgeCodes = capture_clock_domain_bridge_codes();
+    return bridge.declared_global_code
+      + bridge.resolved_global_code
+      + bias;
+  }
+
   fn main() {
-    print(summarize_clock_domain_runtime(1));
+    print(summarize_clock_domain_runtime(1) + summarize_clock_domain_bridge(1));
   }
 }

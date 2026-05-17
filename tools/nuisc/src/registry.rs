@@ -59,6 +59,11 @@ pub struct NustarPackageManifest {
     pub support_surface: Vec<String>,
     pub support_profile_slots: Vec<String>,
     pub default_lanes: Vec<String>,
+    pub clock_domain_id: String,
+    pub clock_kind: String,
+    pub clock_epoch_kind: String,
+    pub clock_resolution: String,
+    pub clock_bridge_default: String,
     pub profiles: Vec<String>,
     pub resource_families: Vec<String>,
     pub unit_types: Vec<String>,
@@ -1177,6 +1182,16 @@ fn parse_manifest(source: &str, path: &Path) -> Result<NustarPackageManifest, St
     let support_profile_slots =
         parse_optional_string_array(source, "support_profile_slots").unwrap_or_default();
     let default_lanes = parse_optional_string_array(source, "default_lanes").unwrap_or_default();
+    let clock_domain_id = parse_optional_string(source, "clock_domain_id")
+        .unwrap_or_else(|| format!("{domain_family}.clock.local.v1"));
+    let clock_kind =
+        parse_optional_string(source, "clock_kind").unwrap_or_else(|| "local-monotonic".to_owned());
+    let clock_epoch_kind =
+        parse_optional_string(source, "clock_epoch_kind").unwrap_or_else(|| "domain-epoch".to_owned());
+    let clock_resolution =
+        parse_optional_string(source, "clock_resolution").unwrap_or_else(|| "tick:1ns".to_owned());
+    let clock_bridge_default = parse_optional_string(source, "clock_bridge_default")
+        .unwrap_or_else(|| "self".to_owned());
     let profiles = parse_string_array(source, "profiles", path)?;
     let resource_families = parse_string_array(source, "resource_families", path)?;
     let unit_types = parse_optional_string_array(source, "unit_types").unwrap_or_default();
@@ -1212,6 +1227,11 @@ fn parse_manifest(source: &str, path: &Path) -> Result<NustarPackageManifest, St
         support_surface,
         support_profile_slots,
         default_lanes,
+        clock_domain_id,
+        clock_kind,
+        clock_epoch_kind,
+        clock_resolution,
+        clock_bridge_default,
         profiles,
         resource_families,
         unit_types,
@@ -1528,6 +1548,11 @@ mod tests {
             support_surface: Vec::new(),
             support_profile_slots: Vec::new(),
             default_lanes: Vec::new(),
+            clock_domain_id: "cpu.clock.host.v1".to_owned(),
+            clock_kind: "host-monotonic".to_owned(),
+            clock_epoch_kind: "host-epoch".to_owned(),
+            clock_resolution: "cpu.tick_i64".to_owned(),
+            clock_bridge_default: "global->monotonic:bridge".to_owned(),
             profiles: vec!["aot".to_owned()],
             resource_families: vec!["cpu".to_owned()],
             unit_types: vec!["Main".to_owned()],

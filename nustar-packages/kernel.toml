@@ -23,6 +23,11 @@ abi_targets = ["kernel.apple_ane.coreml.v1:arch=arm64|os=darwin|object=mach-o|ca
 implementation_kinds = ["native-stub", "native-dylib", "llvm-bc"]
 loader_entry = "nustar.bootstrap.v1"
 loader_abi = "nustar-loader-v1"
+clock_domain_id = "kernel.clock.dispatch.v1"
+clock_kind = "dispatch-monotonic"
+clock_epoch_kind = "dispatch-epoch"
+clock_resolution = "kernel-queue-step"
+clock_bridge_default = "global->dispatch:bridge"
 profiles = ["aot"]
 resource_families = ["kernel", "kernel.apple", "npu", "npu.apple"]
 unit_types = ["KernelUnit", "TensorProgram", "ComputeGraph"]

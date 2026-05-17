@@ -1,6 +1,6 @@
 use nuis_semantics::model::{
     AstBinaryOp, AstExpr, AstExternFunction, AstExternInterface, AstFunction, AstModule, AstParam,
-    AstStmt, AstStructDef, AstStructField, AstTypeRef, TestClockDomain,
+    AstStmt, AstStructDef, AstStructField, AstTypeRef, TestClockDomain, TestClockPolicy,
 };
 
 use super::lexer::{describe_token, Token};
@@ -158,6 +158,7 @@ impl Parser {
             test_reason,
             test_timeout_ms,
             test_clock_domain,
+            test_clock_policy,
         ) = if self.peek_word("test") {
             self.expect_word("test")?;
             if !self.peek_symbol('(') {
@@ -168,7 +169,7 @@ impl Parser {
             }
             self.parse_test_decl_call_syntax()?
         } else {
-            (None, false, false, None, None, None)
+            (None, false, false, None, None, None, None)
         };
         let is_async = if self.peek_word("async") {
             self.expect_word("async")?;
@@ -215,6 +216,7 @@ impl Parser {
             test_reason,
             test_timeout_ms,
             test_clock_domain,
+            test_clock_policy,
             is_async,
             params,
             return_type,
@@ -232,6 +234,7 @@ impl Parser {
             Option<String>,
             Option<i64>,
             Option<TestClockDomain>,
+            Option<TestClockPolicy>,
         ),
         String,
     > {
@@ -242,6 +245,7 @@ impl Parser {
         let mut reason = None;
         let mut timeout_ms = None;
         let mut clock_domain = None;
+        let mut clock_policy = None;
         while !self.peek_symbol(')') {
             match self.next() {
                 Some(Token::String(value)) => {
@@ -256,6 +260,7 @@ impl Parser {
                             "reason" => reason = Some(self.parse_test_meta_string()?),
                             "timeout_ms" => timeout_ms = Some(self.parse_test_meta_int()?),
                             "clock_domain" => clock_domain = Some(self.parse_test_clock_domain()?),
+                            "clock_policy" => clock_policy = Some(self.parse_test_clock_policy()?),
                             _ => {
                                 return Err(format!(
                                     "unknown test metadata key `{word}` in `test(...)`"
@@ -281,6 +286,12 @@ impl Parser {
                             "clock_domain" => {
                                 return Err(
                                     "test metadata key `clock_domain` expects `clock_domain=\"...\"` in `test(...)`"
+                                        .to_owned(),
+                                )
+                            }
+                            "clock_policy" => {
+                                return Err(
+                                    "test metadata key `clock_policy` expects `clock_policy=\"...\"` in `test(...)`"
                                         .to_owned(),
                                 )
                             }
@@ -314,6 +325,7 @@ impl Parser {
             reason,
             timeout_ms,
             clock_domain,
+            clock_policy,
         ))
     }
 
@@ -358,6 +370,16 @@ impl Parser {
         TestClockDomain::parse(&raw).ok_or_else(|| {
             format!(
                 "unsupported `clock_domain=\"{}\"`; expected `monotonic`, `wall`, or `global`",
+                raw
+            )
+        })
+    }
+
+    fn parse_test_clock_policy(&mut self) -> Result<TestClockPolicy, String> {
+        let raw = self.parse_test_meta_string()?;
+        TestClockPolicy::parse(&raw).ok_or_else(|| {
+            format!(
+                "unsupported `clock_policy=\"{}\"`; expected `bridge`",
                 raw
             )
         })

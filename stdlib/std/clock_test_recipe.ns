@@ -10,8 +10,8 @@ mod cpu Main {
   }
 
   struct ClockTestSummary {
-    declared_domain: i64,
-    resolved_domain: i64,
+    declared_global_code: i64,
+    resolved_global_code: i64,
     wall_ns: i64,
     monotonic_ns: i64,
     global_domain_id: i64,
@@ -26,10 +26,18 @@ mod cpu Main {
     };
   }
 
+  fn capture_declared_global_code() -> i64 {
+    return 2;
+  }
+
+  fn capture_resolved_global_code() -> i64 {
+    return 0;
+  }
+
   fn summarize_runtime(seed: ClockTestSeed) -> ClockTestSummary {
     return ClockTestSummary {
-      declared_domain: 2,
-      resolved_domain: 0,
+      declared_global_code: capture_declared_global_code(),
+      resolved_global_code: capture_resolved_global_code(),
       wall_ns: host_wall_time_ns(),
       monotonic_ns: host_monotonic_time_ns(),
       global_domain_id: host_clock_domain_id() + seed.bias,
@@ -42,8 +50,8 @@ mod cpu Main {
   fn summarize_clock_test_recipe(bias: i64) -> i64 {
     let seed: ClockTestSeed = build_seed(bias);
     let summary: ClockTestSummary = summarize_runtime(seed);
-    return summary.declared_domain
-      + summary.resolved_domain
+    return summary.declared_global_code
+      + summary.resolved_global_code
       + summary.wall_ns
       + summary.monotonic_ns
       + summary.global_domain_id
