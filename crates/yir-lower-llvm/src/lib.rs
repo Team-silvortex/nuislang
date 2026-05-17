@@ -1452,6 +1452,144 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 body.push(format!("  ret i64 {returned}"));
                 body.push(format!("{cont_label}:"));
             }
+            ("cpu", "guard_print_return") => {
+                let cond_value = registers.get(&node.op.args[0]).cloned();
+                let print_value = registers.get(&node.op.args[1]).cloned();
+                let return_value = registers.get(&node.op.args[2]).cloned();
+                let (Some(cond_value), Some(print_value), Some(return_value)) =
+                    (cond_value, print_value, return_value)
+                else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.guard_print_return `{}` because one or more inputs are outside the current CPU LLVM slice",
+                        node.name
+                    ));
+                    continue;
+                };
+                let Some(cond) = coerce_to_i64(&cond_value, &mut body, &mut next_reg) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.guard_print_return `{}` because its condition is not coercible to i64",
+                        node.name
+                    ));
+                    continue;
+                };
+                let Some(returned) = coerce_to_i64(&return_value, &mut body, &mut next_reg) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.guard_print_return `{}` because its return value is not coercible to i64",
+                        node.name
+                    ));
+                    continue;
+                };
+                let cond_bool = fresh_reg(&mut next_reg);
+                body.push(format!("  {cond_bool} = icmp ne i64 {cond}, 0"));
+                let then_label = fresh_block(&mut next_block, "guard_print_return_then");
+                let cont_label = fresh_block(&mut next_block, "guard_print_return_cont");
+                body.push(format!(
+                    "  br i1 {cond_bool}, label %{then_label}, label %{cont_label}"
+                ));
+                body.push(format!("{then_label}:"));
+                if let Some(input) = coerce_to_cstr(&print_value, &mut body, &mut next_reg) {
+                    body.push(format!("  %print_str_{next_reg} = call i32 @puts(ptr {input})"));
+                } else if let Some(input) = coerce_to_i64(&print_value, &mut body, &mut next_reg) {
+                    body.push(format!("  call void @nuis_debug_print_i64(i64 {input})"));
+                } else {
+                    body.push(format!(
+                        "  ; deferred lowering inside cpu.guard_print_return `{}` because its print value is not printable in the current CPU LLVM slice",
+                        node.name
+                    ));
+                }
+                body.push(format!("  ret i64 {returned}"));
+                body.push(format!("{cont_label}:"));
+            }
+            ("cpu", "branch_print_return") => {
+                let cond_value = registers.get(&node.op.args[0]).cloned();
+                let then_print_value = registers.get(&node.op.args[1]).cloned();
+                let then_return_value = registers.get(&node.op.args[2]).cloned();
+                let else_print_value = registers.get(&node.op.args[3]).cloned();
+                let else_return_value = registers.get(&node.op.args[4]).cloned();
+                let (
+                    Some(cond_value),
+                    Some(then_print_value),
+                    Some(then_return_value),
+                    Some(else_print_value),
+                    Some(else_return_value),
+                ) = (
+                    cond_value,
+                    then_print_value,
+                    then_return_value,
+                    else_print_value,
+                    else_return_value,
+                ) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.branch_print_return `{}` because one or more inputs are outside the current CPU LLVM slice",
+                        node.name
+                    ));
+                    continue;
+                };
+                let Some(cond) = coerce_to_i64(&cond_value, &mut body, &mut next_reg) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.branch_print_return `{}` because its condition is not coercible to i64",
+                        node.name
+                    ));
+                    continue;
+                };
+                let Some(then_returned) =
+                    coerce_to_i64(&then_return_value, &mut body, &mut next_reg)
+                else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.branch_print_return `{}` because its then-return value is not coercible to i64",
+                        node.name
+                    ));
+                    continue;
+                };
+                let Some(else_returned) =
+                    coerce_to_i64(&else_return_value, &mut body, &mut next_reg)
+                else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.branch_print_return `{}` because its else-return value is not coercible to i64",
+                        node.name
+                    ));
+                    continue;
+                };
+                let cond_bool = fresh_reg(&mut next_reg);
+                body.push(format!("  {cond_bool} = icmp ne i64 {cond}, 0"));
+                let then_label = fresh_block(&mut next_block, "branch_print_return_then");
+                let else_label = fresh_block(&mut next_block, "branch_print_return_else");
+                body.push(format!(
+                    "  br i1 {cond_bool}, label %{then_label}, label %{else_label}"
+                ));
+                body.push(format!("{then_label}:"));
+                if let Some(input) =
+                    coerce_to_cstr(&then_print_value, &mut body, &mut next_reg)
+                {
+                    body.push(format!("  %print_str_{next_reg} = call i32 @puts(ptr {input})"));
+                } else if let Some(input) =
+                    coerce_to_i64(&then_print_value, &mut body, &mut next_reg)
+                {
+                    body.push(format!("  call void @nuis_debug_print_i64(i64 {input})"));
+                } else {
+                    body.push(format!(
+                        "  ; deferred lowering inside cpu.branch_print_return `{}` because its then-print value is not printable in the current CPU LLVM slice",
+                        node.name
+                    ));
+                }
+                body.push(format!("  ret i64 {then_returned}"));
+                body.push(format!("{else_label}:"));
+                if let Some(input) =
+                    coerce_to_cstr(&else_print_value, &mut body, &mut next_reg)
+                {
+                    body.push(format!("  %print_str_{next_reg} = call i32 @puts(ptr {input})"));
+                } else if let Some(input) =
+                    coerce_to_i64(&else_print_value, &mut body, &mut next_reg)
+                {
+                    body.push(format!("  call void @nuis_debug_print_i64(i64 {input})"));
+                } else {
+                    body.push(format!(
+                        "  ; deferred lowering inside cpu.branch_print_return `{}` because its else-print value is not printable in the current CPU LLVM slice",
+                        node.name
+                    ));
+                }
+                body.push(format!("  ret i64 {else_returned}"));
+            }
             _ => {
                 body.push(format!(
                     "  ; deferred lowering for {} on {} ({})",
@@ -1634,6 +1772,17 @@ fn coerce_to_i64(
             body.push(format!("  {reg} = fptosi double {value} to i64"));
             Some(reg)
         }
+        _ => None,
+    }
+}
+
+fn coerce_to_cstr<'a>(
+    value: &'a LlvmValueRef,
+    _body: &mut Vec<String>,
+    _next_reg: &mut usize,
+) -> Option<&'a str> {
+    match value {
+        LlvmValueRef::TextHandle { ptr, .. } => Some(ptr.as_str()),
         _ => None,
     }
 }
@@ -1914,5 +2063,119 @@ mod tests {
         assert!(llvm_ir.contains("guard_return_cont."));
         assert_eq!(llvm_ir.matches("ret i64 ").count(), 2);
         assert!(llvm_ir.find("guard_return_cont.").unwrap() < llvm_ir.find("= add i64 0, 7").unwrap());
+    }
+
+    #[test]
+    fn emits_guard_print_return_as_real_branch() {
+        let mut module = YirModule::new("0.1");
+        module.resources.push(Resource {
+            name: "cpu0".to_owned(),
+            kind: ResourceKind::parse("cpu.main"),
+        });
+        module.nodes.push(Node {
+            name: "cond".to_owned(),
+            resource: "cpu0".to_owned(),
+            op: Operation::parse("cpu.const_bool", vec!["true".to_owned()]).unwrap(),
+        });
+        module.nodes.push(Node {
+            name: "msg".to_owned(),
+            resource: "cpu0".to_owned(),
+            op: Operation::parse("cpu.text", vec!["usage".to_owned()]).unwrap(),
+        });
+        module.nodes.push(Node {
+            name: "early".to_owned(),
+            resource: "cpu0".to_owned(),
+            op: Operation::parse("cpu.const_i64", vec!["64".to_owned()]).unwrap(),
+        });
+        module.nodes.push(Node {
+            name: "guard".to_owned(),
+            resource: "cpu0".to_owned(),
+            op: Operation::parse(
+                "cpu.guard_print_return",
+                vec!["cond".to_owned(), "msg".to_owned(), "early".to_owned()],
+            )
+            .unwrap(),
+        });
+        module.nodes.push(Node {
+            name: "later".to_owned(),
+            resource: "cpu0".to_owned(),
+            op: Operation::parse("cpu.const_i64", vec!["7".to_owned()]).unwrap(),
+        });
+        for from in ["cond", "msg", "early"] {
+            module.edges.push(Edge {
+                kind: EdgeKind::Dep,
+                from: from.to_owned(),
+                to: "guard".to_owned(),
+            });
+        }
+
+        let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
+        assert!(llvm_ir.contains("br i1"));
+        assert!(llvm_ir.contains("guard_print_return_then."));
+        assert!(llvm_ir.contains("call i32 @puts(ptr"));
+        assert_eq!(llvm_ir.matches("ret i64 ").count(), 2);
+        assert!(llvm_ir.contains("guard_print_return_cont."));
+    }
+
+    #[test]
+    fn emits_branch_print_return_as_real_two_way_branch() {
+        let mut module = YirModule::new("0.1");
+        module.resources.push(Resource {
+            name: "cpu0".to_owned(),
+            kind: ResourceKind::parse("cpu.main"),
+        });
+        module.nodes.push(Node {
+            name: "cond".to_owned(),
+            resource: "cpu0".to_owned(),
+            op: Operation::parse("cpu.const_bool", vec!["true".to_owned()]).unwrap(),
+        });
+        module.nodes.push(Node {
+            name: "then_msg".to_owned(),
+            resource: "cpu0".to_owned(),
+            op: Operation::parse("cpu.text", vec!["ok".to_owned()]).unwrap(),
+        });
+        module.nodes.push(Node {
+            name: "then_ret".to_owned(),
+            resource: "cpu0".to_owned(),
+            op: Operation::parse("cpu.const_i64", vec!["0".to_owned()]).unwrap(),
+        });
+        module.nodes.push(Node {
+            name: "else_msg".to_owned(),
+            resource: "cpu0".to_owned(),
+            op: Operation::parse("cpu.text", vec!["fail".to_owned()]).unwrap(),
+        });
+        module.nodes.push(Node {
+            name: "else_ret".to_owned(),
+            resource: "cpu0".to_owned(),
+            op: Operation::parse("cpu.const_i64", vec!["64".to_owned()]).unwrap(),
+        });
+        module.nodes.push(Node {
+            name: "branch".to_owned(),
+            resource: "cpu0".to_owned(),
+            op: Operation::parse(
+                "cpu.branch_print_return",
+                vec![
+                    "cond".to_owned(),
+                    "then_msg".to_owned(),
+                    "then_ret".to_owned(),
+                    "else_msg".to_owned(),
+                    "else_ret".to_owned(),
+                ],
+            )
+            .unwrap(),
+        });
+        for from in ["cond", "then_msg", "then_ret", "else_msg", "else_ret"] {
+            module.edges.push(Edge {
+                kind: EdgeKind::Dep,
+                from: from.to_owned(),
+                to: "branch".to_owned(),
+            });
+        }
+
+        let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
+        assert!(llvm_ir.contains("branch_print_return_then."));
+        assert!(llvm_ir.contains("branch_print_return_else."));
+        assert!(llvm_ir.matches("call i32 @puts(ptr").count() >= 2);
+        assert!(llvm_ir.matches("ret i64 ").count() >= 2);
     }
 }

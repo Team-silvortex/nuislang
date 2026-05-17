@@ -530,6 +530,26 @@ impl RegisteredMod for CpuMod {
 
                 Ok(InstructionSemantics::effect(node.op.args.clone()))
             }
+            "guard_print_return" => {
+                if node.op.args.len() != 3 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.guard_print_return <name> <resource> <condition> <print> <return>`",
+                        node.name
+                    ));
+                }
+
+                Ok(InstructionSemantics::effect(node.op.args.clone()))
+            }
+            "branch_print_return" => {
+                if node.op.args.len() != 5 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.branch_print_return <name> <resource> <condition> <then_print> <then_return> <else_print> <else_return>`",
+                        node.name
+                    ));
+                }
+
+                Ok(InstructionSemantics::effect(node.op.args.clone()))
+            }
             other => Err(format!("unknown cpu instruction `{other}`")),
         }
     }
@@ -1357,6 +1377,40 @@ impl RegisteredMod for CpuMod {
                     format!(
                         "effect cpu.guard_return @{} [{}]: if {} then return {}",
                         node.resource, resource.kind.raw, condition, returned
+                    ),
+                );
+                Ok(Value::Unit)
+            }
+            "guard_print_return" => {
+                let condition = state.expect_value(&node.op.args[0])?.clone();
+                let printed = state.expect_value(&node.op.args[1])?.clone();
+                let returned = state.expect_value(&node.op.args[2])?.clone();
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.guard_print_return @{} [{}]: if {} then print {} and return {}",
+                        node.resource, resource.kind.raw, condition, printed, returned
+                    ),
+                );
+                Ok(Value::Unit)
+            }
+            "branch_print_return" => {
+                let condition = state.expect_value(&node.op.args[0])?.clone();
+                let then_printed = state.expect_value(&node.op.args[1])?.clone();
+                let then_returned = state.expect_value(&node.op.args[2])?.clone();
+                let else_printed = state.expect_value(&node.op.args[3])?.clone();
+                let else_returned = state.expect_value(&node.op.args[4])?.clone();
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.branch_print_return @{} [{}]: if {} then print {} and return {} else print {} and return {}",
+                        node.resource,
+                        resource.kind.raw,
+                        condition,
+                        then_printed,
+                        then_returned,
+                        else_printed,
+                        else_returned
                     ),
                 );
                 Ok(Value::Unit)

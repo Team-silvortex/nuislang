@@ -74,6 +74,7 @@ mod cpu Main {
   fn main() -> i64 {
     let argc: i64 = host_argv_count();
     if argc < 5 {
+      print("usage: native_tool_runner_demo <program> <arg0> <arg1> <arg2>");
       return 64;
     }
     return summarize_tool("NUIS_TOOL_FLAG", "1");

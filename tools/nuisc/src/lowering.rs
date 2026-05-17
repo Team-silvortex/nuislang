@@ -3260,6 +3260,39 @@ fn lower_if_pair(
                 return Ok(LoweredIfOutcome::Continued);
             }
         }
+        if then_body.len() == 2 && else_body.is_empty() {
+            if let (NirStmt::Print(value), NirStmt::Return(Some(returned))) =
+                (&then_body[0], &then_body[1])
+            {
+                let print_name = lower_expr(value, state, bindings)?;
+                let return_name = lower_expr(returned, state, bindings)?;
+                lower_guard_print_return(condition_name, print_name, return_name, state);
+                return Ok(LoweredIfOutcome::Continued);
+            }
+        }
+        if then_body.len() == 2 && else_body.len() == 2 {
+            if let (
+                NirStmt::Print(then_print),
+                NirStmt::Return(Some(then_return)),
+                NirStmt::Print(else_print),
+                NirStmt::Return(Some(else_return)),
+            ) = (&then_body[0], &then_body[1], &else_body[0], &else_body[1])
+            {
+                let then_print_name = lower_expr(then_print, state, bindings)?;
+                let then_return_name = lower_expr(then_return, state, bindings)?;
+                let else_print_name = lower_expr(else_print, state, bindings)?;
+                let else_return_name = lower_expr(else_return, state, bindings)?;
+                lower_branch_print_return(
+                    condition_name,
+                    then_print_name,
+                    then_return_name,
+                    else_print_name,
+                    else_return_name,
+                    state,
+                );
+                return Ok(LoweredIfOutcome::Continued);
+            }
+        }
         return Err(
             "minimal nuisc lowering currently only supports `if` where both branches contain exactly one statement"
                 .to_owned(),
@@ -3362,6 +3395,90 @@ fn lower_guard_return(
         from: return_name,
         to: name,
     });
+}
+
+fn lower_guard_print_return(
+    condition_name: String,
+    print_name: String,
+    return_name: String,
+    state: &mut LoweringState<'_>,
+) {
+    let name = next_name(state, "guard_print_return");
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "guard_print_return".to_owned(),
+            args: vec![condition_name.clone(), print_name.clone(), return_name.clone()],
+        },
+    });
+    push_dep_edges(state, &condition_name, &name);
+    push_dep_edges(state, &print_name, &name);
+    push_dep_edges(state, &return_name, &name);
+    state.yir.edges.push(Edge {
+        kind: EdgeKind::Effect,
+        from: condition_name,
+        to: name.clone(),
+    });
+    state.yir.edges.push(Edge {
+        kind: EdgeKind::Effect,
+        from: print_name,
+        to: name.clone(),
+    });
+    state.yir.edges.push(Edge {
+        kind: EdgeKind::Effect,
+        from: return_name,
+        to: name,
+    });
+}
+
+fn lower_branch_print_return(
+    condition_name: String,
+    then_print_name: String,
+    then_return_name: String,
+    else_print_name: String,
+    else_return_name: String,
+    state: &mut LoweringState<'_>,
+) {
+    let name = next_name(state, "branch_print_return");
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "branch_print_return".to_owned(),
+            args: vec![
+                condition_name.clone(),
+                then_print_name.clone(),
+                then_return_name.clone(),
+                else_print_name.clone(),
+                else_return_name.clone(),
+            ],
+        },
+    });
+    for dep in [
+        &condition_name,
+        &then_print_name,
+        &then_return_name,
+        &else_print_name,
+        &else_return_name,
+    ] {
+        push_dep_edges(state, dep, &name);
+    }
+    for effect in [
+        &condition_name,
+        &then_print_name,
+        &then_return_name,
+        &else_print_name,
+        &else_return_name,
+    ] {
+        state.yir.edges.push(Edge {
+            kind: EdgeKind::Effect,
+            from: effect.clone(),
+            to: name.clone(),
+        });
+    }
 }
 
 fn lower_select(
