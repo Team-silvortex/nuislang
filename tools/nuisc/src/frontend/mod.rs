@@ -16991,4 +16991,37 @@ mod tests {
 
         assert!(error.contains("must be used under `await`"));
     }
+
+    #[test]
+    fn lowers_integer_comparison_into_bool_condition() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                if 2 < 5 {
+                  return 1;
+                } else {
+                  return 0;
+                }
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        match &function.body[0] {
+            NirStmt::If { condition, .. } => match condition {
+                NirExpr::Binary { op, .. } => {
+                    assert_eq!(*op, nuis_semantics::model::NirBinaryOp::Lt);
+                }
+                other => panic!("expected comparison condition, found {other:?}"),
+            },
+            other => panic!("expected if statement, found {other:?}"),
+        }
+    }
 }

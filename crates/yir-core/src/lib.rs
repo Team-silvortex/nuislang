@@ -629,7 +629,7 @@ impl Operation {
                 CpuLlvmLoweringClass::Memory
             }
             "input_i64" | "extern_call_i64" => CpuLlvmLoweringClass::Runtime,
-            "print" => CpuLlvmLoweringClass::Effect,
+            "print" | "guard_return" => CpuLlvmLoweringClass::Effect,
             _ if self.is_async_core_op() => CpuLlvmLoweringClass::Effect,
             _ => CpuLlvmLoweringClass::Other,
         }

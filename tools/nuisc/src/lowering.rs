@@ -3228,6 +3228,7 @@ fn lower_if_stmt(
     let condition_name = lower_expr(condition, state, bindings)?;
     let lowered = lower_if_pair(condition_name, then_body, else_body, state, bindings)?;
     match lowered {
+        LoweredIfOutcome::Continued => Ok(None),
         LoweredIfOutcome::Bind { name, value } => {
             bindings.insert(name, value);
             Ok(None)
@@ -3238,6 +3239,7 @@ fn lower_if_stmt(
 }
 
 enum LoweredIfOutcome {
+    Continued,
     Bind { name: String, value: String },
     Printed,
     Returned(String),
@@ -3251,6 +3253,13 @@ fn lower_if_pair(
     bindings: &BTreeMap<String, String>,
 ) -> Result<LoweredIfOutcome, String> {
     if then_body.len() != 1 || else_body.len() != 1 {
+        if then_body.len() == 1 && else_body.is_empty() {
+            if let NirStmt::Return(Some(value)) = &then_body[0] {
+                let lowered = lower_expr(value, state, bindings)?;
+                lower_guard_return(condition_name, lowered, state);
+                return Ok(LoweredIfOutcome::Continued);
+            }
+        }
         return Err(
             "minimal nuisc lowering currently only supports `if` where both branches contain exactly one statement"
                 .to_owned(),
@@ -3324,6 +3333,35 @@ fn lower_if_pair(
                 .to_owned(),
         ),
     }
+}
+
+fn lower_guard_return(
+    condition_name: String,
+    return_name: String,
+    state: &mut LoweringState<'_>,
+) {
+    let name = next_name(state, "guard_return");
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "guard_return".to_owned(),
+            args: vec![condition_name.clone(), return_name.clone()],
+        },
+    });
+    push_dep_edges(state, &condition_name, &name);
+    push_dep_edges(state, &return_name, &name);
+    state.yir.edges.push(Edge {
+        kind: EdgeKind::Effect,
+        from: condition_name,
+        to: name.clone(),
+    });
+    state.yir.edges.push(Edge {
+        kind: EdgeKind::Effect,
+        from: return_name,
+        to: name,
+    });
 }
 
 fn lower_select(

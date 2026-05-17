@@ -1085,6 +1085,21 @@ mod tests {
     }
 
     #[test]
+    fn folds_integer_comparison_constants() {
+        let mut module = sample_module(vec![NirStmt::Return(Some(NirExpr::Binary {
+            op: NirBinaryOp::Lt,
+            lhs: Box::new(NirExpr::Int(2)),
+            rhs: Box::new(NirExpr::Int(5)),
+        }))]);
+        let changed = simplify_nir_module(&mut module);
+        assert!(changed);
+        assert_eq!(
+            module.functions[0].body,
+            vec![NirStmt::Return(Some(NirExpr::Int(1)))]
+        );
+    }
+
+    #[test]
     fn normalizes_if_true_into_then_branch() {
         let mut module = sample_module(vec![NirStmt::If {
             condition: NirExpr::Bool(true),

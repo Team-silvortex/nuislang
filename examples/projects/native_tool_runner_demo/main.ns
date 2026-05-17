@@ -35,15 +35,6 @@ mod cpu Main {
     return host_text_concat(keyed, env_value_handle);
   }
 
-  fn print_usage() -> i64 {
-    let program_name: i64 = host_argv_at(0);
-    let usage_line: i64 = host_text_concat(
-      program_name,
-      " <program> <arg1> <arg2> <arg3>"
-    );
-    return host_stdout_write(usage_line) + host_stdout_flush();
-  }
-
   fn run_tool(env_key_handle: i64, env_value_handle: i64) -> ToolRunSummary {
     let program_handle: i64 = host_argv_at(1);
     let first_arg_handle: i64 = host_argv_at(2);
@@ -83,9 +74,8 @@ mod cpu Main {
   fn main() -> i64 {
     let argc: i64 = host_argv_count();
     if argc < 5 {
-      return 64 + print_usage();
-    } else {
-      return summarize_tool("NUIS_TOOL_FLAG", "1");
+      return 64;
     }
+    return summarize_tool("NUIS_TOOL_FLAG", "1");
   }
 }

@@ -520,6 +520,16 @@ impl RegisteredMod for CpuMod {
 
                 Ok(InstructionSemantics::effect(node.op.args.clone()))
             }
+            "guard_return" => {
+                if node.op.args.len() != 2 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.guard_return <name> <resource> <condition> <return>`",
+                        node.name
+                    ));
+                }
+
+                Ok(InstructionSemantics::effect(node.op.args.clone()))
+            }
             other => Err(format!("unknown cpu instruction `{other}`")),
         }
     }
@@ -1335,6 +1345,18 @@ impl RegisteredMod for CpuMod {
                     format!(
                         "effect cpu.print @{} [{}]: {}",
                         node.resource, resource.kind.raw, value
+                    ),
+                );
+                Ok(Value::Unit)
+            }
+            "guard_return" => {
+                let condition = state.expect_value(&node.op.args[0])?.clone();
+                let returned = state.expect_value(&node.op.args[1])?.clone();
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.guard_return @{} [{}]: if {} then return {}",
+                        node.resource, resource.kind.raw, condition, returned
                     ),
                 );
                 Ok(Value::Unit)

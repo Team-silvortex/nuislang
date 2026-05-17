@@ -972,6 +972,10 @@ static int64_t nuis_host_text_register(const char* text) {
     return nuis_host_text_len;
 }
 
+int64_t nuis_host_text_lift(const char* text) {
+    return nuis_host_text_register(text);
+}
+
 static const char* nuis_host_text_lookup(int64_t handle) {
     static char fallback[64];
     if (handle > 0 && handle <= nuis_host_text_len && nuis_host_text_slots[handle - 1] != NULL) {

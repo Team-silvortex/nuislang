@@ -12,7 +12,7 @@ enum LlvmValueRef {
     F64(String),
     Struct(StructLlvmValueRef),
     Ptr(String),
-    CStr(String),
+    TextHandle { ptr: String, handle: String },
     Void,
 }
 
@@ -29,6 +29,7 @@ struct LlvmLoweringState {
     buffer_lengths: BTreeMap<String, String>,
     next_reg: usize,
     next_global: usize,
+    next_block: usize,
     last_cpu_value: Option<String>,
 }
 
@@ -44,9 +45,13 @@ fn lower_cpu_literal_node(node: &Node, state: &mut LlvmLoweringState) -> bool {
             state.body.push(format!(
                 "  {ptr} = getelementptr inbounds [{len} x i8], ptr {label}, i64 0, i64 0"
             ));
+            let handle = fresh_reg(&mut state.next_reg);
+            state.body.push(format!(
+                "  {handle} = call i64 @nuis_host_text_lift(ptr {ptr})"
+            ));
             state
                 .registers
-                .insert(node.name.clone(), LlvmValueRef::CStr(ptr));
+                .insert(node.name.clone(), LlvmValueRef::TextHandle { ptr, handle });
             true
         }
         "const_bool" => {
@@ -244,6 +249,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
         buffer_lengths: BTreeMap::new(),
         next_reg: 0,
         next_global: 0,
+        next_block: 0,
         last_cpu_value: None,
     };
 
@@ -292,6 +298,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
         let registers = &mut state.registers;
         let buffer_lengths = &mut state.buffer_lengths;
         let mut next_reg = &mut state.next_reg;
+        let mut next_block = &mut state.next_block;
         let _next_global = &mut state.next_global;
         let last_cpu_value = &mut state.last_cpu_value;
 
@@ -1354,8 +1361,10 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 };
                 let reg = fresh_reg(&mut next_reg);
                 let call = match lowered_args.as_slice() {
+                    [] => format!("call i64 @{symbol}()"),
                     [a0] => format!("call i64 @{symbol}(i64 {a0})"),
                     [a0, a1] => format!("call i64 @{symbol}(i64 {a0}, i64 {a1})"),
+                    [a0, a1, a2] => format!("call i64 @{symbol}(i64 {a0}, i64 {a1}, i64 {a2})"),
                     _ => {
                         body.push(format!(
                             "  ; deferred lowering for cpu.extern_call_i64 `{}` because symbol `{}` has unsupported arity {}",
@@ -1371,7 +1380,12 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 *last_cpu_value = Some(reg);
             }
             ("cpu", "print") => {
-                if let Some(input) = get_i64(&registers, &node.op.args[0]) {
+                if let Some(input) = get_cstr(&registers, &node.op.args[0]) {
+                    body.push(format!(
+                        "  %print_str_{next_reg} = call i32 @puts(ptr {input})"
+                    ));
+                    *last_cpu_value = Some("0".to_owned());
+                } else if let Some(input) = get_i64(&registers, &node.op.args[0]) {
                     body.push(format!("  call void @nuis_debug_print_i64(i64 {input})"));
                     *last_cpu_value = Some(input.to_owned());
                 } else if let Some(input) = get_i32(&registers, &node.op.args[0]) {
@@ -1396,17 +1410,47 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                     let widened = fresh_reg(&mut next_reg);
                     body.push(format!("  {widened} = fptosi double {input} to i64"));
                     *last_cpu_value = Some(widened);
-                } else if let Some(input) = get_cstr(&registers, &node.op.args[0]) {
-                    body.push(format!(
-                        "  %print_str_{next_reg} = call i32 @puts(ptr {input})"
-                    ));
-                    *last_cpu_value = Some("0".to_owned());
                 } else {
                     body.push(format!(
                         "  ; deferred lowering for cpu.print `{}` because its input is produced outside the current CPU LLVM slice",
                         node.op.args[0]
                     ));
                 }
+            }
+            ("cpu", "guard_return") => {
+                let cond_value = registers.get(&node.op.args[0]).cloned();
+                let return_value = registers.get(&node.op.args[1]).cloned();
+                let (Some(cond_value), Some(return_value)) = (cond_value, return_value) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.guard_return `{}` because one or more inputs are outside the current CPU LLVM slice",
+                        node.name
+                    ));
+                    continue;
+                };
+                let Some(cond) = coerce_to_i64(&cond_value, &mut body, &mut next_reg) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.guard_return `{}` because its condition is not coercible to i64",
+                        node.name
+                    ));
+                    continue;
+                };
+                let Some(returned) = coerce_to_i64(&return_value, &mut body, &mut next_reg) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.guard_return `{}` because its return value is not coercible to i64",
+                        node.name
+                    ));
+                    continue;
+                };
+                let cond_bool = fresh_reg(&mut next_reg);
+                body.push(format!("  {cond_bool} = icmp ne i64 {cond}, 0"));
+                let then_label = fresh_block(&mut next_block, "guard_return_then");
+                let cont_label = fresh_block(&mut next_block, "guard_return_cont");
+                body.push(format!(
+                    "  br i1 {cond_bool}, label %{then_label}, label %{cont_label}"
+                ));
+                body.push(format!("{then_label}:"));
+                body.push(format!("  ret i64 {returned}"));
+                body.push(format!("{cont_label}:"));
             }
             _ => {
                 body.push(format!(
@@ -1434,6 +1478,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
 declare ptr @malloc(i64)\n\
 declare void @free(ptr)\n\
 declare i32 @puts(ptr)\n\
+declare i64 @nuis_host_text_lift(ptr)\n\
 declare void @nuis_debug_print_bool(i32)\n\
 declare void @nuis_debug_print_i32(i32)\n\
 declare void @nuis_debug_print_i64(i64)\n\n\
@@ -1518,6 +1563,7 @@ fn render_dynamic_extern_decls(module: &YirModule) -> Vec<String> {
 fn get_i64<'a>(registers: &'a BTreeMap<String, LlvmValueRef>, name: &str) -> Option<&'a str> {
     match registers.get(name) {
         Some(LlvmValueRef::I64(value)) => Some(value.as_str()),
+        Some(LlvmValueRef::TextHandle { handle, .. }) => Some(handle.as_str()),
         _ => None,
     }
 }
@@ -1567,6 +1613,7 @@ fn coerce_to_i64(
 ) -> Option<String> {
     match value {
         LlvmValueRef::I64(value) => Some(value.clone()),
+        LlvmValueRef::TextHandle { handle, .. } => Some(handle.clone()),
         LlvmValueRef::I32(value) => {
             let reg = fresh_reg(next_reg);
             body.push(format!("  {reg} = sext i32 {value} to i64"));
@@ -1600,7 +1647,7 @@ fn get_ptr<'a>(registers: &'a BTreeMap<String, LlvmValueRef>, name: &str) -> Opt
 
 fn get_cstr<'a>(registers: &'a BTreeMap<String, LlvmValueRef>, name: &str) -> Option<&'a str> {
     match registers.get(name) {
-        Some(LlvmValueRef::CStr(value)) => Some(value.as_str()),
+        Some(LlvmValueRef::TextHandle { ptr, .. }) => Some(ptr.as_str()),
         _ => None,
     }
 }
@@ -1613,6 +1660,12 @@ fn fresh_reg(next: &mut usize) -> String {
 
 fn fresh_global(next: &mut usize) -> String {
     let label = format!("@.str.{}", *next);
+    *next += 1;
+    label
+}
+
+fn fresh_block(next: &mut usize, prefix: &str) -> String {
+    let label = format!("{prefix}.{}", *next);
     *next += 1;
     label
 }
@@ -1680,6 +1733,12 @@ fn fresh_label(next: &mut usize, prefix: &str) -> String {
 fn topological_order(module: &YirModule) -> Result<Vec<String>, String> {
     let mut adjacency = BTreeMap::<String, Vec<String>>::new();
     let mut indegree = BTreeMap::<String, usize>::new();
+    let node_positions = module
+        .nodes
+        .iter()
+        .enumerate()
+        .map(|(index, node)| (node.name.clone(), index))
+        .collect::<BTreeMap<_, _>>();
 
     for node in &module.nodes {
         adjacency.entry(node.name.clone()).or_default();
@@ -1705,7 +1764,7 @@ fn topological_order(module: &YirModule) -> Result<Vec<String>, String> {
         .iter()
         .filter_map(|(name, degree)| (*degree == 0).then_some(name.clone()))
         .collect::<Vec<_>>();
-    ready.sort();
+    ready.sort_by_key(|name| std::cmp::Reverse(node_positions[name]));
 
     let mut order = Vec::with_capacity(module.nodes.len());
     while let Some(node) = ready.pop() {
@@ -1716,7 +1775,7 @@ fn topological_order(module: &YirModule) -> Result<Vec<String>, String> {
                     *degree -= 1;
                     if *degree == 0 {
                         ready.push(target.clone());
-                        ready.sort();
+                        ready.sort_by_key(|name| std::cmp::Reverse(node_positions[name]));
                     }
                 }
             }
@@ -1765,5 +1824,95 @@ mod tests {
         let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
         assert!(llvm_ir.contains("declare i64 @usleep(i64)"));
         assert!(llvm_ir.contains("call i64 @usleep(i64"));
+    }
+
+    #[test]
+    fn emits_three_arg_cpu_extern_calls() {
+        let mut module = YirModule::new("0.1");
+        module.resources.push(Resource {
+            name: "cpu0".to_owned(),
+            kind: ResourceKind::parse("cpu.main"),
+        });
+        for (name, value) in [("arg0", "1"), ("arg1", "2"), ("arg2", "3")] {
+            module.nodes.push(Node {
+                name: name.to_owned(),
+                resource: "cpu0".to_owned(),
+                op: Operation::parse("cpu.const_i64", vec![value.to_owned()]).unwrap(),
+            });
+        }
+        module.nodes.push(Node {
+            name: "spawn_call".to_owned(),
+            resource: "cpu0".to_owned(),
+            op: Operation::parse(
+                "cpu.extern_call_i64",
+                vec![
+                    "c".to_owned(),
+                    "host_subprocess_spawn".to_owned(),
+                    "arg0".to_owned(),
+                    "arg1".to_owned(),
+                    "arg2".to_owned(),
+                ],
+            )
+            .unwrap(),
+        });
+        for from in ["arg0", "arg1", "arg2"] {
+            module.edges.push(Edge {
+                kind: EdgeKind::Dep,
+                from: from.to_owned(),
+                to: "spawn_call".to_owned(),
+            });
+        }
+
+        let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
+        assert!(llvm_ir.contains("declare i64 @host_subprocess_spawn(i64, i64, i64)"));
+        assert!(llvm_ir.contains("call i64 @host_subprocess_spawn(i64"));
+    }
+
+    #[test]
+    fn emits_guard_return_as_real_branch() {
+        let mut module = YirModule::new("0.1");
+        module.resources.push(Resource {
+            name: "cpu0".to_owned(),
+            kind: ResourceKind::parse("cpu.main"),
+        });
+        module.nodes.push(Node {
+            name: "cond".to_owned(),
+            resource: "cpu0".to_owned(),
+            op: Operation::parse("cpu.const_bool", vec!["true".to_owned()]).unwrap(),
+        });
+        module.nodes.push(Node {
+            name: "early".to_owned(),
+            resource: "cpu0".to_owned(),
+            op: Operation::parse("cpu.const_i64", vec!["64".to_owned()]).unwrap(),
+        });
+        module.nodes.push(Node {
+            name: "guard".to_owned(),
+            resource: "cpu0".to_owned(),
+            op: Operation::parse(
+                "cpu.guard_return",
+                vec!["cond".to_owned(), "early".to_owned()],
+            )
+            .unwrap(),
+        });
+        module.nodes.push(Node {
+            name: "later".to_owned(),
+            resource: "cpu0".to_owned(),
+            op: Operation::parse("cpu.const_i64", vec!["7".to_owned()]).unwrap(),
+        });
+        for from in ["cond", "early"] {
+            module.edges.push(Edge {
+                kind: EdgeKind::Dep,
+                from: from.to_owned(),
+                to: "guard".to_owned(),
+            });
+        }
+
+        let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
+        assert!(llvm_ir.contains("br i1"));
+        assert!(llvm_ir.contains("guard_return_then."));
+        assert!(llvm_ir.contains("ret i64 %"));
+        assert!(llvm_ir.contains("guard_return_cont."));
+        assert_eq!(llvm_ir.matches("ret i64 ").count(), 2);
+        assert!(llvm_ir.find("guard_return_cont.").unwrap() < llvm_ir.find("= add i64 0, 7").unwrap());
     }
 }
