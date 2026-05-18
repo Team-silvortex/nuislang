@@ -1,0 +1,6 @@
+name = "bad_task_ref_spawn"
+entry = "main.ns"
+
+abi = [
+  "cpu=cpu.arm64.apple_aapcs64",
+]

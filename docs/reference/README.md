@@ -38,6 +38,9 @@ Start in this order:
   current `GLM` reading of `Task<T>` / `TaskResult<T>`, including the current
   observation boundary and what is still missing before tasks become a fuller
   ownership/lifetime object
+* [cpu-task-payload-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-payload-matrix.md)
+  current allowed/rejected task payload families with concrete positive and
+  negative examples
 
 If your question is specifically “what command should I run next for this
 project?”, start with

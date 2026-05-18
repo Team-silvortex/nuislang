@@ -19,4 +19,6 @@ cargo run -p nuis -- check examples/invalid/projects/bad_nir_surface_missing_sha
 cargo run -p nuis -- check examples/invalid/projects/bad_shader_profile_missing_inline_wgsl
 cargo run -p nuis -- check examples/invalid/projects/bad_abi_profile_mismatch
 cargo run -p nuis -- check examples/invalid/projects/bad_shader_abi_inline_wgsl_forbidden
+cargo run -p nuis -- check examples/invalid/projects/bad_task_borrowed_spawn
+cargo run -p nuis -- check examples/invalid/projects/bad_task_ref_spawn
 ```

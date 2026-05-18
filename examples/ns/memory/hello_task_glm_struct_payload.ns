@@ -1,0 +1,19 @@
+mod cpu Main {
+  struct ScalarPacket {
+    lhs: i64,
+    rhs: i64
+  }
+
+  async fn add(packet: ScalarPacket) -> i64 {
+    return packet.lhs + packet.rhs;
+  }
+
+  fn main() -> i64 {
+    let packet: ScalarPacket = ScalarPacket {
+      lhs: 3,
+      rhs: 4
+    };
+    let task: Task<i64> = spawn(add(packet));
+    return join(task);
+  }
+}

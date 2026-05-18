@@ -154,6 +154,8 @@ Also included:
   but native CPU task execution in the LLVM/AOT path is still deferred, so this
   sample is currently strongest as a compile/contract example rather than a
   fully live runtime task demo.
+  Future direction note:
+  [examples/projects/task_lifecycle_branch_demo/FUTURE_LIFECYCLE_SKETCH.md](/Users/Shared/chroot/dev/nuislang/examples/projects/task_lifecycle_branch_demo/FUTURE_LIFECYCLE_SKETCH.md)
 * [task_completed_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_completed_observe_demo)
   one-file `cpu`-only completed-result demo:
   `main.ns`
@@ -169,6 +171,21 @@ Also included:
   and real CPU branch control flow.
   Like the timeout sibling, this is currently strongest as a compile/contract
   example while native CPU task execution remains deferred in LLVM/AOT.
+  Future direction note:
+  [examples/projects/task_cancel_branch_demo/FUTURE_CANCEL_SKETCH.md](/Users/Shared/chroot/dev/nuislang/examples/projects/task_cancel_branch_demo/FUTURE_CANCEL_SKETCH.md)
+* [task_join_nonconsuming_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_join_nonconsuming_probe_demo)
+  one-file `cpu`-only join-boundary probe:
+  `main.ns`
+  showing a shape that is currently legal because `join(...)` is still treated
+  as a direct payload boundary rather than a final graph-level consume.
+  It deliberately performs `join(task)` and later `join_result(task)` in the
+  same flow, so it acts as a future regression probe if task-GLM ownership
+  rules become stricter.
+  See also:
+  [examples/projects/task_join_nonconsuming_probe_demo/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/task_join_nonconsuming_probe_demo/README.md)
+  for the future-tightening note, and
+  [examples/projects/task_join_nonconsuming_probe_demo/FUTURE_CONSUME_SKETCH.md](/Users/Shared/chroot/dev/nuislang/examples/projects/task_join_nonconsuming_probe_demo/FUTURE_CONSUME_SKETCH.md)
+  for the likely migration sketch if `join(...)` later becomes consuming.
 
 ## Migration Map
 
@@ -212,6 +229,8 @@ cargo run -p nuis -- check examples/projects/task_completed_observe_demo
 cargo run -p nuis -- build examples/projects/task_completed_observe_demo /private/tmp/task_completed_observe_demo_out
 cargo run -p nuis -- check examples/projects/task_cancel_branch_demo
 cargo run -p nuis -- build examples/projects/task_cancel_branch_demo /private/tmp/task_cancel_branch_demo_out
+cargo run -p nuis -- check examples/projects/task_join_nonconsuming_probe_demo
+cargo run -p nuis -- build examples/projects/task_join_nonconsuming_probe_demo /private/tmp/task_join_nonconsuming_probe_demo_out
 ```
 
 Generated outputs to expect from a project build:

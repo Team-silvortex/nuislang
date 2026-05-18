@@ -162,6 +162,24 @@ So, for now, treat `join(...)` as:
 That gap is one of the main reasons this area should stay conservative until
 the concurrent memory model is stronger.
 
+One useful current probe shape is:
+
+* direct `join(task)` for payload extraction
+* followed later by `join_result(task)` for observation
+
+That shape is intentionally still possible today because `join(...)` has not
+yet been elevated to a graph-level consume boundary. If the repository later
+promotes `join(...)` into final ownership transfer semantics, this is exactly
+the kind of sample that should be revisited.
+
+Current concrete probes:
+
+* [hello_task_glm_join_nonconsuming_probe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_join_nonconsuming_probe.ns)
+* [task_join_nonconsuming_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_join_nonconsuming_probe_demo)
+* [FUTURE_CONSUME_SKETCH.md](/Users/Shared/chroot/dev/nuislang/examples/projects/task_join_nonconsuming_probe_demo/FUTURE_CONSUME_SKETCH.md)
+* [FUTURE_LIFECYCLE_SKETCH.md](/Users/Shared/chroot/dev/nuislang/examples/projects/task_lifecycle_branch_demo/FUTURE_LIFECYCLE_SKETCH.md)
+* [FUTURE_CANCEL_SKETCH.md](/Users/Shared/chroot/dev/nuislang/examples/projects/task_cancel_branch_demo/FUTURE_CANCEL_SKETCH.md)
+
 ## Current Cancel And Timeout Classification
 
 `cancel(...)` and `timeout(...)` should be read with the same caution.

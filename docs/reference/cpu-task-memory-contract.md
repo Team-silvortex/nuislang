@@ -78,6 +78,28 @@ Today that means async boundaries reject types like:
 * result families such as `TaskResult<...>`, `DataResult<...>`,
   `ShaderResult<...>`, and `KernelResult<...>`
 
+Current mental model:
+
+* scalar/value-like payloads are the safe side of the boundary for now
+* pointer-like, nullable, staged-instance, nested-task, and result-family
+  payloads are the unsafe side for now
+
+Current positive examples:
+
+* [hello_task_glm_scalar_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_scalar_payload.ns)
+* [hello_task_glm_struct_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_struct_payload.ns)
+* [hello_task_glm_text_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_text_payload.ns)
+
+For the compact current-state view, also see:
+
+* [cpu-task-payload-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-payload-matrix.md)
+
+Useful concrete negative examples:
+
+* [hello_task_glm_optional_payload_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_optional_payload_invalid.ns)
+* [hello_task_glm_instance_payload_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_instance_payload_invalid.ns)
+* [hello_task_glm_result_payload_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_result_payload_invalid.ns)
+
 This matters for task payloads because `spawn(...)` ultimately depends on the
 callee's async boundary shape. Even before a real parallel runtime exists, the
 language is already trying to keep task payloads on the safer side of the

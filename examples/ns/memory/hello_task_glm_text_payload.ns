@@ -1,0 +1,10 @@
+mod cpu Main {
+  async fn text_len(message: String) -> i64 {
+    return 5;
+  }
+
+  fn main() -> i64 {
+    let task: Task<i64> = spawn(text_len("hello"));
+    return join(task);
+  }
+}

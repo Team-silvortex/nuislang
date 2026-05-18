@@ -32,16 +32,30 @@ These are the best current front-end examples to read first.
   `struct` fields carrying `ref` values
 * [hello_glm.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_glm.ns)
   ownership/lifetime-flavored CPU memory path through `.ns -> NIR -> YIR`
+* [hello_task_glm_scalar_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_scalar_payload.ns)
+  smallest currently-safe scalar task payload path
+* [hello_task_glm_struct_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_struct_payload.ns)
+  small struct-of-scalars payload path across the current async/task boundary
+* [hello_task_glm_text_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_text_payload.ns)
+  current plain text/value-like payload path across the current async/task boundary
 * [hello_task_glm_origin.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_origin.ns)
   smallest current task-handle origin and direct payload extraction path: `spawn -> join`
 * [hello_task_glm_lifecycle.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_lifecycle.ns)
   lifecycle-shaping path through `timeout/cancel -> join_result -> task_timed_out/task_cancelled`
+* [hello_task_glm_boundary_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_boundary_compare.ns)
+  direct side-by-side task boundary sample:
+  `spawn -> join` as origin/payload path
+  versus `timeout/cancel -> join_result -> task_*` as lifecycle observation path
 * [hello_task_glm_lifecycle_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_lifecycle_compare.ns)
   side-by-side lifecycle sample showing that completed tasks flow to `task_value(...)`, while timeout/cancel paths stay observation-only
 * [hello_task_glm_observe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_observe.ns)
   current positive task-observation path: `spawn -> timeout -> join_result -> task_completed -> task_value`
 * [hello_task_glm_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_compare.ns)
   side-by-side comparison of direct payload extraction with `join(...)` and lifecycle-aware observation with `join_result(...)`
+* [hello_task_glm_join_nonconsuming_probe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_join_nonconsuming_probe.ns)
+  design-probe sample showing a shape that is currently allowed because
+  `join(...)` is not yet treated as a graph-level consume boundary:
+  direct `join(task)` followed by `join_result(task)`
 * [hello_data.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/data/hello_data.ns)
   first front-end `data` link surface
 * [hello_data_window.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/data/hello_data_window.ns)
@@ -98,6 +112,12 @@ These examples are intentionally supposed to fail.
   invalid borrowed task input passed directly through `spawn(...)`
 * [hello_task_glm_ref_spawn_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_ref_spawn_invalid.ns)
   invalid `ref`-typed task input crossing the current spawn boundary
+* [hello_task_glm_optional_payload_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_optional_payload_invalid.ns)
+  invalid optional task payload family crossing the current async/task boundary
+* [hello_task_glm_instance_payload_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_instance_payload_invalid.ns)
+  invalid `Instance<...>` task payload family crossing the current async/task boundary
+* [hello_task_glm_result_payload_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_result_payload_invalid.ns)
+  invalid `TaskResult<...>` payload family crossing the current async/task boundary
 * [hello_nested_mod_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/core/hello_nested_mod_invalid.ns)
   nested `mod` definitions are forbidden
 
