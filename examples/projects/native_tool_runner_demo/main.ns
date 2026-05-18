@@ -19,6 +19,14 @@ mod cpu Main {
     child_exit: i64
   }
 
+  fn usage_message() -> String {
+    return "usage: native_tool_runner_demo <program> <arg0> <arg1> <arg2>";
+  }
+
+  fn usage_exit_code() -> i64 {
+    return 60 + 4;
+  }
+
   fn build_argv_tail(
     first_arg_handle: i64,
     second_arg_handle: i64,
@@ -74,10 +82,8 @@ mod cpu Main {
   fn main() -> i64 {
     let argc: i64 = host_argv_count();
     if argc < 5 {
-      let usage_text = "usage: native_tool_runner_demo <program> <arg0> <arg1> <arg2>";
-      let usage: String = usage_text;
-      let exit_base: i64 = 60;
-      let exit_code: i64 = exit_base + 4;
+      let usage: String = usage_message();
+      let exit_code: i64 = usage_exit_code();
       print(usage);
       return exit_code;
     }

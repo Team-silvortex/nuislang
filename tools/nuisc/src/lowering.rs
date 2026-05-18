@@ -1,4 +1,7 @@
-use std::{collections::BTreeMap, path::Path};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::Path,
+};
 
 use nuis_semantics::model::{
     nir_expr_effect_class, NirBinaryOp, NirExpr, NirExprEffectClass, NirFunction, NirModule,
@@ -124,6 +127,7 @@ fn lower_nir_to_yir_builtin_cpu(module: &NirModule) -> Result<YirModule, String>
     let mut state = LoweringState {
         yir: &mut yir,
         function_map,
+        pure_helpers: collect_pure_helper_functions(module),
         value_counter: 0,
         print_counter: 0,
         await_counter: 0,
@@ -260,6 +264,7 @@ fn default_lane_for_node<'a>(
 struct LoweringState<'a> {
     yir: &'a mut YirModule,
     function_map: BTreeMap<&'a str, &'a NirFunction>,
+    pure_helpers: BTreeSet<String>,
     value_counter: usize,
     print_counter: usize,
     await_counter: usize,
@@ -3262,7 +3267,7 @@ fn lower_if_pair(
 ) -> Result<LoweredIfOutcome, String> {
     if then_body.len() != 1 || else_body.len() != 1 {
         if else_body.is_empty() {
-            if let Some(then_branch) = prepare_terminal_branch(then_body) {
+            if let Some(then_branch) = prepare_terminal_branch(then_body, &state.pure_helpers) {
                 match then_branch {
                     PreparedTerminalBranch::Return(value) => {
                         let lowered = lower_expr(&value, state, bindings)?;
@@ -3278,8 +3283,8 @@ fn lower_if_pair(
             }
         }
         if let (Some(then_branch), Some(else_branch)) = (
-            prepare_terminal_branch(then_body),
-            prepare_terminal_branch(else_body),
+            prepare_terminal_branch(then_body, &state.pure_helpers),
+            prepare_terminal_branch(else_body, &state.pure_helpers),
         ) {
             match (then_branch, else_branch) {
                 (
@@ -3393,7 +3398,10 @@ fn lower_if_pair(
     }
 }
 
-fn prepare_terminal_branch(stmts: &[NirStmt]) -> Option<PreparedTerminalBranch> {
+fn prepare_terminal_branch(
+    stmts: &[NirStmt],
+    pure_helpers: &BTreeSet<String>,
+) -> Option<PreparedTerminalBranch> {
     match stmts {
         [NirStmt::Return(Some(value))] => Some(PreparedTerminalBranch::Return(value.clone())),
         [NirStmt::Print(print), NirStmt::Return(Some(returned))] => {
@@ -3403,8 +3411,8 @@ fn prepare_terminal_branch(stmts: &[NirStmt]) -> Option<PreparedTerminalBranch> 
             })
         }
         [binding @ (NirStmt::Let { .. } | NirStmt::Const { .. }), tail @ ..] => {
-            let (name, value) = extract_pure_branch_binding(binding)?;
-            let prepared = prepare_terminal_branch(tail)?;
+            let (name, value) = extract_pure_branch_binding(binding, pure_helpers)?;
+            let prepared = prepare_terminal_branch(tail, pure_helpers)?;
             Some(substitute_prepared_terminal_branch(
                 prepared, &name, &value,
             ))
@@ -3413,17 +3421,116 @@ fn prepare_terminal_branch(stmts: &[NirStmt]) -> Option<PreparedTerminalBranch> 
     }
 }
 
-fn extract_pure_branch_binding(stmt: &NirStmt) -> Option<(String, NirExpr)> {
+fn extract_pure_branch_binding(
+    stmt: &NirStmt,
+    pure_helpers: &BTreeSet<String>,
+) -> Option<(String, NirExpr)> {
     let (name, value) = match stmt {
         NirStmt::Let { name, value, .. } | NirStmt::Const { name, value, .. } => {
             (name.clone(), value.clone())
         }
         _ => return None,
     };
-    if nir_expr_effect_class(&value) != NirExprEffectClass::Pure {
+    if !is_terminal_branch_pure_expr(&value, pure_helpers) {
         return None;
     }
     Some((name, value))
+}
+
+fn is_terminal_branch_pure_expr(expr: &NirExpr, pure_helpers: &BTreeSet<String>) -> bool {
+    match expr {
+        NirExpr::Call { callee, args } => {
+            pure_helpers.contains(callee)
+                && args
+                    .iter()
+                    .all(|arg| is_terminal_branch_pure_expr(arg, pure_helpers))
+        }
+        NirExpr::MethodCall { .. } => false,
+        NirExpr::Await(_) | NirExpr::Instantiate { .. } => false,
+        NirExpr::StructLiteral { fields, .. } => fields
+            .iter()
+            .all(|(_, value)| is_terminal_branch_pure_expr(value, pure_helpers)),
+        NirExpr::FieldAccess { base, .. } => is_terminal_branch_pure_expr(base, pure_helpers),
+        NirExpr::Binary { lhs, rhs, .. } => {
+            is_terminal_branch_pure_expr(lhs, pure_helpers)
+                && is_terminal_branch_pure_expr(rhs, pure_helpers)
+        }
+        _ => nir_expr_effect_class(expr) == NirExprEffectClass::Pure,
+    }
+}
+
+fn collect_pure_helper_functions(module: &NirModule) -> BTreeSet<String> {
+    let function_map = module
+        .functions
+        .iter()
+        .map(|function| (function.name.as_str(), function))
+        .collect::<BTreeMap<_, _>>();
+    let mut memo = BTreeMap::<String, bool>::new();
+    let mut visiting = BTreeSet::<String>::new();
+    module
+        .functions
+        .iter()
+        .filter(|function| function.name != "main")
+        .filter(|function| {
+            is_pure_helper_function(function, &function_map, &mut memo, &mut visiting)
+        })
+        .map(|function| function.name.clone())
+        .collect()
+}
+
+fn is_pure_helper_function(
+    function: &NirFunction,
+    function_map: &BTreeMap<&str, &NirFunction>,
+    memo: &mut BTreeMap<String, bool>,
+    visiting: &mut BTreeSet<String>,
+) -> bool {
+    if let Some(&cached) = memo.get(&function.name) {
+        return cached;
+    }
+    if !visiting.insert(function.name.clone()) {
+        return false;
+    }
+    let result = !function.is_async
+        && matches!(
+            function.body.as_slice(),
+            [NirStmt::Return(Some(expr))]
+                if is_pure_helper_expr(expr, function_map, memo, visiting)
+        );
+    visiting.remove(&function.name);
+    memo.insert(function.name.clone(), result);
+    result
+}
+
+fn is_pure_helper_expr(
+    expr: &NirExpr,
+    function_map: &BTreeMap<&str, &NirFunction>,
+    memo: &mut BTreeMap<String, bool>,
+    visiting: &mut BTreeSet<String>,
+) -> bool {
+    match expr {
+        NirExpr::Call { callee, args } => {
+            let Some(function) = function_map.get(callee.as_str()).copied() else {
+                return false;
+            };
+            is_pure_helper_function(function, function_map, memo, visiting)
+                && args
+                    .iter()
+                    .all(|arg| is_pure_helper_expr(arg, function_map, memo, visiting))
+        }
+        NirExpr::MethodCall { .. } => false,
+        NirExpr::Await(_) | NirExpr::Instantiate { .. } => false,
+        NirExpr::StructLiteral { fields, .. } => fields
+            .iter()
+            .all(|(_, value)| is_pure_helper_expr(value, function_map, memo, visiting)),
+        NirExpr::FieldAccess { base, .. } => {
+            is_pure_helper_expr(base, function_map, memo, visiting)
+        }
+        NirExpr::Binary { lhs, rhs, .. } => {
+            is_pure_helper_expr(lhs, function_map, memo, visiting)
+                && is_pure_helper_expr(rhs, function_map, memo, visiting)
+        }
+        _ => nir_expr_effect_class(expr) == NirExprEffectClass::Pure,
+    }
 }
 
 fn substitute_branch_binding(expr: &NirExpr, binding_name: &str, binding_value: &NirExpr) -> NirExpr {
@@ -4420,6 +4527,498 @@ mod tests {
 
         assert!(yir.nodes.iter().any(|node| {
             node.op.module == "cpu" && node.op.instruction == "guard_print_return"
+        }));
+    }
+
+    #[test]
+    fn lowers_pure_helper_call_binding_into_guard_print_return() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              extern "c" fn host_argv_count() -> i64;
+
+              fn usage_exit_code() -> i64 {
+                return 60 + 4;
+              }
+
+              fn main() -> i64 {
+                let argc: i64 = host_argv_count();
+                if argc < 2 {
+                  let usage_text = "usage";
+                  let usage: String = usage_text;
+                  let exit_code: i64 = usage_exit_code();
+                  print(usage);
+                  return exit_code;
+                }
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+        assert!(yir.nodes.iter().any(|node| {
+            node.op.module == "cpu" && node.op.instruction == "guard_print_return"
+        }));
+    }
+
+    #[test]
+    fn lowers_pure_text_helper_call_binding_into_guard_print_return() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              extern "c" fn host_argv_count() -> i64;
+
+              fn usage_message() -> String {
+                return "usage";
+              }
+
+              fn usage_exit_code() -> i64 {
+                return 60 + 4;
+              }
+
+              fn main() -> i64 {
+                let argc: i64 = host_argv_count();
+                if argc < 2 {
+                  let usage: String = usage_message();
+                  let exit_code: i64 = usage_exit_code();
+                  print(usage);
+                  return exit_code;
+                }
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+        assert!(yir.nodes.iter().any(|node| {
+            node.op.module == "cpu" && node.op.instruction == "guard_print_return"
+        }));
+    }
+
+    #[test]
+    fn lowers_pure_struct_helper_call_binding_into_branch_print_return() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              extern "c" fn host_argv_count() -> i64;
+
+              struct ExitSummary {
+                message: String,
+                code: i64
+              }
+
+              fn usage_summary() -> ExitSummary {
+                return ExitSummary {
+                  message: "usage",
+                  code: 60 + 4
+                };
+              }
+
+              fn ok_summary() -> ExitSummary {
+                return ExitSummary {
+                  message: "ok",
+                  code: 0 + 0
+                };
+              }
+
+              fn main() -> i64 {
+                let argc: i64 = host_argv_count();
+                if argc < 2 {
+                  let summary: ExitSummary = usage_summary();
+                  print(summary.message);
+                  return summary.code;
+                } else {
+                  let summary: ExitSummary = ok_summary();
+                  print(summary.message);
+                  return summary.code;
+                }
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+        assert!(yir.nodes.iter().any(|node| {
+            node.op.module == "cpu" && node.op.instruction == "branch_print_return"
+        }));
+    }
+
+    #[test]
+    fn lowers_nested_pure_helper_call_chain_into_branch_print_return() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              extern "c" fn host_argv_count() -> i64;
+
+              struct ExitSummary {
+                message: String,
+                code: i64
+              }
+
+              fn usage_message() -> String {
+                return "usage";
+              }
+
+              fn usage_exit_code() -> i64 {
+                return 60 + 4;
+              }
+
+              fn ok_message() -> String {
+                return "ok";
+              }
+
+              fn ok_exit_code() -> i64 {
+                return 0 + 0;
+              }
+
+              fn render_summary(message: String, code: i64) -> ExitSummary {
+                return ExitSummary {
+                  message: message,
+                  code: code
+                };
+              }
+
+              fn usage_summary() -> ExitSummary {
+                return render_summary(usage_message(), usage_exit_code());
+              }
+
+              fn ok_summary() -> ExitSummary {
+                return render_summary(ok_message(), ok_exit_code());
+              }
+
+              fn main() -> i64 {
+                let argc: i64 = host_argv_count();
+                if argc < 2 {
+                  let summary: ExitSummary = usage_summary();
+                  print(summary.message);
+                  return summary.code;
+                } else {
+                  let summary: ExitSummary = ok_summary();
+                  print(summary.message);
+                  return summary.code;
+                }
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+        assert!(yir.nodes.iter().any(|node| {
+            node.op.module == "cpu" && node.op.instruction == "branch_print_return"
+        }));
+    }
+
+    #[test]
+    fn lowers_nested_pure_helper_param_passthrough_into_branch_print_return() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              extern "c" fn host_argv_count() -> i64;
+
+              struct ExitSummary {
+                message: String,
+                code: i64
+              }
+
+              fn usage_message() -> String {
+                return "usage";
+              }
+
+              fn ok_message() -> String {
+                return "ok";
+              }
+
+              fn pass_text(message: String) -> String {
+                return message;
+              }
+
+              fn usage_exit_code() -> i64 {
+                return 60 + 4;
+              }
+
+              fn ok_exit_code() -> i64 {
+                return 0 + 0;
+              }
+
+              fn render_summary(message: String, code: i64) -> ExitSummary {
+                return ExitSummary {
+                  message: message,
+                  code: code
+                };
+              }
+
+              fn usage_summary() -> ExitSummary {
+                return render_summary(pass_text(usage_message()), usage_exit_code());
+              }
+
+              fn ok_summary() -> ExitSummary {
+                return render_summary(pass_text(ok_message()), ok_exit_code());
+              }
+
+              fn main() -> i64 {
+                let argc: i64 = host_argv_count();
+                if argc < 2 {
+                  let summary: ExitSummary = usage_summary();
+                  print(summary.message);
+                  return summary.code;
+                } else {
+                  let summary: ExitSummary = ok_summary();
+                  print(summary.message);
+                  return summary.code;
+                }
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+        assert!(yir.nodes.iter().any(|node| {
+            node.op.module == "cpu" && node.op.instruction == "branch_print_return"
+        }));
+    }
+
+    #[test]
+    fn lowers_branch_local_binding_into_pure_helper_param_chain() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              extern "c" fn host_argv_count() -> i64;
+
+              struct ExitSummary {
+                message: String,
+                code: i64
+              }
+
+              fn usage_message() -> String {
+                return "usage";
+              }
+
+              fn ok_message() -> String {
+                return "ok";
+              }
+
+              fn pass_text(message: String) -> String {
+                return message;
+              }
+
+              fn usage_exit_code() -> i64 {
+                return 60 + 4;
+              }
+
+              fn ok_exit_code() -> i64 {
+                return 0 + 0;
+              }
+
+              fn render_summary(message: String, code: i64) -> ExitSummary {
+                return ExitSummary {
+                  message: message,
+                  code: code
+                };
+              }
+
+              fn main() -> i64 {
+                let argc: i64 = host_argv_count();
+                if argc < 2 {
+                  let base_usage: String = usage_message();
+                  let summary: ExitSummary = render_summary(pass_text(base_usage), usage_exit_code());
+                  print(summary.message);
+                  return summary.code;
+                } else {
+                  let base_ok: String = ok_message();
+                  let summary: ExitSummary = render_summary(pass_text(base_ok), ok_exit_code());
+                  print(summary.message);
+                  return summary.code;
+                }
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+        assert!(yir.nodes.iter().any(|node| {
+            node.op.module == "cpu" && node.op.instruction == "branch_print_return"
+        }));
+    }
+
+    #[test]
+    fn lowers_multi_step_summary_helpers_inside_branch() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              extern "c" fn host_argv_count() -> i64;
+
+              struct ExitSummary {
+                message: String,
+                code: i64
+              }
+
+              fn usage_message() -> String {
+                return "usage";
+              }
+
+              fn ok_message() -> String {
+                return "ok";
+              }
+
+              fn pass_text(message: String) -> String {
+                return message;
+              }
+
+              fn usage_exit_code() -> i64 {
+                return 60 + 4;
+              }
+
+              fn ok_exit_code() -> i64 {
+                return 0 + 0;
+              }
+
+              fn render_summary(message: String, code: i64) -> ExitSummary {
+                return ExitSummary {
+                  message: message,
+                  code: code
+                };
+              }
+
+              fn attach_message(summary: ExitSummary, message: String) -> ExitSummary {
+                return ExitSummary {
+                  message: message,
+                  code: summary.code
+                };
+              }
+
+              fn attach_code(summary: ExitSummary, code: i64) -> ExitSummary {
+                return ExitSummary {
+                  message: summary.message,
+                  code: code
+                };
+              }
+
+              fn main() -> i64 {
+                let argc: i64 = host_argv_count();
+                if argc < 2 {
+                  let base_usage: String = usage_message();
+                  let empty_summary: ExitSummary = render_summary("", 0);
+                  let message_summary: ExitSummary = attach_message(empty_summary, pass_text(base_usage));
+                  let summary: ExitSummary = attach_code(message_summary, usage_exit_code());
+                  print(summary.message);
+                  return summary.code;
+                } else {
+                  let base_ok: String = ok_message();
+                  let empty_summary: ExitSummary = render_summary("", 0);
+                  let message_summary: ExitSummary = attach_message(empty_summary, pass_text(base_ok));
+                  let summary: ExitSummary = attach_code(message_summary, ok_exit_code());
+                  print(summary.message);
+                  return summary.code;
+                }
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+        assert!(yir.nodes.iter().any(|node| {
+            node.op.module == "cpu" && node.op.instruction == "branch_print_return"
+        }));
+    }
+
+    #[test]
+    fn lowers_shared_branch_bindings_into_multiple_pure_helpers() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              extern "c" fn host_argv_count() -> i64;
+
+              struct ExitSummary {
+                message: String,
+                code: i64
+              }
+
+              fn usage_message() -> String {
+                return "usage";
+              }
+
+              fn ok_message() -> String {
+                return "ok";
+              }
+
+              fn pass_text(message: String) -> String {
+                return message;
+              }
+
+              fn usage_exit_code() -> i64 {
+                return 60 + 4;
+              }
+
+              fn ok_exit_code() -> i64 {
+                return 0 + 0;
+              }
+
+              fn render_summary(message: String, code: i64) -> ExitSummary {
+                return ExitSummary {
+                  message: message,
+                  code: code
+                };
+              }
+
+              fn attach_message(summary: ExitSummary, message: String) -> ExitSummary {
+                return ExitSummary {
+                  message: message,
+                  code: summary.code
+                };
+              }
+
+              fn attach_code(summary: ExitSummary, code: i64) -> ExitSummary {
+                return ExitSummary {
+                  message: summary.message,
+                  code: code
+                };
+              }
+
+              fn amplify_code(base: i64) -> i64 {
+                return base + 0;
+              }
+
+              fn decorate_message(message: String) -> String {
+                return pass_text(message);
+              }
+
+              fn main() -> i64 {
+                let argc: i64 = host_argv_count();
+                if argc < 2 {
+                  let base_usage: String = usage_message();
+                  let base_code: i64 = usage_exit_code();
+                  let empty_summary: ExitSummary = render_summary("", 0);
+                  let message_summary: ExitSummary = attach_message(empty_summary, decorate_message(base_usage));
+                  let summary: ExitSummary = attach_code(message_summary, amplify_code(base_code));
+                  print(summary.message);
+                  return summary.code;
+                } else {
+                  let base_ok: String = ok_message();
+                  let base_code: i64 = ok_exit_code();
+                  let empty_summary: ExitSummary = render_summary("", 0);
+                  let message_summary: ExitSummary = attach_message(empty_summary, decorate_message(base_ok));
+                  let summary: ExitSummary = attach_code(message_summary, amplify_code(base_code));
+                  print(summary.message);
+                  return summary.code;
+                }
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+        assert!(yir.nodes.iter().any(|node| {
+            node.op.module == "cpu" && node.op.instruction == "branch_print_return"
         }));
     }
 }

@@ -874,7 +874,7 @@ fn lower_call_expr_with_async(
                 args: spawned_args
                     .iter()
                     .map(|arg| {
-                        lower_nested_expr_with_async(
+                        let lowered = lower_nested_expr_with_async(
                             arg,
                             current_domain,
                             current_function_is_async,
@@ -882,7 +882,15 @@ fn lower_call_expr_with_async(
                             signatures,
                             struct_table,
                             None,
-                        )
+                        )?;
+                        ensure_spawn_input_safe(
+                            "spawn",
+                            &lowered,
+                            bindings,
+                            signatures,
+                            struct_table,
+                        )?;
+                        Ok::<NirExpr, String>(lowered)
                     })
                     .collect::<Result<Vec<_>, _>>()?,
             })
@@ -11648,6 +11656,27 @@ fn ensure_task_like(
     }
 }
 
+fn ensure_spawn_input_safe(
+    name: &str,
+    expr: &NirExpr,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> Result<(), String> {
+    if matches!(expr, NirExpr::Borrow(_) | NirExpr::BorrowEnd(_)) {
+        return Err(format!(
+            "{name}(...) does not currently allow borrowed task inputs; move or copy a value instead"
+        ));
+    }
+    match infer_nir_expr_type(expr, bindings, signatures, struct_table) {
+        Some(ty) if ty.is_ref => Err(format!(
+            "{name}(...) does not currently allow `ref` task inputs, found `{}`",
+            render_type_name(&ty)
+        )),
+        _ => Ok(()),
+    }
+}
+
 fn lower_single_nested_expr(
     name: &str,
     args: &[AstExpr],
@@ -12932,7 +12961,7 @@ fn validate_declared_nir_types(module: &NirModule) -> Result<(), String> {
             validate_type_ref(&param.ty)?;
             if function.is_async && !param.ty.is_async_boundary_safe() {
                 return Err(format!(
-                    "async function `{}` parameter `{}` cannot cross async boundary with type `{}`; async parameters currently forbid `ref`, `?`, and `Instance<...>`",
+                    "async function `{}` parameter `{}` cannot cross async boundary with type `{}`; async parameters currently forbid `ref`, `?`, `Instance<...>`, `Task<...>`, and `*Result<...>` families",
                     function.name,
                     param.name,
                     param.ty.render()
@@ -12943,7 +12972,7 @@ fn validate_declared_nir_types(module: &NirModule) -> Result<(), String> {
             validate_type_ref(return_type)?;
             if function.is_async && !return_type.is_async_boundary_safe() {
                 return Err(format!(
-                    "async function `{}` cannot return `{}` across async boundary; async returns currently forbid `ref`, `?`, and `Instance<...>`",
+                    "async function `{}` cannot return `{}` across async boundary; async returns currently forbid `ref`, `?`, `Instance<...>`, `Task<...>`, and `*Result<...>` families",
                     function.name,
                     return_type.render()
                 ));
@@ -14033,6 +14062,141 @@ mod tests {
         .unwrap_err();
 
         assert!(error.contains("expects `Task<...>`"));
+    }
+
+    #[test]
+    fn rejects_spawn_of_borrowed_input() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              async fn ping(head_ref: ref Node) -> i64 {
+                return 7;
+              }
+
+              fn main() -> i64 {
+                let head: ref Node = alloc_node(1, null());
+                let task: Task<i64> = spawn(ping(borrow(head)));
+                return join(task);
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("does not currently allow borrowed task inputs"));
+    }
+
+    #[test]
+    fn rejects_spawn_of_ref_typed_input() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              async fn ping(head: ref Node) -> i64 {
+                return 7;
+              }
+
+              fn main() -> i64 {
+                let head: ref Node = alloc_node(1, null());
+                let task: Task<i64> = spawn(ping(head));
+                return join(task);
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("does not currently allow `ref` task inputs"));
+    }
+
+    #[test]
+    fn rejects_async_function_ref_parameter_boundary() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              async fn ping(head: ref Node) -> i64 {
+                return 7;
+              }
+
+              fn main() -> i64 {
+                return 1;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("cannot cross async boundary"));
+        assert!(error.contains("`Task<...>`"));
+    }
+
+    #[test]
+    fn rejects_async_function_result_family_return_boundary() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              async fn ping() -> TaskResult<i64> {
+                return join_result(timeout(spawn(pong()), 16));
+              }
+
+              async fn pong() -> i64 {
+                return 7;
+              }
+
+              fn main() -> i64 {
+                return 1;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("cannot return `TaskResult<i64>` across async boundary"));
+        assert!(error.contains("*Result<...>"));
+    }
+
+    #[test]
+    fn rejects_task_completed_on_raw_task_input() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              async fn ping() -> i64 {
+                return 7;
+              }
+
+              fn main() -> bool {
+                let task: Task<i64> = spawn(ping());
+                return task_completed(task);
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("task_completed(...) expects `TaskResult<...>`"));
+        assert!(error.contains("found `Task<i64>`"));
+    }
+
+    #[test]
+    fn rejects_task_value_on_join_payload_input() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              async fn ping() -> i64 {
+                return 7;
+              }
+
+              fn main() -> i64 {
+                let task: Task<i64> = spawn(ping());
+                let value: i64 = join(task);
+                return task_value(value);
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("task_value(...) expects `TaskResult<...>`"));
+        assert!(error.contains("found `i64`"));
     }
 
     #[test]

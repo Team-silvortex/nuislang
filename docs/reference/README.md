@@ -27,6 +27,13 @@ Start in this order:
 * [host-read-bridge.md](/Users/Shared/chroot/dev/nuislang/docs/reference/host-read-bridge.md)
   current bridge between compiler-recognized host reads and `std` host facade
   modules
+* [cpu-task-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-contract.md)
+  current `cpu` task semantics, including `spawn/join/timeout/join_result`
+  boundaries and the line between async expression support and true
+  concurrency runtime
+* [cpu-task-memory-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-memory-contract.md)
+  current ownership boundary for task inputs, including why `spawn(...)`
+  currently rejects borrowed and `ref` values
 
 If your question is specifically “what command should I run next for this
 project?”, start with
