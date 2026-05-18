@@ -1,0 +1,55 @@
+mod cpu Main {
+  struct TaskSummary {
+    message: String,
+    code: i64
+  }
+
+  async fn ping() -> i64 {
+    return 7;
+  }
+
+  fn cancelled_message() -> String {
+    return "task_cancel_branch_demo: cancelled";
+  }
+
+  fn live_message() -> String {
+    return "task_cancel_branch_demo: live";
+  }
+
+  fn cancelled_code() -> i64 {
+    return 70 + 1;
+  }
+
+  fn live_code() -> i64 {
+    return 0;
+  }
+
+  fn render_summary(message: String, code: i64) -> TaskSummary {
+    return TaskSummary {
+      message: message,
+      code: code
+    };
+  }
+
+  fn cancelled_summary() -> TaskSummary {
+    return render_summary(cancelled_message(), cancelled_code());
+  }
+
+  fn live_summary() -> TaskSummary {
+    return render_summary(live_message(), live_code());
+  }
+
+  fn main() -> i64 {
+    let task: Task<i64> = cancel(spawn(ping()));
+    let result: TaskResult<i64> = join_result(task);
+    if task_cancelled(result) {
+      let summary: TaskSummary = cancelled_summary();
+      print(summary.message);
+      return summary.code;
+    } else {
+      let summary: TaskSummary = live_summary();
+      print(summary.message);
+      return summary.code;
+    }
+  }
+}

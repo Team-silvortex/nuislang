@@ -160,6 +160,15 @@ Today `nuis` has:
 * verifier-visible result-source rules
 * a built-in CPU-domain interpretation for task lifecycle
 
+Today the repository also still has one important runtime boundary:
+
+* native LLVM/AOT lowering for CPU task primitives is not yet a full live task
+  executor
+* project/examples can already validate task semantics through
+  `.ns -> NIR -> YIR -> LLVM`
+* but that should not yet be read as proof that `spawn/join/timeout/cancel`
+  already execute as a complete native task runtime
+
 Today `nuis` does **not** yet have:
 
 * a mature parallel executor

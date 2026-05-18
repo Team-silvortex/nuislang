@@ -1,0 +1,27 @@
+mod cpu Main {
+  async fn ping() -> i64 {
+    return 7;
+  }
+
+  fn main() -> i64 {
+    let completed_task: Task<i64> = spawn(ping());
+    let completed_result: TaskResult<i64> = join_result(completed_task);
+    if task_completed(completed_result) {
+      return task_value(completed_result);
+    }
+
+    let timed_task: Task<i64> = timeout(spawn(ping()), 0);
+    let timed_result: TaskResult<i64> = join_result(timed_task);
+    if task_timed_out(timed_result) {
+      return 40;
+    }
+
+    let cancelled_task: Task<i64> = cancel(spawn(ping()));
+    let cancelled_result: TaskResult<i64> = join_result(cancelled_task);
+    if task_cancelled(cancelled_result) {
+      return 20;
+    }
+
+    return 0;
+  }
+}

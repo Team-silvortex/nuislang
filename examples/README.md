@@ -32,6 +32,16 @@ These are the best current front-end examples to read first.
   `struct` fields carrying `ref` values
 * [hello_glm.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_glm.ns)
   ownership/lifetime-flavored CPU memory path through `.ns -> NIR -> YIR`
+* [hello_task_glm_origin.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_origin.ns)
+  smallest current task-handle origin and direct payload extraction path: `spawn -> join`
+* [hello_task_glm_lifecycle.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_lifecycle.ns)
+  lifecycle-shaping path through `timeout/cancel -> join_result -> task_timed_out/task_cancelled`
+* [hello_task_glm_lifecycle_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_lifecycle_compare.ns)
+  side-by-side lifecycle sample showing that completed tasks flow to `task_value(...)`, while timeout/cancel paths stay observation-only
+* [hello_task_glm_observe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_observe.ns)
+  current positive task-observation path: `spawn -> timeout -> join_result -> task_completed -> task_value`
+* [hello_task_glm_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_compare.ns)
+  side-by-side comparison of direct payload extraction with `join(...)` and lifecycle-aware observation with `join_result(...)`
 * [hello_data.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/data/hello_data.ns)
   first front-end `data` link surface
 * [hello_data_window.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/data/hello_data_window.ns)
@@ -82,6 +92,12 @@ These examples are intentionally supposed to fail.
   invalid ownership use
 * [hello_ref_struct_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_ref_struct_invalid.ns)
   invalid consume of a borrowed `struct` field
+* [hello_task_glm_observer_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_observer_invalid.ns)
+  invalid attempt to treat `task_value(...)` as a direct `join(...)`-style extractor
+* [hello_task_glm_borrowed_spawn_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_borrowed_spawn_invalid.ns)
+  invalid borrowed task input passed directly through `spawn(...)`
+* [hello_task_glm_ref_spawn_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_ref_spawn_invalid.ns)
+  invalid `ref`-typed task input crossing the current spawn boundary
 * [hello_nested_mod_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/core/hello_nested_mod_invalid.ns)
   nested `mod` definitions are forbidden
 

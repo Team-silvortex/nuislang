@@ -139,6 +139,36 @@ Also included:
   showing the current project-form real CPU control-flow half-step for
   `if { print(...); return ... } else { print(...); return ... }`.
   This is the smallest canonical sample for native CLI usage/error vs ok paths.
+* [task_lifecycle_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_lifecycle_branch_demo)
+  one-file `cpu`-only async/task lifecycle demo:
+  `main.ns`
+  showing the current project-form bridge between
+  `spawn/timeout/join_result/task_timed_out`
+  and real CPU branch control flow.
+  This is the current canonical project-shaped sample for task observation plus
+  branch/return behavior, while payload extraction still remains easier to read
+  in the single-file memory examples.
+  Current note:
+  the project route already validates this shape through
+  `.ns -> NIR -> YIR -> LLVM`,
+  but native CPU task execution in the LLVM/AOT path is still deferred, so this
+  sample is currently strongest as a compile/contract example rather than a
+  fully live runtime task demo.
+* [task_completed_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_completed_observe_demo)
+  one-file `cpu`-only completed-result demo:
+  `main.ns`
+  showing the current project-form positive observation path for
+  `spawn -> join_result -> task_completed -> task_value`.
+  This is the smallest project-shaped sample for payload extraction from a
+  completed task result.
+* [task_cancel_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_cancel_branch_demo)
+  one-file `cpu`-only cancel lifecycle demo:
+  `main.ns`
+  showing the current project-form bridge between
+  `cancel -> join_result -> task_cancelled`
+  and real CPU branch control flow.
+  Like the timeout sibling, this is currently strongest as a compile/contract
+  example while native CPU task execution remains deferred in LLVM/AOT.
 
 ## Migration Map
 
@@ -176,6 +206,12 @@ cargo run -p nuis -- check examples/projects/native_tool_runner_demo
 cargo run -p nuis -- build examples/projects/native_tool_runner_demo /private/tmp/native_tool_runner_demo_out
 cargo run -p nuis -- check examples/projects/native_branch_cli_demo
 cargo run -p nuis -- build examples/projects/native_branch_cli_demo /private/tmp/native_branch_cli_demo_out
+cargo run -p nuis -- check examples/projects/task_lifecycle_branch_demo
+cargo run -p nuis -- build examples/projects/task_lifecycle_branch_demo /private/tmp/task_lifecycle_branch_demo_out
+cargo run -p nuis -- check examples/projects/task_completed_observe_demo
+cargo run -p nuis -- build examples/projects/task_completed_observe_demo /private/tmp/task_completed_observe_demo_out
+cargo run -p nuis -- check examples/projects/task_cancel_branch_demo
+cargo run -p nuis -- build examples/projects/task_cancel_branch_demo /private/tmp/task_cancel_branch_demo_out
 ```
 
 Generated outputs to expect from a project build:

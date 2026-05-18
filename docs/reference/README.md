@@ -34,6 +34,10 @@ Start in this order:
 * [cpu-task-memory-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-memory-contract.md)
   current ownership boundary for task inputs, including why `spawn(...)`
   currently rejects borrowed and `ref` values
+* [cpu-task-glm-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-glm-contract.md)
+  current `GLM` reading of `Task<T>` / `TaskResult<T>`, including the current
+  observation boundary and what is still missing before tasks become a fuller
+  ownership/lifetime object
 
 If your question is specifically “what command should I run next for this
 project?”, start with

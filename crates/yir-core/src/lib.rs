@@ -997,6 +997,104 @@ mod tests {
     }
 
     #[test]
+    fn glm_profiles_task_observation_ops_as_val_reads() {
+        let join_result = Operation::parse("cpu.join_result", vec!["task_0".to_owned()]).unwrap();
+        let task_completed =
+            Operation::parse("cpu.task_completed", vec!["result_0".to_owned()]).unwrap();
+        let task_value = Operation::parse("cpu.task_value", vec!["result_0".to_owned()]).unwrap();
+
+        let join_result_profile = super::glm_profile_for_operation(&join_result);
+        assert_eq!(join_result_profile.result_class, GlmValueClass::Val);
+        assert_eq!(join_result_profile.accesses.len(), 1);
+        assert_eq!(join_result_profile.accesses[0].input, "task_0");
+        assert_eq!(join_result_profile.accesses[0].class, GlmValueClass::Val);
+        assert_eq!(join_result_profile.accesses[0].mode, GlmUseMode::Read);
+
+        let task_completed_profile = super::glm_profile_for_operation(&task_completed);
+        assert_eq!(task_completed_profile.result_class, GlmValueClass::Val);
+        assert_eq!(task_completed_profile.accesses.len(), 1);
+        assert_eq!(task_completed_profile.accesses[0].input, "result_0");
+        assert_eq!(task_completed_profile.accesses[0].class, GlmValueClass::Val);
+        assert_eq!(task_completed_profile.accesses[0].mode, GlmUseMode::Read);
+
+        let task_value_profile = super::glm_profile_for_operation(&task_value);
+        assert_eq!(task_value_profile.result_class, GlmValueClass::Val);
+        assert_eq!(task_value_profile.accesses.len(), 1);
+        assert_eq!(task_value_profile.accesses[0].input, "result_0");
+        assert_eq!(task_value_profile.accesses[0].class, GlmValueClass::Val);
+        assert_eq!(task_value_profile.accesses[0].mode, GlmUseMode::Read);
+    }
+
+    #[test]
+    fn glm_profiles_spawn_path_as_val_reads_not_task_resource_origin() {
+        let async_call = Operation::parse("cpu.async_call", vec!["ping".to_owned()]).unwrap();
+        let spawn = Operation::parse(
+            "cpu.spawn_task",
+            vec!["ping".to_owned(), "async_call_0".to_owned()],
+        )
+        .unwrap();
+
+        let async_call_profile = super::glm_profile_for_operation(&async_call);
+        assert_eq!(async_call_profile.result_class, GlmValueClass::Val);
+        assert_eq!(async_call_profile.accesses.len(), 1);
+        assert_eq!(async_call_profile.accesses[0].input, "ping");
+        assert_eq!(async_call_profile.accesses[0].class, GlmValueClass::Val);
+        assert_eq!(async_call_profile.accesses[0].mode, GlmUseMode::Read);
+        assert_eq!(async_call_profile.effect, GlmEffect::None);
+
+        let spawn_profile = super::glm_profile_for_operation(&spawn);
+        assert_eq!(spawn_profile.result_class, GlmValueClass::Val);
+        assert_eq!(spawn_profile.accesses.len(), 2);
+        assert_eq!(spawn_profile.accesses[0].input, "ping");
+        assert_eq!(spawn_profile.accesses[0].class, GlmValueClass::Val);
+        assert_eq!(spawn_profile.accesses[0].mode, GlmUseMode::Read);
+        assert_eq!(spawn_profile.accesses[1].input, "async_call_0");
+        assert_eq!(spawn_profile.accesses[1].class, GlmValueClass::Val);
+        assert_eq!(spawn_profile.accesses[1].mode, GlmUseMode::Read);
+        assert_eq!(spawn_profile.effect, GlmEffect::None);
+    }
+
+    #[test]
+    fn glm_profiles_direct_join_as_val_read_not_own_consume() {
+        let join = Operation::parse("cpu.join", vec!["task_0".to_owned()]).unwrap();
+        let profile = super::glm_profile_for_operation(&join);
+
+        assert_eq!(profile.result_class, GlmValueClass::Val);
+        assert_eq!(profile.accesses.len(), 1);
+        assert_eq!(profile.accesses[0].input, "task_0");
+        assert_eq!(profile.accesses[0].class, GlmValueClass::Val);
+        assert_eq!(profile.accesses[0].mode, GlmUseMode::Read);
+        assert_eq!(profile.effect, GlmEffect::None);
+    }
+
+    #[test]
+    fn glm_profiles_cancel_and_timeout_as_val_reads_not_lifetime_end() {
+        let cancel = Operation::parse("cpu.cancel", vec!["task_0".to_owned()]).unwrap();
+        let timeout =
+            Operation::parse("cpu.timeout", vec!["task_0".to_owned(), "limit_0".to_owned()])
+                .unwrap();
+
+        let cancel_profile = super::glm_profile_for_operation(&cancel);
+        assert_eq!(cancel_profile.result_class, GlmValueClass::Val);
+        assert_eq!(cancel_profile.accesses.len(), 1);
+        assert_eq!(cancel_profile.accesses[0].input, "task_0");
+        assert_eq!(cancel_profile.accesses[0].class, GlmValueClass::Val);
+        assert_eq!(cancel_profile.accesses[0].mode, GlmUseMode::Read);
+        assert_eq!(cancel_profile.effect, GlmEffect::None);
+
+        let timeout_profile = super::glm_profile_for_operation(&timeout);
+        assert_eq!(timeout_profile.result_class, GlmValueClass::Val);
+        assert_eq!(timeout_profile.accesses.len(), 2);
+        assert_eq!(timeout_profile.accesses[0].input, "task_0");
+        assert_eq!(timeout_profile.accesses[0].class, GlmValueClass::Val);
+        assert_eq!(timeout_profile.accesses[0].mode, GlmUseMode::Read);
+        assert_eq!(timeout_profile.accesses[1].input, "limit_0");
+        assert_eq!(timeout_profile.accesses[1].class, GlmValueClass::Val);
+        assert_eq!(timeout_profile.accesses[1].mode, GlmUseMode::Read);
+        assert_eq!(timeout_profile.effect, GlmEffect::None);
+    }
+
+    #[test]
     fn exposes_result_family_state_and_payload_from_values() {
         let task = Value::TaskResult(TaskResultHandle {
             label: "ping".to_owned(),

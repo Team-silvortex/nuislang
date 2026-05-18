@@ -1,0 +1,55 @@
+mod cpu Main {
+  struct TaskSummary {
+    message: String,
+    code: i64
+  }
+
+  async fn ping() -> i64 {
+    return 7;
+  }
+
+  fn timeout_message() -> String {
+    return "task_lifecycle_branch_demo: timed out";
+  }
+
+  fn completed_message() -> String {
+    return "task_lifecycle_branch_demo: completed";
+  }
+
+  fn timeout_code() -> i64 {
+    return 70 + 4;
+  }
+
+  fn completed_code() -> i64 {
+    return 0;
+  }
+
+  fn render_summary(message: String, code: i64) -> TaskSummary {
+    return TaskSummary {
+      message: message,
+      code: code
+    };
+  }
+
+  fn timeout_summary() -> TaskSummary {
+    return render_summary(timeout_message(), timeout_code());
+  }
+
+  fn completed_summary() -> TaskSummary {
+    return render_summary(completed_message(), completed_code());
+  }
+
+  fn main() -> i64 {
+    let task: Task<i64> = timeout(spawn(ping()), 0);
+    let result: TaskResult<i64> = join_result(task);
+    if task_timed_out(result) {
+      let summary: TaskSummary = timeout_summary();
+      print(summary.message);
+      return summary.code;
+    } else {
+      let summary: TaskSummary = completed_summary();
+      print(summary.message);
+      return summary.code;
+    }
+  }
+}

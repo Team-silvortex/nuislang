@@ -1,0 +1,6 @@
+name = "task_completed_observe_demo"
+entry = "main.ns"
+
+abi = [
+  "cpu=cpu.arm64.apple_aapcs64",
+]

@@ -1,0 +1,11 @@
+mod cpu Main {
+  async fn ping() -> i64 {
+    return 7;
+  }
+
+  fn main() -> i64 {
+    let task: Task<i64> = spawn(ping());
+    let value: i64 = join(task);
+    return task_value(value);
+  }
+}
