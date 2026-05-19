@@ -46,6 +46,7 @@ Facade modules:
   - [argv_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/argv_runtime.ns)
   - [env_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/env_runtime.ns)
   - [process_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/process_runtime.ns)
+  - [task_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_runtime.ns)
   - [command_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_runtime.ns)
   - [subprocess_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/subprocess_runtime.ns)
 * terminal and output
@@ -82,6 +83,7 @@ Recipe modules:
   - [window_fabric_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/window_fabric_recipe.ns)
 * CLI/tooling runtime
   - [cli_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_runtime_recipe.ns)
+  - [task_cli_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_cli_recipe.ns)
 * checker/reporter tooling
   - [report_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/report_runtime_recipe.ns)
 * automation/workflow tooling
@@ -91,6 +93,8 @@ Recipe modules:
   - [command_text_builder_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_text_builder_recipe.ns)
 * clock/test timing alignment
   - [clock_test_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/clock_test_recipe.ns)
+  - [task_clock_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_clock_recipe.ns)
+  - [task_scheduler_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_scheduler_recipe.ns)
 
 Current boundaries:
 
@@ -150,6 +154,15 @@ Current boundaries:
   facade surface; only a small builtin set is currently classified as
   `HostReadOnly`, while most explicit `host_*` facade calls still lower through
   conservative `cpu.extern_call_*` paths
+* current task-facing `std` direction is intentionally still value-like and
+  observer-oriented; [task_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_runtime.ns)
+  , [task_clock_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_clock_recipe.ns),
+  [task_scheduler_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_scheduler_recipe.ns),
+  and [task_cli_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_cli_recipe.ns)
+  mirror the current `spawn/join_result/task_*` guidance plus timeout/clock,
+  lane-hint, and task-facing CLI reporting shape, but they should not be read
+  as a promise of a finished native concurrency runtime or executor standard
+  library
 * current `json/text-format` direction is also still a host-backed formatting
   facade; it is enough to sketch machine-readable and human-readable output
   flows, but not yet a finalized native text/serialization standard library

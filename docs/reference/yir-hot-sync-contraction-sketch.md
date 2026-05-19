@@ -108,6 +108,123 @@ to establish a conjunction of conditions like:
 
 These names are sketches, not frozen verifier rules yet.
 
+## Current Disqualifiers
+
+Before the repository has a stronger verifier/runtime story, it is useful to
+state the opposite side just as clearly:
+
+*what should immediately disqualify a region from hot sync contraction?*
+
+The current conservative answer is:
+
+* if any of the following are true, the region should be treated as
+  **non-contractible by default**
+
+### 1. Borrowed or `ref`-shaped task inputs
+
+If a region depends on task inputs that are:
+
+* borrowed
+* `ref`-typed
+* alias-sensitive through nested payload shape
+
+then the region should not be contracted.
+
+Why:
+
+* the repository explicitly does not yet claim a finished concurrent memory
+  model for these shapes
+
+### 2. Resource-bearing or external-handle payload families
+
+If a region depends on payloads or nested payload fields from families like:
+
+* `Window<...>` / `WindowMut<...>`
+* `Pipe<...>`
+* `Marker<...>`
+* `HandleTable<...>`
+* `Instance<...>`
+
+then the region should not be contracted.
+
+Why:
+
+* those are exactly the families that the repository is currently treating as
+  future external-handle or bridge-object design space, not settled value-like
+  task payloads
+
+### 3. Lifecycle-sensitive branches
+
+If local behavior changes based on:
+
+* `task_timed_out(...)`
+* `task_cancelled(...)`
+* timeout-specific branch structure
+* cancellation-specific branch structure
+
+then the region should not be contracted.
+
+Why:
+
+* timeout/cancel semantics are precisely the area where future task lifetime
+  rules are still intentionally conservative
+
+### 4. Regions that require later observation of the same task
+
+If a region extracts a direct value or otherwise simplifies task state in a way
+that would interfere with later observation of the same task handle, the region
+should not be contracted.
+
+This includes shapes that are currently legal only because `join(...)` is not
+yet a final consume boundary.
+
+Why:
+
+* the repository already treats those shapes as future-tightening probes, not
+  stable optimization targets
+
+### 5. Explicit clock-bridge dependence
+
+If a region depends on:
+
+* `clock_domain`
+* `clock_policy="bridge"`
+* resolved bridge interpretation
+* declared/resolved clock-domain distinction
+* explicit global/local clock comparison intent
+
+then the region should not be contracted.
+
+Why:
+
+* timing-sensitive contraction should wait until the global/local clock
+  negotiation story is much stronger
+
+### 6. Required cross-lane or cross-domain distinction
+
+If the region’s meaning depends on:
+
+* scheduler-lane placement
+* lane-specific sequencing
+* cross-domain timing/visibility differences
+* explicit `xfer`/bridge semantics that are still semantically important
+
+then the region should not be contracted.
+
+Why:
+
+* erasing local async machinery in these cases risks erasing exactly the
+  hetero distinctions the repository is trying to preserve
+
+## Safe Default Rule
+
+Until stronger proof machinery exists, a healthy default is:
+
+* value-like, observer-local, completed-only regions may become probe
+  candidates
+* everything resource-bearing, timeout-sensitive, cancel-sensitive,
+  bridge-sensitive, or alias-sensitive should remain explicitly async
+
 ## Why This Is Harder Than Ordinary Inlining
 
 Ordinary inlining usually reasons about:

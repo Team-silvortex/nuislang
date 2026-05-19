@@ -1,0 +1,105 @@
+mod cpu Main {
+  extern "c" fn host_monotonic_time_ns() -> i64;
+  extern "c" fn host_clock_domain_id() -> i64;
+  extern "c" fn host_clock_epoch_ns() -> i64;
+  extern "c" fn host_clock_scale_ppm() -> i64;
+
+  struct TaskClockSeed {
+    payload: i64,
+    timeout_limit: i64,
+    bias: i64
+  }
+
+  struct TaskClockSummary {
+    declared_global_code: i64,
+    resolved_global_code: i64,
+    completed: i64,
+    timed_out: i64,
+    value: i64,
+    global_domain_id: i64,
+    global_epoch_ns: i64,
+    monotonic_ns: i64,
+    global_tick: i64,
+    global_scale_ppm: i64
+  }
+
+  async fn ping(seed: i64) -> i64 {
+    return seed + 3;
+  }
+
+  fn encode_timed_out(result: TaskResult<i64>) -> i64 {
+    if task_timed_out(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn build_seed(payload: i64, timeout_limit: i64, bias: i64) -> TaskClockSeed {
+    return TaskClockSeed {
+      payload: payload,
+      timeout_limit: timeout_limit,
+      bias: bias
+    };
+  }
+
+  fn capture_declared_global_code() -> i64 {
+    return 2;
+  }
+
+  fn capture_resolved_global_code() -> i64 {
+    return 0;
+  }
+
+  fn summarize_runtime(seed: TaskClockSeed) -> TaskClockSummary {
+    let task: Task<i64> = timeout(spawn(ping(seed.payload)), seed.timeout_limit);
+    let result: TaskResult<i64> = join_result(task);
+    let timed_out: i64 = encode_timed_out(result);
+
+    if task_completed(result) {
+      return TaskClockSummary {
+        declared_global_code: capture_declared_global_code(),
+        resolved_global_code: capture_resolved_global_code(),
+        completed: 1,
+        timed_out: 0,
+        value: task_value(result),
+        global_domain_id: host_clock_domain_id() + seed.bias,
+        global_epoch_ns: host_clock_epoch_ns(),
+        monotonic_ns: host_monotonic_time_ns(),
+        global_tick: cpu_tick_i64(0, 1),
+        global_scale_ppm: host_clock_scale_ppm()
+      };
+    }
+
+    return TaskClockSummary {
+      declared_global_code: capture_declared_global_code(),
+      resolved_global_code: capture_resolved_global_code(),
+      completed: 0,
+      timed_out: timed_out,
+      value: 0,
+      global_domain_id: host_clock_domain_id() + seed.bias,
+      global_epoch_ns: host_clock_epoch_ns(),
+      monotonic_ns: host_monotonic_time_ns(),
+      global_tick: cpu_tick_i64(0, 1),
+      global_scale_ppm: host_clock_scale_ppm()
+    };
+  }
+
+  fn summarize_task_clock_recipe(payload: i64, timeout_limit: i64, bias: i64) -> i64 {
+    let seed: TaskClockSeed = build_seed(payload, timeout_limit, bias);
+    let summary: TaskClockSummary = summarize_runtime(seed);
+    return summary.declared_global_code
+      + summary.resolved_global_code
+      + summary.completed
+      + summary.timed_out
+      + summary.value
+      + summary.global_domain_id
+      + summary.global_epoch_ns
+      + summary.monotonic_ns
+      + summary.global_tick
+      + summary.global_scale_ppm;
+  }
+
+  fn main() {
+    print(summarize_task_clock_recipe(7, 16, 1));
+  }
+}

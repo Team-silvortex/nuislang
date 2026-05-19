@@ -1,0 +1,141 @@
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+  extern "c" fn host_stdout_write(text_handle: i64) -> i64;
+  extern "c" fn host_stderr_write(text_handle: i64) -> i64;
+  extern "c" fn host_diag_label(message_handle: i64) -> i64;
+  extern "c" fn host_diag_span(start: i64, end: i64) -> i64;
+  extern "c" fn host_diag_emit(label_handle: i64, span_handle: i64, severity: i64) -> i64;
+  extern "c" fn host_monotonic_time_ns() -> i64;
+
+  struct TaskCliSeed {
+    payload: i64,
+    timeout_limit: i64,
+    ok_text_handle: i64,
+    timeout_text_handle: i64,
+    diag_start: i64,
+    diag_end: i64,
+    diag_severity: i64
+  }
+
+  struct TaskCliSummary {
+    argv_count: i64,
+    completed: i64,
+    timed_out: i64,
+    value: i64,
+    stdout_code: i64,
+    stderr_code: i64,
+    diag_code: i64,
+    tick_ns: i64
+  }
+
+  async fn ping(seed: i64) -> i64 {
+    return seed + 9;
+  }
+
+  fn build_seed(
+    payload: i64,
+    timeout_limit: i64,
+    ok_text_handle: i64,
+    timeout_text_handle: i64,
+    diag_start: i64,
+    diag_end: i64,
+    diag_severity: i64
+  ) -> TaskCliSeed {
+    return TaskCliSeed {
+      payload: payload,
+      timeout_limit: timeout_limit,
+      ok_text_handle: ok_text_handle,
+      timeout_text_handle: timeout_text_handle,
+      diag_start: diag_start,
+      diag_end: diag_end,
+      diag_severity: diag_severity
+    };
+  }
+
+  fn encode_timed_out(result: TaskResult<i64>) -> i64 {
+    if task_timed_out(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn emit_diag(message_handle: i64, start: i64, end: i64, severity: i64) -> i64 {
+    let label_handle: i64 = host_diag_label(message_handle);
+    let span_handle: i64 = host_diag_span(start, end);
+    return host_diag_emit(label_handle, span_handle, severity);
+  }
+
+  fn summarize_runtime(seed: TaskCliSeed) -> TaskCliSummary {
+    let task: Task<i64> = timeout(spawn(ping(seed.payload)), seed.timeout_limit);
+    let result: TaskResult<i64> = join_result(task);
+    let timed_out: i64 = encode_timed_out(result);
+    let tick_ns: i64 = host_monotonic_time_ns();
+
+    if task_completed(result) {
+      return TaskCliSummary {
+        argv_count: host_argv_count(),
+        completed: 1,
+        timed_out: timed_out,
+        value: task_value(result),
+        stdout_code: host_stdout_write(seed.ok_text_handle),
+        stderr_code: 0,
+        diag_code: emit_diag(
+          seed.ok_text_handle,
+          seed.diag_start,
+          seed.diag_end,
+          seed.diag_severity
+        ),
+        tick_ns: tick_ns
+      };
+    }
+
+    return TaskCliSummary {
+      argv_count: host_argv_count(),
+      completed: 0,
+      timed_out: timed_out,
+      value: 0,
+      stdout_code: 0,
+      stderr_code: host_stderr_write(seed.timeout_text_handle),
+      diag_code: emit_diag(
+        seed.timeout_text_handle,
+        seed.diag_start,
+        seed.diag_end,
+        seed.diag_severity
+      ),
+      tick_ns: tick_ns
+    };
+  }
+
+  fn summarize_task_cli_recipe(
+    payload: i64,
+    timeout_limit: i64,
+    ok_text_handle: i64,
+    timeout_text_handle: i64,
+    diag_start: i64,
+    diag_end: i64,
+    diag_severity: i64
+  ) -> i64 {
+    let seed: TaskCliSeed = build_seed(
+      payload,
+      timeout_limit,
+      ok_text_handle,
+      timeout_text_handle,
+      diag_start,
+      diag_end,
+      diag_severity
+    );
+    let summary: TaskCliSummary = summarize_runtime(seed);
+    return summary.argv_count
+      + summary.completed
+      + summary.timed_out
+      + summary.value
+      + summary.stdout_code
+      + summary.stderr_code
+      + summary.diag_code
+      + summary.tick_ns;
+  }
+
+  fn main() {
+    print(summarize_task_cli_recipe(7, 16, 1901, 1903, 4, 12, 2));
+  }
+}
