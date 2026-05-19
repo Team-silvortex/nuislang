@@ -179,6 +179,60 @@ The most likely healthy future order is:
 
 So this sketch is intentionally early and narrow.
 
+## Current Probe Candidates
+
+The repository already has several samples that are good future probe
+candidates for hot sync contraction work.
+
+### Best Near-Term Candidates
+
+These are good because they already expose task/lifecycle structure clearly,
+while still staying relatively local:
+
+* [hello_task_glm_origin.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_origin.ns)
+  * smallest `spawn -> join` payload path
+* [hello_task_glm_observe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_observe.ns)
+  * smallest `spawn -> timeout -> join_result -> task_completed -> task_value`
+    observation path
+* [hello_task_glm_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_compare.ns)
+  * direct-payload path beside observation path
+* [hello_task_glm_lifecycle_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_lifecycle_compare.ns)
+  * completed/timeout/cancel observation contrast
+
+### Best Project-Shaped Candidates
+
+These are especially useful because they already sit in a more realistic
+project/front-door compilation shape:
+
+* [task_completed_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_completed_observe_demo)
+  * best current small project candidate for “can a completed-observe path
+    collapse locally?”
+  * see also:
+    [examples/projects/task_completed_observe_demo/FUTURE_HOT_SYNC_CONTRACTION_SKETCH.md](/Users/Shared/chroot/dev/nuislang/examples/projects/task_completed_observe_demo/FUTURE_HOT_SYNC_CONTRACTION_SKETCH.md)
+* [task_lifecycle_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_lifecycle_branch_demo)
+  * useful for testing that timeout-sensitive paths do **not** contract too
+    aggressively
+* [task_cancel_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_cancel_branch_demo)
+  * useful for testing that cancellation-sensitive paths do **not** contract
+    too aggressively
+* [task_join_nonconsuming_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_join_nonconsuming_probe_demo)
+  * good future regression probe if local contraction begins to interact with
+    a stricter future `join(...)` boundary
+
+### What To Avoid As First Probes
+
+The following are currently better treated as boundary/negative samples, not as
+first contraction targets:
+
+* borrowed/ref payload invalids
+* resource-bearing external-handle probes
+* samples whose main purpose is future `GLM` tightening rather than local
+  async-state simplification
+
+That is because the first contraction work should stay on value-like task
+regions before it touches resource-bearing or future-concurrency-sensitive
+families.
+
 ## Related References
 
 * [cpu-task-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-contract.md)

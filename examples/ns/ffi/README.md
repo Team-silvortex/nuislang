@@ -70,6 +70,8 @@ Reading guidance:
   and the current `nuis test` time semantics; it includes a `should_fail=true`
   async test with `clock_domain="global"` so the front-door runner prints the
   resolved host clock domain during execution
+  Future direction note:
+  [examples/ns/ffi/FUTURE_CLOCK_NEGOTIATION_SKETCH.md](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/FUTURE_CLOCK_NEGOTIATION_SKETCH.md)
 
 Current note:
 

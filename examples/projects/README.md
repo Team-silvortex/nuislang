@@ -163,6 +163,8 @@ Also included:
   `spawn -> join_result -> task_completed -> task_value`.
   This is the smallest project-shaped sample for payload extraction from a
   completed task result.
+  Future direction note:
+  [examples/projects/task_completed_observe_demo/FUTURE_HOT_SYNC_CONTRACTION_SKETCH.md](/Users/Shared/chroot/dev/nuislang/examples/projects/task_completed_observe_demo/FUTURE_HOT_SYNC_CONTRACTION_SKETCH.md)
 * [task_cancel_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_cancel_branch_demo)
   one-file `cpu`-only cancel lifecycle demo:
   `main.ns`
