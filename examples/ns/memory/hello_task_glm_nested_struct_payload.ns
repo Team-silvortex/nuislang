@@ -1,0 +1,27 @@
+mod cpu Main {
+  struct ScalarPair {
+    lhs: i64,
+    rhs: i64
+  }
+
+  struct NestedPacket {
+    pair: ScalarPair,
+    bias: i64
+  }
+
+  async fn add(packet: NestedPacket) -> i64 {
+    return packet.pair.lhs + packet.pair.rhs + packet.bias;
+  }
+
+  fn main() -> i64 {
+    let packet: NestedPacket = NestedPacket {
+      pair: ScalarPair {
+        lhs: 3,
+        rhs: 4
+      },
+      bias: 5
+    };
+    let task: Task<i64> = spawn(add(packet));
+    return join(task);
+  }
+}

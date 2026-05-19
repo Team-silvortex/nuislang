@@ -1070,9 +1070,11 @@ mod tests {
     #[test]
     fn glm_profiles_cancel_and_timeout_as_val_reads_not_lifetime_end() {
         let cancel = Operation::parse("cpu.cancel", vec!["task_0".to_owned()]).unwrap();
-        let timeout =
-            Operation::parse("cpu.timeout", vec!["task_0".to_owned(), "limit_0".to_owned()])
-                .unwrap();
+        let timeout = Operation::parse(
+            "cpu.timeout",
+            vec!["task_0".to_owned(), "limit_0".to_owned()],
+        )
+        .unwrap();
 
         let cancel_profile = super::glm_profile_for_operation(&cancel);
         assert_eq!(cancel_profile.result_class, GlmValueClass::Val);

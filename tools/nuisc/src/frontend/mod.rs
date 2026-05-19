@@ -11673,6 +11673,10 @@ fn ensure_spawn_input_safe(
             "{name}(...) does not currently allow `ref` task inputs, found `{}`",
             render_type_name(&ty)
         )),
+        Some(ty) if async_boundary_violation_detail(&ty, struct_table).is_some() => Err(format!(
+            "{name}(...) does not currently allow task inputs whose nested payloads cross the async boundary, found `{}`",
+            render_type_name(&ty)
+        )),
         _ => Ok(()),
     }
 }
@@ -12915,6 +12919,11 @@ fn builtin_struct_field_type(type_name: &str, field: &str) -> Option<NirTypeRef>
 }
 
 fn validate_declared_nir_types(module: &NirModule) -> Result<(), String> {
+    let struct_table = module
+        .structs
+        .iter()
+        .map(|definition| (definition.name.clone(), definition.clone()))
+        .collect::<BTreeMap<_, _>>();
     for function in &module.externs {
         for param in &function.params {
             validate_type_ref(&param.ty)?;
@@ -12959,23 +12968,30 @@ fn validate_declared_nir_types(module: &NirModule) -> Result<(), String> {
         }
         for param in &function.params {
             validate_type_ref(&param.ty)?;
-            if function.is_async && !param.ty.is_async_boundary_safe() {
-                return Err(format!(
-                    "async function `{}` parameter `{}` cannot cross async boundary with type `{}`; async parameters currently forbid `ref`, `?`, `Instance<...>`, `Task<...>`, and `*Result<...>` families",
+            if function.is_async {
+                if let Some(detail) = async_boundary_violation_detail(&param.ty, &struct_table) {
+                    return Err(format!(
+                    "async function `{}` parameter `{}` cannot cross async boundary with type `{}`; {}; async parameters currently forbid `ref`, resource-bearing `Window<...>` / `WindowMut<...>` / `Pipe<...>`, control-plane `Marker<...>` / `HandleTable<...>`, `?`, `Instance<...>`, `Task<...>`, and `*Result<...>` families",
                     function.name,
                     param.name,
-                    param.ty.render()
+                    param.ty.render(),
+                    detail,
                 ));
+                }
             }
         }
         if let Some(return_type) = &function.return_type {
             validate_type_ref(return_type)?;
-            if function.is_async && !return_type.is_async_boundary_safe() {
-                return Err(format!(
-                    "async function `{}` cannot return `{}` across async boundary; async returns currently forbid `ref`, `?`, `Instance<...>`, `Task<...>`, and `*Result<...>` families",
+            if function.is_async {
+                if let Some(detail) = async_boundary_violation_detail(return_type, &struct_table) {
+                    return Err(format!(
+                    "async function `{}` cannot return `{}` across async boundary; {}; async returns currently forbid `ref`, resource-bearing `Window<...>` / `WindowMut<...>` / `Pipe<...>`, control-plane `Marker<...>` / `HandleTable<...>`, `?`, `Instance<...>`, `Task<...>`, and `*Result<...>` families",
                     function.name,
                     return_type.render()
+                    ,
+                    detail
                 ));
+                }
             }
         }
         for stmt in &function.body {
@@ -12995,6 +13011,61 @@ fn validate_declared_nir_types(module: &NirModule) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+fn async_boundary_violation_detail(
+    ty: &NirTypeRef,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> Option<String> {
+    let mut visiting = BTreeSet::new();
+    async_boundary_violation_detail_inner(ty, struct_table, &mut visiting)
+}
+
+fn async_boundary_violation_detail_inner(
+    ty: &NirTypeRef,
+    struct_table: &BTreeMap<String, NirStructDef>,
+    visiting: &mut BTreeSet<String>,
+) -> Option<String> {
+    if !ty.is_async_boundary_safe() {
+        return Some(format!("directly carries `{}`", ty.render()));
+    }
+    if is_async_resource_bearing_payload(ty) {
+        return Some(format!(
+            "directly carries resource-bearing `{}`",
+            ty.render()
+        ));
+    }
+    let Some(definition) = struct_table.get(&ty.name) else {
+        return None;
+    };
+    let visit_key = ty.render();
+    if !visiting.insert(visit_key.clone()) {
+        return None;
+    }
+    for field in &definition.fields {
+        if let Some(nested) =
+            async_boundary_violation_detail_inner(&field.ty, struct_table, visiting)
+        {
+            visiting.remove(&visit_key);
+            return Some(format!(
+                "nested field `{}.{}` {}",
+                definition.name, field.name, nested
+            ));
+        }
+    }
+    visiting.remove(&visit_key);
+    None
+}
+
+fn is_async_resource_bearing_payload(ty: &NirTypeRef) -> bool {
+    matches!(
+        ty.container_kind(),
+        Some(
+            nuis_semantics::model::NirContainerKind::Window
+                | nuis_semantics::model::NirContainerKind::Pipe
+        )
+    ) || ty.is_marker_family()
+        || ty.is_handle_table_family()
 }
 
 fn validate_test_function_signature(
@@ -17068,6 +17139,209 @@ mod tests {
         assert!(error.contains("parameter `result`"));
         assert!(error.contains("ShaderResult<Frame>"));
         assert!(error.contains("async boundary"));
+    }
+
+    #[test]
+    fn rejects_async_function_taking_struct_with_nested_ref_field() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              struct RefPacket {
+                head: ref Node
+              }
+
+              async fn consume(packet: RefPacket) -> i64 {
+                return 7;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("parameter `packet`"));
+        assert!(error.contains("RefPacket"));
+        assert!(error.contains("nested field `RefPacket.head`"));
+        assert!(error.contains("ref Node"));
+        assert!(error.contains("async boundary"));
+    }
+
+    #[test]
+    fn rejects_async_function_returning_struct_with_nested_ref_field() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              struct RefPacket {
+                head: ref Node
+              }
+
+              async fn emit() -> RefPacket {
+                return RefPacket { head: null() };
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("cannot return `RefPacket` across async boundary"));
+        assert!(error.contains("nested field `RefPacket.head`"));
+        assert!(error.contains("ref Node"));
+    }
+
+    #[test]
+    fn rejects_async_function_taking_struct_with_nested_optional_field() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              struct OptionalPacket {
+                value: i64?
+              }
+
+              async fn consume(packet: OptionalPacket) -> i64 {
+                return 7;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("parameter `packet`"));
+        assert!(error.contains("OptionalPacket"));
+        assert!(error.contains("nested field `OptionalPacket.value`"));
+        assert!(error.contains("i64?"));
+    }
+
+    #[test]
+    fn rejects_async_function_taking_struct_with_nested_instance_field() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              struct ShaderPacket {
+                shader: Instance<SurfaceShader>
+              }
+
+              async fn consume(packet: ShaderPacket) -> i64 {
+                return 7;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("parameter `packet`"));
+        assert!(error.contains("ShaderPacket"));
+        assert!(error.contains("nested field `ShaderPacket.shader`"));
+        assert!(error.contains("Instance<SurfaceShader>"));
+    }
+
+    #[test]
+    fn rejects_async_function_taking_struct_with_nested_result_field() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              struct ResultPacket {
+                result: TaskResult<i64>
+              }
+
+              async fn consume(packet: ResultPacket) -> i64 {
+                return 7;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("parameter `packet`"));
+        assert!(error.contains("ResultPacket"));
+        assert!(error.contains("nested field `ResultPacket.result`"));
+        assert!(error.contains("TaskResult<i64>"));
+    }
+
+    #[test]
+    fn rejects_async_function_taking_window_param() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              async fn consume(window: Window<i64>) -> i64 {
+                return 7;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("parameter `window`"));
+        assert!(error.contains("Window<i64>"));
+        assert!(error.contains("resource-bearing"));
+    }
+
+    #[test]
+    fn rejects_async_function_taking_struct_with_nested_marker_field() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              struct MarkerPacket {
+                ready: Marker<CpuToShader>
+              }
+
+              async fn consume(packet: MarkerPacket) -> i64 {
+                return 7;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("parameter `packet`"));
+        assert!(error.contains("MarkerPacket"));
+        assert!(error.contains("nested field `MarkerPacket.ready`"));
+        assert!(error.contains("resource-bearing `Marker<CpuToShader>`"));
+    }
+
+    #[test]
+    fn allows_async_function_taking_nested_scalar_struct_payload() {
+        parse_nuis_module(
+            r#"
+            mod cpu Main {
+              struct ScalarPair {
+                lhs: i64,
+                rhs: i64
+              }
+
+              struct NestedPacket {
+                pair: ScalarPair,
+                bias: i64
+              }
+
+              async fn add(packet: NestedPacket) -> i64 {
+                return packet.pair.lhs + packet.pair.rhs + packet.bias;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn allows_async_function_taking_nested_text_struct_payload() {
+        parse_nuis_module(
+            r#"
+            mod cpu Main {
+              struct MessagePacket {
+                message: String
+              }
+
+              struct LabeledMessage {
+                packet: MessagePacket,
+                label: String
+              }
+
+              async fn show(input: LabeledMessage) -> i64 {
+                return 5;
+              }
+            }
+            "#,
+        )
+        .unwrap();
     }
 
     #[test]

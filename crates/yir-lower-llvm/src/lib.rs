@@ -1521,7 +1521,8 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                     then_return_value,
                     else_print_value,
                     else_return_value,
-                ) else {
+                )
+                else {
                     body.push(format!(
                         "  ; deferred lowering for cpu.branch_print_return `{}` because one or more inputs are outside the current CPU LLVM slice",
                         node.name
@@ -1561,9 +1562,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                     "  br i1 {cond_bool}, label %{then_label}, label %{else_label}"
                 ));
                 body.push(format!("{then_label}:"));
-                if let Some(input) =
-                    coerce_to_cstr(&then_print_value, &mut body, &mut next_reg)
-                {
+                if let Some(input) = coerce_to_cstr(&then_print_value, &mut body, &mut next_reg) {
                     let print_reg = fresh_reg(&mut next_reg);
                     body.push(format!("  {print_reg} = call i32 @puts(ptr {input})"));
                 } else if let Some(input) =
@@ -1578,9 +1577,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 }
                 body.push(format!("  ret i64 {then_returned}"));
                 body.push(format!("{else_label}:"));
-                if let Some(input) =
-                    coerce_to_cstr(&else_print_value, &mut body, &mut next_reg)
-                {
+                if let Some(input) = coerce_to_cstr(&else_print_value, &mut body, &mut next_reg) {
                     let print_reg = fresh_reg(&mut next_reg);
                     body.push(format!("  {print_reg} = call i32 @puts(ptr {input})"));
                 } else if let Some(input) =
@@ -2072,7 +2069,9 @@ mod tests {
         assert!(llvm_ir.contains("ret i64 %"));
         assert!(llvm_ir.contains("guard_return_cont."));
         assert_eq!(llvm_ir.matches("ret i64 ").count(), 2);
-        assert!(llvm_ir.find("guard_return_cont.").unwrap() < llvm_ir.find("= add i64 0, 7").unwrap());
+        assert!(
+            llvm_ir.find("guard_return_cont.").unwrap() < llvm_ir.find("= add i64 0, 7").unwrap()
+        );
     }
 
     #[test]

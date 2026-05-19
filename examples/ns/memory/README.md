@@ -6,7 +6,9 @@ This folder contains ownership/lifetime-oriented front-end examples:
 * `hello_borrow_end.ns`
 * `hello_task_glm_scalar_payload.ns`
 * `hello_task_glm_struct_payload.ns`
+* `hello_task_glm_nested_struct_payload.ns`
 * `hello_task_glm_text_payload.ns`
+* `hello_task_glm_nested_text_struct_payload.ns`
 * `hello_task_glm_origin.ns`
 * `hello_task_glm_lifecycle.ns`
 * `hello_task_glm_boundary_compare.ns`
@@ -28,7 +30,9 @@ cargo run -p nuis -- dump-yir examples/ns/memory/hello_glm.ns
 cargo run -p nuis -- dump-nir examples/ns/memory/hello_borrow_end.ns
 cargo run -p nuis -- check examples/ns/memory/hello_task_glm_scalar_payload.ns
 cargo run -p nuis -- check examples/ns/memory/hello_task_glm_struct_payload.ns
+cargo run -p nuis -- check examples/ns/memory/hello_task_glm_nested_struct_payload.ns
 cargo run -p nuis -- check examples/ns/memory/hello_task_glm_text_payload.ns
+cargo run -p nuis -- check examples/ns/memory/hello_task_glm_nested_text_struct_payload.ns
 cargo run -p nuis -- check examples/ns/memory/hello_task_glm_origin.ns
 cargo run -p nuis -- check examples/ns/memory/hello_task_glm_lifecycle.ns
 cargo run -p nuis -- check examples/ns/memory/hello_task_glm_boundary_compare.ns

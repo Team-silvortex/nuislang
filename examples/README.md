@@ -36,8 +36,12 @@ These are the best current front-end examples to read first.
   smallest currently-safe scalar task payload path
 * [hello_task_glm_struct_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_struct_payload.ns)
   small struct-of-scalars payload path across the current async/task boundary
+* [hello_task_glm_nested_struct_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_nested_struct_payload.ns)
+  nested struct-of-scalars payload path showing that named wrappers are still allowed when their fields remain value-like
 * [hello_task_glm_text_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_text_payload.ns)
   current plain text/value-like payload path across the current async/task boundary
+* [hello_task_glm_nested_text_struct_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_nested_text_struct_payload.ns)
+  nested text/value-like payload path showing that named wrappers with safe text fields remain allowed
 * [hello_task_glm_origin.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_origin.ns)
   smallest current task-handle origin and direct payload extraction path: `spawn -> join`
 * [hello_task_glm_lifecycle.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_lifecycle.ns)
@@ -112,12 +116,26 @@ These examples are intentionally supposed to fail.
   invalid borrowed task input passed directly through `spawn(...)`
 * [hello_task_glm_ref_spawn_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_ref_spawn_invalid.ns)
   invalid `ref`-typed task input crossing the current spawn boundary
+* [hello_task_glm_nested_ref_struct_payload_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_nested_ref_struct_payload_invalid.ns)
+  invalid nominal struct payload whose nested field still carries a `ref` across the current async/task boundary
+* [hello_task_glm_nested_window_struct_payload_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_nested_window_struct_payload_invalid.ns)
+  invalid nominal struct payload whose nested field still carries a resource-bearing `Window<...>` across the current async/task boundary
+* [hello_task_glm_window_external_handle_probe_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_window_external_handle_probe_invalid.ns)
+  design probe for a future task-external `Window<...>` handle packet shape; intentionally still invalid today
+* [hello_task_glm_nested_marker_struct_payload_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_nested_marker_struct_payload_invalid.ns)
+  invalid nominal struct payload whose nested field still carries a control-plane `Marker<...>` across the current async/task boundary
 * [hello_task_glm_optional_payload_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_optional_payload_invalid.ns)
   invalid optional task payload family crossing the current async/task boundary
+* [hello_task_glm_nested_optional_struct_payload_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_nested_optional_struct_payload_invalid.ns)
+  invalid nominal struct payload whose nested field still carries an optional `?...` across the current async/task boundary
 * [hello_task_glm_instance_payload_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_instance_payload_invalid.ns)
   invalid `Instance<...>` task payload family crossing the current async/task boundary
+* [hello_task_glm_nested_instance_struct_payload_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_nested_instance_struct_payload_invalid.ns)
+  invalid nominal struct payload whose nested field still carries `Instance<...>` across the current async/task boundary
 * [hello_task_glm_result_payload_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_result_payload_invalid.ns)
   invalid `TaskResult<...>` payload family crossing the current async/task boundary
+* [hello_task_glm_nested_result_struct_payload_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_nested_result_struct_payload_invalid.ns)
+  invalid nominal struct payload whose nested field still carries a `*Result<...>` family across the current async/task boundary
 * [hello_nested_mod_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/core/hello_nested_mod_invalid.ns)
   nested `mod` definitions are forbidden
 

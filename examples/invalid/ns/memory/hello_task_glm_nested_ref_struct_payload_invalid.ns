@@ -1,0 +1,16 @@
+mod cpu Main {
+  struct RefPacket {
+    head: ref Node
+  }
+
+  async fn ping(packet: RefPacket) -> i64 {
+    return 7;
+  }
+
+  fn main() -> i64 {
+    let head: ref Node = alloc_node(1, null());
+    let packet: RefPacket = RefPacket { head: head };
+    let task: Task<i64> = spawn(ping(packet));
+    return join(task);
+  }
+}

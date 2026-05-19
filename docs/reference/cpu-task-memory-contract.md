@@ -72,11 +72,27 @@ The repository already has a second, broader async-boundary check:
 Today that means async boundaries reject types like:
 
 * `ref ...`
+* resource-bearing `Window<...>`, `WindowMut<...>`, and `Pipe<...>`
+* control-plane `Marker<...>` and `HandleTable<...>`
 * optional `?...`
 * `Instance<...>`
 * `Task<...>`
 * result families such as `TaskResult<...>`, `DataResult<...>`,
   `ShaderResult<...>`, and `KernelResult<...>`
+
+That rule now also applies recursively through nominal struct payloads.
+
+So a payload like:
+
+* `ScalarPacket { lhs: i64, rhs: i64 }`
+
+is still allowed, but a payload like:
+
+* `RefPacket { head: ref Node }`
+
+is rejected even though the outer payload is a named struct, because the
+frontend now inspects nested struct fields instead of trusting only the
+top-level nominal wrapper.
 
 Current mental model:
 
@@ -88,7 +104,9 @@ Current positive examples:
 
 * [hello_task_glm_scalar_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_scalar_payload.ns)
 * [hello_task_glm_struct_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_struct_payload.ns)
+* [hello_task_glm_nested_struct_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_nested_struct_payload.ns)
 * [hello_task_glm_text_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_text_payload.ns)
+* [hello_task_glm_nested_text_struct_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_nested_text_struct_payload.ns)
 
 For the compact current-state view, also see:
 
@@ -96,9 +114,15 @@ For the compact current-state view, also see:
 
 Useful concrete negative examples:
 
+* [hello_task_glm_nested_ref_struct_payload_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_nested_ref_struct_payload_invalid.ns)
+* [hello_task_glm_nested_window_struct_payload_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_nested_window_struct_payload_invalid.ns)
+* [hello_task_glm_nested_marker_struct_payload_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_nested_marker_struct_payload_invalid.ns)
 * [hello_task_glm_optional_payload_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_optional_payload_invalid.ns)
+* [hello_task_glm_nested_optional_struct_payload_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_nested_optional_struct_payload_invalid.ns)
 * [hello_task_glm_instance_payload_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_instance_payload_invalid.ns)
+* [hello_task_glm_nested_instance_struct_payload_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_nested_instance_struct_payload_invalid.ns)
 * [hello_task_glm_result_payload_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_result_payload_invalid.ns)
+* [hello_task_glm_nested_result_struct_payload_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_nested_result_struct_payload_invalid.ns)
 
 This matters for task payloads because `spawn(...)` ultimately depends on the
 callee's async boundary shape. Even before a real parallel runtime exists, the
@@ -171,5 +195,6 @@ If you want task code that fits the current system well:
 Read this together with:
 
 * [cpu-task-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-contract.md)
+* [cpu-task-external-handle-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-external-handle-contract.md)
 * [nir-memory-model.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nir-memory-model.md)
 * [nir-optimization-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nir-optimization-contract.md)

@@ -1,0 +1,13 @@
+mod cpu Main {
+  struct MarkerPacket {
+    ready: Marker<CpuToShader>
+  }
+
+  async fn consume(packet: MarkerPacket) -> i64 {
+    return 7;
+  }
+
+  fn main() -> i64 {
+    return 1;
+  }
+}

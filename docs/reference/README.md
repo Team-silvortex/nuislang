@@ -41,6 +41,13 @@ Start in this order:
 * [cpu-task-payload-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-payload-matrix.md)
   current allowed/rejected task payload families with concrete positive and
   negative examples
+* [cpu-task-external-handle-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-external-handle-contract.md)
+  current design direction for resource-bearing task payload families that may
+  later need an explicit external-handle contract instead of plain value
+  semantics
+* [cpu-task-scheduler-clock.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-scheduler-clock.md)
+  current relationship between task semantics, lane/scheduler surfaces, and
+  clock/timeout bridges
 
 If your question is specifically “what command should I run next for this
 project?”, start with

@@ -1,0 +1,25 @@
+mod cpu Main {
+  struct MessagePacket {
+    message: String
+  }
+
+  struct LabeledMessage {
+    packet: MessagePacket,
+    label: String
+  }
+
+  async fn text_len(input: LabeledMessage) -> i64 {
+    return 5;
+  }
+
+  fn main() -> i64 {
+    let message: LabeledMessage = LabeledMessage {
+      packet: MessagePacket {
+        message: "hello"
+      },
+      label: "demo"
+    };
+    let task: Task<i64> = spawn(text_len(message));
+    return join(task);
+  }
+}

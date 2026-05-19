@@ -3311,10 +3311,7 @@ fn lower_if_pair(
                     );
                     return Ok(LoweredIfOutcome::Continued);
                 }
-                (
-                    PreparedTerminalBranch::Return(lhs),
-                    PreparedTerminalBranch::Return(rhs),
-                ) => {
+                (PreparedTerminalBranch::Return(lhs), PreparedTerminalBranch::Return(rhs)) => {
                     let lhs_name = lower_expr(&lhs, state, bindings)?;
                     let rhs_name = lower_expr(&rhs, state, bindings)?;
                     let selected = lower_select(condition_name, lhs_name, rhs_name, state)?;
@@ -3413,9 +3410,7 @@ fn prepare_terminal_branch(
         [binding @ (NirStmt::Let { .. } | NirStmt::Const { .. }), tail @ ..] => {
             let (name, value) = extract_pure_branch_binding(binding, pure_helpers)?;
             let prepared = prepare_terminal_branch(tail, pure_helpers)?;
-            Some(substitute_prepared_terminal_branch(
-                prepared, &name, &value,
-            ))
+            Some(substitute_prepared_terminal_branch(prepared, &name, &value))
         }
         _ => None,
     }
@@ -3533,12 +3528,18 @@ fn is_pure_helper_expr(
     }
 }
 
-fn substitute_branch_binding(expr: &NirExpr, binding_name: &str, binding_value: &NirExpr) -> NirExpr {
+fn substitute_branch_binding(
+    expr: &NirExpr,
+    binding_name: &str,
+    binding_value: &NirExpr,
+) -> NirExpr {
     match expr {
         NirExpr::Var(name) if name == binding_name => binding_value.clone(),
-        NirExpr::Await(inner) => {
-            NirExpr::Await(Box::new(substitute_branch_binding(inner, binding_name, binding_value)))
-        }
+        NirExpr::Await(inner) => NirExpr::Await(Box::new(substitute_branch_binding(
+            inner,
+            binding_name,
+            binding_value,
+        ))),
         NirExpr::Call { callee, args } => NirExpr::Call {
             callee: callee.clone(),
             args: args
@@ -3605,11 +3606,7 @@ fn substitute_prepared_terminal_branch(
     }
 }
 
-fn lower_guard_return(
-    condition_name: String,
-    return_name: String,
-    state: &mut LoweringState<'_>,
-) {
+fn lower_guard_return(condition_name: String, return_name: String, state: &mut LoweringState<'_>) {
     let name = next_name(state, "guard_return");
     state.yir.nodes.push(Node {
         name: name.clone(),
@@ -3647,7 +3644,11 @@ fn lower_guard_print_return(
         op: Operation {
             module: "cpu".to_owned(),
             instruction: "guard_print_return".to_owned(),
-            args: vec![condition_name.clone(), print_name.clone(), return_name.clone()],
+            args: vec![
+                condition_name.clone(),
+                print_name.clone(),
+                return_name.clone(),
+            ],
         },
     });
     push_dep_edges(state, &condition_name, &name);
