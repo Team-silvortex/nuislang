@@ -1,0 +1,21 @@
+yir 0.1
+
+resource shader0 shader.render
+
+shader.const_f32 color_f32 shader0 2.0
+shader.const_f32 speed_f32 shader0 7.5
+
+# sketch.glm bridge
+# sketch.bridge-kind task-external-handle
+# Future reading note:
+# this probe treats render-side packet/state flow as a future bridge-shaped
+# discussion anchor. Today it remains ordinary handwritten YIR; the sketch tags
+# only preserve the intent for later GLM/runtime work.
+shader.pack_ball_state packet shader0 color_f32 speed_f32
+shader.draw_sphere sphere shader0 packet
+shader.print print_sphere shader0 sphere
+
+edge dep color_f32 packet
+edge dep speed_f32 packet
+edge dep packet sphere
+edge dep sphere print_sphere

@@ -16,6 +16,16 @@ pub enum GlmValueClass {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GlmSketchValueClass {
+    Bridge,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GlmBridgeObjectKind {
+    TaskExternalHandle,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GlmUseMode {
     Own,
     Read,
@@ -727,6 +737,22 @@ impl fmt::Display for GlmValueClass {
     }
 }
 
+impl fmt::Display for GlmSketchValueClass {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Bridge => f.write_str("bridge"),
+        }
+    }
+}
+
+impl fmt::Display for GlmBridgeObjectKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::TaskExternalHandle => f.write_str("task-external-handle"),
+        }
+    }
+}
+
 impl fmt::Display for GlmUseMode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -931,11 +957,11 @@ pub fn glm_profile_for_operation(op: &Operation) -> GlmNodeProfile {
 mod tests {
     use super::{
         AsyncCoreOp, CpuLlvmLoweringClass, DataFabricPrimitive, DataFlowState, DataMod,
-        DataResultHandle, DataWindow, ExecutionState, GlmEffect, GlmUseMode, GlmValueClass,
-        KernelFlowState, KernelResultHandle, Node, Operation, OperationDomainFamily, RegisteredMod,
-        Resource, ResourceKind, SemanticOp, ShaderFlowState, ShaderResultHandle,
-        TaskLifecycleState, TaskResultHandle, Value, YirResultFamily, YirResultRole,
-        YirResultState,
+        DataResultHandle, DataWindow, ExecutionState, GlmBridgeObjectKind, GlmEffect,
+        GlmSketchValueClass, GlmUseMode, GlmValueClass, KernelFlowState, KernelResultHandle, Node,
+        Operation, OperationDomainFamily, RegisteredMod, Resource, ResourceKind, SemanticOp,
+        ShaderFlowState, ShaderResultHandle, TaskLifecycleState, TaskResultHandle, Value,
+        YirResultFamily, YirResultRole, YirResultState,
     };
 
     #[test]
@@ -952,6 +978,15 @@ mod tests {
         assert_eq!(profile.result_class, GlmValueClass::Res);
         assert_eq!(profile.accesses[0].mode, GlmUseMode::Own);
         assert_eq!(profile.effect, GlmEffect::DomainMove);
+    }
+
+    #[test]
+    fn exposes_bridge_object_sketch_names_without_changing_live_glm_classes() {
+        assert_eq!(GlmSketchValueClass::Bridge.to_string(), "bridge");
+        assert_eq!(
+            GlmBridgeObjectKind::TaskExternalHandle.to_string(),
+            "task-external-handle"
+        );
     }
 
     #[test]

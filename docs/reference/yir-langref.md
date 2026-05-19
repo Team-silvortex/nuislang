@@ -48,6 +48,14 @@ Important current boundary:
 * when implementation and prose differ, prefer the currently checked-in
   `yir-core` + verifier behavior
 
+Important current `GLM` boundary:
+
+* the live `GLM` value classes in `yir-core` are still only `val` and `res`
+* `bridge` currently exists only as reserved sketch vocabulary for future
+  design discussion
+* it is not yet a live `GlmNodeProfile` class and does not currently change
+  verifier behavior
+
 ---
 
 # 3. Module Structure
@@ -152,6 +160,39 @@ layer. They do not change resource ownership, but they let traces and future
 schedulers distinguish flows such as host-main, memory, uplink, or render
 queues on the same underlying resource. The queue identity is scoped as
 `<resource>@<lane>`.
+
+## Comment-Only Sketch Annotations
+
+Handwritten `YIR` currently also allows a very small **comment-only** sketch
+surface for future design discussion.
+
+Because `yir-syntax` ignores lines that begin with `#`, these annotations are:
+
+* parse-safe
+* verifier-neutral
+* not part of the live `YIR` graph
+* suitable only for forward-looking probes and design notes
+
+Current reserved sketch tags:
+
+```text
+# sketch.glm bridge
+# sketch.bridge-kind task-external-handle
+```
+
+Current intended reading:
+
+* `sketch.glm bridge` says the nearby handwritten shape is being discussed as a
+  future bridge-shaped `GLM` object, not as a live `val`/`res` classification
+* `sketch.bridge-kind task-external-handle` says the nearby shape is being used
+  as a probe for future task-external handle work
+
+Important current boundary:
+
+* these tags do **not** change parsing
+* they do **not** create a new node-profile class
+* they do **not** change verifier behavior
+* they are only canonical comment vocabulary for repository-local sketches
 
 ---
 

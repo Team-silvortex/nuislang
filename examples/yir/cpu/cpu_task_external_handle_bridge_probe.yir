@@ -1,0 +1,14 @@
+# sketch.glm bridge
+# sketch.bridge-kind task-external-handle
+# This probe is comment-only metadata today. It does not change parsing or
+# verification; it only marks the surrounding task path as a future
+# task-external-handle discussion anchor.
+
+resource cpu0 cpu.arm64
+
+cpu.const_i64 ping_value cpu0 1
+cpu.async_call async_ping cpu0 ping ping_value
+cpu.spawn_task task0 cpu0 ping async_ping
+cpu.join_result result0 cpu0 task0
+cpu.task_completed done0 cpu0 result0
+cpu.task_value value0 cpu0 result0

@@ -45,9 +45,18 @@ Start in this order:
   current design direction for resource-bearing task payload families that may
   later need an explicit external-handle contract instead of plain value
   semantics
+* [cpu-task-external-handle-glm-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-external-handle-glm-sketch.md)
+  current design sketch for whether future task-external handles should read as
+  plain `val`, full `res`, or an intermediate bridge object in `GLM`
 * [cpu-task-scheduler-clock.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-scheduler-clock.md)
   current relationship between task semantics, lane/scheduler surfaces, and
   clock/timeout bridges
+* [yir-hot-sync-contraction-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-hot-sync-contraction-sketch.md)
+  forward-looking sketch for verifier-driven local async-to-sync contraction on
+  hot paths
+* [yir-global-clock-negotiation-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-global-clock-negotiation-sketch.md)
+  forward-looking sketch for `YIR`-level global clock reference and
+  multi-`nustar` time negotiation
 
 If your question is specifically “what command should I run next for this
 project?”, start with

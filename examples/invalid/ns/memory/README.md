@@ -11,6 +11,8 @@ This folder contains ownership/lifetime failures:
 * `hello_task_glm_nested_window_struct_payload_invalid.ns`
 * `hello_task_glm_nested_marker_struct_payload_invalid.ns`
 * `hello_task_glm_window_external_handle_probe_invalid.ns`
+* `hello_task_glm_marker_external_handle_probe_invalid.ns`
+* `hello_task_glm_handle_table_external_handle_probe_invalid.ns`
 * `hello_task_glm_optional_payload_invalid.ns`
 * `hello_task_glm_nested_optional_struct_payload_invalid.ns`
 * `hello_task_glm_instance_payload_invalid.ns`

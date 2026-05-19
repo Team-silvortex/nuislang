@@ -12,3 +12,6 @@ Recommended starting points:
   binding layout, geometry input, and render-state surface
 * [shader_texture_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/shader/shader_texture_demo.yir)
   texture/sampler/UV path
+* [shader_external_handle_bridge_probe.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/shader/shader_external_handle_bridge_probe.yir)
+  comment-only bridge probe for future render-packet / draw-state external-handle
+  discussion

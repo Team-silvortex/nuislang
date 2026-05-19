@@ -16,3 +16,5 @@ Recommended starting points:
   ownership-flavored linked-list path
 * [cpu_async_shorthand.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/cpu/cpu_async_shorthand.yir)
   compact handwritten async/lane style
+* [cpu_task_external_handle_bridge_probe.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/cpu/cpu_task_external_handle_bridge_probe.yir)
+  comment-only bridge-shaped task probe for future external-handle discussion

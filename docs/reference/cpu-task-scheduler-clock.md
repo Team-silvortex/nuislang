@@ -143,6 +143,12 @@ But:
 * lane semantics do not yet guarantee final executor behavior
 * clock semantics do not yet guarantee final cross-domain timing behavior
 
+That is also why two future directions matter here:
+
+* hotspot-local async-to-sync contraction must remain proof-driven
+* global-clock / local-clock negotiation must become more explicit before
+  timing-sensitive contraction is trusted
+
 So the repository is currently strongest at:
 
 * semantic structure
@@ -174,3 +180,5 @@ If you want code that fits the current system well:
 * [cpu-task-glm-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-glm-contract.md)
 * [cpu-task-payload-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-payload-matrix.md)
 * [host-read-bridge.md](/Users/Shared/chroot/dev/nuislang/docs/reference/host-read-bridge.md)
+* [yir-hot-sync-contraction-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-hot-sync-contraction-sketch.md)
+* [yir-global-clock-negotiation-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-global-clock-negotiation-sketch.md)

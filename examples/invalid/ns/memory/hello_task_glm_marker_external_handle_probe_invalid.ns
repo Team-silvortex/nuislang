@@ -1,0 +1,15 @@
+mod cpu Main {
+  struct MarkerHandleTaskPacket {
+    ready: Marker<CpuToShader>,
+    lane: i64,
+    domain_code: i64
+  }
+
+  async fn consume(packet: MarkerHandleTaskPacket) -> i64 {
+    return packet.lane + packet.domain_code;
+  }
+
+  fn main() -> i64 {
+    return 1;
+  }
+}

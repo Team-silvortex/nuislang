@@ -122,6 +122,10 @@ These examples are intentionally supposed to fail.
   invalid nominal struct payload whose nested field still carries a resource-bearing `Window<...>` across the current async/task boundary
 * [hello_task_glm_window_external_handle_probe_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_window_external_handle_probe_invalid.ns)
   design probe for a future task-external `Window<...>` handle packet shape; intentionally still invalid today
+* [hello_task_glm_marker_external_handle_probe_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_marker_external_handle_probe_invalid.ns)
+  design probe for a future task-external `Marker<...>` control-plane packet shape; intentionally still invalid today
+* [hello_task_glm_handle_table_external_handle_probe_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_handle_table_external_handle_probe_invalid.ns)
+  design probe for a future task-external `HandleTable<...>` routing/control packet shape; intentionally still invalid today
 * [hello_task_glm_nested_marker_struct_payload_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_nested_marker_struct_payload_invalid.ns)
   invalid nominal struct payload whose nested field still carries a control-plane `Marker<...>` across the current async/task boundary
 * [hello_task_glm_optional_payload_invalid.ns](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/memory/hello_task_glm_optional_payload_invalid.ns)
