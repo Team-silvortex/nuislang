@@ -1,0 +1,31 @@
+mod cpu Main {
+  extern "c" fn host_stdin_read(buffer_handle: i64, len: i64) -> i64;
+
+  struct StdinFacadeSummary {
+    primary_requested_len: i64,
+    primary_read_len: i64,
+    secondary_requested_len: i64,
+    secondary_read_len: i64
+  }
+
+  fn capture_stdin_facade(primary_len: i64, secondary_len: i64) -> StdinFacadeSummary {
+    let primary_backing: ref Buffer = alloc_buffer(primary_len, 0);
+    let secondary_backing: ref Buffer = alloc_buffer(secondary_len, 0);
+    return StdinFacadeSummary {
+      primary_requested_len: primary_len,
+      primary_read_len: host_stdin_read(primary_backing, primary_len),
+      secondary_requested_len: secondary_len,
+      secondary_read_len: host_stdin_read(secondary_backing, secondary_len)
+    };
+  }
+
+  fn main() {
+    let summary: StdinFacadeSummary = capture_stdin_facade(32, 16);
+    print(
+      summary.primary_requested_len
+      + summary.primary_read_len
+      + summary.secondary_requested_len
+      + summary.secondary_read_len
+    );
+  }
+}

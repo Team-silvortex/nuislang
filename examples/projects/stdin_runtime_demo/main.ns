@@ -1,0 +1,29 @@
+mod cpu Main {
+  extern "c" fn host_stdin_read(buffer_handle: i64, len: i64) -> i64;
+
+  struct StdinProjectSummary {
+    primary_requested_len: i64,
+    primary_read_len: i64,
+    secondary_requested_len: i64,
+    secondary_read_len: i64
+  }
+
+  fn capture_stdin_project(primary_len: i64, secondary_len: i64) -> StdinProjectSummary {
+    let primary_backing: ref Buffer = alloc_buffer(primary_len, 0);
+    let secondary_backing: ref Buffer = alloc_buffer(secondary_len, 0);
+    return StdinProjectSummary {
+      primary_requested_len: primary_len,
+      primary_read_len: host_stdin_read(primary_backing, primary_len),
+      secondary_requested_len: secondary_len,
+      secondary_read_len: host_stdin_read(secondary_backing, secondary_len)
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: StdinProjectSummary = capture_stdin_project(32, 16);
+    return summary.primary_requested_len
+      + summary.primary_read_len
+      + summary.secondary_requested_len
+      + summary.secondary_read_len;
+  }
+}

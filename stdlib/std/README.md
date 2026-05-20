@@ -2,6 +2,12 @@
 
 `std` is the practical systems layer above `core`.
 
+Canonical short map:
+
+* [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+  Use that file for the shortest current reading path across task, host I/O,
+  persistence, and filesystem surfaces. Use this README for local detail only.
+
 ## Current Status
 
 At the current repository stage, `std` is also still mostly a layout/contract
@@ -317,7 +323,11 @@ Recommended path read order:
 Tooling/runtime fast map:
 
 * io
+  - [argv_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/argv_runtime_recipe.ns)
   - [env_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/env_runtime_recipe.ns)
+  - [process_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/process_runtime_recipe.ns)
+  - [stdin_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/stdin_runtime_recipe.ns)
+  - [tty_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/tty_runtime_recipe.ns)
   - [input_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/input_runtime_recipe.ns)
   - [terminal_io_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/terminal_io_recipe.ns)
   - [line_input_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/line_input_recipe.ns)
@@ -336,8 +346,16 @@ Tooling/runtime fast map:
 
 Recommended tooling read order:
 
-* start with [env_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/env_runtime_recipe.ns)
+* start with [argv_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/argv_runtime_recipe.ns)
+  for the narrowest host argument-vector surface
+* then read [env_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/env_runtime_recipe.ns)
   for the narrowest host presence/value surface
+* then read [process_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/process_runtime_recipe.ns)
+  for the narrowest process-status surface
+* then read [stdin_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/stdin_runtime_recipe.ns)
+  for the narrowest stdin-read surface
+* then read [tty_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/tty_runtime_recipe.ns)
+  for the narrowest tty-shape surface
 * then read [input_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/input_runtime_recipe.ns)
   for the smallest host I/O surface
 * then read [terminal_io_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/terminal_io_recipe.ns) and [line_input_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/line_input_recipe.ns)
@@ -350,22 +368,34 @@ Recommended tooling read order:
 State/location/persistence fast map:
 
 * location
+  - [cwd_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cwd_runtime_recipe.ns)
+  - [temp_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/temp_runtime_recipe.ns)
+  - [home_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/home_runtime_recipe.ns)
   - [location_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/location_runtime_recipe.ns)
 * kv
   - [kv_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/kv_runtime_recipe.ns)
 * cache
   - [cache_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cache_runtime_recipe.ns)
 * config and cache bridge
+  - [config_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/config_runtime_recipe.ns)
   - [config_cache_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/config_cache_recipe.ns)
 
 Recommended persistence read order:
 
-* start with [location_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/location_runtime_recipe.ns)
-  for the cleanest state-free location surface
+* start with [cwd_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cwd_runtime_recipe.ns)
+  for the narrowest current-directory surface
+* then read [temp_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/temp_runtime_recipe.ns)
+  for the narrowest temporary-path surface
+* then read [home_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/home_runtime_recipe.ns)
+  for the narrowest home/config surface
+* then read [location_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/location_runtime_recipe.ns)
+  for the wider location bundle
 * then read [kv_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/kv_runtime_recipe.ns)
   for the narrowest explicit store/get path
 * then read [cache_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cache_runtime_recipe.ns)
   for cache-shaped persistence
+* then read [config_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/config_runtime_recipe.ns)
+  for the narrowest config-open/get/close path
 * finish with [config_cache_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/config_cache_recipe.ns)
   once config plus persistence composition feels natural
 
@@ -642,6 +672,27 @@ Recommended persistence read order:
     [hello_native_workflow_runtime.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_native_workflow_runtime.ns)
   - narrow project companion:
     [automation_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/automation_runtime_demo)
+* cwd/runtime
+  - recipe:
+    [cwd_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cwd_runtime_recipe.ns)
+  - single-file mirror:
+    [hello_cwd_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_cwd_runtime_facades.ns)
+  - narrow project companion:
+    [cwd_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/cwd_runtime_demo)
+* temp/runtime
+  - recipe:
+    [temp_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/temp_runtime_recipe.ns)
+  - single-file mirror:
+    [hello_temp_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_temp_runtime_facades.ns)
+  - narrow project companion:
+    [temp_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/temp_runtime_demo)
+* home/runtime
+  - recipe:
+    [home_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/home_runtime_recipe.ns)
+  - single-file mirror:
+    [hello_home_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_home_runtime_facades.ns)
+  - narrow project companion:
+    [home_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/home_runtime_demo)
 * location/runtime
   - recipe:
     [location_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/location_runtime_recipe.ns)
@@ -663,6 +714,13 @@ Recommended persistence read order:
     [hello_cache_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_cache_runtime_facades.ns)
   - narrow project companion:
     [cache_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/cache_runtime_demo)
+* config/runtime
+  - recipe:
+    [config_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/config_runtime_recipe.ns)
+  - single-file mirror:
+    [hello_config_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_config_runtime_facades.ns)
+  - narrow project companion:
+    [config_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/config_runtime_demo)
 * config/cache
   - recipe:
     [config_cache_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/config_cache_recipe.ns)
@@ -791,6 +849,13 @@ Recommended fast read:
   [hello_task_cli_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_task_cli_facades.ns)
   Project companion:
   [task_cli_tooling_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_cli_tooling_demo)
+* [argv_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/argv_runtime_recipe.ns)
+  narrow argv/runtime staging:
+  `argv_count -> argv_at(0/1)`
+  Single-file companion:
+  [hello_argv_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_argv_runtime_facades.ns)
+  Narrow project companion:
+  [argv_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/argv_runtime_demo)
 * [env_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/env_runtime_recipe.ns)
   narrow env/runtime staging:
   `env_has/env_get`
@@ -798,15 +863,34 @@ Recommended fast read:
   [hello_env_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_env_runtime_facades.ns)
   Narrow project companion:
   [env_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/env_runtime_demo)
+* [process_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/process_runtime_recipe.ns)
+  narrow process/runtime staging:
+  `process_id/status/exit_code`
+  Single-file companion:
+  [hello_process_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_process_runtime_facades.ns)
+  Narrow project companion:
+  [process_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/process_runtime_demo)
+* [stdin_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/stdin_runtime_recipe.ns)
+  narrow stdin/runtime staging:
+  `stdin_read(primary/secondary)`
+  Single-file companion:
+  [hello_stdin_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_stdin_runtime_facades.ns)
+  Narrow project companion:
+  [stdin_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/stdin_runtime_demo)
+* [tty_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/tty_runtime_recipe.ns)
+  narrow tty/runtime staging:
+  `isatty/width/height(primary/secondary)`
+  Single-file companion:
+  [hello_tty_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_tty_runtime_facades.ns)
+  Narrow project companion:
+  [tty_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tty_runtime_demo)
 * [input_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/input_runtime_recipe.ns)
   narrow native input/runtime staging:
   `argv -> file_read -> stdin_read -> tty_isatty`
-  Single-file companions:
+  Narrow single-file companion:
   [hello_input_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_input_runtime_facades.ns)
-  and
-  [hello_native_input_tool.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_native_input_tool.ns)
-  Wider project companion:
-  [native_cli_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/native_cli_pipeline_demo)
+  Narrow project companion:
+  [input_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/input_runtime_demo)
 * [command_shell_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_shell_recipe.ns)
   shell-oriented command/subprocess staging:
   `program/argv/env -> command_wait_exit + subprocess_join_exit`
@@ -814,8 +898,6 @@ Recommended fast read:
   [hello_native_command_runtime.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_native_command_runtime.ns)
   Narrow project companion:
   [command_shell_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/command_shell_demo)
-  Wider project companion:
-  [native_tool_runner_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/native_tool_runner_demo)
 * [report_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/report_runtime_recipe.ns)
   narrow report/diagnostic staging:
   `path/fs/json -> diag_emit + stdout`

@@ -21,6 +21,7 @@ There is also a practical split inside the current tree:
 
 If you want to understand the repository as it exists today, start here:
 
+* [current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
 * [reference/README.md](/Users/Shared/chroot/dev/nuislang/docs/reference/README.md)
 * [repo-layout.md](/Users/Shared/chroot/dev/nuislang/docs/repo-layout.md)
 
@@ -33,15 +34,8 @@ Then branch by the kind of truth you want:
 * current stdlib/source-asset maps
   - [stdlib/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/README.md)
   - [stdlib/std/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
-
-Current mainline docs to trust first:
-
-* [reference/README.md](/Users/Shared/chroot/dev/nuislang/docs/reference/README.md)
-* [repo-layout.md](/Users/Shared/chroot/dev/nuislang/docs/repo-layout.md)
-* [../examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
-* [../stdlib/std/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
-
-Those files are the closest to “current implementation truth”.
+* cleanup policy / archiving candidates
+  - [repo-cleanup-candidates.md](/Users/Shared/chroot/dev/nuislang/docs/repo-cleanup-candidates.md)
 
 ## Grammar And Frontend Notes
 
@@ -55,17 +49,10 @@ These folders describe broader architecture direction and are useful, but they
 should be read together with the current reference docs above:
 
 * [fabric-spec/README.md](/Users/Shared/chroot/dev/nuislang/docs/fabric-spec/README.md)
-* `glm-spec/`
-* `versioning/`
-* `yir-spec/`
-* [historical/README.md](/Users/Shared/chroot/dev/nuislang/docs/historical/README.md)
-
-Treat these as more experimental today:
-
-* [fabric-spec/README.md](/Users/Shared/chroot/dev/nuislang/docs/fabric-spec/README.md)
 * [glm-spec/README.md](/Users/Shared/chroot/dev/nuislang/docs/glm-spec/README.md)
 * [versioning/README.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/README.md)
 * [yir-spec/README.md](/Users/Shared/chroot/dev/nuislang/docs/yir-spec/README.md)
+* [historical/README.md](/Users/Shared/chroot/dev/nuislang/docs/historical/README.md)
 
 Important current reading rule:
 

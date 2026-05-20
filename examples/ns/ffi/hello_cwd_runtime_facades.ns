@@ -1,0 +1,24 @@
+mod cpu Main {
+  extern "c" fn host_cwd_handle() -> i64;
+  extern "c" fn host_cwd_len() -> i64;
+  extern "c" fn host_chdir(path_handle: i64) -> i64;
+
+  struct CwdFacadeSummary {
+    cwd_handle: i64,
+    cwd_len: i64,
+    chdir_code: i64
+  }
+
+  fn capture_cwd_facade(target_path_handle: i64) -> CwdFacadeSummary {
+    return CwdFacadeSummary {
+      cwd_handle: host_cwd_handle(),
+      cwd_len: host_cwd_len(),
+      chdir_code: host_chdir(target_path_handle)
+    };
+  }
+
+  fn main() {
+    let summary: CwdFacadeSummary = capture_cwd_facade(907);
+    print(summary.cwd_handle + summary.cwd_len + summary.chdir_code);
+  }
+}

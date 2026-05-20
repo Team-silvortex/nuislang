@@ -1,0 +1,34 @@
+mod cpu Main {
+  extern "c" fn host_temp_dir_handle() -> i64;
+  extern "c" fn host_temp_path_len() -> i64;
+  extern "c" fn host_temp_file_handle(prefix_handle: i64) -> i64;
+
+  struct TempRecipeSeed {
+    prefix_handle: i64
+  }
+
+  struct TempRecipeSummary {
+    temp_dir_handle: i64,
+    temp_path_len: i64,
+    temp_file_handle: i64
+  }
+
+  fn capture_temp_recipe(seed: TempRecipeSeed) -> TempRecipeSummary {
+    return TempRecipeSummary {
+      temp_dir_handle: host_temp_dir_handle(),
+      temp_path_len: host_temp_path_len(),
+      temp_file_handle: host_temp_file_handle(seed.prefix_handle)
+    };
+  }
+
+  fn summarize_temp_recipe(prefix_handle: i64) -> i64 {
+    let summary: TempRecipeSummary = capture_temp_recipe(TempRecipeSeed {
+      prefix_handle: prefix_handle
+    });
+    return summary.temp_dir_handle + summary.temp_path_len + summary.temp_file_handle;
+  }
+
+  fn main() {
+    print(summarize_temp_recipe(1003));
+  }
+}

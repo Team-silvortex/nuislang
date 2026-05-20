@@ -1,4 +1,4 @@
-name = "native_cli_pipeline_demo"
+name = "argv_runtime_demo"
 entry = "main.ns"
 modules = ["main.ns"]
 abi = [

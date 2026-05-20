@@ -1,4 +1,4 @@
-name = "native_tool_runner_demo"
+name = "home_runtime_demo"
 entry = "main.ns"
 modules = ["main.ns"]
 abi = [

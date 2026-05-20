@@ -1,0 +1,37 @@
+mod cpu Main {
+  extern "c" fn host_config_open(scope_handle: i64) -> i64;
+  extern "c" fn host_config_get(config_handle: i64, key_handle: i64) -> i64;
+  extern "c" fn host_config_close(config_handle: i64) -> i64;
+
+  struct ConfigRecipeSeed {
+    scope_handle: i64,
+    key_handle: i64
+  }
+
+  struct ConfigRecipeSummary {
+    config_handle: i64,
+    value_handle: i64,
+    close_code: i64
+  }
+
+  fn capture_config_recipe(seed: ConfigRecipeSeed) -> ConfigRecipeSummary {
+    let config_handle: i64 = host_config_open(seed.scope_handle);
+    return ConfigRecipeSummary {
+      config_handle: config_handle,
+      value_handle: host_config_get(config_handle, seed.key_handle),
+      close_code: host_config_close(config_handle)
+    };
+  }
+
+  fn summarize_config_recipe(scope_handle: i64, key_handle: i64) -> i64 {
+    let summary: ConfigRecipeSummary = capture_config_recipe(ConfigRecipeSeed {
+      scope_handle: scope_handle,
+      key_handle: key_handle
+    });
+    return summary.config_handle + summary.value_handle + summary.close_code;
+  }
+
+  fn main() {
+    print(summarize_config_recipe(1401, 29));
+  }
+}

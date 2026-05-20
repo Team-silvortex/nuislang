@@ -119,20 +119,6 @@ Also included:
   `kernel_profile_bind_core/kernel_profile_queue_depth/kernel_profile_batch_lanes`.
   Its `FabricPlane` now only declares the `cpu_to_kernel/kernel_to_cpu` sync
   markers required by that route.
-* [native_cli_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/native_cli_pipeline_demo)
-  one-file `cpu`-only native CLI/tooling demo:
-  `main.ns`
-  showing the current project-form AOT host-backed path for
-  `argv`, `stdout`, `file`, `stdin`, `command`, and `subprocess`.
-  This is the repo's current canonical project-shaped sample for the native
-  `input -> process -> child command -> exit code` pipeline.
-* [native_tool_runner_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/native_tool_runner_demo)
-  one-file `cpu`-only command runner demo:
-  `main.ns`
-  showing the current project-form AOT host-backed path for
-  `argv`, `stdout`, `command`, `subprocess`, and direct exit observers.
-  This is the lighter-weight sibling route when you want a native tool runner
-  without the extra file/stdin input path.
 * [command_shell_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/command_shell_demo)
   one-file `cpu`-only command/subprocess staging demo:
   `main.ns`
@@ -154,6 +140,27 @@ Also included:
   `cwd/temp/cache -> subprocess + monotonic time`.
   This is the narrowest project-shaped companion to
   [automation_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/automation_runtime_recipe.ns).
+* [cwd_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/cwd_runtime_demo)
+  one-file `cpu`-only cwd/runtime staging demo:
+  `main.ns`
+  showing the current project-form bridge for
+  `cwd_handle/cwd_len/chdir`.
+  This is the narrowest project-shaped companion to
+  [cwd_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cwd_runtime_recipe.ns).
+* [temp_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/temp_runtime_demo)
+  one-file `cpu`-only temp/runtime staging demo:
+  `main.ns`
+  showing the current project-form bridge for
+  `temp_dir/temp_path_len/temp_file_handle`.
+  This is the narrowest project-shaped companion to
+  [temp_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/temp_runtime_recipe.ns).
+* [home_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/home_runtime_demo)
+  one-file `cpu`-only home/runtime staging demo:
+  `main.ns`
+  showing the current project-form bridge for
+  `home_dir/home_len/config_dir`.
+  This is the narrowest project-shaped companion to
+  [home_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/home_runtime_recipe.ns).
 * [cli_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/cli_runtime_demo)
   one-file `cpu`-only CLI/runtime staging demo:
   `main.ns`
@@ -161,12 +168,6 @@ Also included:
   `argv/env/cwd/config/cache -> stdout + diag + monotonic time`.
   This is the narrowest project-shaped companion to
   [cli_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_runtime_recipe.ns).
-* [native_branch_cli_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/native_branch_cli_demo)
-  one-file `cpu`-only branch/usage demo:
-  `main.ns`
-  showing the current project-form real CPU control-flow half-step for
-  `if { print(...); return ... } else { print(...); return ... }`.
-  This is the smallest canonical sample for native CLI usage/error vs ok paths.
 * [input_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/input_runtime_demo)
   one-file `cpu`-only native input/runtime demo:
   `main.ns`
@@ -174,6 +175,13 @@ Also included:
   `argv`, `file`, `stdin`, and `tty`.
   This is the narrowest project-shaped companion to
   [input_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/input_runtime_recipe.ns).
+* [config_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/config_runtime_demo)
+  one-file `cpu`-only config/runtime staging demo:
+  `main.ns`
+  showing the current project-form bridge for
+  `config_open/get/close`.
+  This is the narrowest project-shaped companion to
+  [config_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/config_runtime_recipe.ns).
 * [env_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/env_runtime_demo)
   one-file `cpu`-only env/runtime staging demo:
   `main.ns`
@@ -181,6 +189,34 @@ Also included:
   `env_has/env_get`.
   This is the narrowest project-shaped companion to
   [env_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/env_runtime_recipe.ns).
+* [process_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/process_runtime_demo)
+  one-file `cpu`-only process/runtime staging demo:
+  `main.ns`
+  showing the current project-form bridge for
+  `process_id/status/exit_code`.
+  This is the narrowest project-shaped companion to
+  [process_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/process_runtime_recipe.ns).
+* [stdin_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/stdin_runtime_demo)
+  one-file `cpu`-only stdin/runtime staging demo:
+  `main.ns`
+  showing the current project-form bridge for
+  repeated `stdin_read`.
+  This is the narrowest project-shaped companion to
+  [stdin_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/stdin_runtime_recipe.ns).
+* [tty_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tty_runtime_demo)
+  one-file `cpu`-only tty/runtime staging demo:
+  `main.ns`
+  showing the current project-form bridge for
+  `isatty/width/height`.
+  This is the narrowest project-shaped companion to
+  [tty_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/tty_runtime_recipe.ns).
+* [argv_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/argv_runtime_demo)
+  one-file `cpu`-only argv/runtime staging demo:
+  `main.ns`
+  showing the current project-form bridge for
+  `argv_count -> argv_at(0/1)`.
+  This is the narrowest project-shaped companion to
+  [argv_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/argv_runtime_recipe.ns).
 * [task_lifecycle_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_lifecycle_branch_demo)
   one-file `cpu`-only async/task lifecycle demo:
   `main.ns`
@@ -324,6 +360,8 @@ Path project fast map:
 Tooling project fast map:
 
 * io
+  - [argv_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/argv_runtime_demo)
+  - [process_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/process_runtime_demo)
   - [env_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/env_runtime_demo)
   - [input_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/input_runtime_demo)
   - [terminal_io_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/terminal_io_demo)
@@ -426,12 +464,20 @@ State/persistence project fast map:
   - [directory_stat_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/directory_stat_demo)
 * automation/workflow
   - [automation_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/automation_runtime_demo)
+* cwd/runtime
+  - [cwd_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/cwd_runtime_demo)
+* temp/runtime
+  - [temp_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/temp_runtime_demo)
+* home/runtime
+  - [home_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/home_runtime_demo)
 * location/runtime
   - [location_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/location_runtime_demo)
 * kv/runtime
   - [kv_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/kv_runtime_demo)
 * cache/runtime
   - [cache_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/cache_runtime_demo)
+* config/runtime
+  - [config_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/config_runtime_demo)
 * config/cache
   - [config_cache_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/config_cache_demo)
 
@@ -478,6 +524,12 @@ Task-facing `std` companions:
 * [input_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/input_runtime_recipe.ns)
   is mirrored most directly by
   [input_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/input_runtime_demo)
+* [stdin_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/stdin_runtime_recipe.ns)
+  is mirrored most directly by
+  [stdin_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/stdin_runtime_demo)
+* [tty_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/tty_runtime_recipe.ns)
+  is mirrored most directly by
+  [tty_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tty_runtime_demo)
 
 Recommended reading order for the current task projects:
 
@@ -554,10 +606,6 @@ cargo run -p nuis -- dump-yir examples/projects/window_controls_demo
 cargo run -p nuis -- build examples/projects/window_controls_demo examples/bins/window_controls_demo_project
 cargo run -p nuis -- check examples/projects/kernel_tensor_demo
 cargo run -p nuis -- build examples/projects/kernel_tensor_demo examples/bins/kernel_tensor_demo_project
-cargo run -p nuis -- check examples/projects/native_cli_pipeline_demo
-cargo run -p nuis -- build examples/projects/native_cli_pipeline_demo /private/tmp/native_cli_pipeline_demo_out
-cargo run -p nuis -- check examples/projects/native_tool_runner_demo
-cargo run -p nuis -- build examples/projects/native_tool_runner_demo /private/tmp/native_tool_runner_demo_out
 cargo run -p nuis -- check examples/projects/command_shell_demo
 cargo run -p nuis -- build examples/projects/command_shell_demo /private/tmp/command_shell_demo_out
 cargo run -p nuis -- check examples/projects/report_runtime_demo
@@ -566,8 +614,6 @@ cargo run -p nuis -- check examples/projects/automation_runtime_demo
 cargo run -p nuis -- build examples/projects/automation_runtime_demo /private/tmp/automation_runtime_demo_out
 cargo run -p nuis -- check examples/projects/cli_runtime_demo
 cargo run -p nuis -- build examples/projects/cli_runtime_demo /private/tmp/cli_runtime_demo_out
-cargo run -p nuis -- check examples/projects/native_branch_cli_demo
-cargo run -p nuis -- build examples/projects/native_branch_cli_demo /private/tmp/native_branch_cli_demo_out
 cargo run -p nuis -- check examples/projects/input_runtime_demo
 cargo run -p nuis -- build examples/projects/input_runtime_demo /private/tmp/input_runtime_demo_out
 cargo run -p nuis -- check examples/projects/task_lifecycle_branch_demo

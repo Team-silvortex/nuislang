@@ -1,0 +1,34 @@
+mod cpu Main {
+  extern "c" fn host_cwd_handle() -> i64;
+  extern "c" fn host_cwd_len() -> i64;
+  extern "c" fn host_chdir(path_handle: i64) -> i64;
+
+  struct CwdRecipeSeed {
+    target_path_handle: i64
+  }
+
+  struct CwdRecipeSummary {
+    cwd_handle: i64,
+    cwd_len: i64,
+    chdir_code: i64
+  }
+
+  fn capture_cwd_recipe(seed: CwdRecipeSeed) -> CwdRecipeSummary {
+    return CwdRecipeSummary {
+      cwd_handle: host_cwd_handle(),
+      cwd_len: host_cwd_len(),
+      chdir_code: host_chdir(seed.target_path_handle)
+    };
+  }
+
+  fn summarize_cwd_recipe(target_path_handle: i64) -> i64 {
+    let summary: CwdRecipeSummary = capture_cwd_recipe(CwdRecipeSeed {
+      target_path_handle: target_path_handle
+    });
+    return summary.cwd_handle + summary.cwd_len + summary.chdir_code;
+  }
+
+  fn main() {
+    print(summarize_cwd_recipe(907));
+  }
+}

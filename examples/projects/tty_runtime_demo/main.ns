@@ -1,0 +1,41 @@
+mod cpu Main {
+  extern "c" fn host_tty_isatty(fd: i64) -> i64;
+  extern "c" fn host_tty_width(fd: i64) -> i64;
+  extern "c" fn host_tty_height(fd: i64) -> i64;
+
+  struct TtyProjectSummary {
+    primary_fd: i64,
+    primary_is_tty: i64,
+    primary_width: i64,
+    primary_height: i64,
+    secondary_fd: i64,
+    secondary_is_tty: i64,
+    secondary_width: i64,
+    secondary_height: i64
+  }
+
+  fn capture_tty_project(primary_fd: i64, secondary_fd: i64) -> TtyProjectSummary {
+    return TtyProjectSummary {
+      primary_fd: primary_fd,
+      primary_is_tty: host_tty_isatty(primary_fd),
+      primary_width: host_tty_width(primary_fd),
+      primary_height: host_tty_height(primary_fd),
+      secondary_fd: secondary_fd,
+      secondary_is_tty: host_tty_isatty(secondary_fd),
+      secondary_width: host_tty_width(secondary_fd),
+      secondary_height: host_tty_height(secondary_fd)
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: TtyProjectSummary = capture_tty_project(0, 1);
+    return summary.primary_fd
+      + summary.primary_is_tty
+      + summary.primary_width
+      + summary.primary_height
+      + summary.secondary_fd
+      + summary.secondary_is_tty
+      + summary.secondary_width
+      + summary.secondary_height;
+  }
+}

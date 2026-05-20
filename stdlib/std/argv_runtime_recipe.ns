@@ -1,0 +1,35 @@
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+  extern "c" fn host_argv_at(index: i64) -> i64;
+
+  struct ArgvRecipeSeed {
+    first_index: i64,
+    second_index: i64
+  }
+
+  struct ArgvRecipeSummary {
+    count: i64,
+    first_handle: i64,
+    second_handle: i64
+  }
+
+  fn capture_argv_recipe(seed: ArgvRecipeSeed) -> ArgvRecipeSummary {
+    return ArgvRecipeSummary {
+      count: host_argv_count(),
+      first_handle: host_argv_at(seed.first_index),
+      second_handle: host_argv_at(seed.second_index)
+    };
+  }
+
+  fn summarize_argv_recipe(first_index: i64, second_index: i64) -> i64 {
+    let summary: ArgvRecipeSummary = capture_argv_recipe(ArgvRecipeSeed {
+      first_index: first_index,
+      second_index: second_index
+    });
+    return summary.count + summary.first_handle + summary.second_handle;
+  }
+
+  fn main() {
+    print(summarize_argv_recipe(0, 1));
+  }
+}

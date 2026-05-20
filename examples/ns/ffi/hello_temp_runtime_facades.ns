@@ -1,0 +1,24 @@
+mod cpu Main {
+  extern "c" fn host_temp_dir_handle() -> i64;
+  extern "c" fn host_temp_path_len() -> i64;
+  extern "c" fn host_temp_file_handle(prefix_handle: i64) -> i64;
+
+  struct TempFacadeSummary {
+    temp_dir_handle: i64,
+    temp_path_len: i64,
+    temp_file_handle: i64
+  }
+
+  fn capture_temp_facade(prefix_handle: i64) -> TempFacadeSummary {
+    return TempFacadeSummary {
+      temp_dir_handle: host_temp_dir_handle(),
+      temp_path_len: host_temp_path_len(),
+      temp_file_handle: host_temp_file_handle(prefix_handle)
+    };
+  }
+
+  fn main() {
+    let summary: TempFacadeSummary = capture_temp_facade(1003);
+    print(summary.temp_dir_handle + summary.temp_path_len + summary.temp_file_handle);
+  }
+}

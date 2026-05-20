@@ -9,6 +9,12 @@ This folder currently mixes three kinds of material:
 The goal is to keep the useful history, while still making it obvious which files
 best reflect the current `nuis -> NIR -> YIR -> LLVM/AOT` progress.
 
+Canonical short map:
+
+* [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+  Use that file first when you want the shortest current path through the
+  active examples and `std` surfaces.
+
 Subdirectory guides:
 
 * [examples/ns/README.md](/Users/Shared/chroot/dev/nuislang/examples/ns/README.md)
@@ -18,192 +24,41 @@ Subdirectory guides:
 * [examples/legacy/README.md](/Users/Shared/chroot/dev/nuislang/examples/legacy/README.md)
 * [examples/bins/README.md](/Users/Shared/chroot/dev/nuislang/examples/bins/README.md)
 
-## Recommended `.ns` examples
+## Shortest Current Routes
 
-These are the best current front-end examples to read first.
+Use the canonical short map first:
 
-* [hello_world.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/core/hello_world.ns)
-  minimal `mod cpu <unit>` entry
-* [hello_let_expr.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/core/hello_let_expr.ns)
-  `let` + arithmetic expression lowering
-* [hello_struct.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/types/hello_struct.ns)
-  module-level `struct` plus field access
-* [hello_ref_struct.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/types/hello_ref_struct.ns)
-  `struct` fields carrying `ref` values
-* [hello_glm.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_glm.ns)
-  ownership/lifetime-flavored CPU memory path through `.ns -> NIR -> YIR`
-* [hello_task_glm_scalar_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_scalar_payload.ns)
-  smallest currently-safe scalar task payload path
-* [hello_task_glm_struct_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_struct_payload.ns)
-  small struct-of-scalars payload path across the current async/task boundary
-* [hello_task_glm_nested_struct_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_nested_struct_payload.ns)
-  nested struct-of-scalars payload path showing that named wrappers are still allowed when their fields remain value-like
-* [hello_task_glm_text_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_text_payload.ns)
-  current plain text/value-like payload path across the current async/task boundary
-* [hello_task_glm_nested_text_struct_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_nested_text_struct_payload.ns)
-  nested text/value-like payload path showing that named wrappers with safe text fields remain allowed
-* [hello_task_glm_origin.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_origin.ns)
-  smallest current task-handle origin and direct payload extraction path: `spawn -> join`
-* [hello_task_glm_status_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_status_path.ns)
-  narrowest current status-only observer path:
-  `join_result -> task_completed/task_timed_out/task_cancelled`
-* [hello_task_glm_value_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_value_path.ns)
-  narrowest current completed-only value path:
-  `spawn -> join_result -> task_completed -> task_value`
-* [hello_task_glm_lifecycle_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_lifecycle_path.ns)
-  narrowest current lifecycle-only path:
-  `timeout/cancel -> join_result -> task_timed_out/task_cancelled`
-* [hello_task_glm_lifecycle.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_lifecycle.ns)
-  lifecycle-shaping path through `timeout/cancel -> join_result -> task_timed_out/task_cancelled`
-* [hello_task_glm_boundary_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_boundary_compare.ns)
-  direct side-by-side task boundary sample:
-  `spawn -> join` as origin/payload path
-  versus `timeout/cancel -> join_result -> task_*` as lifecycle observation path
-* [hello_task_glm_lifecycle_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_lifecycle_compare.ns)
-  side-by-side lifecycle sample showing that completed tasks flow to `task_value(...)`, while timeout/cancel paths stay observation-only
-* [hello_task_glm_observe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_observe.ns)
-  current positive task-observation path: `spawn -> timeout -> join_result -> task_completed -> task_value`
-* [hello_task_glm_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_compare.ns)
-  side-by-side comparison of direct payload extraction with `join(...)` and lifecycle-aware observation with `join_result(...)`
-  This is the clearest single-file companion for
-  [task_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_compare_recipe.ns).
-* [hello_task_glm_join_nonconsuming_probe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_join_nonconsuming_probe.ns)
-  design-probe sample showing a shape that is currently allowed because
-  `join(...)` is not yet treated as a graph-level consume boundary:
-  direct `join(task)` followed by `join_result(task)`
-* [hello_input_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_input_runtime_facades.ns)
-  narrow host-facing input/runtime mirror for the current `std` recipe path:
-  `argv -> file_read -> stdin_read -> tty_isatty`
-* [hello_env_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_env_runtime_facades.ns)
-  narrow host-facing env/runtime mirror for the current `std` recipe path:
-  `env_has/env_get`
-* [hello_location_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_location_runtime_facades.ns)
-  narrow host-facing location/runtime mirror for the current `std` recipe path:
-  `cwd -> temp -> home/config-dir`
-* [hello_kv_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_kv_runtime_facades.ns)
-  narrow host-facing kv/runtime mirror for the current `std` recipe path:
-  `kv_open/put/get/close`
-* [hello_cache_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_cache_runtime_facades.ns)
-  narrow host-facing cache/runtime mirror for the current `std` recipe path:
-  `cache_open/lookup/store/close`
-* [hello_directory_create_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_directory_create_facades.ns)
-  narrow host-facing directory/create mirror for the current `std` recipe path:
-  `temp_file_handle -> dir_create -> fs_exists`
-* [hello_directory_stat_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_directory_stat_facades.ns)
-  narrow host-facing directory/stat mirror for the current `std` recipe path:
-  `dir_open/entry_count/close -> fs/stat`
-* [hello_terminal_io_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_terminal_io_facades.ns)
-  narrow host-facing terminal/io mirror for the current `std` recipe path:
-  `stdout/stderr/stdin/tty`
-* [hello_path_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_runtime_facades.ns)
-  narrow host-facing path/runtime mirror for the current `std` recipe path:
-  `path_join/is_absolute/basename`
-* [hello_path_is_empty_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_is_empty_facades.ns)
-  narrow host-facing path/is-empty mirror for the current `std` recipe path:
-  `path_is_empty/path_is_absolute/path_is_relative`
-* [hello_path_is_dot_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_is_dot_facades.ns)
-  narrow host-facing path/is-dot mirror for the current `std` recipe path:
-  `path_is_empty/path_is_dot/path_is_relative`
-* [hello_path_is_dotdot_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_is_dotdot_facades.ns)
-  narrow host-facing path/is-dotdot mirror for the current `std` recipe path:
-  `path_is_empty/path_is_dotdot/path_is_relative`
-* [hello_path_has_parent_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_has_parent_facades.ns)
-  narrow host-facing path/has-parent mirror for the current `std` recipe path:
-  `path_parent/path_has_parent/path_depth`
-* [hello_path_depth_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_depth_facades.ns)
-  narrow host-facing path/depth mirror for the current `std` recipe path:
-  `path_parent/path_depth/is_absolute`
-* [hello_path_is_basename_only_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_is_basename_only_facades.ns)
-  narrow host-facing path/is-basename-only mirror for the current `std` recipe path:
-  `path_is_empty/path_basename/path_is_basename_only`
-* [hello_path_basename_matches_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_basename_matches_facades.ns)
-  narrow host-facing path/basename-matches mirror for the current `std` recipe path:
-  `path_basename/path_is_basename_only/path_basename_matches`
-* [hello_path_filename_matches_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_filename_matches_facades.ns)
-  narrow host-facing path/filename-matches mirror for the current `std` recipe path:
-  `path_filename/path_extension/path_filename_matches`
-* [hello_path_parent_matches_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_parent_matches_facades.ns)
-  narrow host-facing path/parent-matches mirror for the current `std` recipe path:
-  `path_parent/path_has_parent/path_parent_matches`
-* [hello_path_stem_matches_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_stem_matches_facades.ns)
-  narrow host-facing path/stem-matches mirror for the current `std` recipe path:
-  `path_stem/path_extension/path_stem_matches`
-* [hello_path_filename_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_filename_facades.ns)
-  narrow host-facing path/filename mirror for the current `std` recipe path:
-  `path_filename/path_stem/path_extension`
-* [hello_path_matches_extension_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_matches_extension_facades.ns)
-  narrow host-facing path/matches-extension mirror for the current `std` recipe path:
-  `path_extension/path_has_extension/path_matches_extension`
-* [hello_path_extension_is_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_extension_is_facades.ns)
-  narrow host-facing path/extension-is mirror for the current `std` recipe path:
-  `path_extension/path_has_extension/path_extension_is`
-* [hello_path_starts_with_dot_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_starts_with_dot_facades.ns)
-  narrow host-facing path/starts-with-dot mirror for the current `std` recipe path:
-  `path_basename/path_starts_with_dot/path_is_hidden`
-* [hello_path_is_root_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_is_root_facades.ns)
-  narrow host-facing path/is-root mirror for the current `std` recipe path:
-  `path_is_absolute/path_is_root/path_parent`
-* [hello_path_ends_with_slash_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_ends_with_slash_facades.ns)
-  narrow host-facing path/ends-with-slash mirror for the current `std` recipe path:
-  `path_is_root/path_ends_with_slash/path_depth`
-* [hello_path_rename_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_rename_facades.ns)
-  narrow host-facing path/rename mirror for the current `std` recipe path:
-  `temp_file_handle -> path_rename -> fs_exists`
-* [hello_path_remove_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_remove_facades.ns)
-  narrow host-facing path/remove mirror for the current `std` recipe path:
-  `temp_file_handle -> path_remove -> fs_exists`
-* [hello_file_output_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_file_output_facades.ns)
-  narrow host-facing file/output mirror for the current `std` recipe path:
-  `temp_file_handle -> file_open/write/close`
-* [hello_line_input_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_line_input_facades.ns)
-  narrow host-facing line-input mirror for the current `std` recipe path:
-  `line_read/line_len`
-* [hello_text_json_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_text_json_facades.ns)
-  narrow host-facing text/json mirror for the current `std` recipe path:
-  `text_len/concat/measure -> json_pair/object/array`
-* [hello_result_diagnostic_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_result_diagnostic_facades.ns)
-  narrow host-facing result/diagnostic mirror for the current `std` recipe path:
-  `result_is_ok/value/error -> error -> diagnostic`
-* [hello_config_cache_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_config_cache_facades.ns)
-  narrow host-facing config/cache mirror for the current `std` recipe path:
-  `config_open/get/close -> cache_open/lookup/store/close`
-* [hello_data.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/data/hello_data.ns)
-  first front-end `data` link surface
-* [hello_data_window.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/data/hello_data_window.ns)
-  front-end `data` windows and handle table
-* [hello_instantiate.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/data/hello_instantiate.ns)
-  `cpu`-side unit instantiation of another domain through lazy `nustar` binding
-* [window_controls_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/window_controls_demo.ns)
-  front-end `cpu + data + shader` control/render demo that now builds to a live macOS bundle
-* [projects/window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo)
-  same live ball demo as a multi-file `nuis.toml` project with `main / shader / data` split
-* [projects/kernel_tensor_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/kernel_tensor_demo)
-  current multi-file `cpu + data + kernel` project route
+* [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
 
-## Recommended `YIR` examples
+Then branch by goal:
 
-These are the best current handwritten `YIR` examples to read first.
+* source-language `.ns` route
+  - [examples/ns/README.md](/Users/Shared/chroot/dev/nuislang/examples/ns/README.md)
+  - start with:
+    [hello_world.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/core/hello_world.ns),
+    [hello_ref_struct.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/types/hello_ref_struct.ns),
+    [hello_task_glm_value_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_value_path.ns),
+    [hello_input_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_input_runtime_facades.ns)
+* multi-file project route
+  - [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
+  - start with:
+    [window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo),
+    [kernel_tensor_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/kernel_tensor_demo),
+    [task_status_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_status_observe_demo)
+* handwritten `YIR` route
+  - [examples/yir/README.md](/Users/Shared/chroot/dev/nuislang/examples/yir/README.md)
+  - start with:
+    [hello_yir.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/demos/hello_yir.yir),
+    [window_controls_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/demos/window_controls_demo.yir),
+    [data_fabric_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/data/data_fabric_demo.yir)
 
-* [hello_yir.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/demos/hello_yir.yir)
-  smallest cross-domain `cpu + data + shader` flavor
-* [window_controls_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/demos/window_controls_demo.yir)
-  current main `cpu + data + shader` control/render demo
-* [host_ui_sphere.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/demos/host_ui_sphere.yir)
-  richer host-window/render path
-* [shader_bindings_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/shader/shader_bindings_demo.yir)
-  shader resource layout, geometry input, and render-state surface
-* [shader_texture_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/shader/shader_texture_demo.yir)
-  texture/sampler/UV sampling path
-* [kernel_auto_broadcast_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/kernel/kernel_auto_broadcast_demo.yir)
-  current kernel broadcast path
-* [kernel_topk_axis_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/kernel/kernel_topk_axis_demo.yir)
-  current axis-selection path
-* [data_fabric_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/data/data_fabric_demo.yir)
-  current typed Fabric/data surface
-* [cpu_linked_list_rustish.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/cpu/cpu_linked_list_rustish.yir)
-  current Rust-ish CPU ownership model
-* [cpu_types_struct.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/cpu/cpu_types_struct.yir)
-  typed scalar + struct value surface
+Current reading rule:
+
+* use this file and [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+  for the shortest route
+* use local READMEs for area detail
+* treat wider native examples and older umbrella demos as secondary unless
+  you're actively working in that subsystem
 
 ## Verifier / Negative Examples
 

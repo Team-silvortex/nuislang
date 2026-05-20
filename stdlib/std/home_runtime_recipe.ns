@@ -1,0 +1,28 @@
+mod cpu Main {
+  extern "c" fn host_home_dir_handle() -> i64;
+  extern "c" fn host_home_dir_len() -> i64;
+  extern "c" fn host_config_dir_handle() -> i64;
+
+  struct HomeRecipeSummary {
+    home_handle: i64,
+    home_len: i64,
+    config_handle: i64
+  }
+
+  fn capture_home_recipe() -> HomeRecipeSummary {
+    return HomeRecipeSummary {
+      home_handle: host_home_dir_handle(),
+      home_len: host_home_dir_len(),
+      config_handle: host_config_dir_handle()
+    };
+  }
+
+  fn summarize_home_recipe() -> i64 {
+    let summary: HomeRecipeSummary = capture_home_recipe();
+    return summary.home_handle + summary.home_len + summary.config_handle;
+  }
+
+  fn main() {
+    print(summarize_home_recipe());
+  }
+}

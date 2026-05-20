@@ -6,8 +6,8 @@ This folder contains CPU host-bridge examples:
 * `hello_c_ffi.ns`
 * `hello_cli_host_facades.ns`
 * `hello_result_diagnostic_facades.ns`
-* `hello_native_cli_runtime.ns`
 * `hello_native_command_runtime.ns`
+* `hello_argv_runtime_facades.ns`
 * `hello_path_runtime_facades.ns`
 * `hello_path_is_empty_facades.ns`
 * `hello_path_is_dot_facades.ns`
@@ -38,21 +38,23 @@ This folder contains CPU host-bridge examples:
 * `hello_line_input_facades.ns`
 * `hello_terminal_io_facades.ns`
 * `hello_env_runtime_facades.ns`
+* `hello_process_runtime_facades.ns`
 * `hello_text_json_facades.ns`
-* `hello_native_input_tool.ns`
 * `hello_input_runtime_facades.ns`
-* `hello_native_cli_pipeline.ns`
-* `hello_native_tool_runner.ns`
 * `hello_native_workflow_runtime.ns`
 * `hello_clock_test_facades.ns`
 * `hello_task_scheduler_facades.ns`
 * `hello_task_cli_facades.ns`
+* `hello_cwd_runtime_facades.ns`
+* `hello_temp_runtime_facades.ns`
+* `hello_home_runtime_facades.ns`
 * `hello_directory_create_facades.ns`
 * `hello_directory_remove_facades.ns`
 * `hello_directory_stat_facades.ns`
 * `hello_location_runtime_facades.ns`
 * `hello_kv_runtime_facades.ns`
 * `hello_cache_runtime_facades.ns`
+* `hello_config_runtime_facades.ns`
 * `hello_config_cache_facades.ns`
 
 Reading guidance:
@@ -75,11 +77,6 @@ Reading guidance:
   [result_diagnostic_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/result_diagnostic_recipe.ns)
   and keeps `result_is_ok/value/error` plus `error_code/message/severity` and
   `diag_label/span/emit` on their own source-level staging path
-* `hello_native_cli_runtime.ns`
-  a more concrete native-backed CLI example that leans on the current AOT shim
-  batch for `argv/env/cwd/path/fs/stdout/process`, so it is a better guide when
-  you want to see which `std` host facades have started to become real system
-  integration instead of pure placeholder shape
 * `hello_native_command_runtime.ns`
   a focused native-backed command example that shows the current early
   `command/subprocess` staging contract directly:
@@ -89,6 +86,20 @@ Reading guidance:
   [command_shell_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_shell_recipe.ns)
   and now has the narrower project-shaped companion
   [command_shell_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/command_shell_demo)
+* `hello_process_runtime_facades.ns`
+  a narrower process/runtime facade example that mirrors
+  [process_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/process_runtime_recipe.ns)
+  and keeps `process_id/status/exit_code` on their own source-level staging
+  path
+* `hello_stdin_runtime_facades.ns`
+  a narrower stdin/runtime facade example that mirrors
+  [stdin_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/stdin_runtime_recipe.ns)
+  and keeps repeated `stdin_read` observation on its own source-level staging
+  path
+* `hello_argv_runtime_facades.ns`
+  a narrower argv/runtime facade example that mirrors
+  [argv_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/argv_runtime_recipe.ns)
+  and keeps `argv_count -> argv_at(0/1)` on their own source-level staging path
 * `hello_env_runtime_facades.ns`
   a narrower env/runtime facade example that mirrors
   [env_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/env_runtime_recipe.ns)
@@ -260,7 +271,11 @@ Path facade fast map:
 Tooling facade fast map:
 
 * io
+  - `hello_argv_runtime_facades.ns`
   - `hello_env_runtime_facades.ns`
+  - `hello_process_runtime_facades.ns`
+  - `hello_stdin_runtime_facades.ns`
+  - `hello_tty_runtime_facades.ns`
   - `hello_input_runtime_facades.ns`
   - `hello_terminal_io_facades.ns`
   - `hello_line_input_facades.ns`
@@ -295,24 +310,21 @@ State/persistence facade fast map:
   [text_json_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/text_json_recipe.ns)
   and keeps `text_len/concat/measure` plus `json_pair/object/array` on their
   own source-level staging path
-* `hello_native_input_tool.ns`
-  a small input-driven native example that takes a file path from `argv`,
-  performs one native file read, performs one native stdin read, and folds the
-  observed byte counts into its own result; it is the clearest repo-local sample
-  for the current `file/stdin` AOT-backed host path
 * `hello_input_runtime_facades.ns`
   a narrower `argv/file/stdin/tty` facade example that mirrors
   [input_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/input_runtime_recipe.ns)
   and keeps the current native input/runtime staging separate from the wider
   command/process pipeline examples
-* `hello_native_cli_pipeline.ns`
-  a combined native CLI sample that first reads file/stdin input and then,
-  when input is present, triggers the current command/subprocess bridge and uses
-  direct-exit observers in the same flow
-* `hello_native_tool_runner.ns`
-  a more tool-shaped native example that reads `argv`, launches a command and a
-  subprocess, and then uses direct-exit observers to decide its own result; it
-  is the clearest repo-local sample for “small native CLI workflow” thinking
+* `hello_stdin_runtime_facades.ns`
+  a narrower stdin/runtime facade example that mirrors
+  [stdin_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/stdin_runtime_recipe.ns)
+  and keeps repeated `stdin_read` observation separate from the wider
+  `argv/file/stdin/tty` staging path
+* `hello_tty_runtime_facades.ns`
+  a narrower tty/runtime facade example that mirrors
+  [tty_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/tty_runtime_recipe.ns)
+  and keeps `isatty/width/height` observation on its own source-level staging
+  path
 * `hello_native_workflow_runtime.ns`
   a native-backed workflow example that leans on the current AOT shim batch for
   `cwd/directory/temp/process/command/subprocess/stdout`, so it is the best
@@ -350,6 +362,7 @@ State/persistence facade fast map:
   [config_cache_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/config_cache_recipe.ns)
   and keeps `config_open/get/close` plus `cache_open/lookup/store/close` on
   their own source-level staging path
+
 * `hello_directory_create_facades.ns`
   a narrower directory/create facade example that mirrors
   [directory_create_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/directory_create_recipe.ns)
@@ -369,6 +382,20 @@ State/persistence facade fast map:
   a narrower location/runtime facade example that mirrors
   [location_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/location_runtime_recipe.ns)
   and keeps `cwd/temp/home/config-dir` on their own source-level staging path
+* `hello_cwd_runtime_facades.ns`
+  a narrower cwd/runtime facade example that mirrors
+  [cwd_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cwd_runtime_recipe.ns)
+  and keeps `cwd_handle/cwd_len/chdir` on their own source-level staging path
+* `hello_temp_runtime_facades.ns`
+  a narrower temp/runtime facade example that mirrors
+  [temp_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/temp_runtime_recipe.ns)
+  and keeps `temp_dir/temp_path_len/temp_file_handle` on their own
+  source-level staging path
+* `hello_home_runtime_facades.ns`
+  a narrower home/runtime facade example that mirrors
+  [home_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/home_runtime_recipe.ns)
+  and keeps `home_dir/home_len/config_dir` on their own source-level staging
+  path
 * `hello_kv_runtime_facades.ns`
   a narrower kv/runtime facade example that mirrors
   [kv_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/kv_runtime_recipe.ns)
@@ -377,6 +404,10 @@ State/persistence facade fast map:
   a narrower cache/runtime facade example that mirrors
   [cache_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cache_runtime_recipe.ns)
   and keeps `cache_open/lookup/store/close` on their own source-level staging path
+* `hello_config_runtime_facades.ns`
+  a narrower config/runtime facade example that mirrors
+  [config_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/config_runtime_recipe.ns)
+  and keeps `config_open/get/close` on their own source-level staging path
 
 Systems mirror map:
 
@@ -495,12 +526,20 @@ Filesystem mini-map:
   - [hello_directory_stat_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_directory_stat_facades.ns)
 * automation/workflow
   - [hello_native_workflow_runtime.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_native_workflow_runtime.ns)
+* cwd/runtime
+  - [hello_cwd_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_cwd_runtime_facades.ns)
+* temp/runtime
+  - [hello_temp_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_temp_runtime_facades.ns)
+* home/runtime
+  - [hello_home_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_home_runtime_facades.ns)
 * location/runtime
   - [hello_location_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_location_runtime_facades.ns)
 * kv/runtime
   - [hello_kv_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_kv_runtime_facades.ns)
 * cache/runtime
   - [hello_cache_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_cache_runtime_facades.ns)
+* config/runtime
+  - [hello_config_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_config_runtime_facades.ns)
 * config/cache
   - [hello_config_cache_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_config_cache_facades.ns)
 
@@ -522,6 +561,12 @@ Task-facing recipe map:
 * [input_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/input_runtime_recipe.ns)
   is the closest direct mirror for
   [hello_input_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_input_runtime_facades.ns)
+* [stdin_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/stdin_runtime_recipe.ns)
+  is the closest direct mirror for
+  [hello_stdin_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_stdin_runtime_facades.ns)
+* [tty_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/tty_runtime_recipe.ns)
+  is the closest direct mirror for
+  [hello_tty_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_tty_runtime_facades.ns)
 
 Recommended reading order for the task-facing FFI examples:
 

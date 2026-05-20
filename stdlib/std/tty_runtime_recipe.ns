@@ -1,0 +1,53 @@
+mod cpu Main {
+  extern "c" fn host_tty_isatty(fd: i64) -> i64;
+  extern "c" fn host_tty_width(fd: i64) -> i64;
+  extern "c" fn host_tty_height(fd: i64) -> i64;
+
+  struct TtyRecipeSeed {
+    primary_fd: i64,
+    secondary_fd: i64
+  }
+
+  struct TtyRecipeSummary {
+    primary_fd: i64,
+    primary_is_tty: i64,
+    primary_width: i64,
+    primary_height: i64,
+    secondary_fd: i64,
+    secondary_is_tty: i64,
+    secondary_width: i64,
+    secondary_height: i64
+  }
+
+  fn capture_tty_runtime(seed: TtyRecipeSeed) -> TtyRecipeSummary {
+    return TtyRecipeSummary {
+      primary_fd: seed.primary_fd,
+      primary_is_tty: host_tty_isatty(seed.primary_fd),
+      primary_width: host_tty_width(seed.primary_fd),
+      primary_height: host_tty_height(seed.primary_fd),
+      secondary_fd: seed.secondary_fd,
+      secondary_is_tty: host_tty_isatty(seed.secondary_fd),
+      secondary_width: host_tty_width(seed.secondary_fd),
+      secondary_height: host_tty_height(seed.secondary_fd)
+    };
+  }
+
+  fn summarize_tty_runtime(primary_fd: i64, secondary_fd: i64) -> i64 {
+    let summary: TtyRecipeSummary = capture_tty_runtime(TtyRecipeSeed {
+      primary_fd: primary_fd,
+      secondary_fd: secondary_fd
+    });
+    return summary.primary_fd
+      + summary.primary_is_tty
+      + summary.primary_width
+      + summary.primary_height
+      + summary.secondary_fd
+      + summary.secondary_is_tty
+      + summary.secondary_width
+      + summary.secondary_height;
+  }
+
+  fn main() {
+    print(summarize_tty_runtime(0, 1));
+  }
+}

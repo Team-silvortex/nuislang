@@ -1,0 +1,25 @@
+mod cpu Main {
+  extern "c" fn host_process_id() -> i64;
+  extern "c" fn host_process_status() -> i64;
+  extern "c" fn host_process_exit_code(status: i64) -> i64;
+
+  struct ProcessFacadeSummary {
+    pid: i64,
+    status: i64,
+    exit_code: i64
+  }
+
+  fn capture_process_facade() -> ProcessFacadeSummary {
+    let status: i64 = host_process_status();
+    return ProcessFacadeSummary {
+      pid: host_process_id(),
+      status: status,
+      exit_code: host_process_exit_code(status)
+    };
+  }
+
+  fn main() {
+    let summary: ProcessFacadeSummary = capture_process_facade();
+    print(summary.pid + summary.status + summary.exit_code);
+  }
+}

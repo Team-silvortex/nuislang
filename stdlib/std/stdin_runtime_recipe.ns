@@ -1,0 +1,41 @@
+mod cpu Main {
+  extern "c" fn host_stdin_read(buffer_handle: i64, len: i64) -> i64;
+
+  struct StdinRecipeSeed {
+    primary_len: i64,
+    secondary_len: i64
+  }
+
+  struct StdinRecipeSummary {
+    primary_requested_len: i64,
+    primary_read_len: i64,
+    secondary_requested_len: i64,
+    secondary_read_len: i64
+  }
+
+  fn capture_stdin_runtime(seed: StdinRecipeSeed) -> StdinRecipeSummary {
+    let primary_backing: ref Buffer = alloc_buffer(seed.primary_len, 0);
+    let secondary_backing: ref Buffer = alloc_buffer(seed.secondary_len, 0);
+    return StdinRecipeSummary {
+      primary_requested_len: seed.primary_len,
+      primary_read_len: host_stdin_read(primary_backing, seed.primary_len),
+      secondary_requested_len: seed.secondary_len,
+      secondary_read_len: host_stdin_read(secondary_backing, seed.secondary_len)
+    };
+  }
+
+  fn summarize_stdin_runtime(primary_len: i64, secondary_len: i64) -> i64 {
+    let summary: StdinRecipeSummary = capture_stdin_runtime(StdinRecipeSeed {
+      primary_len: primary_len,
+      secondary_len: secondary_len
+    });
+    return summary.primary_requested_len
+      + summary.primary_read_len
+      + summary.secondary_requested_len
+      + summary.secondary_read_len;
+  }
+
+  fn main() {
+    print(summarize_stdin_runtime(32, 16));
+  }
+}

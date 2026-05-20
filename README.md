@@ -140,23 +140,12 @@ Reading rule that matches this split:
 * treat sketches, probes, and future notes as design direction, not as already
   promised repository behavior
 
-## Current Reference Examples
-
-Start here:
-
-* [examples/README.md](/Users/Shared/chroot/dev/nuislang/examples/README.md)
-* [examples/ns/README.md](/Users/Shared/chroot/dev/nuislang/examples/ns/README.md)
-* [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
-* [examples/yir/README.md](/Users/Shared/chroot/dev/nuislang/examples/yir/README.md)
-* [examples/bins/README.md](/Users/Shared/chroot/dev/nuislang/examples/bins/README.md)
-* [stdlib/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/README.md)
-* [docs/README.md](/Users/Shared/chroot/dev/nuislang/docs/README.md)
-* [docs/repo-layout.md](/Users/Shared/chroot/dev/nuislang/docs/repo-layout.md)
-
 ## Fast Orientation
 
 If you want the shortest path by goal:
 
+* consolidated current mainline map
+  - [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
 * current user-facing project path
   - [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
   - [docs/reference/yir-tools-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-tools-reference.md)
@@ -173,20 +162,6 @@ If you want the shortest path by goal:
 * quick repo map
   - [docs/repo-layout.md](/Users/Shared/chroot/dev/nuislang/docs/repo-layout.md)
 
-Recommended current examples:
-
-* [examples/ns/core/hello_world.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/core/hello_world.ns)
-* [examples/ns/types/hello_ref_struct.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/types/hello_ref_struct.ns)
-* [examples/ns/data/hello_data.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/data/hello_data.ns)
-* [examples/ns/ffi/hello_ffi.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_ffi.ns)
-* [examples/ns/demos/window_controls_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/window_controls_demo.ns)
-* [examples/projects/window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo)
-* [examples/projects/kernel_tensor_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/kernel_tensor_demo)
-* [examples/yir/demos/window_controls_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/demos/window_controls_demo.yir)
-* [examples/yir/data/data_fabric_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/data/data_fabric_demo.yir)
-* [examples/yir/shader/shader_bindings_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/shader/shader_bindings_demo.yir)
-* [examples/yir/kernel/kernel_auto_broadcast_demo.yir](/Users/Shared/chroot/dev/nuislang/examples/yir/kernel/kernel_auto_broadcast_demo.yir)
-
 ## Key Architectural Notes
 
 Current high-signal architectural facts:
@@ -200,20 +175,6 @@ Current high-signal architectural facts:
 * current Fabric host integration is intentionally thin and AOT-first, with static typed action tables rather than a heavy runtime metadata graph.
 * async/result semantics are being normalized into `yir-core`, even though the concrete entry ops are still currently surfaced through `cpu.*`.
 
-## Notes
-
-This repository now keeps current implementation guidance and historical design material in separate places.
-
-For current reality, stay with:
-
-* [README.md](/Users/Shared/chroot/dev/nuislang/README.md)
-* [docs/README.md](/Users/Shared/chroot/dev/nuislang/docs/README.md)
-* [docs/repo-layout.md](/Users/Shared/chroot/dev/nuislang/docs/repo-layout.md)
-* [docs/reference/yir-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-reference.md)
-* [docs/reference/yir-langref.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-langref.md)
-* [docs/reference/yir-tools-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-tools-reference.md)
-
-For historical architecture arguments and the older long-form whitepaper, go to:
+Historical architecture material lives under:
 
 * [docs/historical/README.md](/Users/Shared/chroot/dev/nuislang/docs/historical/README.md)
-* [docs/historical/nuislang-whitepaper-v0.44b.md](/Users/Shared/chroot/dev/nuislang/docs/historical/nuislang-whitepaper-v0.44b.md)

@@ -57,8 +57,6 @@ Read these examples in roughly five bands:
   - [hello_result_diagnostic_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_result_diagnostic_facades.ns)
     narrow result/diagnostic host example aligned with current
     `std/result_diagnostic_recipe.ns`
-  - [hello_native_cli_runtime.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_native_cli_runtime.ns)
-    repo-local native CLI example aligned with the current AOT-backed `std` host shim batch
   - [hello_native_command_runtime.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_native_command_runtime.ns)
     repo-local native command example aligned with the current shell-oriented
     `program/argv/env` handle bridge in the AOT-backed `std` host shim batch
@@ -131,21 +129,24 @@ Read these examples in roughly five bands:
   - [hello_text_json_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_text_json_facades.ns)
     narrow text/json host example aligned with current
     `std/text_json_recipe.ns`
-  - [hello_native_input_tool.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_native_input_tool.ns)
-    repo-local native input-driven example that reads one file path from `argv`
-    and combines native file/stdin byte counts into its own result
   - [hello_input_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_input_runtime_facades.ns)
     narrower `argv/file/stdin/tty` facade mirror aligned directly with
     `std/input_runtime_recipe.ns`
   - [hello_env_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_env_runtime_facades.ns)
     narrow env/runtime host example aligned with current
     `std/env_runtime_recipe.ns`
-  - [hello_native_cli_pipeline.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_native_cli_pipeline.ns)
-    repo-local native pipeline example that combines input-driven reads with a
-    child command/subprocess step in one front-door flow
-  - [hello_native_tool_runner.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_native_tool_runner.ns)
-    repo-local native tool-shaped example that launches a child command and
-    decides its own result from direct-exit observers
+  - [hello_process_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_process_runtime_facades.ns)
+    narrow process/runtime host example aligned with current
+    `std/process_runtime_recipe.ns`
+  - [hello_stdin_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_stdin_runtime_facades.ns)
+    narrow stdin/runtime host example aligned with current
+    `std/stdin_runtime_recipe.ns`
+  - [hello_tty_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_tty_runtime_facades.ns)
+    narrow tty/runtime host example aligned with current
+    `std/tty_runtime_recipe.ns`
+  - [hello_argv_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_argv_runtime_facades.ns)
+    narrow argv/runtime host example aligned with current
+    `std/argv_runtime_recipe.ns`
   - [hello_native_workflow_runtime.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_native_workflow_runtime.ns)
     repo-local native workflow example aligned with the current AOT-backed `std`
     directory/temp/process/command/subprocess shim batch
@@ -156,6 +157,15 @@ Read these examples in roughly five bands:
     and lane-hint plus monotonic-tick task context
   - [hello_task_cli_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_task_cli_facades.ns)
     task/tooling host example aligned with current `std` task CLI recipe and observer-oriented async/task reporting
+  - [hello_cwd_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_cwd_runtime_facades.ns)
+    narrow cwd/runtime host example aligned with current
+    `std/cwd_runtime_recipe.ns`
+  - [hello_temp_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_temp_runtime_facades.ns)
+    narrow temp/runtime host example aligned with current
+    `std/temp_runtime_recipe.ns`
+  - [hello_home_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_home_runtime_facades.ns)
+    narrow home/runtime host example aligned with current
+    `std/home_runtime_recipe.ns`
   - [hello_location_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_location_runtime_facades.ns)
     narrow location/runtime host example aligned with current
     `std/location_runtime_recipe.ns`
@@ -165,6 +175,9 @@ Read these examples in roughly five bands:
   - [hello_cache_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_cache_runtime_facades.ns)
     narrow cache/runtime host example aligned with current
     `std/cache_runtime_recipe.ns`
+  - [hello_config_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_config_runtime_facades.ns)
+    narrow config/runtime host example aligned with current
+    `std/config_runtime_recipe.ns`
   - [hello_directory_create_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_directory_create_facades.ns)
     narrow directory/create host example aligned with current
     `std/directory_create_recipe.ns`
@@ -174,6 +187,9 @@ Read these examples in roughly five bands:
   - [hello_config_cache_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_config_cache_facades.ns)
     narrow config/cache host example aligned with current
     `std/config_cache_recipe.ns`
+  - broader native host routes are still kept in
+    [examples/ns/ffi/README.md](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/README.md),
+    but they are no longer part of the shortest current route
 * end-to-end demo path
   - [window_controls_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/window_controls_demo.ns)
     current single-file `cpu + data + shader` real-time control/render demo
