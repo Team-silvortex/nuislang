@@ -1,0 +1,79 @@
+mod cpu Main {
+  extern "c" fn host_path_parent(path_handle: i64) -> i64;
+  extern "c" fn host_path_has_parent(path_handle: i64) -> i64;
+  extern "c" fn host_path_parent_matches(path_handle: i64, name_handle: i64) -> i64;
+
+  struct PathParentMatchesSeed {
+    lhs_handle: i64,
+    rhs_handle: i64,
+    lhs_name_handle: i64,
+    rhs_name_handle: i64
+  }
+
+  struct PathParentMatchesSummary {
+    lhs_parent_handle: i64,
+    rhs_parent_handle: i64,
+    lhs_has_parent: i64,
+    rhs_has_parent: i64,
+    lhs_matches_name: i64,
+    rhs_matches_name: i64
+  }
+
+  fn build_path_parent_matches_seed(
+    lhs_handle: i64,
+    rhs_handle: i64,
+    lhs_name_handle: i64,
+    rhs_name_handle: i64
+  ) -> PathParentMatchesSeed {
+    return PathParentMatchesSeed {
+      lhs_handle: lhs_handle,
+      rhs_handle: rhs_handle,
+      lhs_name_handle: lhs_name_handle,
+      rhs_name_handle: rhs_name_handle
+    };
+  }
+
+  fn capture_path_parent_matches(
+    seed: PathParentMatchesSeed
+  ) -> PathParentMatchesSummary {
+    return PathParentMatchesSummary {
+      lhs_parent_handle: host_path_parent(seed.lhs_handle),
+      rhs_parent_handle: host_path_parent(seed.rhs_handle),
+      lhs_has_parent: host_path_has_parent(seed.lhs_handle),
+      rhs_has_parent: host_path_has_parent(seed.rhs_handle),
+      lhs_matches_name: host_path_parent_matches(
+        seed.lhs_handle,
+        seed.lhs_name_handle
+      ),
+      rhs_matches_name: host_path_parent_matches(
+        seed.rhs_handle,
+        seed.rhs_name_handle
+      )
+    };
+  }
+
+  fn summarize_path_parent_matches_recipe(
+    lhs_handle: i64,
+    rhs_handle: i64,
+    lhs_name_handle: i64,
+    rhs_name_handle: i64
+  ) -> i64 {
+    let seed: PathParentMatchesSeed = build_path_parent_matches_seed(
+      lhs_handle,
+      rhs_handle,
+      lhs_name_handle,
+      rhs_name_handle
+    );
+    let summary: PathParentMatchesSummary = capture_path_parent_matches(seed);
+    return summary.lhs_parent_handle
+      + summary.rhs_parent_handle
+      + summary.lhs_has_parent
+      + summary.rhs_has_parent
+      + summary.lhs_matches_name
+      + summary.rhs_matches_name;
+  }
+
+  fn main() {
+    print(summarize_path_parent_matches_recipe(31, 47, 59, 61));
+  }
+}

@@ -151,11 +151,17 @@ High-level read map:
   - [path_parent_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_parent_recipe.ns)
   - [path_has_parent_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_has_parent_recipe.ns)
   - [path_depth_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_depth_recipe.ns)
+  - [path_is_basename_only_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_is_basename_only_recipe.ns)
   - [path_filename_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_filename_recipe.ns)
+  - [path_basename_matches_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_basename_matches_recipe.ns)
+  - [path_filename_matches_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_filename_matches_recipe.ns)
+  - [path_parent_matches_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_parent_matches_recipe.ns)
+  - [path_stem_matches_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_stem_matches_recipe.ns)
   - [path_stem_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_stem_recipe.ns)
   - [path_extension_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_extension_recipe.ns)
   - [path_has_extension_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_has_extension_recipe.ns)
   - [path_matches_extension_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_matches_extension_recipe.ns)
+  - [path_extension_is_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_extension_is_recipe.ns)
   - [path_starts_with_dot_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_starts_with_dot_recipe.ns)
   - [path_is_hidden_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_is_hidden_recipe.ns)
   - [path_is_relative_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_is_relative_recipe.ns)
@@ -185,11 +191,17 @@ High-level read map:
   - [path_parent_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_parent_recipe.ns)
   - [path_has_parent_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_has_parent_recipe.ns)
   - [path_depth_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_depth_recipe.ns)
+  - [path_is_basename_only_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_is_basename_only_recipe.ns)
   - [path_filename_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_filename_recipe.ns)
+  - [path_basename_matches_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_basename_matches_recipe.ns)
+  - [path_filename_matches_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_filename_matches_recipe.ns)
+  - [path_parent_matches_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_parent_matches_recipe.ns)
+  - [path_stem_matches_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_stem_matches_recipe.ns)
   - [path_stem_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_stem_recipe.ns)
   - [path_extension_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_extension_recipe.ns)
   - [path_has_extension_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_has_extension_recipe.ns)
   - [path_matches_extension_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_matches_extension_recipe.ns)
+  - [path_extension_is_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_extension_is_recipe.ns)
   - [path_starts_with_dot_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_starts_with_dot_recipe.ns)
   - [path_is_hidden_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_is_hidden_recipe.ns)
   - [path_is_relative_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_is_relative_recipe.ns)
@@ -235,11 +247,17 @@ Filesystem read/write/mutate mini-map:
   - [path_parent_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_parent_recipe.ns)
   - [path_has_parent_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_has_parent_recipe.ns)
   - [path_depth_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_depth_recipe.ns)
+  - [path_is_basename_only_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_is_basename_only_recipe.ns)
   - [path_filename_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_filename_recipe.ns)
+  - [path_basename_matches_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_basename_matches_recipe.ns)
+  - [path_filename_matches_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_filename_matches_recipe.ns)
+  - [path_parent_matches_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_parent_matches_recipe.ns)
+  - [path_stem_matches_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_stem_matches_recipe.ns)
   - [path_stem_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_stem_recipe.ns)
   - [path_extension_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_extension_recipe.ns)
   - [path_has_extension_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_has_extension_recipe.ns)
   - [path_matches_extension_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_matches_extension_recipe.ns)
+  - [path_extension_is_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_extension_is_recipe.ns)
   - [path_starts_with_dot_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_starts_with_dot_recipe.ns)
   - [path_is_hidden_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_is_hidden_recipe.ns)
   - [path_is_relative_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_is_relative_recipe.ns)
@@ -255,6 +273,101 @@ Filesystem read/write/mutate mini-map:
   - [file_output_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/file_output_recipe.ns)
 * inspection
   - [directory_stat_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/directory_stat_recipe.ns)
+
+Path naming/inspection fast map:
+
+* shape
+  - [path_is_empty_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_is_empty_recipe.ns)
+  - [path_is_dot_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_is_dot_recipe.ns)
+  - [path_is_dotdot_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_is_dotdot_recipe.ns)
+  - [path_is_relative_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_is_relative_recipe.ns)
+  - [path_is_root_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_is_root_recipe.ns)
+  - [path_ends_with_slash_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_ends_with_slash_recipe.ns)
+  - [path_starts_with_dot_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_starts_with_dot_recipe.ns)
+  - [path_is_hidden_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_is_hidden_recipe.ns)
+* structure
+  - [path_parent_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_parent_recipe.ns)
+  - [path_has_parent_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_has_parent_recipe.ns)
+  - [path_depth_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_depth_recipe.ns)
+  - [path_is_basename_only_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_is_basename_only_recipe.ns)
+* name parts
+  - [path_filename_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_filename_recipe.ns)
+  - [path_stem_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_stem_recipe.ns)
+  - [path_extension_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_extension_recipe.ns)
+  - [path_has_extension_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_has_extension_recipe.ns)
+* matches
+  - [path_basename_matches_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_basename_matches_recipe.ns)
+  - [path_filename_matches_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_filename_matches_recipe.ns)
+  - [path_parent_matches_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_parent_matches_recipe.ns)
+  - [path_stem_matches_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_stem_matches_recipe.ns)
+  - [path_matches_extension_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_matches_extension_recipe.ns)
+  - [path_extension_is_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_extension_is_recipe.ns)
+
+Recommended path read order:
+
+* start with [path_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_runtime_recipe.ns)
+  for the smallest naming surface
+* then read [path_parent_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_parent_recipe.ns) and [path_depth_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_depth_recipe.ns)
+  for structure
+* then read [path_filename_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_filename_recipe.ns), [path_stem_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_stem_recipe.ns), and [path_extension_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_extension_recipe.ns)
+  for name-part extraction
+* finish with the comparison helpers, especially [path_basename_matches_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_basename_matches_recipe.ns) and [path_extension_is_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_extension_is_recipe.ns)
+  once the extraction surfaces already feel natural
+
+Tooling/runtime fast map:
+
+* io
+  - [env_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/env_runtime_recipe.ns)
+  - [input_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/input_runtime_recipe.ns)
+  - [terminal_io_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/terminal_io_recipe.ns)
+  - [line_input_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/line_input_recipe.ns)
+  - [file_output_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/file_output_recipe.ns)
+* shell and process
+  - [command_shell_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_shell_recipe.ns)
+  - [automation_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/automation_runtime_recipe.ns)
+* cli and reporting
+  - [cli_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_runtime_recipe.ns)
+  - [report_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/report_runtime_recipe.ns)
+  - [result_diagnostic_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/result_diagnostic_recipe.ns)
+* location and persistence support
+  - [location_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/location_runtime_recipe.ns)
+  - [config_cache_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/config_cache_recipe.ns)
+  - [cache_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cache_runtime_recipe.ns)
+
+Recommended tooling read order:
+
+* start with [env_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/env_runtime_recipe.ns)
+  for the narrowest host presence/value surface
+* then read [input_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/input_runtime_recipe.ns)
+  for the smallest host I/O surface
+* then read [terminal_io_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/terminal_io_recipe.ns) and [line_input_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/line_input_recipe.ns)
+  for interactive terminal staging
+* then read [command_shell_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_shell_recipe.ns)
+  before the wider workflow layer
+* finish with [cli_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_runtime_recipe.ns) and [report_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/report_runtime_recipe.ns)
+  once argv/env/stdout/diagnostic grouping already feels natural
+
+State/location/persistence fast map:
+
+* location
+  - [location_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/location_runtime_recipe.ns)
+* kv
+  - [kv_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/kv_runtime_recipe.ns)
+* cache
+  - [cache_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cache_runtime_recipe.ns)
+* config and cache bridge
+  - [config_cache_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/config_cache_recipe.ns)
+
+Recommended persistence read order:
+
+* start with [location_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/location_runtime_recipe.ns)
+  for the cleanest state-free location surface
+* then read [kv_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/kv_runtime_recipe.ns)
+  for the narrowest explicit store/get path
+* then read [cache_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cache_runtime_recipe.ns)
+  for cache-shaped persistence
+* finish with [config_cache_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/config_cache_recipe.ns)
+  once config plus persistence composition feels natural
 
 * input/runtime
   - recipe:
@@ -319,6 +432,41 @@ Filesystem read/write/mutate mini-map:
     [hello_path_depth_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_depth_facades.ns)
   - narrow project companion:
     [path_depth_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_depth_demo)
+* path/is-basename-only
+  - recipe:
+    [path_is_basename_only_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_is_basename_only_recipe.ns)
+  - single-file mirror:
+    [hello_path_is_basename_only_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_is_basename_only_facades.ns)
+  - narrow project companion:
+    [path_is_basename_only_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_is_basename_only_demo)
+* path/basename-matches
+  - recipe:
+    [path_basename_matches_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_basename_matches_recipe.ns)
+  - single-file mirror:
+    [hello_path_basename_matches_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_basename_matches_facades.ns)
+  - narrow project companion:
+    [path_basename_matches_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_basename_matches_demo)
+* path/filename-matches
+  - recipe:
+    [path_filename_matches_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_filename_matches_recipe.ns)
+  - single-file mirror:
+    [hello_path_filename_matches_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_filename_matches_facades.ns)
+  - narrow project companion:
+    [path_filename_matches_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_filename_matches_demo)
+* path/parent-matches
+  - recipe:
+    [path_parent_matches_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_parent_matches_recipe.ns)
+  - single-file mirror:
+    [hello_path_parent_matches_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_parent_matches_facades.ns)
+  - narrow project companion:
+    [path_parent_matches_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_parent_matches_demo)
+* path/stem-matches
+  - recipe:
+    [path_stem_matches_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_stem_matches_recipe.ns)
+  - single-file mirror:
+    [hello_path_stem_matches_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_stem_matches_facades.ns)
+  - narrow project companion:
+    [path_stem_matches_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_stem_matches_demo)
 * path/filename
   - recipe:
     [path_filename_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_filename_recipe.ns)
@@ -354,6 +502,13 @@ Filesystem read/write/mutate mini-map:
     [hello_path_matches_extension_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_matches_extension_facades.ns)
   - narrow project companion:
     [path_matches_extension_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_matches_extension_demo)
+* path/extension-is
+  - recipe:
+    [path_extension_is_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_extension_is_recipe.ns)
+  - single-file mirror:
+    [hello_path_extension_is_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_extension_is_facades.ns)
+  - narrow project companion:
+    [path_extension_is_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_extension_is_demo)
 * path/starts-with-dot
   - recipe:
     [path_starts_with_dot_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_starts_with_dot_recipe.ns)
@@ -636,6 +791,13 @@ Recommended fast read:
   [hello_task_cli_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_task_cli_facades.ns)
   Project companion:
   [task_cli_tooling_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_cli_tooling_demo)
+* [env_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/env_runtime_recipe.ns)
+  narrow env/runtime staging:
+  `env_has/env_get`
+  Single-file companion:
+  [hello_env_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_env_runtime_facades.ns)
+  Narrow project companion:
+  [env_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/env_runtime_demo)
 * [input_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/input_runtime_recipe.ns)
   narrow native input/runtime staging:
   `argv -> file_read -> stdin_read -> tty_isatty`

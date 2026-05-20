@@ -80,12 +80,30 @@ Read these examples in roughly five bands:
   - [hello_path_depth_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_depth_facades.ns)
     narrow path/depth host example aligned with current
     `std/path_depth_recipe.ns`
+  - [hello_path_is_basename_only_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_is_basename_only_facades.ns)
+    narrow path/is-basename-only host example aligned with current
+    `std/path_is_basename_only_recipe.ns`
+  - [hello_path_basename_matches_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_basename_matches_facades.ns)
+    narrow path/basename-matches host example aligned with current
+    `std/path_basename_matches_recipe.ns`
+  - [hello_path_filename_matches_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_filename_matches_facades.ns)
+    narrow path/filename-matches host example aligned with current
+    `std/path_filename_matches_recipe.ns`
+  - [hello_path_parent_matches_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_parent_matches_facades.ns)
+    narrow path/parent-matches host example aligned with current
+    `std/path_parent_matches_recipe.ns`
+  - [hello_path_stem_matches_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_stem_matches_facades.ns)
+    narrow path/stem-matches host example aligned with current
+    `std/path_stem_matches_recipe.ns`
   - [hello_path_filename_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_filename_facades.ns)
     narrow path/filename host example aligned with current
     `std/path_filename_recipe.ns`
   - [hello_path_matches_extension_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_matches_extension_facades.ns)
     narrow path/matches-extension host example aligned with current
     `std/path_matches_extension_recipe.ns`
+  - [hello_path_extension_is_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_extension_is_facades.ns)
+    narrow path/extension-is host example aligned with current
+    `std/path_extension_is_recipe.ns`
   - [hello_path_starts_with_dot_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_starts_with_dot_facades.ns)
     narrow path/starts-with-dot host example aligned with current
     `std/path_starts_with_dot_recipe.ns`
@@ -119,6 +137,9 @@ Read these examples in roughly five bands:
   - [hello_input_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_input_runtime_facades.ns)
     narrower `argv/file/stdin/tty` facade mirror aligned directly with
     `std/input_runtime_recipe.ns`
+  - [hello_env_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_env_runtime_facades.ns)
+    narrow env/runtime host example aligned with current
+    `std/env_runtime_recipe.ns`
   - [hello_native_cli_pipeline.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_native_cli_pipeline.ns)
     repo-local native pipeline example that combines input-driven reads with a
     child command/subprocess step in one front-door flow

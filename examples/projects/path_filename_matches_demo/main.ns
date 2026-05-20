@@ -1,0 +1,36 @@
+mod cpu Main {
+  extern "c" fn host_path_filename(path_handle: i64) -> i64;
+  extern "c" fn host_path_extension(path_handle: i64) -> i64;
+  extern "c" fn host_path_filename_matches(path_handle: i64, name_handle: i64) -> i64;
+
+  struct PathFilenameMatchesProjectSummary {
+    lhs_filename_handle: i64,
+    rhs_filename_handle: i64,
+    lhs_extension_handle: i64,
+    rhs_extension_handle: i64,
+    lhs_matches_name: i64,
+    rhs_matches_name: i64
+  }
+
+  fn capture_path_filename_matches_project() -> PathFilenameMatchesProjectSummary {
+    return PathFilenameMatchesProjectSummary {
+      lhs_filename_handle: host_path_filename(31),
+      rhs_filename_handle: host_path_filename(47),
+      lhs_extension_handle: host_path_extension(31),
+      rhs_extension_handle: host_path_extension(47),
+      lhs_matches_name: host_path_filename_matches(31, 59),
+      rhs_matches_name: host_path_filename_matches(47, 61)
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: PathFilenameMatchesProjectSummary =
+      capture_path_filename_matches_project();
+    return summary.lhs_filename_handle
+      + summary.rhs_filename_handle
+      + summary.lhs_extension_handle
+      + summary.rhs_extension_handle
+      + summary.lhs_matches_name
+      + summary.rhs_matches_name;
+  }
+}

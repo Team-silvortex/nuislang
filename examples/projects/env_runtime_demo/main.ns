@@ -1,0 +1,28 @@
+mod cpu Main {
+  extern "c" fn host_env_has(key_handle: i64) -> i64;
+  extern "c" fn host_env_get(key_handle: i64) -> i64;
+
+  struct EnvProjectSummary {
+    primary_present: i64,
+    primary_value_handle: i64,
+    fallback_present: i64,
+    fallback_value_handle: i64
+  }
+
+  fn capture_env_project(primary_key_handle: i64, fallback_key_handle: i64) -> EnvProjectSummary {
+    return EnvProjectSummary {
+      primary_present: host_env_has(primary_key_handle),
+      primary_value_handle: host_env_get(primary_key_handle),
+      fallback_present: host_env_has(fallback_key_handle),
+      fallback_value_handle: host_env_get(fallback_key_handle)
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: EnvProjectSummary = capture_env_project(101, 202);
+    return summary.primary_present
+      + summary.primary_value_handle
+      + summary.fallback_present
+      + summary.fallback_value_handle;
+  }
+}

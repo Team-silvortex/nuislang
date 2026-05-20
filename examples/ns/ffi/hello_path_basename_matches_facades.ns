@@ -1,0 +1,38 @@
+mod cpu Main {
+  extern "c" fn host_path_basename(path_handle: i64) -> i64;
+  extern "c" fn host_path_is_basename_only(path_handle: i64) -> i64;
+  extern "c" fn host_path_basename_matches(path_handle: i64, name_handle: i64) -> i64;
+
+  struct PathBasenameMatchesFacadeSummary {
+    lhs_basename_handle: i64,
+    rhs_basename_handle: i64,
+    lhs_is_basename_only: i64,
+    rhs_is_basename_only: i64,
+    lhs_matches_name: i64,
+    rhs_matches_name: i64
+  }
+
+  fn capture_path_basename_matches_facades() -> PathBasenameMatchesFacadeSummary {
+    return PathBasenameMatchesFacadeSummary {
+      lhs_basename_handle: host_path_basename(31),
+      rhs_basename_handle: host_path_basename(47),
+      lhs_is_basename_only: host_path_is_basename_only(31),
+      rhs_is_basename_only: host_path_is_basename_only(47),
+      lhs_matches_name: host_path_basename_matches(31, 59),
+      rhs_matches_name: host_path_basename_matches(47, 61)
+    };
+  }
+
+  fn main() {
+    let summary: PathBasenameMatchesFacadeSummary =
+      capture_path_basename_matches_facades();
+    print(
+      summary.lhs_basename_handle
+        + summary.rhs_basename_handle
+        + summary.lhs_is_basename_only
+        + summary.rhs_is_basename_only
+        + summary.lhs_matches_name
+        + summary.rhs_matches_name
+    );
+  }
+}

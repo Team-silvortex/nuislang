@@ -15,11 +15,17 @@ This folder contains CPU host-bridge examples:
 * `hello_path_parent_facades.ns`
 * `hello_path_has_parent_facades.ns`
 * `hello_path_depth_facades.ns`
+* `hello_path_is_basename_only_facades.ns`
+* `hello_path_basename_matches_facades.ns`
+* `hello_path_filename_matches_facades.ns`
+* `hello_path_parent_matches_facades.ns`
+* `hello_path_stem_matches_facades.ns`
 * `hello_path_filename_facades.ns`
 * `hello_path_stem_facades.ns`
 * `hello_path_extension_facades.ns`
 * `hello_path_has_extension_facades.ns`
 * `hello_path_matches_extension_facades.ns`
+* `hello_path_extension_is_facades.ns`
 * `hello_path_starts_with_dot_facades.ns`
 * `hello_path_is_hidden_facades.ns`
 * `hello_path_is_relative_facades.ns`
@@ -31,6 +37,7 @@ This folder contains CPU host-bridge examples:
 * `hello_file_output_facades.ns`
 * `hello_line_input_facades.ns`
 * `hello_terminal_io_facades.ns`
+* `hello_env_runtime_facades.ns`
 * `hello_text_json_facades.ns`
 * `hello_native_input_tool.ns`
 * `hello_input_runtime_facades.ns`
@@ -82,6 +89,10 @@ Reading guidance:
   [command_shell_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_shell_recipe.ns)
   and now has the narrower project-shaped companion
   [command_shell_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/command_shell_demo)
+* `hello_env_runtime_facades.ns`
+  a narrower env/runtime facade example that mirrors
+  [env_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/env_runtime_recipe.ns)
+  and keeps `env_has/env_get` on their own source-level staging path
 * `hello_path_runtime_facades.ns`
   a narrower path/runtime facade example that mirrors
   [path_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_runtime_recipe.ns)
@@ -116,6 +127,31 @@ Reading guidance:
   [path_depth_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_depth_recipe.ns)
   and keeps `path_parent/path_depth/is_absolute` on their own source-level
   staging path
+* `hello_path_is_basename_only_facades.ns`
+  a narrower path/is-basename-only facade example that mirrors
+  [path_is_basename_only_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_is_basename_only_recipe.ns)
+  and keeps `path_is_empty/path_basename/path_is_basename_only` on their own
+  source-level staging path
+* `hello_path_basename_matches_facades.ns`
+  a narrower path/basename-matches facade example that mirrors
+  [path_basename_matches_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_basename_matches_recipe.ns)
+  and keeps `path_basename/path_is_basename_only/path_basename_matches` on
+  their own source-level staging path
+* `hello_path_filename_matches_facades.ns`
+  a narrower path/filename-matches facade example that mirrors
+  [path_filename_matches_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_filename_matches_recipe.ns)
+  and keeps `path_filename/path_extension/path_filename_matches` on their own
+  source-level staging path
+* `hello_path_parent_matches_facades.ns`
+  a narrower path/parent-matches facade example that mirrors
+  [path_parent_matches_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_parent_matches_recipe.ns)
+  and keeps `path_parent/path_has_parent/path_parent_matches` on their own
+  source-level staging path
+* `hello_path_stem_matches_facades.ns`
+  a narrower path/stem-matches facade example that mirrors
+  [path_stem_matches_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_stem_matches_recipe.ns)
+  and keeps `path_stem/path_extension/path_stem_matches` on their own
+  source-level staging path
 * `hello_path_filename_facades.ns`
   a narrower path/filename facade example that mirrors
   [path_filename_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_filename_recipe.ns)
@@ -141,6 +177,11 @@ Reading guidance:
   [path_matches_extension_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_matches_extension_recipe.ns)
   and keeps `path_extension/path_has_extension/path_matches_extension` on their
   own source-level staging path
+* `hello_path_extension_is_facades.ns`
+  a narrower path/extension-is facade example that mirrors
+  [path_extension_is_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_extension_is_recipe.ns)
+  and keeps `path_extension/path_has_extension/path_extension_is` on their own
+  source-level staging path
 * `hello_path_starts_with_dot_facades.ns`
   a narrower path/starts-with-dot facade example that mirrors
   [path_starts_with_dot_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_starts_with_dot_recipe.ns)
@@ -186,6 +227,61 @@ Reading guidance:
   [file_output_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/file_output_recipe.ns)
   and keeps `temp_file_handle -> file_open/write/close` on their own
   source-level staging path
+
+Path facade fast map:
+
+* shape
+  - `hello_path_is_empty_facades.ns`
+  - `hello_path_is_dot_facades.ns`
+  - `hello_path_is_dotdot_facades.ns`
+  - `hello_path_is_relative_facades.ns`
+  - `hello_path_is_root_facades.ns`
+  - `hello_path_ends_with_slash_facades.ns`
+  - `hello_path_starts_with_dot_facades.ns`
+  - `hello_path_is_hidden_facades.ns`
+* structure
+  - `hello_path_parent_facades.ns`
+  - `hello_path_has_parent_facades.ns`
+  - `hello_path_depth_facades.ns`
+  - `hello_path_is_basename_only_facades.ns`
+* name parts
+  - `hello_path_filename_facades.ns`
+  - `hello_path_stem_facades.ns`
+  - `hello_path_extension_facades.ns`
+  - `hello_path_has_extension_facades.ns`
+* matches
+  - `hello_path_basename_matches_facades.ns`
+  - `hello_path_filename_matches_facades.ns`
+  - `hello_path_parent_matches_facades.ns`
+  - `hello_path_stem_matches_facades.ns`
+  - `hello_path_matches_extension_facades.ns`
+  - `hello_path_extension_is_facades.ns`
+
+Tooling facade fast map:
+
+* io
+  - `hello_env_runtime_facades.ns`
+  - `hello_input_runtime_facades.ns`
+  - `hello_terminal_io_facades.ns`
+  - `hello_line_input_facades.ns`
+  - `hello_file_output_facades.ns`
+* shell and process
+  - `hello_native_command_runtime.ns`
+  - `hello_native_workflow_runtime.ns`
+* cli and reporting
+  - `hello_cli_host_facades.ns`
+  - `hello_result_diagnostic_facades.ns`
+
+State/persistence facade fast map:
+
+* location
+  - `hello_location_runtime_facades.ns`
+* kv
+  - `hello_kv_runtime_facades.ns`
+* cache
+  - `hello_cache_runtime_facades.ns`
+* config and cache bridge
+  - `hello_config_cache_facades.ns`
 * `hello_line_input_facades.ns`
   a narrower line-input facade example that mirrors
   [line_input_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/line_input_recipe.ns)
@@ -294,11 +390,17 @@ Filesystem mini-map:
   - [hello_path_parent_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_parent_facades.ns)
   - [hello_path_has_parent_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_has_parent_facades.ns)
   - [hello_path_depth_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_depth_facades.ns)
+  - [hello_path_is_basename_only_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_is_basename_only_facades.ns)
+  - [hello_path_basename_matches_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_basename_matches_facades.ns)
+  - [hello_path_filename_matches_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_filename_matches_facades.ns)
+  - [hello_path_parent_matches_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_parent_matches_facades.ns)
+  - [hello_path_stem_matches_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_stem_matches_facades.ns)
   - [hello_path_filename_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_filename_facades.ns)
   - [hello_path_stem_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_stem_facades.ns)
   - [hello_path_extension_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_extension_facades.ns)
   - [hello_path_has_extension_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_has_extension_facades.ns)
   - [hello_path_matches_extension_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_matches_extension_facades.ns)
+  - [hello_path_extension_is_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_extension_is_facades.ns)
   - [hello_path_starts_with_dot_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_starts_with_dot_facades.ns)
   - [hello_path_is_hidden_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_is_hidden_facades.ns)
   - [hello_path_is_relative_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_is_relative_facades.ns)
@@ -333,6 +435,16 @@ Filesystem mini-map:
   - [hello_path_has_parent_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_has_parent_facades.ns)
 * path/depth
   - [hello_path_depth_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_depth_facades.ns)
+* path/is-basename-only
+  - [hello_path_is_basename_only_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_is_basename_only_facades.ns)
+* path/basename-matches
+  - [hello_path_basename_matches_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_basename_matches_facades.ns)
+* path/filename-matches
+  - [hello_path_filename_matches_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_filename_matches_facades.ns)
+* path/parent-matches
+  - [hello_path_parent_matches_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_parent_matches_facades.ns)
+* path/stem-matches
+  - [hello_path_stem_matches_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_stem_matches_facades.ns)
 * path/filename
   - [hello_path_filename_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_filename_facades.ns)
 * path/stem
@@ -343,6 +455,8 @@ Filesystem mini-map:
   - [hello_path_has_extension_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_has_extension_facades.ns)
 * path/matches-extension
   - [hello_path_matches_extension_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_matches_extension_facades.ns)
+* path/extension-is
+  - [hello_path_extension_is_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_extension_is_facades.ns)
 * path/starts-with-dot
   - [hello_path_starts_with_dot_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_starts_with_dot_facades.ns)
 * path/is-hidden

@@ -1,0 +1,71 @@
+mod cpu Main {
+  extern "c" fn host_path_extension(path_handle: i64) -> i64;
+  extern "c" fn host_path_has_extension(path_handle: i64) -> i64;
+  extern "c" fn host_path_extension_is(path_handle: i64, ext_handle: i64) -> i64;
+
+  struct PathExtensionIsSeed {
+    lhs_handle: i64,
+    rhs_handle: i64,
+    plain_ext_handle: i64,
+    dotted_ext_handle: i64
+  }
+
+  struct PathExtensionIsSummary {
+    lhs_extension_handle: i64,
+    rhs_extension_handle: i64,
+    lhs_has_extension: i64,
+    rhs_has_extension: i64,
+    lhs_is_plain: i64,
+    rhs_is_dotted: i64
+  }
+
+  fn build_path_extension_is_seed(
+    lhs_handle: i64,
+    rhs_handle: i64,
+    plain_ext_handle: i64,
+    dotted_ext_handle: i64
+  ) -> PathExtensionIsSeed {
+    return PathExtensionIsSeed {
+      lhs_handle: lhs_handle,
+      rhs_handle: rhs_handle,
+      plain_ext_handle: plain_ext_handle,
+      dotted_ext_handle: dotted_ext_handle
+    };
+  }
+
+  fn capture_path_extension_is(seed: PathExtensionIsSeed) -> PathExtensionIsSummary {
+    return PathExtensionIsSummary {
+      lhs_extension_handle: host_path_extension(seed.lhs_handle),
+      rhs_extension_handle: host_path_extension(seed.rhs_handle),
+      lhs_has_extension: host_path_has_extension(seed.lhs_handle),
+      rhs_has_extension: host_path_has_extension(seed.rhs_handle),
+      lhs_is_plain: host_path_extension_is(seed.lhs_handle, seed.plain_ext_handle),
+      rhs_is_dotted: host_path_extension_is(seed.rhs_handle, seed.dotted_ext_handle)
+    };
+  }
+
+  fn summarize_path_extension_is_recipe(
+    lhs_handle: i64,
+    rhs_handle: i64,
+    plain_ext_handle: i64,
+    dotted_ext_handle: i64
+  ) -> i64 {
+    let seed: PathExtensionIsSeed = build_path_extension_is_seed(
+      lhs_handle,
+      rhs_handle,
+      plain_ext_handle,
+      dotted_ext_handle
+    );
+    let summary: PathExtensionIsSummary = capture_path_extension_is(seed);
+    return summary.lhs_extension_handle
+      + summary.rhs_extension_handle
+      + summary.lhs_has_extension
+      + summary.rhs_has_extension
+      + summary.lhs_is_plain
+      + summary.rhs_is_dotted;
+  }
+
+  fn main() {
+    print(summarize_path_extension_is_recipe(31, 47, 59, 61));
+  }
+}

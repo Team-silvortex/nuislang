@@ -1263,6 +1263,85 @@ static int64_t nuis_host_path_filename(int64_t path_handle) {
     return nuis_host_path_basename(path_handle);
 }
 
+static int64_t nuis_host_path_basename_matches(
+    int64_t path_handle,
+    int64_t name_handle
+) {
+    const char* path = nuis_host_text_lookup(path_handle);
+    const char* name = nuis_host_text_lookup(name_handle);
+    if (path == NULL || name == NULL) return 0;
+    size_t len = strlen(path);
+    while (len > 1 && path[len - 1] == '/') {
+        len -= 1;
+    }
+    size_t start = len;
+    while (start > 0 && path[start - 1] != '/') {
+        start -= 1;
+    }
+    size_t slice_len = len - start;
+    size_t name_len = strlen(name);
+    if (slice_len != name_len) return 0;
+    return memcmp(path + start, name, slice_len) == 0 ? 1 : 0;
+}
+
+static int64_t nuis_host_path_filename_matches(
+    int64_t path_handle,
+    int64_t name_handle
+) {
+    return nuis_host_path_basename_matches(path_handle, name_handle);
+}
+
+static int64_t nuis_host_path_parent_matches(
+    int64_t path_handle,
+    int64_t name_handle
+) {
+    const char* path = nuis_host_text_lookup(path_handle);
+    const char* name = nuis_host_text_lookup(name_handle);
+    if (path == NULL || name == NULL) return 0;
+    size_t len = strlen(path);
+    while (len > 1 && path[len - 1] == '/') {
+        len -= 1;
+    }
+    while (len > 1 && path[len - 1] != '/') {
+        len -= 1;
+    }
+    while (len > 1 && path[len - 1] == '/') {
+        len -= 1;
+    }
+    size_t name_len = strlen(name);
+    if (len != name_len) return 0;
+    return memcmp(path, name, len) == 0 ? 1 : 0;
+}
+
+static int64_t nuis_host_path_stem_matches(
+    int64_t path_handle,
+    int64_t name_handle
+) {
+    const char* path = nuis_host_text_lookup(path_handle);
+    const char* name = nuis_host_text_lookup(name_handle);
+    if (path == NULL || name == NULL) return 0;
+    size_t len = strlen(path);
+    while (len > 1 && path[len - 1] == '/') {
+        len -= 1;
+    }
+    size_t start = len;
+    while (start > 0 && path[start - 1] != '/') {
+        start -= 1;
+    }
+    size_t end = len;
+    size_t dot = end;
+    while (dot > start && path[dot - 1] != '.') {
+        dot -= 1;
+    }
+    if (dot > start + 1 && dot < end) {
+        end = dot - 1;
+    }
+    size_t stem_len = end - start;
+    size_t name_len = strlen(name);
+    if (stem_len != name_len) return 0;
+    return memcmp(path + start, name, stem_len) == 0 ? 1 : 0;
+}
+
 static int64_t nuis_host_path_parent(int64_t path_handle) {
     const char* path = nuis_host_text_lookup(path_handle);
     size_t len = strlen(path);
@@ -1297,6 +1376,23 @@ static int64_t nuis_host_path_has_parent(int64_t path_handle) {
         i -= 1;
     }
     return 0;
+}
+
+static int64_t nuis_host_path_is_basename_only(int64_t path_handle) {
+    const char* path = nuis_host_text_lookup(path_handle);
+    if (path == NULL || path[0] == '\0') return 0;
+    size_t len = strlen(path);
+    while (len > 1 && path[len - 1] == '/') {
+        len -= 1;
+    }
+    if (len == 1 && (path[0] == '.' || path[0] == '/')) return 0;
+    if (len == 2 && path[0] == '.' && path[1] == '.') return 0;
+    size_t i = 0;
+    while (i < len) {
+        if (path[i] == '/') return 0;
+        i += 1;
+    }
+    return 1;
 }
 
 static int64_t nuis_host_path_depth(int64_t path_handle) {
@@ -1410,6 +1506,10 @@ static int64_t nuis_host_path_matches_extension(int64_t path_handle, int64_t ext
     const char* actual = path + dot;
     if (ext[0] == '.') ext += 1;
     return strcmp(actual, ext) == 0 ? 1 : 0;
+}
+
+static int64_t nuis_host_path_extension_is(int64_t path_handle, int64_t ext_handle) {
+    return nuis_host_path_matches_extension(path_handle, ext_handle);
 }
 
 static int64_t nuis_host_path_starts_with_dot(int64_t path_handle) {
@@ -1960,6 +2060,30 @@ fn render_host_ffi_stub(symbol: &str, function: AstExternFunction) -> String {
             "    return nuis_host_path_filename({});",
             arg_name(0, &function)
         )
+    } else if symbol == "host_path_basename_matches" {
+        format!(
+            "    return nuis_host_path_basename_matches({}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function)
+        )
+    } else if symbol == "host_path_filename_matches" {
+        format!(
+            "    return nuis_host_path_filename_matches({}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function)
+        )
+    } else if symbol == "host_path_parent_matches" {
+        format!(
+            "    return nuis_host_path_parent_matches({}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function)
+        )
+    } else if symbol == "host_path_stem_matches" {
+        format!(
+            "    return nuis_host_path_stem_matches({}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function)
+        )
     } else if symbol == "host_path_parent" {
         format!(
             "    return nuis_host_path_parent({});",
@@ -1968,6 +2092,11 @@ fn render_host_ffi_stub(symbol: &str, function: AstExternFunction) -> String {
     } else if symbol == "host_path_has_parent" {
         format!(
             "    return nuis_host_path_has_parent({});",
+            arg_name(0, &function)
+        )
+    } else if symbol == "host_path_is_basename_only" {
+        format!(
+            "    return nuis_host_path_is_basename_only({});",
             arg_name(0, &function)
         )
     } else if symbol == "host_path_depth" {
@@ -1993,6 +2122,12 @@ fn render_host_ffi_stub(symbol: &str, function: AstExternFunction) -> String {
     } else if symbol == "host_path_matches_extension" {
         format!(
             "    return nuis_host_path_matches_extension({}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function)
+        )
+    } else if symbol == "host_path_extension_is" {
+        format!(
+            "    return nuis_host_path_extension_is({}, {});",
             arg_name(0, &function),
             arg_name(1, &function)
         )
@@ -2413,6 +2548,70 @@ mod tests {
                 AstExternFunction {
                     abi: "c".to_owned(),
                     interface: None,
+                    name: "host_path_basename_matches".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "path_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "name_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                },
+                AstExternFunction {
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_path_filename_matches".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "path_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "name_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                },
+                AstExternFunction {
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_path_parent_matches".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "path_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "name_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                },
+                AstExternFunction {
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_path_stem_matches".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "path_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "name_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                },
+                AstExternFunction {
+                    abi: "c".to_owned(),
+                    interface: None,
                     name: "host_path_parent".to_owned(),
                     params: vec![nuis_semantics::model::AstParam {
                         name: "path_handle".to_owned(),
@@ -2424,6 +2623,16 @@ mod tests {
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_path_has_parent".to_owned(),
+                    params: vec![nuis_semantics::model::AstParam {
+                        name: "path_handle".to_owned(),
+                        ty: i64_ty(),
+                    }],
+                    return_type: i64_ty(),
+                },
+                AstExternFunction {
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_path_is_basename_only".to_owned(),
                     params: vec![nuis_semantics::model::AstParam {
                         name: "path_handle".to_owned(),
                         ty: i64_ty(),
@@ -2539,6 +2748,22 @@ mod tests {
                 AstExternFunction {
                     abi: "c".to_owned(),
                     interface: None,
+                    name: "host_path_extension_is".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "path_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "ext_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                },
+                AstExternFunction {
+                    abi: "c".to_owned(),
+                    interface: None,
                     name: "host_path_starts_with_dot".to_owned(),
                     params: vec![nuis_semantics::model::AstParam {
                         name: "path_handle".to_owned(),
@@ -2590,13 +2815,19 @@ mod tests {
         assert!(shim.contains("return nuis_host_path_is_root(path_handle);"));
         assert!(shim.contains("return nuis_host_path_basename(path_handle);"));
         assert!(shim.contains("return nuis_host_path_filename(path_handle);"));
+        assert!(shim.contains("return nuis_host_path_basename_matches(path_handle, name_handle);"));
+        assert!(shim.contains("return nuis_host_path_filename_matches(path_handle, name_handle);"));
+        assert!(shim.contains("return nuis_host_path_parent_matches(path_handle, name_handle);"));
+        assert!(shim.contains("return nuis_host_path_stem_matches(path_handle, name_handle);"));
         assert!(shim.contains("return nuis_host_path_parent(path_handle);"));
         assert!(shim.contains("return nuis_host_path_has_parent(path_handle);"));
+        assert!(shim.contains("return nuis_host_path_is_basename_only(path_handle);"));
         assert!(shim.contains("return nuis_host_path_depth(path_handle);"));
         assert!(shim.contains("return nuis_host_path_stem(path_handle);"));
         assert!(shim.contains("return nuis_host_path_extension(path_handle);"));
         assert!(shim.contains("return nuis_host_path_has_extension(path_handle);"));
         assert!(shim.contains("return nuis_host_path_matches_extension(path_handle, ext_handle);"));
+        assert!(shim.contains("return nuis_host_path_extension_is(path_handle, ext_handle);"));
         assert!(shim.contains("return nuis_host_path_starts_with_dot(path_handle);"));
         assert!(shim.contains("return nuis_host_path_ends_with_slash(path_handle);"));
         assert!(shim.contains("return nuis_host_path_is_hidden(path_handle);"));

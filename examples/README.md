@@ -74,6 +74,9 @@ These are the best current front-end examples to read first.
 * [hello_input_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_input_runtime_facades.ns)
   narrow host-facing input/runtime mirror for the current `std` recipe path:
   `argv -> file_read -> stdin_read -> tty_isatty`
+* [hello_env_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_env_runtime_facades.ns)
+  narrow host-facing env/runtime mirror for the current `std` recipe path:
+  `env_has/env_get`
 * [hello_location_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_location_runtime_facades.ns)
   narrow host-facing location/runtime mirror for the current `std` recipe path:
   `cwd -> temp -> home/config-dir`
@@ -110,12 +113,30 @@ These are the best current front-end examples to read first.
 * [hello_path_depth_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_depth_facades.ns)
   narrow host-facing path/depth mirror for the current `std` recipe path:
   `path_parent/path_depth/is_absolute`
+* [hello_path_is_basename_only_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_is_basename_only_facades.ns)
+  narrow host-facing path/is-basename-only mirror for the current `std` recipe path:
+  `path_is_empty/path_basename/path_is_basename_only`
+* [hello_path_basename_matches_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_basename_matches_facades.ns)
+  narrow host-facing path/basename-matches mirror for the current `std` recipe path:
+  `path_basename/path_is_basename_only/path_basename_matches`
+* [hello_path_filename_matches_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_filename_matches_facades.ns)
+  narrow host-facing path/filename-matches mirror for the current `std` recipe path:
+  `path_filename/path_extension/path_filename_matches`
+* [hello_path_parent_matches_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_parent_matches_facades.ns)
+  narrow host-facing path/parent-matches mirror for the current `std` recipe path:
+  `path_parent/path_has_parent/path_parent_matches`
+* [hello_path_stem_matches_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_stem_matches_facades.ns)
+  narrow host-facing path/stem-matches mirror for the current `std` recipe path:
+  `path_stem/path_extension/path_stem_matches`
 * [hello_path_filename_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_filename_facades.ns)
   narrow host-facing path/filename mirror for the current `std` recipe path:
   `path_filename/path_stem/path_extension`
 * [hello_path_matches_extension_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_matches_extension_facades.ns)
   narrow host-facing path/matches-extension mirror for the current `std` recipe path:
   `path_extension/path_has_extension/path_matches_extension`
+* [hello_path_extension_is_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_extension_is_facades.ns)
+  narrow host-facing path/extension-is mirror for the current `std` recipe path:
+  `path_extension/path_has_extension/path_extension_is`
 * [hello_path_starts_with_dot_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_starts_with_dot_facades.ns)
   narrow host-facing path/starts-with-dot mirror for the current `std` recipe path:
   `path_basename/path_starts_with_dot/path_is_hidden`

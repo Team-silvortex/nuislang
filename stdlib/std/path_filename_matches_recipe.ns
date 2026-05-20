@@ -1,0 +1,79 @@
+mod cpu Main {
+  extern "c" fn host_path_filename(path_handle: i64) -> i64;
+  extern "c" fn host_path_extension(path_handle: i64) -> i64;
+  extern "c" fn host_path_filename_matches(path_handle: i64, name_handle: i64) -> i64;
+
+  struct PathFilenameMatchesSeed {
+    lhs_handle: i64,
+    rhs_handle: i64,
+    lhs_name_handle: i64,
+    rhs_name_handle: i64
+  }
+
+  struct PathFilenameMatchesSummary {
+    lhs_filename_handle: i64,
+    rhs_filename_handle: i64,
+    lhs_extension_handle: i64,
+    rhs_extension_handle: i64,
+    lhs_matches_name: i64,
+    rhs_matches_name: i64
+  }
+
+  fn build_path_filename_matches_seed(
+    lhs_handle: i64,
+    rhs_handle: i64,
+    lhs_name_handle: i64,
+    rhs_name_handle: i64
+  ) -> PathFilenameMatchesSeed {
+    return PathFilenameMatchesSeed {
+      lhs_handle: lhs_handle,
+      rhs_handle: rhs_handle,
+      lhs_name_handle: lhs_name_handle,
+      rhs_name_handle: rhs_name_handle
+    };
+  }
+
+  fn capture_path_filename_matches(
+    seed: PathFilenameMatchesSeed
+  ) -> PathFilenameMatchesSummary {
+    return PathFilenameMatchesSummary {
+      lhs_filename_handle: host_path_filename(seed.lhs_handle),
+      rhs_filename_handle: host_path_filename(seed.rhs_handle),
+      lhs_extension_handle: host_path_extension(seed.lhs_handle),
+      rhs_extension_handle: host_path_extension(seed.rhs_handle),
+      lhs_matches_name: host_path_filename_matches(
+        seed.lhs_handle,
+        seed.lhs_name_handle
+      ),
+      rhs_matches_name: host_path_filename_matches(
+        seed.rhs_handle,
+        seed.rhs_name_handle
+      )
+    };
+  }
+
+  fn summarize_path_filename_matches_recipe(
+    lhs_handle: i64,
+    rhs_handle: i64,
+    lhs_name_handle: i64,
+    rhs_name_handle: i64
+  ) -> i64 {
+    let seed: PathFilenameMatchesSeed = build_path_filename_matches_seed(
+      lhs_handle,
+      rhs_handle,
+      lhs_name_handle,
+      rhs_name_handle
+    );
+    let summary: PathFilenameMatchesSummary = capture_path_filename_matches(seed);
+    return summary.lhs_filename_handle
+      + summary.rhs_filename_handle
+      + summary.lhs_extension_handle
+      + summary.rhs_extension_handle
+      + summary.lhs_matches_name
+      + summary.rhs_matches_name;
+  }
+
+  fn main() {
+    print(summarize_path_filename_matches_recipe(31, 47, 59, 61));
+  }
+}
