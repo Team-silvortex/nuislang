@@ -1,0 +1,37 @@
+mod cpu Main {
+  extern "c" fn host_path_is_absolute(path_handle: i64) -> i64;
+  extern "c" fn host_path_is_relative(path_handle: i64) -> i64;
+  extern "c" fn host_path_basename(path_handle: i64) -> i64;
+
+  struct PathIsRelativeFacadeSummary {
+    lhs_is_absolute: i64,
+    rhs_is_absolute: i64,
+    lhs_is_relative: i64,
+    rhs_is_relative: i64,
+    lhs_basename_handle: i64,
+    rhs_basename_handle: i64
+  }
+
+  fn capture_path_is_relative_facades() -> PathIsRelativeFacadeSummary {
+    return PathIsRelativeFacadeSummary {
+      lhs_is_absolute: host_path_is_absolute(31),
+      rhs_is_absolute: host_path_is_absolute(47),
+      lhs_is_relative: host_path_is_relative(31),
+      rhs_is_relative: host_path_is_relative(47),
+      lhs_basename_handle: host_path_basename(31),
+      rhs_basename_handle: host_path_basename(47)
+    };
+  }
+
+  fn main() {
+    let summary: PathIsRelativeFacadeSummary = capture_path_is_relative_facades();
+    print(
+      summary.lhs_is_absolute
+        + summary.rhs_is_absolute
+        + summary.lhs_is_relative
+        + summary.rhs_is_relative
+        + summary.lhs_basename_handle
+        + summary.rhs_basename_handle
+    );
+  }
+}

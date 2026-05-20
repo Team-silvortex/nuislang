@@ -1,0 +1,61 @@
+mod cpu Main {
+  extern "c" fn host_temp_file_handle(prefix_handle: i64) -> i64;
+  extern "c" fn host_path_rename(src_handle: i64, dst_handle: i64) -> i64;
+  extern "c" fn host_fs_exists(path_handle: i64) -> i64;
+
+  struct PathRenameSeed {
+    src_prefix_handle: i64,
+    dst_prefix_handle: i64
+  }
+
+  struct PathRenameSummary {
+    src_path_handle: i64,
+    dst_path_handle: i64,
+    rename_code: i64,
+    src_exists_code: i64,
+    dst_exists_code: i64
+  }
+
+  fn build_path_rename_seed(
+    src_prefix_handle: i64,
+    dst_prefix_handle: i64
+  ) -> PathRenameSeed {
+    return PathRenameSeed {
+      src_prefix_handle: src_prefix_handle,
+      dst_prefix_handle: dst_prefix_handle
+    };
+  }
+
+  fn capture_path_rename(seed: PathRenameSeed) -> PathRenameSummary {
+    let src_path_handle: i64 = host_temp_file_handle(seed.src_prefix_handle);
+    let dst_path_handle: i64 = host_temp_file_handle(seed.dst_prefix_handle);
+    let rename_code: i64 = host_path_rename(src_path_handle, dst_path_handle);
+    return PathRenameSummary {
+      src_path_handle: src_path_handle,
+      dst_path_handle: dst_path_handle,
+      rename_code: rename_code,
+      src_exists_code: host_fs_exists(src_path_handle),
+      dst_exists_code: host_fs_exists(dst_path_handle)
+    };
+  }
+
+  fn summarize_path_rename_recipe(
+    src_prefix_handle: i64,
+    dst_prefix_handle: i64
+  ) -> i64 {
+    let seed: PathRenameSeed = build_path_rename_seed(
+      src_prefix_handle,
+      dst_prefix_handle
+    );
+    let summary: PathRenameSummary = capture_path_rename(seed);
+    return summary.src_path_handle
+      + summary.dst_path_handle
+      + summary.rename_code
+      + summary.src_exists_code
+      + summary.dst_exists_code;
+  }
+
+  fn main() {
+    print(summarize_path_rename_recipe(3001, 3007));
+  }
+}

@@ -1,0 +1,55 @@
+mod cpu Main {
+  extern "c" fn host_path_filename(path_handle: i64) -> i64;
+  extern "c" fn host_path_stem(path_handle: i64) -> i64;
+  extern "c" fn host_path_extension(path_handle: i64) -> i64;
+
+  struct PathFilenameSeed {
+    lhs_handle: i64,
+    rhs_handle: i64
+  }
+
+  struct PathFilenameSummary {
+    lhs_filename_handle: i64,
+    rhs_filename_handle: i64,
+    lhs_stem_handle: i64,
+    rhs_stem_handle: i64,
+    lhs_extension_handle: i64,
+    rhs_extension_handle: i64
+  }
+
+  fn build_path_filename_seed(
+    lhs_handle: i64,
+    rhs_handle: i64
+  ) -> PathFilenameSeed {
+    return PathFilenameSeed {
+      lhs_handle: lhs_handle,
+      rhs_handle: rhs_handle
+    };
+  }
+
+  fn capture_path_filename(seed: PathFilenameSeed) -> PathFilenameSummary {
+    return PathFilenameSummary {
+      lhs_filename_handle: host_path_filename(seed.lhs_handle),
+      rhs_filename_handle: host_path_filename(seed.rhs_handle),
+      lhs_stem_handle: host_path_stem(seed.lhs_handle),
+      rhs_stem_handle: host_path_stem(seed.rhs_handle),
+      lhs_extension_handle: host_path_extension(seed.lhs_handle),
+      rhs_extension_handle: host_path_extension(seed.rhs_handle)
+    };
+  }
+
+  fn summarize_path_filename_recipe(lhs_handle: i64, rhs_handle: i64) -> i64 {
+    let seed: PathFilenameSeed = build_path_filename_seed(lhs_handle, rhs_handle);
+    let summary: PathFilenameSummary = capture_path_filename(seed);
+    return summary.lhs_filename_handle
+      + summary.rhs_filename_handle
+      + summary.lhs_stem_handle
+      + summary.rhs_stem_handle
+      + summary.lhs_extension_handle
+      + summary.rhs_extension_handle;
+  }
+
+  fn main() {
+    print(summarize_path_filename_recipe(31, 47));
+  }
+}

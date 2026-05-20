@@ -1,0 +1,60 @@
+mod cpu Main {
+  extern "c" fn host_path_is_absolute(path_handle: i64) -> i64;
+  extern "c" fn host_path_is_relative(path_handle: i64) -> i64;
+  extern "c" fn host_path_basename(path_handle: i64) -> i64;
+
+  struct PathIsRelativeSeed {
+    lhs_handle: i64,
+    rhs_handle: i64
+  }
+
+  struct PathIsRelativeSummary {
+    lhs_is_absolute: i64,
+    rhs_is_absolute: i64,
+    lhs_is_relative: i64,
+    rhs_is_relative: i64,
+    lhs_basename_handle: i64,
+    rhs_basename_handle: i64
+  }
+
+  fn build_path_is_relative_seed(
+    lhs_handle: i64,
+    rhs_handle: i64
+  ) -> PathIsRelativeSeed {
+    return PathIsRelativeSeed {
+      lhs_handle: lhs_handle,
+      rhs_handle: rhs_handle
+    };
+  }
+
+  fn capture_path_is_relative(
+    seed: PathIsRelativeSeed
+  ) -> PathIsRelativeSummary {
+    return PathIsRelativeSummary {
+      lhs_is_absolute: host_path_is_absolute(seed.lhs_handle),
+      rhs_is_absolute: host_path_is_absolute(seed.rhs_handle),
+      lhs_is_relative: host_path_is_relative(seed.lhs_handle),
+      rhs_is_relative: host_path_is_relative(seed.rhs_handle),
+      lhs_basename_handle: host_path_basename(seed.lhs_handle),
+      rhs_basename_handle: host_path_basename(seed.rhs_handle)
+    };
+  }
+
+  fn summarize_path_is_relative_recipe(lhs_handle: i64, rhs_handle: i64) -> i64 {
+    let seed: PathIsRelativeSeed = build_path_is_relative_seed(
+      lhs_handle,
+      rhs_handle
+    );
+    let summary: PathIsRelativeSummary = capture_path_is_relative(seed);
+    return summary.lhs_is_absolute
+      + summary.rhs_is_absolute
+      + summary.lhs_is_relative
+      + summary.rhs_is_relative
+      + summary.lhs_basename_handle
+      + summary.rhs_basename_handle;
+  }
+
+  fn main() {
+    print(summarize_path_is_relative_recipe(31, 47));
+  }
+}

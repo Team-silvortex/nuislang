@@ -1,0 +1,7 @@
+name = "path_ends_with_slash_demo"
+entry = "main.ns"
+modules = ["main.ns"]
+
+abi = [
+  "cpu=cpu.arm64.apple_aapcs64"
+]

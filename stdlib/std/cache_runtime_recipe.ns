@@ -1,0 +1,54 @@
+mod cpu Main {
+  extern "c" fn host_cache_open(name_handle: i64) -> i64;
+  extern "c" fn host_cache_lookup(cache_handle: i64, key_handle: i64) -> i64;
+  extern "c" fn host_cache_store(cache_handle: i64, key_handle: i64, value_handle: i64) -> i64;
+  extern "c" fn host_cache_close(cache_handle: i64) -> i64;
+
+  struct CacheSeed {
+    name_handle: i64,
+    key_handle: i64,
+    value_handle: i64
+  }
+
+  struct CacheRuntimeSummary {
+    cache_handle: i64,
+    hit_handle: i64,
+    store_code: i64,
+    close_code: i64
+  }
+
+  fn build_cache_seed(name_handle: i64, key_handle: i64, value_handle: i64) -> CacheSeed {
+    return CacheSeed {
+      name_handle: name_handle,
+      key_handle: key_handle,
+      value_handle: value_handle
+    };
+  }
+
+  fn capture_cache_runtime(seed: CacheSeed) -> CacheRuntimeSummary {
+    let cache_handle: i64 = host_cache_open(seed.name_handle);
+    return CacheRuntimeSummary {
+      cache_handle: cache_handle,
+      hit_handle: host_cache_lookup(cache_handle, seed.key_handle),
+      store_code: host_cache_store(cache_handle, seed.key_handle, seed.value_handle),
+      close_code: host_cache_close(cache_handle)
+    };
+  }
+
+  fn summarize_cache_runtime_recipe(
+    name_handle: i64,
+    key_handle: i64,
+    value_handle: i64
+  ) -> i64 {
+    let seed: CacheSeed = build_cache_seed(name_handle, key_handle, value_handle);
+    let summary: CacheRuntimeSummary = capture_cache_runtime(seed);
+    return summary.cache_handle
+      + summary.hit_handle
+      + summary.store_code
+      + summary.close_code;
+  }
+
+  fn main() {
+    print(summarize_cache_runtime_recipe(1607, 41, 777));
+  }
+}

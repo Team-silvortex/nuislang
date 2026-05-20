@@ -1,0 +1,53 @@
+mod cpu Main {
+  extern "c" fn host_dir_open(path_handle: i64) -> i64;
+  extern "c" fn host_dir_entry_count(dir_handle: i64) -> i64;
+  extern "c" fn host_dir_close(dir_handle: i64) -> i64;
+  extern "c" fn host_fs_exists(path_handle: i64) -> i64;
+  extern "c" fn host_fs_kind(path_handle: i64) -> i64;
+  extern "c" fn host_fs_size(path_handle: i64) -> i64;
+  extern "c" fn host_stat_mode(path_handle: i64) -> i64;
+  extern "c" fn host_stat_mtime_ns(path_handle: i64) -> i64;
+  extern "c" fn host_stat_ctime_ns(path_handle: i64) -> i64;
+
+  struct DirectoryStatFacadeSummary {
+    dir_handle: i64,
+    dir_entry_count: i64,
+    dir_close_code: i64,
+    exists: i64,
+    kind: i64,
+    size: i64,
+    mode: i64,
+    mtime_ns: i64,
+    ctime_ns: i64
+  }
+
+  fn capture_directory_stat_facades() -> DirectoryStatFacadeSummary {
+    let dir_handle: i64 = host_dir_open(2001);
+    return DirectoryStatFacadeSummary {
+      dir_handle: dir_handle,
+      dir_entry_count: host_dir_entry_count(dir_handle),
+      dir_close_code: host_dir_close(dir_handle),
+      exists: host_fs_exists(2103),
+      kind: host_fs_kind(2103),
+      size: host_fs_size(2103),
+      mode: host_stat_mode(2103),
+      mtime_ns: host_stat_mtime_ns(2103),
+      ctime_ns: host_stat_ctime_ns(2103)
+    };
+  }
+
+  fn main() {
+    let summary: DirectoryStatFacadeSummary = capture_directory_stat_facades();
+    print(
+      summary.dir_handle
+        + summary.dir_entry_count
+        + summary.dir_close_code
+        + summary.exists
+        + summary.kind
+        + summary.size
+        + summary.mode
+        + summary.mtime_ns
+        + summary.ctime_ns
+    );
+  }
+}

@@ -1,0 +1,63 @@
+mod cpu Main {
+  extern "c" fn host_temp_file_handle(prefix_handle: i64) -> i64;
+  extern "c" fn host_file_open(path_handle: i64, flags: i64) -> i64;
+  extern "c" fn host_file_write(file_handle: i64, text_handle: i64) -> i64;
+  extern "c" fn host_file_close(file_handle: i64) -> i64;
+
+  struct FileOutputSeed {
+    prefix_handle: i64,
+    text_handle: i64,
+    flags: i64
+  }
+
+  struct FileOutputSummary {
+    path_handle: i64,
+    file_handle: i64,
+    write_code: i64,
+    close_code: i64
+  }
+
+  fn build_file_output_seed(
+    prefix_handle: i64,
+    text_handle: i64,
+    flags: i64
+  ) -> FileOutputSeed {
+    return FileOutputSeed {
+      prefix_handle: prefix_handle,
+      text_handle: text_handle,
+      flags: flags
+    };
+  }
+
+  fn capture_file_output(seed: FileOutputSeed) -> FileOutputSummary {
+    let path_handle: i64 = host_temp_file_handle(seed.prefix_handle);
+    let file_handle: i64 = host_file_open(path_handle, seed.flags);
+    return FileOutputSummary {
+      path_handle: path_handle,
+      file_handle: file_handle,
+      write_code: host_file_write(file_handle, seed.text_handle),
+      close_code: host_file_close(file_handle)
+    };
+  }
+
+  fn summarize_file_output_recipe(
+    prefix_handle: i64,
+    text_handle: i64,
+    flags: i64
+  ) -> i64 {
+    let seed: FileOutputSeed = build_file_output_seed(
+      prefix_handle,
+      text_handle,
+      flags
+    );
+    let summary: FileOutputSummary = capture_file_output(seed);
+    return summary.path_handle
+      + summary.file_handle
+      + summary.write_code
+      + summary.close_code;
+  }
+
+  fn main() {
+    print(summarize_file_output_recipe(221, 777, 1));
+  }
+}

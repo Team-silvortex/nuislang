@@ -1,0 +1,35 @@
+mod cpu Main {
+  extern "c" fn host_path_stem(path_handle: i64) -> i64;
+  extern "c" fn host_path_extension(path_handle: i64) -> i64;
+  extern "c" fn host_path_is_absolute(path_handle: i64) -> i64;
+
+  struct PathExtensionProjectSummary {
+    lhs_stem_handle: i64,
+    rhs_stem_handle: i64,
+    lhs_extension_handle: i64,
+    rhs_extension_handle: i64,
+    lhs_is_absolute: i64,
+    rhs_is_absolute: i64
+  }
+
+  fn capture_path_extension_project() -> PathExtensionProjectSummary {
+    return PathExtensionProjectSummary {
+      lhs_stem_handle: host_path_stem(31),
+      rhs_stem_handle: host_path_stem(47),
+      lhs_extension_handle: host_path_extension(31),
+      rhs_extension_handle: host_path_extension(47),
+      lhs_is_absolute: host_path_is_absolute(31),
+      rhs_is_absolute: host_path_is_absolute(47)
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: PathExtensionProjectSummary = capture_path_extension_project();
+    return summary.lhs_stem_handle
+      + summary.rhs_stem_handle
+      + summary.lhs_extension_handle
+      + summary.rhs_extension_handle
+      + summary.lhs_is_absolute
+      + summary.rhs_is_absolute;
+  }
+}

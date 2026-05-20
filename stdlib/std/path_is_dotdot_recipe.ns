@@ -1,0 +1,55 @@
+mod cpu Main {
+  extern "c" fn host_path_is_empty(path_handle: i64) -> i64;
+  extern "c" fn host_path_is_dotdot(path_handle: i64) -> i64;
+  extern "c" fn host_path_is_relative(path_handle: i64) -> i64;
+
+  struct PathIsDotdotSeed {
+    lhs_handle: i64,
+    rhs_handle: i64
+  }
+
+  struct PathIsDotdotSummary {
+    lhs_is_empty: i64,
+    rhs_is_empty: i64,
+    lhs_is_dotdot: i64,
+    rhs_is_dotdot: i64,
+    lhs_is_relative: i64,
+    rhs_is_relative: i64
+  }
+
+  fn build_path_is_dotdot_seed(
+    lhs_handle: i64,
+    rhs_handle: i64
+  ) -> PathIsDotdotSeed {
+    return PathIsDotdotSeed {
+      lhs_handle: lhs_handle,
+      rhs_handle: rhs_handle
+    };
+  }
+
+  fn capture_path_is_dotdot(seed: PathIsDotdotSeed) -> PathIsDotdotSummary {
+    return PathIsDotdotSummary {
+      lhs_is_empty: host_path_is_empty(seed.lhs_handle),
+      rhs_is_empty: host_path_is_empty(seed.rhs_handle),
+      lhs_is_dotdot: host_path_is_dotdot(seed.lhs_handle),
+      rhs_is_dotdot: host_path_is_dotdot(seed.rhs_handle),
+      lhs_is_relative: host_path_is_relative(seed.lhs_handle),
+      rhs_is_relative: host_path_is_relative(seed.rhs_handle)
+    };
+  }
+
+  fn summarize_path_is_dotdot_recipe(lhs_handle: i64, rhs_handle: i64) -> i64 {
+    let seed: PathIsDotdotSeed = build_path_is_dotdot_seed(lhs_handle, rhs_handle);
+    let summary: PathIsDotdotSummary = capture_path_is_dotdot(seed);
+    return summary.lhs_is_empty
+      + summary.rhs_is_empty
+      + summary.lhs_is_dotdot
+      + summary.rhs_is_dotdot
+      + summary.lhs_is_relative
+      + summary.rhs_is_relative;
+  }
+
+  fn main() {
+    print(summarize_path_is_dotdot_recipe(31, 47));
+  }
+}

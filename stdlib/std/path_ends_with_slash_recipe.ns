@@ -1,0 +1,60 @@
+mod cpu Main {
+  extern "c" fn host_path_is_root(path_handle: i64) -> i64;
+  extern "c" fn host_path_ends_with_slash(path_handle: i64) -> i64;
+  extern "c" fn host_path_depth(path_handle: i64) -> i64;
+
+  struct PathEndsWithSlashSeed {
+    lhs_handle: i64,
+    rhs_handle: i64
+  }
+
+  struct PathEndsWithSlashSummary {
+    lhs_is_root: i64,
+    rhs_is_root: i64,
+    lhs_ends_with_slash: i64,
+    rhs_ends_with_slash: i64,
+    lhs_depth: i64,
+    rhs_depth: i64
+  }
+
+  fn build_path_ends_with_slash_seed(
+    lhs_handle: i64,
+    rhs_handle: i64
+  ) -> PathEndsWithSlashSeed {
+    return PathEndsWithSlashSeed {
+      lhs_handle: lhs_handle,
+      rhs_handle: rhs_handle
+    };
+  }
+
+  fn capture_path_ends_with_slash(
+    seed: PathEndsWithSlashSeed
+  ) -> PathEndsWithSlashSummary {
+    return PathEndsWithSlashSummary {
+      lhs_is_root: host_path_is_root(seed.lhs_handle),
+      rhs_is_root: host_path_is_root(seed.rhs_handle),
+      lhs_ends_with_slash: host_path_ends_with_slash(seed.lhs_handle),
+      rhs_ends_with_slash: host_path_ends_with_slash(seed.rhs_handle),
+      lhs_depth: host_path_depth(seed.lhs_handle),
+      rhs_depth: host_path_depth(seed.rhs_handle)
+    };
+  }
+
+  fn summarize_path_ends_with_slash_recipe(lhs_handle: i64, rhs_handle: i64) -> i64 {
+    let seed: PathEndsWithSlashSeed = build_path_ends_with_slash_seed(
+      lhs_handle,
+      rhs_handle
+    );
+    let summary: PathEndsWithSlashSummary = capture_path_ends_with_slash(seed);
+    return summary.lhs_is_root
+      + summary.rhs_is_root
+      + summary.lhs_ends_with_slash
+      + summary.rhs_ends_with_slash
+      + summary.lhs_depth
+      + summary.rhs_depth;
+  }
+
+  fn main() {
+    print(summarize_path_ends_with_slash_recipe(31, 47));
+  }
+}

@@ -1,0 +1,92 @@
+mod cpu Main {
+  extern "c" fn host_text_len(text_handle: i64) -> i64;
+  extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
+  extern "c" fn host_text_concat_len(lhs_handle: i64, rhs_handle: i64) -> i64;
+  extern "c" fn host_text_measure(text_handle: i64) -> i64;
+  extern "c" fn host_json_pair_len(key_handle: i64, value_handle: i64) -> i64;
+  extern "c" fn host_json_array_len(item_count: i64) -> i64;
+  extern "c" fn host_json_object_len(field_count: i64) -> i64;
+
+  struct TextJsonSeed {
+    lhs_handle: i64,
+    rhs_handle: i64,
+    key_handle: i64,
+    value_handle: i64,
+    item_count: i64,
+    field_count: i64
+  }
+
+  struct TextJsonSummary {
+    lhs_len: i64,
+    rhs_len: i64,
+    merged_handle: i64,
+    merged_len: i64,
+    measured_len: i64,
+    pair_len: i64,
+    array_len: i64,
+    object_len: i64
+  }
+
+  fn build_text_json_seed(
+    lhs_handle: i64,
+    rhs_handle: i64,
+    key_handle: i64,
+    value_handle: i64,
+    item_count: i64,
+    field_count: i64
+  ) -> TextJsonSeed {
+    return TextJsonSeed {
+      lhs_handle: lhs_handle,
+      rhs_handle: rhs_handle,
+      key_handle: key_handle,
+      value_handle: value_handle,
+      item_count: item_count,
+      field_count: field_count
+    };
+  }
+
+  fn capture_text_json(seed: TextJsonSeed) -> TextJsonSummary {
+    let merged_handle: i64 = host_text_concat(seed.lhs_handle, seed.rhs_handle);
+    return TextJsonSummary {
+      lhs_len: host_text_len(seed.lhs_handle),
+      rhs_len: host_text_len(seed.rhs_handle),
+      merged_handle: merged_handle,
+      merged_len: host_text_concat_len(seed.lhs_handle, seed.rhs_handle),
+      measured_len: host_text_measure(merged_handle),
+      pair_len: host_json_pair_len(seed.key_handle, seed.value_handle),
+      array_len: host_json_array_len(seed.item_count),
+      object_len: host_json_object_len(seed.field_count)
+    };
+  }
+
+  fn summarize_text_json_recipe(
+    lhs_handle: i64,
+    rhs_handle: i64,
+    key_handle: i64,
+    value_handle: i64,
+    item_count: i64,
+    field_count: i64
+  ) -> i64 {
+    let seed: TextJsonSeed = build_text_json_seed(
+      lhs_handle,
+      rhs_handle,
+      key_handle,
+      value_handle,
+      item_count,
+      field_count
+    );
+    let summary: TextJsonSummary = capture_text_json(seed);
+    return summary.lhs_len
+      + summary.rhs_len
+      + summary.merged_handle
+      + summary.merged_len
+      + summary.measured_len
+      + summary.pair_len
+      + summary.array_len
+      + summary.object_len;
+  }
+
+  fn main() {
+    print(summarize_text_json_recipe(11, 19, 601, 709, 3, 2));
+  }
+}

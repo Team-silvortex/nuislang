@@ -1,0 +1,77 @@
+mod cpu Main {
+  extern "c" fn host_dir_open(path_handle: i64) -> i64;
+  extern "c" fn host_dir_entry_count(dir_handle: i64) -> i64;
+  extern "c" fn host_dir_close(dir_handle: i64) -> i64;
+  extern "c" fn host_fs_exists(path_handle: i64) -> i64;
+  extern "c" fn host_fs_kind(path_handle: i64) -> i64;
+  extern "c" fn host_fs_size(path_handle: i64) -> i64;
+  extern "c" fn host_stat_mode(path_handle: i64) -> i64;
+  extern "c" fn host_stat_mtime_ns(path_handle: i64) -> i64;
+  extern "c" fn host_stat_ctime_ns(path_handle: i64) -> i64;
+
+  struct DirectoryStatSeed {
+    dir_path_handle: i64,
+    file_path_handle: i64
+  }
+
+  struct DirectoryStatSummary {
+    dir_handle: i64,
+    dir_entry_count: i64,
+    dir_close_code: i64,
+    exists: i64,
+    kind: i64,
+    size: i64,
+    mode: i64,
+    mtime_ns: i64,
+    ctime_ns: i64
+  }
+
+  fn build_directory_stat_seed(
+    dir_path_handle: i64,
+    file_path_handle: i64
+  ) -> DirectoryStatSeed {
+    return DirectoryStatSeed {
+      dir_path_handle: dir_path_handle,
+      file_path_handle: file_path_handle
+    };
+  }
+
+  fn capture_directory_stat(seed: DirectoryStatSeed) -> DirectoryStatSummary {
+    let dir_handle: i64 = host_dir_open(seed.dir_path_handle);
+    return DirectoryStatSummary {
+      dir_handle: dir_handle,
+      dir_entry_count: host_dir_entry_count(dir_handle),
+      dir_close_code: host_dir_close(dir_handle),
+      exists: host_fs_exists(seed.file_path_handle),
+      kind: host_fs_kind(seed.file_path_handle),
+      size: host_fs_size(seed.file_path_handle),
+      mode: host_stat_mode(seed.file_path_handle),
+      mtime_ns: host_stat_mtime_ns(seed.file_path_handle),
+      ctime_ns: host_stat_ctime_ns(seed.file_path_handle)
+    };
+  }
+
+  fn summarize_directory_stat_recipe(
+    dir_path_handle: i64,
+    file_path_handle: i64
+  ) -> i64 {
+    let seed: DirectoryStatSeed = build_directory_stat_seed(
+      dir_path_handle,
+      file_path_handle
+    );
+    let summary: DirectoryStatSummary = capture_directory_stat(seed);
+    return summary.dir_handle
+      + summary.dir_entry_count
+      + summary.dir_close_code
+      + summary.exists
+      + summary.kind
+      + summary.size
+      + summary.mode
+      + summary.mtime_ns
+      + summary.ctime_ns;
+  }
+
+  fn main() {
+    print(summarize_directory_stat_recipe(2001, 2103));
+  }
+}

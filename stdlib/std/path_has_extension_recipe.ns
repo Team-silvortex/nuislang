@@ -1,0 +1,60 @@
+mod cpu Main {
+  extern "c" fn host_path_stem(path_handle: i64) -> i64;
+  extern "c" fn host_path_extension(path_handle: i64) -> i64;
+  extern "c" fn host_path_has_extension(path_handle: i64) -> i64;
+
+  struct PathHasExtensionSeed {
+    lhs_handle: i64,
+    rhs_handle: i64
+  }
+
+  struct PathHasExtensionSummary {
+    lhs_stem_handle: i64,
+    rhs_stem_handle: i64,
+    lhs_extension_handle: i64,
+    rhs_extension_handle: i64,
+    lhs_has_extension: i64,
+    rhs_has_extension: i64
+  }
+
+  fn build_path_has_extension_seed(
+    lhs_handle: i64,
+    rhs_handle: i64
+  ) -> PathHasExtensionSeed {
+    return PathHasExtensionSeed {
+      lhs_handle: lhs_handle,
+      rhs_handle: rhs_handle
+    };
+  }
+
+  fn capture_path_has_extension(
+    seed: PathHasExtensionSeed
+  ) -> PathHasExtensionSummary {
+    return PathHasExtensionSummary {
+      lhs_stem_handle: host_path_stem(seed.lhs_handle),
+      rhs_stem_handle: host_path_stem(seed.rhs_handle),
+      lhs_extension_handle: host_path_extension(seed.lhs_handle),
+      rhs_extension_handle: host_path_extension(seed.rhs_handle),
+      lhs_has_extension: host_path_has_extension(seed.lhs_handle),
+      rhs_has_extension: host_path_has_extension(seed.rhs_handle)
+    };
+  }
+
+  fn summarize_path_has_extension_recipe(lhs_handle: i64, rhs_handle: i64) -> i64 {
+    let seed: PathHasExtensionSeed = build_path_has_extension_seed(
+      lhs_handle,
+      rhs_handle
+    );
+    let summary: PathHasExtensionSummary = capture_path_has_extension(seed);
+    return summary.lhs_stem_handle
+      + summary.rhs_stem_handle
+      + summary.lhs_extension_handle
+      + summary.rhs_extension_handle
+      + summary.lhs_has_extension
+      + summary.rhs_has_extension;
+  }
+
+  fn main() {
+    print(summarize_path_has_extension_recipe(31, 47));
+  }
+}

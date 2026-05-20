@@ -1,0 +1,52 @@
+mod cpu Main {
+  extern "c" fn host_temp_file_handle(prefix_handle: i64) -> i64;
+  extern "c" fn host_dir_create(path_handle: i64) -> i64;
+  extern "c" fn host_dir_remove(path_handle: i64) -> i64;
+  extern "c" fn host_fs_exists(path_handle: i64) -> i64;
+
+  struct DirectoryRemoveSeed {
+    prefix_handle: i64
+  }
+
+  struct DirectoryRemoveSummary {
+    path_handle: i64,
+    create_code: i64,
+    exists_before_remove: i64,
+    remove_code: i64,
+    exists_after_remove: i64
+  }
+
+  fn build_directory_remove_seed(prefix_handle: i64) -> DirectoryRemoveSeed {
+    return DirectoryRemoveSeed {
+      prefix_handle: prefix_handle
+    };
+  }
+
+  fn capture_directory_remove(seed: DirectoryRemoveSeed) -> DirectoryRemoveSummary {
+    let path_handle: i64 = host_temp_file_handle(seed.prefix_handle);
+    let create_code: i64 = host_dir_create(path_handle);
+    let exists_before_remove: i64 = host_fs_exists(path_handle);
+    let remove_code: i64 = host_dir_remove(path_handle);
+    return DirectoryRemoveSummary {
+      path_handle: path_handle,
+      create_code: create_code,
+      exists_before_remove: exists_before_remove,
+      remove_code: remove_code,
+      exists_after_remove: host_fs_exists(path_handle)
+    };
+  }
+
+  fn summarize_directory_remove_recipe(prefix_handle: i64) -> i64 {
+    let seed: DirectoryRemoveSeed = build_directory_remove_seed(prefix_handle);
+    let summary: DirectoryRemoveSummary = capture_directory_remove(seed);
+    return summary.path_handle
+      + summary.create_code
+      + summary.exists_before_remove
+      + summary.remove_code
+      + summary.exists_after_remove;
+  }
+
+  fn main() {
+    print(summarize_directory_remove_recipe(2813));
+  }
+}

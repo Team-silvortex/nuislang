@@ -255,16 +255,110 @@ Also included:
 
 Narrow systems companions:
 
+Filesystem mini-map:
+
+* naming
+  - [path_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_runtime_demo)
+  - [path_is_empty_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_is_empty_demo)
+  - [path_is_dot_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_is_dot_demo)
+  - [path_is_dotdot_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_is_dotdot_demo)
+  - [path_parent_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_parent_demo)
+  - [path_depth_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_depth_demo)
+  - [path_filename_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_filename_demo)
+  - [path_stem_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_stem_demo)
+  - [path_extension_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_extension_demo)
+  - [path_has_extension_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_has_extension_demo)
+  - [path_matches_extension_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_matches_extension_demo)
+  - [path_starts_with_dot_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_starts_with_dot_demo)
+  - [path_is_hidden_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_is_hidden_demo)
+  - [path_is_relative_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_is_relative_demo)
+  - [path_is_root_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_is_root_demo)
+  - [path_ends_with_slash_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_ends_with_slash_demo)
+* mutation
+  - [path_rename_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_rename_demo)
+  - [path_copy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_copy_demo)
+  - [path_remove_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_remove_demo)
+  - [directory_create_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/directory_create_demo)
+  - [directory_remove_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/directory_remove_demo)
+* output
+  - [file_output_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/file_output_demo)
+* inspection
+  - [directory_stat_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/directory_stat_demo)
+
 * input/runtime
   - [input_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/input_runtime_demo)
 * command/shell
   - [command_shell_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/command_shell_demo)
+* path/runtime
+  - [path_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_runtime_demo)
+* path/is-empty
+  - [path_is_empty_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_is_empty_demo)
+* path/is-dot
+  - [path_is_dot_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_is_dot_demo)
+* path/is-dotdot
+  - [path_is_dotdot_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_is_dotdot_demo)
+* path/parent
+  - [path_parent_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_parent_demo)
+* path/has-parent
+  - [path_has_parent_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_has_parent_demo)
+* path/depth
+  - [path_depth_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_depth_demo)
+* path/filename
+  - [path_filename_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_filename_demo)
+* path/stem
+  - [path_stem_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_stem_demo)
+* path/extension
+  - [path_extension_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_extension_demo)
+* path/has-extension
+  - [path_has_extension_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_has_extension_demo)
+* path/matches-extension
+  - [path_matches_extension_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_matches_extension_demo)
+* path/starts-with-dot
+  - [path_starts_with_dot_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_starts_with_dot_demo)
+* path/is-hidden
+  - [path_is_hidden_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_is_hidden_demo)
+* path/is-relative
+  - [path_is_relative_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_is_relative_demo)
+* path/is-root
+  - [path_is_root_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_is_root_demo)
+* path/ends-with-slash
+  - [path_ends_with_slash_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_ends_with_slash_demo)
+* path/rename
+  - [path_rename_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_rename_demo)
+* path/copy
+  - [path_copy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_copy_demo)
+* path/remove
+  - [path_remove_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/path_remove_demo)
+* file/output
+  - [file_output_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/file_output_demo)
+* line-input
+  - [line_input_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/line_input_demo)
+* terminal/io
+  - [terminal_io_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/terminal_io_demo)
+* text/json
+  - [text_json_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/text_json_demo)
 * cli/runtime
   - [cli_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/cli_runtime_demo)
+* result/diagnostic
+  - [result_diagnostic_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/result_diagnostic_demo)
 * report/diagnostic
   - [report_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/report_runtime_demo)
+* directory/create
+  - [directory_create_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/directory_create_demo)
+* directory/remove
+  - [directory_remove_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/directory_remove_demo)
+* directory/stat
+  - [directory_stat_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/directory_stat_demo)
 * automation/workflow
   - [automation_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/automation_runtime_demo)
+* location/runtime
+  - [location_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/location_runtime_demo)
+* kv/runtime
+  - [kv_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/kv_runtime_demo)
+* cache/runtime
+  - [cache_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/cache_runtime_demo)
+* config/cache
+  - [config_cache_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/config_cache_demo)
 
 Task-facing `std` companions:
 

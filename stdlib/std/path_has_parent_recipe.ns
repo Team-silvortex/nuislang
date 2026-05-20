@@ -1,0 +1,55 @@
+mod cpu Main {
+  extern "c" fn host_path_parent(path_handle: i64) -> i64;
+  extern "c" fn host_path_has_parent(path_handle: i64) -> i64;
+  extern "c" fn host_path_depth(path_handle: i64) -> i64;
+
+  struct PathHasParentSeed {
+    lhs_handle: i64,
+    rhs_handle: i64
+  }
+
+  struct PathHasParentSummary {
+    lhs_parent_handle: i64,
+    rhs_parent_handle: i64,
+    lhs_has_parent: i64,
+    rhs_has_parent: i64,
+    lhs_depth: i64,
+    rhs_depth: i64
+  }
+
+  fn build_path_has_parent_seed(
+    lhs_handle: i64,
+    rhs_handle: i64
+  ) -> PathHasParentSeed {
+    return PathHasParentSeed {
+      lhs_handle: lhs_handle,
+      rhs_handle: rhs_handle
+    };
+  }
+
+  fn capture_path_has_parent(seed: PathHasParentSeed) -> PathHasParentSummary {
+    return PathHasParentSummary {
+      lhs_parent_handle: host_path_parent(seed.lhs_handle),
+      rhs_parent_handle: host_path_parent(seed.rhs_handle),
+      lhs_has_parent: host_path_has_parent(seed.lhs_handle),
+      rhs_has_parent: host_path_has_parent(seed.rhs_handle),
+      lhs_depth: host_path_depth(seed.lhs_handle),
+      rhs_depth: host_path_depth(seed.rhs_handle)
+    };
+  }
+
+  fn summarize_path_has_parent_recipe(lhs_handle: i64, rhs_handle: i64) -> i64 {
+    let seed: PathHasParentSeed = build_path_has_parent_seed(lhs_handle, rhs_handle);
+    let summary: PathHasParentSummary = capture_path_has_parent(seed);
+    return summary.lhs_parent_handle
+      + summary.rhs_parent_handle
+      + summary.lhs_has_parent
+      + summary.rhs_has_parent
+      + summary.lhs_depth
+      + summary.rhs_depth;
+  }
+
+  fn main() {
+    print(summarize_path_has_parent_recipe(31, 47));
+  }
+}

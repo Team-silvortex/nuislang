@@ -1,0 +1,61 @@
+mod cpu Main {
+  extern "c" fn host_cwd_handle() -> i64;
+  extern "c" fn host_cwd_len() -> i64;
+  extern "c" fn host_temp_dir_handle() -> i64;
+  extern "c" fn host_temp_path_len() -> i64;
+  extern "c" fn host_temp_file_handle(prefix_handle: i64) -> i64;
+  extern "c" fn host_home_dir_handle() -> i64;
+  extern "c" fn host_home_dir_len() -> i64;
+  extern "c" fn host_config_dir_handle() -> i64;
+
+  struct LocationSeed {
+    prefix_handle: i64
+  }
+
+  struct LocationRuntimeSummary {
+    cwd_handle: i64,
+    cwd_len: i64,
+    temp_dir_handle: i64,
+    temp_path_len: i64,
+    temp_file_handle: i64,
+    home_handle: i64,
+    home_len: i64,
+    config_handle: i64
+  }
+
+  fn build_location_seed(prefix_handle: i64) -> LocationSeed {
+    return LocationSeed {
+      prefix_handle: prefix_handle
+    };
+  }
+
+  fn capture_location_runtime(seed: LocationSeed) -> LocationRuntimeSummary {
+    return LocationRuntimeSummary {
+      cwd_handle: host_cwd_handle(),
+      cwd_len: host_cwd_len(),
+      temp_dir_handle: host_temp_dir_handle(),
+      temp_path_len: host_temp_path_len(),
+      temp_file_handle: host_temp_file_handle(seed.prefix_handle),
+      home_handle: host_home_dir_handle(),
+      home_len: host_home_dir_len(),
+      config_handle: host_config_dir_handle()
+    };
+  }
+
+  fn summarize_location_recipe(prefix_handle: i64) -> i64 {
+    let seed: LocationSeed = build_location_seed(prefix_handle);
+    let summary: LocationRuntimeSummary = capture_location_runtime(seed);
+    return summary.cwd_handle
+      + summary.cwd_len
+      + summary.temp_dir_handle
+      + summary.temp_path_len
+      + summary.temp_file_handle
+      + summary.home_handle
+      + summary.home_len
+      + summary.config_handle;
+  }
+
+  fn main() {
+    print(summarize_location_recipe(2401));
+  }
+}

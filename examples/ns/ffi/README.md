@@ -5,8 +5,33 @@ This folder contains CPU host-bridge examples:
 * `hello_ffi.ns`
 * `hello_c_ffi.ns`
 * `hello_cli_host_facades.ns`
+* `hello_result_diagnostic_facades.ns`
 * `hello_native_cli_runtime.ns`
 * `hello_native_command_runtime.ns`
+* `hello_path_runtime_facades.ns`
+* `hello_path_is_empty_facades.ns`
+* `hello_path_is_dot_facades.ns`
+* `hello_path_is_dotdot_facades.ns`
+* `hello_path_parent_facades.ns`
+* `hello_path_has_parent_facades.ns`
+* `hello_path_depth_facades.ns`
+* `hello_path_filename_facades.ns`
+* `hello_path_stem_facades.ns`
+* `hello_path_extension_facades.ns`
+* `hello_path_has_extension_facades.ns`
+* `hello_path_matches_extension_facades.ns`
+* `hello_path_starts_with_dot_facades.ns`
+* `hello_path_is_hidden_facades.ns`
+* `hello_path_is_relative_facades.ns`
+* `hello_path_is_root_facades.ns`
+* `hello_path_ends_with_slash_facades.ns`
+* `hello_path_rename_facades.ns`
+* `hello_path_copy_facades.ns`
+* `hello_path_remove_facades.ns`
+* `hello_file_output_facades.ns`
+* `hello_line_input_facades.ns`
+* `hello_terminal_io_facades.ns`
+* `hello_text_json_facades.ns`
 * `hello_native_input_tool.ns`
 * `hello_input_runtime_facades.ns`
 * `hello_native_cli_pipeline.ns`
@@ -15,6 +40,12 @@ This folder contains CPU host-bridge examples:
 * `hello_clock_test_facades.ns`
 * `hello_task_scheduler_facades.ns`
 * `hello_task_cli_facades.ns`
+* `hello_directory_create_facades.ns`
+* `hello_directory_remove_facades.ns`
+* `hello_directory_stat_facades.ns`
+* `hello_location_runtime_facades.ns`
+* `hello_kv_runtime_facades.ns`
+* `hello_cache_runtime_facades.ns`
 * `hello_config_cache_facades.ns`
 
 Reading guidance:
@@ -32,6 +63,11 @@ Reading guidance:
   , and
   [automation_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/automation_runtime_recipe.ns)
   from the current `stdlib/std` host-backed tooling direction
+* `hello_result_diagnostic_facades.ns`
+  a narrower result/diagnostic facade example that mirrors
+  [result_diagnostic_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/result_diagnostic_recipe.ns)
+  and keeps `result_is_ok/value/error` plus `error_code/message/severity` and
+  `diag_label/span/emit` on their own source-level staging path
 * `hello_native_cli_runtime.ns`
   a more concrete native-backed CLI example that leans on the current AOT shim
   batch for `argv/env/cwd/path/fs/stdout/process`, so it is a better guide when
@@ -46,6 +82,123 @@ Reading guidance:
   [command_shell_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_shell_recipe.ns)
   and now has the narrower project-shaped companion
   [command_shell_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/command_shell_demo)
+* `hello_path_runtime_facades.ns`
+  a narrower path/runtime facade example that mirrors
+  [path_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_runtime_recipe.ns)
+  and keeps `path_join/is_absolute/basename` on their own source-level staging path
+* `hello_path_is_empty_facades.ns`
+  a narrower path/is-empty facade example that mirrors
+  [path_is_empty_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_is_empty_recipe.ns)
+  and keeps `path_is_empty/path_is_absolute/path_is_relative` on their own
+  source-level staging path
+* `hello_path_is_dot_facades.ns`
+  a narrower path/is-dot facade example that mirrors
+  [path_is_dot_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_is_dot_recipe.ns)
+  and keeps `path_is_empty/path_is_dot/path_is_relative` on their own
+  source-level staging path
+* `hello_path_is_dotdot_facades.ns`
+  a narrower path/is-dotdot facade example that mirrors
+  [path_is_dotdot_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_is_dotdot_recipe.ns)
+  and keeps `path_is_empty/path_is_dotdot/path_is_relative` on their own
+  source-level staging path
+* `hello_path_parent_facades.ns`
+  a narrower path/parent facade example that mirrors
+  [path_parent_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_parent_recipe.ns)
+  and keeps `path_parent/is_absolute/basename` on their own source-level
+  staging path
+* `hello_path_has_parent_facades.ns`
+  a narrower path/has-parent facade example that mirrors
+  [path_has_parent_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_has_parent_recipe.ns)
+  and keeps `path_parent/path_has_parent/path_depth` on their own source-level
+  staging path
+* `hello_path_depth_facades.ns`
+  a narrower path/depth facade example that mirrors
+  [path_depth_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_depth_recipe.ns)
+  and keeps `path_parent/path_depth/is_absolute` on their own source-level
+  staging path
+* `hello_path_filename_facades.ns`
+  a narrower path/filename facade example that mirrors
+  [path_filename_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_filename_recipe.ns)
+  and keeps `path_filename/path_stem/path_extension` on their own
+  source-level staging path
+* `hello_path_stem_facades.ns`
+  a narrower path/stem facade example that mirrors
+  [path_stem_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_stem_recipe.ns)
+  and keeps `path_parent/path_stem/is_absolute` on their own source-level
+  staging path
+* `hello_path_extension_facades.ns`
+  a narrower path/extension facade example that mirrors
+  [path_extension_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_extension_recipe.ns)
+  and keeps `path_stem/path_extension/is_absolute` on their own source-level
+  staging path
+* `hello_path_has_extension_facades.ns`
+  a narrower path/has-extension facade example that mirrors
+  [path_has_extension_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_has_extension_recipe.ns)
+  and keeps `path_stem/path_extension/path_has_extension` on their own
+  source-level staging path
+* `hello_path_matches_extension_facades.ns`
+  a narrower path/matches-extension facade example that mirrors
+  [path_matches_extension_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_matches_extension_recipe.ns)
+  and keeps `path_extension/path_has_extension/path_matches_extension` on their
+  own source-level staging path
+* `hello_path_starts_with_dot_facades.ns`
+  a narrower path/starts-with-dot facade example that mirrors
+  [path_starts_with_dot_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_starts_with_dot_recipe.ns)
+  and keeps `path_basename/path_starts_with_dot/path_is_hidden` on their own
+  source-level staging path
+* `hello_path_is_hidden_facades.ns`
+  a narrower path/is-hidden facade example that mirrors
+  [path_is_hidden_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_is_hidden_recipe.ns)
+  and keeps `path_basename/path_extension/path_is_hidden` on their own
+  source-level staging path
+* `hello_path_is_relative_facades.ns`
+  a narrower path/is-relative facade example that mirrors
+  [path_is_relative_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_is_relative_recipe.ns)
+  and keeps `path_is_absolute/path_is_relative/path_basename` on their own
+  source-level staging path
+* `hello_path_is_root_facades.ns`
+  a narrower path/is-root facade example that mirrors
+  [path_is_root_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_is_root_recipe.ns)
+  and keeps `path_is_absolute/path_is_root/path_parent` on their own
+  source-level staging path
+* `hello_path_ends_with_slash_facades.ns`
+  a narrower path/ends-with-slash facade example that mirrors
+  [path_ends_with_slash_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_ends_with_slash_recipe.ns)
+  and keeps `path_is_root/path_ends_with_slash/path_depth` on their own
+  source-level staging path
+* `hello_path_rename_facades.ns`
+  a narrower path/rename facade example that mirrors
+  [path_rename_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_rename_recipe.ns)
+  and keeps `temp_file_handle -> path_rename -> fs_exists` on their own
+  source-level staging path
+* `hello_path_copy_facades.ns`
+  a narrower path/copy facade example that mirrors
+  [path_copy_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_copy_recipe.ns)
+  and keeps `temp source -> file_write -> path_copy -> fs_exists` on their own
+  source-level staging path
+* `hello_path_remove_facades.ns`
+  a narrower path/remove facade example that mirrors
+  [path_remove_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/path_remove_recipe.ns)
+  and keeps `temp_file_handle -> path_remove -> fs_exists` on their own
+  source-level staging path
+* `hello_file_output_facades.ns`
+  a narrower file/output facade example that mirrors
+  [file_output_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/file_output_recipe.ns)
+  and keeps `temp_file_handle -> file_open/write/close` on their own
+  source-level staging path
+* `hello_line_input_facades.ns`
+  a narrower line-input facade example that mirrors
+  [line_input_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/line_input_recipe.ns)
+  and keeps `line_read/line_len` on their own source-level staging path
+* `hello_terminal_io_facades.ns`
+  a narrower terminal/io facade example that mirrors
+  [terminal_io_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/terminal_io_recipe.ns)
+  and keeps `stdout/stderr/stdin/tty` on their own source-level staging path
+* `hello_text_json_facades.ns`
+  a narrower text/json facade example that mirrors
+  [text_json_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/text_json_recipe.ns)
+  and keeps `text_len/concat/measure` plus `json_pair/object/array` on their
+  own source-level staging path
 * `hello_native_input_tool.ns`
   a small input-driven native example that takes a file path from `argv`,
   performs one native file read, performs one native stdin read, and folds the
@@ -101,19 +254,139 @@ Reading guidance:
   [config_cache_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/config_cache_recipe.ns)
   and keeps `config_open/get/close` plus `cache_open/lookup/store/close` on
   their own source-level staging path
+* `hello_directory_create_facades.ns`
+  a narrower directory/create facade example that mirrors
+  [directory_create_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/directory_create_recipe.ns)
+  and keeps `temp_file_handle -> dir_create -> fs_exists` on their own
+  source-level staging path
+* `hello_directory_remove_facades.ns`
+  a narrower directory/remove facade example that mirrors
+  [directory_remove_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/directory_remove_recipe.ns)
+  and keeps `temp_file_handle -> dir_create -> dir_remove -> fs_exists` on
+  their own source-level staging path
+* `hello_directory_stat_facades.ns`
+  a narrower directory/stat facade example that mirrors
+  [directory_stat_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/directory_stat_recipe.ns)
+  and keeps `dir_open/entry_count/close` plus `fs/stat` inspection on their
+  own source-level staging path
+* `hello_location_runtime_facades.ns`
+  a narrower location/runtime facade example that mirrors
+  [location_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/location_runtime_recipe.ns)
+  and keeps `cwd/temp/home/config-dir` on their own source-level staging path
+* `hello_kv_runtime_facades.ns`
+  a narrower kv/runtime facade example that mirrors
+  [kv_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/kv_runtime_recipe.ns)
+  and keeps `kv_open/put/get/close` on their own source-level staging path
+* `hello_cache_runtime_facades.ns`
+  a narrower cache/runtime facade example that mirrors
+  [cache_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cache_runtime_recipe.ns)
+  and keeps `cache_open/lookup/store/close` on their own source-level staging path
 
 Systems mirror map:
+
+Filesystem mini-map:
+
+* naming
+  - [hello_path_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_runtime_facades.ns)
+  - [hello_path_is_empty_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_is_empty_facades.ns)
+  - [hello_path_is_dot_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_is_dot_facades.ns)
+  - [hello_path_is_dotdot_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_is_dotdot_facades.ns)
+  - [hello_path_parent_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_parent_facades.ns)
+  - [hello_path_has_parent_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_has_parent_facades.ns)
+  - [hello_path_depth_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_depth_facades.ns)
+  - [hello_path_filename_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_filename_facades.ns)
+  - [hello_path_stem_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_stem_facades.ns)
+  - [hello_path_extension_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_extension_facades.ns)
+  - [hello_path_has_extension_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_has_extension_facades.ns)
+  - [hello_path_matches_extension_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_matches_extension_facades.ns)
+  - [hello_path_starts_with_dot_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_starts_with_dot_facades.ns)
+  - [hello_path_is_hidden_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_is_hidden_facades.ns)
+  - [hello_path_is_relative_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_is_relative_facades.ns)
+  - [hello_path_is_root_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_is_root_facades.ns)
+  - [hello_path_ends_with_slash_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_ends_with_slash_facades.ns)
+* mutation
+  - [hello_path_rename_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_rename_facades.ns)
+  - [hello_path_copy_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_copy_facades.ns)
+  - [hello_path_remove_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_remove_facades.ns)
+  - [hello_directory_create_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_directory_create_facades.ns)
+  - [hello_directory_remove_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_directory_remove_facades.ns)
+* output
+  - [hello_file_output_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_file_output_facades.ns)
+* inspection
+  - [hello_directory_stat_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_directory_stat_facades.ns)
 
 * input/runtime
   - [hello_input_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_input_runtime_facades.ns)
 * command/shell
   - [hello_native_command_runtime.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_native_command_runtime.ns)
+* path/runtime
+  - [hello_path_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_runtime_facades.ns)
+* path/is-empty
+  - [hello_path_is_empty_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_is_empty_facades.ns)
+* path/is-dot
+  - [hello_path_is_dot_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_is_dot_facades.ns)
+* path/is-dotdot
+  - [hello_path_is_dotdot_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_is_dotdot_facades.ns)
+* path/parent
+  - [hello_path_parent_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_parent_facades.ns)
+* path/has-parent
+  - [hello_path_has_parent_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_has_parent_facades.ns)
+* path/depth
+  - [hello_path_depth_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_depth_facades.ns)
+* path/filename
+  - [hello_path_filename_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_filename_facades.ns)
+* path/stem
+  - [hello_path_stem_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_stem_facades.ns)
+* path/extension
+  - [hello_path_extension_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_extension_facades.ns)
+* path/has-extension
+  - [hello_path_has_extension_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_has_extension_facades.ns)
+* path/matches-extension
+  - [hello_path_matches_extension_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_matches_extension_facades.ns)
+* path/starts-with-dot
+  - [hello_path_starts_with_dot_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_starts_with_dot_facades.ns)
+* path/is-hidden
+  - [hello_path_is_hidden_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_is_hidden_facades.ns)
+* path/is-relative
+  - [hello_path_is_relative_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_is_relative_facades.ns)
+* path/is-root
+  - [hello_path_is_root_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_is_root_facades.ns)
+* path/ends-with-slash
+  - [hello_path_ends_with_slash_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_ends_with_slash_facades.ns)
+* path/rename
+  - [hello_path_rename_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_rename_facades.ns)
+* path/copy
+  - [hello_path_copy_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_copy_facades.ns)
+* path/remove
+  - [hello_path_remove_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_remove_facades.ns)
+* file/output
+  - [hello_file_output_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_file_output_facades.ns)
+* line-input
+  - [hello_line_input_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_line_input_facades.ns)
+* terminal/io
+  - [hello_terminal_io_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_terminal_io_facades.ns)
+* text/json
+  - [hello_text_json_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_text_json_facades.ns)
 * cli/runtime
   - [hello_cli_host_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_cli_host_facades.ns)
+* result/diagnostic
+  - [hello_result_diagnostic_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_result_diagnostic_facades.ns)
 * report/diagnostic
   - [hello_cli_host_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_cli_host_facades.ns)
+* directory/create
+  - [hello_directory_create_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_directory_create_facades.ns)
+* directory/remove
+  - [hello_directory_remove_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_directory_remove_facades.ns)
+* directory/stat
+  - [hello_directory_stat_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_directory_stat_facades.ns)
 * automation/workflow
   - [hello_native_workflow_runtime.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_native_workflow_runtime.ns)
+* location/runtime
+  - [hello_location_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_location_runtime_facades.ns)
+* kv/runtime
+  - [hello_kv_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_kv_runtime_facades.ns)
+* cache/runtime
+  - [hello_cache_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_cache_runtime_facades.ns)
 * config/cache
   - [hello_config_cache_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_config_cache_facades.ns)
 

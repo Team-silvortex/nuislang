@@ -1,0 +1,35 @@
+mod cpu Main {
+  extern "c" fn host_path_is_empty(path_handle: i64) -> i64;
+  extern "c" fn host_path_is_dot(path_handle: i64) -> i64;
+  extern "c" fn host_path_is_relative(path_handle: i64) -> i64;
+
+  struct PathIsDotProjectSummary {
+    lhs_is_empty: i64,
+    rhs_is_empty: i64,
+    lhs_is_dot: i64,
+    rhs_is_dot: i64,
+    lhs_is_relative: i64,
+    rhs_is_relative: i64
+  }
+
+  fn capture_path_is_dot_project() -> PathIsDotProjectSummary {
+    return PathIsDotProjectSummary {
+      lhs_is_empty: host_path_is_empty(31),
+      rhs_is_empty: host_path_is_empty(47),
+      lhs_is_dot: host_path_is_dot(31),
+      rhs_is_dot: host_path_is_dot(47),
+      lhs_is_relative: host_path_is_relative(31),
+      rhs_is_relative: host_path_is_relative(47)
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: PathIsDotProjectSummary = capture_path_is_dot_project();
+    return summary.lhs_is_empty
+      + summary.rhs_is_empty
+      + summary.lhs_is_dot
+      + summary.rhs_is_dot
+      + summary.lhs_is_relative
+      + summary.rhs_is_relative;
+  }
+}

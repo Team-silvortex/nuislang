@@ -74,6 +74,75 @@ These are the best current front-end examples to read first.
 * [hello_input_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_input_runtime_facades.ns)
   narrow host-facing input/runtime mirror for the current `std` recipe path:
   `argv -> file_read -> stdin_read -> tty_isatty`
+* [hello_location_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_location_runtime_facades.ns)
+  narrow host-facing location/runtime mirror for the current `std` recipe path:
+  `cwd -> temp -> home/config-dir`
+* [hello_kv_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_kv_runtime_facades.ns)
+  narrow host-facing kv/runtime mirror for the current `std` recipe path:
+  `kv_open/put/get/close`
+* [hello_cache_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_cache_runtime_facades.ns)
+  narrow host-facing cache/runtime mirror for the current `std` recipe path:
+  `cache_open/lookup/store/close`
+* [hello_directory_create_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_directory_create_facades.ns)
+  narrow host-facing directory/create mirror for the current `std` recipe path:
+  `temp_file_handle -> dir_create -> fs_exists`
+* [hello_directory_stat_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_directory_stat_facades.ns)
+  narrow host-facing directory/stat mirror for the current `std` recipe path:
+  `dir_open/entry_count/close -> fs/stat`
+* [hello_terminal_io_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_terminal_io_facades.ns)
+  narrow host-facing terminal/io mirror for the current `std` recipe path:
+  `stdout/stderr/stdin/tty`
+* [hello_path_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_runtime_facades.ns)
+  narrow host-facing path/runtime mirror for the current `std` recipe path:
+  `path_join/is_absolute/basename`
+* [hello_path_is_empty_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_is_empty_facades.ns)
+  narrow host-facing path/is-empty mirror for the current `std` recipe path:
+  `path_is_empty/path_is_absolute/path_is_relative`
+* [hello_path_is_dot_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_is_dot_facades.ns)
+  narrow host-facing path/is-dot mirror for the current `std` recipe path:
+  `path_is_empty/path_is_dot/path_is_relative`
+* [hello_path_is_dotdot_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_is_dotdot_facades.ns)
+  narrow host-facing path/is-dotdot mirror for the current `std` recipe path:
+  `path_is_empty/path_is_dotdot/path_is_relative`
+* [hello_path_has_parent_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_has_parent_facades.ns)
+  narrow host-facing path/has-parent mirror for the current `std` recipe path:
+  `path_parent/path_has_parent/path_depth`
+* [hello_path_depth_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_depth_facades.ns)
+  narrow host-facing path/depth mirror for the current `std` recipe path:
+  `path_parent/path_depth/is_absolute`
+* [hello_path_filename_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_filename_facades.ns)
+  narrow host-facing path/filename mirror for the current `std` recipe path:
+  `path_filename/path_stem/path_extension`
+* [hello_path_matches_extension_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_matches_extension_facades.ns)
+  narrow host-facing path/matches-extension mirror for the current `std` recipe path:
+  `path_extension/path_has_extension/path_matches_extension`
+* [hello_path_starts_with_dot_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_starts_with_dot_facades.ns)
+  narrow host-facing path/starts-with-dot mirror for the current `std` recipe path:
+  `path_basename/path_starts_with_dot/path_is_hidden`
+* [hello_path_is_root_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_is_root_facades.ns)
+  narrow host-facing path/is-root mirror for the current `std` recipe path:
+  `path_is_absolute/path_is_root/path_parent`
+* [hello_path_ends_with_slash_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_ends_with_slash_facades.ns)
+  narrow host-facing path/ends-with-slash mirror for the current `std` recipe path:
+  `path_is_root/path_ends_with_slash/path_depth`
+* [hello_path_rename_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_rename_facades.ns)
+  narrow host-facing path/rename mirror for the current `std` recipe path:
+  `temp_file_handle -> path_rename -> fs_exists`
+* [hello_path_remove_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_remove_facades.ns)
+  narrow host-facing path/remove mirror for the current `std` recipe path:
+  `temp_file_handle -> path_remove -> fs_exists`
+* [hello_file_output_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_file_output_facades.ns)
+  narrow host-facing file/output mirror for the current `std` recipe path:
+  `temp_file_handle -> file_open/write/close`
+* [hello_line_input_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_line_input_facades.ns)
+  narrow host-facing line-input mirror for the current `std` recipe path:
+  `line_read/line_len`
+* [hello_text_json_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_text_json_facades.ns)
+  narrow host-facing text/json mirror for the current `std` recipe path:
+  `text_len/concat/measure -> json_pair/object/array`
+* [hello_result_diagnostic_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_result_diagnostic_facades.ns)
+  narrow host-facing result/diagnostic mirror for the current `std` recipe path:
+  `result_is_ok/value/error -> error -> diagnostic`
 * [hello_config_cache_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_config_cache_facades.ns)
   narrow host-facing config/cache mirror for the current `std` recipe path:
   `config_open/get/close -> cache_open/lookup/store/close`

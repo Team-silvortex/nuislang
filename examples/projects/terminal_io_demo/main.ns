@@ -1,0 +1,53 @@
+mod cpu Main {
+  extern "c" fn host_stdout_write(text_handle: i64) -> i64;
+  extern "c" fn host_stderr_write(text_handle: i64) -> i64;
+  extern "c" fn host_stdout_flush() -> i64;
+  extern "c" fn host_stderr_flush() -> i64;
+  extern "c" fn host_stdin_read(buffer_handle: i64, len: i64) -> i64;
+  extern "c" fn host_tty_isatty(fd: i64) -> i64;
+  extern "c" fn host_tty_width(fd: i64) -> i64;
+  extern "c" fn host_tty_height(fd: i64) -> i64;
+
+  struct TerminalIoProjectSummary {
+    stdout_written: i64,
+    stderr_written: i64,
+    stdout_flushed: i64,
+    stderr_flushed: i64,
+    stdin_read_len: i64,
+    stdin_requested_len: i64,
+    tty_fd: i64,
+    tty_is_tty: i64,
+    tty_width: i64,
+    tty_height: i64
+  }
+
+  fn capture_terminal_io_project(read_len: i64, fd: i64) -> TerminalIoProjectSummary {
+    let stdin_backing: ref Buffer = alloc_buffer(read_len, 0);
+    return TerminalIoProjectSummary {
+      stdout_written: host_stdout_write(71),
+      stderr_written: host_stderr_write(89),
+      stdout_flushed: host_stdout_flush(),
+      stderr_flushed: host_stderr_flush(),
+      stdin_read_len: host_stdin_read(stdin_backing, read_len),
+      stdin_requested_len: read_len,
+      tty_fd: fd,
+      tty_is_tty: host_tty_isatty(fd),
+      tty_width: host_tty_width(fd),
+      tty_height: host_tty_height(fd)
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: TerminalIoProjectSummary = capture_terminal_io_project(32, 1);
+    return summary.stdout_written
+      + summary.stderr_written
+      + summary.stdout_flushed
+      + summary.stderr_flushed
+      + summary.stdin_read_len
+      + summary.stdin_requested_len
+      + summary.tty_fd
+      + summary.tty_is_tty
+      + summary.tty_width
+      + summary.tty_height;
+  }
+}

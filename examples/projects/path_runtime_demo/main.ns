@@ -1,0 +1,32 @@
+mod cpu Main {
+  extern "c" fn host_path_join_len(lhs_handle: i64, rhs_handle: i64) -> i64;
+  extern "c" fn host_path_is_absolute(path_handle: i64) -> i64;
+  extern "c" fn host_path_basename(path_handle: i64) -> i64;
+
+  struct PathProjectSummary {
+    lhs_is_absolute: i64,
+    rhs_is_absolute: i64,
+    lhs_basename_handle: i64,
+    rhs_basename_handle: i64,
+    joined_len: i64
+  }
+
+  fn capture_path_project() -> PathProjectSummary {
+    return PathProjectSummary {
+      lhs_is_absolute: host_path_is_absolute(31),
+      rhs_is_absolute: host_path_is_absolute(47),
+      lhs_basename_handle: host_path_basename(31),
+      rhs_basename_handle: host_path_basename(47),
+      joined_len: host_path_join_len(31, 47)
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: PathProjectSummary = capture_path_project();
+    return summary.lhs_is_absolute
+      + summary.rhs_is_absolute
+      + summary.lhs_basename_handle
+      + summary.rhs_basename_handle
+      + summary.joined_len;
+  }
+}

@@ -1,0 +1,35 @@
+mod cpu Main {
+  extern "c" fn host_path_basename(path_handle: i64) -> i64;
+  extern "c" fn host_path_extension(path_handle: i64) -> i64;
+  extern "c" fn host_path_is_hidden(path_handle: i64) -> i64;
+
+  struct PathIsHiddenProjectSummary {
+    lhs_basename_handle: i64,
+    rhs_basename_handle: i64,
+    lhs_extension_handle: i64,
+    rhs_extension_handle: i64,
+    lhs_is_hidden: i64,
+    rhs_is_hidden: i64
+  }
+
+  fn capture_path_is_hidden_project() -> PathIsHiddenProjectSummary {
+    return PathIsHiddenProjectSummary {
+      lhs_basename_handle: host_path_basename(31),
+      rhs_basename_handle: host_path_basename(47),
+      lhs_extension_handle: host_path_extension(31),
+      rhs_extension_handle: host_path_extension(47),
+      lhs_is_hidden: host_path_is_hidden(31),
+      rhs_is_hidden: host_path_is_hidden(47)
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: PathIsHiddenProjectSummary = capture_path_is_hidden_project();
+    return summary.lhs_basename_handle
+      + summary.rhs_basename_handle
+      + summary.lhs_extension_handle
+      + summary.rhs_extension_handle
+      + summary.lhs_is_hidden
+      + summary.rhs_is_hidden;
+  }
+}

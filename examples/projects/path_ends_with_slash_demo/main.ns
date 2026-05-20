@@ -1,0 +1,35 @@
+mod cpu Main {
+  extern "c" fn host_path_is_root(path_handle: i64) -> i64;
+  extern "c" fn host_path_ends_with_slash(path_handle: i64) -> i64;
+  extern "c" fn host_path_depth(path_handle: i64) -> i64;
+
+  struct PathEndsWithSlashProjectSummary {
+    lhs_is_root: i64,
+    rhs_is_root: i64,
+    lhs_ends_with_slash: i64,
+    rhs_ends_with_slash: i64,
+    lhs_depth: i64,
+    rhs_depth: i64
+  }
+
+  fn capture_path_ends_with_slash_project() -> PathEndsWithSlashProjectSummary {
+    return PathEndsWithSlashProjectSummary {
+      lhs_is_root: host_path_is_root(31),
+      rhs_is_root: host_path_is_root(47),
+      lhs_ends_with_slash: host_path_ends_with_slash(31),
+      rhs_ends_with_slash: host_path_ends_with_slash(47),
+      lhs_depth: host_path_depth(31),
+      rhs_depth: host_path_depth(47)
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: PathEndsWithSlashProjectSummary = capture_path_ends_with_slash_project();
+    return summary.lhs_is_root
+      + summary.rhs_is_root
+      + summary.lhs_ends_with_slash
+      + summary.rhs_ends_with_slash
+      + summary.lhs_depth
+      + summary.rhs_depth;
+  }
+}

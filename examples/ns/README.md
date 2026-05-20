@@ -54,11 +54,65 @@ Read these examples in roughly five bands:
     lower-level explicit `extern "c"` host route
   - [hello_cli_host_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_cli_host_facades.ns)
     tooling-shaped host example aligned with current `std` CLI/report/automation recipe thinking
+  - [hello_result_diagnostic_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_result_diagnostic_facades.ns)
+    narrow result/diagnostic host example aligned with current
+    `std/result_diagnostic_recipe.ns`
   - [hello_native_cli_runtime.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_native_cli_runtime.ns)
     repo-local native CLI example aligned with the current AOT-backed `std` host shim batch
   - [hello_native_command_runtime.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_native_command_runtime.ns)
     repo-local native command example aligned with the current shell-oriented
     `program/argv/env` handle bridge in the AOT-backed `std` host shim batch
+  - [hello_path_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_runtime_facades.ns)
+    narrow path/runtime host example aligned with current
+    `std/path_runtime_recipe.ns`
+  - [hello_path_is_empty_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_is_empty_facades.ns)
+    narrow path/is-empty host example aligned with current
+    `std/path_is_empty_recipe.ns`
+  - [hello_path_is_dot_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_is_dot_facades.ns)
+    narrow path/is-dot host example aligned with current
+    `std/path_is_dot_recipe.ns`
+  - [hello_path_is_dotdot_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_is_dotdot_facades.ns)
+    narrow path/is-dotdot host example aligned with current
+    `std/path_is_dotdot_recipe.ns`
+  - [hello_path_has_parent_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_has_parent_facades.ns)
+    narrow path/has-parent host example aligned with current
+    `std/path_has_parent_recipe.ns`
+  - [hello_path_depth_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_depth_facades.ns)
+    narrow path/depth host example aligned with current
+    `std/path_depth_recipe.ns`
+  - [hello_path_filename_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_filename_facades.ns)
+    narrow path/filename host example aligned with current
+    `std/path_filename_recipe.ns`
+  - [hello_path_matches_extension_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_matches_extension_facades.ns)
+    narrow path/matches-extension host example aligned with current
+    `std/path_matches_extension_recipe.ns`
+  - [hello_path_starts_with_dot_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_starts_with_dot_facades.ns)
+    narrow path/starts-with-dot host example aligned with current
+    `std/path_starts_with_dot_recipe.ns`
+  - [hello_path_is_root_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_is_root_facades.ns)
+    narrow path/is-root host example aligned with current
+    `std/path_is_root_recipe.ns`
+  - [hello_path_ends_with_slash_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_ends_with_slash_facades.ns)
+    narrow path/ends-with-slash host example aligned with current
+    `std/path_ends_with_slash_recipe.ns`
+  - [hello_path_rename_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_rename_facades.ns)
+    narrow path/rename host example aligned with current
+    `std/path_rename_recipe.ns`
+  - [hello_path_remove_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_path_remove_facades.ns)
+    narrow path/remove host example aligned with current
+    `std/path_remove_recipe.ns`
+  - [hello_file_output_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_file_output_facades.ns)
+    narrow file/output host example aligned with current
+    `std/file_output_recipe.ns`
+  - [hello_line_input_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_line_input_facades.ns)
+    narrow line-input host example aligned with current
+    `std/line_input_recipe.ns`
+  - [hello_terminal_io_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_terminal_io_facades.ns)
+    narrow terminal/io host example aligned with current
+    `std/terminal_io_recipe.ns`
+  - [hello_text_json_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_text_json_facades.ns)
+    narrow text/json host example aligned with current
+    `std/text_json_recipe.ns`
   - [hello_native_input_tool.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_native_input_tool.ns)
     repo-local native input-driven example that reads one file path from `argv`
     and combines native file/stdin byte counts into its own result
@@ -81,6 +135,21 @@ Read these examples in roughly five bands:
     and lane-hint plus monotonic-tick task context
   - [hello_task_cli_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_task_cli_facades.ns)
     task/tooling host example aligned with current `std` task CLI recipe and observer-oriented async/task reporting
+  - [hello_location_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_location_runtime_facades.ns)
+    narrow location/runtime host example aligned with current
+    `std/location_runtime_recipe.ns`
+  - [hello_kv_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_kv_runtime_facades.ns)
+    narrow kv/runtime host example aligned with current
+    `std/kv_runtime_recipe.ns`
+  - [hello_cache_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_cache_runtime_facades.ns)
+    narrow cache/runtime host example aligned with current
+    `std/cache_runtime_recipe.ns`
+  - [hello_directory_create_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_directory_create_facades.ns)
+    narrow directory/create host example aligned with current
+    `std/directory_create_recipe.ns`
+  - [hello_directory_stat_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_directory_stat_facades.ns)
+    narrow directory/stat host example aligned with current
+    `std/directory_stat_recipe.ns`
   - [hello_config_cache_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_config_cache_facades.ns)
     narrow config/cache host example aligned with current
     `std/config_cache_recipe.ns`

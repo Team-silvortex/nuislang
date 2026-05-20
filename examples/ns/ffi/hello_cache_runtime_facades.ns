@@ -1,0 +1,33 @@
+mod cpu Main {
+  extern "c" fn host_cache_open(name_handle: i64) -> i64;
+  extern "c" fn host_cache_lookup(cache_handle: i64, key_handle: i64) -> i64;
+  extern "c" fn host_cache_store(cache_handle: i64, key_handle: i64, value_handle: i64) -> i64;
+  extern "c" fn host_cache_close(cache_handle: i64) -> i64;
+
+  struct CacheFacadeSummary {
+    cache_handle: i64,
+    hit_handle: i64,
+    store_code: i64,
+    close_code: i64
+  }
+
+  fn capture_cache_facades() -> CacheFacadeSummary {
+    let cache_handle: i64 = host_cache_open(1607);
+    return CacheFacadeSummary {
+      cache_handle: cache_handle,
+      hit_handle: host_cache_lookup(cache_handle, 41),
+      store_code: host_cache_store(cache_handle, 41, 777),
+      close_code: host_cache_close(cache_handle)
+    };
+  }
+
+  fn main() {
+    let summary: CacheFacadeSummary = capture_cache_facades();
+    print(
+      summary.cache_handle
+        + summary.hit_handle
+        + summary.store_code
+        + summary.close_code
+    );
+  }
+}

@@ -1,0 +1,35 @@
+mod cpu Main {
+  extern "c" fn host_path_basename(path_handle: i64) -> i64;
+  extern "c" fn host_path_starts_with_dot(path_handle: i64) -> i64;
+  extern "c" fn host_path_is_hidden(path_handle: i64) -> i64;
+
+  struct PathStartsWithDotProjectSummary {
+    lhs_basename_handle: i64,
+    rhs_basename_handle: i64,
+    lhs_starts_with_dot: i64,
+    rhs_starts_with_dot: i64,
+    lhs_is_hidden: i64,
+    rhs_is_hidden: i64
+  }
+
+  fn capture_path_starts_with_dot_project() -> PathStartsWithDotProjectSummary {
+    return PathStartsWithDotProjectSummary {
+      lhs_basename_handle: host_path_basename(31),
+      rhs_basename_handle: host_path_basename(47),
+      lhs_starts_with_dot: host_path_starts_with_dot(31),
+      rhs_starts_with_dot: host_path_starts_with_dot(47),
+      lhs_is_hidden: host_path_is_hidden(31),
+      rhs_is_hidden: host_path_is_hidden(47)
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: PathStartsWithDotProjectSummary = capture_path_starts_with_dot_project();
+    return summary.lhs_basename_handle
+      + summary.rhs_basename_handle
+      + summary.lhs_starts_with_dot
+      + summary.rhs_starts_with_dot
+      + summary.lhs_is_hidden
+      + summary.rhs_is_hidden;
+  }
+}

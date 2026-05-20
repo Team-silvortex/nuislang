@@ -1,0 +1,31 @@
+mod cpu Main {
+  extern "c" fn host_kv_open(namespace_handle: i64) -> i64;
+  extern "c" fn host_kv_put(store_handle: i64, key_handle: i64, value_handle: i64) -> i64;
+  extern "c" fn host_kv_get(store_handle: i64, key_handle: i64) -> i64;
+  extern "c" fn host_kv_close(store_handle: i64) -> i64;
+
+  struct KvProjectSummary {
+    store_handle: i64,
+    put_code: i64,
+    value_result_handle: i64,
+    close_code: i64
+  }
+
+  fn capture_kv_project() -> KvProjectSummary {
+    let store_handle: i64 = host_kv_open(1503);
+    return KvProjectSummary {
+      store_handle: store_handle,
+      put_code: host_kv_put(store_handle, 31, 901),
+      value_result_handle: host_kv_get(store_handle, 31),
+      close_code: host_kv_close(store_handle)
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: KvProjectSummary = capture_kv_project();
+    return summary.store_handle
+      + summary.put_code
+      + summary.value_result_handle
+      + summary.close_code;
+  }
+}

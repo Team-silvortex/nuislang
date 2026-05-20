@@ -1,0 +1,35 @@
+mod cpu Main {
+  extern "c" fn host_path_parent(path_handle: i64) -> i64;
+  extern "c" fn host_path_basename(path_handle: i64) -> i64;
+  extern "c" fn host_path_is_absolute(path_handle: i64) -> i64;
+
+  struct PathParentProjectSummary {
+    lhs_parent_handle: i64,
+    rhs_parent_handle: i64,
+    lhs_basename_handle: i64,
+    rhs_basename_handle: i64,
+    lhs_is_absolute: i64,
+    rhs_is_absolute: i64
+  }
+
+  fn capture_path_parent_project() -> PathParentProjectSummary {
+    return PathParentProjectSummary {
+      lhs_parent_handle: host_path_parent(31),
+      rhs_parent_handle: host_path_parent(47),
+      lhs_basename_handle: host_path_basename(31),
+      rhs_basename_handle: host_path_basename(47),
+      lhs_is_absolute: host_path_is_absolute(31),
+      rhs_is_absolute: host_path_is_absolute(47)
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: PathParentProjectSummary = capture_path_parent_project();
+    return summary.lhs_parent_handle
+      + summary.rhs_parent_handle
+      + summary.lhs_basename_handle
+      + summary.rhs_basename_handle
+      + summary.lhs_is_absolute
+      + summary.rhs_is_absolute;
+  }
+}

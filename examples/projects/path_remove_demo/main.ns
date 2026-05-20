@@ -1,0 +1,32 @@
+mod cpu Main {
+  extern "c" fn host_temp_file_handle(prefix_handle: i64) -> i64;
+  extern "c" fn host_path_remove(path_handle: i64) -> i64;
+  extern "c" fn host_fs_exists(path_handle: i64) -> i64;
+
+  struct PathRemoveProjectSummary {
+    path_handle: i64,
+    exists_before: i64,
+    remove_code: i64,
+    exists_after: i64
+  }
+
+  fn capture_path_remove_project() -> PathRemoveProjectSummary {
+    let path_handle: i64 = host_temp_file_handle(3201);
+    let exists_before: i64 = host_fs_exists(path_handle);
+    let remove_code: i64 = host_path_remove(path_handle);
+    return PathRemoveProjectSummary {
+      path_handle: path_handle,
+      exists_before: exists_before,
+      remove_code: remove_code,
+      exists_after: host_fs_exists(path_handle)
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: PathRemoveProjectSummary = capture_path_remove_project();
+    return summary.path_handle
+      + summary.exists_before
+      + summary.remove_code
+      + summary.exists_after;
+  }
+}

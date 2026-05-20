@@ -1,0 +1,37 @@
+mod cpu Main {
+  extern "c" fn host_path_extension(path_handle: i64) -> i64;
+  extern "c" fn host_path_has_extension(path_handle: i64) -> i64;
+  extern "c" fn host_path_matches_extension(path_handle: i64, ext_handle: i64) -> i64;
+
+  struct PathMatchesExtensionFacadeSummary {
+    lhs_extension_handle: i64,
+    rhs_extension_handle: i64,
+    lhs_has_extension: i64,
+    rhs_has_extension: i64,
+    lhs_matches_plain: i64,
+    rhs_matches_dotted: i64
+  }
+
+  fn capture_path_matches_extension_facades() -> PathMatchesExtensionFacadeSummary {
+    return PathMatchesExtensionFacadeSummary {
+      lhs_extension_handle: host_path_extension(31),
+      rhs_extension_handle: host_path_extension(47),
+      lhs_has_extension: host_path_has_extension(31),
+      rhs_has_extension: host_path_has_extension(47),
+      lhs_matches_plain: host_path_matches_extension(31, 59),
+      rhs_matches_dotted: host_path_matches_extension(47, 61)
+    };
+  }
+
+  fn main() {
+    let summary: PathMatchesExtensionFacadeSummary = capture_path_matches_extension_facades();
+    print(
+      summary.lhs_extension_handle
+        + summary.rhs_extension_handle
+        + summary.lhs_has_extension
+        + summary.rhs_has_extension
+        + summary.lhs_matches_plain
+        + summary.rhs_matches_dotted
+    );
+  }
+}

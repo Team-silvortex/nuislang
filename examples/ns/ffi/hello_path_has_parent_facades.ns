@@ -1,0 +1,37 @@
+mod cpu Main {
+  extern "c" fn host_path_parent(path_handle: i64) -> i64;
+  extern "c" fn host_path_has_parent(path_handle: i64) -> i64;
+  extern "c" fn host_path_depth(path_handle: i64) -> i64;
+
+  struct PathHasParentFacadeSummary {
+    lhs_parent_handle: i64,
+    rhs_parent_handle: i64,
+    lhs_has_parent: i64,
+    rhs_has_parent: i64,
+    lhs_depth: i64,
+    rhs_depth: i64
+  }
+
+  fn capture_path_has_parent_facades() -> PathHasParentFacadeSummary {
+    return PathHasParentFacadeSummary {
+      lhs_parent_handle: host_path_parent(31),
+      rhs_parent_handle: host_path_parent(47),
+      lhs_has_parent: host_path_has_parent(31),
+      rhs_has_parent: host_path_has_parent(47),
+      lhs_depth: host_path_depth(31),
+      rhs_depth: host_path_depth(47)
+    };
+  }
+
+  fn main() {
+    let summary: PathHasParentFacadeSummary = capture_path_has_parent_facades();
+    print(
+      summary.lhs_parent_handle
+        + summary.rhs_parent_handle
+        + summary.lhs_has_parent
+        + summary.rhs_has_parent
+        + summary.lhs_depth
+        + summary.rhs_depth
+    );
+  }
+}

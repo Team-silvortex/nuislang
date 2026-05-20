@@ -1,0 +1,7 @@
+name = "path_is_dot_demo"
+entry = "main.ns"
+modules = ["main.ns"]
+
+abi = [
+  "cpu=cpu.arm64.apple_aapcs64"
+]
