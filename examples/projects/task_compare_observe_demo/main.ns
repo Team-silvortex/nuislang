@@ -1,0 +1,24 @@
+mod cpu Main {
+  async fn ping(seed: i64) -> i64 {
+    return seed + 3;
+  }
+
+  fn capture_direct_value(seed: i64) -> i64 {
+    let task: Task<i64> = spawn(ping(seed));
+    return join(task);
+  }
+
+  fn capture_observed_value(seed: i64) -> i64 {
+    let result: TaskResult<i64> = join_result(spawn(ping(seed)));
+    if task_completed(result) {
+      return task_value(result);
+    }
+    return 0;
+  }
+
+  fn main() -> i64 {
+    let direct_value: i64 = capture_direct_value(7);
+    let observed_value: i64 = capture_observed_value(7);
+    return direct_value + observed_value;
+  }
+}

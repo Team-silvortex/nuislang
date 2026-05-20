@@ -71,6 +71,12 @@ These are the best current front-end examples to read first.
   design-probe sample showing a shape that is currently allowed because
   `join(...)` is not yet treated as a graph-level consume boundary:
   direct `join(task)` followed by `join_result(task)`
+* [hello_input_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_input_runtime_facades.ns)
+  narrow host-facing input/runtime mirror for the current `std` recipe path:
+  `argv -> file_read -> stdin_read -> tty_isatty`
+* [hello_config_cache_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_config_cache_facades.ns)
+  narrow host-facing config/cache mirror for the current `std` recipe path:
+  `config_open/get/close -> cache_open/lookup/store/close`
 * [hello_data.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/data/hello_data.ns)
   first front-end `data` link surface
 * [hello_data_window.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/data/hello_data_window.ns)

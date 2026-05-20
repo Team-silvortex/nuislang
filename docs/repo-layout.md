@@ -26,6 +26,32 @@ quickly.
   current reference docs, grammar/front-end notes, design notes, and historical
   archive material
 
+## Current Mainline Vs Experimental Surfaces
+
+Use this as the shortest repo-level split:
+
+* mainline today
+  - [tools](/Users/Shared/chroot/dev/nuislang/tools)
+  - [crates](/Users/Shared/chroot/dev/nuislang/crates)
+  - [nustar-packages](/Users/Shared/chroot/dev/nuislang/nustar-packages)
+  - [examples/projects](/Users/Shared/chroot/dev/nuislang/examples/projects)
+  - [examples/ns](/Users/Shared/chroot/dev/nuislang/examples/ns)
+  - [stdlib/std](/Users/Shared/chroot/dev/nuislang/stdlib/std)
+  - [docs/reference](/Users/Shared/chroot/dev/nuislang/docs/reference)
+* experimental or softer-edged today
+  - [examples/yir](/Users/Shared/chroot/dev/nuislang/examples/yir)
+    when used as handwritten probes rather than current front-door behavior
+  - [docs/fabric-spec](/Users/Shared/chroot/dev/nuislang/docs/fabric-spec)
+  - [docs/glm-spec](/Users/Shared/chroot/dev/nuislang/docs/glm-spec)
+  - [docs/yir-spec](/Users/Shared/chroot/dev/nuislang/docs/yir-spec)
+  - future-sketch notes scattered under
+    [examples/projects](/Users/Shared/chroot/dev/nuislang/examples/projects)
+    and
+    [examples/ns/ffi](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi)
+
+This is not a value judgment. It is just the practical rule for deciding what
+to trust first when implementation and future direction are both present.
+
 ## Support / Secondary Directories
 
 * [nuis-logo](/Users/Shared/chroot/dev/nuislang/nuis-logo)
@@ -43,6 +69,13 @@ If you want the current user-facing path:
 * [README.md](/Users/Shared/chroot/dev/nuislang/README.md)
 * [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
 * [docs/reference/README.md](/Users/Shared/chroot/dev/nuislang/docs/reference/README.md)
+
+If you want the current practical systems/library path:
+
+* [stdlib/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/README.md)
+* [stdlib/std/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
+* [examples/ns/ffi/README.md](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/README.md)
+* [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
 
 If you want implementation internals:
 

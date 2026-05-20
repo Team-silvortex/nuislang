@@ -1,0 +1,59 @@
+mod cpu Main {
+  extern "c" fn host_cwd_handle() -> i64;
+  extern "c" fn host_temp_dir_handle() -> i64;
+  extern "c" fn host_temp_file_handle(prefix_handle: i64) -> i64;
+  extern "c" fn host_cache_open(name_handle: i64) -> i64;
+  extern "c" fn host_cache_lookup(cache_handle: i64, key_handle: i64) -> i64;
+  extern "c" fn host_cache_store(cache_handle: i64, key_handle: i64, value_handle: i64) -> i64;
+  extern "c" fn host_cache_close(cache_handle: i64) -> i64;
+  extern "c" fn host_subprocess_spawn(program_handle: i64, argv_handle: i64, env_handle: i64) -> i64;
+  extern "c" fn host_subprocess_signal(process_handle: i64, signal: i64) -> i64;
+  extern "c" fn host_subprocess_join(process_handle: i64) -> i64;
+  extern "c" fn host_monotonic_time_ns() -> i64;
+
+  struct AutomationRuntimeSummary {
+    cwd_handle: i64,
+    temp_dir_handle: i64,
+    temp_file_handle: i64,
+    cache_hit_handle: i64,
+    cache_store_code: i64,
+    process_handle: i64,
+    signal_code: i64,
+    join_code: i64,
+    tick_ns: i64
+  }
+
+  fn capture_automation_runtime() -> AutomationRuntimeSummary {
+    let cache_handle: i64 = host_cache_open(1607);
+    let cache_hit_handle: i64 = host_cache_lookup(cache_handle, 41);
+    let temp_file_handle: i64 = host_temp_file_handle(2401);
+    let cache_store_code: i64 = host_cache_store(cache_handle, 41, temp_file_handle);
+    let cache_close_code: i64 = host_cache_close(cache_handle);
+    let process_handle: i64 = host_subprocess_spawn(2503, 29, 7);
+
+    return AutomationRuntimeSummary {
+      cwd_handle: host_cwd_handle(),
+      temp_dir_handle: host_temp_dir_handle(),
+      temp_file_handle: temp_file_handle,
+      cache_hit_handle: cache_hit_handle + cache_close_code,
+      cache_store_code: cache_store_code,
+      process_handle: process_handle,
+      signal_code: host_subprocess_signal(process_handle, 0),
+      join_code: host_subprocess_join(process_handle),
+      tick_ns: host_monotonic_time_ns()
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: AutomationRuntimeSummary = capture_automation_runtime();
+    return summary.cwd_handle
+      + summary.temp_dir_handle
+      + summary.temp_file_handle
+      + summary.cache_hit_handle
+      + summary.cache_store_code
+      + summary.process_handle
+      + summary.signal_code
+      + summary.join_code
+      + summary.tick_ns;
+  }
+}

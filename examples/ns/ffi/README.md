@@ -8,12 +8,14 @@ This folder contains CPU host-bridge examples:
 * `hello_native_cli_runtime.ns`
 * `hello_native_command_runtime.ns`
 * `hello_native_input_tool.ns`
+* `hello_input_runtime_facades.ns`
 * `hello_native_cli_pipeline.ns`
 * `hello_native_tool_runner.ns`
 * `hello_native_workflow_runtime.ns`
 * `hello_clock_test_facades.ns`
 * `hello_task_scheduler_facades.ns`
 * `hello_task_cli_facades.ns`
+* `hello_config_cache_facades.ns`
 
 Reading guidance:
 
@@ -42,11 +44,18 @@ Reading guidance:
   multiple source arguments`, `env_handle <- KEY=VALUE prefix text`; it is the
   repo-local example that most directly mirrors
   [command_shell_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_shell_recipe.ns)
+  and now has the narrower project-shaped companion
+  [command_shell_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/command_shell_demo)
 * `hello_native_input_tool.ns`
   a small input-driven native example that takes a file path from `argv`,
   performs one native file read, performs one native stdin read, and folds the
   observed byte counts into its own result; it is the clearest repo-local sample
   for the current `file/stdin` AOT-backed host path
+* `hello_input_runtime_facades.ns`
+  a narrower `argv/file/stdin/tty` facade example that mirrors
+  [input_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/input_runtime_recipe.ns)
+  and keeps the current native input/runtime staging separate from the wider
+  command/process pipeline examples
 * `hello_native_cli_pipeline.ns`
   a combined native CLI sample that first reads file/stdin input and then,
   when input is present, triggers the current command/subprocess bridge and uses
@@ -87,6 +96,26 @@ Reading guidance:
   from the current `stdlib/std` task-facing recipe family; it combines
   `spawn/timeout/join_result/task_*` with stdout/stderr, diagnostic emit, and
   monotonic host timing in one source-level example
+* `hello_config_cache_facades.ns`
+  a narrower config/cache facade example that mirrors
+  [config_cache_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/config_cache_recipe.ns)
+  and keeps `config_open/get/close` plus `cache_open/lookup/store/close` on
+  their own source-level staging path
+
+Systems mirror map:
+
+* input/runtime
+  - [hello_input_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_input_runtime_facades.ns)
+* command/shell
+  - [hello_native_command_runtime.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_native_command_runtime.ns)
+* cli/runtime
+  - [hello_cli_host_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_cli_host_facades.ns)
+* report/diagnostic
+  - [hello_cli_host_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_cli_host_facades.ns)
+* automation/workflow
+  - [hello_native_workflow_runtime.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_native_workflow_runtime.ns)
+* config/cache
+  - [hello_config_cache_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_config_cache_facades.ns)
 
 Task-facing recipe map:
 
@@ -103,6 +132,9 @@ Task-facing recipe map:
 * [task_scheduler_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_scheduler_recipe.ns)
   is the closest direct mirror for
   [hello_task_scheduler_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_task_scheduler_facades.ns)
+* [input_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/input_runtime_recipe.ns)
+  is the closest direct mirror for
+  [hello_input_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_input_runtime_facades.ns)
 
 Recommended reading order for the task-facing FFI examples:
 

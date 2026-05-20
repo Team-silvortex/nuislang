@@ -62,6 +62,9 @@ Read these examples in roughly five bands:
   - [hello_native_input_tool.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_native_input_tool.ns)
     repo-local native input-driven example that reads one file path from `argv`
     and combines native file/stdin byte counts into its own result
+  - [hello_input_runtime_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_input_runtime_facades.ns)
+    narrower `argv/file/stdin/tty` facade mirror aligned directly with
+    `std/input_runtime_recipe.ns`
   - [hello_native_cli_pipeline.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_native_cli_pipeline.ns)
     repo-local native pipeline example that combines input-driven reads with a
     child command/subprocess step in one front-door flow
@@ -78,6 +81,9 @@ Read these examples in roughly five bands:
     and lane-hint plus monotonic-tick task context
   - [hello_task_cli_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_task_cli_facades.ns)
     task/tooling host example aligned with current `std` task CLI recipe and observer-oriented async/task reporting
+  - [hello_config_cache_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_config_cache_facades.ns)
+    narrow config/cache host example aligned with current
+    `std/config_cache_recipe.ns`
 * end-to-end demo path
   - [window_controls_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/window_controls_demo.ns)
     current single-file `cpu + data + shader` real-time control/render demo

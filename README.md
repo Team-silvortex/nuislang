@@ -114,6 +114,32 @@ High-signal implemented surfaces:
 * task-style async primitives with `spawn / join / cancel / timeout / join_result`
 * core-level async/result metadata beginning to move into `yir-core`
 
+## Mainline Vs Experimental
+
+Current mainline, meaning “good default places to stand on today”:
+
+* `nuis -> NIR -> YIR -> LLVM/AOT` build path
+* multi-file `nuis.toml` projects
+* `nustar`-driven ABI and lane policy registration
+* `examples/projects` as the primary runnable/compile-contract example layer
+* `docs/reference` as the primary implementation-truth documentation layer
+* `stdlib/std` and `stdlib/ns-nova` as the current source-asset/library growth path
+
+Current experimental or intentionally still soft-edged tracks:
+
+* `Task<T>` / `TaskResult<T>` ownership and future `GLM` elevation
+* external-handle bridge-object direction for resource-bearing task payloads
+* hot-sync contraction of local async regions
+* `YIR`-level global clock negotiation and multi-`nustar` time conversion
+* native CPU task execution beyond the current compile/contract staging path
+
+Reading rule that matches this split:
+
+* when current examples/docs and future sketches differ, prefer the current
+  project/examples/reference path first
+* treat sketches, probes, and future notes as design direction, not as already
+  promised repository behavior
+
 ## Current Reference Examples
 
 Start here:
@@ -126,6 +152,26 @@ Start here:
 * [stdlib/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/README.md)
 * [docs/README.md](/Users/Shared/chroot/dev/nuislang/docs/README.md)
 * [docs/repo-layout.md](/Users/Shared/chroot/dev/nuislang/docs/repo-layout.md)
+
+## Fast Orientation
+
+If you want the shortest path by goal:
+
+* current user-facing project path
+  - [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
+  - [docs/reference/yir-tools-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-tools-reference.md)
+* current source-level language and host examples
+  - [examples/ns/README.md](/Users/Shared/chroot/dev/nuislang/examples/ns/README.md)
+  - [examples/ns/ffi/README.md](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/README.md)
+  - [examples/ns/memory/README.md](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/README.md)
+* current implementation-facing semantic contracts
+  - [docs/reference/README.md](/Users/Shared/chroot/dev/nuislang/docs/reference/README.md)
+* current `std` and framework source assets
+  - [stdlib/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/README.md)
+  - [stdlib/std/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
+  - [stdlib/ns-nova/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/README.md)
+* quick repo map
+  - [docs/repo-layout.md](/Users/Shared/chroot/dev/nuislang/docs/repo-layout.md)
 
 Recommended current examples:
 

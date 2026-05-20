@@ -1,0 +1,47 @@
+mod cpu Main {
+  extern "c" fn host_config_open(scope_handle: i64) -> i64;
+  extern "c" fn host_config_get(config_handle: i64, key_handle: i64) -> i64;
+  extern "c" fn host_config_close(config_handle: i64) -> i64;
+  extern "c" fn host_cache_open(name_handle: i64) -> i64;
+  extern "c" fn host_cache_lookup(cache_handle: i64, key_handle: i64) -> i64;
+  extern "c" fn host_cache_store(cache_handle: i64, key_handle: i64, value_handle: i64) -> i64;
+  extern "c" fn host_cache_close(cache_handle: i64) -> i64;
+
+  struct ConfigCacheFacadeSummary {
+    config_value_handle: i64,
+    config_close_code: i64,
+    cache_hit_handle: i64,
+    cache_store_code: i64,
+    cache_close_code: i64
+  }
+
+  fn capture_config_cache_facades() -> ConfigCacheFacadeSummary {
+    let config_handle: i64 = host_config_open(1401);
+    let config_value_handle: i64 = host_config_get(config_handle, 29);
+    let config_close_code: i64 = host_config_close(config_handle);
+
+    let cache_handle: i64 = host_cache_open(1607);
+    let cache_hit_handle: i64 = host_cache_lookup(cache_handle, 41);
+    let cache_store_code: i64 = host_cache_store(cache_handle, 41, config_value_handle);
+    let cache_close_code: i64 = host_cache_close(cache_handle);
+
+    return ConfigCacheFacadeSummary {
+      config_value_handle: config_value_handle,
+      config_close_code: config_close_code,
+      cache_hit_handle: cache_hit_handle,
+      cache_store_code: cache_store_code,
+      cache_close_code: cache_close_code
+    };
+  }
+
+  fn main() {
+    let summary: ConfigCacheFacadeSummary = capture_config_cache_facades();
+    print(
+      summary.config_value_handle
+        + summary.config_close_code
+        + summary.cache_hit_handle
+        + summary.cache_store_code
+        + summary.cache_close_code
+    );
+  }
+}

@@ -1,0 +1,60 @@
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+  extern "c" fn host_env_has(key_handle: i64) -> i64;
+  extern "c" fn host_cwd_handle() -> i64;
+  extern "c" fn host_stdout_write(text_handle: i64) -> i64;
+  extern "c" fn host_diag_emit(label_handle: i64, span_handle: i64, severity: i64) -> i64;
+  extern "c" fn host_config_open(scope_handle: i64) -> i64;
+  extern "c" fn host_config_get(config_handle: i64, key_handle: i64) -> i64;
+  extern "c" fn host_config_close(config_handle: i64) -> i64;
+  extern "c" fn host_cache_open(name_handle: i64) -> i64;
+  extern "c" fn host_cache_lookup(cache_handle: i64, key_handle: i64) -> i64;
+  extern "c" fn host_cache_store(cache_handle: i64, key_handle: i64, value_handle: i64) -> i64;
+  extern "c" fn host_cache_close(cache_handle: i64) -> i64;
+  extern "c" fn host_monotonic_time_ns() -> i64;
+
+  struct CliRuntimeSummary {
+    argv_count: i64,
+    env_present: i64,
+    cwd_handle: i64,
+    config_value_handle: i64,
+    cache_hit_handle: i64,
+    stdout_code: i64,
+    diag_code: i64,
+    tick_ns: i64
+  }
+
+  fn capture_cli_runtime() -> CliRuntimeSummary {
+    let config_handle: i64 = host_config_open(1401);
+    let config_value_handle: i64 = host_config_get(config_handle, 29);
+    let config_close_code: i64 = host_config_close(config_handle);
+
+    let cache_handle: i64 = host_cache_open(1607);
+    let cache_hit_handle: i64 = host_cache_lookup(cache_handle, 41);
+    let cache_store_code: i64 = host_cache_store(cache_handle, 41, config_value_handle);
+    let cache_close_code: i64 = host_cache_close(cache_handle);
+
+    return CliRuntimeSummary {
+      argv_count: host_argv_count(),
+      env_present: host_env_has(1701),
+      cwd_handle: host_cwd_handle(),
+      config_value_handle: config_value_handle + config_close_code,
+      cache_hit_handle: cache_hit_handle + cache_store_code + cache_close_code,
+      stdout_code: host_stdout_write(1901),
+      diag_code: host_diag_emit(1901, 0, 1),
+      tick_ns: host_monotonic_time_ns()
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: CliRuntimeSummary = capture_cli_runtime();
+    return summary.argv_count
+      + summary.env_present
+      + summary.cwd_handle
+      + summary.config_value_handle
+      + summary.cache_hit_handle
+      + summary.stdout_code
+      + summary.diag_code
+      + summary.tick_ns;
+  }
+}

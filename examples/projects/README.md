@@ -133,12 +133,47 @@ Also included:
   `argv`, `stdout`, `command`, `subprocess`, and direct exit observers.
   This is the lighter-weight sibling route when you want a native tool runner
   without the extra file/stdin input path.
+* [command_shell_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/command_shell_demo)
+  one-file `cpu`-only command/subprocess staging demo:
+  `main.ns`
+  showing the current project-form shell-oriented bridge for
+  `program/argv/env -> command/subprocess observers`.
+  This is the narrowest project-shaped companion to
+  [command_shell_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_shell_recipe.ns).
+* [report_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/report_runtime_demo)
+  one-file `cpu`-only report/diagnostic staging demo:
+  `main.ns`
+  showing the current project-form bridge for
+  `path/fs/json -> diag_emit + stdout`.
+  This is the narrowest project-shaped companion to
+  [report_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/report_runtime_recipe.ns).
+* [automation_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/automation_runtime_demo)
+  one-file `cpu`-only automation/workflow staging demo:
+  `main.ns`
+  showing the current project-form bridge for
+  `cwd/temp/cache -> subprocess + monotonic time`.
+  This is the narrowest project-shaped companion to
+  [automation_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/automation_runtime_recipe.ns).
+* [cli_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/cli_runtime_demo)
+  one-file `cpu`-only CLI/runtime staging demo:
+  `main.ns`
+  showing the current project-form bridge for
+  `argv/env/cwd/config/cache -> stdout + diag + monotonic time`.
+  This is the narrowest project-shaped companion to
+  [cli_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_runtime_recipe.ns).
 * [native_branch_cli_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/native_branch_cli_demo)
   one-file `cpu`-only branch/usage demo:
   `main.ns`
   showing the current project-form real CPU control-flow half-step for
   `if { print(...); return ... } else { print(...); return ... }`.
   This is the smallest canonical sample for native CLI usage/error vs ok paths.
+* [input_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/input_runtime_demo)
+  one-file `cpu`-only native input/runtime demo:
+  `main.ns`
+  showing the current project-form AOT host-backed path for
+  `argv`, `file`, `stdin`, and `tty`.
+  This is the narrowest project-shaped companion to
+  [input_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/input_runtime_recipe.ns).
 * [task_lifecycle_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_lifecycle_branch_demo)
   one-file `cpu`-only async/task lifecycle demo:
   `main.ns`
@@ -165,6 +200,15 @@ Also included:
   completed task result.
   Future direction note:
   [examples/projects/task_completed_observe_demo/FUTURE_HOT_SYNC_CONTRACTION_SKETCH.md](/Users/Shared/chroot/dev/nuislang/examples/projects/task_completed_observe_demo/FUTURE_HOT_SYNC_CONTRACTION_SKETCH.md)
+* [task_compare_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_compare_observe_demo)
+  one-file `cpu`-only direct-vs-observed compare demo:
+  `main.ns`
+  showing the current project-form comparison between
+  `spawn -> join`
+  and
+  `spawn -> join_result -> task_completed -> task_value`.
+  This is the smallest project-shaped companion to
+  [task_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_compare_recipe.ns).
 * [task_status_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_status_observe_demo)
   one-file `cpu`-only status observer demo:
   `main.ns`
@@ -209,6 +253,19 @@ Also included:
   [examples/projects/task_join_nonconsuming_probe_demo/FUTURE_CONSUME_SKETCH.md](/Users/Shared/chroot/dev/nuislang/examples/projects/task_join_nonconsuming_probe_demo/FUTURE_CONSUME_SKETCH.md)
   for the likely migration sketch if `join(...)` later becomes consuming.
 
+Narrow systems companions:
+
+* input/runtime
+  - [input_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/input_runtime_demo)
+* command/shell
+  - [command_shell_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/command_shell_demo)
+* cli/runtime
+  - [cli_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/cli_runtime_demo)
+* report/diagnostic
+  - [report_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/report_runtime_demo)
+* automation/workflow
+  - [automation_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/automation_runtime_demo)
+
 Task-facing `std` companions:
 
 * [task_status_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_status_recipe.ns)
@@ -221,14 +278,16 @@ Task-facing `std` companions:
   is reflected most directly in
   [task_completed_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_completed_observe_demo)
   ,
+  [task_compare_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_compare_observe_demo)
+  ,
   [task_status_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_status_observe_demo)
   ,
   [task_lifecycle_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_lifecycle_branch_demo)
   , and
   [task_cancel_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_cancel_branch_demo)
 * [task_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_compare_recipe.ns)
-  is still best paired with the single-file memory compare samples today; it
-  does not yet have its own project-shaped one-to-one companion
+  is mirrored most directly by
+  [task_compare_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_compare_observe_demo)
 * [task_lifecycle_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_lifecycle_recipe.ns)
   is mirrored most directly by
   [task_lifecycle_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_lifecycle_branch_demo)
@@ -247,6 +306,9 @@ Task-facing `std` companions:
 * [task_cli_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_cli_recipe.ns)
   is mirrored most directly by
   [task_cli_tooling_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_cli_tooling_demo)
+* [input_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/input_runtime_recipe.ns)
+  is mirrored most directly by
+  [input_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/input_runtime_demo)
 
 Recommended reading order for the current task projects:
 
@@ -256,6 +318,9 @@ Recommended reading order for the current task projects:
 * then read
   [task_completed_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_completed_observe_demo)
   for the smallest positive observation path
+* then read
+  [task_compare_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_compare_observe_demo)
+  for the narrowest project-form direct-vs-observed comparison
 * then read
   [task_lifecycle_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_lifecycle_branch_demo)
   and
@@ -275,6 +340,10 @@ Current task project boundaries by reading stage:
   is the cleanest project-shaped positive observation path, but it should still
   be read mainly as a compile/contract sample while native CPU task execution
   remains deferred
+* [task_compare_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_compare_observe_demo)
+  is the cleanest project-shaped direct-vs-observed comparison path, but it
+  should still be read as a current contract probe rather than proof that the
+  present non-consuming `join(...)` shape is final
 * [task_lifecycle_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_lifecycle_branch_demo)
   and
   [task_cancel_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_cancel_branch_demo)
@@ -320,12 +389,24 @@ cargo run -p nuis -- check examples/projects/native_cli_pipeline_demo
 cargo run -p nuis -- build examples/projects/native_cli_pipeline_demo /private/tmp/native_cli_pipeline_demo_out
 cargo run -p nuis -- check examples/projects/native_tool_runner_demo
 cargo run -p nuis -- build examples/projects/native_tool_runner_demo /private/tmp/native_tool_runner_demo_out
+cargo run -p nuis -- check examples/projects/command_shell_demo
+cargo run -p nuis -- build examples/projects/command_shell_demo /private/tmp/command_shell_demo_out
+cargo run -p nuis -- check examples/projects/report_runtime_demo
+cargo run -p nuis -- build examples/projects/report_runtime_demo /private/tmp/report_runtime_demo_out
+cargo run -p nuis -- check examples/projects/automation_runtime_demo
+cargo run -p nuis -- build examples/projects/automation_runtime_demo /private/tmp/automation_runtime_demo_out
+cargo run -p nuis -- check examples/projects/cli_runtime_demo
+cargo run -p nuis -- build examples/projects/cli_runtime_demo /private/tmp/cli_runtime_demo_out
 cargo run -p nuis -- check examples/projects/native_branch_cli_demo
 cargo run -p nuis -- build examples/projects/native_branch_cli_demo /private/tmp/native_branch_cli_demo_out
+cargo run -p nuis -- check examples/projects/input_runtime_demo
+cargo run -p nuis -- build examples/projects/input_runtime_demo /private/tmp/input_runtime_demo_out
 cargo run -p nuis -- check examples/projects/task_lifecycle_branch_demo
 cargo run -p nuis -- build examples/projects/task_lifecycle_branch_demo /private/tmp/task_lifecycle_branch_demo_out
 cargo run -p nuis -- check examples/projects/task_completed_observe_demo
 cargo run -p nuis -- build examples/projects/task_completed_observe_demo /private/tmp/task_completed_observe_demo_out
+cargo run -p nuis -- check examples/projects/task_compare_observe_demo
+cargo run -p nuis -- build examples/projects/task_compare_observe_demo /private/tmp/task_compare_observe_demo_out
 cargo run -p nuis -- check examples/projects/task_status_observe_demo
 cargo run -p nuis -- build examples/projects/task_status_observe_demo /private/tmp/task_status_observe_demo_out
 cargo run -p nuis -- check examples/projects/task_cli_tooling_demo
