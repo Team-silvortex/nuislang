@@ -1,0 +1,46 @@
+mod cpu Main {
+  struct TaskLifecycleSummary {
+    timed_out: i64,
+    cancelled: i64
+  }
+
+  async fn ping(seed: i64) -> i64 {
+    return seed + 2;
+  }
+
+  fn encode_timed_out(result: TaskResult<i64>) -> i64 {
+    if task_timed_out(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_cancelled(result: TaskResult<i64>) -> i64 {
+    if task_cancelled(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn capture_task_lifecycle(seed: i64, limit: i64) -> TaskLifecycleSummary {
+    let timed_task: Task<i64> = timeout(spawn(ping(seed)), limit);
+    let timed_result: TaskResult<i64> = join_result(timed_task);
+
+    let cancelled_task: Task<i64> = cancel(spawn(ping(seed)));
+    let cancelled_result: TaskResult<i64> = join_result(cancelled_task);
+
+    return TaskLifecycleSummary {
+      timed_out: encode_timed_out(timed_result),
+      cancelled: encode_cancelled(cancelled_result)
+    };
+  }
+
+  fn summarize_task_lifecycle_recipe(seed: i64, limit: i64) -> i64 {
+    let summary: TaskLifecycleSummary = capture_task_lifecycle(seed, limit);
+    return summary.timed_out + summary.cancelled;
+  }
+
+  fn main() {
+    print(summarize_task_lifecycle_recipe(7, 0));
+  }
+}

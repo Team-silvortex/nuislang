@@ -1,0 +1,45 @@
+mod cpu Main {
+  struct TaskValueSeed {
+    payload: i64
+  }
+
+  struct TaskValueSummary {
+    completed: i64,
+    value: i64
+  }
+
+  async fn ping(seed: i64) -> i64 {
+    return seed + 5;
+  }
+
+  fn build_seed(payload: i64) -> TaskValueSeed {
+    return TaskValueSeed {
+      payload: payload
+    };
+  }
+
+  fn capture_completed_value(seed: TaskValueSeed) -> TaskValueSummary {
+    let task: Task<i64> = spawn(ping(seed.payload));
+    let result: TaskResult<i64> = join_result(task);
+    if task_completed(result) {
+      return TaskValueSummary {
+        completed: 1,
+        value: task_value(result)
+      };
+    }
+    return TaskValueSummary {
+      completed: 0,
+      value: 0
+    };
+  }
+
+  fn summarize_task_value_recipe(payload: i64) -> i64 {
+    let seed: TaskValueSeed = build_seed(payload);
+    let summary: TaskValueSummary = capture_completed_value(seed);
+    return summary.completed + summary.value;
+  }
+
+  fn main() {
+    print(summarize_task_value_recipe(7));
+  }
+}

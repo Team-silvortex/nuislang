@@ -1,0 +1,57 @@
+mod cpu Main {
+  struct TaskStatusSummary {
+    completed: i64,
+    timed_out: i64,
+    cancelled: i64
+  }
+
+  async fn ping(seed: i64) -> i64 {
+    return seed + 4;
+  }
+
+  fn capture_status(result: TaskResult<i64>) -> TaskStatusSummary {
+    if task_completed(result) {
+      return TaskStatusSummary {
+        completed: 1,
+        timed_out: 0,
+        cancelled: 0
+      };
+    }
+    return TaskStatusSummary {
+      completed: 0,
+      timed_out: 0,
+      cancelled: 0
+    };
+  }
+
+  fn encode_timed_out(result: TaskResult<i64>) -> i64 {
+    if task_timed_out(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_cancelled(result: TaskResult<i64>) -> i64 {
+    if task_cancelled(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn summarize_task_status_recipe(seed: i64, limit: i64) -> i64 {
+    let completed_result: TaskResult<i64> = join_result(spawn(ping(seed)));
+    let completed_status: TaskStatusSummary = capture_status(completed_result);
+
+    let timed_result: TaskResult<i64> = join_result(timeout(spawn(ping(seed)), limit));
+    let timed_out: i64 = encode_timed_out(timed_result);
+
+    let cancelled_result: TaskResult<i64> = join_result(cancel(spawn(ping(seed))));
+    let cancelled: i64 = encode_cancelled(cancelled_result);
+
+    return completed_status.completed + timed_out + cancelled;
+  }
+
+  fn main() {
+    print(summarize_task_status_recipe(7, 0));
+  }
+}

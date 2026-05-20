@@ -83,6 +83,10 @@ Recipe modules:
   - [window_fabric_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/window_fabric_recipe.ns)
 * CLI/tooling runtime
   - [cli_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_runtime_recipe.ns)
+  - [task_status_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_status_recipe.ns)
+  - [task_value_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_value_recipe.ns)
+  - [task_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_compare_recipe.ns)
+  - [task_lifecycle_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_lifecycle_recipe.ns)
   - [task_cli_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_cli_recipe.ns)
 * checker/reporter tooling
   - [report_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/report_runtime_recipe.ns)
@@ -95,6 +99,194 @@ Recipe modules:
   - [clock_test_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/clock_test_recipe.ns)
   - [task_clock_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_clock_recipe.ns)
   - [task_scheduler_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_scheduler_recipe.ns)
+
+Task-facing map:
+
+Short task-facing summary:
+
+* status
+  [task_status_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_status_recipe.ns)
+  is the narrowest status-only observer path:
+  `join_result -> task_completed/task_timed_out/task_cancelled`
+* value
+  [task_value_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_value_recipe.ns)
+  is the narrowest completed-only value path:
+  `spawn -> join_result -> task_completed -> task_value`
+* compare
+  [task_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_compare_recipe.ns)
+  is the narrowest direct-vs-observed comparison path:
+  `spawn -> join` beside
+  `spawn -> join_result -> task_completed -> task_value`
+* lifecycle
+  [task_lifecycle_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_lifecycle_recipe.ns)
+  is the narrowest timeout/cancel lifecycle path:
+  `timeout/cancel -> join_result -> task_timed_out/task_cancelled`
+* clock
+  [task_clock_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_clock_recipe.ns)
+  adds timeout plus current clock-bridge staging to the observer path
+* scheduler
+  [task_scheduler_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_scheduler_recipe.ns)
+  adds lane-hint and monotonic-tick context without pretending `std` already
+  exposes a finished executor runtime
+* cli
+  [task_cli_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_cli_recipe.ns)
+  adds task-facing reporting through argv/stdout/stderr/diagnostic/monotonic
+  host surfaces
+
+Recommended fast read:
+
+* start with `status`
+* then `value`
+* then `compare`
+* then `lifecycle`
+* then `clock`
+* then `scheduler`
+* finish with `cli`
+
+* [task_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_runtime.ns)
+  the smallest observer-oriented task source module:
+  `spawn -> join_result -> task_completed/task_timed_out/task_cancelled -> task_value`
+  Single-file companion:
+  [hello_task_cli_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_task_cli_facades.ns)
+  Project companions:
+  [task_completed_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_completed_observe_demo)
+  ,
+  [task_lifecycle_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_lifecycle_branch_demo)
+  , and
+  [task_cancel_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_cancel_branch_demo)
+* [task_status_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_status_recipe.ns)
+  the narrowest status-only observer path:
+  `join_result -> task_completed/task_timed_out/task_cancelled`
+  Closest current companions:
+  [hello_task_glm_status_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_status_path.ns)
+  ,
+  [hello_task_glm_observe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_observe.ns)
+  ,
+  [hello_task_glm_lifecycle.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_lifecycle.ns)
+  ,
+  [task_lifecycle_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_lifecycle_branch_demo)
+  , and
+  [task_cancel_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_cancel_branch_demo)
+* [task_value_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_value_recipe.ns)
+  the smallest completed-only value path:
+  `spawn -> join_result -> task_completed -> task_value`
+  Closest current companions:
+  [hello_task_glm_value_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_value_path.ns)
+  ,
+  [task_completed_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_completed_observe_demo)
+  and
+  [hello_task_cli_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_task_cli_facades.ns)
+* [task_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_compare_recipe.ns)
+  the narrowest direct-vs-observed comparison path:
+  `spawn -> join` beside `spawn -> join_result -> task_completed -> task_value`
+  Closest current companions:
+  [hello_task_glm_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_compare.ns)
+  and
+  [hello_task_glm_boundary_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_boundary_compare.ns)
+* [task_lifecycle_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_lifecycle_recipe.ns)
+  the narrowest timeout/cancel lifecycle path:
+  `timeout/cancel -> join_result -> task_timed_out/task_cancelled`
+  Closest current companions:
+  [hello_task_glm_lifecycle_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_lifecycle_path.ns)
+  ,
+  [hello_task_glm_lifecycle.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_lifecycle.ns)
+  ,
+  [task_lifecycle_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_lifecycle_branch_demo)
+  , and
+  [task_cancel_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_cancel_branch_demo)
+* [task_clock_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_clock_recipe.ns)
+  task observe plus timeout/clock bridge summary:
+  `timeout -> join_result -> task_completed/task_timed_out`
+  plus declared/resolved global clock code and host/global timing metadata
+  Single-file companion:
+  [hello_clock_test_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_clock_test_facades.ns)
+  Project companion:
+  [task_lifecycle_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_lifecycle_branch_demo)
+* [task_scheduler_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_scheduler_recipe.ns)
+  lane-hint plus task observe plus host timing:
+  `cpu_bind_core(0)`, `timeout`, `join_result`, `cpu_tick_i64`, `host_monotonic_time_ns`
+  Single-file companion:
+  [hello_task_scheduler_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_task_scheduler_facades.ns)
+  Closest current project companions:
+  [task_completed_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_completed_observe_demo)
+  and
+  [task_cli_tooling_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_cli_tooling_demo)
+* [task_cli_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_cli_recipe.ns)
+  task observe plus CLI-facing reporting:
+  `host_argv_count`, `stdout/stderr`, diagnostic emit, and monotonic timing
+  Single-file companion:
+  [hello_task_cli_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_task_cli_facades.ns)
+  Project companion:
+  [task_cli_tooling_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_cli_tooling_demo)
+
+Recommended reading order for the current task-facing `std` line:
+
+* start with [task_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_runtime.ns)
+  to read the smallest observer-oriented task contract first
+* continue to [task_status_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_status_recipe.ns)
+  when you want the narrowest status-only observation path
+* continue to [task_value_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_value_recipe.ns)
+  when you want the narrowest completed-only payload extraction path
+* continue to [task_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_compare_recipe.ns)
+  when you want the smallest direct-vs-observed task-path comparison
+* continue to [task_lifecycle_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_lifecycle_recipe.ns)
+  when you want the narrowest timeout/cancel lifecycle path
+* continue to [task_clock_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_clock_recipe.ns)
+  when you want timeout plus clock bridge semantics
+* then read [task_scheduler_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_scheduler_recipe.ns)
+  when you want lane-hint plus monotonic-tick context
+* finish with [task_cli_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_cli_recipe.ns)
+  when you want the task/tooling front-door reporting shape
+
+Recommended example route for the same line:
+
+* single-file source mirrors:
+  [hello_task_cli_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_task_cli_facades.ns)
+  and
+  [hello_clock_test_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_clock_test_facades.ns)
+* project-shaped companions:
+  [task_completed_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_completed_observe_demo)
+  ,
+  [task_lifecycle_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_lifecycle_branch_demo)
+  ,
+  [task_cancel_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_cancel_branch_demo)
+  , and
+  [task_cli_tooling_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_cli_tooling_demo)
+
+Current task-facing boundaries by reading stage:
+
+* [task_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_runtime.ns)
+  is the right place to learn the current observer-oriented task contract, but
+  it should not be read as a promise that `Task<T>` already has final GLM
+  ownership semantics or a finished native concurrency runtime
+* [task_status_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_status_recipe.ns)
+  is the right place to learn the narrow status-only observer path, but it
+  should not be read as a promise that those status observations already imply
+  final lifetime-end or consuming GLM semantics
+* [task_value_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_value_recipe.ns)
+  is the right place to learn the narrow completed-only value path, but it
+  should not be read as a promise that `join(...)` or `join_result(...)` have
+  already been frozen into final consuming ownership semantics
+* [task_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_compare_recipe.ns)
+  is the right place to compare the current direct and observed task paths, but
+  it should not be read as a promise that the present non-consuming `join(...)`
+  contract is final
+* [task_lifecycle_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_lifecycle_recipe.ns)
+  is the right place to learn the current timeout/cancel observation path, but
+  it should not be read as a promise that cancellation or timeout already carry
+  final lifetime-end semantics in GLM or runtime
+* [task_clock_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_clock_recipe.ns)
+  is the right place to learn timeout plus clock bridge staging, but it should
+  not be read as a promise that cross-domain time negotiation has already been
+  finalized beyond the current `global -> monotonic` front-door contract
+* [task_scheduler_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_scheduler_recipe.ns)
+  is the right place to learn lane-hint plus monotonic tick context, but it
+  should not be read as a promise that `std` already exposes a mature executor,
+  fairness contract, or parallel scheduler runtime
+* [task_cli_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_cli_recipe.ns)
+  is the right place to learn task/tooling reporting shape, but it should not
+  be read as a promise that async task execution, timeout handling, and host
+  reporting are already unified into a fully live native tooling runtime
 
 Current boundaries:
 

@@ -1,0 +1,77 @@
+mod cpu Main {
+  extern "c" fn host_monotonic_time_ns() -> i64;
+
+  struct TaskSchedulerSeed {
+    payload: i64,
+    timeout_ns: i64,
+    bias: i64
+  }
+
+  struct TaskSchedulerSummary {
+    lane_code: i64,
+    completed: i64,
+    timed_out: i64,
+    payload: i64,
+    scheduler_tick: i64,
+    monotonic_ns: i64
+  }
+
+  async fn ping(seed: i64) -> i64 {
+    return seed + 5;
+  }
+
+  fn encode_timed_out(result: TaskResult<i64>) -> i64 {
+    if task_timed_out(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn summarize_task_scheduler(seed: TaskSchedulerSeed) -> TaskSchedulerSummary {
+    cpu_bind_core(0);
+
+    let task: Task<i64> = timeout(spawn(ping(seed.payload)), seed.timeout_ns);
+    let result: TaskResult<i64> = join_result(task);
+    let timed_out: i64 = encode_timed_out(result);
+    let scheduler_tick: i64 = cpu_tick_i64(0, 1);
+    let monotonic_ns: i64 = host_monotonic_time_ns();
+
+    if task_completed(result) {
+      return TaskSchedulerSummary {
+        lane_code: 0 + seed.bias,
+        completed: 1,
+        timed_out: timed_out,
+        payload: task_value(result),
+        scheduler_tick: scheduler_tick,
+        monotonic_ns: monotonic_ns
+      };
+    }
+
+    return TaskSchedulerSummary {
+      lane_code: 0 + seed.bias,
+      completed: 0,
+      timed_out: timed_out,
+      payload: 0,
+      scheduler_tick: scheduler_tick,
+      monotonic_ns: monotonic_ns
+    };
+  }
+
+  fn summarize_task_scheduler_snapshot(payload: i64, timeout_ns: i64, bias: i64) -> i64 {
+    let summary: TaskSchedulerSummary = summarize_task_scheduler(TaskSchedulerSeed {
+      payload: payload,
+      timeout_ns: timeout_ns,
+      bias: bias
+    });
+    return summary.lane_code
+      + summary.completed
+      + summary.timed_out
+      + summary.payload
+      + summary.scheduler_tick
+      + summary.monotonic_ns;
+  }
+
+  fn main() -> i64 {
+    return summarize_task_scheduler_snapshot(7, 16, 1);
+  }
+}

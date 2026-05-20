@@ -12,6 +12,8 @@ This folder contains CPU host-bridge examples:
 * `hello_native_tool_runner.ns`
 * `hello_native_workflow_runtime.ns`
 * `hello_clock_test_facades.ns`
+* `hello_task_scheduler_facades.ns`
+* `hello_task_cli_facades.ns`
 
 Reading guidance:
 
@@ -67,11 +69,71 @@ Reading guidance:
   [clock_domain_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/clock_domain_runtime.ns)
   ,
   [clock_test_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/clock_test_recipe.ns)
-  and the current `nuis test` time semantics; it includes a `should_fail=true`
-  async test with `clock_domain="global"` so the front-door runner prints the
-  resolved host clock domain during execution
+  and the current `nuis test` time semantics; inside the task-facing `std`
+  line it is also the narrowest single-file mirror for
+  [task_clock_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_clock_recipe.ns).
+  It includes a `should_fail=true` async test with `clock_domain="global"` so
+  the front-door runner prints the resolved host clock domain during execution
   Future direction note:
   [examples/ns/ffi/FUTURE_CLOCK_NEGOTIATION_SKETCH.md](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/FUTURE_CLOCK_NEGOTIATION_SKETCH.md)
+* `hello_task_scheduler_facades.ns`
+  a task/scheduler-oriented `extern "c"` example that mirrors
+  [task_scheduler_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_scheduler_recipe.ns)
+  and combines `cpu_bind_core(0)`, `cpu_tick_i64`, `timeout`, `join_result`,
+  `task_completed`, and monotonic host timing in one source-level example
+* `hello_task_cli_facades.ns`
+  a task/tooling-oriented `extern "c"` example that mirrors
+  [task_cli_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_cli_recipe.ns)
+  from the current `stdlib/std` task-facing recipe family; it combines
+  `spawn/timeout/join_result/task_*` with stdout/stderr, diagnostic emit, and
+  monotonic host timing in one source-level example
+
+Task-facing recipe map:
+
+* [task_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_runtime.ns)
+  and
+  [task_cli_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_cli_recipe.ns)
+  are the closest direct mirrors for
+  [hello_task_cli_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_task_cli_facades.ns)
+* [task_clock_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_clock_recipe.ns)
+  is the closest direct mirror for
+  [hello_clock_test_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_clock_test_facades.ns)
+  and that file is the current narrowest single-file clock companion in the
+  task-facing `std` sequence
+* [task_scheduler_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_scheduler_recipe.ns)
+  is the closest direct mirror for
+  [hello_task_scheduler_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_task_scheduler_facades.ns)
+
+Recommended reading order for the task-facing FFI examples:
+
+* start with
+  [hello_task_cli_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_task_cli_facades.ns)
+  to read the smallest task/tooling observer path
+* then read
+  [hello_clock_test_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_clock_test_facades.ns)
+  when you want the task/clock bridge and timeout-facing timing vocabulary
+  in its narrowest single-file form
+* then read
+  [hello_task_scheduler_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_task_scheduler_facades.ns)
+  when you want the narrowest lane-hint plus monotonic-tick task path
+* finish with
+  [hello_task_cli_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_task_cli_facades.ns)
+  when you want task/tooling reporting on top of those earlier shapes
+
+Current task-facing example boundaries:
+
+* [hello_task_cli_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_task_cli_facades.ns)
+  is the clearest source-level mirror for current task/tooling observation
+  shape, but it is still a host-facade example rather than a promise of a live
+  native task executor path
+* [hello_clock_test_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_clock_test_facades.ns)
+  is the clearest source-level mirror for current timeout/clock bridge
+  vocabulary, but it still reflects staging metadata rather than a finalized
+  multi-domain time negotiation protocol
+* [hello_task_scheduler_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_task_scheduler_facades.ns)
+  is the clearest source-level mirror for current lane-hint plus monotonic-tick
+  task context, but it should not be read as a promise that `std` already
+  exposes a mature executor or fairness-aware scheduler runtime
 
 Current note:
 

@@ -1,0 +1,42 @@
+mod cpu Main {
+  struct TaskCompareSummary {
+    direct_value: i64,
+    observed_completed: i64,
+    observed_value: i64
+  }
+
+  async fn ping(seed: i64) -> i64 {
+    return seed + 3;
+  }
+
+  fn capture_direct_value(seed: i64) -> i64 {
+    let task: Task<i64> = spawn(ping(seed));
+    return join(task);
+  }
+
+  fn capture_observed_value(seed: i64) -> TaskCompareSummary {
+    let result: TaskResult<i64> = join_result(spawn(ping(seed)));
+    if task_completed(result) {
+      return TaskCompareSummary {
+        direct_value: 0,
+        observed_completed: 1,
+        observed_value: task_value(result)
+      };
+    }
+    return TaskCompareSummary {
+      direct_value: 0,
+      observed_completed: 0,
+      observed_value: 0
+    };
+  }
+
+  fn summarize_task_compare_recipe(seed: i64) -> i64 {
+    let direct_value: i64 = capture_direct_value(seed);
+    let observed: TaskCompareSummary = capture_observed_value(seed);
+    return direct_value + observed.observed_completed + observed.observed_value;
+  }
+
+  fn main() {
+    print(summarize_task_compare_recipe(7));
+  }
+}

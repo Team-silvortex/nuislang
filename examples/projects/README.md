@@ -165,6 +165,26 @@ Also included:
   completed task result.
   Future direction note:
   [examples/projects/task_completed_observe_demo/FUTURE_HOT_SYNC_CONTRACTION_SKETCH.md](/Users/Shared/chroot/dev/nuislang/examples/projects/task_completed_observe_demo/FUTURE_HOT_SYNC_CONTRACTION_SKETCH.md)
+* [task_status_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_status_observe_demo)
+  one-file `cpu`-only status observer demo:
+  `main.ns`
+  showing the current project-form narrow status path for
+  `join_result -> task_completed/task_timed_out/task_cancelled`.
+  This is the smallest project-shaped companion to
+  [task_status_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_status_recipe.ns).
+* [task_cli_tooling_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_cli_tooling_demo)
+  one-file `cpu`-only async tooling demo:
+  `main.ns`
+  showing the current project-form bridge between
+  `spawn/timeout/join_result/task_completed/task_value`
+  and host-facing CLI reporting surfaces like
+  `host_argv_count`, `host_stdout_write`, `host_stderr_write`, and
+  `host_monotonic_time_ns`.
+  This is the current canonical project-shaped companion to
+  [task_cli_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_cli_recipe.ns).
+  Like the other current task samples, it is strongest today as a
+  compile/contract example while native CPU task execution remains deferred in
+  LLVM/AOT.
 * [task_cancel_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_cancel_branch_demo)
   one-file `cpu`-only cancel lifecycle demo:
   `main.ns`
@@ -188,6 +208,83 @@ Also included:
   for the future-tightening note, and
   [examples/projects/task_join_nonconsuming_probe_demo/FUTURE_CONSUME_SKETCH.md](/Users/Shared/chroot/dev/nuislang/examples/projects/task_join_nonconsuming_probe_demo/FUTURE_CONSUME_SKETCH.md)
   for the likely migration sketch if `join(...)` later becomes consuming.
+
+Task-facing `std` companions:
+
+* [task_status_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_status_recipe.ns)
+  is mirrored most directly by
+  [task_status_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_status_observe_demo)
+* [task_value_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_value_recipe.ns)
+  is mirrored most directly by
+  [task_completed_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_completed_observe_demo)
+* [task_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_runtime.ns)
+  is reflected most directly in
+  [task_completed_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_completed_observe_demo)
+  ,
+  [task_status_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_status_observe_demo)
+  ,
+  [task_lifecycle_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_lifecycle_branch_demo)
+  , and
+  [task_cancel_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_cancel_branch_demo)
+* [task_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_compare_recipe.ns)
+  is still best paired with the single-file memory compare samples today; it
+  does not yet have its own project-shaped one-to-one companion
+* [task_lifecycle_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_lifecycle_recipe.ns)
+  is mirrored most directly by
+  [task_lifecycle_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_lifecycle_branch_demo)
+  and
+  [task_cancel_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_cancel_branch_demo)
+* [task_clock_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_clock_recipe.ns)
+  is closest to
+  [task_lifecycle_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_lifecycle_branch_demo)
+  as the current compile/contract timeout-lifecycle companion
+* [task_scheduler_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_scheduler_recipe.ns)
+  is currently closest in spirit to
+  [task_completed_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_completed_observe_demo)
+  and
+  [task_cli_tooling_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_cli_tooling_demo)
+  because they stay value-like, observer-local, and monotonic-time aware
+* [task_cli_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_cli_recipe.ns)
+  is mirrored most directly by
+  [task_cli_tooling_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_cli_tooling_demo)
+
+Recommended reading order for the current task projects:
+
+* start with
+  [task_status_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_status_observe_demo)
+  for the narrowest status-only observation path
+* then read
+  [task_completed_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_completed_observe_demo)
+  for the smallest positive observation path
+* then read
+  [task_lifecycle_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_lifecycle_branch_demo)
+  and
+  [task_cancel_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_cancel_branch_demo)
+  for timeout/cancel lifecycle shaping
+* finish with
+  [task_cli_tooling_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_cli_tooling_demo)
+  when you want the current async/tooling reporting companion
+
+Current task project boundaries by reading stage:
+
+* [task_status_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_status_observe_demo)
+  is the cleanest project-shaped status-only observation path, but it should
+  still be read as a compile/contract sample rather than proof that task status
+  observation already implies a full native runtime lifecycle model
+* [task_completed_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_completed_observe_demo)
+  is the cleanest project-shaped positive observation path, but it should still
+  be read mainly as a compile/contract sample while native CPU task execution
+  remains deferred
+* [task_lifecycle_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_lifecycle_branch_demo)
+  and
+  [task_cancel_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_cancel_branch_demo)
+  are the clearest lifecycle-shaping samples, but they should still be read as
+  branch/control-flow companions rather than proof of a completed cancellation
+  or timeout runtime model
+* [task_cli_tooling_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_cli_tooling_demo)
+  is the clearest task/tooling project companion, but it should still be read
+  as a project-form contract and reporting sample rather than a finished async
+  native CLI runtime
 
 ## Migration Map
 
@@ -229,6 +326,10 @@ cargo run -p nuis -- check examples/projects/task_lifecycle_branch_demo
 cargo run -p nuis -- build examples/projects/task_lifecycle_branch_demo /private/tmp/task_lifecycle_branch_demo_out
 cargo run -p nuis -- check examples/projects/task_completed_observe_demo
 cargo run -p nuis -- build examples/projects/task_completed_observe_demo /private/tmp/task_completed_observe_demo_out
+cargo run -p nuis -- check examples/projects/task_status_observe_demo
+cargo run -p nuis -- build examples/projects/task_status_observe_demo /private/tmp/task_status_observe_demo_out
+cargo run -p nuis -- check examples/projects/task_cli_tooling_demo
+cargo run -p nuis -- build examples/projects/task_cli_tooling_demo /private/tmp/task_cli_tooling_demo_out
 cargo run -p nuis -- check examples/projects/task_cancel_branch_demo
 cargo run -p nuis -- build examples/projects/task_cancel_branch_demo /private/tmp/task_cancel_branch_demo_out
 cargo run -p nuis -- check examples/projects/task_join_nonconsuming_probe_demo

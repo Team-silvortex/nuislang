@@ -28,6 +28,18 @@ Read these examples in roughly five bands:
     `struct` plus `ref` fields
   - [hello_borrow_end.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_borrow_end.ns)
     explicit local lifetime closure
+  - [hello_task_glm_value_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_value_path.ns)
+    narrowest current completed-only task value path and the closest single-file
+    memory companion to `std/task_value_recipe.ns`
+  - [hello_task_glm_status_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_status_path.ns)
+    narrowest current status-only task path and the closest single-file memory
+    companion to `std/task_status_recipe.ns`
+  - [hello_task_glm_lifecycle_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_lifecycle_path.ns)
+    narrowest current lifecycle-only task path and the closest single-file
+    memory companion to `std/task_lifecycle_recipe.ns`
+  - [hello_task_glm_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_compare.ns)
+    clearest current direct-vs-observed task comparison path and the closest
+    single-file memory companion to `std/task_compare_recipe.ns`
 * data-path examples
   - [hello_data.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/data/hello_data.ns)
     first front-end `data` link surface
@@ -61,6 +73,11 @@ Read these examples in roughly five bands:
     directory/temp/process/command/subprocess shim batch
   - [hello_clock_test_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_clock_test_facades.ns)
     clock/timing host example aligned with current `std` clock/test recipe and `nuis test` timeout semantics
+  - [hello_task_scheduler_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_task_scheduler_facades.ns)
+    task/scheduler host example aligned with current `std` task scheduler recipe
+    and lane-hint plus monotonic-tick task context
+  - [hello_task_cli_facades.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/ffi/hello_task_cli_facades.ns)
+    task/tooling host example aligned with current `std` task CLI recipe and observer-oriented async/task reporting
 * end-to-end demo path
   - [window_controls_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/window_controls_demo.ns)
     current single-file `cpu + data + shader` real-time control/render demo

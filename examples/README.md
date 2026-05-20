@@ -44,6 +44,15 @@ These are the best current front-end examples to read first.
   nested text/value-like payload path showing that named wrappers with safe text fields remain allowed
 * [hello_task_glm_origin.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_origin.ns)
   smallest current task-handle origin and direct payload extraction path: `spawn -> join`
+* [hello_task_glm_status_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_status_path.ns)
+  narrowest current status-only observer path:
+  `join_result -> task_completed/task_timed_out/task_cancelled`
+* [hello_task_glm_value_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_value_path.ns)
+  narrowest current completed-only value path:
+  `spawn -> join_result -> task_completed -> task_value`
+* [hello_task_glm_lifecycle_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_lifecycle_path.ns)
+  narrowest current lifecycle-only path:
+  `timeout/cancel -> join_result -> task_timed_out/task_cancelled`
 * [hello_task_glm_lifecycle.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_lifecycle.ns)
   lifecycle-shaping path through `timeout/cancel -> join_result -> task_timed_out/task_cancelled`
 * [hello_task_glm_boundary_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_boundary_compare.ns)
@@ -56,6 +65,8 @@ These are the best current front-end examples to read first.
   current positive task-observation path: `spawn -> timeout -> join_result -> task_completed -> task_value`
 * [hello_task_glm_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_compare.ns)
   side-by-side comparison of direct payload extraction with `join(...)` and lifecycle-aware observation with `join_result(...)`
+  This is the clearest single-file companion for
+  [task_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_compare_recipe.ns).
 * [hello_task_glm_join_nonconsuming_probe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_join_nonconsuming_probe.ns)
   design-probe sample showing a shape that is currently allowed because
   `join(...)` is not yet treated as a graph-level consume boundary:
