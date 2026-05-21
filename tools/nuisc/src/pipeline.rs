@@ -306,8 +306,14 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         | NirExpr::KernelReduceMean(inner)
         | NirExpr::KernelArgmax(inner)
         | NirExpr::KernelArgmin(inner)
+        | NirExpr::KernelArgmaxAxis { input: inner, .. }
+        | NirExpr::KernelArgminAxis { input: inner, .. }
+        | NirExpr::KernelReduceMaxAxis { input: inner, .. }
+        | NirExpr::KernelReduceMeanAxis { input: inner, .. }
         | NirExpr::KernelReduceSumAxis { input: inner, .. }
         | NirExpr::KernelSort(inner)
+        | NirExpr::KernelSortAxis { input: inner, .. }
+        | NirExpr::KernelTopkAxis { input: inner, .. }
         | NirExpr::DataOutputPipe(inner)
         | NirExpr::DataInputPipe(inner)
         | NirExpr::CpuPresentFrame(inner)

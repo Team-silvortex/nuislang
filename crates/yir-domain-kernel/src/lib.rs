@@ -347,6 +347,21 @@ fn describe_kernel_node(node: &Node, resource: &Resource) -> Result<InstructionS
                 )),
             }
         }
+        "sort_axis" => {
+            if node.op.args.len() != 2 {
+                return Err(format!(
+                    "node `{}` expects `kernel.sort_axis <name> <resource> <input> <axis>`",
+                    node.name
+                ));
+            }
+            match node.op.args[1].as_str() {
+                "rows" | "cols" => Ok(InstructionSemantics::pure(vec![node.op.args[0].clone()])),
+                other => Err(format!(
+                    "node `{}` has invalid sort axis `{other}`; expected rows or cols",
+                    node.name
+                )),
+            }
+        }
         "reduce_sum_axis" | "reduce_max_axis" | "reduce_mean_axis" | "reduce_min_axis"
         | "argmax_axis" | "argmin_axis" => {
             if node.op.args.len() != 2 {
@@ -740,6 +755,17 @@ fn execute_kernel_node(
                 "cols" => topk_cols(input, k).map(Value::Tensor),
                 other => Err(format!(
                     "node `{}` has invalid topk axis `{other}`; expected rows or cols",
+                    node.name
+                )),
+            }
+        }
+        "sort_axis" => {
+            let input = state.expect_tensor(&node.op.args[0])?;
+            match node.op.args[1].as_str() {
+                "rows" => Ok(Value::Tensor(sort_rows(input))),
+                "cols" => Ok(Value::Tensor(sort_cols(input))),
+                other => Err(format!(
+                    "node `{}` has invalid sort axis `{other}`; expected rows or cols",
                     node.name
                 )),
             }
@@ -1335,6 +1361,45 @@ fn topk_cols(input: &TensorValue, k: usize) -> Result<TensorValue, String> {
         cols: input.cols,
         elements,
     })
+}
+
+fn sort_rows(input: &TensorValue) -> TensorValue {
+    let mut elements = Vec::with_capacity(input.elements.len());
+    for row in 0..input.rows {
+        let start = row * input.cols;
+        let end = start + input.cols;
+        let mut row_values = input.elements[start..end].to_vec();
+        row_values.sort_unstable();
+        elements.extend(row_values);
+    }
+    TensorValue {
+        rows: input.rows,
+        cols: input.cols,
+        elements,
+    }
+}
+
+fn sort_cols(input: &TensorValue) -> TensorValue {
+    let mut columns = Vec::with_capacity(input.cols);
+    for col in 0..input.cols {
+        let mut col_values = (0..input.rows)
+            .map(|row| input.elements[row * input.cols + col])
+            .collect::<Vec<_>>();
+        col_values.sort_unstable();
+        columns.push(col_values);
+    }
+
+    let mut elements = Vec::with_capacity(input.elements.len());
+    for row in 0..input.rows {
+        for column in &columns {
+            elements.push(column[row]);
+        }
+    }
+    TensorValue {
+        rows: input.rows,
+        cols: input.cols,
+        elements,
+    }
 }
 
 fn matmul(lhs: &TensorValue, rhs: &TensorValue) -> Result<TensorValue, String> {

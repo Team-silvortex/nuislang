@@ -514,11 +514,24 @@ fn verify_expr(
         NirExpr::KernelArgmax(inner) | NirExpr::KernelArgmin(inner) => {
             verify_expr(inner, moved, borrows, borrow_bindings, data_bindings)?
         }
+        NirExpr::KernelArgmaxAxis { input, .. } | NirExpr::KernelArgminAxis { input, .. } => {
+            verify_expr(input, moved, borrows, borrow_bindings, data_bindings)?
+        }
+        NirExpr::KernelReduceMaxAxis { input, .. }
+        | NirExpr::KernelReduceMeanAxis { input, .. } => {
+            verify_expr(input, moved, borrows, borrow_bindings, data_bindings)?
+        }
         NirExpr::KernelReduceSumAxis { input, .. } => {
             verify_expr(input, moved, borrows, borrow_bindings, data_bindings)?
         }
         NirExpr::KernelSort(inner) => {
             verify_expr(inner, moved, borrows, borrow_bindings, data_bindings)?
+        }
+        NirExpr::KernelSortAxis { input, .. } => {
+            verify_expr(input, moved, borrows, borrow_bindings, data_bindings)?
+        }
+        NirExpr::KernelTopkAxis { input, .. } => {
+            verify_expr(input, moved, borrows, borrow_bindings, data_bindings)?
         }
         NirExpr::KernelTopk { input, .. } => {
             verify_expr(input, moved, borrows, borrow_bindings, data_bindings)?
@@ -825,8 +838,15 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
         NirExpr::KernelArgmax(inner) | NirExpr::KernelArgmin(inner) => {
             verify_expr_uses(inner, moved)?
         }
+        NirExpr::KernelArgmaxAxis { input, .. } | NirExpr::KernelArgminAxis { input, .. } => {
+            verify_expr_uses(input, moved)?
+        }
+        NirExpr::KernelReduceMaxAxis { input, .. }
+        | NirExpr::KernelReduceMeanAxis { input, .. } => verify_expr_uses(input, moved)?,
         NirExpr::KernelReduceSumAxis { input, .. } => verify_expr_uses(input, moved)?,
         NirExpr::KernelSort(inner) => verify_expr_uses(inner, moved)?,
+        NirExpr::KernelSortAxis { input, .. } => verify_expr_uses(input, moved)?,
+        NirExpr::KernelTopkAxis { input, .. } => verify_expr_uses(input, moved)?,
         NirExpr::KernelTopk { input, .. } => verify_expr_uses(input, moved)?,
         NirExpr::CpuSpawn { args, .. } | NirExpr::CpuExternCall { args, .. } => {
             for arg in args {

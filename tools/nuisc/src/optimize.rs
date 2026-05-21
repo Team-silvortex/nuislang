@@ -863,8 +863,14 @@ fn collect_used_vars_expr(expr: &NirExpr, out: &mut BTreeSet<String>) {
         | NirExpr::KernelReduceMean(inner)
         | NirExpr::KernelArgmax(inner)
         | NirExpr::KernelArgmin(inner)
+        | NirExpr::KernelArgmaxAxis { input: inner, .. }
+        | NirExpr::KernelArgminAxis { input: inner, .. }
+        | NirExpr::KernelReduceMaxAxis { input: inner, .. }
+        | NirExpr::KernelReduceMeanAxis { input: inner, .. }
         | NirExpr::KernelReduceSumAxis { input: inner, .. }
         | NirExpr::KernelSort(inner)
+        | NirExpr::KernelSortAxis { input: inner, .. }
+        | NirExpr::KernelTopkAxis { input: inner, .. }
         | NirExpr::ShaderPassReady(inner)
         | NirExpr::ShaderFrameReady(inner)
         | NirExpr::ShaderValue(inner)

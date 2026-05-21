@@ -3190,6 +3190,22 @@ fn lower_expr(
             push_dep_edges(state, &input_name, &name);
             Ok(name)
         }
+        NirExpr::KernelReduceMaxAxis { input, axis } => {
+            ensure_kernel_resource(state.yir);
+            let input_name = lower_expr(input, state, bindings)?;
+            let name = next_name(state, "kernel_reduce_max_axis");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "kernel0".to_owned(),
+                op: Operation {
+                    module: "kernel".to_owned(),
+                    instruction: "reduce_max_axis".to_owned(),
+                    args: vec![input_name.clone(), axis.render().to_owned()],
+                },
+            });
+            push_dep_edges(state, &input_name, &name);
+            Ok(name)
+        }
         NirExpr::KernelReduceMean(input) => {
             ensure_kernel_resource(state.yir);
             let input_name = lower_expr(input, state, bindings)?;
@@ -3201,6 +3217,22 @@ fn lower_expr(
                     module: "kernel".to_owned(),
                     instruction: "reduce_mean".to_owned(),
                     args: vec![input_name.clone()],
+                },
+            });
+            push_dep_edges(state, &input_name, &name);
+            Ok(name)
+        }
+        NirExpr::KernelReduceMeanAxis { input, axis } => {
+            ensure_kernel_resource(state.yir);
+            let input_name = lower_expr(input, state, bindings)?;
+            let name = next_name(state, "kernel_reduce_mean_axis");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "kernel0".to_owned(),
+                op: Operation {
+                    module: "kernel".to_owned(),
+                    instruction: "reduce_mean_axis".to_owned(),
+                    args: vec![input_name.clone(), axis.render().to_owned()],
                 },
             });
             push_dep_edges(state, &input_name, &name);
@@ -3222,6 +3254,22 @@ fn lower_expr(
             push_dep_edges(state, &input_name, &name);
             Ok(name)
         }
+        NirExpr::KernelArgmaxAxis { input, axis } => {
+            ensure_kernel_resource(state.yir);
+            let input_name = lower_expr(input, state, bindings)?;
+            let name = next_name(state, "kernel_argmax_axis");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "kernel0".to_owned(),
+                op: Operation {
+                    module: "kernel".to_owned(),
+                    instruction: "argmax_axis".to_owned(),
+                    args: vec![input_name.clone(), axis.render().to_owned()],
+                },
+            });
+            push_dep_edges(state, &input_name, &name);
+            Ok(name)
+        }
         NirExpr::KernelArgmin(input) => {
             ensure_kernel_resource(state.yir);
             let input_name = lower_expr(input, state, bindings)?;
@@ -3233,6 +3281,22 @@ fn lower_expr(
                     module: "kernel".to_owned(),
                     instruction: "argmin".to_owned(),
                     args: vec![input_name.clone()],
+                },
+            });
+            push_dep_edges(state, &input_name, &name);
+            Ok(name)
+        }
+        NirExpr::KernelArgminAxis { input, axis } => {
+            ensure_kernel_resource(state.yir);
+            let input_name = lower_expr(input, state, bindings)?;
+            let name = next_name(state, "kernel_argmin_axis");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "kernel0".to_owned(),
+                op: Operation {
+                    module: "kernel".to_owned(),
+                    instruction: "argmin_axis".to_owned(),
+                    args: vec![input_name.clone(), axis.render().to_owned()],
                 },
             });
             push_dep_edges(state, &input_name, &name);
@@ -3254,6 +3318,22 @@ fn lower_expr(
             push_dep_edges(state, &input_name, &name);
             Ok(name)
         }
+        NirExpr::KernelSortAxis { input, axis } => {
+            ensure_kernel_resource(state.yir);
+            let input_name = lower_expr(input, state, bindings)?;
+            let name = next_name(state, "kernel_sort_axis");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "kernel0".to_owned(),
+                op: Operation {
+                    module: "kernel".to_owned(),
+                    instruction: "sort_axis".to_owned(),
+                    args: vec![input_name.clone(), axis.render().to_owned()],
+                },
+            });
+            push_dep_edges(state, &input_name, &name);
+            Ok(name)
+        }
         NirExpr::KernelTopk { input, k } => {
             ensure_kernel_resource(state.yir);
             let input_name = lower_expr(input, state, bindings)?;
@@ -3265,6 +3345,22 @@ fn lower_expr(
                     module: "kernel".to_owned(),
                     instruction: "topk".to_owned(),
                     args: vec![input_name.clone(), k.to_string()],
+                },
+            });
+            push_dep_edges(state, &input_name, &name);
+            Ok(name)
+        }
+        NirExpr::KernelTopkAxis { input, axis, k } => {
+            ensure_kernel_resource(state.yir);
+            let input_name = lower_expr(input, state, bindings)?;
+            let name = next_name(state, "kernel_topk_axis");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "kernel0".to_owned(),
+                op: Operation {
+                    module: "kernel".to_owned(),
+                    instruction: "topk_axis".to_owned(),
+                    args: vec![input_name.clone(), k.to_string(), axis.render().to_owned()],
                 },
             });
             push_dep_edges(state, &input_name, &name);
@@ -5054,6 +5150,104 @@ mod tests {
             .nodes
             .iter()
             .any(|node| node.op.module == "kernel" && node.op.instruction == "element_at"));
+    }
+
+    #[test]
+    fn lowers_kernel_tensor_reduce_axis_family_primitives_into_kernel_nodes() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let input = kernel_tensor(2, 3, "2,4,6,1,3,5");
+                let row_max = kernel_reduce_max_axis(input, "rows");
+                let col_mean = kernel_reduce_mean_axis(input, "cols");
+                return kernel_element_at(row_max, 0, 0) + kernel_element_at(col_mean, 0, 1);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "reduce_max_axis"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "reduce_mean_axis"));
+    }
+
+    #[test]
+    fn lowers_kernel_tensor_select_axis_family_primitives_into_kernel_nodes() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let input = kernel_tensor(2, 3, "2,4,6,1,3,5");
+                let row_hi = kernel_argmax_axis(input, "rows");
+                let col_lo = kernel_argmin_axis(input, "cols");
+                return kernel_element_at(row_hi, 0, 1) + kernel_element_at(col_lo, 0, 2);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "argmax_axis"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "argmin_axis"));
+    }
+
+    #[test]
+    fn lowers_kernel_tensor_topk_axis_primitive_into_kernel_node() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let input = kernel_tensor(2, 3, "2,4,6,1,3,5");
+                let top2_rows = kernel_topk_axis(input, "rows", 2);
+                return kernel_element_at(top2_rows, 0, 1);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "topk_axis"));
+    }
+
+    #[test]
+    fn lowers_kernel_tensor_sort_axis_primitive_into_kernel_node() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let input = kernel_tensor(2, 3, "2,4,6,1,3,5");
+                let sorted_rows = kernel_sort_axis(input, "rows");
+                return kernel_element_at(sorted_rows, 0, 1);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "sort_axis"));
     }
 
     #[test]

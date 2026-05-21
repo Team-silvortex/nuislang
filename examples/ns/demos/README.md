@@ -16,6 +16,10 @@ stubs:
 * `kernel_tensor_select_demo.ns`
 * `kernel_tensor_order_demo.ns`
 * `kernel_tensor_axis_reduce_demo.ns`
+* `kernel_tensor_axis_family_demo.ns`
+* `kernel_tensor_axis_select_demo.ns`
+* `kernel_tensor_axis_sort_demo.ns`
+* `kernel_tensor_axis_order_demo.ns`
 * `kernel_tensor_map_zip_demo.ns`
 
 Current guidance:
@@ -28,6 +32,8 @@ Current guidance:
   `kernel_tensor_reshape_demo.ns`, `kernel_tensor_broadcast_demo.ns`,
   `kernel_tensor_reduce_demo.ns`, `kernel_tensor_select_demo.ns`,
   `kernel_tensor_order_demo.ns`, `kernel_tensor_axis_reduce_demo.ns`,
+  `kernel_tensor_axis_family_demo.ns`, `kernel_tensor_axis_select_demo.ns`,
+  `kernel_tensor_axis_sort_demo.ns`, `kernel_tensor_axis_order_demo.ns`,
   `kernel_tensor_map_zip_demo.ns` as current source-shaped mirrors of
   project-first lanes
 * today those two domain stubs do not pass standalone `nuis check` because
@@ -51,5 +57,9 @@ cargo run -p nuis -- check examples/projects/domains/kernel_tensor_reduce_demo
 cargo run -p nuis -- check examples/projects/domains/kernel_tensor_select_demo
 cargo run -p nuis -- check examples/projects/domains/kernel_tensor_order_demo
 cargo run -p nuis -- check examples/projects/domains/kernel_tensor_axis_reduce_demo
+cargo run -p nuis -- check examples/projects/domains/kernel_tensor_axis_family_demo
+cargo run -p nuis -- check examples/projects/domains/kernel_tensor_axis_select_demo
+cargo run -p nuis -- check examples/projects/domains/kernel_tensor_axis_sort_demo
+cargo run -p nuis -- check examples/projects/domains/kernel_tensor_axis_order_demo
 cargo run -p nuis -- check examples/projects/domains/kernel_tensor_map_zip_demo
 ```

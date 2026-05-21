@@ -1,0 +1,11 @@
+use kernel KernelUnit;
+
+mod cpu Main {
+  fn main() {
+    let input = kernel_tensor(2, 3, "2,4,6,1,3,5");
+    let top2_rows = kernel_topk_axis(input, "rows", 2);
+    let pick: i64 = kernel_element_at(top2_rows, 0, 1);
+
+    print(pick);
+  }
+}

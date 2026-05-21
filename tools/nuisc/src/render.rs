@@ -757,18 +757,49 @@ fn render_nir_expr(value: &NirExpr) -> String {
             render_nir_expr(input),
             axis.render()
         ),
+        NirExpr::KernelReduceMaxAxis { input, axis } => format!(
+            "kernel_reduce_max_axis({}, \"{}\")",
+            render_nir_expr(input),
+            axis.render()
+        ),
+        NirExpr::KernelReduceMeanAxis { input, axis } => format!(
+            "kernel_reduce_mean_axis({}, \"{}\")",
+            render_nir_expr(input),
+            axis.render()
+        ),
         NirExpr::KernelReduceMax(input) => {
             format!("kernel_reduce_max({})", render_nir_expr(input))
         }
         NirExpr::KernelReduceMean(input) => {
             format!("kernel_reduce_mean({})", render_nir_expr(input))
         }
+        NirExpr::KernelArgmaxAxis { input, axis } => format!(
+            "kernel_argmax_axis({}, \"{}\")",
+            render_nir_expr(input),
+            axis.render()
+        ),
+        NirExpr::KernelArgminAxis { input, axis } => format!(
+            "kernel_argmin_axis({}, \"{}\")",
+            render_nir_expr(input),
+            axis.render()
+        ),
         NirExpr::KernelArgmax(input) => format!("kernel_argmax({})", render_nir_expr(input)),
         NirExpr::KernelArgmin(input) => format!("kernel_argmin({})", render_nir_expr(input)),
         NirExpr::KernelSort(input) => format!("kernel_sort({})", render_nir_expr(input)),
+        NirExpr::KernelSortAxis { input, axis } => format!(
+            "kernel_sort_axis({}, \"{}\")",
+            render_nir_expr(input),
+            axis.render()
+        ),
         NirExpr::KernelTopk { input, k } => {
             format!("kernel_topk({}, {})", render_nir_expr(input), k)
         }
+        NirExpr::KernelTopkAxis { input, axis, k } => format!(
+            "kernel_topk_axis({}, \"{}\", {})",
+            render_nir_expr(input),
+            axis.render(),
+            k
+        ),
         NirExpr::DataProfileSendUplink { unit, input } => format!(
             "data_profile_send_uplink(\"{}\", {})",
             escape_debug(unit),

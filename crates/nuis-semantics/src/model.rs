@@ -1094,12 +1094,37 @@ pub enum NirExpr {
         axis: NirKernelAxis,
     },
     KernelReduceMax(Box<NirExpr>),
+    KernelReduceMaxAxis {
+        input: Box<NirExpr>,
+        axis: NirKernelAxis,
+    },
     KernelReduceMean(Box<NirExpr>),
+    KernelReduceMeanAxis {
+        input: Box<NirExpr>,
+        axis: NirKernelAxis,
+    },
     KernelArgmax(Box<NirExpr>),
+    KernelArgmaxAxis {
+        input: Box<NirExpr>,
+        axis: NirKernelAxis,
+    },
     KernelArgmin(Box<NirExpr>),
+    KernelArgminAxis {
+        input: Box<NirExpr>,
+        axis: NirKernelAxis,
+    },
     KernelSort(Box<NirExpr>),
+    KernelSortAxis {
+        input: Box<NirExpr>,
+        axis: NirKernelAxis,
+    },
     KernelTopk {
         input: Box<NirExpr>,
+        k: i64,
+    },
+    KernelTopkAxis {
+        input: Box<NirExpr>,
+        axis: NirKernelAxis,
         k: i64,
     },
     DataProfileSendUplink {
@@ -1538,11 +1563,17 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::KernelReduceSum(_)
         | NirExpr::KernelReduceSumAxis { .. }
         | NirExpr::KernelReduceMax(_)
+        | NirExpr::KernelReduceMaxAxis { .. }
         | NirExpr::KernelReduceMean(_)
+        | NirExpr::KernelReduceMeanAxis { .. }
         | NirExpr::KernelArgmax(_)
+        | NirExpr::KernelArgmaxAxis { .. }
         | NirExpr::KernelArgmin(_)
+        | NirExpr::KernelArgminAxis { .. }
         | NirExpr::KernelSort(_)
+        | NirExpr::KernelSortAxis { .. }
         | NirExpr::KernelTopk { .. }
+        | NirExpr::KernelTopkAxis { .. }
         | NirExpr::DataProfileSendUplink { .. }
         | NirExpr::DataProfileSendDownlink { .. }
         | NirExpr::CpuExternCall { .. }
@@ -1702,11 +1733,17 @@ pub fn nir_expr_effect_class(expr: &NirExpr) -> NirExprEffectClass {
         | NirExpr::KernelReduceSum(_)
         | NirExpr::KernelReduceSumAxis { .. }
         | NirExpr::KernelReduceMax(_)
+        | NirExpr::KernelReduceMaxAxis { .. }
         | NirExpr::KernelReduceMean(_)
+        | NirExpr::KernelReduceMeanAxis { .. }
         | NirExpr::KernelArgmax(_)
+        | NirExpr::KernelArgmaxAxis { .. }
         | NirExpr::KernelArgmin(_)
+        | NirExpr::KernelArgminAxis { .. }
         | NirExpr::KernelSort(_)
+        | NirExpr::KernelSortAxis { .. }
         | NirExpr::KernelTopk { .. }
+        | NirExpr::KernelTopkAxis { .. }
         | NirExpr::ShaderResult { .. } => NirExprEffectClass::DomainReadOnly,
         NirExpr::CpuWindow { .. }
         | NirExpr::CpuSpawn { .. }

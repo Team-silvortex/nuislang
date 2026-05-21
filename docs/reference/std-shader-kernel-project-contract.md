@@ -75,6 +75,10 @@ The current narrow project-form companions are:
 * [kernel_tensor_select_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_select_demo)
 * [kernel_tensor_order_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_order_demo)
 * [kernel_tensor_axis_reduce_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_reduce_demo)
+* [kernel_tensor_axis_family_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_family_demo)
+* [kernel_tensor_axis_select_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_select_demo)
+* [kernel_tensor_axis_sort_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_sort_demo)
+* [kernel_tensor_axis_order_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_order_demo)
 * [kernel_tensor_map_zip_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_map_zip_demo)
 * [kernel_roundtrip_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_roundtrip_profile_demo)
 
@@ -119,6 +123,18 @@ Current role split:
 * `kernel_tensor_axis_reduce_demo` is the next narrow route where
   `kernel_reduce_sum_axis(..., "rows|cols")` becomes visible as the first
   explicit axis-aware reduction cluster
+* `kernel_tensor_axis_family_demo` is the next narrow route where
+  `kernel_reduce_max_axis(...)` and `kernel_reduce_mean_axis(...)` become
+  visible together as the next explicit axis-aware reduction family
+* `kernel_tensor_axis_select_demo` is the next narrow route where
+  `kernel_argmax_axis(...)` and `kernel_argmin_axis(...)` become visible
+  together as the first explicit axis-aware selection family
+* `kernel_tensor_axis_sort_demo` is the next narrow route where
+  `kernel_sort_axis(...)` becomes visible as the first explicit axis-aware
+  full-order helper
+* `kernel_tensor_axis_order_demo` is the next narrow route where
+  `kernel_topk_axis(...)` becomes visible as the first explicit axis-aware
+  ordered-selection helper
 * `kernel_tensor_map_zip_demo` is the next narrow route where light tensor
   transform helpers such as `kernel_map(...)` and `kernel_zip(...)` become
   visible at source level while still lowering into the existing kernel op set
@@ -126,6 +142,35 @@ Current role split:
   metadata is already joined with explicit `data` uplink/downlink
 
 These are intentionally narrower than the showcase projects.
+
+## Current Axis-Aware Kernel Lane
+
+The current axis-aware tensor lane is now explicit enough to read as its own
+subgroup inside the broader `kernel` ladder:
+
+* [kernel_tensor_axis_reduce_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_reduce_demo)
+  introduces `kernel_reduce_sum_axis(..., "rows|cols")`
+* [kernel_tensor_axis_family_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_family_demo)
+  expands that into `kernel_reduce_max_axis(...)` and
+  `kernel_reduce_mean_axis(...)`
+* [kernel_tensor_axis_select_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_select_demo)
+  introduces `kernel_argmax_axis(...)` and `kernel_argmin_axis(...)`
+* [kernel_tensor_axis_sort_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_sort_demo)
+  introduces `kernel_sort_axis(...)`
+* [kernel_tensor_axis_order_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_order_demo)
+  introduces `kernel_topk_axis(...)`
+
+Current reading rule inside this subgroup:
+
+* start with axis reduction
+* then read axis selection
+* then read axis full-order and axis top-k
+
+That keeps the growth shape aligned with the existing non-axis ladder:
+
+* reduction
+* selection
+* ordered selection
 
 ## Current Source-Shaped Mirrors
 
@@ -143,6 +188,10 @@ The repository still keeps source-shaped mirrors for these lanes:
 * [kernel_tensor_select_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_select_demo.ns)
 * [kernel_tensor_order_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_order_demo.ns)
 * [kernel_tensor_axis_reduce_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_axis_reduce_demo.ns)
+* [kernel_tensor_axis_family_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_axis_family_demo.ns)
+* [kernel_tensor_axis_select_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_axis_select_demo.ns)
+* [kernel_tensor_axis_sort_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_axis_sort_demo.ns)
+* [kernel_tensor_axis_order_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_axis_order_demo.ns)
 * [kernel_tensor_map_zip_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_map_zip_demo.ns)
 
 Their current role is:

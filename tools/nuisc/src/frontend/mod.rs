@@ -11511,6 +11511,64 @@ fn lower_call_expr_with_async(
                 None,
             )?)))
         }
+        "kernel_reduce_max_axis" => {
+            let [input, axis] = args else {
+                return Err("kernel_reduce_max_axis(...) expects 2 args".to_owned());
+            };
+            let AstExpr::Text(axis_name) = axis else {
+                return Err("kernel_reduce_max_axis(...) axis must be a string literal".to_owned());
+            };
+            let axis = match axis_name.as_str() {
+                "rows" => NirKernelAxis::Rows,
+                "cols" => NirKernelAxis::Cols,
+                _ => {
+                    return Err(format!(
+                        "kernel_reduce_max_axis(...) unsupported axis `{}`; expected rows/cols",
+                        axis_name
+                    ));
+                }
+            };
+            Ok(NirExpr::KernelReduceMaxAxis {
+                input: Box::new(lower_expr(
+                    input,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    None,
+                )?),
+                axis,
+            })
+        }
+        "kernel_reduce_mean_axis" => {
+            let [input, axis] = args else {
+                return Err("kernel_reduce_mean_axis(...) expects 2 args".to_owned());
+            };
+            let AstExpr::Text(axis_name) = axis else {
+                return Err("kernel_reduce_mean_axis(...) axis must be a string literal".to_owned());
+            };
+            let axis = match axis_name.as_str() {
+                "rows" => NirKernelAxis::Rows,
+                "cols" => NirKernelAxis::Cols,
+                _ => {
+                    return Err(format!(
+                        "kernel_reduce_mean_axis(...) unsupported axis `{}`; expected rows/cols",
+                        axis_name
+                    ));
+                }
+            };
+            Ok(NirExpr::KernelReduceMeanAxis {
+                input: Box::new(lower_expr(
+                    input,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    None,
+                )?),
+                axis,
+            })
+        }
         "kernel_reduce_sum_axis" => {
             let [input, axis] = args else {
                 return Err("kernel_reduce_sum_axis(...) expects 2 args".to_owned());
@@ -11553,6 +11611,35 @@ fn lower_call_expr_with_async(
                 None,
             )?)))
         }
+        "kernel_argmax_axis" => {
+            let [input, axis] = args else {
+                return Err("kernel_argmax_axis(...) expects 2 args".to_owned());
+            };
+            let AstExpr::Text(axis_name) = axis else {
+                return Err("kernel_argmax_axis(...) axis must be a string literal".to_owned());
+            };
+            let axis = match axis_name.as_str() {
+                "rows" => NirKernelAxis::Rows,
+                "cols" => NirKernelAxis::Cols,
+                _ => {
+                    return Err(format!(
+                        "kernel_argmax_axis(...) unsupported axis `{}`; expected rows/cols",
+                        axis_name
+                    ));
+                }
+            };
+            Ok(NirExpr::KernelArgmaxAxis {
+                input: Box::new(lower_expr(
+                    input,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    None,
+                )?),
+                axis,
+            })
+        }
         "kernel_argmin" => {
             let [input] = args else {
                 return Err("kernel_argmin(...) expects 1 arg".to_owned());
@@ -11566,6 +11653,35 @@ fn lower_call_expr_with_async(
                 None,
             )?)))
         }
+        "kernel_argmin_axis" => {
+            let [input, axis] = args else {
+                return Err("kernel_argmin_axis(...) expects 2 args".to_owned());
+            };
+            let AstExpr::Text(axis_name) = axis else {
+                return Err("kernel_argmin_axis(...) axis must be a string literal".to_owned());
+            };
+            let axis = match axis_name.as_str() {
+                "rows" => NirKernelAxis::Rows,
+                "cols" => NirKernelAxis::Cols,
+                _ => {
+                    return Err(format!(
+                        "kernel_argmin_axis(...) unsupported axis `{}`; expected rows/cols",
+                        axis_name
+                    ));
+                }
+            };
+            Ok(NirExpr::KernelArgminAxis {
+                input: Box::new(lower_expr(
+                    input,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    None,
+                )?),
+                axis,
+            })
+        }
         "kernel_sort" => {
             let [input] = args else {
                 return Err("kernel_sort(...) expects 1 arg".to_owned());
@@ -11578,6 +11694,35 @@ fn lower_call_expr_with_async(
                 struct_table,
                 None,
             )?)))
+        }
+        "kernel_sort_axis" => {
+            let [input, axis] = args else {
+                return Err("kernel_sort_axis(...) expects 2 args".to_owned());
+            };
+            let AstExpr::Text(axis_name) = axis else {
+                return Err("kernel_sort_axis(...) axis must be a string literal".to_owned());
+            };
+            let axis = match axis_name.as_str() {
+                "rows" => NirKernelAxis::Rows,
+                "cols" => NirKernelAxis::Cols,
+                _ => {
+                    return Err(format!(
+                        "kernel_sort_axis(...) unsupported axis `{}`; expected rows/cols",
+                        axis_name
+                    ));
+                }
+            };
+            Ok(NirExpr::KernelSortAxis {
+                input: Box::new(lower_expr(
+                    input,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    None,
+                )?),
+                axis,
+            })
         }
         "kernel_topk" => {
             let [input, k] = args else {
@@ -11595,6 +11740,39 @@ fn lower_call_expr_with_async(
                     struct_table,
                     None,
                 )?),
+                k: *k,
+            })
+        }
+        "kernel_topk_axis" => {
+            let [input, axis, k] = args else {
+                return Err("kernel_topk_axis(...) expects 3 args".to_owned());
+            };
+            let AstExpr::Text(axis_name) = axis else {
+                return Err("kernel_topk_axis(...) axis must be a string literal".to_owned());
+            };
+            let axis = match axis_name.as_str() {
+                "rows" => NirKernelAxis::Rows,
+                "cols" => NirKernelAxis::Cols,
+                _ => {
+                    return Err(format!(
+                        "kernel_topk_axis(...) unsupported axis `{}`; expected rows/cols",
+                        axis_name
+                    ));
+                }
+            };
+            let AstExpr::Int(k) = k else {
+                return Err("kernel_topk_axis(...) k must be an integer literal".to_owned());
+            };
+            Ok(NirExpr::KernelTopkAxis {
+                input: Box::new(lower_expr(
+                    input,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    None,
+                )?),
+                axis,
                 k: *k,
             })
         }
@@ -12400,15 +12578,21 @@ fn infer_nir_expr_type(
         | NirExpr::KernelCol(_)
         | NirExpr::KernelReshape { .. }
         | NirExpr::KernelBroadcast { .. }
+        | NirExpr::KernelReduceSumAxis { .. }
+        | NirExpr::KernelReduceMaxAxis { .. }
+        | NirExpr::KernelReduceMeanAxis { .. }
+        | NirExpr::KernelArgmaxAxis { .. }
+        | NirExpr::KernelArgminAxis { .. }
         | NirExpr::KernelSort(_)
+        | NirExpr::KernelSortAxis { .. }
         | NirExpr::KernelTopk { .. }
+        | NirExpr::KernelTopkAxis { .. }
         | NirExpr::KernelMap { .. }
         | NirExpr::KernelZip { .. }
         | NirExpr::KernelMatmul { .. }
         | NirExpr::KernelAddBias { .. }
         | NirExpr::KernelRelu(_) => Some(named_type("Tensor")),
         NirExpr::KernelReduceSum(_)
-        | NirExpr::KernelReduceSumAxis { .. }
         | NirExpr::KernelReduceMax(_)
         | NirExpr::KernelReduceMean(_)
         | NirExpr::KernelArgmax(_)
@@ -17758,6 +17942,154 @@ mod tests {
             stmt,
             NirStmt::Let {
                 value: NirExpr::KernelReduceSumAxis { .. },
+                ..
+            }
+        )));
+        assert!(matches!(
+            function.body.last(),
+            Some(NirStmt::Return(Some(NirExpr::KernelElementAt { .. })))
+        ));
+    }
+
+    #[test]
+    fn lowers_explicit_kernel_tensor_reduce_axis_family_helpers() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let input = kernel_tensor(2, 3, "2,4,6,1,3,5");
+                let row_max = kernel_reduce_max_axis(input, "rows");
+                let col_mean = kernel_reduce_mean_axis(input, "cols");
+                return kernel_element_at(row_max, 0, 0) + kernel_element_at(col_mean, 0, 1);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| matches!(
+            stmt,
+            NirStmt::Let {
+                value: NirExpr::KernelReduceMaxAxis { .. },
+                ..
+            }
+        )));
+        assert!(function.body.iter().any(|stmt| matches!(
+            stmt,
+            NirStmt::Let {
+                value: NirExpr::KernelReduceMeanAxis { .. },
+                ..
+            }
+        )));
+        assert!(matches!(
+            function.body.last(),
+            Some(NirStmt::Return(Some(NirExpr::Binary { .. })))
+        ));
+    }
+
+    #[test]
+    fn lowers_explicit_kernel_tensor_select_axis_family_helpers() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let input = kernel_tensor(2, 3, "2,4,6,1,3,5");
+                let row_hi = kernel_argmax_axis(input, "rows");
+                let col_lo = kernel_argmin_axis(input, "cols");
+                return kernel_element_at(row_hi, 0, 1) + kernel_element_at(col_lo, 0, 2);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| matches!(
+            stmt,
+            NirStmt::Let {
+                value: NirExpr::KernelArgmaxAxis { .. },
+                ..
+            }
+        )));
+        assert!(function.body.iter().any(|stmt| matches!(
+            stmt,
+            NirStmt::Let {
+                value: NirExpr::KernelArgminAxis { .. },
+                ..
+            }
+        )));
+        assert!(matches!(
+            function.body.last(),
+            Some(NirStmt::Return(Some(NirExpr::Binary { .. })))
+        ));
+    }
+
+    #[test]
+    fn lowers_explicit_kernel_tensor_topk_axis_helper() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let input = kernel_tensor(2, 3, "2,4,6,1,3,5");
+                let top2_rows = kernel_topk_axis(input, "rows", 2);
+                return kernel_element_at(top2_rows, 0, 1);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| matches!(
+            stmt,
+            NirStmt::Let {
+                value: NirExpr::KernelTopkAxis { .. },
+                ..
+            }
+        )));
+        assert!(matches!(
+            function.body.last(),
+            Some(NirStmt::Return(Some(NirExpr::KernelElementAt { .. })))
+        ));
+    }
+
+    #[test]
+    fn lowers_explicit_kernel_tensor_sort_axis_helper() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let input = kernel_tensor(2, 3, "2,4,6,1,3,5");
+                let sorted_rows = kernel_sort_axis(input, "rows");
+                return kernel_element_at(sorted_rows, 0, 1);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| matches!(
+            stmt,
+            NirStmt::Let {
+                value: NirExpr::KernelSortAxis { .. },
                 ..
             }
         )));
