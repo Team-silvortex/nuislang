@@ -1,0 +1,32 @@
+mod cpu Main {
+  extern "c" fn host_sleep_ns(duration_ns: i64) -> i64;
+
+  struct SleepRecipeSeed {
+    primary_duration_ns: i64,
+    secondary_duration_ns: i64
+  }
+
+  struct SleepRecipeSummary {
+    primary_slept_ns: i64,
+    secondary_slept_ns: i64
+  }
+
+  fn capture_sleep_recipe(seed: SleepRecipeSeed) -> SleepRecipeSummary {
+    return SleepRecipeSummary {
+      primary_slept_ns: host_sleep_ns(seed.primary_duration_ns),
+      secondary_slept_ns: host_sleep_ns(seed.secondary_duration_ns)
+    };
+  }
+
+  fn summarize_sleep_recipe(primary_duration_ns: i64, secondary_duration_ns: i64) -> i64 {
+    let summary: SleepRecipeSummary = capture_sleep_recipe(SleepRecipeSeed {
+      primary_duration_ns: primary_duration_ns,
+      secondary_duration_ns: secondary_duration_ns
+    });
+    return summary.primary_slept_ns + summary.secondary_slept_ns;
+  }
+
+  fn main() {
+    print(summarize_sleep_recipe(1000, 2000));
+  }
+}

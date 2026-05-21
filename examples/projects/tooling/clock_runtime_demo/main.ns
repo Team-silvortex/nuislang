@@ -1,0 +1,26 @@
+mod cpu Main {
+  extern "c" fn host_clock_domain_id() -> i64;
+  extern "c" fn host_clock_epoch_ns() -> i64;
+  extern "c" fn host_clock_scale_ppm() -> i64;
+
+  struct ClockProjectSummary {
+    domain_id: i64,
+    epoch_ns: i64,
+    tick: i64,
+    scale_ppm: i64
+  }
+
+  fn capture_clock_project() -> ClockProjectSummary {
+    return ClockProjectSummary {
+      domain_id: host_clock_domain_id(),
+      epoch_ns: host_clock_epoch_ns(),
+      tick: cpu_tick_i64(0, 1),
+      scale_ppm: host_clock_scale_ppm()
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: ClockProjectSummary = capture_clock_project();
+    return summary.domain_id + summary.epoch_ns + summary.tick + summary.scale_ppm;
+  }
+}

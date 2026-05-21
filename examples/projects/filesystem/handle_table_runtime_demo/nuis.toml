@@ -1,0 +1,8 @@
+version = 1
+
+[project]
+name = "handle_table_runtime_demo"
+entry = "main.ns"
+
+[abi]
+cpu = "cpu.arm64.apple_aapcs64"

@@ -1,0 +1,27 @@
+mod cpu Main {
+  struct ClockDomainFacadeSummary {
+    monotonic_code: i64,
+    wall_code: i64,
+    global_code: i64,
+    resolved_global_code: i64
+  }
+
+  fn capture_clock_domain_facade() -> ClockDomainFacadeSummary {
+    return ClockDomainFacadeSummary {
+      monotonic_code: 0,
+      wall_code: 1,
+      global_code: 2,
+      resolved_global_code: 0
+    };
+  }
+
+  fn main() {
+    let summary: ClockDomainFacadeSummary = capture_clock_domain_facade();
+    print(
+      summary.monotonic_code
+      + summary.wall_code
+      + summary.global_code
+      + summary.resolved_global_code
+    );
+  }
+}

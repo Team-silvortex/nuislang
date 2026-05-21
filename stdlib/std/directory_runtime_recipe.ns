@@ -1,0 +1,39 @@
+mod cpu Main {
+  extern "c" fn host_dir_open(path_handle: i64) -> i64;
+  extern "c" fn host_dir_entry_count(dir_handle: i64) -> i64;
+  extern "c" fn host_dir_close(dir_handle: i64) -> i64;
+
+  struct DirectoryRuntimeRecipeSummary {
+    primary_handle: i64,
+    primary_entry_count: i64,
+    primary_close_code: i64,
+    secondary_handle: i64,
+    secondary_entry_count: i64,
+    secondary_close_code: i64
+  }
+
+  fn capture_directory_runtime_recipe() -> DirectoryRuntimeRecipeSummary {
+    let primary_handle: i64 = host_dir_open(307);
+    let secondary_handle: i64 = host_dir_open(521);
+    return DirectoryRuntimeRecipeSummary {
+      primary_handle: primary_handle,
+      primary_entry_count: host_dir_entry_count(primary_handle),
+      primary_close_code: host_dir_close(primary_handle),
+      secondary_handle: secondary_handle,
+      secondary_entry_count: host_dir_entry_count(secondary_handle),
+      secondary_close_code: host_dir_close(secondary_handle)
+    };
+  }
+
+  fn main() {
+    let summary: DirectoryRuntimeRecipeSummary = capture_directory_runtime_recipe();
+    print(
+      summary.primary_handle
+        + summary.primary_entry_count
+        + summary.primary_close_code
+        + summary.secondary_handle
+        + summary.secondary_entry_count
+        + summary.secondary_close_code
+    );
+  }
+}

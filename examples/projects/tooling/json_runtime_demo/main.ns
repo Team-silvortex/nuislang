@@ -1,0 +1,35 @@
+mod cpu Main {
+  extern "c" fn host_json_pair_len(key_handle: i64, value_handle: i64) -> i64;
+  extern "c" fn host_json_array_len(item_count: i64) -> i64;
+  extern "c" fn host_json_object_len(field_count: i64) -> i64;
+
+  struct JsonRuntimeProjectSummary {
+    primary_pair_len: i64,
+    primary_array_len: i64,
+    primary_object_len: i64,
+    secondary_pair_len: i64,
+    secondary_array_len: i64,
+    secondary_object_len: i64
+  }
+
+  fn capture_json_runtime_project() -> JsonRuntimeProjectSummary {
+    return JsonRuntimeProjectSummary {
+      primary_pair_len: host_json_pair_len(601, 709),
+      primary_array_len: host_json_array_len(3),
+      primary_object_len: host_json_object_len(2),
+      secondary_pair_len: host_json_pair_len(811, 919),
+      secondary_array_len: host_json_array_len(5),
+      secondary_object_len: host_json_object_len(4)
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: JsonRuntimeProjectSummary = capture_json_runtime_project();
+    return summary.primary_pair_len
+      + summary.primary_array_len
+      + summary.primary_object_len
+      + summary.secondary_pair_len
+      + summary.secondary_array_len
+      + summary.secondary_object_len;
+  }
+}

@@ -1,0 +1,24 @@
+mod cpu Main {
+  extern "c" fn host_wall_time_ns() -> i64;
+  extern "c" fn host_monotonic_time_ns() -> i64;
+  extern "c" fn host_sleep_ns(duration_ns: i64) -> i64;
+
+  struct TimeProjectSummary {
+    wall_ns: i64,
+    monotonic_ns: i64,
+    slept_ns: i64
+  }
+
+  fn capture_time_project(duration_ns: i64) -> TimeProjectSummary {
+    return TimeProjectSummary {
+      wall_ns: host_wall_time_ns(),
+      monotonic_ns: host_monotonic_time_ns(),
+      slept_ns: host_sleep_ns(duration_ns)
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: TimeProjectSummary = capture_time_project(1000);
+    return summary.wall_ns + summary.monotonic_ns + summary.slept_ns;
+  }
+}

@@ -102,6 +102,37 @@ Cleanup just completed:
 * then isolated as secondary examples
 * finally deleted once references were quiet
 
+### Long local README inventories
+
+These are not deletion targets yet, but they are the clearest next
+documentation-trim targets whenever a folder README still repeats a large local
+index that is already covered by:
+
+* [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+* [stdlib/std/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
+* local subdirectory READMEs
+
+Strong current candidates:
+
+* `examples/ns/memory/README.md`
+  still mixes a useful small anchor set with a longer command-and-companion
+  inventory that can likely be shortened into a tighter `first anchors + local
+  detail lives here` structure
+* `examples/invalid/README.md`
+  small already, but still a plausible candidate to become even more of a pure
+  router into `invalid/ns/*` and `invalid/yir/*` without maintaining its own
+  recommended-check list
+
+Cleanup now completed:
+
+* `examples/ns/memory/README.md`
+  has been reduced to a short router centered on ownership/task anchors plus
+  direct links to `nir-memory-model`, `cpu-task-memory-contract`,
+  `cpu-task-glm-contract`, and `cpu-task-payload-matrix`
+* `examples/invalid/README.md`
+  has been reduced to a pure invalid-example router with local subdirectory
+  links and direct links back to the task payload matrix and cleanup policy
+
 ## Policy Chosen
 
 ### Checked-in generated bundles
@@ -130,6 +161,53 @@ Practical rule:
 ## Decision Needed
 
 These can be cleaned, but only with an explicit repository-policy decision.
+
+### Physical directory reshaping
+
+These are no longer documentation-only questions. Changing them would affect
+path stability, commands, or the mental model of the repository tree.
+
+Current high-signal candidates:
+
+* `examples/projects/`
+  first-phase reshaping is now complete:
+  - true end-to-end showcase projects such as `window_controls_demo` and
+    `kernel_tensor_demo` remain at the root
+  - narrow one-file companions now live under
+    `examples/projects/task/`,
+    `examples/projects/tooling/`,
+    `examples/projects/state/`, and
+    `examples/projects/filesystem/`
+  Remaining future question:
+  - whether the top-level directory name should stay `projects/`
+    now that it also contains grouped companion subtrees
+  Why this still needs a decision:
+  - the first semantic split is done
+  - but a later rename such as `project-companions/` would still be path churn
+    with little immediate value unless the current grouped layout proves
+    insufficient
+
+* `examples/bins/`
+  the current policy is now clear, but the directory name still reads like a
+  generic dump of binaries rather than “checked-in canonical project bundles”.
+  Future direction worth considering:
+  - keep the current contents
+  - but later rename or alias the area to something closer to
+    `examples/project_builds/` or `examples/canonical-bundles/`
+  Why this needs a decision:
+  - many current build commands and docs point here directly
+  - the current name is familiar but semantically weak
+
+* `docs/fabric-spec/`, `docs/glm-spec/`, `docs/yir-spec/`, `docs/versioning/`
+  these are design/spec directories, while `docs/reference/` is current truth.
+  Future direction worth considering:
+  - keep them separate
+  - but possibly regroup them under a clearer second-level bucket such as
+    `docs/design/` if we later want the top-level docs tree to read more
+    cleanly
+  Why this needs a decision:
+  - large path churn
+  - risk of breaking stable historical/spec references
 
 ### Future re-evaluation of generated bundle outputs
 
@@ -165,10 +243,12 @@ Possible future direction:
 
 If we want a low-risk second pass, do it in this order:
 
-1. remove archived-native examples from recommended-reading sections
-2. add a single “wider native examples” section for the files listed above
+1. keep shrinking front-door and local READMEs that still duplicate long
+   companion inventories
+2. observe whether the new grouped `examples/projects/{task,tooling,state,filesystem}`
+   layout is already enough before considering any further rename
 3. only revisit `examples/bins/` if we want to change the documented workflow
-4. only then move or delete files
+4. only then move or delete more source/example files
 
 ## Current Recommendation
 
@@ -176,5 +256,7 @@ Right now the safest immediate next deletion-like action is not source deletion.
 It is:
 
 * keep shrinking front-door docs
-* demote wider native examples out of the mainline route
+* keep converting long local README inventories into short routers
 * make a conscious policy decision for checked-in generated bundles
+* avoid more physical directory churn unless the new grouped
+  `examples/projects/` layout still proves too noisy

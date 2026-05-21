@@ -175,10 +175,10 @@ the kind of sample that should be revisited.
 Current concrete probes:
 
 * [hello_task_glm_join_nonconsuming_probe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_join_nonconsuming_probe.ns)
-* [task_join_nonconsuming_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_join_nonconsuming_probe_demo)
-* [FUTURE_CONSUME_SKETCH.md](/Users/Shared/chroot/dev/nuislang/examples/projects/task_join_nonconsuming_probe_demo/FUTURE_CONSUME_SKETCH.md)
-* [FUTURE_LIFECYCLE_SKETCH.md](/Users/Shared/chroot/dev/nuislang/examples/projects/task_lifecycle_branch_demo/FUTURE_LIFECYCLE_SKETCH.md)
-* [FUTURE_CANCEL_SKETCH.md](/Users/Shared/chroot/dev/nuislang/examples/projects/task_cancel_branch_demo/FUTURE_CANCEL_SKETCH.md)
+* [task_join_nonconsuming_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_join_nonconsuming_probe_demo)
+* [FUTURE_CONSUME_SKETCH.md](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_join_nonconsuming_probe_demo/FUTURE_CONSUME_SKETCH.md)
+* [FUTURE_LIFECYCLE_SKETCH.md](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_lifecycle_branch_demo/FUTURE_LIFECYCLE_SKETCH.md)
+* [FUTURE_CANCEL_SKETCH.md](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_cancel_branch_demo/FUTURE_CANCEL_SKETCH.md)
 
 ## Current Cancel And Timeout Classification
 

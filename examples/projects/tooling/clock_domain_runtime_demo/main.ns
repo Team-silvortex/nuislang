@@ -1,0 +1,25 @@
+mod cpu Main {
+  struct ClockDomainProjectSummary {
+    monotonic_code: i64,
+    wall_code: i64,
+    global_code: i64,
+    resolved_global_code: i64
+  }
+
+  fn capture_clock_domain_project() -> ClockDomainProjectSummary {
+    return ClockDomainProjectSummary {
+      monotonic_code: 0,
+      wall_code: 1,
+      global_code: 2,
+      resolved_global_code: 0
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: ClockDomainProjectSummary = capture_clock_domain_project();
+    return summary.monotonic_code
+      + summary.wall_code
+      + summary.global_code
+      + summary.resolved_global_code;
+  }
+}

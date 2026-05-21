@@ -1,0 +1,31 @@
+mod cpu Main {
+  struct WindowRuntimeFacadeSummary {
+    first: i64,
+    second: i64,
+    third: i64,
+    sum: i64
+  }
+
+  fn capture_window_runtime_facade(first: i64, second: i64, third: i64) -> WindowRuntimeFacadeSummary {
+    let backing: ref Buffer = alloc_buffer(3, 0);
+    let copy: WindowMut<i64> = data_copy_window(backing, 0, 3);
+    let copy_first: WindowMut<i64> = data_write_window(copy, 0, first);
+    let copy_second: WindowMut<i64> = data_write_window(copy_first, 1, second);
+    let copy_third: WindowMut<i64> = data_write_window(copy_second, 2, third);
+    let frozen: Window<i64> = data_freeze_window(copy_third);
+    let value_first: i64 = data_read_window(frozen, 0);
+    let value_second: i64 = data_read_window(frozen, 1);
+    let value_third: i64 = data_read_window(frozen, 2);
+    return WindowRuntimeFacadeSummary {
+      first: value_first,
+      second: value_second,
+      third: value_third,
+      sum: value_first + value_second + value_third
+    };
+  }
+
+  fn main() {
+    let summary: WindowRuntimeFacadeSummary = capture_window_runtime_facade(9, 18, 27);
+    print(summary.first + summary.second + summary.third + summary.sum);
+  }
+}

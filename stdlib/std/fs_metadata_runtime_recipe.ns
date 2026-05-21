@@ -1,0 +1,47 @@
+mod cpu Main {
+  extern "c" fn host_fs_exists(path_handle: i64) -> i64;
+  extern "c" fn host_fs_kind(path_handle: i64) -> i64;
+  extern "c" fn host_fs_size(path_handle: i64) -> i64;
+
+  struct FsMetadataRecipeSeed {
+    primary_path_handle: i64,
+    secondary_path_handle: i64
+  }
+
+  struct FsMetadataRecipeSummary {
+    primary_exists: i64,
+    primary_kind: i64,
+    primary_size: i64,
+    secondary_exists: i64,
+    secondary_kind: i64,
+    secondary_size: i64
+  }
+
+  fn capture_fs_metadata_recipe(seed: FsMetadataRecipeSeed) -> FsMetadataRecipeSummary {
+    return FsMetadataRecipeSummary {
+      primary_exists: host_fs_exists(seed.primary_path_handle),
+      primary_kind: host_fs_kind(seed.primary_path_handle),
+      primary_size: host_fs_size(seed.primary_path_handle),
+      secondary_exists: host_fs_exists(seed.secondary_path_handle),
+      secondary_kind: host_fs_kind(seed.secondary_path_handle),
+      secondary_size: host_fs_size(seed.secondary_path_handle)
+    };
+  }
+
+  fn summarize_fs_metadata_recipe(primary_path_handle: i64, secondary_path_handle: i64) -> i64 {
+    let summary: FsMetadataRecipeSummary = capture_fs_metadata_recipe(FsMetadataRecipeSeed {
+      primary_path_handle: primary_path_handle,
+      secondary_path_handle: secondary_path_handle
+    });
+    return summary.primary_exists
+      + summary.primary_kind
+      + summary.primary_size
+      + summary.secondary_exists
+      + summary.secondary_kind
+      + summary.secondary_size;
+  }
+
+  fn main() {
+    print(summarize_fs_metadata_recipe(211, 307));
+  }
+}

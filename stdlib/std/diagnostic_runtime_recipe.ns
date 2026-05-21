@@ -1,0 +1,69 @@
+mod cpu Main {
+  extern "c" fn host_diag_label(message_handle: i64) -> i64;
+  extern "c" fn host_diag_span(start: i64, end: i64) -> i64;
+  extern "c" fn host_diag_emit(label_handle: i64, span_handle: i64, severity: i64) -> i64;
+
+  struct DiagnosticRecipeSeed {
+    primary_message_handle: i64,
+    primary_start: i64,
+    primary_end: i64,
+    primary_severity: i64,
+    secondary_message_handle: i64,
+    secondary_start: i64,
+    secondary_end: i64,
+    secondary_severity: i64
+  }
+
+  struct DiagnosticRecipeSummary {
+    primary_emit_code: i64,
+    secondary_emit_code: i64,
+    primary_span_handle: i64,
+    secondary_span_handle: i64
+  }
+
+  fn emit_record(message_handle: i64, start: i64, end: i64, severity: i64) -> i64 {
+    let label_handle: i64 = host_diag_label(message_handle);
+    let span_handle: i64 = host_diag_span(start, end);
+    return host_diag_emit(label_handle, span_handle, severity);
+  }
+
+  fn capture_diagnostic_recipe(seed: DiagnosticRecipeSeed) -> DiagnosticRecipeSummary {
+    return DiagnosticRecipeSummary {
+      primary_emit_code: emit_record(
+        seed.primary_message_handle,
+        seed.primary_start,
+        seed.primary_end,
+        seed.primary_severity
+      ),
+      secondary_emit_code: emit_record(
+        seed.secondary_message_handle,
+        seed.secondary_start,
+        seed.secondary_end,
+        seed.secondary_severity
+      ),
+      primary_span_handle: host_diag_span(seed.primary_start, seed.primary_end),
+      secondary_span_handle: host_diag_span(seed.secondary_start, seed.secondary_end)
+    };
+  }
+
+  fn summarize_diagnostic_recipe() -> i64 {
+    let summary: DiagnosticRecipeSummary = capture_diagnostic_recipe(DiagnosticRecipeSeed {
+      primary_message_handle: 1303,
+      primary_start: 4,
+      primary_end: 9,
+      primary_severity: 2,
+      secondary_message_handle: 1404,
+      secondary_start: 10,
+      secondary_end: 16,
+      secondary_severity: 1
+    });
+    return summary.primary_emit_code
+      + summary.secondary_emit_code
+      + summary.primary_span_handle
+      + summary.secondary_span_handle;
+  }
+
+  fn main() {
+    print(summarize_diagnostic_recipe());
+  }
+}

@@ -44,7 +44,7 @@ Then branch by goal:
   - start with:
     [window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo),
     [kernel_tensor_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/kernel_tensor_demo),
-    [task_status_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_status_observe_demo)
+    [task_status_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_status_observe_demo)
 * handwritten `YIR` route
   - [examples/yir/README.md](/Users/Shared/chroot/dev/nuislang/examples/yir/README.md)
   - start with:

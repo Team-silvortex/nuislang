@@ -1,0 +1,38 @@
+mod cpu Main {
+  struct ClockDomainRecipeSeed {
+    bias: i64
+  }
+
+  struct ClockDomainRecipeSummary {
+    monotonic_code: i64,
+    wall_code: i64,
+    global_code: i64,
+    resolved_global_code: i64,
+    biased_declared_global_code: i64
+  }
+
+  fn capture_clock_domain_recipe(seed: ClockDomainRecipeSeed) -> ClockDomainRecipeSummary {
+    return ClockDomainRecipeSummary {
+      monotonic_code: 0,
+      wall_code: 1,
+      global_code: 2,
+      resolved_global_code: 0,
+      biased_declared_global_code: 2 + seed.bias
+    };
+  }
+
+  fn summarize_clock_domain_recipe(bias: i64) -> i64 {
+    let summary: ClockDomainRecipeSummary = capture_clock_domain_recipe(ClockDomainRecipeSeed {
+      bias: bias
+    });
+    return summary.monotonic_code
+      + summary.wall_code
+      + summary.global_code
+      + summary.resolved_global_code
+      + summary.biased_declared_global_code;
+  }
+
+  fn main() {
+    print(summarize_clock_domain_recipe(1));
+  }
+}

@@ -1,0 +1,26 @@
+mod cpu Main {
+  extern "c" fn host_text_len(text_handle: i64) -> i64;
+  extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
+  extern "c" fn host_text_concat_len(lhs_handle: i64, rhs_handle: i64) -> i64;
+
+  struct HostTextProjectSummary {
+    lhs_len: i64,
+    rhs_len: i64,
+    merged_handle: i64,
+    merged_len: i64
+  }
+
+  fn capture_host_text_project(lhs_handle: i64, rhs_handle: i64) -> HostTextProjectSummary {
+    return HostTextProjectSummary {
+      lhs_len: host_text_len(lhs_handle),
+      rhs_len: host_text_len(rhs_handle),
+      merged_handle: host_text_concat(lhs_handle, rhs_handle),
+      merged_len: host_text_concat_len(lhs_handle, rhs_handle)
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: HostTextProjectSummary = capture_host_text_project(11, 19);
+    return summary.lhs_len + summary.rhs_len + summary.merged_handle + summary.merged_len;
+  }
+}

@@ -1,0 +1,39 @@
+mod cpu Main {
+  extern "c" fn host_text_format_i64(pattern_handle: i64, value: i64) -> i64;
+  extern "c" fn host_text_format_pair(pattern_handle: i64, lhs: i64, rhs: i64) -> i64;
+  extern "c" fn host_text_measure(text_handle: i64) -> i64;
+
+  struct TextFormatRuntimeRecipeSummary {
+    primary_single_handle: i64,
+    primary_pair_handle: i64,
+    primary_pair_len: i64,
+    secondary_single_handle: i64,
+    secondary_pair_handle: i64,
+    secondary_pair_len: i64
+  }
+
+  fn capture_text_format_runtime_recipe() -> TextFormatRuntimeRecipeSummary {
+    let primary_pair_handle: i64 = host_text_format_pair(811, 5, 8);
+    let secondary_pair_handle: i64 = host_text_format_pair(907, 13, 21);
+    return TextFormatRuntimeRecipeSummary {
+      primary_single_handle: host_text_format_i64(811, 13),
+      primary_pair_handle: primary_pair_handle,
+      primary_pair_len: host_text_measure(primary_pair_handle),
+      secondary_single_handle: host_text_format_i64(907, 34),
+      secondary_pair_handle: secondary_pair_handle,
+      secondary_pair_len: host_text_measure(secondary_pair_handle)
+    };
+  }
+
+  fn main() {
+    let summary: TextFormatRuntimeRecipeSummary = capture_text_format_runtime_recipe();
+    print(
+      summary.primary_single_handle
+        + summary.primary_pair_handle
+        + summary.primary_pair_len
+        + summary.secondary_single_handle
+        + summary.secondary_pair_handle
+        + summary.secondary_pair_len
+    );
+  }
+}

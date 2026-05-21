@@ -1,0 +1,88 @@
+mod cpu Main {
+  struct TaskRuntimeCompletedSummary {
+    completed: i64,
+    value: i64
+  }
+
+  struct TaskRuntimeLifecycleSummary {
+    completed: i64,
+    timed_out: i64,
+    cancelled: i64,
+    value: i64
+  }
+
+  async fn ping(seed: i64) -> i64 {
+    return seed + 1;
+  }
+
+  fn encode_timed_out(result: TaskResult<i64>) -> i64 {
+    if task_timed_out(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_cancelled(result: TaskResult<i64>) -> i64 {
+    if task_cancelled(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn capture_completed_task(seed: i64) -> TaskRuntimeCompletedSummary {
+    let task: Task<i64> = spawn(ping(seed));
+    let result: TaskResult<i64> = join_result(task);
+    if task_completed(result) {
+      return TaskRuntimeCompletedSummary {
+        completed: 1,
+        value: task_value(result)
+      };
+    }
+    return TaskRuntimeCompletedSummary {
+      completed: 0,
+      value: 0
+    };
+  }
+
+  fn capture_task_lifecycle(seed: i64, limit: i64) -> TaskRuntimeLifecycleSummary {
+    let completed_task: Task<i64> = spawn(ping(seed));
+    let completed_result: TaskResult<i64> = join_result(completed_task);
+
+    let timed_task: Task<i64> = timeout(spawn(ping(seed)), limit);
+    let timed_result: TaskResult<i64> = join_result(timed_task);
+
+    let cancelled_task: Task<i64> = cancel(spawn(ping(seed)));
+    let cancelled_result: TaskResult<i64> = join_result(cancelled_task);
+    let timed_out: i64 = encode_timed_out(timed_result);
+    let cancelled: i64 = encode_cancelled(cancelled_result);
+
+    if task_completed(completed_result) {
+      return TaskRuntimeLifecycleSummary {
+        completed: 1,
+        timed_out: timed_out,
+        cancelled: cancelled,
+        value: task_value(completed_result)
+      };
+    }
+
+    return TaskRuntimeLifecycleSummary {
+      completed: 0,
+      timed_out: timed_out,
+      cancelled: cancelled,
+      value: 0
+    };
+  }
+
+  fn main() {
+    let completed: TaskRuntimeCompletedSummary = capture_completed_task(7);
+    let lifecycle: TaskRuntimeLifecycleSummary = capture_task_lifecycle(7, 0);
+    print(
+      completed.completed
+        + completed.value
+        + lifecycle.completed
+        + lifecycle.timed_out
+        + lifecycle.cancelled
+        + lifecycle.value
+    );
+  }
+}

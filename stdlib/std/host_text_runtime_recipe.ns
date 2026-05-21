@@ -1,0 +1,47 @@
+mod cpu Main {
+  extern "c" fn host_text_len(text_handle: i64) -> i64;
+  extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
+  extern "c" fn host_text_concat_len(lhs_handle: i64, rhs_handle: i64) -> i64;
+
+  struct HostTextRecipeSeed {
+    lhs_handle: i64,
+    rhs_handle: i64,
+    tail_handle: i64
+  }
+
+  struct HostTextRecipeSummary {
+    lhs_len: i64,
+    rhs_len: i64,
+    merged_handle: i64,
+    merged_len: i64,
+    chained_handle: i64
+  }
+
+  fn capture_host_text_recipe(seed: HostTextRecipeSeed) -> HostTextRecipeSummary {
+    let merged_handle: i64 = host_text_concat(seed.lhs_handle, seed.rhs_handle);
+    return HostTextRecipeSummary {
+      lhs_len: host_text_len(seed.lhs_handle),
+      rhs_len: host_text_len(seed.rhs_handle),
+      merged_handle: merged_handle,
+      merged_len: host_text_concat_len(seed.lhs_handle, seed.rhs_handle),
+      chained_handle: host_text_concat(merged_handle, seed.tail_handle)
+    };
+  }
+
+  fn summarize_host_text_recipe(lhs_handle: i64, rhs_handle: i64, tail_handle: i64) -> i64 {
+    let summary: HostTextRecipeSummary = capture_host_text_recipe(HostTextRecipeSeed {
+      lhs_handle: lhs_handle,
+      rhs_handle: rhs_handle,
+      tail_handle: tail_handle
+    });
+    return summary.lhs_len
+      + summary.rhs_len
+      + summary.merged_handle
+      + summary.merged_len
+      + summary.chained_handle;
+  }
+
+  fn main() {
+    print(summarize_host_text_recipe(11, 19, 23));
+  }
+}

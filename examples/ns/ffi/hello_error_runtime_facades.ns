@@ -1,0 +1,37 @@
+mod cpu Main {
+  extern "c" fn host_error_code(kind_handle: i64) -> i64;
+  extern "c" fn host_error_message(kind_handle: i64) -> i64;
+  extern "c" fn host_error_severity(kind_handle: i64) -> i64;
+
+  struct ErrorFacadeSummary {
+    primary_code: i64,
+    primary_message_handle: i64,
+    primary_severity: i64,
+    secondary_code: i64,
+    secondary_message_handle: i64,
+    secondary_severity: i64
+  }
+
+  fn capture_error_facade() -> ErrorFacadeSummary {
+    return ErrorFacadeSummary {
+      primary_code: host_error_code(1101),
+      primary_message_handle: host_error_message(1101),
+      primary_severity: host_error_severity(1101),
+      secondary_code: host_error_code(1202),
+      secondary_message_handle: host_error_message(1202),
+      secondary_severity: host_error_severity(1202)
+    };
+  }
+
+  fn main() {
+    let summary: ErrorFacadeSummary = capture_error_facade();
+    print(
+      summary.primary_code
+        + summary.primary_message_handle
+        + summary.primary_severity
+        + summary.secondary_code
+        + summary.secondary_message_handle
+        + summary.secondary_severity
+    );
+  }
+}

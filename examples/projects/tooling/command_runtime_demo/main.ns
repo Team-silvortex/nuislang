@@ -1,0 +1,44 @@
+mod cpu Main {
+  extern "c" fn host_command_spawn(program_handle: i64, argv_handle: i64) -> i64;
+  extern "c" fn host_command_status(command_handle: i64) -> i64;
+  extern "c" fn host_command_wait(command_handle: i64) -> i64;
+  extern "c" fn host_command_wait_exit(command_handle: i64) -> i64;
+
+  struct CommandRuntimeProjectSummary {
+    primary_handle: i64,
+    primary_status: i64,
+    primary_wait: i64,
+    primary_wait_exit: i64,
+    secondary_handle: i64,
+    secondary_status: i64,
+    secondary_wait: i64,
+    secondary_wait_exit: i64
+  }
+
+  fn capture_command_runtime_project() -> CommandRuntimeProjectSummary {
+    let primary_handle: i64 = host_command_spawn(401, 17);
+    let secondary_handle: i64 = host_command_spawn(503, 29);
+    return CommandRuntimeProjectSummary {
+      primary_handle: primary_handle,
+      primary_status: host_command_status(primary_handle),
+      primary_wait: host_command_wait(primary_handle),
+      primary_wait_exit: host_command_wait_exit(primary_handle),
+      secondary_handle: secondary_handle,
+      secondary_status: host_command_status(secondary_handle),
+      secondary_wait: host_command_wait(secondary_handle),
+      secondary_wait_exit: host_command_wait_exit(secondary_handle)
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: CommandRuntimeProjectSummary = capture_command_runtime_project();
+    return summary.primary_handle
+      + summary.primary_status
+      + summary.primary_wait
+      + summary.primary_wait_exit
+      + summary.secondary_handle
+      + summary.secondary_status
+      + summary.secondary_wait
+      + summary.secondary_wait_exit;
+  }
+}

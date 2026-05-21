@@ -1,0 +1,51 @@
+mod cpu Main {
+  struct HandleTableRuntimeRecipeSummary {
+    primary_route: i64,
+    primary_slot: i64,
+    primary_sum: i64,
+    secondary_route: i64,
+    secondary_slot: i64,
+    secondary_sum: i64
+  }
+
+  fn capture_handle_table_pair(route: i64, slot: i64) -> i64 {
+    let backing: ref Buffer = alloc_buffer(2, 0);
+    let copy: WindowMut<i64> = data_copy_window(backing, 0, 2);
+    let copy_route: WindowMut<i64> = data_write_window(copy, 0, route);
+    let copy_slot: WindowMut<i64> = data_write_window(copy_route, 1, slot);
+    let frozen: Window<i64> = data_freeze_window(copy_slot);
+    return data_read_window(frozen, 0) + data_read_window(frozen, 1);
+  }
+
+  fn capture_handle_table_runtime_recipe(
+    primary_route: i64,
+    primary_slot: i64,
+    secondary_route: i64,
+    secondary_slot: i64
+  ) -> HandleTableRuntimeRecipeSummary {
+    data_bind_core(1);
+    let handles: HandleTable = data_handle_table("host=cpu0", "fabric=fabric0");
+    let ready: Marker = data_marker("std_handle_table_recipe_ready");
+    return HandleTableRuntimeRecipeSummary {
+      primary_route: primary_route,
+      primary_slot: primary_slot,
+      primary_sum: capture_handle_table_pair(primary_route, primary_slot),
+      secondary_route: secondary_route,
+      secondary_slot: secondary_slot,
+      secondary_sum: capture_handle_table_pair(secondary_route, secondary_slot)
+    };
+  }
+
+  fn main() {
+    let summary: HandleTableRuntimeRecipeSummary =
+      capture_handle_table_runtime_recipe(5, 12, 9, 18);
+    print(
+      summary.primary_route
+        + summary.primary_slot
+        + summary.primary_sum
+        + summary.secondary_route
+        + summary.secondary_slot
+        + summary.secondary_sum
+    );
+  }
+}

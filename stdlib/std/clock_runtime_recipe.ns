@@ -1,0 +1,42 @@
+mod cpu Main {
+  extern "c" fn host_clock_domain_id() -> i64;
+  extern "c" fn host_clock_epoch_ns() -> i64;
+  extern "c" fn host_clock_scale_ppm() -> i64;
+
+  struct ClockRecipeSeed {
+    bias: i64
+  }
+
+  struct ClockRecipeSummary {
+    domain_id: i64,
+    epoch_ns: i64,
+    tick: i64,
+    scale_ppm: i64,
+    biased_domain_id: i64
+  }
+
+  fn capture_clock_recipe(seed: ClockRecipeSeed) -> ClockRecipeSummary {
+    return ClockRecipeSummary {
+      domain_id: host_clock_domain_id(),
+      epoch_ns: host_clock_epoch_ns(),
+      tick: cpu_tick_i64(0, 1),
+      scale_ppm: host_clock_scale_ppm(),
+      biased_domain_id: host_clock_domain_id() + seed.bias
+    };
+  }
+
+  fn summarize_clock_recipe(bias: i64) -> i64 {
+    let summary: ClockRecipeSummary = capture_clock_recipe(ClockRecipeSeed {
+      bias: bias
+    });
+    return summary.domain_id
+      + summary.epoch_ns
+      + summary.tick
+      + summary.scale_ppm
+      + summary.biased_domain_id;
+  }
+
+  fn main() {
+    print(summarize_clock_recipe(1));
+  }
+}

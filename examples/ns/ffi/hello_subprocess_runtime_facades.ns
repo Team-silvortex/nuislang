@@ -1,0 +1,46 @@
+mod cpu Main {
+  extern "c" fn host_subprocess_spawn(program_handle: i64, argv_handle: i64, env_handle: i64) -> i64;
+  extern "c" fn host_subprocess_signal(process_handle: i64, signal: i64) -> i64;
+  extern "c" fn host_subprocess_join(process_handle: i64) -> i64;
+  extern "c" fn host_subprocess_join_exit(process_handle: i64) -> i64;
+
+  struct SubprocessRuntimeFacadeSummary {
+    primary_handle: i64,
+    primary_signal: i64,
+    primary_join: i64,
+    primary_join_exit: i64,
+    secondary_handle: i64,
+    secondary_signal: i64,
+    secondary_join: i64,
+    secondary_join_exit: i64
+  }
+
+  fn capture_subprocess_runtime_facade() -> SubprocessRuntimeFacadeSummary {
+    let primary_handle: i64 = host_subprocess_spawn(503, 29, 7);
+    let secondary_handle: i64 = host_subprocess_spawn(601, 31, 9);
+    return SubprocessRuntimeFacadeSummary {
+      primary_handle: primary_handle,
+      primary_signal: host_subprocess_signal(primary_handle, 0),
+      primary_join: host_subprocess_join(primary_handle),
+      primary_join_exit: host_subprocess_join_exit(primary_handle),
+      secondary_handle: secondary_handle,
+      secondary_signal: host_subprocess_signal(secondary_handle, 0),
+      secondary_join: host_subprocess_join(secondary_handle),
+      secondary_join_exit: host_subprocess_join_exit(secondary_handle)
+    };
+  }
+
+  fn main() {
+    let summary: SubprocessRuntimeFacadeSummary = capture_subprocess_runtime_facade();
+    print(
+      summary.primary_handle
+        + summary.primary_signal
+        + summary.primary_join
+        + summary.primary_join_exit
+        + summary.secondary_handle
+        + summary.secondary_signal
+        + summary.secondary_join
+        + summary.secondary_join_exit
+    );
+  }
+}

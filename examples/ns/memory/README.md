@@ -1,75 +1,67 @@
 # Memory `.ns` Examples
 
-This folder contains ownership/lifetime-oriented front-end examples:
+This folder contains ownership, lifetime, and task-payload front-end examples.
 
-* `hello_glm.ns`
-* `hello_borrow_end.ns`
-* `hello_task_glm_scalar_payload.ns`
-* `hello_task_glm_struct_payload.ns`
-* `hello_task_glm_nested_struct_payload.ns`
-* `hello_task_glm_text_payload.ns`
-* `hello_task_glm_nested_text_struct_payload.ns`
-* `hello_task_glm_origin.ns`
-* `hello_task_glm_status_path.ns`
-* `hello_task_glm_value_path.ns`
-* `hello_task_glm_lifecycle_path.ns`
-* `hello_task_glm_lifecycle.ns`
-* `hello_task_glm_boundary_compare.ns`
-* `hello_task_glm_lifecycle_compare.ns`
-* `hello_task_glm_observe.ns`
-* `hello_task_glm_compare.ns`
-* `hello_task_glm_join_nonconsuming_probe.ns`
+Use it for:
 
-Current note:
+* local borrow / move / lifetime shape
+* current task payload and observation boundaries
+* the narrowest single-file companions to task-facing `std` recipes
 
-* this folder is intentionally small right now because the ownership/lifetime path is still being hardened through `YIR`/verifier work rather than expanded into a broad source-level surface
-* the current verifier-facing rule set is documented in
-  [docs/reference/nir-memory-model.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nir-memory-model.md)
+Canonical short map:
 
-Useful commands:
+* [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+  Use that file first when you want the shortest current route.
 
-```bash
-cargo run -p nuis -- dump-yir examples/ns/memory/hello_glm.ns
-cargo run -p nuis -- dump-nir examples/ns/memory/hello_borrow_end.ns
-cargo run -p nuis -- check examples/ns/memory/hello_task_glm_scalar_payload.ns
-cargo run -p nuis -- check examples/ns/memory/hello_task_glm_struct_payload.ns
-cargo run -p nuis -- check examples/ns/memory/hello_task_glm_nested_struct_payload.ns
-cargo run -p nuis -- check examples/ns/memory/hello_task_glm_text_payload.ns
-cargo run -p nuis -- check examples/ns/memory/hello_task_glm_nested_text_struct_payload.ns
-cargo run -p nuis -- check examples/ns/memory/hello_task_glm_origin.ns
-cargo run -p nuis -- check examples/ns/memory/hello_task_glm_status_path.ns
-cargo run -p nuis -- check examples/ns/memory/hello_task_glm_value_path.ns
-cargo run -p nuis -- check examples/ns/memory/hello_task_glm_lifecycle_path.ns
-cargo run -p nuis -- check examples/ns/memory/hello_task_glm_lifecycle.ns
-cargo run -p nuis -- check examples/ns/memory/hello_task_glm_boundary_compare.ns
-cargo run -p nuis -- check examples/ns/memory/hello_task_glm_lifecycle_compare.ns
-cargo run -p nuis -- check examples/ns/memory/hello_task_glm_observe.ns
-cargo run -p nuis -- check examples/ns/memory/hello_task_glm_compare.ns
-cargo run -p nuis -- check examples/ns/memory/hello_task_glm_join_nonconsuming_probe.ns
-```
+Related current contracts:
 
-Recommended task-reading note:
+* [nir-memory-model.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nir-memory-model.md)
+* [cpu-task-memory-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-memory-contract.md)
+* [cpu-task-glm-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-glm-contract.md)
+* [cpu-task-payload-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-payload-matrix.md)
 
+## First Anchors
+
+Start here:
+
+* [hello_glm.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_glm.ns)
+  smallest ownership-oriented baseline
+* [hello_borrow_end.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_borrow_end.ns)
+  explicit local borrow/lifetime closure
 * [hello_task_glm_origin.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_origin.ns)
-  is the smallest direct `spawn -> join` payload path
+  smallest direct `spawn -> join` payload path
 * [hello_task_glm_status_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_status_path.ns)
-  is the narrowest current `join_result -> task_completed/task_timed_out/task_cancelled`
-  path and is the closest single-file memory companion to
-  [task_status_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_status_recipe.ns)
+  narrowest status-only task path
 * [hello_task_glm_value_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_value_path.ns)
-  is the narrowest current `spawn -> join_result -> task_completed -> task_value`
-  path and is the closest single-file memory companion to
-  [task_value_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_value_recipe.ns)
-* [hello_task_glm_lifecycle_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_lifecycle_path.ns)
-  is the narrowest current `timeout/cancel -> join_result -> task_timed_out/task_cancelled`
-  path and is the closest single-file memory companion to
-  [task_lifecycle_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_lifecycle_recipe.ns)
-* [hello_task_glm_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_compare.ns)
-  is the clearest current direct-vs-observed comparison companion to
-  [task_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_compare_recipe.ns)
-* [hello_task_glm_boundary_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_boundary_compare.ns)
-  is the wider sibling companion for
-  [task_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_compare_recipe.ns)
-  when you also want to see timeout/cancel lifecycle contrast in the same file
-* [hello_task_glm_observe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_observe.ns)
-  widens that same path with timeout/observation shaping
+  narrowest completed-value task path
+
+## Short Task Map
+
+* payload shape
+  - [hello_task_glm_scalar_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_scalar_payload.ns)
+  - [hello_task_glm_struct_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_struct_payload.ns)
+  - [hello_task_glm_nested_struct_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_nested_struct_payload.ns)
+  - [hello_task_glm_text_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_text_payload.ns)
+  - [hello_task_glm_nested_text_struct_payload.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_nested_text_struct_payload.ns)
+* task observation
+  - [hello_task_glm_status_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_status_path.ns)
+  - [hello_task_glm_value_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_value_path.ns)
+  - [hello_task_glm_lifecycle_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_lifecycle_path.ns)
+  - [hello_task_glm_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_compare.ns)
+* wider local probes
+  - [hello_task_glm_observe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_observe.ns)
+  - [hello_task_glm_boundary_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_boundary_compare.ns)
+  - [hello_task_glm_lifecycle_compare.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_lifecycle_compare.ns)
+  - [hello_task_glm_join_nonconsuming_probe.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_join_nonconsuming_probe.ns)
+
+## Reading Rule
+
+* use this README for the shortest memory/task anchor set
+* use [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+  for the shortest repo-level route
+* use [docs/reference/cpu-task-payload-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-payload-matrix.md)
+  when you want the current allowed/rejected payload split
+* use [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
+  when you want project-form task companions
+* treat the wider local probes as secondary unless you are actively working on
+  task/GLM boundary behavior

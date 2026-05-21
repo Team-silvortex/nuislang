@@ -1,0 +1,20 @@
+mod cpu Main {
+  extern "c" fn host_sleep_ns(duration_ns: i64) -> i64;
+
+  struct SleepProjectSummary {
+    primary_slept_ns: i64,
+    secondary_slept_ns: i64
+  }
+
+  fn capture_sleep_project(primary_duration_ns: i64, secondary_duration_ns: i64) -> SleepProjectSummary {
+    return SleepProjectSummary {
+      primary_slept_ns: host_sleep_ns(primary_duration_ns),
+      secondary_slept_ns: host_sleep_ns(secondary_duration_ns)
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: SleepProjectSummary = capture_sleep_project(1000, 2000);
+    return summary.primary_slept_ns + summary.secondary_slept_ns;
+  }
+}

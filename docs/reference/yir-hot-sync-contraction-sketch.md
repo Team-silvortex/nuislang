@@ -321,18 +321,18 @@ while still staying relatively local:
 These are especially useful because they already sit in a more realistic
 project/front-door compilation shape:
 
-* [task_completed_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_completed_observe_demo)
+* [task_completed_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_completed_observe_demo)
   * best current small project candidate for “can a completed-observe path
     collapse locally?”
   * see also:
-    [examples/projects/task_completed_observe_demo/FUTURE_HOT_SYNC_CONTRACTION_SKETCH.md](/Users/Shared/chroot/dev/nuislang/examples/projects/task_completed_observe_demo/FUTURE_HOT_SYNC_CONTRACTION_SKETCH.md)
-* [task_lifecycle_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_lifecycle_branch_demo)
+    [examples/projects/task/task_completed_observe_demo/FUTURE_HOT_SYNC_CONTRACTION_SKETCH.md](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_completed_observe_demo/FUTURE_HOT_SYNC_CONTRACTION_SKETCH.md)
+* [task_lifecycle_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_lifecycle_branch_demo)
   * useful for testing that timeout-sensitive paths do **not** contract too
     aggressively
-* [task_cancel_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_cancel_branch_demo)
+* [task_cancel_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_cancel_branch_demo)
   * useful for testing that cancellation-sensitive paths do **not** contract
     too aggressively
-* [task_join_nonconsuming_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task_join_nonconsuming_probe_demo)
+* [task_join_nonconsuming_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_join_nonconsuming_probe_demo)
   * good future regression probe if local contraction begins to interact with
     a stricter future `join(...)` boundary
 

@@ -1,0 +1,42 @@
+mod cpu Main {
+  extern "c" fn host_stdout_write(text_handle: i64) -> i64;
+  extern "c" fn host_stderr_write(text_handle: i64) -> i64;
+  extern "c" fn host_stdout_flush() -> i64;
+  extern "c" fn host_stderr_flush() -> i64;
+
+  struct IoRuntimeProjectSummary {
+    primary_stdout_written: i64,
+    primary_stderr_written: i64,
+    primary_stdout_flushed: i64,
+    primary_stderr_flushed: i64,
+    secondary_stdout_written: i64,
+    secondary_stderr_written: i64,
+    secondary_stdout_flushed: i64,
+    secondary_stderr_flushed: i64
+  }
+
+  fn capture_io_runtime_project() -> IoRuntimeProjectSummary {
+    return IoRuntimeProjectSummary {
+      primary_stdout_written: host_stdout_write(71),
+      primary_stderr_written: host_stderr_write(89),
+      primary_stdout_flushed: host_stdout_flush(),
+      primary_stderr_flushed: host_stderr_flush(),
+      secondary_stdout_written: host_stdout_write(113),
+      secondary_stderr_written: host_stderr_write(127),
+      secondary_stdout_flushed: host_stdout_flush(),
+      secondary_stderr_flushed: host_stderr_flush()
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: IoRuntimeProjectSummary = capture_io_runtime_project();
+    return summary.primary_stdout_written
+      + summary.primary_stderr_written
+      + summary.primary_stdout_flushed
+      + summary.primary_stderr_flushed
+      + summary.secondary_stdout_written
+      + summary.secondary_stderr_written
+      + summary.secondary_stdout_flushed
+      + summary.secondary_stderr_flushed;
+  }
+}

@@ -1,0 +1,37 @@
+mod cpu Main {
+  extern "c" fn host_result_is_ok(tag_handle: i64) -> i64;
+  extern "c" fn host_result_value(tag_handle: i64) -> i64;
+  extern "c" fn host_result_error(tag_handle: i64) -> i64;
+
+  struct ResultFacadeSummary {
+    primary_is_ok: i64,
+    primary_value_handle: i64,
+    primary_error_handle: i64,
+    secondary_is_ok: i64,
+    secondary_value_handle: i64,
+    secondary_error_handle: i64
+  }
+
+  fn capture_result_facade() -> ResultFacadeSummary {
+    return ResultFacadeSummary {
+      primary_is_ok: host_result_is_ok(1207),
+      primary_value_handle: host_result_value(1207),
+      primary_error_handle: host_result_error(1207),
+      secondary_is_ok: host_result_is_ok(1308),
+      secondary_value_handle: host_result_value(1308),
+      secondary_error_handle: host_result_error(1308)
+    };
+  }
+
+  fn main() {
+    let summary: ResultFacadeSummary = capture_result_facade();
+    print(
+      summary.primary_is_ok
+        + summary.primary_value_handle
+        + summary.primary_error_handle
+        + summary.secondary_is_ok
+        + summary.secondary_value_handle
+        + summary.secondary_error_handle
+    );
+  }
+}

@@ -1,0 +1,35 @@
+mod cpu Main {
+  extern "c" fn host_stat_mtime_ns(path_handle: i64) -> i64;
+  extern "c" fn host_stat_ctime_ns(path_handle: i64) -> i64;
+  extern "c" fn host_stat_mode(path_handle: i64) -> i64;
+
+  struct StatRuntimeProjectSummary {
+    primary_mode: i64,
+    primary_mtime_ns: i64,
+    primary_ctime_ns: i64,
+    secondary_mode: i64,
+    secondary_mtime_ns: i64,
+    secondary_ctime_ns: i64
+  }
+
+  fn capture_stat_runtime_project() -> StatRuntimeProjectSummary {
+    return StatRuntimeProjectSummary {
+      primary_mode: host_stat_mode(419),
+      primary_mtime_ns: host_stat_mtime_ns(419),
+      primary_ctime_ns: host_stat_ctime_ns(419),
+      secondary_mode: host_stat_mode(733),
+      secondary_mtime_ns: host_stat_mtime_ns(733),
+      secondary_ctime_ns: host_stat_ctime_ns(733)
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: StatRuntimeProjectSummary = capture_stat_runtime_project();
+    return summary.primary_mode
+      + summary.primary_mtime_ns
+      + summary.primary_ctime_ns
+      + summary.secondary_mode
+      + summary.secondary_mtime_ns
+      + summary.secondary_ctime_ns;
+  }
+}

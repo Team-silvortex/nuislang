@@ -1,0 +1,81 @@
+mod cpu Main {
+  extern "c" fn host_file_open(path_handle: i64, flags: i64) -> i64;
+  extern "c" fn host_file_read(file_handle: i64, buffer_handle: i64, len: i64) -> i64;
+  extern "c" fn host_file_close(file_handle: i64) -> i64;
+
+  struct FileRuntimeRecipeSeed {
+    primary_path_handle: i64,
+    secondary_path_handle: i64,
+    flags: i64,
+    read_len: i64
+  }
+
+  struct FileRuntimeRecipeSummary {
+    primary_handle: i64,
+    primary_read_bytes: i64,
+    primary_close_code: i64,
+    secondary_handle: i64,
+    secondary_read_bytes: i64,
+    secondary_close_code: i64
+  }
+
+  fn read_once(path_handle: i64, flags: i64, read_len: i64) -> FileRuntimeRecipeSummary {
+    let handle: i64 = host_file_open(path_handle, flags);
+    let backing: ref Buffer = alloc_buffer(read_len, 0);
+    let read_bytes: i64 = host_file_read(handle, backing, read_len);
+    let close_code: i64 = host_file_close(handle);
+    return FileRuntimeRecipeSummary {
+      primary_handle: handle,
+      primary_read_bytes: read_bytes,
+      primary_close_code: close_code,
+      secondary_handle: 0,
+      secondary_read_bytes: 0,
+      secondary_close_code: 0
+    };
+  }
+
+  fn capture_file_runtime_recipe(seed: FileRuntimeRecipeSeed) -> FileRuntimeRecipeSummary {
+    let primary: FileRuntimeRecipeSummary = read_once(
+      seed.primary_path_handle,
+      seed.flags,
+      seed.read_len
+    );
+    let secondary: FileRuntimeRecipeSummary = read_once(
+      seed.secondary_path_handle,
+      seed.flags,
+      seed.read_len
+    );
+    return FileRuntimeRecipeSummary {
+      primary_handle: primary.primary_handle,
+      primary_read_bytes: primary.primary_read_bytes,
+      primary_close_code: primary.primary_close_code,
+      secondary_handle: secondary.primary_handle,
+      secondary_read_bytes: secondary.primary_read_bytes,
+      secondary_close_code: secondary.primary_close_code
+    };
+  }
+
+  fn summarize_file_runtime_recipe(
+    primary_path_handle: i64,
+    secondary_path_handle: i64,
+    flags: i64,
+    read_len: i64
+  ) -> i64 {
+    let summary: FileRuntimeRecipeSummary = capture_file_runtime_recipe(FileRuntimeRecipeSeed {
+      primary_path_handle: primary_path_handle,
+      secondary_path_handle: secondary_path_handle,
+      flags: flags,
+      read_len: read_len
+    });
+    return summary.primary_handle
+      + summary.primary_read_bytes
+      + summary.primary_close_code
+      + summary.secondary_handle
+      + summary.secondary_read_bytes
+      + summary.secondary_close_code;
+  }
+
+  fn main() {
+    print(summarize_file_runtime_recipe(7, 13, 1, 8));
+  }
+}

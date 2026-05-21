@@ -1,0 +1,45 @@
+mod cpu Main {
+  struct PipeRuntimeFacadeSummary {
+    primary_source: i64,
+    primary_roundtrip: i64,
+    primary_frozen_slot: i64,
+    secondary_source: i64,
+    secondary_roundtrip: i64,
+    secondary_frozen_slot: i64
+  }
+
+  fn capture_pipe_runtime_facade(primary_source: i64, secondary_source: i64) -> PipeRuntimeFacadeSummary {
+    data_bind_core(1);
+    let handles: HandleTable = data_handle_table("host=cpu0", "fabric=fabric0");
+    let ready: Marker = data_marker("std_pipe_facade_ready");
+
+    let primary_pipe: Pipe<i64> = data_output_pipe(primary_source);
+    let primary_roundtrip: i64 = data_input_pipe(primary_pipe);
+    let primary_view: Window<i64> = data_immutable_window(primary_source, 0, 1);
+
+    let secondary_pipe: Pipe<i64> = data_output_pipe(secondary_source);
+    let secondary_roundtrip: i64 = data_input_pipe(secondary_pipe);
+    let secondary_view: Window<i64> = data_immutable_window(secondary_source, 0, 1);
+
+    return PipeRuntimeFacadeSummary {
+      primary_source: primary_source,
+      primary_roundtrip: primary_roundtrip,
+      primary_frozen_slot: data_read_window(primary_view, 0),
+      secondary_source: secondary_source,
+      secondary_roundtrip: secondary_roundtrip,
+      secondary_frozen_slot: data_read_window(secondary_view, 0)
+    };
+  }
+
+  fn main() {
+    let summary: PipeRuntimeFacadeSummary = capture_pipe_runtime_facade(42, 57);
+    print(
+      summary.primary_source
+        + summary.primary_roundtrip
+        + summary.primary_frozen_slot
+        + summary.secondary_source
+        + summary.secondary_roundtrip
+        + summary.secondary_frozen_slot
+    );
+  }
+}

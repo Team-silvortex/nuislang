@@ -2,6 +2,18 @@
 
 These examples are supposed to fail verification or front-end checks.
 
+Use this folder for:
+
+* negative verifier coverage
+* front-end structure failures
+* task / ownership / payload boundary failures
+* handwritten `YIR` invalid-shape probes
+
+Canonical short map:
+
+* [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+  Use that file first when you want the shortest current route.
+
 Subfolders:
 
 * [ns/core](/Users/Shared/chroot/dev/nuislang/examples/invalid/ns/core/README.md)
@@ -15,11 +27,13 @@ Subfolders:
 * [yir](/Users/Shared/chroot/dev/nuislang/examples/invalid/yir)
   invalid handwritten `YIR` examples
 
-Recommended checks:
+Reading rule:
 
-```bash
-cargo run -p nuis -- check examples/invalid/ns/core/hello_bad_unit.ns
-cargo run -p nuis -- check examples/invalid/ns/core/hello_nested_mod_invalid.ns
-cargo run -p nuis -- check examples/invalid/projects/bad_links_missing_downlink
-cargo run -p yir-run -- examples/invalid/yir/cpu_use_after_free_invalid.yir
-```
+* use this README as a pure invalid-example router
+* use the local invalid subdirectory README when you want the specific failure
+  family
+* use [docs/reference/cpu-task-payload-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-payload-matrix.md)
+  when you want the current task payload allow/reject split behind the invalid
+  memory cases
+* use [docs/repo-cleanup-candidates.md](/Users/Shared/chroot/dev/nuislang/docs/repo-cleanup-candidates.md)
+  when you want the current cleanup/archiving policy
