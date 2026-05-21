@@ -1,0 +1,12 @@
+use kernel KernelUnit;
+
+mod cpu Main {
+  fn main() {
+    let input = kernel_tensor(2, 3, "2,4,6,1,3,5");
+    let total: i64 = kernel_reduce_sum(input);
+    let peak: i64 = kernel_reduce_max(input);
+    let avg: i64 = kernel_reduce_mean(input);
+
+    print(total + peak + avg);
+  }
+}

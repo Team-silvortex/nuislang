@@ -1,0 +1,22 @@
+mod cpu Main {
+  fn main() {
+    let input = kernel_tensor(1, 3, "2,4,6");
+    let weights = kernel_tensor(3, 2, "1,-2,3,0,2,1");
+    let bias = kernel_tensor(1, 2, "-4,3");
+    let projected = kernel_matmul(input, weights);
+    let shifted = kernel_add_bias(projected, bias);
+    let activated = kernel_relu(shifted);
+    let summary: i64 = kernel_reduce_sum(activated);
+
+    print(summary);
+  }
+}
+
+mod kernel KernelUnit {
+  fn profile() {
+    const bind_core: i64 = 2;
+    const queue_depth: i64 = 8;
+    const batch_lanes: i64 = 16;
+    let profile_entry: Unit = kernel_target_config("apple_ane", "coreml", batch_lanes);
+  }
+}

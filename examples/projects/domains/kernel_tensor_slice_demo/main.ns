@@ -1,0 +1,13 @@
+use kernel KernelUnit;
+
+mod cpu Main {
+  fn main() {
+    let input = kernel_tensor(2, 3, "2,4,6,1,3,5");
+    let first_row = kernel_row(input);
+    let first_col = kernel_col(input);
+    let row_pick: i64 = kernel_element_at(first_row, 0, 2);
+    let col_pick: i64 = kernel_element_at(first_col, 1, 0);
+
+    print(row_pick + col_pick);
+  }
+}

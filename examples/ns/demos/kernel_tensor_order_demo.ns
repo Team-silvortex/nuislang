@@ -1,0 +1,20 @@
+mod cpu Main {
+  fn main() {
+    let input = kernel_tensor(2, 3, "2,4,6,1,3,5");
+    let sorted = kernel_sort(input);
+    let top2 = kernel_topk(input, 2);
+    let first_sorted: i64 = kernel_element_at(sorted, 0, 0);
+    let second_top: i64 = kernel_element_at(top2, 0, 1);
+
+    print(first_sorted + second_top);
+  }
+}
+
+mod kernel KernelUnit {
+  fn profile() {
+    const bind_core: i64 = 2;
+    const queue_depth: i64 = 8;
+    const batch_lanes: i64 = 16;
+    let profile_entry: Unit = kernel_target_config("apple_ane", "coreml", batch_lanes);
+  }
+}

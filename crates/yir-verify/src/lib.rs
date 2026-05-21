@@ -1267,14 +1267,22 @@ fn verify_result_state_nodes(module: &YirModule) -> Result<(), String> {
             SemanticOp::KernelObserve => {
                 let source = observe_source_node(&nodes, node)?;
                 let actual = observe_state_arg(node)?;
-                if source.op.semantic_op() != SemanticOp::CpuProjectProfileRef {
+                let direct_project_ref =
+                    source.op.semantic_op() == SemanticOp::CpuProjectProfileRef;
+                let resolved_kernel_profile_slot = is_resolved_kernel_profile_slot(source);
+                if !direct_project_ref && !resolved_kernel_profile_slot {
                     return Err(format!(
                         "node `{}` expects cpu.project_profile_ref input for kernel observe, got `{}`",
                         node.name,
                         source.op.full_name()
                     ));
                 }
-                if !node.op.observe_state_matches_source(&source.op, actual)? {
+                let state_matches = if resolved_kernel_profile_slot {
+                    actual == "config_ready"
+                } else {
+                    node.op.observe_state_matches_source(&source.op, actual)?
+                };
+                if !state_matches {
                     return Err(format!(
                         "node `{}` observes kernel state `{actual}`, but `{}` does not support that state",
                         node.name, source.name
@@ -1292,6 +1300,12 @@ fn verify_result_state_nodes(module: &YirModule) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+fn is_resolved_kernel_profile_slot(node: &Node) -> bool {
+    node.name.starts_with("project_profile_kernel_")
+        && node.op.module == "cpu"
+        && node.op.instruction == "const_i64"
 }
 
 fn require_expected_result_source(
@@ -2365,6 +2379,56 @@ mod tests {
             ],
             edges: vec![
                 xfer("queue_depth", "kernel_result"),
+                dep("kernel_result", "kernel_ready"),
+            ],
+            node_lanes: BTreeMap::new(),
+        };
+
+        verify_module(&module).unwrap();
+    }
+
+    #[test]
+    fn accepts_kernel_result_observe_from_resolved_project_profile_slot() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![
+                Resource {
+                    name: "cpu0".to_owned(),
+                    kind: ResourceKind::parse("cpu.arm64"),
+                },
+                Resource {
+                    name: "kernel0".to_owned(),
+                    kind: ResourceKind::parse("kernel.compute"),
+                },
+            ],
+            nodes: vec![
+                node(
+                    "project_profile_kernel_KernelUnit_batch_lanes",
+                    "cpu0",
+                    "cpu.const_i64",
+                    &["16"],
+                ),
+                node(
+                    "kernel_result",
+                    "kernel0",
+                    "kernel.observe",
+                    &[
+                        "project_profile_kernel_KernelUnit_batch_lanes",
+                        "config_ready",
+                    ],
+                ),
+                node(
+                    "kernel_ready",
+                    "kernel0",
+                    "kernel.is_config_ready",
+                    &["kernel_result"],
+                ),
+            ],
+            edges: vec![
+                xfer(
+                    "project_profile_kernel_KernelUnit_batch_lanes",
+                    "kernel_result",
+                ),
                 dep("kernel_result", "kernel_ready"),
             ],
             node_lanes: BTreeMap::new(),

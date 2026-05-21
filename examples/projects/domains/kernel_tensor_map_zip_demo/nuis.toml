@@ -1,0 +1,8 @@
+name = "kernel_tensor_map_zip_demo"
+version = "0.1.0"
+entry = "main.ns"
+modules = ["main.ns", "kernel_unit.ns"]
+abi = [
+  "cpu=cpu.arm64.apple_aapcs64",
+  "kernel=kernel.apple_ane.coreml.v1",
+]

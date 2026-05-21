@@ -2896,6 +2896,380 @@ fn lower_expr(
             "kernel_value",
             "value",
         ),
+        NirExpr::KernelTensor {
+            rows,
+            cols,
+            elements_csv,
+        } => {
+            ensure_kernel_resource(state.yir);
+            let name = next_name(state, "kernel_tensor");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "kernel0".to_owned(),
+                op: Operation {
+                    module: "kernel".to_owned(),
+                    instruction: "tensor".to_owned(),
+                    args: vec![rows.to_string(), cols.to_string(), elements_csv.clone()],
+                },
+            });
+            Ok(name)
+        }
+        NirExpr::KernelShape(input) => {
+            ensure_kernel_resource(state.yir);
+            let input_name = lower_expr(input, state, bindings)?;
+            let name = next_name(state, "kernel_shape");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "kernel0".to_owned(),
+                op: Operation {
+                    module: "kernel".to_owned(),
+                    instruction: "shape".to_owned(),
+                    args: vec![input_name.clone()],
+                },
+            });
+            push_dep_edges(state, &input_name, &name);
+            Ok(name)
+        }
+        NirExpr::KernelRows(input) => {
+            ensure_kernel_resource(state.yir);
+            let input_name = lower_expr(input, state, bindings)?;
+            let name = next_name(state, "kernel_rows");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "kernel0".to_owned(),
+                op: Operation {
+                    module: "kernel".to_owned(),
+                    instruction: "rows".to_owned(),
+                    args: vec![input_name.clone()],
+                },
+            });
+            push_dep_edges(state, &input_name, &name);
+            Ok(name)
+        }
+        NirExpr::KernelCols(input) => {
+            ensure_kernel_resource(state.yir);
+            let input_name = lower_expr(input, state, bindings)?;
+            let name = next_name(state, "kernel_cols");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "kernel0".to_owned(),
+                op: Operation {
+                    module: "kernel".to_owned(),
+                    instruction: "cols".to_owned(),
+                    args: vec![input_name.clone()],
+                },
+            });
+            push_dep_edges(state, &input_name, &name);
+            Ok(name)
+        }
+        NirExpr::KernelRow(input) => {
+            ensure_kernel_resource(state.yir);
+            let input_name = lower_expr(input, state, bindings)?;
+            let name = next_name(state, "kernel_row");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "kernel0".to_owned(),
+                op: Operation {
+                    module: "kernel".to_owned(),
+                    instruction: "row".to_owned(),
+                    args: vec![input_name.clone()],
+                },
+            });
+            push_dep_edges(state, &input_name, &name);
+            Ok(name)
+        }
+        NirExpr::KernelCol(input) => {
+            ensure_kernel_resource(state.yir);
+            let input_name = lower_expr(input, state, bindings)?;
+            let name = next_name(state, "kernel_col");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "kernel0".to_owned(),
+                op: Operation {
+                    module: "kernel".to_owned(),
+                    instruction: "col".to_owned(),
+                    args: vec![input_name.clone()],
+                },
+            });
+            push_dep_edges(state, &input_name, &name);
+            Ok(name)
+        }
+        NirExpr::KernelElementAt { input, row, col } => {
+            ensure_kernel_resource(state.yir);
+            let input_name = lower_expr(input, state, bindings)?;
+            let row_name = lower_expr(row, state, bindings)?;
+            let col_name = lower_expr(col, state, bindings)?;
+            let name = next_name(state, "kernel_element_at");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "kernel0".to_owned(),
+                op: Operation {
+                    module: "kernel".to_owned(),
+                    instruction: "element_at".to_owned(),
+                    args: vec![input_name.clone(), row_name.clone(), col_name.clone()],
+                },
+            });
+            push_dep_edges(state, &input_name, &name);
+            push_dep_edges(state, &row_name, &name);
+            push_dep_edges(state, &col_name, &name);
+            Ok(name)
+        }
+        NirExpr::KernelReshape { input, rows, cols } => {
+            ensure_kernel_resource(state.yir);
+            let input_name = lower_expr(input, state, bindings)?;
+            let name = next_name(state, "kernel_reshape");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "kernel0".to_owned(),
+                op: Operation {
+                    module: "kernel".to_owned(),
+                    instruction: "reshape".to_owned(),
+                    args: vec![input_name.clone(), rows.to_string(), cols.to_string()],
+                },
+            });
+            push_dep_edges(state, &input_name, &name);
+            Ok(name)
+        }
+        NirExpr::KernelBroadcast { input, rows, cols } => {
+            ensure_kernel_resource(state.yir);
+            let input_name = lower_expr(input, state, bindings)?;
+            let name = next_name(state, "kernel_broadcast");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "kernel0".to_owned(),
+                op: Operation {
+                    module: "kernel".to_owned(),
+                    instruction: "broadcast".to_owned(),
+                    args: vec![input_name.clone(), rows.to_string(), cols.to_string()],
+                },
+            });
+            push_dep_edges(state, &input_name, &name);
+            Ok(name)
+        }
+        NirExpr::KernelMap { input, op, scalar } => {
+            ensure_kernel_resource(state.yir);
+            let input_name = lower_expr(input, state, bindings)?;
+            let mut args = vec![input_name.clone()];
+            let mut scalar_name = None;
+            if let Some(scalar) = scalar {
+                let lowered = lower_expr(scalar, state, bindings)?;
+                args.push(lowered.clone());
+                scalar_name = Some(lowered);
+            }
+            let name = next_name(state, "kernel_map");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "kernel0".to_owned(),
+                op: Operation {
+                    module: "kernel".to_owned(),
+                    instruction: op.instruction().to_owned(),
+                    args,
+                },
+            });
+            push_dep_edges(state, &input_name, &name);
+            if let Some(scalar_name) = scalar_name {
+                push_dep_edges(state, &scalar_name, &name);
+            }
+            Ok(name)
+        }
+        NirExpr::KernelZip { lhs, rhs, op } => {
+            ensure_kernel_resource(state.yir);
+            let lhs_name = lower_expr(lhs, state, bindings)?;
+            let rhs_name = lower_expr(rhs, state, bindings)?;
+            let name = next_name(state, "kernel_zip");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "kernel0".to_owned(),
+                op: Operation {
+                    module: "kernel".to_owned(),
+                    instruction: op.instruction().to_owned(),
+                    args: vec![lhs_name.clone(), rhs_name.clone()],
+                },
+            });
+            push_dep_edges(state, &lhs_name, &name);
+            push_dep_edges(state, &rhs_name, &name);
+            Ok(name)
+        }
+        NirExpr::KernelMatmul { lhs, rhs } => {
+            ensure_kernel_resource(state.yir);
+            let lhs_name = lower_expr(lhs, state, bindings)?;
+            let rhs_name = lower_expr(rhs, state, bindings)?;
+            let name = next_name(state, "kernel_matmul");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "kernel0".to_owned(),
+                op: Operation {
+                    module: "kernel".to_owned(),
+                    instruction: "matmul".to_owned(),
+                    args: vec![lhs_name.clone(), rhs_name.clone()],
+                },
+            });
+            push_dep_edges(state, &lhs_name, &name);
+            push_dep_edges(state, &rhs_name, &name);
+            Ok(name)
+        }
+        NirExpr::KernelAddBias { input, bias } => {
+            ensure_kernel_resource(state.yir);
+            let input_name = lower_expr(input, state, bindings)?;
+            let bias_name = lower_expr(bias, state, bindings)?;
+            let name = next_name(state, "kernel_add_bias");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "kernel0".to_owned(),
+                op: Operation {
+                    module: "kernel".to_owned(),
+                    instruction: "add_bias".to_owned(),
+                    args: vec![input_name.clone(), bias_name.clone()],
+                },
+            });
+            push_dep_edges(state, &input_name, &name);
+            push_dep_edges(state, &bias_name, &name);
+            Ok(name)
+        }
+        NirExpr::KernelRelu(input) => {
+            ensure_kernel_resource(state.yir);
+            let input_name = lower_expr(input, state, bindings)?;
+            let name = next_name(state, "kernel_relu");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "kernel0".to_owned(),
+                op: Operation {
+                    module: "kernel".to_owned(),
+                    instruction: "relu".to_owned(),
+                    args: vec![input_name.clone()],
+                },
+            });
+            push_dep_edges(state, &input_name, &name);
+            Ok(name)
+        }
+        NirExpr::KernelReduceSum(input) => {
+            ensure_kernel_resource(state.yir);
+            let input_name = lower_expr(input, state, bindings)?;
+            let name = next_name(state, "kernel_reduce_sum");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "kernel0".to_owned(),
+                op: Operation {
+                    module: "kernel".to_owned(),
+                    instruction: "reduce_sum".to_owned(),
+                    args: vec![input_name.clone()],
+                },
+            });
+            push_dep_edges(state, &input_name, &name);
+            Ok(name)
+        }
+        NirExpr::KernelReduceSumAxis { input, axis } => {
+            ensure_kernel_resource(state.yir);
+            let input_name = lower_expr(input, state, bindings)?;
+            let name = next_name(state, "kernel_reduce_sum_axis");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "kernel0".to_owned(),
+                op: Operation {
+                    module: "kernel".to_owned(),
+                    instruction: "reduce_sum_axis".to_owned(),
+                    args: vec![input_name.clone(), axis.render().to_owned()],
+                },
+            });
+            push_dep_edges(state, &input_name, &name);
+            Ok(name)
+        }
+        NirExpr::KernelReduceMax(input) => {
+            ensure_kernel_resource(state.yir);
+            let input_name = lower_expr(input, state, bindings)?;
+            let name = next_name(state, "kernel_reduce_max");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "kernel0".to_owned(),
+                op: Operation {
+                    module: "kernel".to_owned(),
+                    instruction: "reduce_max".to_owned(),
+                    args: vec![input_name.clone()],
+                },
+            });
+            push_dep_edges(state, &input_name, &name);
+            Ok(name)
+        }
+        NirExpr::KernelReduceMean(input) => {
+            ensure_kernel_resource(state.yir);
+            let input_name = lower_expr(input, state, bindings)?;
+            let name = next_name(state, "kernel_reduce_mean");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "kernel0".to_owned(),
+                op: Operation {
+                    module: "kernel".to_owned(),
+                    instruction: "reduce_mean".to_owned(),
+                    args: vec![input_name.clone()],
+                },
+            });
+            push_dep_edges(state, &input_name, &name);
+            Ok(name)
+        }
+        NirExpr::KernelArgmax(input) => {
+            ensure_kernel_resource(state.yir);
+            let input_name = lower_expr(input, state, bindings)?;
+            let name = next_name(state, "kernel_argmax");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "kernel0".to_owned(),
+                op: Operation {
+                    module: "kernel".to_owned(),
+                    instruction: "argmax".to_owned(),
+                    args: vec![input_name.clone()],
+                },
+            });
+            push_dep_edges(state, &input_name, &name);
+            Ok(name)
+        }
+        NirExpr::KernelArgmin(input) => {
+            ensure_kernel_resource(state.yir);
+            let input_name = lower_expr(input, state, bindings)?;
+            let name = next_name(state, "kernel_argmin");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "kernel0".to_owned(),
+                op: Operation {
+                    module: "kernel".to_owned(),
+                    instruction: "argmin".to_owned(),
+                    args: vec![input_name.clone()],
+                },
+            });
+            push_dep_edges(state, &input_name, &name);
+            Ok(name)
+        }
+        NirExpr::KernelSort(input) => {
+            ensure_kernel_resource(state.yir);
+            let input_name = lower_expr(input, state, bindings)?;
+            let name = next_name(state, "kernel_sort");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "kernel0".to_owned(),
+                op: Operation {
+                    module: "kernel".to_owned(),
+                    instruction: "sort".to_owned(),
+                    args: vec![input_name.clone()],
+                },
+            });
+            push_dep_edges(state, &input_name, &name);
+            Ok(name)
+        }
+        NirExpr::KernelTopk { input, k } => {
+            ensure_kernel_resource(state.yir);
+            let input_name = lower_expr(input, state, bindings)?;
+            let name = next_name(state, "kernel_topk");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "kernel0".to_owned(),
+                op: Operation {
+                    module: "kernel".to_owned(),
+                    instruction: "topk".to_owned(),
+                    args: vec![input_name.clone(), k.to_string()],
+                },
+            });
+            push_dep_edges(state, &input_name, &name);
+            Ok(name)
+        }
         NirExpr::ShaderTarget {
             format,
             width,
@@ -4450,6 +4824,289 @@ mod tests {
             .nodes
             .iter()
             .any(|node| node.op.module == "kernel" && node.op.instruction == "value"));
+    }
+
+    #[test]
+    fn lowers_kernel_tensor_primitives_into_kernel_nodes() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let input = kernel_tensor(1, 3, "2,4,6");
+                let weights = kernel_tensor(3, 2, "1,-2,3,0,2,1");
+                let bias = kernel_tensor(1, 2, "-4,3");
+                let projected = kernel_matmul(input, weights);
+                let shifted = kernel_add_bias(projected, bias);
+                let activated = kernel_relu(shifted);
+                return kernel_reduce_sum(activated);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "tensor"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "matmul"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "add_bias"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "relu"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "reduce_sum"));
+    }
+
+    #[test]
+    fn lowers_kernel_tensor_inspect_primitives_into_kernel_nodes() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let input = kernel_tensor(1, 3, "2,4,6");
+                let layout = kernel_shape(input);
+                let rows: i64 = kernel_rows(input);
+                let cols: i64 = kernel_cols(input);
+                let first_row = kernel_row(input);
+                let first_col = kernel_col(input);
+                return kernel_element_at(first_row, 0, 1) + rows + cols + kernel_element_at(first_col, 0, 0);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "shape"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "rows"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "cols"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "row"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "col"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "element_at"));
+    }
+
+    #[test]
+    fn lowers_kernel_tensor_map_zip_primitives_into_kernel_nodes() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let input = kernel_tensor(1, 3, "2,4,6");
+                let lifted = kernel_map(input, "add_scalar", 3);
+                let scaled = kernel_map(lifted, "mul_scalar", 2);
+                let activated = kernel_map(scaled, "relu");
+                let mask = kernel_tensor(1, 3, "1,0,1");
+                let mixed = kernel_zip(activated, mask, "mul");
+                return kernel_reduce_sum(mixed);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "add_scalar"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "mul_scalar"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "relu"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "mul"));
+    }
+
+    #[test]
+    fn lowers_kernel_tensor_reshape_primitive_into_kernel_node() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let input = kernel_tensor(2, 3, "2,4,6,1,3,5");
+                let reshaped = kernel_reshape(input, 3, 2);
+                return kernel_element_at(reshaped, 2, 1);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "reshape"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "element_at"));
+    }
+
+    #[test]
+    fn lowers_kernel_tensor_broadcast_primitive_into_kernel_node() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let input = kernel_tensor(1, 3, "2,4,6");
+                let widened = kernel_broadcast(input, 2, 3);
+                return kernel_element_at(widened, 1, 2);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "broadcast"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "element_at"));
+    }
+
+    #[test]
+    fn lowers_kernel_tensor_reduction_primitives_into_kernel_nodes() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let input = kernel_tensor(2, 3, "2,4,6,1,3,5");
+                let maxed: i64 = kernel_reduce_max(input);
+                return maxed + kernel_reduce_mean(input);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "reduce_max"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "reduce_mean"));
+    }
+
+    #[test]
+    fn lowers_kernel_tensor_reduce_axis_primitive_into_kernel_node() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let input = kernel_tensor(2, 3, "2,4,6,1,3,5");
+                let row_sums = kernel_reduce_sum_axis(input, "rows");
+                return kernel_element_at(row_sums, 0, 1);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "reduce_sum_axis"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "element_at"));
+    }
+
+    #[test]
+    fn lowers_kernel_tensor_selection_primitives_into_kernel_nodes() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let input = kernel_tensor(2, 3, "2,4,6,1,3,5");
+                let hi: i64 = kernel_argmax(input);
+                return hi + kernel_argmin(input);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "argmax"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "argmin"));
+    }
+
+    #[test]
+    fn lowers_kernel_tensor_order_primitives_into_kernel_nodes() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let input = kernel_tensor(2, 3, "2,4,6,1,3,5");
+                let sorted = kernel_sort(input);
+                let top2 = kernel_topk(input, 2);
+                return kernel_element_at(sorted, 0, 0) + kernel_element_at(top2, 0, 1);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "sort"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "topk"));
     }
 
     #[test]

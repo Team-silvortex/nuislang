@@ -5,9 +5,10 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{
     AstBinaryOp, AstExpr, AstFunction, AstModule, AstParam, AstStmt, AstTypeRef, NirBinaryOp,
-    NirDataFlowState, NirExpr, NirExternFunction, NirExternInterface, NirFunction,
-    NirKernelFlowState, NirModule, NirParam, NirResultFamily, NirResultStage, NirShaderFlowState,
-    NirStmt, NirStructDef, NirStructField, NirTypeRef, NirUse, NirWindowMode,
+    NirDataFlowState, NirExpr, NirExternFunction, NirExternInterface, NirFunction, NirKernelAxis,
+    NirKernelFlowState, NirKernelMapOp, NirKernelZipOp, NirModule, NirParam, NirResultFamily,
+    NirResultStage, NirShaderFlowState, NirStmt, NirStructDef, NirStructField, NirTypeRef, NirUse,
+    NirWindowMode,
 };
 
 pub fn frontend_name() -> &'static str {
@@ -11323,6 +11324,463 @@ fn lower_call_expr_with_async(
             NirResultFamily::Kernel,
             |expr| NirExpr::KernelValue(Box::new(expr)),
         ),
+        "kernel_tensor" => {
+            let [rows, cols, elements] = args else {
+                return Err("kernel_tensor(...) expects 3 args".to_owned());
+            };
+            let AstExpr::Int(rows) = rows else {
+                return Err("kernel_tensor(...) rows must be an integer literal".to_owned());
+            };
+            let AstExpr::Int(cols) = cols else {
+                return Err("kernel_tensor(...) cols must be an integer literal".to_owned());
+            };
+            let AstExpr::Text(elements) = elements else {
+                return Err("kernel_tensor(...) elements must be a CSV string literal".to_owned());
+            };
+            Ok(NirExpr::KernelTensor {
+                rows: *rows,
+                cols: *cols,
+                elements_csv: elements.clone(),
+            })
+        }
+        "kernel_shape" => {
+            let [input] = args else {
+                return Err("kernel_shape(...) expects 1 arg".to_owned());
+            };
+            Ok(NirExpr::KernelShape(Box::new(lower_expr(
+                input,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?)))
+        }
+        "kernel_rows" => {
+            let [input] = args else {
+                return Err("kernel_rows(...) expects 1 arg".to_owned());
+            };
+            Ok(NirExpr::KernelRows(Box::new(lower_expr(
+                input,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?)))
+        }
+        "kernel_cols" => {
+            let [input] = args else {
+                return Err("kernel_cols(...) expects 1 arg".to_owned());
+            };
+            Ok(NirExpr::KernelCols(Box::new(lower_expr(
+                input,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?)))
+        }
+        "kernel_row" => {
+            let [input] = args else {
+                return Err("kernel_row(...) expects 1 arg".to_owned());
+            };
+            Ok(NirExpr::KernelRow(Box::new(lower_expr(
+                input,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?)))
+        }
+        "kernel_col" => {
+            let [input] = args else {
+                return Err("kernel_col(...) expects 1 arg".to_owned());
+            };
+            Ok(NirExpr::KernelCol(Box::new(lower_expr(
+                input,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?)))
+        }
+        "kernel_element_at" => {
+            let [input, row, col] = args else {
+                return Err("kernel_element_at(...) expects 3 args".to_owned());
+            };
+            Ok(NirExpr::KernelElementAt {
+                input: Box::new(lower_expr(
+                    input,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    None,
+                )?),
+                row: Box::new(lower_expr(
+                    row,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    Some(&i64_type()),
+                )?),
+                col: Box::new(lower_expr(
+                    col,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    Some(&i64_type()),
+                )?),
+            })
+        }
+        "kernel_reshape" => {
+            let [input, rows, cols] = args else {
+                return Err("kernel_reshape(...) expects 3 args".to_owned());
+            };
+            let AstExpr::Int(rows) = rows else {
+                return Err("kernel_reshape(...) rows must be an integer literal".to_owned());
+            };
+            let AstExpr::Int(cols) = cols else {
+                return Err("kernel_reshape(...) cols must be an integer literal".to_owned());
+            };
+            Ok(NirExpr::KernelReshape {
+                input: Box::new(lower_expr(
+                    input,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    None,
+                )?),
+                rows: *rows,
+                cols: *cols,
+            })
+        }
+        "kernel_broadcast" => {
+            let [input, rows, cols] = args else {
+                return Err("kernel_broadcast(...) expects 3 args".to_owned());
+            };
+            let AstExpr::Int(rows) = rows else {
+                return Err("kernel_broadcast(...) rows must be an integer literal".to_owned());
+            };
+            let AstExpr::Int(cols) = cols else {
+                return Err("kernel_broadcast(...) cols must be an integer literal".to_owned());
+            };
+            Ok(NirExpr::KernelBroadcast {
+                input: Box::new(lower_expr(
+                    input,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    None,
+                )?),
+                rows: *rows,
+                cols: *cols,
+            })
+        }
+        "kernel_reduce_max" => {
+            let [input] = args else {
+                return Err("kernel_reduce_max(...) expects 1 arg".to_owned());
+            };
+            Ok(NirExpr::KernelReduceMax(Box::new(lower_expr(
+                input,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?)))
+        }
+        "kernel_reduce_mean" => {
+            let [input] = args else {
+                return Err("kernel_reduce_mean(...) expects 1 arg".to_owned());
+            };
+            Ok(NirExpr::KernelReduceMean(Box::new(lower_expr(
+                input,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?)))
+        }
+        "kernel_reduce_sum_axis" => {
+            let [input, axis] = args else {
+                return Err("kernel_reduce_sum_axis(...) expects 2 args".to_owned());
+            };
+            let AstExpr::Text(axis_name) = axis else {
+                return Err("kernel_reduce_sum_axis(...) axis must be a string literal".to_owned());
+            };
+            let axis = match axis_name.as_str() {
+                "rows" => NirKernelAxis::Rows,
+                "cols" => NirKernelAxis::Cols,
+                _ => {
+                    return Err(format!(
+                        "kernel_reduce_sum_axis(...) unsupported axis `{}`; expected rows/cols",
+                        axis_name
+                    ));
+                }
+            };
+            Ok(NirExpr::KernelReduceSumAxis {
+                input: Box::new(lower_expr(
+                    input,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    None,
+                )?),
+                axis,
+            })
+        }
+        "kernel_argmax" => {
+            let [input] = args else {
+                return Err("kernel_argmax(...) expects 1 arg".to_owned());
+            };
+            Ok(NirExpr::KernelArgmax(Box::new(lower_expr(
+                input,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?)))
+        }
+        "kernel_argmin" => {
+            let [input] = args else {
+                return Err("kernel_argmin(...) expects 1 arg".to_owned());
+            };
+            Ok(NirExpr::KernelArgmin(Box::new(lower_expr(
+                input,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?)))
+        }
+        "kernel_sort" => {
+            let [input] = args else {
+                return Err("kernel_sort(...) expects 1 arg".to_owned());
+            };
+            Ok(NirExpr::KernelSort(Box::new(lower_expr(
+                input,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?)))
+        }
+        "kernel_topk" => {
+            let [input, k] = args else {
+                return Err("kernel_topk(...) expects 2 args".to_owned());
+            };
+            let AstExpr::Int(k) = k else {
+                return Err("kernel_topk(...) k must be an integer literal".to_owned());
+            };
+            Ok(NirExpr::KernelTopk {
+                input: Box::new(lower_expr(
+                    input,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    None,
+                )?),
+                k: *k,
+            })
+        }
+        "kernel_map" => match args {
+            [input, op] => {
+                let AstExpr::Text(op_name) = op else {
+                    return Err("kernel_map(...) op must be a string literal".to_owned());
+                };
+                let op = match op_name.as_str() {
+                    "relu" => NirKernelMapOp::Relu,
+                    "add_scalar" | "mul_scalar" => {
+                        return Err(format!(
+                            "kernel_map(..., \"{}\") expects a third scalar arg",
+                            op_name
+                        ));
+                    }
+                    _ => {
+                        return Err(format!(
+                            "kernel_map(...) unsupported op `{}`; expected relu/add_scalar/mul_scalar",
+                            op_name
+                        ));
+                    }
+                };
+                Ok(NirExpr::KernelMap {
+                    input: Box::new(lower_expr(
+                        input,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        None,
+                    )?),
+                    op,
+                    scalar: None,
+                })
+            }
+            [input, op, scalar] => {
+                let AstExpr::Text(op_name) = op else {
+                    return Err("kernel_map(...) op must be a string literal".to_owned());
+                };
+                let op = match op_name.as_str() {
+                    "add_scalar" => NirKernelMapOp::AddScalar,
+                    "mul_scalar" => NirKernelMapOp::MulScalar,
+                    "relu" => {
+                        return Err(
+                            "kernel_map(..., \"relu\") does not accept a scalar arg".to_owned()
+                        );
+                    }
+                    _ => {
+                        return Err(format!(
+                            "kernel_map(...) unsupported op `{}`; expected relu/add_scalar/mul_scalar",
+                            op_name
+                        ));
+                    }
+                };
+                Ok(NirExpr::KernelMap {
+                    input: Box::new(lower_expr(
+                        input,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        None,
+                    )?),
+                    op,
+                    scalar: Some(Box::new(lower_expr(
+                        scalar,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        Some(&i64_type()),
+                    )?)),
+                })
+            }
+            _ => Err("kernel_map(...) expects 2 or 3 args".to_owned()),
+        },
+        "kernel_zip" => {
+            let [lhs, rhs, op] = args else {
+                return Err("kernel_zip(...) expects 3 args".to_owned());
+            };
+            let AstExpr::Text(op_name) = op else {
+                return Err("kernel_zip(...) op must be a string literal".to_owned());
+            };
+            let op = match op_name.as_str() {
+                "add" => NirKernelZipOp::Add,
+                "mul" => NirKernelZipOp::Mul,
+                _ => {
+                    return Err(format!(
+                        "kernel_zip(...) unsupported op `{}`; expected add/mul",
+                        op_name
+                    ));
+                }
+            };
+            Ok(NirExpr::KernelZip {
+                lhs: Box::new(lower_expr(
+                    lhs,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    None,
+                )?),
+                rhs: Box::new(lower_expr(
+                    rhs,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    None,
+                )?),
+                op,
+            })
+        }
+        "kernel_matmul" => {
+            let [lhs, rhs] = args else {
+                return Err("kernel_matmul(...) expects 2 args".to_owned());
+            };
+            Ok(NirExpr::KernelMatmul {
+                lhs: Box::new(lower_expr(
+                    lhs,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    None,
+                )?),
+                rhs: Box::new(lower_expr(
+                    rhs,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    None,
+                )?),
+            })
+        }
+        "kernel_add_bias" => {
+            let [input, bias] = args else {
+                return Err("kernel_add_bias(...) expects 2 args".to_owned());
+            };
+            Ok(NirExpr::KernelAddBias {
+                input: Box::new(lower_expr(
+                    input,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    None,
+                )?),
+                bias: Box::new(lower_expr(
+                    bias,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    None,
+                )?),
+            })
+        }
+        "kernel_relu" => {
+            let [input] = args else {
+                return Err("kernel_relu(...) expects 1 arg".to_owned());
+            };
+            Ok(NirExpr::KernelRelu(Box::new(lower_expr(
+                input,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?)))
+        }
+        "kernel_reduce_sum" => {
+            let [input] = args else {
+                return Err("kernel_reduce_sum(...) expects 1 arg".to_owned());
+            };
+            Ok(NirExpr::KernelReduceSum(Box::new(lower_expr(
+                input,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?)))
+        }
         "shader_target" => {
             let [format, width, height] = args else {
                 return Err("shader_target(...) expects 3 args".to_owned());
@@ -11933,6 +12391,28 @@ fn infer_nir_expr_type(
         NirExpr::KernelValue(result) => {
             result_payload_type(result, bindings, signatures, struct_table)
         }
+        NirExpr::KernelShape(_) => Some(named_type("TensorShape")),
+        NirExpr::KernelRows(_) | NirExpr::KernelCols(_) | NirExpr::KernelElementAt { .. } => {
+            Some(i64_type())
+        }
+        NirExpr::KernelTensor { .. }
+        | NirExpr::KernelRow(_)
+        | NirExpr::KernelCol(_)
+        | NirExpr::KernelReshape { .. }
+        | NirExpr::KernelBroadcast { .. }
+        | NirExpr::KernelSort(_)
+        | NirExpr::KernelTopk { .. }
+        | NirExpr::KernelMap { .. }
+        | NirExpr::KernelZip { .. }
+        | NirExpr::KernelMatmul { .. }
+        | NirExpr::KernelAddBias { .. }
+        | NirExpr::KernelRelu(_) => Some(named_type("Tensor")),
+        NirExpr::KernelReduceSum(_)
+        | NirExpr::KernelReduceSumAxis { .. }
+        | NirExpr::KernelReduceMax(_)
+        | NirExpr::KernelReduceMean(_)
+        | NirExpr::KernelArgmax(_)
+        | NirExpr::KernelArgmin(_) => Some(i64_type()),
         NirExpr::DataProfileSendUplink { input, .. }
         | NirExpr::DataProfileSendDownlink { input, .. } => {
             let window_inner = infer_nir_expr_type(input, bindings, signatures, struct_table)?;
@@ -16953,6 +17433,379 @@ mod tests {
                 ..
             }) if ty.render() == "i64"
         ));
+    }
+
+    #[test]
+    fn lowers_explicit_kernel_tensor_helpers() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let input = kernel_tensor(1, 3, "2,4,6");
+                let weights = kernel_tensor(3, 2, "1,-2,3,0,2,1");
+                let bias = kernel_tensor(1, 2, "-4,3");
+                let projected = kernel_matmul(input, weights);
+                let shifted = kernel_add_bias(projected, bias);
+                let activated = kernel_relu(shifted);
+                return kernel_reduce_sum(activated);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| matches!(
+            stmt,
+            NirStmt::Let {
+                value: NirExpr::KernelTensor { .. },
+                ..
+            }
+        )));
+        assert!(function.body.iter().any(|stmt| matches!(
+            stmt,
+            NirStmt::Let {
+                value: NirExpr::KernelMatmul { .. },
+                ..
+            }
+        )));
+        assert!(function.body.iter().any(|stmt| matches!(
+            stmt,
+            NirStmt::Let {
+                value: NirExpr::KernelAddBias { .. },
+                ..
+            }
+        )));
+        assert!(function.body.iter().any(|stmt| matches!(
+            stmt,
+            NirStmt::Let {
+                value: NirExpr::KernelRelu(_),
+                ..
+            }
+        )));
+        assert!(matches!(
+            function.body.last(),
+            Some(NirStmt::Return(Some(NirExpr::KernelReduceSum(_))))
+        ));
+    }
+
+    #[test]
+    fn lowers_explicit_kernel_tensor_inspect_helpers() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let input = kernel_tensor(1, 3, "2,4,6");
+                let layout = kernel_shape(input);
+                let rows: i64 = kernel_rows(input);
+                let cols: i64 = kernel_cols(input);
+                let first_row = kernel_row(input);
+                let first_col = kernel_col(input);
+                return kernel_element_at(first_row, 0, 1) + rows + cols + kernel_element_at(first_col, 0, 0);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| matches!(
+            stmt,
+            NirStmt::Let {
+                value: NirExpr::KernelShape(_),
+                ..
+            }
+        )));
+        assert!(function.body.iter().any(|stmt| matches!(
+            stmt,
+            NirStmt::Let {
+                value: NirExpr::KernelRows(_),
+                ..
+            }
+        )));
+        assert!(function.body.iter().any(|stmt| matches!(
+            stmt,
+            NirStmt::Let {
+                value: NirExpr::KernelCols(_),
+                ..
+            }
+        )));
+        assert!(function.body.iter().any(|stmt| matches!(
+            stmt,
+            NirStmt::Let {
+                value: NirExpr::KernelRow(_),
+                ..
+            }
+        )));
+        assert!(function.body.iter().any(|stmt| matches!(
+            stmt,
+            NirStmt::Let {
+                value: NirExpr::KernelCol(_),
+                ..
+            }
+        )));
+        assert!(function
+            .body
+            .iter()
+            .any(|stmt| matches!(stmt, NirStmt::Return(Some(NirExpr::Binary { .. })))));
+    }
+
+    #[test]
+    fn lowers_explicit_kernel_tensor_map_zip_helpers() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let input = kernel_tensor(1, 3, "2,4,6");
+                let lifted = kernel_map(input, "add_scalar", 3);
+                let scaled = kernel_map(lifted, "mul_scalar", 2);
+                let activated = kernel_map(scaled, "relu");
+                let mask = kernel_tensor(1, 3, "1,0,1");
+                let mixed = kernel_zip(activated, mask, "mul");
+                return kernel_reduce_sum(mixed);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| matches!(
+            stmt,
+            NirStmt::Let {
+                value: NirExpr::KernelMap { .. },
+                ..
+            }
+        )));
+        assert!(function.body.iter().any(|stmt| matches!(
+            stmt,
+            NirStmt::Let {
+                value: NirExpr::KernelZip { .. },
+                ..
+            }
+        )));
+        assert!(matches!(
+            function.body.last(),
+            Some(NirStmt::Return(Some(NirExpr::KernelReduceSum(_))))
+        ));
+    }
+
+    #[test]
+    fn lowers_explicit_kernel_tensor_reshape_helper() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let input = kernel_tensor(2, 3, "2,4,6,1,3,5");
+                let reshaped = kernel_reshape(input, 3, 2);
+                return kernel_element_at(reshaped, 2, 1);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| matches!(
+            stmt,
+            NirStmt::Let {
+                value: NirExpr::KernelReshape { .. },
+                ..
+            }
+        )));
+        assert!(matches!(
+            function.body.last(),
+            Some(NirStmt::Return(Some(NirExpr::KernelElementAt { .. })))
+        ));
+    }
+
+    #[test]
+    fn lowers_explicit_kernel_tensor_broadcast_helper() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let input = kernel_tensor(1, 3, "2,4,6");
+                let widened = kernel_broadcast(input, 2, 3);
+                return kernel_element_at(widened, 1, 2);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| matches!(
+            stmt,
+            NirStmt::Let {
+                value: NirExpr::KernelBroadcast { .. },
+                ..
+            }
+        )));
+        assert!(matches!(
+            function.body.last(),
+            Some(NirStmt::Return(Some(NirExpr::KernelElementAt { .. })))
+        ));
+    }
+
+    #[test]
+    fn lowers_explicit_kernel_tensor_reduction_helpers() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let input = kernel_tensor(2, 3, "2,4,6,1,3,5");
+                let maxed: i64 = kernel_reduce_max(input);
+                return maxed + kernel_reduce_mean(input);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| matches!(
+            stmt,
+            NirStmt::Let {
+                value: NirExpr::KernelReduceMax(_),
+                ..
+            }
+        )));
+        assert!(function
+            .body
+            .iter()
+            .any(|stmt| matches!(stmt, NirStmt::Return(Some(NirExpr::Binary { .. })))));
+    }
+
+    #[test]
+    fn lowers_explicit_kernel_tensor_selection_helpers() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let input = kernel_tensor(2, 3, "2,4,6,1,3,5");
+                let hi: i64 = kernel_argmax(input);
+                return hi + kernel_argmin(input);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| matches!(
+            stmt,
+            NirStmt::Let {
+                value: NirExpr::KernelArgmax(_),
+                ..
+            }
+        )));
+        assert!(function
+            .body
+            .iter()
+            .any(|stmt| matches!(stmt, NirStmt::Return(Some(NirExpr::Binary { .. })))));
+    }
+
+    #[test]
+    fn lowers_explicit_kernel_tensor_reduce_axis_helper() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let input = kernel_tensor(2, 3, "2,4,6,1,3,5");
+                let row_sums = kernel_reduce_sum_axis(input, "rows");
+                return kernel_element_at(row_sums, 0, 1);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| matches!(
+            stmt,
+            NirStmt::Let {
+                value: NirExpr::KernelReduceSumAxis { .. },
+                ..
+            }
+        )));
+        assert!(matches!(
+            function.body.last(),
+            Some(NirStmt::Return(Some(NirExpr::KernelElementAt { .. })))
+        ));
+    }
+
+    #[test]
+    fn lowers_explicit_kernel_tensor_order_helpers() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let input = kernel_tensor(2, 3, "2,4,6,1,3,5");
+                let sorted = kernel_sort(input);
+                let top2 = kernel_topk(input, 2);
+                return kernel_element_at(sorted, 0, 0) + kernel_element_at(top2, 0, 1);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| matches!(
+            stmt,
+            NirStmt::Let {
+                value: NirExpr::KernelSort(_),
+                ..
+            }
+        )));
+        assert!(function.body.iter().any(|stmt| matches!(
+            stmt,
+            NirStmt::Let {
+                value: NirExpr::KernelTopk { .. },
+                ..
+            }
+        )));
+        assert!(function
+            .body
+            .iter()
+            .any(|stmt| matches!(stmt, NirStmt::Return(Some(NirExpr::Binary { .. })))));
     }
 
     #[test]

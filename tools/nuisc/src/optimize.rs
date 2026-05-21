@@ -827,6 +827,7 @@ fn collect_used_vars_expr(expr: &NirExpr, out: &mut BTreeSet<String>) {
         NirExpr::Var(name) => {
             out.insert(name.clone());
         }
+        NirExpr::KernelTensor { .. } => {}
         NirExpr::Await(inner)
         | NirExpr::Borrow(inner)
         | NirExpr::BorrowEnd(inner)
@@ -849,13 +850,58 @@ fn collect_used_vars_expr(expr: &NirExpr, out: &mut BTreeSet<String>) {
         | NirExpr::CpuTaskCancelled(inner)
         | NirExpr::CpuTaskValue(inner)
         | NirExpr::CpuPresentFrame(inner)
+        | NirExpr::KernelShape(inner)
+        | NirExpr::KernelRows(inner)
+        | NirExpr::KernelCols(inner)
+        | NirExpr::KernelRow(inner)
+        | NirExpr::KernelCol(inner)
         | NirExpr::KernelConfigReady(inner)
         | NirExpr::KernelValue(inner)
+        | NirExpr::KernelRelu(inner)
+        | NirExpr::KernelReduceSum(inner)
+        | NirExpr::KernelReduceMax(inner)
+        | NirExpr::KernelReduceMean(inner)
+        | NirExpr::KernelArgmax(inner)
+        | NirExpr::KernelArgmin(inner)
+        | NirExpr::KernelReduceSumAxis { input: inner, .. }
+        | NirExpr::KernelSort(inner)
         | NirExpr::ShaderPassReady(inner)
         | NirExpr::ShaderFrameReady(inner)
         | NirExpr::ShaderValue(inner)
         | NirExpr::Free(inner)
         | NirExpr::IsNull(inner) => collect_used_vars_expr(inner, out),
+        NirExpr::KernelMatmul { lhs, rhs } => {
+            collect_used_vars_expr(lhs, out);
+            collect_used_vars_expr(rhs, out);
+        }
+        NirExpr::KernelElementAt { input, row, col } => {
+            collect_used_vars_expr(input, out);
+            collect_used_vars_expr(row, out);
+            collect_used_vars_expr(col, out);
+        }
+        NirExpr::KernelReshape { input, .. } => {
+            collect_used_vars_expr(input, out);
+        }
+        NirExpr::KernelBroadcast { input, .. } => {
+            collect_used_vars_expr(input, out);
+        }
+        NirExpr::KernelMap { input, scalar, .. } => {
+            collect_used_vars_expr(input, out);
+            if let Some(scalar) = scalar {
+                collect_used_vars_expr(scalar, out);
+            }
+        }
+        NirExpr::KernelTopk { input, .. } => {
+            collect_used_vars_expr(input, out);
+        }
+        NirExpr::KernelZip { lhs, rhs, .. } => {
+            collect_used_vars_expr(lhs, out);
+            collect_used_vars_expr(rhs, out);
+        }
+        NirExpr::KernelAddBias { input, bias } => {
+            collect_used_vars_expr(input, out);
+            collect_used_vars_expr(bias, out);
+        }
         NirExpr::AllocNode { value, next } => {
             collect_used_vars_expr(value, out);
             collect_used_vars_expr(next, out);

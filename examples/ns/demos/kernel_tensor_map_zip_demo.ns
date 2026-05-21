@@ -1,0 +1,22 @@
+mod cpu Main {
+  fn main() {
+    let input = kernel_tensor(1, 3, "2,4,6");
+    let lifted = kernel_map(input, "add_scalar", 3);
+    let scaled = kernel_map(lifted, "mul_scalar", 2);
+    let activated = kernel_map(scaled, "relu");
+    let mask = kernel_tensor(1, 3, "1,0,1");
+    let mixed = kernel_zip(activated, mask, "mul");
+    let total: i64 = kernel_reduce_sum(mixed);
+
+    print(total);
+  }
+}
+
+mod kernel KernelUnit {
+  fn profile() {
+    const bind_core: i64 = 2;
+    const queue_depth: i64 = 8;
+    const batch_lanes: i64 = 16;
+    let profile_entry: Unit = kernel_target_config("apple_ane", "coreml", batch_lanes);
+  }
+}

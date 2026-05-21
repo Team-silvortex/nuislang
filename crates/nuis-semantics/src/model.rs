@@ -1044,6 +1044,64 @@ pub enum NirExpr {
     },
     KernelConfigReady(Box<NirExpr>),
     KernelValue(Box<NirExpr>),
+    KernelTensor {
+        rows: i64,
+        cols: i64,
+        elements_csv: String,
+    },
+    KernelShape(Box<NirExpr>),
+    KernelRows(Box<NirExpr>),
+    KernelCols(Box<NirExpr>),
+    KernelRow(Box<NirExpr>),
+    KernelCol(Box<NirExpr>),
+    KernelElementAt {
+        input: Box<NirExpr>,
+        row: Box<NirExpr>,
+        col: Box<NirExpr>,
+    },
+    KernelReshape {
+        input: Box<NirExpr>,
+        rows: i64,
+        cols: i64,
+    },
+    KernelBroadcast {
+        input: Box<NirExpr>,
+        rows: i64,
+        cols: i64,
+    },
+    KernelMap {
+        input: Box<NirExpr>,
+        op: NirKernelMapOp,
+        scalar: Option<Box<NirExpr>>,
+    },
+    KernelZip {
+        lhs: Box<NirExpr>,
+        rhs: Box<NirExpr>,
+        op: NirKernelZipOp,
+    },
+    KernelMatmul {
+        lhs: Box<NirExpr>,
+        rhs: Box<NirExpr>,
+    },
+    KernelAddBias {
+        input: Box<NirExpr>,
+        bias: Box<NirExpr>,
+    },
+    KernelRelu(Box<NirExpr>),
+    KernelReduceSum(Box<NirExpr>),
+    KernelReduceSumAxis {
+        input: Box<NirExpr>,
+        axis: NirKernelAxis,
+    },
+    KernelReduceMax(Box<NirExpr>),
+    KernelReduceMean(Box<NirExpr>),
+    KernelArgmax(Box<NirExpr>),
+    KernelArgmin(Box<NirExpr>),
+    KernelSort(Box<NirExpr>),
+    KernelTopk {
+        input: Box<NirExpr>,
+        k: i64,
+    },
     DataProfileSendUplink {
         unit: String,
         input: Box<NirExpr>,
@@ -1274,6 +1332,68 @@ pub enum NirKernelFlowState {
     ConfigReady,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NirKernelMapOp {
+    Relu,
+    AddScalar,
+    MulScalar,
+}
+
+impl NirKernelMapOp {
+    pub fn instruction(&self) -> &'static str {
+        match self {
+            Self::Relu => "relu",
+            Self::AddScalar => "add_scalar",
+            Self::MulScalar => "mul_scalar",
+        }
+    }
+
+    pub fn render(&self) -> &'static str {
+        match self {
+            Self::Relu => "relu",
+            Self::AddScalar => "add_scalar",
+            Self::MulScalar => "mul_scalar",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NirKernelZipOp {
+    Add,
+    Mul,
+}
+
+impl NirKernelZipOp {
+    pub fn instruction(&self) -> &'static str {
+        match self {
+            Self::Add => "add",
+            Self::Mul => "mul",
+        }
+    }
+
+    pub fn render(&self) -> &'static str {
+        match self {
+            Self::Add => "add",
+            Self::Mul => "mul",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NirKernelAxis {
+    Rows,
+    Cols,
+}
+
+impl NirKernelAxis {
+    pub fn render(&self) -> &'static str {
+        match self {
+            Self::Rows => "rows",
+            Self::Cols => "cols",
+        }
+    }
+}
+
 impl NirKernelFlowState {
     pub fn render(self) -> &'static str {
         match self {
@@ -1401,6 +1521,28 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::KernelResult { .. }
         | NirExpr::KernelConfigReady(_)
         | NirExpr::KernelValue(_)
+        | NirExpr::KernelTensor { .. }
+        | NirExpr::KernelShape(_)
+        | NirExpr::KernelRows(_)
+        | NirExpr::KernelCols(_)
+        | NirExpr::KernelRow(_)
+        | NirExpr::KernelCol(_)
+        | NirExpr::KernelElementAt { .. }
+        | NirExpr::KernelReshape { .. }
+        | NirExpr::KernelBroadcast { .. }
+        | NirExpr::KernelMap { .. }
+        | NirExpr::KernelZip { .. }
+        | NirExpr::KernelMatmul { .. }
+        | NirExpr::KernelAddBias { .. }
+        | NirExpr::KernelRelu(_)
+        | NirExpr::KernelReduceSum(_)
+        | NirExpr::KernelReduceSumAxis { .. }
+        | NirExpr::KernelReduceMax(_)
+        | NirExpr::KernelReduceMean(_)
+        | NirExpr::KernelArgmax(_)
+        | NirExpr::KernelArgmin(_)
+        | NirExpr::KernelSort(_)
+        | NirExpr::KernelTopk { .. }
         | NirExpr::DataProfileSendUplink { .. }
         | NirExpr::DataProfileSendDownlink { .. }
         | NirExpr::CpuExternCall { .. }
@@ -1543,6 +1685,28 @@ pub fn nir_expr_effect_class(expr: &NirExpr) -> NirExprEffectClass {
         | NirExpr::KernelResult { .. }
         | NirExpr::KernelConfigReady(_)
         | NirExpr::KernelValue(_)
+        | NirExpr::KernelTensor { .. }
+        | NirExpr::KernelShape(_)
+        | NirExpr::KernelRows(_)
+        | NirExpr::KernelCols(_)
+        | NirExpr::KernelRow(_)
+        | NirExpr::KernelCol(_)
+        | NirExpr::KernelElementAt { .. }
+        | NirExpr::KernelReshape { .. }
+        | NirExpr::KernelBroadcast { .. }
+        | NirExpr::KernelMap { .. }
+        | NirExpr::KernelZip { .. }
+        | NirExpr::KernelMatmul { .. }
+        | NirExpr::KernelAddBias { .. }
+        | NirExpr::KernelRelu(_)
+        | NirExpr::KernelReduceSum(_)
+        | NirExpr::KernelReduceSumAxis { .. }
+        | NirExpr::KernelReduceMax(_)
+        | NirExpr::KernelReduceMean(_)
+        | NirExpr::KernelArgmax(_)
+        | NirExpr::KernelArgmin(_)
+        | NirExpr::KernelSort(_)
+        | NirExpr::KernelTopk { .. }
         | NirExpr::ShaderResult { .. } => NirExprEffectClass::DomainReadOnly,
         NirExpr::CpuWindow { .. }
         | NirExpr::CpuSpawn { .. }

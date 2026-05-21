@@ -1,0 +1,13 @@
+use kernel KernelUnit;
+
+mod cpu Main {
+  fn main() {
+    let input = kernel_tensor(2, 3, "2,4,6,1,3,5");
+    let row_sums = kernel_reduce_sum_axis(input, "rows");
+    let col_sums = kernel_reduce_sum_axis(input, "cols");
+    let row_pick: i64 = kernel_element_at(row_sums, 0, 1);
+    let col_pick: i64 = kernel_element_at(col_sums, 0, 2);
+
+    print(row_pick + col_pick);
+  }
+}

@@ -477,6 +477,7 @@ fn verify_expr(
         | NirExpr::KernelProfileBindCoreRef { .. }
         | NirExpr::KernelProfileQueueDepthRef { .. }
         | NirExpr::KernelProfileBatchLanesRef { .. }
+        | NirExpr::KernelTensor { .. }
         | NirExpr::ShaderTarget { .. }
         | NirExpr::ShaderViewport { .. }
         | NirExpr::ShaderPipeline { .. }
@@ -497,8 +498,30 @@ fn verify_expr(
         | NirExpr::ShaderFrameReady(inner)
         | NirExpr::ShaderValue(inner)
         | NirExpr::KernelConfigReady(inner)
-        | NirExpr::KernelValue(inner) => {
+        | NirExpr::KernelValue(inner)
+        | NirExpr::KernelShape(inner)
+        | NirExpr::KernelRows(inner)
+        | NirExpr::KernelCols(inner)
+        | NirExpr::KernelRow(inner)
+        | NirExpr::KernelCol(inner)
+        | NirExpr::KernelRelu(inner)
+        | NirExpr::KernelReduceSum(inner) => {
             verify_expr(inner, moved, borrows, borrow_bindings, data_bindings)?
+        }
+        NirExpr::KernelReduceMax(inner) | NirExpr::KernelReduceMean(inner) => {
+            verify_expr(inner, moved, borrows, borrow_bindings, data_bindings)?
+        }
+        NirExpr::KernelArgmax(inner) | NirExpr::KernelArgmin(inner) => {
+            verify_expr(inner, moved, borrows, borrow_bindings, data_bindings)?
+        }
+        NirExpr::KernelReduceSumAxis { input, .. } => {
+            verify_expr(input, moved, borrows, borrow_bindings, data_bindings)?
+        }
+        NirExpr::KernelSort(inner) => {
+            verify_expr(inner, moved, borrows, borrow_bindings, data_bindings)?
+        }
+        NirExpr::KernelTopk { input, .. } => {
+            verify_expr(input, moved, borrows, borrow_bindings, data_bindings)?
         }
         NirExpr::CpuSpawn { args, .. } | NirExpr::CpuExternCall { args, .. } => {
             for arg in args {
@@ -584,6 +607,35 @@ fn verify_expr(
         | NirExpr::ShaderResult { value: inner, .. }
         | NirExpr::KernelResult { value: inner, .. } => {
             verify_expr(inner, moved, borrows, borrow_bindings, data_bindings)?
+        }
+        NirExpr::KernelMatmul { lhs, rhs } => {
+            verify_expr(lhs, moved, borrows, borrow_bindings, data_bindings)?;
+            verify_expr(rhs, moved, borrows, borrow_bindings, data_bindings)?;
+        }
+        NirExpr::KernelElementAt { input, row, col } => {
+            verify_expr(input, moved, borrows, borrow_bindings, data_bindings)?;
+            verify_expr(row, moved, borrows, borrow_bindings, data_bindings)?;
+            verify_expr(col, moved, borrows, borrow_bindings, data_bindings)?;
+        }
+        NirExpr::KernelReshape { input, .. } => {
+            verify_expr(input, moved, borrows, borrow_bindings, data_bindings)?;
+        }
+        NirExpr::KernelBroadcast { input, .. } => {
+            verify_expr(input, moved, borrows, borrow_bindings, data_bindings)?;
+        }
+        NirExpr::KernelMap { input, scalar, .. } => {
+            verify_expr(input, moved, borrows, borrow_bindings, data_bindings)?;
+            if let Some(scalar) = scalar {
+                verify_expr(scalar, moved, borrows, borrow_bindings, data_bindings)?;
+            }
+        }
+        NirExpr::KernelZip { lhs, rhs, .. } => {
+            verify_expr(lhs, moved, borrows, borrow_bindings, data_bindings)?;
+            verify_expr(rhs, moved, borrows, borrow_bindings, data_bindings)?;
+        }
+        NirExpr::KernelAddBias { input, bias } => {
+            verify_expr(input, moved, borrows, borrow_bindings, data_bindings)?;
+            verify_expr(bias, moved, borrows, borrow_bindings, data_bindings)?;
         }
         NirExpr::DataFreezeWindow(inner) => {
             verify_expr(inner, moved, borrows, borrow_bindings, data_bindings)?
@@ -738,6 +790,7 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
         | NirExpr::KernelProfileBindCoreRef { .. }
         | NirExpr::KernelProfileQueueDepthRef { .. }
         | NirExpr::KernelProfileBatchLanesRef { .. }
+        | NirExpr::KernelTensor { .. }
         | NirExpr::ShaderTarget { .. }
         | NirExpr::ShaderViewport { .. }
         | NirExpr::ShaderPipeline { .. }
@@ -758,7 +811,23 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
         | NirExpr::ShaderFrameReady(inner)
         | NirExpr::ShaderValue(inner)
         | NirExpr::KernelConfigReady(inner)
-        | NirExpr::KernelValue(inner) => verify_expr_uses(inner, moved)?,
+        | NirExpr::KernelValue(inner)
+        | NirExpr::KernelShape(inner)
+        | NirExpr::KernelRows(inner)
+        | NirExpr::KernelCols(inner)
+        | NirExpr::KernelRow(inner)
+        | NirExpr::KernelCol(inner)
+        | NirExpr::KernelRelu(inner)
+        | NirExpr::KernelReduceSum(inner) => verify_expr_uses(inner, moved)?,
+        NirExpr::KernelReduceMax(inner) | NirExpr::KernelReduceMean(inner) => {
+            verify_expr_uses(inner, moved)?
+        }
+        NirExpr::KernelArgmax(inner) | NirExpr::KernelArgmin(inner) => {
+            verify_expr_uses(inner, moved)?
+        }
+        NirExpr::KernelReduceSumAxis { input, .. } => verify_expr_uses(input, moved)?,
+        NirExpr::KernelSort(inner) => verify_expr_uses(inner, moved)?,
+        NirExpr::KernelTopk { input, .. } => verify_expr_uses(input, moved)?,
         NirExpr::CpuSpawn { args, .. } | NirExpr::CpuExternCall { args, .. } => {
             for arg in args {
                 verify_expr_uses(arg, moved)?;
@@ -816,6 +885,35 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
             if let Some(focus_index) = focus_index {
                 verify_expr_uses(focus_index, moved)?;
             }
+        }
+        NirExpr::KernelMatmul { lhs, rhs } => {
+            verify_expr_uses(lhs, moved)?;
+            verify_expr_uses(rhs, moved)?;
+        }
+        NirExpr::KernelElementAt { input, row, col } => {
+            verify_expr_uses(input, moved)?;
+            verify_expr_uses(row, moved)?;
+            verify_expr_uses(col, moved)?;
+        }
+        NirExpr::KernelReshape { input, .. } => {
+            verify_expr_uses(input, moved)?;
+        }
+        NirExpr::KernelBroadcast { input, .. } => {
+            verify_expr_uses(input, moved)?;
+        }
+        NirExpr::KernelMap { input, scalar, .. } => {
+            verify_expr_uses(input, moved)?;
+            if let Some(scalar) = scalar {
+                verify_expr_uses(scalar, moved)?;
+            }
+        }
+        NirExpr::KernelZip { lhs, rhs, .. } => {
+            verify_expr_uses(lhs, moved)?;
+            verify_expr_uses(rhs, moved)?;
+        }
+        NirExpr::KernelAddBias { input, bias } => {
+            verify_expr_uses(input, moved)?;
+            verify_expr_uses(bias, moved)?;
         }
         NirExpr::ShaderDrawInstanced { pass, packet, .. } => {
             verify_expr_uses(pass, moved)?;

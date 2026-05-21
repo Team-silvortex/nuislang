@@ -1,0 +1,12 @@
+use kernel KernelUnit;
+
+mod cpu Main {
+  fn main() {
+    let lanes: KernelResult<i64> =
+      kernel_result(kernel_profile_batch_lanes("KernelUnit"));
+    let ready: bool = kernel_config_ready(lanes);
+    let value: i64 = kernel_value(lanes);
+
+    print(value);
+  }
+}

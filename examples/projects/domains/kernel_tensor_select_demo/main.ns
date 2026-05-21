@@ -1,0 +1,11 @@
+use kernel KernelUnit;
+
+mod cpu Main {
+  fn main() {
+    let input = kernel_tensor(2, 3, "2,4,6,1,3,5");
+    let hi: i64 = kernel_argmax(input);
+    let lo: i64 = kernel_argmin(input);
+
+    print(hi + lo);
+  }
+}

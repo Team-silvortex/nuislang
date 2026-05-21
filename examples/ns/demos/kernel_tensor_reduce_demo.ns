@@ -1,0 +1,19 @@
+mod cpu Main {
+  fn main() {
+    let input = kernel_tensor(2, 3, "2,4,6,1,3,5");
+    let total: i64 = kernel_reduce_sum(input);
+    let peak: i64 = kernel_reduce_max(input);
+    let avg: i64 = kernel_reduce_mean(input);
+
+    print(total + peak + avg);
+  }
+}
+
+mod kernel KernelUnit {
+  fn profile() {
+    const bind_core: i64 = 2;
+    const queue_depth: i64 = 8;
+    const batch_lanes: i64 = 16;
+    let profile_entry: Unit = kernel_target_config("apple_ane", "coreml", batch_lanes);
+  }
+}

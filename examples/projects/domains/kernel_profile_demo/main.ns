@@ -1,0 +1,10 @@
+use kernel KernelUnit;
+
+mod cpu Main {
+  fn main() {
+    let bind_core: i64 = kernel_profile_bind_core("KernelUnit");
+    let queue_depth: i64 = kernel_profile_queue_depth("KernelUnit");
+    let batch_lanes: i64 = kernel_profile_batch_lanes("KernelUnit");
+    print(bind_core + queue_depth + batch_lanes);
+  }
+}

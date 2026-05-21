@@ -229,6 +229,7 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         | NirExpr::KernelProfileBindCoreRef { .. }
         | NirExpr::KernelProfileQueueDepthRef { .. }
         | NirExpr::KernelProfileBatchLanesRef { .. }
+        | NirExpr::KernelTensor { .. }
         | NirExpr::ShaderTarget { .. }
         | NirExpr::ShaderViewport { .. }
         | NirExpr::ShaderPipeline { .. }
@@ -294,11 +295,56 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         | NirExpr::ShaderValue(inner)
         | NirExpr::KernelConfigReady(inner)
         | NirExpr::KernelValue(inner)
+        | NirExpr::KernelShape(inner)
+        | NirExpr::KernelRows(inner)
+        | NirExpr::KernelCols(inner)
+        | NirExpr::KernelRow(inner)
+        | NirExpr::KernelCol(inner)
+        | NirExpr::KernelRelu(inner)
+        | NirExpr::KernelReduceSum(inner)
+        | NirExpr::KernelReduceMax(inner)
+        | NirExpr::KernelReduceMean(inner)
+        | NirExpr::KernelArgmax(inner)
+        | NirExpr::KernelArgmin(inner)
+        | NirExpr::KernelReduceSumAxis { input: inner, .. }
+        | NirExpr::KernelSort(inner)
         | NirExpr::DataOutputPipe(inner)
         | NirExpr::DataInputPipe(inner)
         | NirExpr::CpuPresentFrame(inner)
         | NirExpr::Free(inner)
         | NirExpr::IsNull(inner) => collect_instantiated_units_expr(inner, units),
+        NirExpr::KernelMatmul { lhs, rhs } => {
+            collect_instantiated_units_expr(lhs, units);
+            collect_instantiated_units_expr(rhs, units);
+        }
+        NirExpr::KernelElementAt { input, row, col } => {
+            collect_instantiated_units_expr(input, units);
+            collect_instantiated_units_expr(row, units);
+            collect_instantiated_units_expr(col, units);
+        }
+        NirExpr::KernelReshape { input, .. } => {
+            collect_instantiated_units_expr(input, units);
+        }
+        NirExpr::KernelBroadcast { input, .. } => {
+            collect_instantiated_units_expr(input, units);
+        }
+        NirExpr::KernelMap { input, scalar, .. } => {
+            collect_instantiated_units_expr(input, units);
+            if let Some(scalar) = scalar {
+                collect_instantiated_units_expr(scalar, units);
+            }
+        }
+        NirExpr::KernelTopk { input, .. } => {
+            collect_instantiated_units_expr(input, units);
+        }
+        NirExpr::KernelZip { lhs, rhs, .. } => {
+            collect_instantiated_units_expr(lhs, units);
+            collect_instantiated_units_expr(rhs, units);
+        }
+        NirExpr::KernelAddBias { input, bias } => {
+            collect_instantiated_units_expr(input, units);
+            collect_instantiated_units_expr(bias, units);
+        }
         NirExpr::CpuSpawn { args, .. } => {
             for arg in args {
                 collect_instantiated_units_expr(arg, units);
