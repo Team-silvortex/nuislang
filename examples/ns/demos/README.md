@@ -12,6 +12,8 @@ stubs:
 * `shader_surface_material_panel_profile_demo.ns`
 * `shader_surface_state_profile_demo.ns`
 * `shader_surface_state_packet_profile_demo.ns`
+* `shader_surface_state_pass_profile_demo.ns`
+* `shader_surface_state_flow_profile_demo.ns`
 * `shader_surface_material_flow_profile_demo.ns`
 * `shader_surface_packet_profile_demo.ns`
 * `shader_surface_pass_profile_demo.ns`
@@ -19,7 +21,9 @@ stubs:
 * `shader_packet_bridge_demo.ns`
 * `shader_pass_profile_demo.ns`
 * `shader_frame_profile_demo.ns`
+* `shader_result_family_profile_demo.ns`
 * `shader_result_profile_demo.ns`
+* `shader_draw_render_profile_demo.ns`
 * `shader_draw_profile_demo.ns`
 * `kernel_profile_demo.ns`
 * `kernel_result_profile_demo.ns`
@@ -52,11 +56,14 @@ Current guidance:
   `shader_surface_material_panel_profile_demo.ns`,
   `shader_surface_state_profile_demo.ns`,
   `shader_surface_state_packet_profile_demo.ns`,
+  `shader_surface_state_pass_profile_demo.ns`,
+  `shader_surface_state_flow_profile_demo.ns`,
   `shader_surface_material_flow_profile_demo.ns`,
   `shader_surface_packet_profile_demo.ns`, `shader_surface_pass_profile_demo.ns`,
   `shader_packet_profile_demo.ns`,
   `shader_packet_bridge_demo.ns`, `shader_pass_profile_demo.ns`,
-  `shader_frame_profile_demo.ns`, `shader_result_profile_demo.ns`,
+  `shader_frame_profile_demo.ns`, `shader_result_family_profile_demo.ns`,
+  `shader_result_profile_demo.ns`, `shader_draw_render_profile_demo.ns`,
   `shader_draw_profile_demo.ns`,
   `kernel_profile_demo.ns`,
   `kernel_result_profile_demo.ns`, `kernel_tensor_profile_demo.ns`, and
@@ -86,6 +93,8 @@ cargo run -p nuis -- check examples/projects/domains/shader_surface_material_pac
 cargo run -p nuis -- check examples/projects/domains/shader_surface_material_panel_profile_demo
 cargo run -p nuis -- check examples/projects/domains/shader_surface_state_profile_demo
 cargo run -p nuis -- check examples/projects/domains/shader_surface_state_packet_profile_demo
+cargo run -p nuis -- check examples/projects/domains/shader_surface_state_pass_profile_demo
+cargo run -p nuis -- check examples/projects/domains/shader_surface_state_flow_profile_demo
 cargo run -p nuis -- check examples/projects/domains/shader_surface_material_flow_profile_demo
 cargo run -p nuis -- check examples/projects/domains/shader_surface_packet_profile_demo
 cargo run -p nuis -- check examples/projects/domains/shader_surface_pass_profile_demo
@@ -93,7 +102,9 @@ cargo run -p nuis -- check examples/projects/domains/shader_packet_profile_demo
 cargo run -p nuis -- check examples/projects/domains/shader_packet_bridge_demo
 cargo run -p nuis -- check examples/projects/domains/shader_pass_profile_demo
 cargo run -p nuis -- check examples/projects/domains/shader_frame_profile_demo
+cargo run -p nuis -- check examples/projects/domains/shader_result_family_profile_demo
 cargo run -p nuis -- check examples/projects/domains/shader_result_profile_demo
+cargo run -p nuis -- check examples/projects/domains/shader_draw_render_profile_demo
 cargo run -p nuis -- check examples/projects/domains/shader_draw_profile_demo
 cargo run -p nuis -- check examples/projects/domains/kernel_profile_demo
 cargo run -p nuis -- check examples/projects/domains/kernel_result_profile_demo

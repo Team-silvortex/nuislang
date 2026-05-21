@@ -4,7 +4,7 @@ use shader SurfaceShader;
 mod cpu Main {
   fn main() {
     cpu_bind_core(0);
-    cpu_window(320, 200, "shader_draw_profile_demo");
+    cpu_window(320, 200, "shader_draw_render_profile_demo");
 
     const base_color: i64 = 104;
     const base_speed: i64 = 16;
@@ -19,6 +19,10 @@ mod cpu Main {
     let color_slot: i64 = shader_profile_packet_color_slot("SurfaceShader");
     let speed_slot: i64 = shader_profile_packet_speed_slot("SurfaceShader");
     let radius_slot: i64 = shader_profile_packet_radius_slot("SurfaceShader");
+    let packet_tag: i64 = shader_profile_packet_tag("SurfaceShader");
+    let material_mode: i64 = shader_profile_material_mode("SurfaceShader");
+    let pass_kind: i64 = shader_profile_pass_kind("SurfaceShader");
+    let packet_field_count: i64 = shader_profile_packet_field_count("SurfaceShader");
 
     let panel_color: i64 =
       shader_profile_color_seed("SurfaceShader", base_color + color_slot, color_delta);
@@ -37,22 +41,43 @@ mod cpu Main {
     data_profile_bind_core("FabricPlane");
     let fabric_handles: HandleTable<FabricPlaneBindings> =
       data_profile_handle_table("FabricPlane");
-    let gpu_packet: Window<SurfaceShaderPacket> =
-      data_profile_send_uplink("FabricPlane", render_controls);
 
     let pass_result: ShaderResult<Pass> =
       shader_result(shader_profile_begin_pass("SurfaceShader"));
     let pass_ready: bool = shader_pass_ready(pass_result);
+
+    let gpu_packet_draw: Window<SurfaceShaderPacket> =
+      data_profile_send_uplink("FabricPlane", render_controls);
     let draw_result: ShaderResult<Frame> = shader_result(
-      shader_profile_draw_instanced("SurfaceShader", shader_value(pass_result), gpu_packet)
+      shader_profile_draw_instanced("SurfaceShader", shader_value(pass_result), gpu_packet_draw)
     );
     let draw_ready: bool = shader_frame_ready(draw_result);
-    print(vertex_budget + instance_budget);
+    let host_draw_preview: Window<Frame> =
+      data_profile_send_downlink("FabricPlane", shader_value(draw_result));
+
+    let gpu_packet_render: Window<SurfaceShaderPacket> =
+      data_profile_send_uplink("FabricPlane", render_controls);
+    let render_result: ShaderResult<Frame> =
+      shader_result(shader_profile_render("SurfaceShader", gpu_packet_render));
+    let render_ready: bool = shader_frame_ready(render_result);
+    let host_frame: Window<Frame> =
+      data_profile_send_downlink("FabricPlane", shader_value(render_result));
+
+    print(
+      vertex_budget
+        + instance_budget
+        + color_slot
+        + speed_slot
+        + radius_slot
+        + packet_tag
+        + material_mode
+        + pass_kind
+        + packet_field_count
+    );
     print(pass_ready);
     print(draw_ready);
+    print(render_ready);
 
-    let host_frame: Window<Frame> =
-      data_profile_send_downlink("FabricPlane", shader_value(draw_result));
     cpu_present_frame(host_frame);
   }
 }

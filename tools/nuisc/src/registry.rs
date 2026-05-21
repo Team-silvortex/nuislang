@@ -402,6 +402,15 @@ fn implied_slots_for_surface(domain_family: &str, surface: &str) -> &'static [&'
             "pass_kind",
             "packet_field_count",
         ],
+        ("shader", "shader.profile.draw.v1") => &[
+            "target",
+            "viewport",
+            "pipeline",
+            "vertex_count",
+            "instance_count",
+            "pass_kind",
+            "packet_field_count",
+        ],
         ("shader", "shader.profile.seed.color.v1") => {
             &["packet_color_slot", "slider_color_slot", "material_mode"]
         }
@@ -610,6 +619,9 @@ fn collect_support_usage_expr(
         }
         NirExpr::ShaderProfileRender { .. } if domain_family == "shader" => {
             surfaces.insert("shader.profile.render.v1".to_owned());
+        }
+        NirExpr::ShaderDrawInstanced { .. } if domain_family == "shader" => {
+            surfaces.insert("shader.profile.draw.v1".to_owned());
         }
         NirExpr::ShaderInlineWgsl { .. } if domain_family == "shader" => {
             surfaces.insert("shader.inline.wgsl.v1".to_owned());

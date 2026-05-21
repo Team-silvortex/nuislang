@@ -70,6 +70,8 @@ The current narrow project-form companions are:
 * [shader_surface_material_panel_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_panel_profile_demo)
 * [shader_surface_state_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_state_profile_demo)
 * [shader_surface_state_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_state_packet_profile_demo)
+* [shader_surface_state_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_state_pass_profile_demo)
+* [shader_surface_state_flow_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_state_flow_profile_demo)
 * [shader_surface_material_flow_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_flow_profile_demo)
 * [shader_surface_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_packet_profile_demo)
 * [shader_surface_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_pass_profile_demo)
@@ -77,7 +79,9 @@ The current narrow project-form companions are:
 * [shader_packet_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_packet_bridge_demo)
 * [shader_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_pass_profile_demo)
 * [shader_frame_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_frame_profile_demo)
+* [shader_result_family_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_result_family_profile_demo)
 * [shader_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_result_profile_demo)
+* [shader_draw_render_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_draw_render_profile_demo)
 * [shader_draw_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_draw_profile_demo)
 * [shader_render_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_render_profile_demo)
 * [kernel_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_profile_demo)
@@ -141,6 +145,15 @@ Current role split:
   that compact scene/material state set is explicitly joined with packet slots,
   packet tag, packet field count, and `shader_profile_packet(...)`, while
   still staying outside the data/render bridge lanes
+* `shader_surface_state_pass_profile_demo` is the next narrow route where that
+  compact scene/material state set is explicitly joined with
+  `shader_profile_begin_pass(...)`, `shader_pass_ready(...)`,
+  `shader_value(pass_result)`, and the smallest checked-in draw consumer,
+  while still staying outside the data/render bridge lanes
+* `shader_surface_state_flow_profile_demo` is the next narrow route where that
+  compact scene/material state set is explicitly joined with packet shaping,
+  `shader_profile_begin_pass(...)`, `shader_pass_ready(...)`, and a checked-in
+  draw consumer, creating a shader-only pre-bridge mini-flow
 * `shader_surface_material_flow_profile_demo` is the next narrow route where
   those surface-facing and material-facing seed helpers are explicitly joined
   with packet shaping, `shader_profile_begin_pass(...)`,
@@ -159,28 +172,34 @@ Current role split:
   mode, and pass kind are read together with `shader_profile_packet(...)`
 * `shader_packet_bridge_demo` is the next narrow route where packet-contract
   shaping is explicitly joined with `data_profile_send_uplink(...)` and
-  `data_profile_send_downlink(...)`, while still keeping a minimal
-  `shader_profile_begin_pass(...)` / `shader_profile_render(...)` compatibility
-  path visible for the current project link contract
+  `data_profile_send_downlink(...)`, while keeping a minimal
+  `shader_profile_begin_pass(...)` / `shader_profile_render(...)` bridge path
+  visible
 * `shader_pass_profile_demo` is the next narrow route where
   `shader_profile_begin_pass(...)`, `shader_pass_ready(...)`, and
   `shader_value(...)` are the main focus, with `shader_profile_draw_instanced(...)`
-  kept as the smallest checked-in consumer of the pass value and
-  `shader_profile_render(...)` retained for current project-link compatibility
+  kept as the smallest checked-in consumer of the pass value
 * `shader_frame_profile_demo` is the next narrow route where
   `shader_result(shader_profile_render(...))`, `shader_frame_ready(...)`, and
   `shader_value(frame_result)` are the main focus, while packet shaping stays
   explicit and the downlink/present bridge remains visible
+* `shader_result_family_profile_demo` is the next narrow route where
+  `shader_result(shader_profile_begin_pass(...))`,
+  `shader_result(shader_profile_draw_instanced(...))`, and
+  `shader_result(shader_profile_render(...))` are made visible together with
+  their readiness observers and a minimal checked-in draw/frame downlink split
 * `shader_result_profile_demo` is the next narrow route where shader profile
   metadata is explicitly joined with packet-slot inspection,
   `shader_profile_begin_pass(...)`, `shader_profile_draw_instanced(...)`, and
   `shader_result(...)` observers such as `shader_pass_ready(...)`,
   `shader_frame_ready(...)`, and `shader_value(...)`
+* `shader_draw_render_profile_demo` is the next narrow route where
+  `shader_profile_draw_instanced(...)` and `shader_profile_render(...)` are
+  kept as explicit parallel lanes with separate uplink/downlink edges and
+  separate readiness observers
 * `shader_draw_profile_demo` is the next narrow route where the checked-in
   project lane visibly crosses the explicit draw bridge:
-  `packet -> begin_pass -> draw_instanced -> downlink -> present`,
-  while still keeping `shader_profile_render(...)` present to satisfy the
-  current project link contract
+  `packet -> begin_pass -> draw_instanced -> downlink -> present`
 * `shader_render_profile_demo` is the next narrow route where shader profile
   metadata is already joined with explicit `data` uplink/downlink and
   `shader_profile_render(...)`
@@ -259,6 +278,8 @@ The shader ladder is now easier to read as three local branches after
   [shader_surface_material_panel_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_panel_profile_demo) ->
   [shader_surface_state_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_state_profile_demo) ->
   [shader_surface_state_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_state_packet_profile_demo) ->
+  [shader_surface_state_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_state_pass_profile_demo) ->
+  [shader_surface_state_flow_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_state_flow_profile_demo) ->
   [shader_surface_material_flow_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_flow_profile_demo) ->
   [shader_surface_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_packet_profile_demo) ->
   [shader_surface_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_pass_profile_demo)
@@ -268,16 +289,22 @@ The shader ladder is now easier to read as three local branches after
 * bridge branch:
   [shader_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_pass_profile_demo) ->
   [shader_frame_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_frame_profile_demo) ->
+  [shader_result_family_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_result_family_profile_demo) ->
   [shader_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_result_profile_demo) ->
+  [shader_draw_render_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_draw_render_profile_demo) ->
   [shader_draw_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_draw_profile_demo) ->
   [shader_render_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_render_profile_demo)
 
 Recommended reading order inside shader is now:
 
 * start with `shader_profile_demo`
-* read the surface branch
-* then the packet branch
-* then the bridge branch
+* read the surface branch as:
+  metadata -> material seeds -> state set -> state+packet / state+pass ->
+  state mini-flow
+* then read the packet branch as:
+  packet contract -> packet bridge
+* then read the bridge branch as:
+  pass -> frame -> result family -> draw/render split -> wider draw/render
 * only then move to [window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo)
 
 ## Current Axis-Aware Kernel Lane

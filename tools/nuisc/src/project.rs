@@ -826,16 +826,28 @@ pub fn validate_project_links_against_nir(
                     link.from, link.to, to_unit
                 ));
             }
-            require_declared_support_surface(
-                &shader_support,
-                "shader",
-                &to_unit,
-                "shader.profile.render.v1",
-            )?;
-            if !nir_uses_shader_profile_render(module, &to_unit) {
+            let uses_shader_render = nir_uses_shader_profile_render(module, &to_unit);
+            let uses_shader_draw = nir_uses_shader_profile_draw_instanced(module, &to_unit);
+            if uses_shader_render {
+                require_declared_support_surface(
+                    &shader_support,
+                    "shader",
+                    &to_unit,
+                    "shader.profile.render.v1",
+                )?;
+            }
+            if uses_shader_draw {
+                require_declared_support_surface(
+                    &shader_support,
+                    "shader",
+                    &to_unit,
+                    "shader.profile.draw.v1",
+                )?;
+            }
+            if !uses_shader_render && !uses_shader_draw {
                 return Err(format!(
-                    "project link `{}` -> `{}` requires CPU entry to use shader_profile_render(\"{}\") at NIR level",
-                    link.from, link.to, to_unit
+                    "project link `{}` -> `{}` requires CPU entry to use shader_profile_render(\"{}\", ...) or shader_profile_draw_instanced(\"{}\", ...) at NIR level",
+                    link.from, link.to, to_unit, to_unit
                 ));
             }
             require_declared_support_surface(
@@ -1104,6 +1116,15 @@ fn nir_uses_shader_profile_render(module: &NirModule, unit: &str) -> bool {
     })
 }
 
+fn nir_uses_shader_profile_draw_instanced(module: &NirModule, unit: &str) -> bool {
+    module.functions.iter().any(|function| {
+        function
+            .body
+            .iter()
+            .any(|stmt| stmt_uses_shader_profile_draw_instanced(stmt, unit))
+    })
+}
+
 fn nir_uses_shader_profile_packet(module: &NirModule, unit: &str) -> bool {
     module.functions.iter().any(|function| {
         function
@@ -1226,6 +1247,32 @@ fn stmt_uses_shader_profile_render(stmt: &NirStmt, unit: &str) -> bool {
         NirStmt::Return(value) => value
             .as_ref()
             .is_some_and(|value| expr_uses_shader_profile_render(value, unit)),
+    }
+}
+
+fn stmt_uses_shader_profile_draw_instanced(stmt: &NirStmt, unit: &str) -> bool {
+    match stmt {
+        NirStmt::Let { value, .. }
+        | NirStmt::Const { value, .. }
+        | NirStmt::Print(value)
+        | NirStmt::Await(value)
+        | NirStmt::Expr(value) => expr_uses_shader_profile_draw_instanced(value, unit),
+        NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            expr_uses_shader_profile_draw_instanced(condition, unit)
+                || then_body
+                    .iter()
+                    .any(|stmt| stmt_uses_shader_profile_draw_instanced(stmt, unit))
+                || else_body
+                    .iter()
+                    .any(|stmt| stmt_uses_shader_profile_draw_instanced(stmt, unit))
+        }
+        NirStmt::Return(value) => value
+            .as_ref()
+            .is_some_and(|value| expr_uses_shader_profile_draw_instanced(value, unit)),
     }
 }
 
@@ -1647,6 +1694,14 @@ fn expr_uses_shader_profile_render(expr: &NirExpr, unit: &str) -> bool {
     }
 }
 
+fn expr_uses_shader_profile_draw_instanced(expr: &NirExpr, unit: &str) -> bool {
+    match expr {
+        NirExpr::ShaderDrawInstanced { .. } => true,
+        _ => expr_walk_any(expr, &|inner| {
+            expr_uses_shader_profile_draw_instanced(inner, unit)
+        }),
+    }
+}
 fn expr_uses_shader_profile_packet(expr: &NirExpr, unit: &str) -> bool {
     match expr {
         NirExpr::ShaderProfilePacket {
@@ -5457,6 +5512,103 @@ mod tests {
 
         let error = validate_kernel_profile_slot_contract(&project, "KernelUnit").unwrap_err();
         assert!(error.contains("kernel_target_config(..., batch_lanes)"));
+    }
+
+    #[test]
+    fn project_link_accepts_draw_only_shader_bridge_at_nir_level() {
+        let project = project_with_modules(vec![
+            (
+                "main.ns",
+                r#"
+                use data FabricPlane;
+                use shader SurfaceShader;
+
+                mod cpu Main {
+                  fn main() {
+                    let color: i64 = shader_profile_color_seed("SurfaceShader", 10, 0);
+                    let speed: i64 = shader_profile_speed_seed("SurfaceShader", 0, 1, 20);
+                    let radius: i64 = shader_profile_radius_seed("SurfaceShader", 30, 0);
+                    let packet: SurfaceShaderPacket =
+                      shader_profile_packet("SurfaceShader", color, speed, radius);
+                    data_profile_bind_core("FabricPlane");
+                    let handles: HandleTable<FabricPlaneBindings> =
+                      data_profile_handle_table("FabricPlane");
+                    let gpu_packet: Window<SurfaceShaderPacket> =
+                      data_profile_send_uplink("FabricPlane", packet);
+                    let pass_result: ShaderResult<Pass> =
+                      shader_result(shader_profile_begin_pass("SurfaceShader"));
+                    let draw_result: ShaderResult<Frame> = shader_result(
+                      shader_profile_draw_instanced(
+                        "SurfaceShader",
+                        shader_value(pass_result),
+                        gpu_packet
+                      )
+                    );
+                    let host_frame: Window<Frame> =
+                      data_profile_send_downlink("FabricPlane", shader_value(draw_result));
+                    cpu_present_frame(host_frame);
+                  }
+                }
+                "#,
+            ),
+            (
+                "surface_shader.ns",
+                r#"
+                mod shader SurfaceShader {
+                  fn profile() {
+                    const vertex_count: i64 = 4;
+                    const instance_count: i64 = 1;
+                    const packet_color_slot: i64 = 0;
+                    const packet_speed_slot: i64 = 1;
+                    const packet_radius_slot: i64 = 2;
+                    const packet_tag: i64 = 17;
+                    const material_mode: i64 = 2;
+                    const pass_kind: i64 = 1;
+                    const packet_field_count: i64 = 3;
+                    let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
+                    let profile_view: Viewport = shader_viewport(160, 120);
+                    let profile_pipe: Pipeline = shader_pipeline("lit_sphere", "triangle_strip");
+                    let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", "stub");
+                  }
+                }
+                "#,
+            ),
+            (
+                "fabric_plane.ns",
+                r#"
+                mod data FabricPlane {
+                  fn profile() {
+                    const bind_core: i64 = 0;
+                    const handle_table: i64 = 1;
+                    const window_offset: i64 = 0;
+                    const uplink_len: i64 = 1;
+                    const downlink_len: i64 = 1;
+                    let cpu_to_shader: Marker<CpuToShader> = data_marker("cpu_to_shader");
+                    let shader_to_cpu: Marker<ShaderToCpu> = data_marker("shader_to_cpu");
+                    let uplink_pipe: Marker<UplinkPipe> = data_marker("uplink_pipe");
+                    let downlink_pipe: Marker<DownlinkPipe> = data_marker("downlink_pipe");
+                    let uplink_pipe_class: Marker<UplinkPipeClass> = data_marker("uplink_pipe_class");
+                    let downlink_pipe_class: Marker<DownlinkPipeClass> = data_marker("downlink_pipe_class");
+                    let uplink_payload_class: Marker<PayloadClassWindow> = data_marker("uplink_payload_class");
+                    let downlink_payload_class: Marker<PayloadClassWindow> = data_marker("downlink_payload_class");
+                    let uplink_payload_shape: Marker<PayloadShapeWindowSurfaceShaderPacket> = data_marker("uplink_payload_shape");
+                    let downlink_payload_shape: Marker<PayloadShapeWindowFrame> = data_marker("downlink_payload_shape");
+                    let uplink_window_policy: Marker<UplinkWindowPolicy> = data_marker("uplink_window_policy");
+                    let downlink_window_policy: Marker<DownlinkWindowPolicy> = data_marker("downlink_window_policy");
+                  }
+                }
+                "#,
+            ),
+        ]);
+        let mut project = project;
+        project.manifest.links = vec![ProjectLink {
+            from: "cpu.Main".to_owned(),
+            to: "shader.SurfaceShader".to_owned(),
+            via: Some("data.FabricPlane".to_owned()),
+        }];
+
+        let nir = crate::frontend::lower_ast_to_nir(&project.modules[0].ast).unwrap();
+        validate_project_links_against_nir(&project, &nir).unwrap();
     }
 
     #[test]

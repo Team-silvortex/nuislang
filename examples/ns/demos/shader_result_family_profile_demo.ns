@@ -1,0 +1,157 @@
+use data FabricPlane;
+use shader SurfaceShader;
+
+mod cpu Main {
+  fn main() {
+    cpu_bind_core(0);
+    cpu_window(320, 200, "shader_result_family_profile_demo");
+
+    const base_color: i64 = 104;
+    const base_speed: i64 = 16;
+    const base_radius: i64 = 72;
+    const speed_scale: i64 = 2;
+    const color_delta: i64 = 0;
+    const speed_delta: i64 = 0;
+    const radius_delta: i64 = 0;
+
+    let color_slot: i64 = shader_profile_packet_color_slot("SurfaceShader");
+    let speed_slot: i64 = shader_profile_packet_speed_slot("SurfaceShader");
+    let radius_slot: i64 = shader_profile_packet_radius_slot("SurfaceShader");
+    let packet_tag: i64 = shader_profile_packet_tag("SurfaceShader");
+    let material_mode: i64 = shader_profile_material_mode("SurfaceShader");
+    let pass_kind: i64 = shader_profile_pass_kind("SurfaceShader");
+    let packet_field_count: i64 = shader_profile_packet_field_count("SurfaceShader");
+
+    let panel_color: i64 =
+      shader_profile_color_seed("SurfaceShader", base_color + color_slot, color_delta);
+    let panel_speed: i64 = shader_profile_speed_seed(
+      "SurfaceShader",
+      speed_delta + speed_slot,
+      speed_scale,
+      base_speed
+    );
+    let panel_radius: i64 =
+      shader_profile_radius_seed("SurfaceShader", base_radius + radius_slot, radius_delta);
+
+    let render_controls: SurfaceShaderPacket =
+      shader_profile_packet("SurfaceShader", panel_color, panel_speed, panel_radius);
+
+    data_profile_bind_core("FabricPlane");
+    let fabric_handles: HandleTable<FabricPlaneBindings> =
+      data_profile_handle_table("FabricPlane");
+
+    let pass_result: ShaderResult<Pass> =
+      shader_result(shader_profile_begin_pass("SurfaceShader"));
+    let pass_ready: bool = shader_pass_ready(pass_result);
+
+    let gpu_packet_draw: Window<SurfaceShaderPacket> =
+      data_profile_send_uplink("FabricPlane", render_controls);
+    let draw_result: ShaderResult<Frame> = shader_result(
+      shader_profile_draw_instanced("SurfaceShader", shader_value(pass_result), gpu_packet_draw)
+    );
+    let draw_ready: bool = shader_frame_ready(draw_result);
+    let host_draw_preview: Window<Frame> =
+      data_profile_send_downlink("FabricPlane", shader_value(draw_result));
+
+    let gpu_packet_render: Window<SurfaceShaderPacket> =
+      data_profile_send_uplink("FabricPlane", render_controls);
+    let frame_result: ShaderResult<Frame> =
+      shader_result(shader_profile_render("SurfaceShader", gpu_packet_render));
+    let frame_ready: bool = shader_frame_ready(frame_result);
+    let host_frame: Window<Frame> =
+      data_profile_send_downlink("FabricPlane", shader_value(frame_result));
+
+    print(
+      color_slot
+        + speed_slot
+        + radius_slot
+        + packet_tag
+        + material_mode
+        + pass_kind
+        + packet_field_count
+    );
+    print(pass_ready);
+    print(draw_ready);
+    print(frame_ready);
+
+    cpu_present_frame(host_frame);
+  }
+}
+
+mod data FabricPlane {
+  fn profile() {
+    const window_offset: i64 = 0;
+    const uplink_len: i64 = 1;
+    const downlink_len: i64 = 1;
+
+    data_bind_core(1);
+    let profile_handles: HandleTable<FabricPlaneBindings> =
+      data_handle_table("host=cpu0", "render=shader0");
+    let cpu_to_shader: Marker<CpuToShader> = data_marker("cpu_to_shader");
+    let shader_to_cpu: Marker<ShaderToCpu> = data_marker("shader_to_cpu");
+    let uplink_pipe: Marker<UplinkPipe> = data_marker("uplink_pipe");
+    let downlink_pipe: Marker<DownlinkPipe> = data_marker("downlink_pipe");
+    let uplink_pipe_class: Marker<UplinkPipeClass> = data_marker("uplink_pipe_class");
+    let downlink_pipe_class: Marker<DownlinkPipeClass> = data_marker("downlink_pipe_class");
+    let uplink_payload_class: Marker<PayloadClassWindow> = data_marker("uplink_payload_class");
+    let downlink_payload_class: Marker<PayloadClassWindow> =
+      data_marker("downlink_payload_class");
+    let uplink_payload_shape: Marker<PayloadShapeWindowSurfaceShaderPacket> =
+      data_marker("uplink_payload_shape");
+    let downlink_payload_shape: Marker<PayloadShapeWindowFrame> =
+      data_marker("downlink_payload_shape");
+    let uplink_window_policy: Marker<UplinkWindowPolicy> = data_marker("uplink_window_policy");
+    let downlink_window_policy: Marker<DownlinkWindowPolicy> =
+      data_marker("downlink_window_policy");
+    let uplink_window_mut: WindowMut<i64> =
+      data_copy_window(window_offset, window_offset, uplink_len);
+    let uplink_window: Window<i64> = data_freeze_window(uplink_window_mut);
+    let downlink_window_mut: WindowMut<i64> =
+      data_copy_window(window_offset, window_offset, downlink_len);
+    let downlink_window: Window<i64> = data_freeze_window(downlink_window_mut);
+  }
+}
+
+mod shader SurfaceShader {
+  fn profile() {
+    const vertex_count: i64 = 4;
+    const instance_count: i64 = 1;
+    const packet_color_slot: i64 = 0;
+    const packet_speed_slot: i64 = 1;
+    const packet_radius_slot: i64 = 2;
+    const packet_tag: i64 = 17;
+    const material_mode: i64 = 2;
+    const pass_kind: i64 = 1;
+    const packet_field_count: i64 = 3;
+
+    let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
+    let profile_view: Viewport = shader_viewport(160, 120);
+    let profile_pipe: Pipeline =
+      shader_pipeline("std_shader_result_family_profile", "triangle_strip");
+    let profile_wgsl: ShaderModule = shader_inline_wgsl(
+      "std_shader_result_family_profile",
+      wgsl {
+        struct VsOut {
+          @builtin(position) pos: vec4<f32>,
+          @location(0) uv: vec2<f32>,
+        };
+
+        @vertex
+        fn vs_main(@builtin(vertex_index) vid: u32) -> VsOut {
+          var out: VsOut;
+          let x: f32 = f32((vid << 1u) & 2u);
+          let y: f32 = f32(vid & 2u);
+          out.pos = vec4<f32>(x * 2.0 - 1.0, y * -2.0 + 1.0, 0.0, 1.0);
+          out.uv = vec2<f32>(x, y);
+          return out;
+        }
+
+        @fragment
+        fn fs_main(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
+          let color = vec3<f32>(0.28 + uv.x * 0.22, 0.24 + uv.y * 0.30, 0.84);
+          return vec4<f32>(color, 1.0);
+        }
+      }
+    );
+  }
+}
