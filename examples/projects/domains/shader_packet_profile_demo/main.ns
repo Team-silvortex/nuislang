@@ -1,0 +1,45 @@
+use shader SurfaceShader;
+
+mod cpu Main {
+  fn main() {
+    const base_color: i64 = 104;
+    const base_speed: i64 = 16;
+    const base_radius: i64 = 72;
+    const speed_scale: i64 = 2;
+    const color_delta: i64 = 0;
+    const speed_delta: i64 = 0;
+    const radius_delta: i64 = 0;
+
+    let color_slot: i64 = shader_profile_packet_color_slot("SurfaceShader");
+    let speed_slot: i64 = shader_profile_packet_speed_slot("SurfaceShader");
+    let radius_slot: i64 = shader_profile_packet_radius_slot("SurfaceShader");
+    let packet_tag: i64 = shader_profile_packet_tag("SurfaceShader");
+    let material_mode: i64 = shader_profile_material_mode("SurfaceShader");
+    let pass_kind: i64 = shader_profile_pass_kind("SurfaceShader");
+    let packet_field_count: i64 = shader_profile_packet_field_count("SurfaceShader");
+
+    let panel_color: i64 =
+      shader_profile_color_seed("SurfaceShader", base_color + color_slot, color_delta);
+    let panel_speed: i64 = shader_profile_speed_seed(
+      "SurfaceShader",
+      speed_delta + speed_slot,
+      speed_scale,
+      base_speed
+    );
+    let panel_radius: i64 =
+      shader_profile_radius_seed("SurfaceShader", base_radius + radius_slot, radius_delta);
+
+    let render_controls: SurfaceShaderPacket =
+      shader_profile_packet("SurfaceShader", panel_color, panel_speed, panel_radius);
+
+    print(
+      color_slot
+        + speed_slot
+        + radius_slot
+        + packet_tag
+        + material_mode
+        + pass_kind
+        + packet_field_count
+    );
+  }
+}

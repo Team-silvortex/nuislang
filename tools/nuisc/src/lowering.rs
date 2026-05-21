@@ -4639,23 +4639,14 @@ fn ensure_kernel_resource(yir: &mut YirModule) {
 }
 
 fn push_dep_edges(state: &mut LoweringState<'_>, from: &str, to: &str) {
-    let from_resource = state
-        .yir
-        .nodes
-        .iter()
-        .find(|node| node.name == from)
-        .map(|node| node.resource.as_str());
-    let to_resource = state
-        .yir
-        .nodes
-        .iter()
-        .find(|node| node.name == to)
-        .map(|node| node.resource.as_str());
-    if let (Some(from_resource), Some(to_resource)) = (from_resource, to_resource) {
-        if from_resource != to_resource {
-            push_xfer_edge(state, from, to);
-            return;
-        }
+    let from_node = state.yir.nodes.iter().find(|node| node.name == from);
+    let to_node = state.yir.nodes.iter().find(|node| node.name == to);
+    let (Some(from_node), Some(to_node)) = (from_node, to_node) else {
+        return;
+    };
+    if from_node.resource != to_node.resource {
+        push_xfer_edge(state, from, to);
+        return;
     }
     push_unique_edge(state, EdgeKind::Dep, from, to);
 }

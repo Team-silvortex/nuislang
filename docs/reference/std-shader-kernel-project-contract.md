@@ -63,6 +63,18 @@ That means the most honest checked-in route today is:
 The current narrow project-form companions are:
 
 * [shader_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_profile_demo)
+* [shader_surface_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_profile_demo)
+* [shader_surface_material_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_profile_demo)
+* [shader_surface_material_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_pass_profile_demo)
+* [shader_surface_material_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_packet_profile_demo)
+* [shader_surface_material_panel_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_panel_profile_demo)
+* [shader_surface_material_flow_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_flow_profile_demo)
+* [shader_surface_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_packet_profile_demo)
+* [shader_surface_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_pass_profile_demo)
+* [shader_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_packet_profile_demo)
+* [shader_packet_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_packet_bridge_demo)
+* [shader_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_pass_profile_demo)
+* [shader_frame_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_frame_profile_demo)
 * [shader_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_result_profile_demo)
 * [shader_draw_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_draw_profile_demo)
 * [shader_render_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_render_profile_demo)
@@ -91,6 +103,60 @@ Current role split:
 
 * `shader_profile_demo` is the narrow checked-in route for shader profile
   metadata such as target, viewport, pipeline, packet shape, and inline WGSL
+* `shader_surface_profile_demo` is the next narrow route where surface-facing
+  metadata such as target, viewport, pipeline, vertex count, instance count,
+  material mode, and pass kind are read together without pulling in packet
+  shaping or data/render bridge concerns
+* `shader_surface_material_profile_demo` is the next narrow route where that
+  same surface-facing metadata is explicitly joined with material-facing seed
+  helpers such as `shader_profile_color_seed(...)`,
+  `shader_profile_speed_seed(...)`, and `shader_profile_radius_seed(...)`,
+  while still staying outside packet shaping and data/render bridge concerns
+* `shader_surface_material_pass_profile_demo` is the next narrow route where
+  those surface-facing and material-facing seed helpers are explicitly joined
+  with `shader_profile_begin_pass(...)`, `shader_pass_ready(...)`, and the
+  smallest checked-in `shader_value(pass_result)` consumer, while still
+  staying outside the data/render bridge lanes
+* `shader_surface_material_packet_profile_demo` is the next narrow route where
+  those surface-facing and material-facing seed helpers are explicitly joined
+  with packet slots, packet tag, packet field count, and
+  `shader_profile_packet(...)`, while still staying outside the
+  data/render bridge lanes
+* `shader_surface_material_panel_profile_demo` is the next narrow route where
+  those surface-facing and material-facing seed helpers are explicitly joined
+  with `shader_profile_panel_packet(...)` and the richer `NovaPanelPacket`
+  payload fields such as accent, toggle state, and focus index, while still
+  staying outside the data/render bridge lanes
+* `shader_surface_material_flow_profile_demo` is the next narrow route where
+  those surface-facing and material-facing seed helpers are explicitly joined
+  with packet shaping, `shader_profile_begin_pass(...)`,
+  `shader_pass_ready(...)`, and the smallest checked-in draw consumer, while
+  still staying outside the data/render bridge lanes
+* `shader_surface_packet_profile_demo` is the next narrow route where
+  surface-facing metadata is explicitly joined with packet slots and
+  `shader_profile_packet(...)`, while still staying outside the
+  data/render bridge lanes
+* `shader_surface_pass_profile_demo` is the next narrow route where
+  surface-facing metadata is explicitly joined with
+  `shader_profile_begin_pass(...)`, `shader_pass_ready(...)`, and the smallest
+  checked-in `shader_value(pass_result)` consumer
+* `shader_packet_profile_demo` is the next narrow route where packet-contract
+  metadata such as packet slots, packet field count, packet tag, material
+  mode, and pass kind are read together with `shader_profile_packet(...)`
+* `shader_packet_bridge_demo` is the next narrow route where packet-contract
+  shaping is explicitly joined with `data_profile_send_uplink(...)` and
+  `data_profile_send_downlink(...)`, while still keeping a minimal
+  `shader_profile_begin_pass(...)` / `shader_profile_render(...)` compatibility
+  path visible for the current project link contract
+* `shader_pass_profile_demo` is the next narrow route where
+  `shader_profile_begin_pass(...)`, `shader_pass_ready(...)`, and
+  `shader_value(...)` are the main focus, with `shader_profile_draw_instanced(...)`
+  kept as the smallest checked-in consumer of the pass value and
+  `shader_profile_render(...)` retained for current project-link compatibility
+* `shader_frame_profile_demo` is the next narrow route where
+  `shader_result(shader_profile_render(...))`, `shader_frame_ready(...)`, and
+  `shader_value(frame_result)` are the main focus, while packet shaping stays
+  explicit and the downlink/present bridge remains visible
 * `shader_result_profile_demo` is the next narrow route where shader profile
   metadata is explicitly joined with packet-slot inspection,
   `shader_profile_begin_pass(...)`, `shader_profile_draw_instanced(...)`, and
@@ -166,6 +232,38 @@ Current role split:
 
 These are intentionally narrower than the showcase projects.
 
+## Current Shader Branches
+
+The shader ladder is now easier to read as three local branches after
+[shader_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_profile_demo):
+
+* surface branch:
+  [shader_surface_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_profile_demo) ->
+  [shader_surface_material_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_profile_demo) ->
+  [shader_surface_material_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_pass_profile_demo) ->
+  [shader_surface_material_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_packet_profile_demo) ->
+  [shader_surface_material_panel_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_panel_profile_demo) ->
+  [shader_surface_material_flow_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_flow_profile_demo) ->
+  [shader_surface_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_packet_profile_demo) ->
+  [shader_surface_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_pass_profile_demo)
+* packet branch:
+  [shader_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_packet_profile_demo) ->
+  [shader_packet_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_packet_bridge_demo)
+* bridge branch:
+  [shader_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_pass_profile_demo) ->
+  [shader_frame_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_frame_profile_demo) ->
+  [shader_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_result_profile_demo) ->
+  [shader_draw_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_draw_profile_demo) ->
+  [shader_render_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_render_profile_demo)
+
+Recommended reading order inside shader is now:
+
+* start with `shader_profile_demo`
+* read the surface branch
+* then the packet branch
+* then the bridge branch
+* only then move to [window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo)
+
 ## Current Axis-Aware Kernel Lane
 
 The current axis-aware tensor lane is now explicit enough to read as its own
@@ -214,6 +312,18 @@ That keeps the growth shape aligned with the existing non-axis ladder:
 The repository still keeps source-shaped mirrors for these lanes:
 
 * [shader_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_profile_demo.ns)
+* [shader_surface_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_surface_profile_demo.ns)
+* [shader_surface_material_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_surface_material_profile_demo.ns)
+* [shader_surface_material_pass_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_surface_material_pass_profile_demo.ns)
+* [shader_surface_material_packet_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_surface_material_packet_profile_demo.ns)
+* [shader_surface_material_panel_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_surface_material_panel_profile_demo.ns)
+* [shader_surface_material_flow_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_surface_material_flow_profile_demo.ns)
+* [shader_surface_packet_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_surface_packet_profile_demo.ns)
+* [shader_surface_pass_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_surface_pass_profile_demo.ns)
+* [shader_packet_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_packet_profile_demo.ns)
+* [shader_packet_bridge_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_packet_bridge_demo.ns)
+* [shader_pass_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_pass_profile_demo.ns)
+* [shader_frame_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_frame_profile_demo.ns)
 * [shader_result_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_result_profile_demo.ns)
 * [shader_draw_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_draw_profile_demo.ns)
 * [kernel_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_profile_demo.ns)
@@ -289,11 +399,11 @@ Concretely:
   ->
   [shader_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_profile_demo)
   ->
-  [shader_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_result_profile_demo)
+  surface branch
   ->
-  [shader_draw_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_draw_profile_demo)
+  packet branch
   ->
-  [shader_render_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_render_profile_demo)
+  bridge branch
   ->
   [window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo)
 * kernel:
@@ -342,6 +452,30 @@ If you are reading `shader` or `kernel` today:
   for current domain semantics
 * use [shader_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_profile_demo)
   and
+  [shader_surface_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_profile_demo)
+  and
+  [shader_surface_material_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_profile_demo)
+  and
+  [shader_surface_material_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_pass_profile_demo)
+  and
+  [shader_surface_material_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_packet_profile_demo)
+  and
+  [shader_surface_material_panel_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_panel_profile_demo)
+  and
+  [shader_surface_material_flow_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_flow_profile_demo)
+  and
+  [shader_surface_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_packet_profile_demo)
+  and
+  [shader_surface_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_pass_profile_demo)
+  and
+  [shader_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_packet_profile_demo)
+  and
+  [shader_packet_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_packet_bridge_demo)
+  and
+  [shader_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_pass_profile_demo)
+  and
+  [shader_frame_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_frame_profile_demo)
+  and
   [shader_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_result_profile_demo)
   and
   [shader_draw_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_draw_profile_demo)
@@ -368,6 +502,18 @@ If you are reading `shader` or `kernel` today:
 * [window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo)
 * [kernel_tensor_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/kernel_tensor_demo)
 * [shader_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_profile_demo)
+* [shader_surface_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_profile_demo)
+* [shader_surface_material_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_profile_demo)
+* [shader_surface_material_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_pass_profile_demo)
+* [shader_surface_material_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_packet_profile_demo)
+* [shader_surface_material_panel_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_panel_profile_demo)
+* [shader_surface_material_flow_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_flow_profile_demo)
+* [shader_surface_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_packet_profile_demo)
+* [shader_surface_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_pass_profile_demo)
+* [shader_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_packet_profile_demo)
+* [shader_packet_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_packet_bridge_demo)
+* [shader_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_pass_profile_demo)
+* [shader_frame_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_frame_profile_demo)
 * [shader_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_result_profile_demo)
 * [shader_render_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_render_profile_demo)
 * [kernel_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_profile_demo)

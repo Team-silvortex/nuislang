@@ -1,0 +1,8 @@
+name = "shader_surface_pass_profile_demo"
+version = "0.1.0"
+entry = "main.ns"
+modules = ["main.ns", "surface_shader.ns"]
+abi = [
+  "cpu=cpu.arm64.apple_aapcs64",
+  "shader=shader.metal.msl2_4",
+]

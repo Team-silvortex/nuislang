@@ -1,0 +1,91 @@
+use shader SurfaceShader;
+
+mod cpu Main {
+  fn main() {
+    const base_color: i64 = 104;
+    const base_speed: i64 = 16;
+    const base_radius: i64 = 72;
+    const speed_scale: i64 = 2;
+    const color_delta: i64 = 0;
+    const speed_delta: i64 = 0;
+    const radius_delta: i64 = 0;
+
+    let vertex_budget: i64 = shader_profile_vertex_count("SurfaceShader");
+    let instance_budget: i64 = shader_profile_instance_count("SurfaceShader");
+    let material_mode: i64 = shader_profile_material_mode("SurfaceShader");
+    let pass_kind: i64 = shader_profile_pass_kind("SurfaceShader");
+    let swapchain: Target = shader_profile_target("SurfaceShader");
+    let main_view: Viewport = shader_profile_viewport("SurfaceShader");
+    let lit_pipe: Pipeline = shader_profile_pipeline("SurfaceShader");
+
+    let color_slot: i64 = shader_profile_packet_color_slot("SurfaceShader");
+    let speed_slot: i64 = shader_profile_packet_speed_slot("SurfaceShader");
+    let radius_slot: i64 = shader_profile_packet_radius_slot("SurfaceShader");
+    let packet_tag: i64 = shader_profile_packet_tag("SurfaceShader");
+    let packet_field_count: i64 = shader_profile_packet_field_count("SurfaceShader");
+
+    let panel_color: i64 =
+      shader_profile_color_seed("SurfaceShader", base_color + color_slot, color_delta);
+    let panel_speed: i64 = shader_profile_speed_seed(
+      "SurfaceShader",
+      speed_delta + speed_slot,
+      speed_scale,
+      base_speed
+    );
+    let panel_radius: i64 =
+      shader_profile_radius_seed("SurfaceShader", base_radius + radius_slot, radius_delta);
+
+    let render_controls: SurfaceShaderPacket =
+      shader_profile_packet("SurfaceShader", panel_color, panel_speed, panel_radius);
+
+    print(
+      vertex_budget
+        + instance_budget
+        + material_mode
+        + pass_kind
+        + color_slot
+        + speed_slot
+        + radius_slot
+        + packet_tag
+        + packet_field_count
+    );
+  }
+}
+
+mod shader SurfaceShader {
+  fn profile() {
+    const vertex_count: i64 = 4;
+    const instance_count: i64 = 1;
+    const packet_color_slot: i64 = 0;
+    const packet_speed_slot: i64 = 1;
+    const packet_radius_slot: i64 = 2;
+    const packet_tag: i64 = 17;
+    const material_mode: i64 = 2;
+    const pass_kind: i64 = 1;
+    const packet_field_count: i64 = 3;
+
+    let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
+    let profile_view: Viewport = shader_viewport(160, 120);
+    let profile_pipe: Pipeline =
+      shader_pipeline("std_shader_surface_packet_profile", "triangle_strip");
+    let profile_wgsl: ShaderModule = shader_inline_wgsl("std_shader_surface_packet_profile", wgsl {
+      struct VsOut {
+        @builtin(position) pos: vec4<f32>,
+      };
+
+      @vertex
+      fn vs_main(@builtin(vertex_index) vid: u32) -> VsOut {
+        var out: VsOut;
+        let x: f32 = f32((vid << 1u) & 2u);
+        let y: f32 = f32(vid & 2u);
+        out.pos = vec4<f32>(x * 2.0 - 1.0, y * -2.0 + 1.0, 0.0, 1.0);
+        return out;
+      }
+
+      @fragment
+      fn fs_main() -> @location(0) vec4<f32> {
+        return vec4<f32>(0.30, 0.24, 0.82, 1.0);
+      }
+    });
+  }
+}

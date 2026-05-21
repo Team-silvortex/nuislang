@@ -155,7 +155,9 @@ impl RegisteredMod for CpuMod {
                         .filter_map(|entry| {
                             entry
                                 .split_once('=')
-                                .map(|(_, value)| value.trim().to_owned())
+                                .map(|(_, value)| value.trim())
+                                .filter(|value| !cpu_struct_field_is_literal(value))
+                                .map(str::to_owned)
                         })
                         .collect(),
                 ))
@@ -1451,6 +1453,12 @@ fn require_cpu_resource(node: &Node, resource: &Resource) -> Result<(), String> 
             node.name, resource.name, resource.kind.raw
         ))
     }
+}
+
+fn cpu_struct_field_is_literal(value: &str) -> bool {
+    matches!(value, "true" | "false")
+        || value.parse::<i64>().is_ok()
+        || value.parse::<f64>().is_ok()
 }
 
 fn normalize_channel(channel: &str) -> String {
