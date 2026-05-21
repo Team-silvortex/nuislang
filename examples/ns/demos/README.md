@@ -5,6 +5,8 @@ stubs:
 
 * `window_controls_demo.ns`
 * `shader_profile_demo.ns`
+* `shader_result_profile_demo.ns`
+* `shader_draw_profile_demo.ns`
 * `kernel_profile_demo.ns`
 * `kernel_result_profile_demo.ns`
 * `kernel_tensor_profile_demo.ns`
@@ -29,7 +31,9 @@ Current guidance:
 
 * read this file when you want the single-file end-to-end story
 * prefer [examples/projects/window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo) when you want the canonical multi-file route with explicit project links, ABI state, and support-module profiles
-* treat `shader_profile_demo.ns`, `kernel_profile_demo.ns`,
+* treat `shader_profile_demo.ns`, `shader_result_profile_demo.ns`,
+  `shader_draw_profile_demo.ns`,
+  `kernel_profile_demo.ns`,
   `kernel_result_profile_demo.ns`, `kernel_tensor_profile_demo.ns`, and
   `kernel_tensor_inspect_demo.ns`, `kernel_tensor_slice_demo.ns`,
   `kernel_tensor_reshape_demo.ns`, `kernel_tensor_broadcast_demo.ns`,
@@ -50,6 +54,8 @@ Useful commands:
 cargo run -p nuis -- check examples/ns/demos/window_controls_demo.ns
 cargo run -p nuis -- build examples/ns/demos/window_controls_demo.ns /tmp/window_controls_demo_ns
 cargo run -p nuis -- check examples/projects/domains/shader_profile_demo
+cargo run -p nuis -- check examples/projects/domains/shader_result_profile_demo
+cargo run -p nuis -- check examples/projects/domains/shader_draw_profile_demo
 cargo run -p nuis -- check examples/projects/domains/kernel_profile_demo
 cargo run -p nuis -- check examples/projects/domains/kernel_result_profile_demo
 cargo run -p nuis -- check examples/projects/domains/kernel_tensor_profile_demo

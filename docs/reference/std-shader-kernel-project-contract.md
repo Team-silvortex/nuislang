@@ -63,6 +63,8 @@ That means the most honest checked-in route today is:
 The current narrow project-form companions are:
 
 * [shader_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_profile_demo)
+* [shader_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_result_profile_demo)
+* [shader_draw_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_draw_profile_demo)
 * [shader_render_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_render_profile_demo)
 * [kernel_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_profile_demo)
 * [kernel_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_result_profile_demo)
@@ -89,6 +91,16 @@ Current role split:
 
 * `shader_profile_demo` is the narrow checked-in route for shader profile
   metadata such as target, viewport, pipeline, packet shape, and inline WGSL
+* `shader_result_profile_demo` is the next narrow route where shader profile
+  metadata is explicitly joined with packet-slot inspection,
+  `shader_profile_begin_pass(...)`, `shader_profile_draw_instanced(...)`, and
+  `shader_result(...)` observers such as `shader_pass_ready(...)`,
+  `shader_frame_ready(...)`, and `shader_value(...)`
+* `shader_draw_profile_demo` is the next narrow route where the checked-in
+  project lane visibly crosses the explicit draw bridge:
+  `packet -> begin_pass -> draw_instanced -> downlink -> present`,
+  while still keeping `shader_profile_render(...)` present to satisfy the
+  current project link contract
 * `shader_render_profile_demo` is the next narrow route where shader profile
   metadata is already joined with explicit `data` uplink/downlink and
   `shader_profile_render(...)`
@@ -202,6 +214,8 @@ That keeps the growth shape aligned with the existing non-axis ladder:
 The repository still keeps source-shaped mirrors for these lanes:
 
 * [shader_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_profile_demo.ns)
+* [shader_result_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_result_profile_demo.ns)
+* [shader_draw_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_draw_profile_demo.ns)
 * [kernel_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_profile_demo.ns)
 * [kernel_result_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_result_profile_demo.ns)
 * [kernel_tensor_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_profile_demo.ns)
@@ -275,6 +289,10 @@ Concretely:
   ->
   [shader_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_profile_demo)
   ->
+  [shader_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_result_profile_demo)
+  ->
+  [shader_draw_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_draw_profile_demo)
+  ->
   [shader_render_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_render_profile_demo)
   ->
   [window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo)
@@ -324,6 +342,10 @@ If you are reading `shader` or `kernel` today:
   for current domain semantics
 * use [shader_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_profile_demo)
   and
+  [shader_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_result_profile_demo)
+  and
+  [shader_draw_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_draw_profile_demo)
+  and
   [shader_render_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_render_profile_demo)
   as the narrow checked-in shader validation route
 * use [kernel_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_profile_demo)
@@ -346,6 +368,7 @@ If you are reading `shader` or `kernel` today:
 * [window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo)
 * [kernel_tensor_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/kernel_tensor_demo)
 * [shader_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_profile_demo)
+* [shader_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_result_profile_demo)
 * [shader_render_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_render_profile_demo)
 * [kernel_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_profile_demo)
 * [kernel_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_result_profile_demo)

@@ -1072,12 +1072,42 @@ static NSImage *nuisImageFromPpmData(NSData *ppmData) {
 #include <mach/thread_policy.h>
 #include <pthread.h>
 #include <stdatomic.h>
+#include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 
 extern int64_t nuis_yir_entry(void);
+
+static char* nuis_host_text_slots[4096];
+static int64_t nuis_host_text_len = 0;
+
+static int64_t nuis_host_text_register(const char* text) {{
+    if (text == NULL) return 0;
+    if (nuis_host_text_len >= 4096) return 0;
+    size_t size = strlen(text) + 1;
+    char* copy = (char*)malloc(size);
+    if (copy == NULL) return 0;
+    memcpy(copy, text, size);
+    nuis_host_text_slots[nuis_host_text_len] = copy;
+    nuis_host_text_len += 1;
+    return nuis_host_text_len;
+}}
+
+int64_t nuis_host_text_lift(const char* text) {{
+    return nuis_host_text_register(text);
+}}
+
+static const char* nuis_host_text_lookup(int64_t handle) {{
+    static char fallback[64];
+    if (handle > 0 && handle <= nuis_host_text_len && nuis_host_text_slots[handle - 1] != NULL) {{
+        return nuis_host_text_slots[handle - 1];
+    }}
+    if (handle == 0) return "";
+    snprintf(fallback, sizeof(fallback), "%lld", (long long)handle);
+    return fallback;
+}}
 
 void nuis_debug_print_i64(int64_t value) {{
     printf("%lld\n", (long long)value);
