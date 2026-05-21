@@ -1074,6 +1074,12 @@ pub enum NirExpr {
         op: NirKernelMapOp,
         scalar: Option<Box<NirExpr>>,
     },
+    KernelMapAxis {
+        input: Box<NirExpr>,
+        axis: NirKernelAxis,
+        op: NirKernelMapOp,
+        scalar: Option<Box<NirExpr>>,
+    },
     KernelZip {
         lhs: Box<NirExpr>,
         rhs: Box<NirExpr>,
@@ -1556,6 +1562,7 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::KernelReshape { .. }
         | NirExpr::KernelBroadcast { .. }
         | NirExpr::KernelMap { .. }
+        | NirExpr::KernelMapAxis { .. }
         | NirExpr::KernelZip { .. }
         | NirExpr::KernelMatmul { .. }
         | NirExpr::KernelAddBias { .. }
@@ -1726,6 +1733,7 @@ pub fn nir_expr_effect_class(expr: &NirExpr) -> NirExprEffectClass {
         | NirExpr::KernelReshape { .. }
         | NirExpr::KernelBroadcast { .. }
         | NirExpr::KernelMap { .. }
+        | NirExpr::KernelMapAxis { .. }
         | NirExpr::KernelZip { .. }
         | NirExpr::KernelMatmul { .. }
         | NirExpr::KernelAddBias { .. }

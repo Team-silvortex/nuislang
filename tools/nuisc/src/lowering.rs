@@ -4,8 +4,8 @@ use std::{
 };
 
 use nuis_semantics::model::{
-    nir_expr_effect_class, NirBinaryOp, NirExpr, NirExprEffectClass, NirFunction, NirModule,
-    NirStmt,
+    nir_expr_effect_class, NirBinaryOp, NirExpr, NirExprEffectClass, NirFunction, NirKernelMapOp,
+    NirModule, NirStmt,
 };
 use yir_core::{
     Edge, EdgeKind, Node, Operation, Resource, ResourceKind, SemanticOp, TaskLifecycleState,
@@ -3072,6 +3072,41 @@ fn lower_expr(
             }
             Ok(name)
         }
+        NirExpr::KernelMapAxis {
+            input,
+            axis,
+            op,
+            scalar,
+        } => {
+            ensure_kernel_resource(state.yir);
+            let input_name = lower_expr(input, state, bindings)?;
+            let mut args = vec![input_name.clone(), axis.render().to_owned()];
+            let mut scalar_name = None;
+            if let Some(scalar) = scalar {
+                let lowered = lower_expr(scalar, state, bindings)?;
+                args.push(lowered.clone());
+                scalar_name = Some(lowered);
+            }
+            let name = next_name(state, "kernel_map_axis");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "kernel0".to_owned(),
+                op: Operation {
+                    module: "kernel".to_owned(),
+                    instruction: match op {
+                        NirKernelMapOp::Relu => "relu_axis".to_owned(),
+                        NirKernelMapOp::AddScalar => "add_scalar_axis".to_owned(),
+                        NirKernelMapOp::MulScalar => "mul_scalar_axis".to_owned(),
+                    },
+                    args,
+                },
+            });
+            push_dep_edges(state, &input_name, &name);
+            if let Some(scalar_name) = scalar_name {
+                push_dep_edges(state, &scalar_name, &name);
+            }
+            Ok(name)
+        }
         NirExpr::KernelZip { lhs, rhs, op } => {
             ensure_kernel_resource(state.yir);
             let lhs_name = lower_expr(lhs, state, bindings)?;
@@ -5248,6 +5283,33 @@ mod tests {
             .nodes
             .iter()
             .any(|node| node.op.module == "kernel" && node.op.instruction == "sort_axis"));
+    }
+
+    #[test]
+    fn lowers_kernel_tensor_map_axis_primitive_into_kernel_node() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let input = kernel_tensor(2, 3, "-2,4,-6,1,-3,5");
+                let activated = kernel_map_axis(input, "rows", "relu");
+                let lifted = kernel_map_axis(activated, "cols", "add_scalar", 2);
+                return kernel_element_at(lifted, 0, 0);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "relu_axis"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "kernel" && node.op.instruction == "add_scalar_axis"));
     }
 
     #[test]

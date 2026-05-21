@@ -897,6 +897,12 @@ fn collect_used_vars_expr(expr: &NirExpr, out: &mut BTreeSet<String>) {
                 collect_used_vars_expr(scalar, out);
             }
         }
+        NirExpr::KernelMapAxis { input, scalar, .. } => {
+            collect_used_vars_expr(input, out);
+            if let Some(scalar) = scalar {
+                collect_used_vars_expr(scalar, out);
+            }
+        }
         NirExpr::KernelTopk { input, .. } => {
             collect_used_vars_expr(input, out);
         }

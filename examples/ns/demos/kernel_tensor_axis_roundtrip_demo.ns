@@ -1,0 +1,68 @@
+mod cpu Main {
+  fn main() {
+    cpu_bind_core(0);
+    let bind_core: i64 = kernel_profile_bind_core("KernelUnit");
+    let queue_depth: i64 = kernel_profile_queue_depth("KernelUnit");
+    let batch_lanes: i64 = kernel_profile_batch_lanes("KernelUnit");
+
+    let input = kernel_tensor(2, 4, "-2,4,-6,8,1,-3,5,-7");
+    let activated = kernel_map_axis(input, "rows", "relu");
+    let lifted = kernel_map_axis(activated, "cols", "add_scalar", 1);
+    let row_means = kernel_reduce_mean_axis(lifted, "rows");
+    let top2 = kernel_topk_axis(row_means, "rows", 2);
+    let pick: i64 = kernel_element_at(top2, 0, 1);
+    let roundtrip_seed: i64 = bind_core + queue_depth + batch_lanes;
+
+    data_profile_bind_core("FabricPlane");
+    let handles: HandleTable<FabricPlaneBindings> =
+      data_profile_handle_table("FabricPlane");
+    let uplink: Window<i64> = data_profile_send_uplink("FabricPlane", roundtrip_seed);
+    let downlink: Window<Window<i64>> = data_profile_send_downlink("FabricPlane", uplink);
+
+    print(pick);
+    print(downlink);
+  }
+}
+
+mod kernel KernelUnit {
+  fn profile() {
+    const bind_core: i64 = 2;
+    const queue_depth: i64 = 8;
+    const batch_lanes: i64 = 16;
+    let profile_entry: Unit = kernel_target_config("apple_ane", "coreml", batch_lanes);
+  }
+}
+
+mod data FabricPlane {
+  fn profile() {
+    const window_offset: i64 = 0;
+    const uplink_len: i64 = 1;
+    const downlink_len: i64 = 1;
+
+    data_bind_core(1);
+    let profile_handles: HandleTable<FabricPlaneBindings> =
+      data_handle_table("host=cpu0", "render=kernel0");
+    let cpu_to_kernel: Marker<CpuToKernel> = data_marker("cpu_to_kernel");
+    let kernel_to_cpu: Marker<KernelToCpu> = data_marker("kernel_to_cpu");
+    let uplink_pipe: Marker<UplinkPipe> = data_marker("uplink_pipe");
+    let downlink_pipe: Marker<DownlinkPipe> = data_marker("downlink_pipe");
+    let uplink_pipe_class: Marker<UplinkPipeClass> = data_marker("uplink_pipe_class");
+    let downlink_pipe_class: Marker<DownlinkPipeClass> = data_marker("downlink_pipe_class");
+    let uplink_payload_class: Marker<PayloadClassWindow> = data_marker("uplink_payload_class");
+    let downlink_payload_class: Marker<PayloadClassWindow> =
+      data_marker("downlink_payload_class");
+    let uplink_payload_shape: Marker<PayloadShapeWindowi64> =
+      data_marker("uplink_payload_shape");
+    let downlink_payload_shape: Marker<PayloadShapeWindowWindowi64> =
+      data_marker("downlink_payload_shape");
+    let uplink_window_policy: Marker<UplinkWindowPolicy> = data_marker("uplink_window_policy");
+    let downlink_window_policy: Marker<DownlinkWindowPolicy> =
+      data_marker("downlink_window_policy");
+    let uplink_window_mut: WindowMut<i64> =
+      data_copy_window(window_offset, window_offset, uplink_len);
+    let uplink_window: Window<i64> = data_freeze_window(uplink_window_mut);
+    let downlink_window_mut: WindowMut<i64> =
+      data_copy_window(window_offset, window_offset, downlink_len);
+    let downlink_window: Window<i64> = data_freeze_window(downlink_window_mut);
+  }
+}

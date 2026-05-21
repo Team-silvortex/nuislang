@@ -378,6 +378,39 @@ fn describe_kernel_node(node: &Node, resource: &Resource) -> Result<InstructionS
                 )),
             }
         }
+        "relu_axis" => {
+            if node.op.args.len() != 2 {
+                return Err(format!(
+                    "node `{}` expects `kernel.relu_axis <name> <resource> <input> <axis>`",
+                    node.name
+                ));
+            }
+            match node.op.args[1].as_str() {
+                "rows" | "cols" => Ok(InstructionSemantics::pure(vec![node.op.args[0].clone()])),
+                other => Err(format!(
+                    "node `{}` has invalid map axis `{other}`; expected rows or cols",
+                    node.name
+                )),
+            }
+        }
+        "add_scalar_axis" | "mul_scalar_axis" => {
+            if node.op.args.len() != 3 {
+                return Err(format!(
+                    "node `{}` expects `kernel.{} <name> <resource> <input> <axis> <scalar>`",
+                    node.name, node.op.instruction
+                ));
+            }
+            match node.op.args[1].as_str() {
+                "rows" | "cols" => Ok(InstructionSemantics::pure(vec![
+                    node.op.args[0].clone(),
+                    node.op.args[2].clone(),
+                ])),
+                other => Err(format!(
+                    "node `{}` has invalid map axis `{other}`; expected rows or cols",
+                    node.name
+                )),
+            }
+        }
         "relu" => {
             if node.op.args.len() != 1 {
                 return Err(format!(
@@ -832,6 +865,50 @@ fn execute_kernel_node(
                 "cols" => Ok(Value::Tensor(argmin_cols(input)?)),
                 other => Err(format!(
                     "node `{}` has invalid reduce axis `{other}`; expected rows or cols",
+                    node.name
+                )),
+            }
+        }
+        "relu_axis" => {
+            let input = state.expect_tensor(&node.op.args[0])?;
+            match node.op.args[1].as_str() {
+                "rows" | "cols" => Ok(Value::Tensor(TensorValue {
+                    rows: input.rows,
+                    cols: input.cols,
+                    elements: input.elements.iter().map(|value| (*value).max(0)).collect(),
+                })),
+                other => Err(format!(
+                    "node `{}` has invalid map axis `{other}`; expected rows or cols",
+                    node.name
+                )),
+            }
+        }
+        "add_scalar_axis" => {
+            let input = state.expect_tensor(&node.op.args[0])?;
+            let scalar = expect_tensor_scalar_i64(state.expect_value(&node.op.args[2])?)?;
+            match node.op.args[1].as_str() {
+                "rows" | "cols" => Ok(Value::Tensor(TensorValue {
+                    rows: input.rows,
+                    cols: input.cols,
+                    elements: input.elements.iter().map(|value| *value + scalar).collect(),
+                })),
+                other => Err(format!(
+                    "node `{}` has invalid map axis `{other}`; expected rows or cols",
+                    node.name
+                )),
+            }
+        }
+        "mul_scalar_axis" => {
+            let input = state.expect_tensor(&node.op.args[0])?;
+            let scalar = expect_tensor_scalar_i64(state.expect_value(&node.op.args[2])?)?;
+            match node.op.args[1].as_str() {
+                "rows" | "cols" => Ok(Value::Tensor(TensorValue {
+                    rows: input.rows,
+                    cols: input.cols,
+                    elements: input.elements.iter().map(|value| *value * scalar).collect(),
+                })),
+                other => Err(format!(
+                    "node `{}` has invalid map axis `{other}`; expected rows or cols",
                     node.name
                 )),
             }

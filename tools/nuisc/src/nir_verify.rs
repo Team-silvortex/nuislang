@@ -642,6 +642,12 @@ fn verify_expr(
                 verify_expr(scalar, moved, borrows, borrow_bindings, data_bindings)?;
             }
         }
+        NirExpr::KernelMapAxis { input, scalar, .. } => {
+            verify_expr(input, moved, borrows, borrow_bindings, data_bindings)?;
+            if let Some(scalar) = scalar {
+                verify_expr(scalar, moved, borrows, borrow_bindings, data_bindings)?;
+            }
+        }
         NirExpr::KernelZip { lhs, rhs, .. } => {
             verify_expr(lhs, moved, borrows, borrow_bindings, data_bindings)?;
             verify_expr(rhs, moved, borrows, borrow_bindings, data_bindings)?;
@@ -922,6 +928,12 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
             verify_expr_uses(input, moved)?;
         }
         NirExpr::KernelMap { input, scalar, .. } => {
+            verify_expr_uses(input, moved)?;
+            if let Some(scalar) = scalar {
+                verify_expr_uses(scalar, moved)?;
+            }
+        }
+        NirExpr::KernelMapAxis { input, scalar, .. } => {
             verify_expr_uses(input, moved)?;
             if let Some(scalar) = scalar {
                 verify_expr_uses(scalar, moved)?;

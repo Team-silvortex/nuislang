@@ -340,6 +340,12 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
                 collect_instantiated_units_expr(scalar, units);
             }
         }
+        NirExpr::KernelMapAxis { input, scalar, .. } => {
+            collect_instantiated_units_expr(input, units);
+            if let Some(scalar) = scalar {
+                collect_instantiated_units_expr(scalar, units);
+            }
+        }
         NirExpr::KernelTopk { input, .. } => {
             collect_instantiated_units_expr(input, units);
         }

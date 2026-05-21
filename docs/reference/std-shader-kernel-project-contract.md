@@ -79,6 +79,9 @@ The current narrow project-form companions are:
 * [kernel_tensor_axis_select_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_select_demo)
 * [kernel_tensor_axis_sort_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_sort_demo)
 * [kernel_tensor_axis_order_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_order_demo)
+* [kernel_tensor_axis_map_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_map_demo)
+* [kernel_tensor_axis_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_pipeline_demo)
+* [kernel_tensor_axis_roundtrip_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_roundtrip_demo)
 * [kernel_tensor_map_zip_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_map_zip_demo)
 * [kernel_roundtrip_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_roundtrip_profile_demo)
 
@@ -135,6 +138,14 @@ Current role split:
 * `kernel_tensor_axis_order_demo` is the next narrow route where
   `kernel_topk_axis(...)` becomes visible as the first explicit axis-aware
   ordered-selection helper
+* `kernel_tensor_axis_map_demo` is the next narrow route where
+  `kernel_map_axis(...)` becomes visible as the first explicit axis-aware
+  transform helper
+* `kernel_tensor_axis_pipeline_demo` is the next narrow route where axis-aware
+  reduction, transform, and ordered-selection helpers are composed into a
+  small checked-in operator flow
+* `kernel_tensor_axis_roundtrip_demo` is the next narrow route where that
+  axis-aware mini-flow is joined with explicit `data` uplink/downlink
 * `kernel_tensor_map_zip_demo` is the next narrow route where light tensor
   transform helpers such as `kernel_map(...)` and `kernel_zip(...)` become
   visible at source level while still lowering into the existing kernel op set
@@ -159,18 +170,32 @@ subgroup inside the broader `kernel` ladder:
   introduces `kernel_sort_axis(...)`
 * [kernel_tensor_axis_order_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_order_demo)
   introduces `kernel_topk_axis(...)`
+* [kernel_tensor_axis_map_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_map_demo)
+  introduces `kernel_map_axis(...)`
+* [kernel_tensor_axis_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_pipeline_demo)
+  composes `kernel_map_axis(...)`, `kernel_reduce_mean_axis(...)`, and
+  `kernel_topk_axis(...)` into a narrow checked-in mini-flow
+* [kernel_tensor_axis_roundtrip_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_roundtrip_demo)
+  joins that mini-flow with `data_profile_send_uplink(...)` and
+  `data_profile_send_downlink(...)`
 
 Current reading rule inside this subgroup:
 
 * start with axis reduction
 * then read axis selection
 * then read axis full-order and axis top-k
+* then read axis transform
+* then read one composed mini-flow
+* then read one data-bridge route
 
 That keeps the growth shape aligned with the existing non-axis ladder:
 
 * reduction
 * selection
 * ordered selection
+* transform
+* composition
+* bridge
 
 ## Current Source-Shaped Mirrors
 
@@ -192,6 +217,9 @@ The repository still keeps source-shaped mirrors for these lanes:
 * [kernel_tensor_axis_select_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_axis_select_demo.ns)
 * [kernel_tensor_axis_sort_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_axis_sort_demo.ns)
 * [kernel_tensor_axis_order_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_axis_order_demo.ns)
+* [kernel_tensor_axis_map_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_axis_map_demo.ns)
+* [kernel_tensor_axis_pipeline_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_axis_pipeline_demo.ns)
+* [kernel_tensor_axis_roundtrip_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_axis_roundtrip_demo.ns)
 * [kernel_tensor_map_zip_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_map_zip_demo.ns)
 
 Their current role is:

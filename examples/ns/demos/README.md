@@ -20,6 +20,9 @@ stubs:
 * `kernel_tensor_axis_select_demo.ns`
 * `kernel_tensor_axis_sort_demo.ns`
 * `kernel_tensor_axis_order_demo.ns`
+* `kernel_tensor_axis_map_demo.ns`
+* `kernel_tensor_axis_pipeline_demo.ns`
+* `kernel_tensor_axis_roundtrip_demo.ns`
 * `kernel_tensor_map_zip_demo.ns`
 
 Current guidance:
@@ -34,8 +37,9 @@ Current guidance:
   `kernel_tensor_order_demo.ns`, `kernel_tensor_axis_reduce_demo.ns`,
   `kernel_tensor_axis_family_demo.ns`, `kernel_tensor_axis_select_demo.ns`,
   `kernel_tensor_axis_sort_demo.ns`, `kernel_tensor_axis_order_demo.ns`,
-  `kernel_tensor_map_zip_demo.ns` as current source-shaped mirrors of
-  project-first lanes
+  `kernel_tensor_axis_map_demo.ns`, `kernel_tensor_axis_pipeline_demo.ns`,
+  `kernel_tensor_axis_roundtrip_demo.ns`, `kernel_tensor_map_zip_demo.ns` as
+  current source-shaped mirrors of project-first lanes
 * today those two domain stubs do not pass standalone `nuis check` because
   `shader` and `kernel` lowering still rely on loaded `nustar` implementations
   rather than a bootstrap compatibility shim
@@ -61,5 +65,8 @@ cargo run -p nuis -- check examples/projects/domains/kernel_tensor_axis_family_d
 cargo run -p nuis -- check examples/projects/domains/kernel_tensor_axis_select_demo
 cargo run -p nuis -- check examples/projects/domains/kernel_tensor_axis_sort_demo
 cargo run -p nuis -- check examples/projects/domains/kernel_tensor_axis_order_demo
+cargo run -p nuis -- check examples/projects/domains/kernel_tensor_axis_map_demo
+cargo run -p nuis -- check examples/projects/domains/kernel_tensor_axis_pipeline_demo
+cargo run -p nuis -- check examples/projects/domains/kernel_tensor_axis_roundtrip_demo
 cargo run -p nuis -- check examples/projects/domains/kernel_tensor_map_zip_demo
 ```

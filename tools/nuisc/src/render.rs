@@ -732,6 +732,26 @@ fn render_nir_expr(value: &NirExpr) -> String {
                 op.render()
             ),
         },
+        NirExpr::KernelMapAxis {
+            input,
+            axis,
+            op,
+            scalar,
+        } => match scalar {
+            Some(scalar) => format!(
+                "kernel_map_axis({}, \"{}\", \"{}\", {})",
+                render_nir_expr(input),
+                axis.render(),
+                op.render(),
+                render_nir_expr(scalar)
+            ),
+            None => format!(
+                "kernel_map_axis({}, \"{}\", \"{}\")",
+                render_nir_expr(input),
+                axis.render(),
+                op.render()
+            ),
+        },
         NirExpr::KernelZip { lhs, rhs, op } => format!(
             "kernel_zip({}, {}, \"{}\")",
             render_nir_expr(lhs),

@@ -1,0 +1,21 @@
+mod cpu Main {
+  fn main() {
+    let input = kernel_tensor(2, 4, "-2,4,-6,8,1,-3,5,-7");
+    let activated = kernel_map_axis(input, "rows", "relu");
+    let lifted = kernel_map_axis(activated, "cols", "add_scalar", 1);
+    let row_means = kernel_reduce_mean_axis(lifted, "rows");
+    let top2 = kernel_topk_axis(row_means, "rows", 2);
+    let pick: i64 = kernel_element_at(top2, 0, 1);
+
+    print(pick);
+  }
+}
+
+mod kernel KernelUnit {
+  fn profile() {
+    const bind_core: i64 = 2;
+    const queue_depth: i64 = 8;
+    const batch_lanes: i64 = 16;
+    let profile_entry: Unit = kernel_target_config("apple_ane", "coreml", batch_lanes);
+  }
+}

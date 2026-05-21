@@ -1,0 +1,13 @@
+use kernel KernelUnit;
+
+mod cpu Main {
+  fn main() {
+    let input = kernel_tensor(2, 3, "-2,4,-6,1,-3,5");
+    let activated = kernel_map_axis(input, "rows", "relu");
+    let lifted = kernel_map_axis(activated, "cols", "add_scalar", 2);
+    let scaled = kernel_map_axis(lifted, "rows", "mul_scalar", 2);
+    let pick: i64 = kernel_element_at(scaled, 0, 0);
+
+    print(pick);
+  }
+}

@@ -11850,6 +11850,109 @@ fn lower_call_expr_with_async(
             }
             _ => Err("kernel_map(...) expects 2 or 3 args".to_owned()),
         },
+        "kernel_map_axis" => match args {
+            [input, axis, op] => {
+                let AstExpr::Text(axis_name) = axis else {
+                    return Err("kernel_map_axis(...) axis must be a string literal".to_owned());
+                };
+                let axis = match axis_name.as_str() {
+                    "rows" => NirKernelAxis::Rows,
+                    "cols" => NirKernelAxis::Cols,
+                    _ => {
+                        return Err(format!(
+                            "kernel_map_axis(...) unsupported axis `{}`; expected rows/cols",
+                            axis_name
+                        ));
+                    }
+                };
+                let AstExpr::Text(op_name) = op else {
+                    return Err("kernel_map_axis(...) op must be a string literal".to_owned());
+                };
+                let op = match op_name.as_str() {
+                    "relu" => NirKernelMapOp::Relu,
+                    "add_scalar" | "mul_scalar" => {
+                        return Err(format!(
+                            "kernel_map_axis(..., \"{}\") expects a fourth scalar arg",
+                            op_name
+                        ));
+                    }
+                    _ => {
+                        return Err(format!(
+                            "kernel_map_axis(...) unsupported op `{}`; expected relu/add_scalar/mul_scalar",
+                            op_name
+                        ));
+                    }
+                };
+                Ok(NirExpr::KernelMapAxis {
+                    input: Box::new(lower_expr(
+                        input,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        None,
+                    )?),
+                    axis,
+                    op,
+                    scalar: None,
+                })
+            }
+            [input, axis, op, scalar] => {
+                let AstExpr::Text(axis_name) = axis else {
+                    return Err("kernel_map_axis(...) axis must be a string literal".to_owned());
+                };
+                let axis = match axis_name.as_str() {
+                    "rows" => NirKernelAxis::Rows,
+                    "cols" => NirKernelAxis::Cols,
+                    _ => {
+                        return Err(format!(
+                            "kernel_map_axis(...) unsupported axis `{}`; expected rows/cols",
+                            axis_name
+                        ));
+                    }
+                };
+                let AstExpr::Text(op_name) = op else {
+                    return Err("kernel_map_axis(...) op must be a string literal".to_owned());
+                };
+                let op = match op_name.as_str() {
+                    "add_scalar" => NirKernelMapOp::AddScalar,
+                    "mul_scalar" => NirKernelMapOp::MulScalar,
+                    "relu" => {
+                        return Err(
+                            "kernel_map_axis(..., \"relu\") does not accept a scalar arg"
+                                .to_owned(),
+                        );
+                    }
+                    _ => {
+                        return Err(format!(
+                            "kernel_map_axis(...) unsupported op `{}`; expected relu/add_scalar/mul_scalar",
+                            op_name
+                        ));
+                    }
+                };
+                Ok(NirExpr::KernelMapAxis {
+                    input: Box::new(lower_expr(
+                        input,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        None,
+                    )?),
+                    axis,
+                    op,
+                    scalar: Some(Box::new(lower_expr(
+                        scalar,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        Some(&i64_type()),
+                    )?)),
+                })
+            }
+            _ => Err("kernel_map_axis(...) expects 3 or 4 args".to_owned()),
+        },
         "kernel_zip" => {
             let [lhs, rhs, op] = args else {
                 return Err("kernel_zip(...) expects 3 args".to_owned());
@@ -12588,6 +12691,7 @@ fn infer_nir_expr_type(
         | NirExpr::KernelTopk { .. }
         | NirExpr::KernelTopkAxis { .. }
         | NirExpr::KernelMap { .. }
+        | NirExpr::KernelMapAxis { .. }
         | NirExpr::KernelZip { .. }
         | NirExpr::KernelMatmul { .. }
         | NirExpr::KernelAddBias { .. }
@@ -18057,6 +18161,40 @@ mod tests {
             stmt,
             NirStmt::Let {
                 value: NirExpr::KernelTopkAxis { .. },
+                ..
+            }
+        )));
+        assert!(matches!(
+            function.body.last(),
+            Some(NirStmt::Return(Some(NirExpr::KernelElementAt { .. })))
+        ));
+    }
+
+    #[test]
+    fn lowers_explicit_kernel_tensor_map_axis_helper() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let input = kernel_tensor(2, 3, "-2,4,-6,1,-3,5");
+                let activated = kernel_map_axis(input, "rows", "relu");
+                let lifted = kernel_map_axis(activated, "cols", "add_scalar", 2);
+                return kernel_element_at(lifted, 0, 0);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| matches!(
+            stmt,
+            NirStmt::Let {
+                value: NirExpr::KernelMapAxis { .. },
                 ..
             }
         )));
