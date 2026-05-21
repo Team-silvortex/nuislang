@@ -68,6 +68,8 @@ The current narrow project-form companions are:
 * [shader_surface_material_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_pass_profile_demo)
 * [shader_surface_material_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_packet_profile_demo)
 * [shader_surface_material_panel_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_panel_profile_demo)
+* [shader_surface_state_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_state_profile_demo)
+* [shader_surface_state_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_state_packet_profile_demo)
 * [shader_surface_material_flow_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_flow_profile_demo)
 * [shader_surface_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_packet_profile_demo)
 * [shader_surface_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_pass_profile_demo)
@@ -127,6 +129,18 @@ Current role split:
   with `shader_profile_panel_packet(...)` and the richer `NovaPanelPacket`
   payload fields such as accent, toggle state, and focus index, while still
   staying outside the data/render bridge lanes
+* `shader_surface_state_profile_demo` is the next narrow route where those
+  same surface-facing and material-facing seed helpers are explicitly joined
+  with a compact scene/material state set made of
+  `nova_header_packet(...)`, `nova_theme_packet(...)`,
+  `nova_surface_packet(...)`, `nova_viewport_packet(...)`,
+  `nova_layer_packet(...)`, `nova_scene_packet(...)`,
+  `nova_camera_packet(...)`, and `nova_material_packet(...)`, while still
+  staying outside the data/render bridge lanes
+* `shader_surface_state_packet_profile_demo` is the next narrow route where
+  that compact scene/material state set is explicitly joined with packet slots,
+  packet tag, packet field count, and `shader_profile_packet(...)`, while
+  still staying outside the data/render bridge lanes
 * `shader_surface_material_flow_profile_demo` is the next narrow route where
   those surface-facing and material-facing seed helpers are explicitly joined
   with packet shaping, `shader_profile_begin_pass(...)`,
@@ -243,6 +257,8 @@ The shader ladder is now easier to read as three local branches after
   [shader_surface_material_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_pass_profile_demo) ->
   [shader_surface_material_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_packet_profile_demo) ->
   [shader_surface_material_panel_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_panel_profile_demo) ->
+  [shader_surface_state_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_state_profile_demo) ->
+  [shader_surface_state_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_state_packet_profile_demo) ->
   [shader_surface_material_flow_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_flow_profile_demo) ->
   [shader_surface_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_packet_profile_demo) ->
   [shader_surface_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_pass_profile_demo)

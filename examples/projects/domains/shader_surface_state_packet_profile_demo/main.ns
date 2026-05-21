@@ -1,0 +1,88 @@
+use shader SurfaceShader;
+
+mod cpu Main {
+  fn main() {
+    const base_color: i64 = 104;
+    const base_speed: i64 = 16;
+    const base_radius: i64 = 72;
+    const speed_scale: i64 = 2;
+    const color_delta: i64 = 0;
+    const speed_delta: i64 = 0;
+    const radius_delta: i64 = 0;
+    const accent_base: i64 = 40;
+    const toggle_bias: i64 = 1;
+    const root_count: i64 = 7;
+    const light_count: i64 = 3;
+    const viewport_width: i64 = 52;
+    const viewport_height: i64 = 20;
+
+    let vertex_budget: i64 = shader_profile_vertex_count("SurfaceShader");
+    let instance_budget: i64 = shader_profile_instance_count("SurfaceShader");
+    let material_mode: i64 = shader_profile_material_mode("SurfaceShader");
+    let pass_kind: i64 = shader_profile_pass_kind("SurfaceShader");
+    let swapchain: Target = shader_profile_target("SurfaceShader");
+    let main_view: Viewport = shader_profile_viewport("SurfaceShader");
+    let lit_pipe: Pipeline = shader_profile_pipeline("SurfaceShader");
+
+    let color_slot: i64 = shader_profile_packet_color_slot("SurfaceShader");
+    let speed_slot: i64 = shader_profile_packet_speed_slot("SurfaceShader");
+    let radius_slot: i64 = shader_profile_packet_radius_slot("SurfaceShader");
+    let packet_tag: i64 = shader_profile_packet_tag("SurfaceShader");
+    let packet_field_count: i64 = shader_profile_packet_field_count("SurfaceShader");
+
+    let panel_color: i64 =
+      shader_profile_color_seed("SurfaceShader", base_color + color_slot, color_delta);
+    let panel_speed: i64 = shader_profile_speed_seed(
+      "SurfaceShader",
+      speed_delta + speed_slot,
+      speed_scale,
+      base_speed
+    );
+    let panel_radius: i64 =
+      shader_profile_radius_seed("SurfaceShader", base_radius + radius_slot, radius_delta);
+
+    let accent: i64 = accent_base + material_mode;
+    let toggle_state: i64 = toggle_bias + instance_budget;
+    let focus_index: i64 = vertex_budget + pass_kind;
+
+    let header_packet: NovaHeaderPacket = nova_header_packet(accent, focus_index);
+    let theme_packet: NovaThemePacket =
+      nova_theme_packet(accent, panel_radius, toggle_state, panel_speed);
+    let surface_packet: NovaSurfacePacket =
+      nova_surface_packet(panel_speed, panel_radius, toggle_state, accent);
+    let viewport_packet: NovaViewportPacket =
+      nova_viewport_packet(color_slot, speed_slot, viewport_width, viewport_height);
+    let layer_packet: NovaLayerPacket = nova_layer_packet(1, toggle_state, 1, radius_delta);
+    let scene_packet: NovaScenePacket =
+      nova_scene_packet(root_count, focus_index, light_count, pass_kind);
+    let camera_packet: NovaCameraPacket =
+      nova_camera_packet(toggle_state, focus_index, panel_speed, panel_radius);
+    let material_packet: NovaMaterialPacket =
+      nova_material_packet(material_mode, accent, panel_speed, panel_radius);
+
+    let render_controls: SurfaceShaderPacket =
+      shader_profile_packet("SurfaceShader", panel_color, panel_speed, panel_radius);
+
+    print(
+      vertex_budget
+        + instance_budget
+        + material_mode
+        + pass_kind
+        + color_slot
+        + speed_slot
+        + radius_slot
+        + packet_tag
+        + packet_field_count
+        + panel_color
+        + panel_speed
+        + panel_radius
+        + accent
+        + toggle_state
+        + focus_index
+        + root_count
+        + light_count
+        + viewport_width
+        + viewport_height
+    );
+  }
+}
