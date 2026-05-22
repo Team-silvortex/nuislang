@@ -1,0 +1,110 @@
+use data FabricPlane;
+use kernel KernelUnit;
+
+mod cpu Main {
+  struct KernelAsyncTensorBatchSummary {
+    bind_core_completed: i64,
+    queue_depth_completed: i64,
+    batch_lanes_completed: i64,
+    total_completed: i64,
+    peak_completed: i64,
+    avg_completed: i64,
+    batch_value: i64
+  }
+
+  async fn consume_kernel_result(result: KernelResult<i64>) -> i64 {
+    if kernel_config_ready(result) {
+      return kernel_value(result) + 1;
+    }
+    return 0;
+  }
+
+  fn encode_completed(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_task_value(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return task_value(result);
+    }
+    return 0;
+  }
+
+  fn capture_async_tensor_batch() -> KernelAsyncTensorBatchSummary {
+    let bind_core_result: KernelResult<i64> =
+      kernel_result(kernel_profile_bind_core("KernelUnit"));
+    let queue_depth_result: KernelResult<i64> =
+      kernel_result(kernel_profile_queue_depth("KernelUnit"));
+    let batch_lanes_result: KernelResult<i64> =
+      kernel_result(kernel_profile_batch_lanes("KernelUnit"));
+    let input = kernel_tensor(2, 3, "2,4,6,1,3,5");
+    let total_result: KernelResult<i64> =
+      kernel_result(kernel_reduce_sum(input));
+    let peak_result: KernelResult<i64> =
+      kernel_result(kernel_reduce_max(input));
+    let avg_result: KernelResult<i64> =
+      kernel_result(kernel_reduce_mean(input));
+
+    let bind_core_task: Task<i64> = spawn(consume_kernel_result(bind_core_result));
+    let queue_depth_task: Task<i64> = spawn(consume_kernel_result(queue_depth_result));
+    let batch_lanes_task: Task<i64> = spawn(consume_kernel_result(batch_lanes_result));
+    let total_task: Task<i64> = spawn(consume_kernel_result(total_result));
+    let peak_task: Task<i64> = spawn(consume_kernel_result(peak_result));
+    let avg_task: Task<i64> = spawn(consume_kernel_result(avg_result));
+
+    let bind_core_join: TaskResult<i64> = join_result(bind_core_task);
+    let queue_depth_join: TaskResult<i64> = join_result(queue_depth_task);
+    let batch_lanes_join: TaskResult<i64> = join_result(batch_lanes_task);
+    let total_join: TaskResult<i64> = join_result(total_task);
+    let peak_join: TaskResult<i64> = join_result(peak_task);
+    let avg_join: TaskResult<i64> = join_result(avg_task);
+
+    return KernelAsyncTensorBatchSummary {
+      bind_core_completed: encode_completed(bind_core_join),
+      queue_depth_completed: encode_completed(queue_depth_join),
+      batch_lanes_completed: encode_completed(batch_lanes_join),
+      total_completed: encode_completed(total_join),
+      peak_completed: encode_completed(peak_join),
+      avg_completed: encode_completed(avg_join),
+      batch_value: encode_task_value(bind_core_join)
+        + encode_task_value(queue_depth_join)
+        + encode_task_value(batch_lanes_join)
+        + encode_task_value(total_join)
+        + encode_task_value(peak_join)
+        + encode_task_value(avg_join)
+    };
+  }
+
+  fn main() {
+    cpu_bind_core(0);
+
+    data_profile_bind_core("FabricPlane");
+    let handles: HandleTable<FabricPlaneBindings> =
+      data_profile_handle_table("FabricPlane");
+
+    let summary: KernelAsyncTensorBatchSummary = capture_async_tensor_batch();
+
+    let preview_seed: i64 = summary.total_completed
+      + summary.peak_completed
+      + summary.avg_completed;
+    let preview_uplink: Window<i64> =
+      data_profile_send_uplink("FabricPlane", preview_seed);
+    let preview_downlink: Window<Window<i64>> =
+      data_profile_send_downlink("FabricPlane", preview_uplink);
+
+    let final_seed: i64 = summary.bind_core_completed
+      + summary.queue_depth_completed
+      + summary.batch_lanes_completed
+      + summary.batch_value;
+    let final_uplink: Window<i64> =
+      data_profile_send_uplink("FabricPlane", final_seed);
+    let final_downlink: Window<Window<i64>> =
+      data_profile_send_downlink("FabricPlane", final_uplink);
+
+    print(preview_downlink);
+    print(final_downlink);
+  }
+}

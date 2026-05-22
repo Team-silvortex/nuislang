@@ -12412,7 +12412,7 @@ fn ensure_spawn_input_safe(
             "{name}(...) does not currently allow `ref` task inputs, found `{}`",
             render_type_name(&ty)
         )),
-        Some(ty) if async_boundary_violation_detail(&ty, struct_table).is_some() => Err(format!(
+        Some(ty) if async_parameter_violation_detail(&ty, struct_table).is_some() => Err(format!(
             "{name}(...) does not currently allow task inputs whose nested payloads cross the async boundary, found `{}`",
             render_type_name(&ty)
         )),
@@ -12532,9 +12532,12 @@ fn infer_result_stage(expr: &NirExpr) -> Option<NirResultStage> {
         }
         NirExpr::KernelProfileBindCoreRef { .. }
         | NirExpr::KernelProfileQueueDepthRef { .. }
-        | NirExpr::KernelProfileBatchLanesRef { .. } => {
-            Some(NirKernelFlowState::ConfigReady.into())
-        }
+        | NirExpr::KernelProfileBatchLanesRef { .. }
+        | NirExpr::KernelReduceSum(_)
+        | NirExpr::KernelReduceMax(_)
+        | NirExpr::KernelReduceMean(_)
+        | NirExpr::KernelArgmax(_)
+        | NirExpr::KernelArgmin(_) => Some(NirKernelFlowState::ConfigReady.into()),
         _ => None,
     }
 }
@@ -13737,9 +13740,9 @@ fn validate_declared_nir_types(module: &NirModule) -> Result<(), String> {
         for param in &function.params {
             validate_type_ref(&param.ty)?;
             if function.is_async {
-                if let Some(detail) = async_boundary_violation_detail(&param.ty, &struct_table) {
+                if let Some(detail) = async_parameter_violation_detail(&param.ty, &struct_table) {
                     return Err(format!(
-                    "async function `{}` parameter `{}` cannot cross async boundary with type `{}`; {}; async parameters currently forbid `ref`, resource-bearing `Window<...>` / `WindowMut<...>` / `Pipe<...>`, control-plane `Marker<...>` / `HandleTable<...>`, `?`, `Instance<...>`, `Task<...>`, and `*Result<...>` families",
+                    "async function `{}` parameter `{}` cannot cross async boundary with type `{}`; {}; async parameters currently forbid `ref`, resource-bearing `Window<...>` / `WindowMut<...>` / `Pipe<...>`, control-plane `Marker<...>` / `HandleTable<...>`, `?`, `Instance<...>`, `Task<...>`, and `TaskResult<...>` / `DataResult<...>` families",
                     function.name,
                     param.name,
                     param.ty.render(),
@@ -13787,6 +13790,73 @@ fn async_boundary_violation_detail(
 ) -> Option<String> {
     let mut visiting = BTreeSet::new();
     async_boundary_violation_detail_inner(ty, struct_table, &mut visiting)
+}
+
+fn async_parameter_violation_detail(
+    ty: &NirTypeRef,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> Option<String> {
+    let mut visiting = BTreeSet::new();
+    async_parameter_violation_detail_inner(ty, struct_table, &mut visiting)
+}
+
+fn async_parameter_violation_detail_inner(
+    ty: &NirTypeRef,
+    struct_table: &BTreeMap<String, NirStructDef>,
+    visiting: &mut BTreeSet<String>,
+) -> Option<String> {
+    if let Some(result_family) = ty.result_family() {
+        match result_family {
+            NirResultFamily::Shader | NirResultFamily::Kernel => {
+                let payload = ty.result_payload().expect("result payload");
+                if !payload.is_async_boundary_safe() {
+                    return Some(format!(
+                        "directly carries async-unsafe `{}` payload through `{}`",
+                        payload.render(),
+                        ty.render()
+                    ));
+                }
+                if is_async_resource_bearing_payload(payload) {
+                    return Some(format!(
+                        "directly carries resource-bearing `{}` payload through `{}`",
+                        payload.render(),
+                        ty.render()
+                    ));
+                }
+            }
+            _ => return Some(format!("directly carries `{}`", ty.render())),
+        }
+    } else {
+        if !ty.is_async_boundary_safe() {
+            return Some(format!("directly carries `{}`", ty.render()));
+        }
+        if is_async_resource_bearing_payload(ty) {
+            return Some(format!(
+                "directly carries resource-bearing `{}`",
+                ty.render()
+            ));
+        }
+    }
+    let Some(definition) = struct_table.get(&ty.name) else {
+        return None;
+    };
+    let visit_key = ty.render();
+    if !visiting.insert(visit_key.clone()) {
+        return None;
+    }
+    for field in &definition.fields {
+        if let Some(nested) =
+            async_parameter_violation_detail_inner(&field.ty, struct_table, visiting)
+        {
+            visiting.remove(&visit_key);
+            return Some(format!(
+                "nested field `{}.{}` {}",
+                definition.name, field.name, nested
+            ));
+        }
+    }
+    visiting.remove(&visit_key);
+    None
 }
 
 fn async_boundary_violation_detail_inner(
@@ -17724,6 +17794,56 @@ mod tests {
     }
 
     #[test]
+    fn lowers_explicit_kernel_result_helpers_from_tensor_reductions() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let input = kernel_tensor(2, 3, "2,4,6,1,3,5");
+                let total: KernelResult<i64> = kernel_result(kernel_reduce_sum(input));
+                let peak: KernelResult<i64> = kernel_result(kernel_reduce_max(input));
+                let avg: KernelResult<i64> = kernel_result(kernel_reduce_mean(input));
+                return kernel_value(total) + kernel_value(peak) + kernel_value(avg);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                ty: Some(ty),
+                value: NirExpr::KernelResult { value, state },
+                ..
+            } => {
+                ty.render() == "KernelResult<i64>"
+                    && matches!(state, NirKernelFlowState::ConfigReady)
+                    && matches!(value.as_ref(), NirExpr::KernelReduceSum(_))
+            }
+            _ => false,
+        }));
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                value: NirExpr::KernelResult { value, .. },
+                ..
+            } => matches!(value.as_ref(), NirExpr::KernelReduceMax(_)),
+            _ => false,
+        }));
+        assert!(function.body.iter().any(|stmt| match stmt {
+            NirStmt::Let {
+                value: NirExpr::KernelResult { value, .. },
+                ..
+            } => matches!(value.as_ref(), NirExpr::KernelReduceMean(_)),
+            _ => false,
+        }));
+    }
+
+    #[test]
     fn lowers_explicit_kernel_tensor_helpers() {
         let module = parse_nuis_module(
             r#"
@@ -18444,8 +18564,8 @@ mod tests {
     }
 
     #[test]
-    fn rejects_async_function_taking_result_family_param() {
-        let error = parse_nuis_module(
+    fn accepts_async_function_taking_shader_result_family_param() {
+        let module = parse_nuis_module(
             r#"
             mod cpu Main {
               async fn consume(result: ShaderResult<Frame>) -> i64 {
@@ -18454,14 +18574,49 @@ mod tests {
                 }
                 return 0;
               }
+
+              fn main() -> i64 {
+                return 0;
+              }
             }
             "#,
         )
-        .unwrap_err();
+        .unwrap();
 
-        assert!(error.contains("parameter `result`"));
-        assert!(error.contains("ShaderResult<Frame>"));
-        assert!(error.contains("async boundary"));
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "consume")
+            .unwrap();
+        assert_eq!(function.params[0].ty.render(), "ShaderResult<Frame>");
+    }
+
+    #[test]
+    fn accepts_async_function_taking_kernel_result_family_param() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              async fn consume(result: KernelResult<i64>) -> i64 {
+                if kernel_config_ready(result) {
+                  return kernel_value(result);
+                }
+                return 0;
+              }
+
+              fn main() -> i64 {
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "consume")
+            .unwrap();
+        assert_eq!(function.params[0].ty.render(), "KernelResult<i64>");
     }
 
     #[test]

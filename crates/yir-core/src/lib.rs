@@ -603,7 +603,13 @@ impl Operation {
                 Ok(state == expected)
             }
             SemanticOp::KernelObserve => {
-                if source.semantic_op() != SemanticOp::CpuProjectProfileRef {
+                let direct_project_ref = source.semantic_op() == SemanticOp::CpuProjectProfileRef;
+                let direct_kernel_scalar_source = source.module == "kernel"
+                    && matches!(
+                        source.instruction.as_str(),
+                        "reduce_sum" | "reduce_max" | "reduce_mean" | "argmax" | "argmin"
+                    );
+                if !direct_project_ref && !direct_kernel_scalar_source {
                     return Ok(false);
                 }
                 Ok(state == "config_ready")

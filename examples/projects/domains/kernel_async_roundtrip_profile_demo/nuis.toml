@@ -1,0 +1,13 @@
+name = "kernel_async_roundtrip_profile_demo"
+version = "0.1.0"
+entry = "main.ns"
+modules = ["main.ns", "kernel_unit.ns", "fabric_plane.ns"]
+links = [
+  "cpu.Main -> kernel.KernelUnit via data.FabricPlane",
+  "kernel.KernelUnit -> cpu.Main via data.FabricPlane"
+]
+abi = [
+  "cpu=cpu.arm64.apple_aapcs64",
+  "kernel=kernel.apple_ane.coreml.v1",
+  "data=data.fabric.macos.arm64.v1"
+]

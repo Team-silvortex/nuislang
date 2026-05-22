@@ -21,12 +21,27 @@ stubs:
 * `shader_packet_bridge_demo.ns`
 * `shader_pass_profile_demo.ns`
 * `shader_frame_profile_demo.ns`
+* `shader_async_result_profile_demo.ns`
+* `shader_async_fanin_profile_demo.ns`
+* `shader_async_schedule_profile_demo.ns`
+* `shader_async_policy_profile_demo.ns`
+* `shader_async_fallback_profile_demo.ns`
+* `shader_async_batch_profile_demo.ns`
+* `shader_async_windowed_batch_profile_demo.ns`
 * `shader_result_family_profile_demo.ns`
 * `shader_result_profile_demo.ns`
 * `shader_draw_render_profile_demo.ns`
 * `shader_draw_profile_demo.ns`
 * `kernel_profile_demo.ns`
 * `kernel_result_profile_demo.ns`
+* `kernel_async_result_profile_demo.ns`
+* `kernel_async_batch_profile_demo.ns`
+* `kernel_async_roundtrip_profile_demo.ns`
+* `kernel_async_tensor_batch_profile_demo.ns`
+* `kernel_async_tensor_policy_profile_demo.ns`
+* `kernel_async_tensor_fallback_profile_demo.ns`
+* `kernel_async_tensor_windowed_batch_profile_demo.ns`
+* `kernel_async_tensor_roundtrip_profile_demo.ns`
 * `kernel_tensor_profile_demo.ns`
 * `kernel_tensor_inspect_demo.ns`
 * `kernel_tensor_slice_demo.ns`
@@ -62,11 +77,23 @@ Current guidance:
   `shader_surface_packet_profile_demo.ns`, `shader_surface_pass_profile_demo.ns`,
   `shader_packet_profile_demo.ns`,
   `shader_packet_bridge_demo.ns`, `shader_pass_profile_demo.ns`,
-  `shader_frame_profile_demo.ns`, `shader_result_family_profile_demo.ns`,
+  `shader_frame_profile_demo.ns`, `shader_async_result_profile_demo.ns`,
+  `shader_async_fanin_profile_demo.ns`,
+  `shader_async_schedule_profile_demo.ns`,
+  `shader_async_policy_profile_demo.ns`,
+  `shader_async_fallback_profile_demo.ns`,
+  `shader_async_batch_profile_demo.ns`,
+  `shader_async_windowed_batch_profile_demo.ns`,
+  `shader_result_family_profile_demo.ns`,
   `shader_result_profile_demo.ns`, `shader_draw_render_profile_demo.ns`,
   `shader_draw_profile_demo.ns`,
   `kernel_profile_demo.ns`,
-  `kernel_result_profile_demo.ns`, `kernel_tensor_profile_demo.ns`, and
+  `kernel_result_profile_demo.ns`, `kernel_async_result_profile_demo.ns`,
+  `kernel_async_batch_profile_demo.ns`,
+  `kernel_async_roundtrip_profile_demo.ns`,
+  `kernel_async_tensor_batch_profile_demo.ns`,
+  `kernel_async_tensor_roundtrip_profile_demo.ns`,
+  `kernel_tensor_profile_demo.ns`, and
   `kernel_tensor_inspect_demo.ns`, `kernel_tensor_slice_demo.ns`,
   `kernel_tensor_reshape_demo.ns`, `kernel_tensor_broadcast_demo.ns`,
   `kernel_tensor_reduce_demo.ns`, `kernel_tensor_select_demo.ns`,
@@ -102,12 +129,27 @@ cargo run -p nuis -- check examples/projects/domains/shader_packet_profile_demo
 cargo run -p nuis -- check examples/projects/domains/shader_packet_bridge_demo
 cargo run -p nuis -- check examples/projects/domains/shader_pass_profile_demo
 cargo run -p nuis -- check examples/projects/domains/shader_frame_profile_demo
+cargo run -p nuis -- check examples/projects/domains/shader_async_result_profile_demo
+cargo run -p nuis -- check examples/projects/domains/shader_async_fanin_profile_demo
+cargo run -p nuis -- check examples/projects/domains/shader_async_schedule_profile_demo
+cargo run -p nuis -- check examples/projects/domains/shader_async_policy_profile_demo
+cargo run -p nuis -- check examples/projects/domains/shader_async_fallback_profile_demo
+cargo run -p nuis -- check examples/projects/domains/shader_async_batch_profile_demo
+cargo run -p nuis -- check examples/projects/domains/shader_async_windowed_batch_profile_demo
 cargo run -p nuis -- check examples/projects/domains/shader_result_family_profile_demo
 cargo run -p nuis -- check examples/projects/domains/shader_result_profile_demo
 cargo run -p nuis -- check examples/projects/domains/shader_draw_render_profile_demo
 cargo run -p nuis -- check examples/projects/domains/shader_draw_profile_demo
 cargo run -p nuis -- check examples/projects/domains/kernel_profile_demo
 cargo run -p nuis -- check examples/projects/domains/kernel_result_profile_demo
+cargo run -p nuis -- check examples/projects/domains/kernel_async_result_profile_demo
+cargo run -p nuis -- check examples/projects/domains/kernel_async_batch_profile_demo
+cargo run -p nuis -- check examples/projects/domains/kernel_async_roundtrip_profile_demo
+cargo run -p nuis -- check examples/projects/domains/kernel_async_tensor_batch_profile_demo
+cargo run -p nuis -- check examples/projects/domains/kernel_async_tensor_policy_profile_demo
+cargo run -p nuis -- check examples/projects/domains/kernel_async_tensor_fallback_profile_demo
+cargo run -p nuis -- check examples/projects/domains/kernel_async_tensor_windowed_batch_profile_demo
+cargo run -p nuis -- check examples/projects/domains/kernel_async_tensor_roundtrip_profile_demo
 cargo run -p nuis -- check examples/projects/domains/kernel_tensor_profile_demo
 cargo run -p nuis -- check examples/projects/domains/kernel_tensor_inspect_demo
 cargo run -p nuis -- check examples/projects/domains/kernel_tensor_slice_demo

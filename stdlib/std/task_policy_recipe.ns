@@ -1,0 +1,76 @@
+mod cpu Main {
+  struct TaskPolicySummary {
+    primary_completed: i64,
+    secondary_completed: i64,
+    fallback_timed_out: i64,
+    selected_value: i64
+  }
+
+  async fn primary(seed: i64) -> i64 {
+    return seed + 10;
+  }
+
+  async fn secondary(seed: i64) -> i64 {
+    return seed + 20;
+  }
+
+  fn encode_completed(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_timed_out(result: TaskResult<i64>) -> i64 {
+    if task_timed_out(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn select_value(
+    primary_result: TaskResult<i64>,
+    secondary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    if task_completed(primary_result) {
+      return task_value(primary_result) + 100;
+    }
+    if task_completed(secondary_result) {
+      return task_value(secondary_result) + 10;
+    }
+    if task_timed_out(fallback_result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn capture_task_policy(seed: i64, limit: i64) -> TaskPolicySummary {
+    let primary_task: Task<i64> = spawn(primary(seed));
+    let secondary_task: Task<i64> = spawn(secondary(seed));
+    let fallback_task: Task<i64> = timeout(spawn(primary(seed)), limit);
+
+    let primary_result: TaskResult<i64> = join_result(primary_task);
+    let secondary_result: TaskResult<i64> = join_result(secondary_task);
+    let fallback_result: TaskResult<i64> = join_result(fallback_task);
+
+    return TaskPolicySummary {
+      primary_completed: encode_completed(primary_result),
+      secondary_completed: encode_completed(secondary_result),
+      fallback_timed_out: encode_timed_out(fallback_result),
+      selected_value: select_value(primary_result, secondary_result, fallback_result)
+    };
+  }
+
+  fn summarize_task_policy_recipe(seed: i64, limit: i64) -> i64 {
+    let summary: TaskPolicySummary = capture_task_policy(seed, limit);
+    return summary.primary_completed
+      + summary.secondary_completed
+      + summary.fallback_timed_out
+      + summary.selected_value;
+  }
+
+  fn main() {
+    print(summarize_task_policy_recipe(7, 0));
+  }
+}

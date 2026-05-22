@@ -1,0 +1,39 @@
+mod cpu Main {
+  async fn observe_draw(result: ShaderResult<Frame>) -> i64 {
+    if shader_frame_ready(result) {
+      return 4;
+    }
+    return 0;
+  }
+
+  async fn observe_render(result: ShaderResult<Frame>) -> i64 {
+    if shader_frame_ready(result) {
+      return 8;
+    }
+    return 0;
+  }
+
+  fn encode_task_value(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return task_value(result);
+    }
+    return 0;
+  }
+
+  fn main() {
+    let pass_result: ShaderResult<Pass> =
+      shader_result(shader_profile_begin_pass("SurfaceShader"));
+    let draw_result: ShaderResult<Frame> = shader_result(
+      shader_profile_draw_instanced("SurfaceShader", shader_value(pass_result), gpu_packet)
+    );
+    let render_result: ShaderResult<Frame> =
+      shader_result(shader_profile_render("SurfaceShader", gpu_packet_2));
+
+    let draw_task: Task<i64> = spawn(observe_draw(draw_result));
+    let render_task: Task<i64> = spawn(observe_render(render_result));
+    let draw_join: TaskResult<i64> = join_result(draw_task);
+    let render_join: TaskResult<i64> = join_result(render_task);
+
+    print(encode_task_value(draw_join) + encode_task_value(render_join));
+  }
+}

@@ -27,6 +27,7 @@ task_runtime
 -> task_value
 -> task_compare
 -> task_lifecycle
+-> task_policy
 -> task_clock / task_scheduler
 -> task_cli
 ```
@@ -63,6 +64,7 @@ These are the current narrow checked-in task routes.
 * [task_value_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_value_recipe.ns)
 * [task_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_compare_recipe.ns)
 * [task_lifecycle_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_lifecycle_recipe.ns)
+* [task_policy_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_policy_recipe.ns)
 
 Current role split:
 
@@ -72,6 +74,7 @@ Current role split:
 * `task_value` isolates payload extraction after a valid result path
 * `task_compare` isolates branchable comparison over task outcomes
 * `task_lifecycle` bundles the first wider but still task-local lifecycle route
+* `task_policy` bundles the first explicit task-local policy/fallback route
 
 These are the narrowest readable contracts for the checked-in task semantics
 before timing, scheduler, or CLI concerns are layered on top.
@@ -121,6 +124,7 @@ task_runtime
 -> task_value
 -> task_compare
 -> task_lifecycle
+-> task_policy
 -> task_clock / task_scheduler
 -> task_cli
 ```
@@ -132,6 +136,7 @@ Concrete sources:
 * [task_value_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_value_recipe.ns)
 * [task_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_compare_recipe.ns)
 * [task_lifecycle_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_lifecycle_recipe.ns)
+* [task_policy_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_policy_recipe.ns)
 * [task_clock_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_clock_recipe.ns)
 * [task_scheduler_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_scheduler_recipe.ns)
 * [task_cli_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_cli_recipe.ns)
@@ -140,7 +145,7 @@ This cluster should currently be read as:
 
 * `task_runtime` explains the first semantic route
 * `task_status` and `task_value` explain observation vs extraction
-* `task_compare` and `task_lifecycle` explain branchable lifecycle structure
+* `task_compare`, `task_lifecycle`, and `task_policy` explain branchable lifecycle and policy structure
 * `task_clock` and `task_scheduler` explain timing and lane-aware extensions
 * `task_cli` explains the first practical host-facing combined route
 
@@ -181,6 +186,7 @@ Examples:
 * [task_clock_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_clock_observe_demo)
 * [task_scheduler_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_scheduler_observe_demo)
 * [task_lifecycle_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_lifecycle_branch_demo)
+* [task_policy_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_policy_branch_demo)
 
 ## What This Contract Does Not Promise
 

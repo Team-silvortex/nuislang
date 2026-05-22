@@ -1270,14 +1270,18 @@ fn verify_result_state_nodes(module: &YirModule) -> Result<(), String> {
                 let direct_project_ref =
                     source.op.semantic_op() == SemanticOp::CpuProjectProfileRef;
                 let resolved_kernel_profile_slot = is_resolved_kernel_profile_slot(source);
-                if !direct_project_ref && !resolved_kernel_profile_slot {
+                let direct_kernel_scalar_source = is_direct_kernel_scalar_source(source);
+                if !direct_project_ref
+                    && !resolved_kernel_profile_slot
+                    && !direct_kernel_scalar_source
+                {
                     return Err(format!(
-                        "node `{}` expects cpu.project_profile_ref input for kernel observe, got `{}`",
+                        "node `{}` expects cpu.project_profile_ref or direct kernel scalar input for kernel observe, got `{}`",
                         node.name,
                         source.op.full_name()
                     ));
                 }
-                let state_matches = if resolved_kernel_profile_slot {
+                let state_matches = if resolved_kernel_profile_slot || direct_kernel_scalar_source {
                     actual == "config_ready"
                 } else {
                     node.op.observe_state_matches_source(&source.op, actual)?
@@ -1306,6 +1310,14 @@ fn is_resolved_kernel_profile_slot(node: &Node) -> bool {
     node.name.starts_with("project_profile_kernel_")
         && node.op.module == "cpu"
         && node.op.instruction == "const_i64"
+}
+
+fn is_direct_kernel_scalar_source(node: &Node) -> bool {
+    node.op.module == "kernel"
+        && matches!(
+            node.op.instruction.as_str(),
+            "reduce_sum" | "reduce_max" | "reduce_mean" | "argmax" | "argmin"
+        )
 }
 
 fn require_expected_result_source(

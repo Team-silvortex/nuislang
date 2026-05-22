@@ -1,0 +1,80 @@
+mod cpu Main {
+  async fn observe_pass(result: ShaderResult<Pass>) -> i64 {
+    if shader_pass_ready(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  async fn observe_frame(result: ShaderResult<Frame>) -> i64 {
+    if shader_frame_ready(result) {
+      return 2;
+    }
+    return 0;
+  }
+
+  fn encode_task_value(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return task_value(result);
+    }
+    return 0;
+  }
+
+  fn main() {
+    const base_color: i64 = 104;
+    const base_speed: i64 = 16;
+    const base_radius: i64 = 72;
+    const speed_scale: i64 = 2;
+    const color_delta: i64 = 0;
+    const speed_delta: i64 = 0;
+    const radius_delta: i64 = 0;
+
+    let color_slot: i64 = shader_profile_packet_color_slot("SurfaceShader");
+    let speed_slot: i64 = shader_profile_packet_speed_slot("SurfaceShader");
+    let radius_slot: i64 = shader_profile_packet_radius_slot("SurfaceShader");
+
+    let panel_color: i64 =
+      shader_profile_color_seed("SurfaceShader", base_color + color_slot, color_delta);
+    let panel_speed: i64 = shader_profile_speed_seed(
+      "SurfaceShader",
+      speed_delta + speed_slot,
+      speed_scale,
+      base_speed
+    );
+    let panel_radius: i64 =
+      shader_profile_radius_seed("SurfaceShader", base_radius + radius_slot, radius_delta);
+
+    let render_controls: SurfaceShaderPacket =
+      shader_profile_packet("SurfaceShader", panel_color, panel_speed, panel_radius);
+    let pass_result: ShaderResult<Pass> =
+      shader_result(shader_profile_begin_pass("SurfaceShader"));
+    let pass_task: Task<i64> = spawn(observe_pass(pass_result));
+    let frame_result: ShaderResult<Frame> =
+      shader_result(shader_profile_render("SurfaceShader", render_controls));
+    let frame_task: Task<i64> = spawn(observe_frame(frame_result));
+    let pass_task_result: TaskResult<i64> = join_result(pass_task);
+    let frame_task_result: TaskResult<i64> = join_result(frame_task);
+    print(encode_task_value(pass_task_result) + encode_task_value(frame_task_result));
+  }
+}
+
+mod shader SurfaceShader {
+  fn profile() {
+    const vertex_count: i64 = 4;
+    const instance_count: i64 = 1;
+    const packet_color_slot: i64 = 0;
+    const packet_speed_slot: i64 = 1;
+    const packet_radius_slot: i64 = 2;
+    const packet_tag: i64 = 17;
+    const material_mode: i64 = 2;
+    const pass_kind: i64 = 1;
+    const packet_field_count: i64 = 3;
+
+    let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
+    let profile_view: Viewport = shader_viewport(160, 120);
+    let profile_pipe: Pipeline =
+      shader_pipeline("std_shader_async_fanin_profile", "triangle_strip");
+    let profile_wgsl: ShaderModule =
+      shader_inline_wgsl("std_shader_async_fanin_profile", wgsl { });
+  }
+}

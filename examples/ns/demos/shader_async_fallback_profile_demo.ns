@@ -1,0 +1,39 @@
+mod cpu Main {
+  async fn observe_draw(result: ShaderResult<Frame>) -> i64 {
+    if shader_frame_ready(result) {
+      return 4;
+    }
+    return 0;
+  }
+
+  async fn observe_render(result: ShaderResult<Frame>) -> i64 {
+    if shader_frame_ready(result) {
+      return 8;
+    }
+    return 0;
+  }
+
+  fn main() {
+    let draw_task: Task<i64> = spawn(observe_draw(draw_result));
+    let render_task: Task<i64> = timeout(spawn(observe_render(render_result)), 0);
+    let draw_join: TaskResult<i64> = join_result(draw_task);
+    let render_join: TaskResult<i64> = join_result(render_task);
+
+    if task_completed(render_join) {
+      print(task_value(render_join) + 1000);
+      return;
+    }
+
+    if task_completed(draw_join) {
+      print(task_value(draw_join) + 1);
+      return;
+    }
+
+    if task_timed_out(render_join) {
+      print(10);
+      return;
+    }
+
+    print(0);
+  }
+}

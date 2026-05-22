@@ -1,0 +1,76 @@
+use data FabricPlane;
+use kernel KernelUnit;
+
+mod cpu Main {
+  struct KernelAsyncBatchSummary {
+    bind_core_completed: i64,
+    queue_depth_completed: i64,
+    batch_lanes_completed: i64,
+    batch_value: i64
+  }
+
+  async fn consume_kernel_result(result: KernelResult<i64>) -> i64 {
+    if kernel_config_ready(result) {
+      return kernel_value(result) + 1;
+    }
+    return 0;
+  }
+
+  fn encode_completed(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_task_value(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return task_value(result);
+    }
+    return 0;
+  }
+
+  fn capture_async_batch() -> KernelAsyncBatchSummary {
+    let bind_core: KernelResult<i64> =
+      kernel_result(kernel_profile_bind_core("KernelUnit"));
+    let queue_depth: KernelResult<i64> =
+      kernel_result(kernel_profile_queue_depth("KernelUnit"));
+    let batch_lanes: KernelResult<i64> =
+      kernel_result(kernel_profile_batch_lanes("KernelUnit"));
+
+    let bind_core_task: Task<i64> = spawn(consume_kernel_result(bind_core));
+    let queue_depth_task: Task<i64> = spawn(consume_kernel_result(queue_depth));
+    let batch_lanes_task: Task<i64> = spawn(consume_kernel_result(batch_lanes));
+
+    let bind_core_join: TaskResult<i64> = join_result(bind_core_task);
+    let queue_depth_join: TaskResult<i64> = join_result(queue_depth_task);
+    let batch_lanes_join: TaskResult<i64> = join_result(batch_lanes_task);
+
+    return KernelAsyncBatchSummary {
+      bind_core_completed: encode_completed(bind_core_join),
+      queue_depth_completed: encode_completed(queue_depth_join),
+      batch_lanes_completed: encode_completed(batch_lanes_join),
+      batch_value: encode_task_value(bind_core_join)
+        + encode_task_value(queue_depth_join)
+        + encode_task_value(batch_lanes_join)
+    };
+  }
+
+  fn main() {
+    cpu_bind_core(0);
+
+    let summary: KernelAsyncBatchSummary = capture_async_batch();
+    let roundtrip_seed: i64 = summary.bind_core_completed
+      + summary.queue_depth_completed
+      + summary.batch_lanes_completed
+      + summary.batch_value;
+
+    data_profile_bind_core("FabricPlane");
+    let handles: HandleTable<FabricPlaneBindings> =
+      data_profile_handle_table("FabricPlane");
+    let uplink: Window<i64> = data_profile_send_uplink("FabricPlane", roundtrip_seed);
+    let downlink: Window<Window<i64>> = data_profile_send_downlink("FabricPlane", uplink);
+
+    print(downlink);
+  }
+}

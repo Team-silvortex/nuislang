@@ -1,0 +1,109 @@
+mod cpu Main {
+  struct KernelAsyncTensorPolicySummary {
+    bind_core_completed: i64,
+    queue_depth_completed: i64,
+    batch_lanes_completed: i64,
+    total_completed: i64,
+    peak_completed: i64,
+    avg_timed_out: i64,
+    selected_value: i64
+  }
+
+  async fn consume_kernel_result(result: KernelResult<i64>) -> i64 {
+    if kernel_config_ready(result) {
+      return kernel_value(result) + 1;
+    }
+    return 0;
+  }
+
+  fn encode_completed(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_timed_out(result: TaskResult<i64>) -> i64 {
+    if task_timed_out(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn select_value(
+    peak_join: TaskResult<i64>,
+    total_join: TaskResult<i64>,
+    avg_join: TaskResult<i64>
+  ) -> i64 {
+    if task_completed(peak_join) {
+      return task_value(peak_join) + 100;
+    }
+    if task_completed(total_join) {
+      return task_value(total_join) + 10;
+    }
+    if task_timed_out(avg_join) {
+      return 5;
+    }
+    return 0;
+  }
+
+  fn main() {
+    let bind_core: KernelResult<i64> =
+      kernel_result(kernel_profile_bind_core("KernelUnit"));
+    let queue_depth: KernelResult<i64> =
+      kernel_result(kernel_profile_queue_depth("KernelUnit"));
+    let batch_lanes: KernelResult<i64> =
+      kernel_result(kernel_profile_batch_lanes("KernelUnit"));
+
+    let input = kernel_tensor(2, 3, "2,4,6,1,3,5");
+    let total_result: KernelResult<i64> =
+      kernel_result(kernel_reduce_sum(input));
+    let peak_result: KernelResult<i64> =
+      kernel_result(kernel_reduce_max(input));
+    let avg_result: KernelResult<i64> =
+      kernel_result(kernel_reduce_mean(input));
+
+    let bind_core_task: Task<i64> = spawn(consume_kernel_result(bind_core));
+    let queue_depth_task: Task<i64> = spawn(consume_kernel_result(queue_depth));
+    let batch_lanes_task: Task<i64> = spawn(consume_kernel_result(batch_lanes));
+    let total_task: Task<i64> = spawn(consume_kernel_result(total_result));
+    let peak_task: Task<i64> = spawn(consume_kernel_result(peak_result));
+    let avg_task: Task<i64> = timeout(spawn(consume_kernel_result(avg_result)), 0);
+
+    let bind_core_join: TaskResult<i64> = join_result(bind_core_task);
+    let queue_depth_join: TaskResult<i64> = join_result(queue_depth_task);
+    let batch_lanes_join: TaskResult<i64> = join_result(batch_lanes_task);
+    let total_join: TaskResult<i64> = join_result(total_task);
+    let peak_join: TaskResult<i64> = join_result(peak_task);
+    let avg_join: TaskResult<i64> = join_result(avg_task);
+
+    let summary: KernelAsyncTensorPolicySummary = KernelAsyncTensorPolicySummary {
+      bind_core_completed: encode_completed(bind_core_join),
+      queue_depth_completed: encode_completed(queue_depth_join),
+      batch_lanes_completed: encode_completed(batch_lanes_join),
+      total_completed: encode_completed(total_join),
+      peak_completed: encode_completed(peak_join),
+      avg_timed_out: encode_timed_out(avg_join),
+      selected_value: select_value(peak_join, total_join, avg_join)
+    };
+
+    print(
+      summary.bind_core_completed
+        + summary.queue_depth_completed
+        + summary.batch_lanes_completed
+        + summary.total_completed
+        + summary.peak_completed
+        + summary.avg_timed_out
+        + summary.selected_value
+    );
+  }
+}
+
+mod kernel KernelUnit {
+  fn profile() {
+    const bind_core: i64 = 2;
+    const queue_depth: i64 = 8;
+    const batch_lanes: i64 = 16;
+    let profile_entry: Unit = kernel_target_config("apple_ane", "coreml", batch_lanes);
+  }
+}

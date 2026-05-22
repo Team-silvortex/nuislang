@@ -1,0 +1,27 @@
+mod cpu Main {
+  async fn consume_kernel_result(result: KernelResult<i64>) -> i64 {
+    if kernel_config_ready(result) {
+      return kernel_value(result) + 1;
+    }
+    return 0;
+  }
+
+  fn main() {
+    let lanes: KernelResult<i64> =
+      kernel_result(kernel_profile_batch_lanes("KernelUnit"));
+    let observe_task: Task<i64> = spawn(consume_kernel_result(lanes));
+    let observe_result: TaskResult<i64> = join_result(observe_task);
+    if task_completed(observe_result) {
+      print(task_value(observe_result));
+    }
+  }
+}
+
+mod kernel KernelUnit {
+  fn profile() {
+    const bind_core: i64 = 2;
+    const queue_depth: i64 = 8;
+    const batch_lanes: i64 = 16;
+    let profile_entry: Unit = kernel_target_config("apple_ane", "coreml", batch_lanes);
+  }
+}

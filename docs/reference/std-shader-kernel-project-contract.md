@@ -79,6 +79,13 @@ The current narrow project-form companions are:
 * [shader_packet_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_packet_bridge_demo)
 * [shader_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_pass_profile_demo)
 * [shader_frame_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_frame_profile_demo)
+* [shader_async_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_result_profile_demo)
+* [shader_async_fanin_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_fanin_profile_demo)
+* [shader_async_schedule_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_schedule_profile_demo)
+* [shader_async_policy_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_policy_profile_demo)
+* [shader_async_fallback_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_fallback_profile_demo)
+* [shader_async_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_batch_profile_demo)
+* [shader_async_windowed_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_windowed_batch_profile_demo)
 * [shader_result_family_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_result_family_profile_demo)
 * [shader_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_result_profile_demo)
 * [shader_draw_render_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_draw_render_profile_demo)
@@ -86,6 +93,14 @@ The current narrow project-form companions are:
 * [shader_render_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_render_profile_demo)
 * [kernel_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_profile_demo)
 * [kernel_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_result_profile_demo)
+* [kernel_async_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_result_profile_demo)
+* [kernel_async_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_batch_profile_demo)
+* [kernel_async_roundtrip_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_roundtrip_profile_demo)
+* [kernel_async_tensor_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_batch_profile_demo)
+* [kernel_async_tensor_policy_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_policy_profile_demo)
+* [kernel_async_tensor_fallback_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_fallback_profile_demo)
+* [kernel_async_tensor_windowed_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_windowed_batch_profile_demo)
+* [kernel_async_tensor_roundtrip_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_roundtrip_profile_demo)
 * [kernel_tensor_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_profile_demo)
 * [kernel_tensor_inspect_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_inspect_demo)
 * [kernel_tensor_slice_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_slice_demo)
@@ -183,6 +198,35 @@ Current role split:
   `shader_result(shader_profile_render(...))`, `shader_frame_ready(...)`, and
   `shader_value(frame_result)` are the main focus, while packet shaping stays
   explicit and the downlink/present bridge remains visible
+* `shader_async_result_profile_demo` is the next narrow route where
+  `ShaderResult<Frame>` explicitly crosses a `mod cpu` async-helper boundary
+  and is consumed through `spawn(...) -> join_result(...) -> TaskResult<i64>`
+* `shader_async_fanin_profile_demo` is the next narrow route where
+  `ShaderResult<Pass>` and `ShaderResult<Frame>` explicitly cross separate
+  `mod cpu` async-helper boundaries, are consumed through parallel
+  `spawn(...) -> join_result(...) -> TaskResult<i64>` lanes, and then fold
+  back into one checked-in CPU-side fan-in point
+* `shader_async_schedule_profile_demo` is the next narrow route where
+  draw-lane `ShaderResult<Frame>` and render-lane `ShaderResult<Frame>`
+  explicitly cross separate `mod cpu` async-helper boundaries, are consumed
+  through parallel `spawn(...) -> join_result(...) -> TaskResult<i64>` lanes,
+  and then fold back into one checked-in CPU-side scheduling point
+* `shader_async_policy_profile_demo` is the next narrow route where those
+  draw-lane and render-lane async observations are explicitly folded through a
+  checked-in CPU-side priority policy that prefers one lane over the other
+  before rejoining the wider shader result family
+* `shader_async_fallback_profile_demo` is the next narrow route where the
+  render-lane async observation is explicitly forced through a short timeout,
+  and the checked-in CPU-side fallback rule prefers the draw-lane preview when
+  that render lane does not complete in time
+* `shader_async_batch_profile_demo` is the next narrow route where multiple
+  draw/render async observations are explicitly launched as one checked-in CPU
+  batch, joined through parallel `join_result(...)` points, and folded into a
+  compact batch summary rather than a single one-off lane value
+* `shader_async_windowed_batch_profile_demo` is the next narrow route where
+  that checked-in async batch summary is explicitly joined with a draw preview
+  downlink and a final render present path, making the batch visibly windowed
+  rather than purely observational
 * `shader_result_family_profile_demo` is the next narrow route where
   `shader_result(shader_profile_begin_pass(...))`,
   `shader_result(shader_profile_draw_instanced(...))`, and
@@ -208,6 +252,25 @@ Current role split:
 * `kernel_result_profile_demo` is the next narrow route where kernel profile
   metadata is explicitly wrapped into `KernelResult<T>` and then observed
   through `kernel_config_ready(...)` and `kernel_value(...)`
+* kernel async base:
+  [kernel_async_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_result_profile_demo) is the first route where
+  `KernelResult<i64>` crosses a `mod cpu` async-helper boundary,
+  [kernel_async_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_batch_profile_demo) is the next route where multiple observations are launched and joined as one batch,
+  and [kernel_async_roundtrip_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_roundtrip_profile_demo) is the route where that narrower profile batch is compressed into a roundtrip seed and joined with `data_profile_send_uplink(...)` and `data_profile_send_downlink(...)`
+* kernel async tensor:
+  [kernel_async_tensor_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_batch_profile_demo) first compresses the tensor lane into scalar `KernelResult<i64>` observations,
+  [kernel_async_tensor_policy_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_policy_profile_demo) adds explicit CPU-side priority policy,
+  [kernel_async_tensor_fallback_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_fallback_profile_demo) adds explicit timeout fallback,
+  [kernel_async_tensor_windowed_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_windowed_batch_profile_demo) splits that tensor async batch into preview-window and final-window summaries,
+  and [kernel_async_tensor_roundtrip_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_roundtrip_profile_demo) compresses that tensor async batch into a roundtrip seed and joins it with `data_profile_send_uplink(...)` and `data_profile_send_downlink(...)`
+* async branch alignment:
+  shader async starts at [shader_async_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_result_profile_demo), grows through [shader_async_policy_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_policy_profile_demo), [shader_async_fallback_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_fallback_profile_demo), and [shader_async_windowed_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_windowed_batch_profile_demo), then rejoins the wider bridge branch
+  kernel async now mirrors that in two layers:
+  async base uses [kernel_async_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_result_profile_demo), [kernel_async_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_batch_profile_demo), and [kernel_async_roundtrip_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_roundtrip_profile_demo)
+  async tensor uses [kernel_async_tensor_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_batch_profile_demo), [kernel_async_tensor_policy_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_policy_profile_demo), [kernel_async_tensor_fallback_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_fallback_profile_demo), [kernel_async_tensor_windowed_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_windowed_batch_profile_demo), and [kernel_async_tensor_roundtrip_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_roundtrip_profile_demo)
+  the practical reading rule is:
+  shader async is frame/result-first,
+  kernel async is profile/tensor-summary-first
 * `kernel_tensor_profile_demo` is the next narrow route where kernel profile
   metadata is already joined with source-facing tensor primitives such as
   `kernel_tensor(...)`, `kernel_matmul(...)`, `kernel_add_bias(...)`,
@@ -289,6 +352,13 @@ The shader ladder is now easier to read as three local branches after
 * bridge branch:
   [shader_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_pass_profile_demo) ->
   [shader_frame_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_frame_profile_demo) ->
+  [shader_async_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_result_profile_demo) ->
+  [shader_async_fanin_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_fanin_profile_demo) ->
+  [shader_async_schedule_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_schedule_profile_demo) ->
+  [shader_async_policy_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_policy_profile_demo) ->
+  [shader_async_fallback_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_fallback_profile_demo) ->
+  [shader_async_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_batch_profile_demo) ->
+  [shader_async_windowed_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_windowed_batch_profile_demo) ->
   [shader_result_family_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_result_family_profile_demo) ->
   [shader_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_result_profile_demo) ->
   [shader_draw_render_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_draw_render_profile_demo) ->
@@ -304,7 +374,9 @@ Recommended reading order inside shader is now:
 * then read the packet branch as:
   packet contract -> packet bridge
 * then read the bridge branch as:
-  pass -> frame -> result family -> draw/render split -> wider draw/render
+  pass -> frame -> async result consume -> async fan-in -> async scheduling ->
+  async policy -> async fallback -> async batch -> async windowed batch ->
+  result family -> draw/render split -> wider draw/render
 * only then move to [window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo)
 
 ## Current Axis-Aware Kernel Lane
@@ -367,10 +439,25 @@ The repository still keeps source-shaped mirrors for these lanes:
 * [shader_packet_bridge_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_packet_bridge_demo.ns)
 * [shader_pass_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_pass_profile_demo.ns)
 * [shader_frame_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_frame_profile_demo.ns)
+* [shader_async_result_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_async_result_profile_demo.ns)
+* [shader_async_fanin_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_async_fanin_profile_demo.ns)
+* [shader_async_schedule_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_async_schedule_profile_demo.ns)
+* [shader_async_policy_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_async_policy_profile_demo.ns)
+* [shader_async_fallback_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_async_fallback_profile_demo.ns)
+* [shader_async_batch_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_async_batch_profile_demo.ns)
+* [shader_async_windowed_batch_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_async_windowed_batch_profile_demo.ns)
 * [shader_result_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_result_profile_demo.ns)
 * [shader_draw_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/shader_draw_profile_demo.ns)
 * [kernel_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_profile_demo.ns)
 * [kernel_result_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_result_profile_demo.ns)
+* [kernel_async_result_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_async_result_profile_demo.ns)
+* [kernel_async_batch_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_async_batch_profile_demo.ns)
+* [kernel_async_tensor_batch_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_async_tensor_batch_profile_demo.ns)
+* [kernel_async_tensor_policy_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_async_tensor_policy_profile_demo.ns)
+* [kernel_async_tensor_fallback_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_async_tensor_fallback_profile_demo.ns)
+* [kernel_async_tensor_windowed_batch_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_async_tensor_windowed_batch_profile_demo.ns)
+* [kernel_async_tensor_roundtrip_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_async_tensor_roundtrip_profile_demo.ns)
+* [kernel_async_roundtrip_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_async_roundtrip_profile_demo.ns)
 * [kernel_tensor_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_profile_demo.ns)
 * [kernel_tensor_inspect_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_inspect_demo.ns)
 * [kernel_tensor_slice_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/kernel_tensor_slice_demo.ns)
@@ -457,6 +544,8 @@ Concretely:
   [kernel_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_profile_demo)
   ->
   [kernel_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_result_profile_demo)
+  ->
+  [kernel_async_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_result_profile_demo)
   ->
   [kernel_tensor_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_profile_demo)
   ->

@@ -41,6 +41,7 @@ source_modules = [
   "task_value_recipe.ns",
   "task_compare_recipe.ns",
   "task_lifecycle_recipe.ns",
+  "task_policy_recipe.ns",
   "path_runtime.ns",
   "path_runtime_recipe.ns",
   "path_is_empty_recipe.ns",
