@@ -1,0 +1,90 @@
+mod cpu Main {
+  struct TaskFallbackSummary {
+    primary_timed_out: i64,
+    fallback_completed: i64,
+    default_selected: i64,
+    selected_value: i64
+  }
+
+  async fn primary(seed: i64) -> i64 {
+    return seed + 10;
+  }
+
+  async fn fallback(seed: i64) -> i64 {
+    return seed + 20;
+  }
+
+  fn encode_timed_out(result: TaskResult<i64>) -> i64 {
+    if task_timed_out(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_completed(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_default_selected(
+    primary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    if task_completed(fallback_result) {
+      return 0;
+    }
+    if task_timed_out(primary_result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn select_fallback_value(fallback_result: TaskResult<i64>) -> i64 {
+    if task_completed(fallback_result) {
+      return task_value(fallback_result) + 10;
+    }
+    return 1;
+  }
+
+  fn select_value(
+    primary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    if task_completed(primary_result) {
+      return task_value(primary_result) + 100;
+    }
+    if task_timed_out(primary_result) {
+      return select_fallback_value(fallback_result);
+    }
+    return 0;
+  }
+
+  fn capture_task_fallback(seed: i64, limit: i64) -> TaskFallbackSummary {
+    let primary_task: Task<i64> = timeout(spawn(primary(seed)), limit);
+    let fallback_task: Task<i64> = spawn(fallback(seed));
+
+    let primary_result: TaskResult<i64> = join_result(primary_task);
+    let fallback_result: TaskResult<i64> = join_result(fallback_task);
+
+    return TaskFallbackSummary {
+      primary_timed_out: encode_timed_out(primary_result),
+      fallback_completed: encode_completed(fallback_result),
+      default_selected: encode_default_selected(primary_result, fallback_result),
+      selected_value: select_value(primary_result, fallback_result)
+    };
+  }
+
+  fn summarize_task_fallback_recipe(seed: i64, limit: i64) -> i64 {
+    let summary: TaskFallbackSummary = capture_task_fallback(seed, limit);
+    return summary.primary_timed_out
+      + summary.fallback_completed
+      + summary.default_selected
+      + summary.selected_value;
+  }
+
+  fn main() {
+    print(summarize_task_fallback_recipe(7, 0));
+  }
+}

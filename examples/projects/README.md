@@ -188,6 +188,7 @@ Core companion routes:
   [task_clock_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_clock_observe_demo),
   [task_scheduler_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_scheduler_observe_demo),
   [task_lifecycle_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_lifecycle_branch_demo),
+  [task_fallback_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_fallback_branch_demo),
   [task_policy_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_policy_branch_demo),
   [task_cli_tooling_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_cli_tooling_demo)
 * tooling/runtime companions:
@@ -304,7 +305,9 @@ cargo run -p nuis -- build examples/projects/tooling/diagnostic_runtime_demo /pr
 cargo run -p nuis -- check examples/projects/tooling/sleep_runtime_demo
 cargo run -p nuis -- build examples/projects/tooling/sleep_runtime_demo /private/tmp/sleep_runtime_demo_out
 cargo run -p nuis -- check examples/projects/task/task_lifecycle_branch_demo
+cargo run -p nuis -- check examples/projects/task/task_fallback_branch_demo
 cargo run -p nuis -- build examples/projects/task/task_lifecycle_branch_demo /private/tmp/task_lifecycle_branch_demo_out
+cargo run -p nuis -- build examples/projects/task/task_fallback_branch_demo /private/tmp/task_fallback_branch_demo_out
 cargo run -p nuis -- check examples/projects/task/task_policy_branch_demo
 cargo run -p nuis -- build examples/projects/task/task_policy_branch_demo /private/tmp/task_policy_branch_demo_out
 cargo run -p nuis -- check examples/projects/task/task_runtime_demo
