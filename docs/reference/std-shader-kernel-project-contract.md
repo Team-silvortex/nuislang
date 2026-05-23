@@ -13,6 +13,28 @@ The important current truth is simple:
 * they are not currently `std`-first lanes
 * they are not currently standalone single-file `check` lanes
 
+## Shared Task Alignment
+
+Even though `shader` and `kernel` are still project-first lanes, their current
+async reading order now lines up with the checked-in shared task-facing
+primitives in `std`.
+
+Current shared task reading rule:
+
+* semantic core:
+  `task_runtime -> task_status -> task_value -> task_compare -> task_lifecycle`
+* async control:
+  `task_fallback -> task_policy -> task_batch -> task_windowed_batch`
+* async result:
+  `task_result_family -> task_result_policy -> task_result_batch -> task_result_windowed_batch`
+
+The practical current rule is:
+
+* shader async lanes read closest to `task async control -> task async result`
+* kernel async lanes read closest to `task async result -> task async control`
+* this is a reading and design alignment, not a claim that shader/kernel are
+  already implemented as `std`-first wrapper layers
+
 ## Current Lane Shape
 
 The current `shader` / `kernel` lane prefers this order:
@@ -214,24 +236,33 @@ Current role split:
 * `shader_async_policy_profile_demo` is the next narrow route where those
   draw-lane and render-lane async observations are explicitly folded through a
   checked-in CPU-side priority policy that prefers one lane over the other
-  before rejoining the wider shader result family
+  before rejoining the wider shader result family; this is the current shader
+  lane that reads closest to `task_policy`, and it now uses a local
+  `ShaderTaskPolicySummary` / `capture_task_policy(...)` shape to make that
+  alignment explicit at source level
 * `shader_async_fallback_profile_demo` is the next narrow route where the
   render-lane async observation is explicitly forced through a short timeout,
   and the checked-in CPU-side fallback rule prefers the draw-lane preview when
-  that render lane does not complete in time
+  that render lane does not complete in time; this is the current shader lane
+  that reads closest to `task_fallback`, and it now uses a local
+  `ShaderTaskFallbackSummary` / `capture_task_fallback(...)` shape to make
+  that alignment explicit at source level
 * `shader_async_batch_profile_demo` is the next narrow route where multiple
   draw/render async observations are explicitly launched as one checked-in CPU
   batch, joined through parallel `join_result(...)` points, and folded into a
-  compact batch summary rather than a single one-off lane value
+  compact batch summary rather than a single one-off lane value; this is the
+  current shader lane that reads closest to `task_batch`
 * `shader_async_windowed_batch_profile_demo` is the next narrow route where
   that checked-in async batch summary is explicitly joined with a draw preview
   downlink and a final render present path, making the batch visibly windowed
-  rather than purely observational
+  rather than purely observational; this is the current shader lane that reads
+  closest to `task_windowed_batch`
 * `shader_result_family_profile_demo` is the next narrow route where
   `shader_result(shader_profile_begin_pass(...))`,
   `shader_result(shader_profile_draw_instanced(...))`, and
   `shader_result(shader_profile_render(...))` are made visible together with
-  their readiness observers and a minimal checked-in draw/frame downlink split
+  their readiness observers and a minimal checked-in draw/frame downlink split;
+  this is the current shader lane that reads closest to `task_result_family`
 * `shader_result_profile_demo` is the next narrow route where shader profile
   metadata is explicitly joined with packet-slot inspection,
   `shader_profile_begin_pass(...)`, `shader_profile_draw_instanced(...)`, and
@@ -271,6 +302,11 @@ Current role split:
   the practical reading rule is:
   shader async is frame/result-first,
   kernel async is profile/tensor-summary-first
+  and both now line up against the shared task subgroups like this:
+  shader async control ~= `task_fallback -> task_policy -> task_batch -> task_windowed_batch`
+  shader async result ~= `task_result_family -> task_result_policy`
+  kernel async control ~= `task_policy -> task_batch -> task_windowed_batch`
+  kernel async result ~= `task_result_family -> task_result_batch -> task_result_windowed_batch`
 * `kernel_tensor_profile_demo` is the next narrow route where kernel profile
   metadata is already joined with source-facing tensor primitives such as
   `kernel_tensor(...)`, `kernel_matmul(...)`, `kernel_add_bias(...)`,

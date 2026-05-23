@@ -190,6 +190,12 @@ Core companion routes:
   [task_lifecycle_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_lifecycle_branch_demo),
   [task_fallback_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_fallback_branch_demo),
   [task_policy_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_policy_branch_demo),
+  [task_batch_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_batch_branch_demo),
+  [task_windowed_batch_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_windowed_batch_branch_demo),
+  [task_result_family_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_family_branch_demo),
+  [task_result_policy_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_policy_branch_demo),
+  [task_result_batch_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_batch_branch_demo),
+  [task_result_windowed_batch_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_windowed_batch_branch_demo),
   [task_cli_tooling_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_cli_tooling_demo)
 * tooling/runtime companions:
   [argv_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/argv_runtime_demo),
@@ -309,7 +315,19 @@ cargo run -p nuis -- check examples/projects/task/task_fallback_branch_demo
 cargo run -p nuis -- build examples/projects/task/task_lifecycle_branch_demo /private/tmp/task_lifecycle_branch_demo_out
 cargo run -p nuis -- build examples/projects/task/task_fallback_branch_demo /private/tmp/task_fallback_branch_demo_out
 cargo run -p nuis -- check examples/projects/task/task_policy_branch_demo
+cargo run -p nuis -- check examples/projects/task/task_batch_branch_demo
+cargo run -p nuis -- check examples/projects/task/task_windowed_batch_branch_demo
+cargo run -p nuis -- check examples/projects/task/task_result_family_branch_demo
+cargo run -p nuis -- check examples/projects/task/task_result_policy_branch_demo
+cargo run -p nuis -- check examples/projects/task/task_result_batch_branch_demo
+cargo run -p nuis -- check examples/projects/task/task_result_windowed_batch_branch_demo
 cargo run -p nuis -- build examples/projects/task/task_policy_branch_demo /private/tmp/task_policy_branch_demo_out
+cargo run -p nuis -- build examples/projects/task/task_batch_branch_demo /private/tmp/task_batch_branch_demo_out
+cargo run -p nuis -- build examples/projects/task/task_windowed_batch_branch_demo /private/tmp/task_windowed_batch_branch_demo_out
+cargo run -p nuis -- build examples/projects/task/task_result_family_branch_demo /private/tmp/task_result_family_branch_demo_out
+cargo run -p nuis -- build examples/projects/task/task_result_policy_branch_demo /private/tmp/task_result_policy_branch_demo_out
+cargo run -p nuis -- build examples/projects/task/task_result_batch_branch_demo /private/tmp/task_result_batch_branch_demo_out
+cargo run -p nuis -- build examples/projects/task/task_result_windowed_batch_branch_demo /private/tmp/task_result_windowed_batch_branch_demo_out
 cargo run -p nuis -- check examples/projects/task/task_runtime_demo
 cargo run -p nuis -- build examples/projects/task/task_runtime_demo /private/tmp/task_runtime_demo_out
 cargo run -p nuis -- check examples/projects/task/task_completed_observe_demo

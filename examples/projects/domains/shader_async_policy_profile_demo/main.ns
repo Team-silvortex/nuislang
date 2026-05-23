@@ -2,6 +2,12 @@ use data FabricPlane;
 use shader SurfaceShader;
 
 mod cpu Main {
+  struct ShaderTaskPolicySummary {
+    primary_completed: i64,
+    secondary_completed: i64,
+    selected_value: i64
+  }
+
   async fn observe_draw(result: ShaderResult<Frame>) -> i64 {
     if shader_frame_ready(result) {
       return 4;
@@ -21,6 +27,39 @@ mod cpu Main {
       return task_value(result);
     }
     return 0;
+  }
+
+  fn encode_completed(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn select_policy_value(
+    primary_result: TaskResult<i64>,
+    secondary_result: TaskResult<i64>
+  ) -> i64 {
+    if task_completed(primary_result) {
+      return task_value(primary_result) + 100;
+    }
+
+    if task_completed(secondary_result) {
+      return task_value(secondary_result) + 10;
+    }
+
+    return 0;
+  }
+
+  fn capture_task_policy(
+    draw_task_result: TaskResult<i64>,
+    render_task_result: TaskResult<i64>
+  ) -> ShaderTaskPolicySummary {
+    return ShaderTaskPolicySummary {
+      primary_completed: encode_completed(render_task_result),
+      secondary_completed: encode_completed(draw_task_result),
+      selected_value: select_policy_value(render_task_result, draw_task_result)
+    };
   }
 
   fn main() -> i64 {
@@ -80,6 +119,8 @@ mod cpu Main {
 
     let draw_task_result: TaskResult<i64> = join_result(draw_task);
     let render_task_result: TaskResult<i64> = join_result(render_task);
+    let policy_summary: ShaderTaskPolicySummary =
+      capture_task_policy(draw_task_result, render_task_result);
 
     let gpu_packet_present: Window<SurfaceShaderPacket> =
       data_profile_send_uplink("FabricPlane", render_controls);
@@ -89,14 +130,10 @@ mod cpu Main {
       data_profile_send_downlink("FabricPlane", shader_value(render_result_present));
     cpu_present_frame(host_frame);
 
-    if task_completed(render_task_result) {
-      return vertex_budget + instance_budget + task_value(render_task_result) + 100;
-    }
-
-    if task_completed(draw_task_result) {
-      return vertex_budget + instance_budget + task_value(draw_task_result) + 10;
-    }
-
-    return vertex_budget + instance_budget;
+    return vertex_budget
+      + instance_budget
+      + policy_summary.primary_completed
+      + policy_summary.secondary_completed
+      + policy_summary.selected_value;
   }
 }

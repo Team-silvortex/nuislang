@@ -29,6 +29,12 @@ task_runtime
 -> task_lifecycle
 -> task_fallback
 -> task_policy
+-> task_batch
+-> task_windowed_batch
+-> task_result_family
+-> task_result_policy
+-> task_result_batch
+-> task_result_windowed_batch
 -> task_clock / task_scheduler
 -> task_cli
 ```
@@ -67,6 +73,12 @@ These are the current narrow checked-in task routes.
 * [task_lifecycle_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_lifecycle_recipe.ns)
 * [task_fallback_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_fallback_recipe.ns)
 * [task_policy_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_policy_recipe.ns)
+* [task_batch_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_batch_recipe.ns)
+* [task_windowed_batch_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_windowed_batch_recipe.ns)
+* [task_result_family_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_result_family_recipe.ns)
+* [task_result_policy_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_result_policy_recipe.ns)
+* [task_result_batch_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_result_batch_recipe.ns)
+* [task_result_windowed_batch_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_result_windowed_batch_recipe.ns)
 
 Current role split:
 
@@ -78,9 +90,36 @@ Current role split:
 * `task_lifecycle` bundles the first wider but still task-local lifecycle route
 * `task_fallback` isolates timeout-first fallback chaining before wider policy
 * `task_policy` bundles the first explicit task-local policy/fallback route
+* `task_batch` isolates the first explicit multi-task fan-in and summary route
+* `task_windowed_batch` splits batch summary into preview/final windows before domain bridges
+* `task_result_family` bundles completed/timed-out/cancelled observation with first value-family summary
+* `task_result_policy` combines result-family observation with task-local policy selection
+* `task_result_batch` combines result-family observation with explicit multi-result fan-in
+* `task_result_windowed_batch` splits result-batch summary into preview/final windows
 
 These are the narrowest readable contracts for the checked-in task semantics
 before timing, scheduler, or CLI concerns are layered on top.
+
+## Current Reading Order
+
+The current task-facing lane reads best in three short groups:
+
+* semantic core:
+  `task_runtime -> task_status -> task_value -> task_compare -> task_lifecycle`
+* async control:
+  `task_fallback -> task_policy -> task_batch -> task_windowed_batch`
+* async result:
+  `task_result_family -> task_result_policy -> task_result_batch -> task_result_windowed_batch`
+
+That means the shortest practical route today is:
+
+```text
+task semantic core
+-> async control
+-> async result
+-> task_clock / task_scheduler
+-> task_cli
+```
 
 ## Timing And Scheduler Branches
 
@@ -129,6 +168,12 @@ task_runtime
 -> task_lifecycle
 -> task_fallback
 -> task_policy
+-> task_batch
+-> task_windowed_batch
+-> task_result_family
+-> task_result_policy
+-> task_result_batch
+-> task_result_windowed_batch
 -> task_clock / task_scheduler
 -> task_cli
 ```
@@ -142,6 +187,12 @@ Concrete sources:
 * [task_lifecycle_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_lifecycle_recipe.ns)
 * [task_fallback_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_fallback_recipe.ns)
 * [task_policy_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_policy_recipe.ns)
+* [task_batch_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_batch_recipe.ns)
+* [task_windowed_batch_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_windowed_batch_recipe.ns)
+* [task_result_family_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_result_family_recipe.ns)
+* [task_result_policy_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_result_policy_recipe.ns)
+* [task_result_batch_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_result_batch_recipe.ns)
+* [task_result_windowed_batch_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_result_windowed_batch_recipe.ns)
 * [task_clock_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_clock_recipe.ns)
 * [task_scheduler_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_scheduler_recipe.ns)
 * [task_cli_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_cli_recipe.ns)
@@ -150,7 +201,9 @@ This cluster should currently be read as:
 
 * `task_runtime` explains the first semantic route
 * `task_status` and `task_value` explain observation vs extraction
-* `task_compare`, `task_lifecycle`, `task_fallback`, and `task_policy` explain branchable lifecycle, fallback, and policy structure
+* `task_compare` and `task_lifecycle` finish the semantic core
+* `task_fallback`, `task_policy`, `task_batch`, and `task_windowed_batch` are the current async-control subgroup
+* `task_result_family`, `task_result_policy`, `task_result_batch`, and `task_result_windowed_batch` are the current async-result subgroup
 * `task_clock` and `task_scheduler` explain timing and lane-aware extensions
 * `task_cli` explains the first practical host-facing combined route
 
@@ -193,6 +246,12 @@ Examples:
 * [task_lifecycle_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_lifecycle_branch_demo)
 * [task_fallback_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_fallback_branch_demo)
 * [task_policy_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_policy_branch_demo)
+* [task_batch_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_batch_branch_demo)
+* [task_windowed_batch_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_windowed_batch_branch_demo)
+* [task_result_family_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_family_branch_demo)
+* [task_result_policy_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_policy_branch_demo)
+* [task_result_batch_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_batch_branch_demo)
+* [task_result_windowed_batch_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_windowed_batch_branch_demo)
 
 ## What This Contract Does Not Promise
 

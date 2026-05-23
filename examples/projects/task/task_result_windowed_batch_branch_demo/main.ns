@@ -1,0 +1,69 @@
+mod cpu Main {
+  struct TaskResultBatchSummary {
+    alpha_completed: i64,
+    beta_completed: i64,
+    gamma_completed: i64,
+    batch_value: i64
+  }
+
+  struct TaskResultWindowedBatchSummary {
+    preview_value: i64,
+    final_value: i64
+  }
+
+  async fn alpha(seed: i64) -> i64 {
+    return seed + 10;
+  }
+
+  async fn beta(seed: i64) -> i64 {
+    return seed + 20;
+  }
+
+  async fn gamma(seed: i64) -> i64 {
+    return seed + 30;
+  }
+
+  fn encode_completed(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_value(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return task_value(result);
+    }
+    return 0;
+  }
+
+  fn capture_task_result_batch(seed: i64) -> TaskResultBatchSummary {
+    let alpha_result: TaskResult<i64> = join_result(spawn(alpha(seed)));
+    let beta_result: TaskResult<i64> = join_result(spawn(beta(seed)));
+    let gamma_result: TaskResult<i64> = join_result(spawn(gamma(seed)));
+
+    return TaskResultBatchSummary {
+      alpha_completed: encode_completed(alpha_result),
+      beta_completed: encode_completed(beta_result),
+      gamma_completed: encode_completed(gamma_result),
+      batch_value: encode_value(alpha_result)
+        + encode_value(beta_result)
+        + encode_value(gamma_result)
+    };
+  }
+
+  fn capture_task_result_windowed_batch(seed: i64) -> TaskResultWindowedBatchSummary {
+    let summary: TaskResultBatchSummary = capture_task_result_batch(seed);
+    return TaskResultWindowedBatchSummary {
+      preview_value: summary.alpha_completed
+        + summary.beta_completed
+        + summary.gamma_completed,
+      final_value: summary.batch_value
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: TaskResultWindowedBatchSummary = capture_task_result_windowed_batch(7);
+    return summary.preview_value + summary.final_value;
+  }
+}

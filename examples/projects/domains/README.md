@@ -146,3 +146,11 @@ Reading rule:
   surface = metadata -> material seeds -> state set -> state+packet / state+pass -> state mini-flow
   packet = packet contract -> packet bridge
   bridge = pass -> frame -> async result consume -> async fan-in -> async scheduling -> async policy -> async fallback -> async batch -> async windowed batch -> result family -> draw/render split -> wider draw/render
+* when comparing shader/kernel async lanes back to `std` task:
+  task async control = fallback -> policy -> batch -> windowed batch
+  task async result = result family -> result policy -> result batch -> result windowed batch
+  shader reads closest to task async control first
+  kernel reads closest to task async result first
+  shader policy/fallback now also use explicit local task-shaped helpers in
+  source: `ShaderTaskPolicySummary` / `capture_task_policy(...)` and
+  `ShaderTaskFallbackSummary` / `capture_task_fallback(...)`
