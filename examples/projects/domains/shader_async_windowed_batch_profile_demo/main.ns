@@ -1,43 +1,32 @@
+use cpu ShaderTaskAsyncShapes;
 use data FabricPlane;
 use shader SurfaceShader;
 
 mod cpu Main {
-  struct ShaderAsyncBatchSummary {
-    draw_a_completed: i64,
-    draw_b_completed: i64,
-    render_completed: i64,
-    batch_value: i64
+  struct ShaderAsyncWindowedBatchSummary {
+    completed_count: i64,
+    batch_value: i64,
+    preview_value: i64,
+    final_value: i64
   }
 
-  async fn observe_draw(result: ShaderResult<Frame>) -> i64 {
+  async fn observe_result_ready_draw(result: ShaderResult<Frame>) -> i64 {
     if shader_frame_ready(result) {
       return 4;
     }
     return 0;
   }
 
-  async fn observe_render(result: ShaderResult<Frame>) -> i64 {
+  async fn observe_result_ready_render(result: ShaderResult<Frame>) -> i64 {
     if shader_frame_ready(result) {
       return 8;
     }
     return 0;
   }
 
-  fn encode_completed(result: TaskResult<i64>) -> i64 {
-    if task_completed(result) {
-      return 1;
-    }
-    return 0;
-  }
-
-  fn encode_task_value(result: TaskResult<i64>) -> i64 {
-    if task_completed(result) {
-      return task_value(result);
-    }
-    return 0;
-  }
-
-  fn capture_async_batch(render_controls: SurfaceShaderPacket) -> ShaderAsyncBatchSummary {
+  fn capture_async_windowed_batch_summary(
+    render_controls: SurfaceShaderPacket
+  ) -> ShaderAsyncWindowedBatchSummary {
     let pass_result_draw_a: ShaderResult<Pass> =
       shader_result(shader_profile_begin_pass("SurfaceShader"));
     let gpu_packet_draw_a: Window<SurfaceShaderPacket> =
@@ -49,7 +38,8 @@ mod cpu Main {
         gpu_packet_draw_a
       )
     );
-    let draw_task_a: Task<i64> = spawn(observe_draw(draw_result_a));
+    let draw_result_observer_task_a: Task<i64> =
+      spawn(observe_result_ready_draw(draw_result_a));
 
     let pass_result_draw_b: ShaderResult<Pass> =
       shader_result(shader_profile_begin_pass("SurfaceShader"));
@@ -62,25 +52,44 @@ mod cpu Main {
         gpu_packet_draw_b
       )
     );
-    let draw_task_b: Task<i64> = spawn(observe_draw(draw_result_b));
+    let draw_result_observer_task_b: Task<i64> =
+      spawn(observe_result_ready_draw(draw_result_b));
 
     let gpu_packet_render: Window<SurfaceShaderPacket> =
       data_profile_send_uplink("FabricPlane", render_controls);
     let render_result: ShaderResult<Frame> =
       shader_result(shader_profile_render("SurfaceShader", gpu_packet_render));
-    let render_task: Task<i64> = spawn(observe_render(render_result));
+    let render_result_observer_task: Task<i64> =
+      spawn(observe_result_ready_render(render_result));
 
-    let draw_join_a: TaskResult<i64> = join_result(draw_task_a);
-    let draw_join_b: TaskResult<i64> = join_result(draw_task_b);
-    let render_join: TaskResult<i64> = join_result(render_task);
+    let draw_result_observer_join_a: TaskResult<i64> =
+      join_result(draw_result_observer_task_a);
+    let draw_result_observer_join_b: TaskResult<i64> =
+      join_result(draw_result_observer_task_b);
+    let render_result_observer_join: TaskResult<i64> =
+      join_result(render_result_observer_task);
 
-    return ShaderAsyncBatchSummary {
-      draw_a_completed: encode_completed(draw_join_a),
-      draw_b_completed: encode_completed(draw_join_b),
-      render_completed: encode_completed(render_join),
-      batch_value: encode_task_value(draw_join_a)
-        + encode_task_value(draw_join_b)
-        + encode_task_value(render_join)
+    return ShaderAsyncWindowedBatchSummary {
+      completed_count: ShaderTaskAsyncShapes.async_batch_summary_completed(
+        draw_result_observer_join_a,
+        draw_result_observer_join_b,
+        render_result_observer_join
+      ),
+      batch_value: ShaderTaskAsyncShapes.async_batch_summary_value(
+        draw_result_observer_join_a,
+        draw_result_observer_join_b,
+        render_result_observer_join
+      ),
+      preview_value: ShaderTaskAsyncShapes.async_windowed_preview_summary_value(
+        draw_result_observer_join_a,
+        draw_result_observer_join_b,
+        render_result_observer_join
+      ),
+      final_value: ShaderTaskAsyncShapes.async_windowed_final_summary_value(
+        draw_result_observer_join_a,
+        draw_result_observer_join_b,
+        render_result_observer_join
+      )
     };
   }
 
@@ -120,7 +129,8 @@ mod cpu Main {
     let fabric_handles: HandleTable<FabricPlaneBindings> =
       data_profile_handle_table("FabricPlane");
 
-    let summary: ShaderAsyncBatchSummary = capture_async_batch(render_controls);
+    let async_windowed_batch_summary: ShaderAsyncWindowedBatchSummary =
+      capture_async_windowed_batch_summary(render_controls);
 
     let pass_result_preview: ShaderResult<Pass> =
       shader_result(shader_profile_begin_pass("SurfaceShader"));
@@ -133,22 +143,22 @@ mod cpu Main {
         gpu_packet_preview
       )
     );
-    let host_draw_preview: Window<Frame> =
+    let preview_window_frame: Window<Frame> =
       data_profile_send_downlink("FabricPlane", shader_value(draw_result_preview));
 
     let gpu_packet_present: Window<SurfaceShaderPacket> =
       data_profile_send_uplink("FabricPlane", render_controls);
     let render_result_present: ShaderResult<Frame> =
       shader_result(shader_profile_render("SurfaceShader", gpu_packet_present));
-    let host_frame: Window<Frame> =
+    let final_window_frame: Window<Frame> =
       data_profile_send_downlink("FabricPlane", shader_value(render_result_present));
-    cpu_present_frame(host_frame);
+    cpu_present_frame(final_window_frame);
 
     return vertex_budget
       + instance_budget
-      + summary.draw_a_completed
-      + summary.draw_b_completed
-      + summary.render_completed
-      + summary.batch_value;
+      + async_windowed_batch_summary.completed_count
+      + async_windowed_batch_summary.batch_value
+      + async_windowed_batch_summary.preview_value
+      + async_windowed_batch_summary.final_value;
   }
 }

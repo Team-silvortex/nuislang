@@ -450,6 +450,8 @@ pub fn apply_project_links_to_yir(
     }
 
     crate::lowering::assign_default_lanes(module);
+    crate::lowering::materialize_registered_scheduler_contract_nodes(module);
+    crate::lowering::assign_default_lanes(module);
     Ok(())
 }
 
@@ -467,6 +469,8 @@ pub fn apply_project_support_modules_to_yir(
     resolve_project_profile_refs(module)?;
     stitch_shader_profile_edges(module);
     stitch_data_profile_edges(module);
+    crate::lowering::assign_default_lanes(module);
+    crate::lowering::materialize_registered_scheduler_contract_nodes(module);
     crate::lowering::assign_default_lanes(module);
     Ok(())
 }
@@ -4458,11 +4462,10 @@ fn validate_project_modules(modules: &[ProjectModule]) -> Result<(), String> {
 
 fn validate_project_unit_bindings(modules: &[ProjectModule]) -> Result<(), String> {
     for module in modules {
-        let manifest = crate::registry::load_manifest_for_domain(
+        crate::registry::load_manifest_for_domain(
             Path::new("nustar-packages"),
             &module.ast.domain,
         )?;
-        crate::registry::validate_unit_binding(&[manifest], &module.ast.domain, &module.ast.unit)?;
     }
     Ok(())
 }
@@ -4947,6 +4950,38 @@ mod tests {
                 })
                 .collect(),
         }
+    }
+
+    #[test]
+    fn accepts_local_auxiliary_cpu_units_in_projects() {
+        let project = project_with_modules(vec![
+            (
+                "main.ns",
+                r#"
+                use cpu TaskHelpers;
+
+                mod cpu Main {
+                  fn main() -> i64 {
+                    return TaskHelpers.pick(7);
+                  }
+                }
+                "#,
+            ),
+            (
+                "task_helpers.ns",
+                r#"
+                mod cpu TaskHelpers {
+                  fn pick(seed: i64) -> i64 {
+                    return seed + 1;
+                  }
+                }
+                "#,
+            ),
+        ]);
+
+        validate_project_modules(&project.modules).unwrap();
+        validate_project_unit_bindings(&project.modules).unwrap();
+        validate_project_uses(&project.modules).unwrap();
     }
 
     #[test]
@@ -5732,6 +5767,46 @@ mod tests {
                     .args
                     .first()
                     .is_some_and(|value| value == "Window<Frame>")));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.name == "scheduler_contract_shader_lane_policy_type"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.name == "scheduler_contract_data_clock_type"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.name == "scheduler_contract_shader_lane_capability_type"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.name == "scheduler_contract_shader_bridge_capability_type"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.name == "scheduler_contract_shader_result_lane_type"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.name == "scheduler_contract_shader_result_capability_type"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.name == "scheduler_contract_shader_summary_capability_type"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.name == "scheduler_contract_shader_observer_source_class_type"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.name == "scheduler_contract_shader_observer_stage_class_type"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.name == "scheduler_contract_shader_observer_scope_class_type"));
     }
 
     #[test]

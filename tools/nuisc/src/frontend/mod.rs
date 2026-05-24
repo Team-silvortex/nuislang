@@ -22,6 +22,24 @@ pub fn parse_nuis_ast(input: &str) -> Result<AstModule, String> {
 }
 
 pub fn lower_ast_to_nir(module: &AstModule) -> Result<NirModule, String> {
+    lower_project_ast_to_nir(module, &[])
+}
+
+pub fn lower_project_ast_to_nir(
+    module: &AstModule,
+    local_modules: &[AstModule],
+) -> Result<NirModule, String> {
+    let local_cpu_helpers = module
+        .uses
+        .iter()
+        .filter(|item| item.domain == module.domain)
+        .filter_map(|item| {
+            local_modules
+                .iter()
+                .find(|candidate| candidate.domain == item.domain && candidate.unit == item.unit)
+        })
+        .collect::<Vec<_>>();
+
     let struct_defs = module
         .structs
         .iter()
@@ -36,22 +54,52 @@ pub fn lower_ast_to_nir(module: &AstModule) -> Result<NirModule, String> {
                 })
                 .collect(),
         })
+        .chain(local_cpu_helpers.iter().flat_map(|helper| {
+            helper.structs.iter().map(|definition| NirStructDef {
+                name: definition.name.clone(),
+                fields: definition
+                    .fields
+                    .iter()
+                    .map(|field| NirStructField {
+                        name: field.name.clone(),
+                        ty: lower_type_ref(&field.ty),
+                    })
+                    .collect(),
+            })
+        }))
         .collect::<Vec<_>>();
     let struct_table = struct_defs
         .iter()
         .map(|definition| (definition.name.clone(), definition.clone()))
         .collect::<BTreeMap<_, _>>();
 
-    let signatures = module
-        .externs
-        .iter()
-        .map(|function| {
-            (
-                function.name.clone(),
+    let mut signatures = BTreeMap::<String, FunctionSignature>::new();
+    for function in &module.externs {
+        signatures.insert(
+            function.name.clone(),
+            FunctionSignature {
+                abi: function.abi.clone(),
+                interface: None,
+                symbol_name: function.name.clone(),
+                params: function
+                    .params
+                    .iter()
+                    .map(|param| lower_type_ref(&param.ty))
+                    .collect(),
+                return_type: Some(lower_type_ref(&function.return_type)),
+                is_extern: true,
+                is_async: false,
+            },
+        );
+    }
+    for interface in &module.extern_interfaces {
+        for function in &interface.methods {
+            signatures.insert(
+                format!("{}.{}", interface.name, function.name),
                 FunctionSignature {
                     abi: function.abi.clone(),
-                    interface: None,
-                    symbol_name: function.name.clone(),
+                    interface: Some(interface.name.clone()),
+                    symbol_name: format!("{}__{}", interface.name, function.name),
                     params: function
                         .params
                         .iter()
@@ -61,47 +109,67 @@ pub fn lower_ast_to_nir(module: &AstModule) -> Result<NirModule, String> {
                     is_extern: true,
                     is_async: false,
                 },
-            )
-        })
-        .chain(module.extern_interfaces.iter().flat_map(|interface| {
-            interface.methods.iter().map(move |function| {
-                (
-                    format!("{}.{}", interface.name, function.name),
-                    FunctionSignature {
-                        abi: function.abi.clone(),
-                        interface: Some(interface.name.clone()),
-                        symbol_name: format!("{}__{}", interface.name, function.name),
-                        params: function
-                            .params
-                            .iter()
-                            .map(|param| lower_type_ref(&param.ty))
-                            .collect(),
-                        return_type: Some(lower_type_ref(&function.return_type)),
-                        is_extern: true,
-                        is_async: false,
-                    },
-                )
-            })
-        }))
-        .chain(module.functions.iter().map(|function| {
-            (
-                function.name.clone(),
-                FunctionSignature {
-                    abi: "nuis".to_owned(),
-                    interface: None,
-                    symbol_name: function.name.clone(),
-                    params: function
-                        .params
-                        .iter()
-                        .map(|param| lower_type_ref(&param.ty))
-                        .collect(),
-                    return_type: function.return_type.as_ref().map(lower_type_ref),
-                    is_extern: false,
-                    is_async: function.is_async,
-                },
-            )
-        }))
-        .collect::<BTreeMap<_, _>>();
+            );
+        }
+    }
+    for function in &module.functions {
+        signatures.insert(
+            function.name.clone(),
+            FunctionSignature {
+                abi: "nuis".to_owned(),
+                interface: None,
+                symbol_name: function.name.clone(),
+                params: function
+                    .params
+                    .iter()
+                    .map(|param| lower_type_ref(&param.ty))
+                    .collect(),
+                return_type: function.return_type.as_ref().map(lower_type_ref),
+                is_extern: false,
+                is_async: function.is_async,
+            },
+        );
+    }
+    for helper in &local_cpu_helpers {
+        for function in &helper.functions {
+            let signature = FunctionSignature {
+                abi: "nuis".to_owned(),
+                interface: None,
+                symbol_name: format!("{}.{}", helper.unit, function.name),
+                params: function
+                    .params
+                    .iter()
+                    .map(|param| lower_type_ref(&param.ty))
+                    .collect(),
+                return_type: function.return_type.as_ref().map(lower_type_ref),
+                is_extern: false,
+                is_async: function.is_async,
+            };
+            signatures.insert(
+                format!("{}.{}", helper.unit, function.name),
+                signature.clone(),
+            );
+            signatures.entry(function.name.clone()).or_insert(signature);
+        }
+    }
+
+    let mut lowered_functions = module
+        .functions
+        .iter()
+        .map(|function| lower_function(function, &module.domain, &signatures, &struct_table))
+        .collect::<Result<Vec<_>, _>>()?;
+    for helper in &local_cpu_helpers {
+        for function in &helper.functions {
+            let mut renamed = function.clone();
+            renamed.name = format!("{}.{}", helper.unit, function.name);
+            lowered_functions.push(lower_function(
+                &renamed,
+                &module.domain,
+                &signatures,
+                &struct_table,
+            )?);
+        }
+    }
 
     let nir = NirModule {
         uses: module
@@ -145,11 +213,7 @@ pub fn lower_ast_to_nir(module: &AstModule) -> Result<NirModule, String> {
             })
             .collect(),
         structs: struct_defs,
-        functions: module
-            .functions
-            .iter()
-            .map(|function| lower_function(function, &module.domain, &signatures, &struct_table))
-            .collect::<Result<Vec<_>, _>>()?,
+        functions: lowered_functions,
     };
     validate_declared_nir_types(&nir)?;
     Ok(nir)
@@ -553,6 +617,22 @@ fn lower_expr_with_async(
                             args: lowered_args,
                         });
                     }
+                    if signature.is_async {
+                        if !current_function_is_async {
+                            return Err(format!(
+                                "async function `{signature_key}` can only be called inside `async fn`"
+                            ));
+                        }
+                        if !allow_async_calls {
+                            return Err(format!(
+                                "async function `{signature_key}` must be used under `await`"
+                            ));
+                        }
+                    }
+                    return Ok(NirExpr::Call {
+                        callee: signature.symbol_name.clone(),
+                        args: lowered_args,
+                    });
                 }
             }
             NirExpr::MethodCall {
@@ -12348,6 +12428,10 @@ fn lower_call_expr_with_async(
                         args: lowered_args,
                     });
                 }
+                return Ok(NirExpr::Call {
+                    callee: signature.symbol_name.clone(),
+                    args: lowered_args,
+                });
             }
             Ok(NirExpr::Call {
                 callee: callee.to_owned(),
@@ -14934,6 +15018,59 @@ mod tests {
         assert!(matches!(
             function.body.get(2),
             Some(NirStmt::Return(Some(NirExpr::CpuJoin(_))))
+        ));
+    }
+
+    #[test]
+    fn lowers_project_local_cpu_helper_calls_with_qualified_callees() {
+        let entry = parse_nuis_ast(
+            r#"
+            use cpu TaskHelpers;
+
+            mod cpu Main {
+              fn main() -> i64 {
+                return TaskHelpers.task_policy_completed(7);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let helper = parse_nuis_ast(
+            r#"
+            mod cpu TaskHelpers {
+              fn encode_completed(value: i64) -> i64 {
+                return value + 1;
+              }
+
+              fn task_policy_completed(value: i64) -> i64 {
+                return encode_completed(value);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let module = super::lower_project_ast_to_nir(&entry, &[helper]).unwrap();
+        let helper_function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "TaskHelpers.task_policy_completed")
+            .unwrap();
+        assert!(matches!(
+            helper_function.body.first(),
+            Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
+                if callee == "TaskHelpers.encode_completed"
+        ));
+
+        let main_function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            main_function.body.first(),
+            Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
+                if callee == "TaskHelpers.task_policy_completed"
         ));
     }
 

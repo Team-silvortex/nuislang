@@ -1,0 +1,119 @@
+mod cpu Main {
+  extern "c" fn host_argv_at(index: i64) -> i64;
+  extern "c" fn host_line_read(prompt_handle: i64) -> i64;
+  extern "c" fn host_line_len(line_handle: i64) -> i64;
+  extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
+  extern "c" fn host_command_spawn(program_handle: i64, argv_handle: i64) -> i64;
+  extern "c" fn host_command_wait_exit(command_handle: i64) -> i64;
+  extern "c" fn host_subprocess_spawn(program_handle: i64, argv_handle: i64, env_handle: i64) -> i64;
+  extern "c" fn host_subprocess_join_exit(process_handle: i64) -> i64;
+  extern "c" fn host_stdout_write(text_handle: i64) -> i64;
+  extern "c" fn host_stderr_write(text_handle: i64) -> i64;
+  extern "c" fn host_stdout_flush() -> i64;
+  extern "c" fn host_stderr_flush() -> i64;
+  extern "c" fn host_monotonic_time_ns() -> i64;
+
+  struct CliShellSessionSeed {
+    prompt_handle: i64,
+    env_key_handle: i64,
+    env_value_handle: i64,
+    ok_text_handle: i64,
+    err_text_handle: i64
+  }
+
+  struct CliShellSessionSummary {
+    line_handle: i64,
+    line_len: i64,
+    argv_tail_handle: i64,
+    env_prefix_handle: i64,
+    command_wait_exit: i64,
+    child_join_exit: i64,
+    stdout_code: i64,
+    stderr_code: i64,
+    stdout_flushed: i64,
+    stderr_flushed: i64,
+    tick_ns: i64
+  }
+
+  fn build_env_prefix(env_key_handle: i64, env_value_handle: i64) -> i64 {
+    let keyed: i64 = host_text_concat(env_key_handle, "=");
+    return host_text_concat(keyed, env_value_handle);
+  }
+
+  fn build_seed(
+    prompt_handle: i64,
+    env_key_handle: i64,
+    env_value_handle: i64,
+    ok_text_handle: i64,
+    err_text_handle: i64
+  ) -> CliShellSessionSeed {
+    return CliShellSessionSeed {
+      prompt_handle: prompt_handle,
+      env_key_handle: env_key_handle,
+      env_value_handle: env_value_handle,
+      ok_text_handle: ok_text_handle,
+      err_text_handle: err_text_handle
+    };
+  }
+
+  fn capture_cli_shell_session(seed: CliShellSessionSeed) -> CliShellSessionSummary {
+    let program_handle: i64 = host_argv_at(1);
+    let line_handle: i64 = host_line_read(seed.prompt_handle);
+    let line_len: i64 = host_line_len(line_handle);
+    let argv_tail_handle: i64 = host_text_concat(line_handle, " --interactive");
+    let env_prefix_handle: i64 =
+      build_env_prefix(seed.env_key_handle, seed.env_value_handle);
+    let command_handle: i64 = host_command_spawn(program_handle, argv_tail_handle);
+    let child_handle: i64 = host_subprocess_spawn(
+      program_handle,
+      argv_tail_handle,
+      env_prefix_handle
+    );
+
+    return CliShellSessionSummary {
+      line_handle: line_handle,
+      line_len: line_len,
+      argv_tail_handle: argv_tail_handle,
+      env_prefix_handle: env_prefix_handle,
+      command_wait_exit: host_command_wait_exit(command_handle),
+      child_join_exit: host_subprocess_join_exit(child_handle),
+      stdout_code: host_stdout_write(seed.ok_text_handle),
+      stderr_code: host_stderr_write(seed.err_text_handle),
+      stdout_flushed: host_stdout_flush(),
+      stderr_flushed: host_stderr_flush(),
+      tick_ns: host_monotonic_time_ns()
+    };
+  }
+
+  fn summarize_cli_shell_session_recipe(
+    prompt_handle: i64,
+    env_key_handle: i64,
+    env_value_handle: i64,
+    ok_text_handle: i64,
+    err_text_handle: i64
+  ) -> i64 {
+    let seed: CliShellSessionSeed = build_seed(
+      prompt_handle,
+      env_key_handle,
+      env_value_handle,
+      ok_text_handle,
+      err_text_handle
+    );
+    let summary: CliShellSessionSummary = capture_cli_shell_session(seed);
+    return summary.line_handle
+      + summary.line_len
+      + summary.argv_tail_handle
+      + summary.env_prefix_handle
+      + summary.command_wait_exit
+      + summary.child_join_exit
+      + summary.stdout_code
+      + summary.stderr_code
+      + summary.stdout_flushed
+      + summary.stderr_flushed
+      + summary.tick_ns;
+  }
+
+  fn main() {
+    print(summarize_cli_shell_session_recipe(509, 2501, 2502, 1901, 1903));
+  }
+}

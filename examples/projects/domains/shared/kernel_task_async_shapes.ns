@@ -1,0 +1,281 @@
+mod cpu KernelTaskAsyncShapes {
+  fn encode_completed(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_timed_out(result: TaskResult<i64>) -> i64 {
+    if task_timed_out(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn task_policy_completed(
+    primary_result: TaskResult<i64>,
+    secondary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    return encode_completed(primary_result)
+      + encode_completed(secondary_result)
+      + encode_timed_out(fallback_result);
+  }
+
+  fn task_policy_selected_value(
+    primary_result: TaskResult<i64>,
+    secondary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    if task_completed(primary_result) {
+      return task_value(primary_result) + 100;
+    }
+    if task_completed(secondary_result) {
+      return task_value(secondary_result) + 10;
+    }
+    if task_timed_out(fallback_result) {
+      return 5;
+    }
+    return 0;
+  }
+
+  fn task_fallback_completed(
+    primary_result: TaskResult<i64>,
+    first_fallback_result: TaskResult<i64>,
+    second_fallback_result: TaskResult<i64>,
+    default_result: TaskResult<i64>
+  ) -> i64 {
+    let default_selected: i64 =
+      encode_default_selected(
+        primary_result,
+        first_fallback_result,
+        second_fallback_result,
+        default_result
+      );
+
+    return encode_timed_out(primary_result)
+      + encode_completed(first_fallback_result)
+      + encode_completed(second_fallback_result)
+      + encode_completed(default_result)
+      + default_selected;
+  }
+
+  fn encode_default_selected(
+    primary_result: TaskResult<i64>,
+    first_fallback_result: TaskResult<i64>,
+    second_fallback_result: TaskResult<i64>,
+    default_result: TaskResult<i64>
+  ) -> i64 {
+    if task_completed(first_fallback_result) {
+      return 0;
+    }
+    if task_completed(second_fallback_result) {
+      return 0;
+    }
+    if task_completed(default_result) {
+      return 0;
+    }
+    if task_timed_out(primary_result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn task_fallback_selected_value(
+    primary_result: TaskResult<i64>,
+    first_fallback_result: TaskResult<i64>,
+    second_fallback_result: TaskResult<i64>,
+    default_result: TaskResult<i64>
+  ) -> i64 {
+    if task_completed(primary_result) {
+      return task_value(primary_result) + 1000;
+    }
+    if task_completed(first_fallback_result) {
+      return task_value(first_fallback_result) + 100;
+    }
+    if task_completed(second_fallback_result) {
+      return task_value(second_fallback_result) + 10;
+    }
+    if task_completed(default_result) {
+      return task_value(default_result) + 1;
+    }
+    return 0;
+  }
+
+  fn task_batch_completed(
+    primary_result: TaskResult<i64>,
+    secondary_result: TaskResult<i64>,
+    tertiary_result: TaskResult<i64>,
+    quaternary_result: TaskResult<i64>,
+    quinary_result: TaskResult<i64>,
+    senary_result: TaskResult<i64>
+  ) -> i64 {
+    return encode_completed(primary_result)
+      + encode_completed(secondary_result)
+      + encode_completed(tertiary_result)
+      + encode_completed(quaternary_result)
+      + encode_completed(quinary_result)
+      + encode_completed(senary_result);
+  }
+
+  fn task_batch_value(
+    primary_result: TaskResult<i64>,
+    secondary_result: TaskResult<i64>,
+    tertiary_result: TaskResult<i64>,
+    quaternary_result: TaskResult<i64>,
+    quinary_result: TaskResult<i64>,
+    senary_result: TaskResult<i64>
+  ) -> i64 {
+    return selected_task_value(primary_result)
+      + selected_task_value(secondary_result)
+      + selected_task_value(tertiary_result)
+      + selected_task_value(quaternary_result)
+      + selected_task_value(quinary_result)
+      + selected_task_value(senary_result);
+  }
+
+  fn selected_task_value(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return task_value(result);
+    }
+    return 0;
+  }
+
+  fn task_windowed_preview_value(
+    total_result: TaskResult<i64>,
+    peak_result: TaskResult<i64>,
+    avg_result: TaskResult<i64>
+  ) -> i64 {
+    return encode_completed(total_result)
+      + encode_completed(peak_result)
+      + encode_completed(avg_result);
+  }
+
+  fn task_windowed_final_value(
+    bind_core_result: TaskResult<i64>,
+    queue_depth_result: TaskResult<i64>,
+    batch_lanes_result: TaskResult<i64>,
+    total_result: TaskResult<i64>,
+    peak_result: TaskResult<i64>,
+    avg_result: TaskResult<i64>
+  ) -> i64 {
+    return encode_completed(bind_core_result)
+      + encode_completed(queue_depth_result)
+      + encode_completed(batch_lanes_result)
+      + task_batch_value(
+        bind_core_result,
+        queue_depth_result,
+        batch_lanes_result,
+        total_result,
+        peak_result,
+        avg_result
+      );
+  }
+
+  fn async_policy_summary_completed(
+    primary_result: TaskResult<i64>,
+    secondary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    return task_policy_completed(primary_result, secondary_result, fallback_result);
+  }
+
+  fn async_policy_summary_selected_value(
+    primary_result: TaskResult<i64>,
+    secondary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    return task_policy_selected_value(primary_result, secondary_result, fallback_result);
+  }
+
+  fn async_fallback_summary_completed(
+    primary_result: TaskResult<i64>,
+    first_fallback_result: TaskResult<i64>,
+    second_fallback_result: TaskResult<i64>,
+    default_result: TaskResult<i64>
+  ) -> i64 {
+    return task_fallback_completed(
+      primary_result,
+      first_fallback_result,
+      second_fallback_result,
+      default_result
+    );
+  }
+
+  fn async_fallback_summary_selected_value(
+    primary_result: TaskResult<i64>,
+    first_fallback_result: TaskResult<i64>,
+    second_fallback_result: TaskResult<i64>,
+    default_result: TaskResult<i64>
+  ) -> i64 {
+    return task_fallback_selected_value(
+      primary_result,
+      first_fallback_result,
+      second_fallback_result,
+      default_result
+    );
+  }
+
+  fn async_batch_summary_completed(
+    primary_result: TaskResult<i64>,
+    secondary_result: TaskResult<i64>,
+    tertiary_result: TaskResult<i64>,
+    quaternary_result: TaskResult<i64>,
+    quinary_result: TaskResult<i64>,
+    senary_result: TaskResult<i64>
+  ) -> i64 {
+    return task_batch_completed(
+      primary_result,
+      secondary_result,
+      tertiary_result,
+      quaternary_result,
+      quinary_result,
+      senary_result
+    );
+  }
+
+  fn async_batch_summary_value(
+    primary_result: TaskResult<i64>,
+    secondary_result: TaskResult<i64>,
+    tertiary_result: TaskResult<i64>,
+    quaternary_result: TaskResult<i64>,
+    quinary_result: TaskResult<i64>,
+    senary_result: TaskResult<i64>
+  ) -> i64 {
+    return task_batch_value(
+      primary_result,
+      secondary_result,
+      tertiary_result,
+      quaternary_result,
+      quinary_result,
+      senary_result
+    );
+  }
+
+  fn async_windowed_preview_summary_value(
+    total_result: TaskResult<i64>,
+    peak_result: TaskResult<i64>,
+    avg_result: TaskResult<i64>
+  ) -> i64 {
+    return task_windowed_preview_value(total_result, peak_result, avg_result);
+  }
+
+  fn async_windowed_final_summary_value(
+    bind_core_result: TaskResult<i64>,
+    queue_depth_result: TaskResult<i64>,
+    batch_lanes_result: TaskResult<i64>,
+    total_result: TaskResult<i64>,
+    peak_result: TaskResult<i64>,
+    avg_result: TaskResult<i64>
+  ) -> i64 {
+    return task_windowed_final_value(
+      bind_core_result,
+      queue_depth_result,
+      batch_lanes_result,
+      total_result,
+      peak_result,
+      avg_result
+    );
+  }
+}

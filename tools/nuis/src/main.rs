@@ -121,6 +121,7 @@ fn run() -> Result<(), String> {
         cli::CommandKind::DumpAst { input } => handle_dump_ast(input)?,
         cli::CommandKind::DumpNir { input } => handle_dump_nir(input)?,
         cli::CommandKind::DumpYir { input } => handle_dump_yir(input)?,
+        cli::CommandKind::SchedulerView { input } => handle_scheduler_view(input)?,
         cli::CommandKind::Rc { args } => {
             run_nuis_rc(&args)?;
         }
@@ -772,6 +773,72 @@ fn handle_dump_yir(input: std::path::PathBuf) -> Result<(), String> {
     Ok(())
 }
 
+fn handle_scheduler_view(input: std::path::PathBuf) -> Result<(), String> {
+    println!("scheduler view: {}", input.display());
+    if nuisc::project::is_project_input(&input) {
+        let project = nuisc::project::load_project(&input)?;
+        let resolution = nuisc::project::resolve_project_abi(&project)?;
+        println!("  source_kind: project");
+        println!("  project: {}", project.manifest.name);
+        println!(
+            "  abi_mode: {}",
+            if resolution.explicit {
+                "explicit"
+            } else {
+                "auto-recommended"
+            }
+        );
+        println!("  resolved_domains: {}", resolution.requirements.len());
+        for item in resolution.requirements {
+            println!("  domain: {}", item.domain);
+            println!("    abi: {}", item.abi);
+            if let Ok(manifest) = nuisc::registry::load_manifest_for_domain(
+                std::path::Path::new("nustar-packages"),
+                &item.domain,
+            ) {
+                if let Ok(target) = nuisc::registry::registered_abi_target(&manifest, &item.abi) {
+                    println!(
+                        "    abi_target_machine: {}-{}",
+                        target.machine_arch, target.machine_os
+                    );
+                    println!("    abi_target_object: {}", target.object_format);
+                    println!("    abi_target_calling: {}", target.calling_abi);
+                    println!("    abi_target_clang: {}", target.clang_target);
+                    if let Some(backend) = target.backend_family {
+                        println!("    abi_target_backend: {}", backend);
+                    }
+                    println!(
+                        "    abi_target_host_adaptive: {}",
+                        if target.host_adaptive {
+                            "true"
+                        } else {
+                            "false"
+                        }
+                    );
+                }
+            }
+            print_project_scheduler_contract_view(&item.domain)?;
+        }
+        return Ok(());
+    }
+
+    let artifacts = nuisc::pipeline::compile_source_path(&input)?;
+    let manifests = nuisc::registry::load_required_manifests(
+        std::path::Path::new("nustar-packages"),
+        &artifacts.yir,
+    )?;
+    println!("  source_kind: single-file");
+    println!("  ast_domain: {}", artifacts.ast.domain);
+    println!("  ast_unit: {}", artifacts.ast.unit);
+    println!("  resolved_domains: {}", manifests.len());
+    for manifest in manifests {
+        println!("  domain: {}", manifest.domain_family);
+        println!("    package: {}", manifest.package_id);
+        print_project_scheduler_contract_view(&manifest.domain_family)?;
+    }
+    Ok(())
+}
+
 fn handle_project_status(input: std::path::PathBuf) -> Result<(), String> {
     let project = nuisc::project::load_project(&input)?;
     let resolution = nuisc::project::resolve_project_abi(&project)?;
@@ -853,6 +920,7 @@ fn handle_project_status(input: std::path::PathBuf) -> Result<(), String> {
                 );
             }
         }
+        print_project_scheduler_contract_view(&item.domain)?;
     }
     for item in &project.manifest.galaxy_dependencies {
         println!("  galaxy: {}={}", item.name, item.version);
@@ -955,6 +1023,7 @@ fn handle_project_doctor(input: std::path::PathBuf) -> Result<(), String> {
     );
     for item in &resolution.requirements {
         println!("  abi: {}={}", item.domain, item.abi);
+        print_project_scheduler_contract_view(&item.domain)?;
     }
 
     println!(
@@ -1224,6 +1293,28 @@ fn handle_project_doctor(input: std::path::PathBuf) -> Result<(), String> {
         );
     }
 
+    Ok(())
+}
+
+fn print_project_scheduler_contract_view(domain: &str) -> Result<(), String> {
+    let manifest =
+        nuisc::registry::load_manifest_for_domain(std::path::Path::new("nustar-packages"), domain)?;
+    println!(
+        "    scheduler_contract_stack: placement -> timing -> result observation -> async summary observation -> observer classification"
+    );
+    println!(
+        "    scheduler_clock: {} [{}] bridge={}",
+        manifest.clock_domain_id, manifest.clock_kind, manifest.clock_bridge_default
+    );
+    println!(
+        "    scheduler_result_roles: entry=result-entry, probe=result-ready-probe, value=result-payload-value"
+    );
+    println!(
+        "    scheduler_summary_api: policy=async-policy-summary, batch=async-batch-summary, windowed=async-windowed-summary"
+    );
+    println!(
+        "    scheduler_observer_classes: source=profile-backed|result-backed|summary-backed; stage=entry|ready|payload|policy|batch|windowed; scope=local|cross-lane|cross-domain|bridge-visible"
+    );
     Ok(())
 }
 
@@ -1503,6 +1594,7 @@ fn print_help() {
     println!("    nuis dump-ast [input.ns|project-dir|nuis.toml]");
     println!("    nuis dump-nir [input.ns|project-dir|nuis.toml]");
     println!("    nuis dump-yir [input.ns|project-dir|nuis.toml]");
+    println!("    nuis scheduler-view [input.ns|project-dir|nuis.toml]");
     println!("    nuis verify-build-manifest <nuis.build.manifest.toml>");
     println!();
     println!("  project workflow:");

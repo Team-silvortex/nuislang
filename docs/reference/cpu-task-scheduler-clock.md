@@ -85,10 +85,40 @@ Today the important pieces are:
 * mod-owned lane defaults in `nustar` manifests:
   * CPU has defaults like `cpu.alloc_node=mem`, `cpu.print=main`
   * data/shader/kernel also carry their own default lane maps
+* explicit lowered `YIR` scheduler contract nodes:
+  * `scheduler_contract_<family>_lane_policy_type`
+  * `scheduler_contract_<family>_lane_capability_type`
+  * `scheduler_contract_<family>_bridge_capability_type`
+  * `scheduler_contract_<family>_clock_type`
+  * `scheduler_contract_<family>_result_lane_type`
+  * `scheduler_contract_<family>_result_capability_type`
+  * `scheduler_contract_<family>_summary_capability_type`
+  * `scheduler_contract_<family>_observer_source_class_type`
+  * `scheduler_contract_<family>_observer_stage_class_type`
+  * `scheduler_contract_<family>_observer_scope_class_type`
 
 Current reading rule:
 
 * lanes are already visible as lowering policy
+* scheduler registration is now best read as a short stack:
+  * placement
+    * `lane_policy -> lane_capability -> bridge_capability`
+  * timing
+    * `clock`
+  * result observation
+    * `result_lane -> result_capability`
+  * async summary observation
+    * `summary_capability`
+  * observer classification
+    * `observer_source_class -> observer_stage_class -> observer_scope_class`
+* `nuis registry` now exposes the same stack in a shorter package-facing form:
+  * `scheduler_contract_stack`
+  * `scheduler_result_roles`
+  * `scheduler_summary_api`
+  * `scheduler_observer_classes`
+* `nuis project-status` / `nuis project-doctor` now expose the same short
+  scheduler-facing view per resolved domain, together with the resolved
+  domain-local clock and default bridge
 * lanes are **not** yet a proof that tasks execute on a finished worker runtime
 
 In other words:

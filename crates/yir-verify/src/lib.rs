@@ -134,6 +134,7 @@ pub fn verify_module_with_registry(
     verify_glm_protocol(module)?;
     verify_data_fabric_protocol(module, &resources)?;
     verify_result_state_nodes(module)?;
+    verify_scheduler_contract_nodes(module, &resources, &nodes)?;
     verify_project_type_contract_nodes(module)?;
     verify_cpu_heap_protocol(module)?;
     Ok(())
@@ -567,6 +568,785 @@ fn verify_project_type_contract_nodes(module: &YirModule) -> Result<(), String> 
         }
     }
 
+    Ok(())
+}
+
+fn verify_scheduler_contract_nodes(
+    module: &YirModule,
+    resources: &BTreeMap<String, &Resource>,
+    nodes: &BTreeMap<String, &Node>,
+) -> Result<(), String> {
+    for node in &module.nodes {
+        if node.op.module != "cpu" || node.op.instruction != "text" {
+            continue;
+        }
+        let Some(contract) = classify_scheduler_contract_node(node.name.as_str()) else {
+            continue;
+        };
+        let value = node
+            .op
+            .args
+            .first()
+            .map(|value| value.trim())
+            .ok_or_else(|| {
+                format!(
+                    "scheduler contract node `{}` must carry a canonical text payload",
+                    node.name
+                )
+            })?;
+        if value.is_empty() {
+            return Err(format!(
+                "scheduler contract node `{}` must carry a non-empty canonical text payload",
+                node.name
+            ));
+        }
+        let targets = module
+            .edges
+            .iter()
+            .filter(|edge| {
+                edge.from == node.name
+                    && matches!(edge.kind, EdgeKind::Dep | EdgeKind::CrossDomainExchange)
+            })
+            .map(|edge| edge.to.as_str())
+            .collect::<Vec<_>>();
+        if targets.is_empty() {
+            return Err(format!(
+                "scheduler contract node `{}` requires at least one dep/xfer edge into its domain anchor",
+                node.name
+            ));
+        }
+        for target_name in &targets {
+            let target = nodes.get(*target_name).copied().ok_or_else(|| {
+                format!(
+                    "scheduler contract node `{}` references unknown target `{}`",
+                    node.name, target_name
+                )
+            })?;
+            let target_resource = resources.get(&target.resource).copied().ok_or_else(|| {
+                format!(
+                    "scheduler contract node `{}` references target `{}` with unknown resource `{}`",
+                    node.name, target.name, target.resource
+                )
+            })?;
+            if target_resource.kind.family() != contract.family {
+                return Err(format!(
+                    "scheduler contract node `{}` is declared for `{}`, but targets `{}` on `{}`",
+                    node.name,
+                    contract.family,
+                    target.name,
+                    target_resource.kind.family()
+                ));
+            }
+        }
+
+        match contract.kind {
+            SchedulerContractKind::LanePolicy => {
+                verify_scheduler_lane_contract_text(node.name.as_str(), contract.family, value)?
+            }
+            SchedulerContractKind::LaneCapability => {
+                verify_scheduler_lane_capability_contract_text(
+                    nodes,
+                    node.name.as_str(),
+                    contract.family,
+                    value,
+                )?
+            }
+            SchedulerContractKind::BridgeCapability => {
+                verify_scheduler_bridge_capability_contract_text(
+                    nodes,
+                    node.name.as_str(),
+                    contract.family,
+                    value,
+                )?
+            }
+            SchedulerContractKind::Clock => {
+                verify_scheduler_clock_contract_text(node.name.as_str(), contract.family, value)?
+            }
+            SchedulerContractKind::ResultLane => verify_scheduler_result_lane_contract_text(
+                nodes,
+                node.name.as_str(),
+                contract.family,
+                value,
+            )?,
+            SchedulerContractKind::ResultCapability => {
+                verify_scheduler_result_capability_contract_text(
+                    nodes,
+                    node.name.as_str(),
+                    contract.family,
+                    value,
+                )?
+            }
+            SchedulerContractKind::SummaryCapability => {
+                verify_scheduler_summary_capability_contract_text(
+                    nodes,
+                    node.name.as_str(),
+                    contract.family,
+                    value,
+                )?
+            }
+            SchedulerContractKind::ObserverSourceClass => {
+                verify_scheduler_observer_source_class_contract_text(
+                    nodes,
+                    node.name.as_str(),
+                    contract.family,
+                    value,
+                )?
+            }
+            SchedulerContractKind::ObserverStageClass => {
+                verify_scheduler_observer_stage_class_contract_text(
+                    nodes,
+                    node.name.as_str(),
+                    contract.family,
+                    value,
+                )?
+            }
+            SchedulerContractKind::ObserverScopeClass => {
+                verify_scheduler_observer_scope_class_contract_text(
+                    nodes,
+                    node.name.as_str(),
+                    contract.family,
+                    value,
+                )?
+            }
+        }
+    }
+    Ok(())
+}
+
+#[derive(Clone, Copy)]
+enum SchedulerContractKind {
+    LanePolicy,
+    LaneCapability,
+    BridgeCapability,
+    Clock,
+    ResultLane,
+    ResultCapability,
+    SummaryCapability,
+    ObserverSourceClass,
+    ObserverStageClass,
+    ObserverScopeClass,
+}
+
+struct SchedulerContract<'a> {
+    family: &'a str,
+    kind: SchedulerContractKind,
+}
+
+fn classify_scheduler_contract_node(name: &str) -> Option<SchedulerContract<'_>> {
+    if let Some(family) = name
+        .strip_prefix("scheduler_contract_")
+        .and_then(|suffix| suffix.strip_suffix("_lane_policy_type"))
+    {
+        return Some(SchedulerContract {
+            family,
+            kind: SchedulerContractKind::LanePolicy,
+        });
+    }
+    if let Some(family) = name
+        .strip_prefix("scheduler_contract_")
+        .and_then(|suffix| suffix.strip_suffix("_lane_capability_type"))
+    {
+        return Some(SchedulerContract {
+            family,
+            kind: SchedulerContractKind::LaneCapability,
+        });
+    }
+    if let Some(family) = name
+        .strip_prefix("scheduler_contract_")
+        .and_then(|suffix| suffix.strip_suffix("_bridge_capability_type"))
+    {
+        return Some(SchedulerContract {
+            family,
+            kind: SchedulerContractKind::BridgeCapability,
+        });
+    }
+    if let Some(family) = name
+        .strip_prefix("scheduler_contract_")
+        .and_then(|suffix| suffix.strip_suffix("_clock_type"))
+    {
+        return Some(SchedulerContract {
+            family,
+            kind: SchedulerContractKind::Clock,
+        });
+    }
+    if let Some(family) = name
+        .strip_prefix("scheduler_contract_")
+        .and_then(|suffix| suffix.strip_suffix("_result_lane_type"))
+    {
+        return Some(SchedulerContract {
+            family,
+            kind: SchedulerContractKind::ResultLane,
+        });
+    }
+    if let Some(family) = name
+        .strip_prefix("scheduler_contract_")
+        .and_then(|suffix| suffix.strip_suffix("_result_capability_type"))
+    {
+        return Some(SchedulerContract {
+            family,
+            kind: SchedulerContractKind::ResultCapability,
+        });
+    }
+    if let Some(family) = name
+        .strip_prefix("scheduler_contract_")
+        .and_then(|suffix| suffix.strip_suffix("_summary_capability_type"))
+    {
+        return Some(SchedulerContract {
+            family,
+            kind: SchedulerContractKind::SummaryCapability,
+        });
+    }
+    if let Some(family) = name
+        .strip_prefix("scheduler_contract_")
+        .and_then(|suffix| suffix.strip_suffix("_observer_source_class_type"))
+    {
+        return Some(SchedulerContract {
+            family,
+            kind: SchedulerContractKind::ObserverSourceClass,
+        });
+    }
+    if let Some(family) = name
+        .strip_prefix("scheduler_contract_")
+        .and_then(|suffix| suffix.strip_suffix("_observer_stage_class_type"))
+    {
+        return Some(SchedulerContract {
+            family,
+            kind: SchedulerContractKind::ObserverStageClass,
+        });
+    }
+    if let Some(family) = name
+        .strip_prefix("scheduler_contract_")
+        .and_then(|suffix| suffix.strip_suffix("_observer_scope_class_type"))
+    {
+        return Some(SchedulerContract {
+            family,
+            kind: SchedulerContractKind::ObserverScopeClass,
+        });
+    }
+    None
+}
+
+fn verify_scheduler_lane_contract_text(
+    node_name: &str,
+    family: &str,
+    value: &str,
+) -> Result<(), String> {
+    let fields = parse_semicolon_kv_contract(node_name, value, "scheduler lane contract")?;
+    let declared_family = fields.get("family").ok_or_else(|| {
+        format!("scheduler contract node `{node_name}` is missing `family` field")
+    })?;
+    if *declared_family != family {
+        return Err(format!(
+            "scheduler contract node `{node_name}` declares `family={declared_family}`, expected `{family}`"
+        ));
+    }
+    let lanes = fields
+        .get("lanes")
+        .ok_or_else(|| format!("scheduler contract node `{node_name}` is missing `lanes` field"))?;
+    let defaults = fields.get("defaults").ok_or_else(|| {
+        format!("scheduler contract node `{node_name}` is missing `defaults` field")
+    })?;
+    let parsed_lanes = lanes
+        .split(',')
+        .map(str::trim)
+        .filter(|lane| !lane.is_empty())
+        .collect::<BTreeSet<_>>();
+    if parsed_lanes.is_empty() {
+        return Err(format!(
+            "scheduler contract node `{node_name}` requires at least one declared lane"
+        ));
+    }
+    let mut lanes_from_defaults = BTreeSet::<&str>::new();
+    for entry in defaults.split('|') {
+        let entry = entry.trim();
+        if entry.is_empty() {
+            continue;
+        }
+        let Some((pattern, lane)) = entry.split_once('=') else {
+            return Err(format!(
+                "scheduler contract node `{node_name}` has invalid default lane entry `{entry}`"
+            ));
+        };
+        let pattern = pattern.trim();
+        let lane = lane.trim();
+        if pattern.is_empty() || lane.is_empty() {
+            return Err(format!(
+                "scheduler contract node `{node_name}` has invalid default lane entry `{entry}`"
+            ));
+        }
+        if !parsed_lanes.contains(lane) {
+            return Err(format!(
+                "scheduler contract node `{node_name}` declares default lane `{lane}` outside `{lanes}`"
+            ));
+        }
+        lanes_from_defaults.insert(lane);
+    }
+    if lanes_from_defaults != parsed_lanes {
+        return Err(format!(
+            "scheduler contract node `{node_name}` declares lanes `{lanes}` but defaults cover `{}`",
+            lanes_from_defaults.into_iter().collect::<Vec<_>>().join(",")
+        ));
+    }
+    Ok(())
+}
+
+fn verify_scheduler_clock_contract_text(
+    node_name: &str,
+    family: &str,
+    value: &str,
+) -> Result<(), String> {
+    let fields = parse_semicolon_kv_contract(node_name, value, "scheduler clock contract")?;
+    let declared_family = fields.get("family").ok_or_else(|| {
+        format!("scheduler contract node `{node_name}` is missing `family` field")
+    })?;
+    if *declared_family != family {
+        return Err(format!(
+            "scheduler contract node `{node_name}` declares `family={declared_family}`, expected `{family}`"
+        ));
+    }
+    for key in ["domain", "kind", "epoch", "resolution", "bridge"] {
+        let value = fields.get(key).ok_or_else(|| {
+            format!("scheduler contract node `{node_name}` is missing `{key}` field")
+        })?;
+        if value.trim().is_empty() {
+            return Err(format!(
+                "scheduler contract node `{node_name}` requires non-empty `{key}`"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn verify_scheduler_lane_capability_contract_text(
+    nodes: &BTreeMap<String, &Node>,
+    node_name: &str,
+    family: &str,
+    value: &str,
+) -> Result<(), String> {
+    let fields =
+        parse_semicolon_kv_contract(node_name, value, "scheduler lane capability contract")?;
+    let declared_family = fields.get("family").ok_or_else(|| {
+        format!("scheduler contract node `{node_name}` is missing `family` field")
+    })?;
+    if *declared_family != family {
+        return Err(format!(
+            "scheduler contract node `{node_name}` declares `family={declared_family}`, expected `{family}`"
+        ));
+    }
+    let lane_policy_name = format!("scheduler_contract_{family}_lane_policy_type");
+    let lane_policy_node = nodes.get(lane_policy_name.as_str()).copied().ok_or_else(|| {
+        format!(
+            "scheduler contract node `{node_name}` requires sibling lane policy node `{lane_policy_name}`"
+        )
+    })?;
+    let lane_policy_value = lane_policy_node
+        .op
+        .args
+        .first()
+        .map(String::as_str)
+        .ok_or_else(|| {
+            format!(
+                "scheduler contract node `{lane_policy_name}` must carry a canonical text payload"
+            )
+        })?;
+    let lane_policy_fields = parse_semicolon_kv_contract(
+        lane_policy_name.as_str(),
+        lane_policy_value,
+        "scheduler lane contract",
+    )?;
+    let declared_lanes = lane_policy_fields
+        .get("lanes")
+        .ok_or_else(|| {
+            format!("scheduler contract node `{lane_policy_name}` is missing `lanes` field")
+        })?
+        .split(',')
+        .map(str::trim)
+        .filter(|lane| !lane.is_empty())
+        .collect::<BTreeSet<_>>();
+    let declared_lane_list = declared_lanes.iter().copied().collect::<Vec<_>>().join(",");
+    let capability_lanes = fields
+        .iter()
+        .filter_map(|(key, value)| (*key != "family").then_some((*key, *value)))
+        .collect::<BTreeMap<_, _>>();
+    if capability_lanes.is_empty() {
+        return Err(format!(
+            "scheduler contract node `{node_name}` requires at least one lane capability entry"
+        ));
+    }
+    for lane in &declared_lanes {
+        let capability = capability_lanes.get(lane).ok_or_else(|| {
+            format!(
+                "scheduler contract node `{node_name}` is missing capability for declared lane `{lane}`"
+            )
+        })?;
+        if capability.trim().is_empty() {
+            return Err(format!(
+                "scheduler contract node `{node_name}` requires non-empty capability for lane `{lane}`"
+            ));
+        }
+    }
+    for lane in capability_lanes.keys() {
+        if !declared_lanes.contains(*lane) {
+            return Err(format!(
+                "scheduler contract node `{node_name}` declares capability for lane `{lane}` outside `{declared_lane_list}`"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn verify_scheduler_bridge_capability_contract_text(
+    nodes: &BTreeMap<String, &Node>,
+    node_name: &str,
+    family: &str,
+    value: &str,
+) -> Result<(), String> {
+    let fields =
+        parse_semicolon_kv_contract(node_name, value, "scheduler bridge capability contract")?;
+    let declared_family = fields.get("family").ok_or_else(|| {
+        format!("scheduler contract node `{node_name}` is missing `family` field")
+    })?;
+    if *declared_family != family {
+        return Err(format!(
+            "scheduler contract node `{node_name}` declares `family={declared_family}`, expected `{family}`"
+        ));
+    }
+    let lane_bridge = fields.get("lane_bridge").ok_or_else(|| {
+        format!("scheduler contract node `{node_name}` is missing `lane_bridge` field")
+    })?;
+    let clock_bridge = fields.get("clock_bridge").ok_or_else(|| {
+        format!("scheduler contract node `{node_name}` is missing `clock_bridge` field")
+    })?;
+    if lane_bridge.trim().is_empty() || clock_bridge.trim().is_empty() {
+        return Err(format!(
+            "scheduler contract node `{node_name}` requires non-empty `lane_bridge` and `clock_bridge`"
+        ));
+    }
+    if family == "cpu" && *lane_bridge != "cpu_bind_core_lane:host_main_lane|worker_lane" {
+        return Err(format!(
+            "scheduler contract node `{node_name}` currently expects CPU lane bridge `cpu_bind_core_lane:host_main_lane|worker_lane`, got `{lane_bridge}`"
+        ));
+    }
+    if family != "cpu" && *lane_bridge != "none" {
+        return Err(format!(
+            "scheduler contract node `{node_name}` currently expects non-CPU lane bridge `none`, got `{lane_bridge}`"
+        ));
+    }
+    let clock_contract_name = format!("scheduler_contract_{family}_clock_type");
+    let clock_contract_node = nodes.get(clock_contract_name.as_str()).copied().ok_or_else(|| {
+        format!(
+            "scheduler contract node `{node_name}` requires sibling clock node `{clock_contract_name}`"
+        )
+    })?;
+    let clock_contract_value = clock_contract_node
+        .op
+        .args
+        .first()
+        .map(String::as_str)
+        .ok_or_else(|| {
+            format!(
+                "scheduler contract node `{clock_contract_name}` must carry a canonical text payload"
+            )
+        })?;
+    let clock_contract_fields = parse_semicolon_kv_contract(
+        clock_contract_name.as_str(),
+        clock_contract_value,
+        "scheduler clock contract",
+    )?;
+    let declared_clock_bridge = clock_contract_fields.get("bridge").ok_or_else(|| {
+        format!("scheduler contract node `{clock_contract_name}` is missing `bridge` field")
+    })?;
+    if *declared_clock_bridge != *clock_bridge {
+        return Err(format!(
+            "scheduler contract node `{node_name}` declares `clock_bridge={clock_bridge}`, but `{clock_contract_name}` uses `{declared_clock_bridge}`"
+        ));
+    }
+    Ok(())
+}
+
+fn verify_scheduler_result_lane_contract_text(
+    nodes: &BTreeMap<String, &Node>,
+    node_name: &str,
+    family: &str,
+    value: &str,
+) -> Result<(), String> {
+    let fields = parse_semicolon_kv_contract(node_name, value, "scheduler result lane contract")?;
+    let declared_family = fields.get("family").ok_or_else(|| {
+        format!("scheduler contract node `{node_name}` is missing `family` field")
+    })?;
+    if *declared_family != family {
+        return Err(format!(
+            "scheduler contract node `{node_name}` declares `family={declared_family}`, expected `{family}`"
+        ));
+    }
+    let lane_policy_name = format!("scheduler_contract_{family}_lane_policy_type");
+    let lane_policy_node = nodes.get(lane_policy_name.as_str()).copied().ok_or_else(|| {
+        format!(
+            "scheduler contract node `{node_name}` requires sibling lane policy node `{lane_policy_name}`"
+        )
+    })?;
+    let lane_policy_value = lane_policy_node
+        .op
+        .args
+        .first()
+        .map(String::as_str)
+        .ok_or_else(|| {
+            format!(
+                "scheduler contract node `{lane_policy_name}` must carry a canonical text payload"
+            )
+        })?;
+    let lane_policy_fields = parse_semicolon_kv_contract(
+        lane_policy_name.as_str(),
+        lane_policy_value,
+        "scheduler lane contract",
+    )?;
+    let declared_lanes = lane_policy_fields
+        .get("lanes")
+        .ok_or_else(|| {
+            format!("scheduler contract node `{lane_policy_name}` is missing `lanes` field")
+        })?
+        .split(',')
+        .map(str::trim)
+        .filter(|lane| !lane.is_empty())
+        .collect::<BTreeSet<_>>();
+    let declared_lane_list = declared_lanes.iter().copied().collect::<Vec<_>>().join(",");
+    for key in ["entry", "probe", "value"] {
+        let lane = fields.get(key).ok_or_else(|| {
+            format!("scheduler contract node `{node_name}` is missing `{key}` field")
+        })?;
+        if !declared_lanes.contains(*lane) {
+            return Err(format!(
+                "scheduler contract node `{node_name}` declares result lane `{lane}` for `{key}` outside `{declared_lane_list}`"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn verify_scheduler_result_capability_contract_text(
+    nodes: &BTreeMap<String, &Node>,
+    node_name: &str,
+    family: &str,
+    value: &str,
+) -> Result<(), String> {
+    let fields =
+        parse_semicolon_kv_contract(node_name, value, "scheduler result capability contract")?;
+    let declared_family = fields.get("family").ok_or_else(|| {
+        format!("scheduler contract node `{node_name}` is missing `family` field")
+    })?;
+    if *declared_family != family {
+        return Err(format!(
+            "scheduler contract node `{node_name}` declares `family={declared_family}`, expected `{family}`"
+        ));
+    }
+    let result_lane_name = format!("scheduler_contract_{family}_result_lane_type");
+    let result_lane_node = nodes.get(result_lane_name.as_str()).copied().ok_or_else(|| {
+        format!(
+            "scheduler contract node `{node_name}` requires sibling result lane node `{result_lane_name}`"
+        )
+    })?;
+    let result_lane_value = result_lane_node
+        .op
+        .args
+        .first()
+        .map(String::as_str)
+        .ok_or_else(|| {
+            format!(
+                "scheduler contract node `{result_lane_name}` must carry a canonical text payload"
+            )
+        })?;
+    let result_lane_fields = parse_semicolon_kv_contract(
+        result_lane_name.as_str(),
+        result_lane_value,
+        "scheduler result lane contract",
+    )?;
+    for key in ["entry", "probe", "value"] {
+        if !result_lane_fields.contains_key(key) {
+            return Err(format!(
+                "scheduler contract node `{result_lane_name}` is missing `{key}` field"
+            ));
+        }
+        let capability = fields.get(key).ok_or_else(|| {
+            format!("scheduler contract node `{node_name}` is missing `{key}` field")
+        })?;
+        let expected = match key {
+            "entry" => "result-entry",
+            "probe" => "result-ready-probe",
+            "value" => "result-payload-value",
+            _ => unreachable!(),
+        };
+        if *capability != expected {
+            return Err(format!(
+                "scheduler contract node `{node_name}` declares `{key}={capability}`, expected `{expected}`"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn verify_scheduler_summary_capability_contract_text(
+    nodes: &BTreeMap<String, &Node>,
+    node_name: &str,
+    family: &str,
+    value: &str,
+) -> Result<(), String> {
+    let fields =
+        parse_semicolon_kv_contract(node_name, value, "scheduler summary capability contract")?;
+    let declared_family = fields.get("family").ok_or_else(|| {
+        format!("scheduler contract node `{node_name}` is missing `family` field")
+    })?;
+    if *declared_family != family {
+        return Err(format!(
+            "scheduler contract node `{node_name}` declares `family={declared_family}`, expected `{family}`"
+        ));
+    }
+    let result_capability_name = format!("scheduler_contract_{family}_result_capability_type");
+    let _result_capability_node = nodes
+        .get(result_capability_name.as_str())
+        .copied()
+        .ok_or_else(|| {
+            format!(
+                "scheduler contract node `{node_name}` requires sibling result capability node `{result_capability_name}`"
+            )
+        })?;
+    for (key, expected) in [
+        ("policy", "async-policy-summary"),
+        ("batch", "async-batch-summary"),
+        ("windowed", "async-windowed-summary"),
+    ] {
+        let capability = fields.get(key).ok_or_else(|| {
+            format!("scheduler contract node `{node_name}` is missing `{key}` field")
+        })?;
+        if *capability != expected {
+            return Err(format!(
+                "scheduler contract node `{node_name}` declares `{key}={capability}`, expected `{expected}`"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn verify_scheduler_observer_source_class_contract_text(
+    nodes: &BTreeMap<String, &Node>,
+    node_name: &str,
+    family: &str,
+    value: &str,
+) -> Result<(), String> {
+    let fields =
+        parse_semicolon_kv_contract(node_name, value, "scheduler observer source class contract")?;
+    let declared_family = fields.get("family").ok_or_else(|| {
+        format!("scheduler contract node `{node_name}` is missing `family` field")
+    })?;
+    if *declared_family != family {
+        return Err(format!(
+            "scheduler contract node `{node_name}` declares `family={declared_family}`, expected `{family}`"
+        ));
+    }
+    let summary_capability_name = format!("scheduler_contract_{family}_summary_capability_type");
+    let _summary_capability_node = nodes
+        .get(summary_capability_name.as_str())
+        .copied()
+        .ok_or_else(|| {
+            format!(
+                "scheduler contract node `{node_name}` requires sibling summary capability node `{summary_capability_name}`"
+            )
+        })?;
+    for (key, expected) in [
+        ("profile", "profile-backed"),
+        ("result", "result-backed"),
+        ("summary", "summary-backed"),
+    ] {
+        let source_class = fields.get(key).ok_or_else(|| {
+            format!("scheduler contract node `{node_name}` is missing `{key}` field")
+        })?;
+        if *source_class != expected {
+            return Err(format!(
+                "scheduler contract node `{node_name}` declares `{key}={source_class}`, expected `{expected}`"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn verify_scheduler_observer_stage_class_contract_text(
+    nodes: &BTreeMap<String, &Node>,
+    node_name: &str,
+    family: &str,
+    value: &str,
+) -> Result<(), String> {
+    let fields =
+        parse_semicolon_kv_contract(node_name, value, "scheduler observer stage class contract")?;
+    let declared_family = fields.get("family").ok_or_else(|| {
+        format!("scheduler contract node `{node_name}` is missing `family` field")
+    })?;
+    if *declared_family != family {
+        return Err(format!(
+            "scheduler contract node `{node_name}` declares `family={declared_family}`, expected `{family}`"
+        ));
+    }
+    let source_class_name = format!("scheduler_contract_{family}_observer_source_class_type");
+    let _source_class_node = nodes.get(source_class_name.as_str()).copied().ok_or_else(|| {
+        format!(
+            "scheduler contract node `{node_name}` requires sibling observer source class node `{source_class_name}`"
+        )
+    })?;
+    for (key, expected) in [
+        ("entry", "observer-entry-stage"),
+        ("ready", "observer-ready-stage"),
+        ("payload", "observer-payload-stage"),
+        ("policy", "observer-policy-stage"),
+        ("batch", "observer-batch-stage"),
+        ("windowed", "observer-windowed-stage"),
+    ] {
+        let stage_class = fields.get(key).ok_or_else(|| {
+            format!("scheduler contract node `{node_name}` is missing `{key}` field")
+        })?;
+        if *stage_class != expected {
+            return Err(format!(
+                "scheduler contract node `{node_name}` declares `{key}={stage_class}`, expected `{expected}`"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn verify_scheduler_observer_scope_class_contract_text(
+    nodes: &BTreeMap<String, &Node>,
+    node_name: &str,
+    family: &str,
+    value: &str,
+) -> Result<(), String> {
+    let fields =
+        parse_semicolon_kv_contract(node_name, value, "scheduler observer scope class contract")?;
+    let declared_family = fields.get("family").ok_or_else(|| {
+        format!("scheduler contract node `{node_name}` is missing `family` field")
+    })?;
+    if *declared_family != family {
+        return Err(format!(
+            "scheduler contract node `{node_name}` declares `family={declared_family}`, expected `{family}`"
+        ));
+    }
+    let stage_class_name = format!("scheduler_contract_{family}_observer_stage_class_type");
+    let _stage_class_node = nodes.get(stage_class_name.as_str()).copied().ok_or_else(|| {
+        format!(
+            "scheduler contract node `{node_name}` requires sibling observer stage class node `{stage_class_name}`"
+        )
+    })?;
+    for (key, expected) in [
+        ("local", "local-scope"),
+        ("cross_lane", "cross-lane-scope"),
+        ("cross_domain", "cross-domain-scope"),
+        ("bridge_visible", "bridge-visible-scope"),
+    ] {
+        let scope_class = fields.get(key).ok_or_else(|| {
+            format!("scheduler contract node `{node_name}` is missing `{key}` field")
+        })?;
+        if *scope_class != expected {
+            return Err(format!(
+                "scheduler contract node `{node_name}` declares `{key}={scope_class}`, expected `{expected}`"
+            ));
+        }
+    }
     Ok(())
 }
 
@@ -2326,6 +3106,789 @@ mod tests {
 
         let error = verify_module(&module).unwrap_err();
         assert!(error.contains("encodes `batch_lanes=12`"));
+    }
+
+    #[test]
+    fn scheduler_contract_nodes_validate_lane_and_clock_registration() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![
+                Resource {
+                    name: "cpu0".to_owned(),
+                    kind: ResourceKind::parse("cpu.arm64"),
+                },
+                Resource {
+                    name: "shader0".to_owned(),
+                    kind: ResourceKind::parse("shader.metal"),
+                },
+            ],
+            nodes: vec![
+                node(
+                    "scheduler_contract_shader_lane_policy_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;lanes=render,setup;defaults=shader.target=setup|shader.begin_pass=render"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_lane_capability_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[r#"family=shader;render=render-pass;setup=render-setup"#],
+                ),
+                node(
+                    "scheduler_contract_shader_bridge_capability_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[r#"family=shader;lane_bridge=none;clock_bridge=global->frame:bridge"#],
+                ),
+                node(
+                    "scheduler_contract_shader_clock_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;domain=shader.clock.frame.v1;kind=frame-monotonic;epoch=frame-epoch;resolution=render-pass-step;bridge=global->frame:bridge"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_result_lane_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[r#"family=shader;entry=setup;probe=setup;value=setup"#],
+                ),
+                node(
+                    "scheduler_contract_shader_result_capability_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;entry=result-entry;probe=result-ready-probe;value=result-payload-value"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_summary_capability_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;policy=async-policy-summary;batch=async-batch-summary;windowed=async-windowed-summary"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_observer_source_class_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;profile=profile-backed;result=result-backed;summary=summary-backed"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_observer_stage_class_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;entry=observer-entry-stage;ready=observer-ready-stage;payload=observer-payload-stage;policy=observer-policy-stage;batch=observer-batch-stage;windowed=observer-windowed-stage"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_observer_scope_class_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;local=local-scope;cross_lane=cross-lane-scope;cross_domain=cross-domain-scope;bridge_visible=bridge-visible-scope"#,
+                    ],
+                ),
+                node(
+                    "shader_target",
+                    "shader0",
+                    "shader.target",
+                    &["rgba8_unorm", "160", "120"],
+                ),
+            ],
+            edges: vec![
+                dep(
+                    "scheduler_contract_shader_lane_policy_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_lane_capability_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_bridge_capability_type",
+                    "shader_target",
+                ),
+                dep("scheduler_contract_shader_clock_type", "shader_target"),
+                dep(
+                    "scheduler_contract_shader_result_lane_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_result_capability_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_summary_capability_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_observer_source_class_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_observer_stage_class_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_observer_scope_class_type",
+                    "shader_target",
+                ),
+            ],
+            node_lanes: BTreeMap::new(),
+        };
+
+        verify_module(&module).unwrap();
+    }
+
+    #[test]
+    fn scheduler_contract_nodes_reject_lane_defaults_outside_declared_set() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![
+                Resource {
+                    name: "cpu0".to_owned(),
+                    kind: ResourceKind::parse("cpu.arm64"),
+                },
+                Resource {
+                    name: "kernel0".to_owned(),
+                    kind: ResourceKind::parse("kernel.apple"),
+                },
+            ],
+            nodes: vec![
+                node(
+                    "scheduler_contract_kernel_lane_policy_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=kernel;lanes=compute;defaults=kernel.tensor=compute|kernel.print=main"#,
+                    ],
+                ),
+                node(
+                    "kernel_entry",
+                    "kernel0",
+                    "kernel.target_config",
+                    &["apple_ane", "coreml", "16"],
+                ),
+            ],
+            edges: vec![dep(
+                "scheduler_contract_kernel_lane_policy_type",
+                "kernel_entry",
+            )],
+            node_lanes: BTreeMap::new(),
+        };
+
+        let error = verify_module(&module).unwrap_err();
+        assert!(error.contains("declares default lane `main` outside"));
+    }
+
+    #[test]
+    fn scheduler_contract_nodes_reject_result_lane_outside_declared_set() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![
+                Resource {
+                    name: "cpu0".to_owned(),
+                    kind: ResourceKind::parse("cpu.arm64"),
+                },
+                Resource {
+                    name: "shader0".to_owned(),
+                    kind: ResourceKind::parse("shader.metal"),
+                },
+            ],
+            nodes: vec![
+                node(
+                    "scheduler_contract_shader_lane_policy_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;lanes=render,setup;defaults=shader.target=setup|shader.begin_pass=render"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_result_lane_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[r#"family=shader;entry=setup;probe=render;value=main"#],
+                ),
+                node(
+                    "shader_target",
+                    "shader0",
+                    "shader.target",
+                    &["rgba8_unorm", "160", "120"],
+                ),
+            ],
+            edges: vec![
+                dep(
+                    "scheduler_contract_shader_lane_policy_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_result_lane_type",
+                    "shader_target",
+                ),
+            ],
+            node_lanes: BTreeMap::new(),
+        };
+
+        let error = verify_module(&module).unwrap_err();
+        assert!(error.contains("declares result lane `main`"));
+    }
+
+    #[test]
+    fn scheduler_contract_nodes_reject_invalid_result_capability_label() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![
+                Resource {
+                    name: "cpu0".to_owned(),
+                    kind: ResourceKind::parse("cpu.arm64"),
+                },
+                Resource {
+                    name: "shader0".to_owned(),
+                    kind: ResourceKind::parse("shader.metal"),
+                },
+            ],
+            nodes: vec![
+                node(
+                    "scheduler_contract_shader_lane_policy_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;lanes=render,setup;defaults=shader.target=setup|shader.begin_pass=render"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_result_lane_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[r#"family=shader;entry=setup;probe=setup;value=setup"#],
+                ),
+                node(
+                    "scheduler_contract_shader_result_capability_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;entry=result-entry;probe=result-state-probe;value=result-payload-value"#,
+                    ],
+                ),
+                node(
+                    "shader_target",
+                    "shader0",
+                    "shader.target",
+                    &["rgba8_unorm", "160", "120"],
+                ),
+            ],
+            edges: vec![
+                dep(
+                    "scheduler_contract_shader_lane_policy_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_result_lane_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_result_capability_type",
+                    "shader_target",
+                ),
+            ],
+            node_lanes: BTreeMap::new(),
+        };
+
+        let error = verify_module(&module).unwrap_err();
+        assert!(error.contains("expected `result-ready-probe`"), "{error}");
+    }
+
+    #[test]
+    fn scheduler_contract_nodes_reject_invalid_summary_capability_label() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![
+                Resource {
+                    name: "cpu0".to_owned(),
+                    kind: ResourceKind::parse("cpu.arm64"),
+                },
+                Resource {
+                    name: "shader0".to_owned(),
+                    kind: ResourceKind::parse("shader.metal"),
+                },
+            ],
+            nodes: vec![
+                node(
+                    "scheduler_contract_shader_lane_policy_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;lanes=render,setup;defaults=shader.target=setup|shader.begin_pass=render"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_result_lane_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[r#"family=shader;entry=setup;probe=setup;value=setup"#],
+                ),
+                node(
+                    "scheduler_contract_shader_result_capability_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;entry=result-entry;probe=result-ready-probe;value=result-payload-value"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_summary_capability_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;policy=async-policy-summary;batch=async-fan-in-summary;windowed=async-windowed-summary"#,
+                    ],
+                ),
+                node(
+                    "shader_target",
+                    "shader0",
+                    "shader.target",
+                    &["rgba8_unorm", "160", "120"],
+                ),
+            ],
+            edges: vec![
+                dep(
+                    "scheduler_contract_shader_lane_policy_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_result_lane_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_result_capability_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_summary_capability_type",
+                    "shader_target",
+                ),
+            ],
+            node_lanes: BTreeMap::new(),
+        };
+
+        let error = verify_module(&module).unwrap_err();
+        assert!(error.contains("expected `async-batch-summary`"), "{error}");
+    }
+
+    #[test]
+    fn scheduler_contract_nodes_reject_invalid_observer_source_class_label() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![
+                Resource {
+                    name: "cpu0".to_owned(),
+                    kind: ResourceKind::parse("cpu.arm64"),
+                },
+                Resource {
+                    name: "shader0".to_owned(),
+                    kind: ResourceKind::parse("shader.metal"),
+                },
+            ],
+            nodes: vec![
+                node(
+                    "scheduler_contract_shader_lane_policy_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;lanes=render,setup;defaults=shader.target=setup|shader.begin_pass=render"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_result_lane_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[r#"family=shader;entry=setup;probe=setup;value=setup"#],
+                ),
+                node(
+                    "scheduler_contract_shader_result_capability_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;entry=result-entry;probe=result-ready-probe;value=result-payload-value"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_summary_capability_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;policy=async-policy-summary;batch=async-batch-summary;windowed=async-windowed-summary"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_observer_source_class_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;profile=profile-source;result=result-backed;summary=summary-backed"#,
+                    ],
+                ),
+                node(
+                    "shader_target",
+                    "shader0",
+                    "shader.target",
+                    &["rgba8_unorm", "160", "120"],
+                ),
+            ],
+            edges: vec![
+                dep(
+                    "scheduler_contract_shader_lane_policy_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_result_lane_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_result_capability_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_summary_capability_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_observer_source_class_type",
+                    "shader_target",
+                ),
+            ],
+            node_lanes: BTreeMap::new(),
+        };
+
+        let error = verify_module(&module).unwrap_err();
+        assert!(error.contains("expected `profile-backed`"), "{error}");
+    }
+
+    #[test]
+    fn scheduler_contract_nodes_reject_invalid_observer_stage_class_label() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![
+                Resource {
+                    name: "cpu0".to_owned(),
+                    kind: ResourceKind::parse("cpu.arm64"),
+                },
+                Resource {
+                    name: "shader0".to_owned(),
+                    kind: ResourceKind::parse("shader.metal"),
+                },
+            ],
+            nodes: vec![
+                node(
+                    "scheduler_contract_shader_lane_policy_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;lanes=render,setup;defaults=shader.target=setup|shader.begin_pass=render"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_result_lane_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[r#"family=shader;entry=setup;probe=setup;value=setup"#],
+                ),
+                node(
+                    "scheduler_contract_shader_result_capability_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;entry=result-entry;probe=result-ready-probe;value=result-payload-value"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_summary_capability_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;policy=async-policy-summary;batch=async-batch-summary;windowed=async-windowed-summary"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_observer_source_class_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;profile=profile-backed;result=result-backed;summary=summary-backed"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_observer_stage_class_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;entry=observer-entry-stage;ready=observer-state-stage;payload=observer-payload-stage;policy=observer-policy-stage;batch=observer-batch-stage;windowed=observer-windowed-stage"#,
+                    ],
+                ),
+                node(
+                    "shader_target",
+                    "shader0",
+                    "shader.target",
+                    &["rgba8_unorm", "160", "120"],
+                ),
+            ],
+            edges: vec![
+                dep(
+                    "scheduler_contract_shader_lane_policy_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_result_lane_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_result_capability_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_summary_capability_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_observer_source_class_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_observer_stage_class_type",
+                    "shader_target",
+                ),
+            ],
+            node_lanes: BTreeMap::new(),
+        };
+
+        let error = verify_module(&module).unwrap_err();
+        assert!(error.contains("expected `observer-ready-stage`"), "{error}");
+    }
+
+    #[test]
+    fn scheduler_contract_nodes_reject_invalid_observer_scope_class_label() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![
+                Resource {
+                    name: "cpu0".to_owned(),
+                    kind: ResourceKind::parse("cpu.arm64"),
+                },
+                Resource {
+                    name: "shader0".to_owned(),
+                    kind: ResourceKind::parse("shader.metal"),
+                },
+            ],
+            nodes: vec![
+                node(
+                    "scheduler_contract_shader_lane_policy_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;lanes=render,setup;defaults=shader.target=setup|shader.begin_pass=render"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_result_lane_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[r#"family=shader;entry=setup;probe=setup;value=setup"#],
+                ),
+                node(
+                    "scheduler_contract_shader_result_capability_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;entry=result-entry;probe=result-ready-probe;value=result-payload-value"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_summary_capability_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;policy=async-policy-summary;batch=async-batch-summary;windowed=async-windowed-summary"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_observer_source_class_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;profile=profile-backed;result=result-backed;summary=summary-backed"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_observer_stage_class_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;entry=observer-entry-stage;ready=observer-ready-stage;payload=observer-payload-stage;policy=observer-policy-stage;batch=observer-batch-stage;windowed=observer-windowed-stage"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_observer_scope_class_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;local=local-scope;cross_lane=lane-crossing-scope;cross_domain=cross-domain-scope;bridge_visible=bridge-visible-scope"#,
+                    ],
+                ),
+                node(
+                    "shader_target",
+                    "shader0",
+                    "shader.target",
+                    &["rgba8_unorm", "160", "120"],
+                ),
+            ],
+            edges: vec![
+                dep(
+                    "scheduler_contract_shader_lane_policy_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_result_lane_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_result_capability_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_summary_capability_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_observer_source_class_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_observer_stage_class_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_observer_scope_class_type",
+                    "shader_target",
+                ),
+            ],
+            node_lanes: BTreeMap::new(),
+        };
+
+        let error = verify_module(&module).unwrap_err();
+        assert!(error.contains("expected `cross-lane-scope`"), "{error}");
+    }
+
+    #[test]
+    fn scheduler_contract_nodes_reject_lane_capability_outside_declared_set() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![
+                Resource {
+                    name: "cpu0".to_owned(),
+                    kind: ResourceKind::parse("cpu.arm64"),
+                },
+                Resource {
+                    name: "shader0".to_owned(),
+                    kind: ResourceKind::parse("shader.metal"),
+                },
+            ],
+            nodes: vec![
+                node(
+                    "scheduler_contract_shader_lane_policy_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;lanes=render,setup;defaults=shader.target=setup|shader.begin_pass=render"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_lane_capability_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[r#"family=shader;render=render-pass;setup=render-setup;main=host-entry"#],
+                ),
+                node(
+                    "shader_target",
+                    "shader0",
+                    "shader.target",
+                    &["rgba8_unorm", "160", "120"],
+                ),
+            ],
+            edges: vec![
+                dep(
+                    "scheduler_contract_shader_lane_policy_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_lane_capability_type",
+                    "shader_target",
+                ),
+            ],
+            node_lanes: BTreeMap::new(),
+        };
+
+        let error = verify_module(&module).unwrap_err();
+        assert!(error.contains("declares capability for lane `main`"));
+    }
+
+    #[test]
+    fn scheduler_contract_nodes_reject_invalid_cpu_bridge_capability() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![Resource {
+                name: "cpu0".to_owned(),
+                kind: ResourceKind::parse("cpu.arm64"),
+            }],
+            nodes: vec![
+                node(
+                    "scheduler_contract_cpu_lane_policy_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[r#"family=cpu;lanes=main,mem;defaults=cpu.print=main|cpu.alloc_node=mem"#],
+                ),
+                node(
+                    "scheduler_contract_cpu_clock_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=cpu;domain=cpu.clock.host.v1;kind=host-monotonic;epoch=host-epoch;resolution=cpu.tick_i64;bridge=global->monotonic:bridge"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_cpu_bridge_capability_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=cpu;lane_bridge=host_main_lane;clock_bridge=global->monotonic:bridge"#,
+                    ],
+                ),
+                node("seed", "cpu0", "cpu.const", &["7"]),
+                node("cpu_entry", "cpu0", "cpu.print", &["seed"]),
+            ],
+            edges: vec![
+                dep("scheduler_contract_cpu_lane_policy_type", "cpu_entry"),
+                dep("scheduler_contract_cpu_clock_type", "cpu_entry"),
+                dep("scheduler_contract_cpu_bridge_capability_type", "cpu_entry"),
+                dep("seed", "cpu_entry"),
+            ],
+            node_lanes: BTreeMap::new(),
+        };
+
+        let error = verify_module(&module).unwrap_err();
+        assert!(
+            error.contains("currently expects CPU lane bridge"),
+            "{error}"
+        );
     }
 
     #[test]

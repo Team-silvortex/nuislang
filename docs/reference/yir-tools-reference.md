@@ -62,6 +62,7 @@ Current reference commands:
 * `project-status <input.ns|project-dir|nuis.toml>`
 * `project-doctor <project-dir|nuis.toml>`
 * `project-lock-abi <project-dir|nuis.toml>`
+* `scheduler-view <input.ns|project-dir|nuis.toml>`
 * `release-check <input> <output-dir>`
 * `check <input.ns|project-dir|nuis.toml>`
 * `test [--list] [--ignored|--include-ignored] [--exact] <input.ns|project-dir|nuis.toml> [filter]`
@@ -85,6 +86,32 @@ Current `nustar` loading policy is:
 * each loaded `nustar` now also declares its `AST surface`, `NIR surface`, `YIR lowering`, and `part verify` responsibilities so `nuisc` can stay mod-agnostic while still seeing the full package role
 * each loaded `nustar` also declares unified entry names for those four surfaces, so future `nuisc` loading can bind through stable entry points instead of hard-coded per-mod assumptions
 * each loaded `nustar` can now also declare a small domain-owned clock contract through `clock_domain_id`, `clock_kind`, `clock_epoch_kind`, `clock_resolution`, and `clock_bridge_default`
+* lowering now also materializes the current scheduler registration into a
+  short contract stack:
+  * placement
+    * `scheduler_contract_cpu_lane_policy_type`
+    * `scheduler_contract_cpu_lane_capability_type`
+    * `scheduler_contract_cpu_bridge_capability_type`
+  * timing
+    * `scheduler_contract_cpu_clock_type`
+  * result observation
+    * `scheduler_contract_cpu_result_lane_type`
+    * `scheduler_contract_cpu_result_capability_type`
+  * async summary observation
+    * `scheduler_contract_cpu_summary_capability_type`
+  * observer classification
+    * `scheduler_contract_cpu_observer_source_class_type`
+    * `scheduler_contract_cpu_observer_stage_class_type`
+    * `scheduler_contract_cpu_observer_scope_class_type`
+* `nuis registry` now also prints the short scheduler-facing reading view for
+  each package:
+  * `scheduler_contract_stack`
+  * `scheduler_result_roles`
+  * `scheduler_summary_api`
+  * `scheduler_observer_classes`
+* `nuis project-status` and `nuis project-doctor` now also print the same
+  scheduler-facing reading view per resolved domain requirement, plus the
+  resolved clock/bridge line for that domain
 
 Current `nustar` packaging prototype is:
 
@@ -125,6 +152,7 @@ For the current repository shape, the most useful front-door sequence is:
 ```text
 project-doctor
   -> project-status
+  -> scheduler-view
   -> project-lock-abi    (when ABI is still auto-resolved)
   -> check
   -> test
@@ -139,6 +167,10 @@ Read that as:
   framework metadata
 * `project-status`
   structural and ABI-resolution view of the project itself
+* `scheduler-view`
+  focused scheduler-contract view for the current input; use this when you
+  want the short `placement / timing / result / summary / observer`
+  projection without the rest of the project-health output
 * `project-lock-abi`
   optional materialization step once you want the current host-matching ABI set
   written into the manifest

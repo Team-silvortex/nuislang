@@ -12,6 +12,8 @@ Current layout:
   - [state](/Users/Shared/chroot/dev/nuislang/examples/projects/state)
   - [filesystem](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem)
   - [domains](/Users/Shared/chroot/dev/nuislang/examples/projects/domains)
+* shared domain-local helper modules now live under:
+  - [domains/shared](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shared)
 
 ## What A Project Gives You
 
@@ -123,6 +125,11 @@ Core companion routes:
   the main `cpu + data + kernel` project route alongside
   [window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo)
 * domain-profile companions:
+  shared helpers:
+  [domains/shared](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shared),
+  [shader_task_async_shapes.ns](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shared/shader_task_async_shapes.ns),
+  [kernel_task_async_shapes.ns](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shared/kernel_task_async_shapes.ns)
+  and
   [shader_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_profile_demo),
   [shader_surface_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_profile_demo),
   [shader_surface_material_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_profile_demo),
@@ -218,6 +225,9 @@ Core companion routes:
   [input_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/input_runtime_demo),
   [io_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/io_runtime_demo),
   [command_shell_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/command_shell_demo),
+  [cli_session_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_session_demo),
+  [cli_shell_session_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_shell_session_demo),
+  [cli_report_session_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_report_session_demo),
   [cli_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_runtime_demo)
 * state/persistence companions:
   [cwd_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/cwd_runtime_demo),
@@ -282,6 +292,12 @@ cargo run -p nuis -- check examples/projects/kernel_tensor_demo
 cargo run -p nuis -- build examples/projects/kernel_tensor_demo examples/bins/kernel_tensor_demo_project
 cargo run -p nuis -- check examples/projects/tooling/command_shell_demo
 cargo run -p nuis -- build examples/projects/tooling/command_shell_demo /private/tmp/command_shell_demo_out
+cargo run -p nuis -- check examples/projects/tooling/cli_session_demo
+cargo run -p nuis -- build examples/projects/tooling/cli_session_demo /private/tmp/cli_session_demo_out
+cargo run -p nuis -- check examples/projects/tooling/cli_shell_session_demo
+cargo run -p nuis -- build examples/projects/tooling/cli_shell_session_demo /private/tmp/cli_shell_session_demo_out
+cargo run -p nuis -- check examples/projects/tooling/cli_report_session_demo
+cargo run -p nuis -- build examples/projects/tooling/cli_report_session_demo /private/tmp/cli_report_session_demo_out
 cargo run -p nuis -- check examples/projects/tooling/report_runtime_demo
 cargo run -p nuis -- build examples/projects/tooling/report_runtime_demo /private/tmp/report_runtime_demo_out
 cargo run -p nuis -- check examples/projects/tooling/automation_runtime_demo

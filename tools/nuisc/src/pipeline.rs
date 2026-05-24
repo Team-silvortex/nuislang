@@ -1,4 +1,4 @@
-use std::{fs, path::Path};
+use std::{collections::BTreeSet, fs, path::Path};
 
 use nuis_semantics::model::{AstModule, NirExpr, NirModule, NirStmt};
 use yir_core::YirModule;
@@ -14,8 +14,19 @@ pub struct PipelineArtifacts {
 pub fn compile_source_path(path: &Path) -> Result<PipelineArtifacts, String> {
     if crate::project::is_project_input(path) {
         let project = crate::project::load_project(path)?;
+        let local_units = project
+            .modules
+            .iter()
+            .map(|module| (module.ast.domain.clone(), module.ast.unit.clone()))
+            .collect::<BTreeSet<_>>();
         let ast = crate::frontend::parse_nuis_ast(&project.entry_source)?;
-        let mut nir = crate::frontend::lower_ast_to_nir(&ast)?;
+        let helper_modules = project
+            .modules
+            .iter()
+            .filter(|module| module.path != project.entry_path)
+            .map(|module| module.ast.clone())
+            .collect::<Vec<_>>();
+        let mut nir = crate::frontend::lower_project_ast_to_nir(&ast, &helper_modules)?;
         crate::optimize::simplify_nir_module(&mut nir);
         crate::nir_verify::verify_nir_module(&nir)?;
         let lowering_manifest =
@@ -26,7 +37,7 @@ pub fn compile_source_path(path: &Path) -> Result<PipelineArtifacts, String> {
             &ast.domain,
             &ast.unit,
         )?;
-        validate_used_units(&nir)?;
+        validate_used_units_with_local_units(&nir, &local_units)?;
         validate_instantiated_units(&nir)?;
         crate::project::validate_project_links_against_nir(&project, &nir)?;
         let yir = crate::lowering::lower_nir_to_yir(&nir, &lowering_manifest)?;
@@ -131,7 +142,17 @@ fn validate_instantiated_units(module: &NirModule) -> Result<(), String> {
 }
 
 fn validate_used_units(module: &NirModule) -> Result<(), String> {
+    validate_used_units_with_local_units(module, &BTreeSet::new())
+}
+
+fn validate_used_units_with_local_units(
+    module: &NirModule,
+    local_units: &BTreeSet<(String, String)>,
+) -> Result<(), String> {
     for item in &module.uses {
+        if local_units.contains(&(item.domain.clone(), item.unit.clone())) {
+            continue;
+        }
         let manifest =
             crate::registry::load_manifest_for_domain(Path::new("nustar-packages"), &item.domain)?;
         crate::registry::validate_unit_binding(&[manifest], &item.domain, &item.unit)?;

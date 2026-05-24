@@ -1,3 +1,4 @@
+use cpu KernelTaskAsyncShapes;
 use kernel KernelUnit;
 
 mod cpu Main {
@@ -5,9 +6,7 @@ mod cpu Main {
     bind_core_completed: i64,
     queue_depth_completed: i64,
     batch_lanes_completed: i64,
-    total_completed: i64,
-    peak_timed_out: i64,
-    avg_completed: i64,
+    fallback_completed: i64,
     selected_value: i64
   }
 
@@ -21,34 +20,6 @@ mod cpu Main {
   fn encode_completed(result: TaskResult<i64>) -> i64 {
     if task_completed(result) {
       return 1;
-    }
-    return 0;
-  }
-
-  fn encode_timed_out(result: TaskResult<i64>) -> i64 {
-    if task_timed_out(result) {
-      return 1;
-    }
-    return 0;
-  }
-
-  fn select_value(
-    peak_join: TaskResult<i64>,
-    total_join: TaskResult<i64>,
-    avg_join: TaskResult<i64>,
-    batch_lanes_join: TaskResult<i64>
-  ) -> i64 {
-    if task_completed(peak_join) {
-      return task_value(peak_join) + 1000;
-    }
-    if task_completed(total_join) {
-      return task_value(total_join) + 100;
-    }
-    if task_completed(avg_join) {
-      return task_value(avg_join) + 10;
-    }
-    if task_completed(batch_lanes_join) {
-      return task_value(batch_lanes_join) + 1;
     }
     return 0;
   }
@@ -82,23 +53,33 @@ mod cpu Main {
     let total_join: TaskResult<i64> = join_result(total_task);
     let peak_join: TaskResult<i64> = join_result(peak_task);
     let avg_join: TaskResult<i64> = join_result(avg_task);
+    let fallback_completed: i64 =
+      KernelTaskAsyncShapes.task_fallback_completed(
+        peak_join,
+        total_join,
+        avg_join,
+        batch_lanes_join
+      );
+    let fallback_selected_value: i64 =
+      KernelTaskAsyncShapes.task_fallback_selected_value(
+        peak_join,
+        total_join,
+        avg_join,
+        batch_lanes_join
+      );
 
     let summary: KernelAsyncTensorFallbackSummary = KernelAsyncTensorFallbackSummary {
       bind_core_completed: encode_completed(bind_core_join),
       queue_depth_completed: encode_completed(queue_depth_join),
       batch_lanes_completed: encode_completed(batch_lanes_join),
-      total_completed: encode_completed(total_join),
-      peak_timed_out: encode_timed_out(peak_join),
-      avg_completed: encode_completed(avg_join),
-      selected_value: select_value(peak_join, total_join, avg_join, batch_lanes_join)
+      fallback_completed: fallback_completed,
+      selected_value: fallback_selected_value
     };
 
     return summary.bind_core_completed
       + summary.queue_depth_completed
       + summary.batch_lanes_completed
-      + summary.total_completed
-      + summary.peak_timed_out
-      + summary.avg_completed
+      + summary.fallback_completed
       + summary.selected_value;
   }
 }

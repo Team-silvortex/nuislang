@@ -137,6 +137,8 @@ fn lower_nir_to_yir_builtin_cpu(module: &NirModule) -> Result<YirModule, String>
     let mut bindings = BTreeMap::<String, String>::new();
     lower_function_body(main, &mut state, &mut bindings, true)?;
     assign_default_lanes(&mut yir);
+    materialize_registered_scheduler_contract_nodes(&mut yir);
+    assign_default_lanes(&mut yir);
 
     Ok(yir)
 }
@@ -157,6 +159,304 @@ pub fn assign_default_lanes(module: &mut YirModule) {
             .unwrap_or("unknown");
         let lane = default_lane_for_node(&lane_policy, family, node);
         module.node_lanes.insert(node.name.clone(), lane.to_owned());
+    }
+}
+
+pub fn materialize_registered_scheduler_contract_nodes(module: &mut YirModule) {
+    let resource_families = module
+        .resources
+        .iter()
+        .map(|resource| (resource.name.as_str(), resource.kind.family().to_owned()))
+        .collect::<BTreeMap<_, _>>();
+    let mut representative_by_family = BTreeMap::<String, String>::new();
+    for node in &module.nodes {
+        let Some(family) = resource_families.get(node.resource.as_str()) else {
+            continue;
+        };
+        representative_by_family
+            .entry(family.clone())
+            .or_insert_with(|| node.name.clone());
+    }
+    let cpu_resource = module
+        .resources
+        .iter()
+        .find(|resource| resource.kind.family() == "cpu")
+        .map(|resource| resource.name.clone())
+        .unwrap_or_else(|| "cpu0".to_owned());
+
+    for (family, target) in representative_by_family {
+        let Ok(manifest) =
+            crate::registry::load_manifest_for_domain(Path::new("nustar-packages"), &family)
+        else {
+            continue;
+        };
+        let lane_contract_name = format!("scheduler_contract_{family}_lane_policy_type");
+        let lane_capability_contract_name =
+            format!("scheduler_contract_{family}_lane_capability_type");
+        let bridge_capability_contract_name =
+            format!("scheduler_contract_{family}_bridge_capability_type");
+        let clock_contract_name = format!("scheduler_contract_{family}_clock_type");
+        let result_lane_contract_name = format!("scheduler_contract_{family}_result_lane_type");
+        let result_capability_contract_name =
+            format!("scheduler_contract_{family}_result_capability_type");
+        let summary_capability_contract_name =
+            format!("scheduler_contract_{family}_summary_capability_type");
+        let observer_source_class_contract_name =
+            format!("scheduler_contract_{family}_observer_source_class_type");
+        let observer_stage_class_contract_name =
+            format!("scheduler_contract_{family}_observer_stage_class_type");
+        let observer_scope_class_contract_name =
+            format!("scheduler_contract_{family}_observer_scope_class_type");
+        let lane_contract_value = render_lane_policy_contract(&family, &manifest.default_lanes);
+        let lane_capability_contract_value =
+            render_lane_capability_contract(&family, &manifest.default_lanes);
+        let bridge_capability_contract_value =
+            render_bridge_capability_contract(&family, &manifest);
+        let clock_contract_value = render_clock_contract(&family, &manifest);
+        let result_lane_contract_value = render_result_lane_contract(&family);
+        let result_capability_contract_value = render_result_capability_contract(&family);
+        let summary_capability_contract_value = render_summary_capability_contract(&family);
+        let observer_source_class_contract_value = render_observer_source_class_contract(&family);
+        let observer_stage_class_contract_value = render_observer_stage_class_contract(&family);
+        let observer_scope_class_contract_value = render_observer_scope_class_contract(&family);
+
+        push_scheduler_contract_text_node(
+            module,
+            &lane_contract_name,
+            &cpu_resource,
+            lane_contract_value,
+        );
+        push_scheduler_contract_text_node(
+            module,
+            &lane_capability_contract_name,
+            &cpu_resource,
+            lane_capability_contract_value,
+        );
+        push_scheduler_contract_text_node(
+            module,
+            &bridge_capability_contract_name,
+            &cpu_resource,
+            bridge_capability_contract_value,
+        );
+        push_scheduler_contract_text_node(
+            module,
+            &clock_contract_name,
+            &cpu_resource,
+            clock_contract_value,
+        );
+        push_scheduler_contract_text_node(
+            module,
+            &result_lane_contract_name,
+            &cpu_resource,
+            result_lane_contract_value,
+        );
+        push_scheduler_contract_text_node(
+            module,
+            &result_capability_contract_name,
+            &cpu_resource,
+            result_capability_contract_value,
+        );
+        push_scheduler_contract_text_node(
+            module,
+            &summary_capability_contract_name,
+            &cpu_resource,
+            summary_capability_contract_value,
+        );
+        push_scheduler_contract_text_node(
+            module,
+            &observer_source_class_contract_name,
+            &cpu_resource,
+            observer_source_class_contract_value,
+        );
+        push_scheduler_contract_text_node(
+            module,
+            &observer_stage_class_contract_name,
+            &cpu_resource,
+            observer_stage_class_contract_value,
+        );
+        push_scheduler_contract_text_node(
+            module,
+            &observer_scope_class_contract_name,
+            &cpu_resource,
+            observer_scope_class_contract_value,
+        );
+        push_scheduler_contract_edge_if_missing(module, &lane_contract_name, &target);
+        push_scheduler_contract_edge_if_missing(module, &lane_capability_contract_name, &target);
+        push_scheduler_contract_edge_if_missing(module, &bridge_capability_contract_name, &target);
+        push_scheduler_contract_edge_if_missing(module, &clock_contract_name, &target);
+        push_scheduler_contract_edge_if_missing(module, &result_lane_contract_name, &target);
+        push_scheduler_contract_edge_if_missing(module, &result_capability_contract_name, &target);
+        push_scheduler_contract_edge_if_missing(module, &summary_capability_contract_name, &target);
+        push_scheduler_contract_edge_if_missing(
+            module,
+            &observer_source_class_contract_name,
+            &target,
+        );
+        push_scheduler_contract_edge_if_missing(
+            module,
+            &observer_stage_class_contract_name,
+            &target,
+        );
+        push_scheduler_contract_edge_if_missing(
+            module,
+            &observer_scope_class_contract_name,
+            &target,
+        );
+    }
+}
+
+fn render_lane_policy_contract(family: &str, default_lanes: &[String]) -> String {
+    let mut lanes = BTreeSet::<String>::new();
+    let mut defaults = Vec::<String>::new();
+    for entry in default_lanes {
+        let Some((pattern, lane)) = entry.split_once('=') else {
+            continue;
+        };
+        let pattern = pattern.trim();
+        let lane = lane.trim();
+        if pattern.is_empty() || lane.is_empty() {
+            continue;
+        }
+        lanes.insert(lane.to_owned());
+        defaults.push(format!("{pattern}={lane}"));
+    }
+    format!(
+        "family={family};lanes={};defaults={}",
+        lanes.into_iter().collect::<Vec<_>>().join(","),
+        defaults.join("|")
+    )
+}
+
+fn render_clock_contract(family: &str, manifest: &NustarPackageManifest) -> String {
+    format!(
+        "family={family};domain={};kind={};epoch={};resolution={};bridge={}",
+        manifest.clock_domain_id,
+        manifest.clock_kind,
+        manifest.clock_epoch_kind,
+        manifest.clock_resolution,
+        manifest.clock_bridge_default
+    )
+}
+
+fn render_lane_capability_contract(family: &str, default_lanes: &[String]) -> String {
+    let lanes = default_lanes
+        .iter()
+        .filter_map(|entry| entry.split_once('='))
+        .map(|(_, lane)| lane.trim())
+        .filter(|lane| !lane.is_empty())
+        .collect::<BTreeSet<_>>();
+    let mut fields = vec![format!("family={family}")];
+    for lane in lanes {
+        let capability = lane_capability_for(family, lane);
+        fields.push(format!("{lane}={capability}"));
+    }
+    fields.join(";")
+}
+
+fn render_bridge_capability_contract(family: &str, manifest: &NustarPackageManifest) -> String {
+    let lane_bridge = match family {
+        "cpu" => "cpu_bind_core_lane:host_main_lane|worker_lane",
+        _ => "none",
+    };
+    format!(
+        "family={family};lane_bridge={lane_bridge};clock_bridge={}",
+        manifest.clock_bridge_default
+    )
+}
+
+fn lane_capability_for(family: &str, lane: &str) -> &'static str {
+    match (family, lane) {
+        ("cpu", "main") => "host-entry",
+        ("cpu", "mem") => "memory-ownership",
+        ("data", "control") => "control-plane",
+        ("data", "uplink") => "uplink-window",
+        ("data", "downlink") => "downlink-window",
+        ("data", "fabric") => "fabric-transfer",
+        ("shader", "setup") => "render-setup",
+        ("shader", "render") => "render-pass",
+        ("kernel", "compute") | ("npu", "compute") => "compute-dispatch",
+        (_, "contract") => "contract-metadata",
+        _ => "general",
+    }
+}
+
+fn render_result_lane_contract(family: &str) -> String {
+    let lane = match family {
+        "cpu" => "main",
+        "data" => "fabric",
+        "shader" => "setup",
+        "kernel" | "npu" => "compute",
+        _ => "main",
+    };
+    format!("family={family};entry={lane};probe={lane};value={lane}")
+}
+
+fn render_result_capability_contract(family: &str) -> String {
+    format!(
+        "family={family};entry=result-entry;probe=result-ready-probe;value=result-payload-value"
+    )
+}
+
+fn render_summary_capability_contract(family: &str) -> String {
+    format!(
+        "family={family};policy=async-policy-summary;batch=async-batch-summary;windowed=async-windowed-summary"
+    )
+}
+
+fn render_observer_source_class_contract(family: &str) -> String {
+    format!("family={family};profile=profile-backed;result=result-backed;summary=summary-backed")
+}
+
+fn render_observer_stage_class_contract(family: &str) -> String {
+    format!(
+        "family={family};entry=observer-entry-stage;ready=observer-ready-stage;payload=observer-payload-stage;policy=observer-policy-stage;batch=observer-batch-stage;windowed=observer-windowed-stage"
+    )
+}
+
+fn render_observer_scope_class_contract(family: &str) -> String {
+    format!(
+        "family={family};local=local-scope;cross_lane=cross-lane-scope;cross_domain=cross-domain-scope;bridge_visible=bridge-visible-scope"
+    )
+}
+
+fn push_scheduler_contract_text_node(
+    module: &mut YirModule,
+    name: &str,
+    resource: &str,
+    value: String,
+) {
+    if let Some(node) = module.nodes.iter_mut().find(|node| node.name == name) {
+        node.resource = resource.to_owned();
+        node.op = Operation {
+            module: "cpu".to_owned(),
+            instruction: "text".to_owned(),
+            args: vec![value],
+        };
+        return;
+    }
+    module.nodes.push(Node {
+        name: name.to_owned(),
+        resource: resource.to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "text".to_owned(),
+            args: vec![value],
+        },
+    });
+}
+
+fn push_scheduler_contract_edge_if_missing(module: &mut YirModule, from: &str, to: &str) {
+    let exists = module.edges.iter().any(|edge| {
+        edge.from == from
+            && edge.to == to
+            && matches!(edge.kind, EdgeKind::Dep | EdgeKind::CrossDomainExchange)
+    });
+    if !exists {
+        module.edges.push(Edge {
+            kind: EdgeKind::Dep,
+            from: from.to_owned(),
+            to: to.to_owned(),
+        });
     }
 }
 
@@ -190,6 +490,9 @@ fn default_lane_for_node<'a>(
     family: &str,
     node: &'a Node,
 ) -> &'a str {
+    if node.name.starts_with("scheduler_contract_") {
+        return "contract";
+    }
     if node.name.starts_with("project_link_") {
         return "contract";
     }
@@ -4760,6 +5063,152 @@ mod tests {
                 && edge.to == await_node.op.args[0]
                 && matches!(edge.kind, EdgeKind::Effect)
         }));
+    }
+
+    #[test]
+    fn materializes_registered_scheduler_contract_nodes_for_cpu_modules() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() {
+                print(7);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+        let lane_contract = yir
+            .nodes
+            .iter()
+            .find(|node| node.name == "scheduler_contract_cpu_lane_policy_type")
+            .unwrap();
+        let lane_capability_contract = yir
+            .nodes
+            .iter()
+            .find(|node| node.name == "scheduler_contract_cpu_lane_capability_type")
+            .unwrap();
+        let bridge_capability_contract = yir
+            .nodes
+            .iter()
+            .find(|node| node.name == "scheduler_contract_cpu_bridge_capability_type")
+            .unwrap();
+        let clock_contract = yir
+            .nodes
+            .iter()
+            .find(|node| node.name == "scheduler_contract_cpu_clock_type")
+            .unwrap();
+        let result_lane_contract = yir
+            .nodes
+            .iter()
+            .find(|node| node.name == "scheduler_contract_cpu_result_lane_type")
+            .unwrap();
+        let result_capability_contract = yir
+            .nodes
+            .iter()
+            .find(|node| node.name == "scheduler_contract_cpu_result_capability_type")
+            .unwrap();
+        let summary_capability_contract = yir
+            .nodes
+            .iter()
+            .find(|node| node.name == "scheduler_contract_cpu_summary_capability_type")
+            .unwrap();
+        let observer_source_class_contract = yir
+            .nodes
+            .iter()
+            .find(|node| node.name == "scheduler_contract_cpu_observer_source_class_type")
+            .unwrap();
+        let observer_stage_class_contract = yir
+            .nodes
+            .iter()
+            .find(|node| node.name == "scheduler_contract_cpu_observer_stage_class_type")
+            .unwrap();
+        let observer_scope_class_contract = yir
+            .nodes
+            .iter()
+            .find(|node| node.name == "scheduler_contract_cpu_observer_scope_class_type")
+            .unwrap();
+        assert_eq!(lane_contract.op.module, "cpu");
+        assert_eq!(lane_capability_contract.op.module, "cpu");
+        assert_eq!(bridge_capability_contract.op.module, "cpu");
+        assert_eq!(clock_contract.op.module, "cpu");
+        assert_eq!(result_lane_contract.op.module, "cpu");
+        assert_eq!(result_capability_contract.op.module, "cpu");
+        assert_eq!(summary_capability_contract.op.module, "cpu");
+        assert_eq!(observer_source_class_contract.op.module, "cpu");
+        assert_eq!(observer_stage_class_contract.op.module, "cpu");
+        assert_eq!(observer_scope_class_contract.op.module, "cpu");
+        assert_eq!(
+            yir.node_lanes
+                .get("scheduler_contract_cpu_lane_policy_type")
+                .map(String::as_str),
+            Some("contract")
+        );
+        assert_eq!(
+            yir.node_lanes
+                .get("scheduler_contract_cpu_result_lane_type")
+                .map(String::as_str),
+            Some("contract")
+        );
+        assert_eq!(
+            yir.node_lanes
+                .get("scheduler_contract_cpu_lane_capability_type")
+                .map(String::as_str),
+            Some("contract")
+        );
+        assert_eq!(
+            yir.node_lanes
+                .get("scheduler_contract_cpu_bridge_capability_type")
+                .map(String::as_str),
+            Some("contract")
+        );
+        assert_eq!(
+            yir.node_lanes
+                .get("scheduler_contract_cpu_result_capability_type")
+                .map(String::as_str),
+            Some("contract")
+        );
+        assert_eq!(
+            yir.node_lanes
+                .get("scheduler_contract_cpu_summary_capability_type")
+                .map(String::as_str),
+            Some("contract")
+        );
+        assert_eq!(
+            yir.node_lanes
+                .get("scheduler_contract_cpu_observer_source_class_type")
+                .map(String::as_str),
+            Some("contract")
+        );
+        assert_eq!(
+            yir.node_lanes
+                .get("scheduler_contract_cpu_observer_stage_class_type")
+                .map(String::as_str),
+            Some("contract")
+        );
+        assert_eq!(
+            yir.node_lanes
+                .get("scheduler_contract_cpu_observer_scope_class_type")
+                .map(String::as_str),
+            Some("contract")
+        );
+        assert!(yir.edges.iter().any(|edge| {
+            edge.from == "scheduler_contract_cpu_lane_policy_type"
+                && matches!(edge.kind, EdgeKind::Dep | EdgeKind::CrossDomainExchange)
+        }));
+        assert!(lane_contract.op.args[0].contains("family=cpu;"));
+        assert!(lane_capability_contract.op.args[0].contains("main=host-entry"));
+        assert!(bridge_capability_contract.op.args[0]
+            .contains("lane_bridge=cpu_bind_core_lane:host_main_lane|worker_lane"));
+        assert!(clock_contract.op.args[0].contains("domain=cpu.clock.host.v1"));
+        assert!(result_lane_contract.op.args[0].contains("entry=main"));
+        assert!(result_capability_contract.op.args[0].contains("probe=result-ready-probe"));
+        assert!(summary_capability_contract.op.args[0].contains("windowed=async-windowed-summary"));
+        assert!(observer_source_class_contract.op.args[0].contains("summary=summary-backed"));
+        assert!(observer_stage_class_contract.op.args[0].contains("payload=observer-payload-stage"));
+        assert!(observer_scope_class_contract.op.args[0]
+            .contains("bridge_visible=bridge-visible-scope"));
     }
 
     #[test]

@@ -1,0 +1,166 @@
+mod cpu ShaderTaskAsyncShapes {
+  fn encode_completed(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_timed_out(result: TaskResult<i64>) -> i64 {
+    if task_timed_out(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn task_policy_completed(
+    primary_result: TaskResult<i64>,
+    secondary_result: TaskResult<i64>
+  ) -> i64 {
+    return encode_completed(primary_result) + encode_completed(secondary_result);
+  }
+
+  fn task_policy_selected_value(
+    primary_result: TaskResult<i64>,
+    secondary_result: TaskResult<i64>
+  ) -> i64 {
+    if task_completed(primary_result) {
+      return task_value(primary_result) + 100;
+    }
+
+    if task_completed(secondary_result) {
+      return task_value(secondary_result) + 10;
+    }
+
+    return 0;
+  }
+
+  fn task_fallback_completed(
+    primary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    return encode_timed_out(primary_result) + encode_completed(fallback_result);
+  }
+
+  fn task_fallback_selected_value(
+    primary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    if task_completed(primary_result) {
+      return task_value(primary_result) + 1000;
+    }
+
+    if task_completed(fallback_result) {
+      return task_value(fallback_result) + 1;
+    }
+
+    if task_timed_out(primary_result) {
+      return 10;
+    }
+
+    return 0;
+  }
+
+  fn task_batch_completed(
+    alpha_result: TaskResult<i64>,
+    beta_result: TaskResult<i64>,
+    gamma_result: TaskResult<i64>
+  ) -> i64 {
+    return encode_completed(alpha_result)
+      + encode_completed(beta_result)
+      + encode_completed(gamma_result);
+  }
+
+  fn task_batch_value(
+    alpha_result: TaskResult<i64>,
+    beta_result: TaskResult<i64>,
+    gamma_result: TaskResult<i64>
+  ) -> i64 {
+    return selected_task_value(alpha_result)
+      + selected_task_value(beta_result)
+      + selected_task_value(gamma_result);
+  }
+
+  fn selected_task_value(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return task_value(result);
+    }
+    return 0;
+  }
+
+  fn task_windowed_preview_value(
+    alpha_result: TaskResult<i64>,
+    beta_result: TaskResult<i64>,
+    gamma_result: TaskResult<i64>
+  ) -> i64 {
+    return task_batch_completed(alpha_result, beta_result, gamma_result);
+  }
+
+  fn task_windowed_final_value(
+    alpha_result: TaskResult<i64>,
+    beta_result: TaskResult<i64>,
+    gamma_result: TaskResult<i64>
+  ) -> i64 {
+    return task_batch_value(alpha_result, beta_result, gamma_result);
+  }
+
+  fn async_policy_summary_completed(
+    primary_result: TaskResult<i64>,
+    secondary_result: TaskResult<i64>
+  ) -> i64 {
+    return task_policy_completed(primary_result, secondary_result);
+  }
+
+  fn async_policy_summary_selected_value(
+    primary_result: TaskResult<i64>,
+    secondary_result: TaskResult<i64>
+  ) -> i64 {
+    return task_policy_selected_value(primary_result, secondary_result);
+  }
+
+  fn async_fallback_summary_completed(
+    primary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    return task_fallback_completed(primary_result, fallback_result);
+  }
+
+  fn async_fallback_summary_selected_value(
+    primary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    return task_fallback_selected_value(primary_result, fallback_result);
+  }
+
+  fn async_batch_summary_completed(
+    alpha_result: TaskResult<i64>,
+    beta_result: TaskResult<i64>,
+    gamma_result: TaskResult<i64>
+  ) -> i64 {
+    return task_batch_completed(alpha_result, beta_result, gamma_result);
+  }
+
+  fn async_batch_summary_value(
+    alpha_result: TaskResult<i64>,
+    beta_result: TaskResult<i64>,
+    gamma_result: TaskResult<i64>
+  ) -> i64 {
+    return task_batch_value(alpha_result, beta_result, gamma_result);
+  }
+
+  fn async_windowed_preview_summary_value(
+    alpha_result: TaskResult<i64>,
+    beta_result: TaskResult<i64>,
+    gamma_result: TaskResult<i64>
+  ) -> i64 {
+    return task_windowed_preview_value(alpha_result, beta_result, gamma_result);
+  }
+
+  fn async_windowed_final_summary_value(
+    alpha_result: TaskResult<i64>,
+    beta_result: TaskResult<i64>,
+    gamma_result: TaskResult<i64>
+  ) -> i64 {
+    return task_windowed_final_value(alpha_result, beta_result, gamma_result);
+  }
+}

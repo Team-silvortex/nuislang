@@ -1,7 +1,7 @@
 name = "kernel_async_tensor_policy_profile_demo"
 version = "0.1.0"
 entry = "main.ns"
-modules = ["main.ns", "kernel_unit.ns"]
+modules = ["main.ns", "kernel_unit.ns", "../shared/kernel_task_async_shapes.ns"]
 abi = [
   "cpu=cpu.arm64.apple_aapcs64",
   "kernel=kernel.apple_ane.coreml.v1"

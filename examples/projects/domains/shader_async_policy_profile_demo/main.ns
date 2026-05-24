@@ -1,65 +1,20 @@
+use cpu ShaderTaskAsyncShapes;
 use data FabricPlane;
 use shader SurfaceShader;
 
 mod cpu Main {
-  struct ShaderTaskPolicySummary {
-    primary_completed: i64,
-    secondary_completed: i64,
-    selected_value: i64
-  }
-
-  async fn observe_draw(result: ShaderResult<Frame>) -> i64 {
+  async fn observe_result_ready_draw(result: ShaderResult<Frame>) -> i64 {
     if shader_frame_ready(result) {
       return 4;
     }
     return 0;
   }
 
-  async fn observe_render(result: ShaderResult<Frame>) -> i64 {
+  async fn observe_result_ready_render(result: ShaderResult<Frame>) -> i64 {
     if shader_frame_ready(result) {
       return 8;
     }
     return 0;
-  }
-
-  fn encode_task_value(result: TaskResult<i64>) -> i64 {
-    if task_completed(result) {
-      return task_value(result);
-    }
-    return 0;
-  }
-
-  fn encode_completed(result: TaskResult<i64>) -> i64 {
-    if task_completed(result) {
-      return 1;
-    }
-    return 0;
-  }
-
-  fn select_policy_value(
-    primary_result: TaskResult<i64>,
-    secondary_result: TaskResult<i64>
-  ) -> i64 {
-    if task_completed(primary_result) {
-      return task_value(primary_result) + 100;
-    }
-
-    if task_completed(secondary_result) {
-      return task_value(secondary_result) + 10;
-    }
-
-    return 0;
-  }
-
-  fn capture_task_policy(
-    draw_task_result: TaskResult<i64>,
-    render_task_result: TaskResult<i64>
-  ) -> ShaderTaskPolicySummary {
-    return ShaderTaskPolicySummary {
-      primary_completed: encode_completed(render_task_result),
-      secondary_completed: encode_completed(draw_task_result),
-      selected_value: select_policy_value(render_task_result, draw_task_result)
-    };
   }
 
   fn main() -> i64 {
@@ -109,18 +64,30 @@ mod cpu Main {
         gpu_packet_draw_async
       )
     );
-    let draw_task: Task<i64> = spawn(observe_draw(draw_result_async));
+    let draw_result_observer_task: Task<i64> =
+      spawn(observe_result_ready_draw(draw_result_async));
 
     let gpu_packet_render_async: Window<SurfaceShaderPacket> =
       data_profile_send_uplink("FabricPlane", render_controls);
     let render_result_async: ShaderResult<Frame> =
       shader_result(shader_profile_render("SurfaceShader", gpu_packet_render_async));
-    let render_task: Task<i64> = spawn(observe_render(render_result_async));
+    let render_result_observer_task: Task<i64> =
+      spawn(observe_result_ready_render(render_result_async));
 
-    let draw_task_result: TaskResult<i64> = join_result(draw_task);
-    let render_task_result: TaskResult<i64> = join_result(render_task);
-    let policy_summary: ShaderTaskPolicySummary =
-      capture_task_policy(draw_task_result, render_task_result);
+    let draw_result_observer_join: TaskResult<i64> =
+      join_result(draw_result_observer_task);
+    let render_result_observer_join: TaskResult<i64> =
+      join_result(render_result_observer_task);
+    let async_policy_summary_completed: i64 =
+      ShaderTaskAsyncShapes.async_policy_summary_completed(
+        render_result_observer_join,
+        draw_result_observer_join
+      );
+    let async_policy_summary_selected_value: i64 =
+      ShaderTaskAsyncShapes.async_policy_summary_selected_value(
+        render_result_observer_join,
+        draw_result_observer_join
+      );
 
     let gpu_packet_present: Window<SurfaceShaderPacket> =
       data_profile_send_uplink("FabricPlane", render_controls);
@@ -132,8 +99,7 @@ mod cpu Main {
 
     return vertex_budget
       + instance_budget
-      + policy_summary.primary_completed
-      + policy_summary.secondary_completed
-      + policy_summary.selected_value;
+      + async_policy_summary_completed
+      + async_policy_summary_selected_value;
   }
 }

@@ -1,0 +1,151 @@
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+  extern "c" fn host_line_read(prompt_handle: i64) -> i64;
+  extern "c" fn host_line_len(line_handle: i64) -> i64;
+  extern "c" fn host_diag_label(message_handle: i64) -> i64;
+  extern "c" fn host_diag_span(start: i64, end: i64) -> i64;
+  extern "c" fn host_diag_emit(label_handle: i64, span_handle: i64, severity: i64) -> i64;
+  extern "c" fn host_stdout_write(text_handle: i64) -> i64;
+  extern "c" fn host_stderr_write(text_handle: i64) -> i64;
+  extern "c" fn host_stdout_flush() -> i64;
+  extern "c" fn host_stderr_flush() -> i64;
+  extern "c" fn host_monotonic_time_ns() -> i64;
+
+  struct CliReportSessionSeed {
+    prompt_handle: i64,
+    ok_text_handle: i64,
+    err_text_handle: i64,
+    timeout_limit: i64,
+    ok_severity: i64,
+    err_severity: i64
+  }
+
+  struct CliReportSessionSummary {
+    argv_count: i64,
+    line_handle: i64,
+    line_len: i64,
+    completed: i64,
+    timed_out: i64,
+    selected_value: i64,
+    diag_code: i64,
+    stdout_code: i64,
+    stderr_code: i64,
+    stdout_flushed: i64,
+    stderr_flushed: i64,
+    tick_ns: i64
+  }
+
+  async fn ping(seed: i64) -> i64 {
+    return seed + 11;
+  }
+
+  fn emit_diag(message_handle: i64, start: i64, end: i64, severity: i64) -> i64 {
+    let label_handle: i64 = host_diag_label(message_handle);
+    let span_handle: i64 = host_diag_span(start, end);
+    return host_diag_emit(label_handle, span_handle, severity);
+  }
+
+  fn build_seed(
+    prompt_handle: i64,
+    ok_text_handle: i64,
+    err_text_handle: i64,
+    timeout_limit: i64,
+    ok_severity: i64,
+    err_severity: i64
+  ) -> CliReportSessionSeed {
+    return CliReportSessionSeed {
+      prompt_handle: prompt_handle,
+      ok_text_handle: ok_text_handle,
+      err_text_handle: err_text_handle,
+      timeout_limit: timeout_limit,
+      ok_severity: ok_severity,
+      err_severity: err_severity
+    };
+  }
+
+  fn capture_cli_report_session(seed: CliReportSessionSeed) -> CliReportSessionSummary {
+    let argv_count: i64 = host_argv_count();
+    let line_handle: i64 = host_line_read(seed.prompt_handle);
+    let line_len: i64 = host_line_len(line_handle);
+    let result: TaskResult<i64> =
+      join_result(timeout(spawn(ping(argv_count + line_len)), seed.timeout_limit));
+    let tick_ns: i64 = host_monotonic_time_ns();
+
+    if task_completed(result) {
+      return CliReportSessionSummary {
+        argv_count: argv_count,
+        line_handle: line_handle,
+        line_len: line_len,
+        completed: 1,
+        timed_out: 0,
+        selected_value: task_value(result),
+        diag_code: emit_diag(
+          seed.ok_text_handle,
+          0,
+          line_len,
+          seed.ok_severity
+        ),
+        stdout_code: host_stdout_write(seed.ok_text_handle),
+        stderr_code: 0,
+        stdout_flushed: host_stdout_flush(),
+        stderr_flushed: 0,
+        tick_ns: tick_ns
+      };
+    }
+
+    return CliReportSessionSummary {
+      argv_count: argv_count,
+      line_handle: line_handle,
+      line_len: line_len,
+      completed: 0,
+      timed_out: 1,
+      selected_value: 0,
+      diag_code: emit_diag(
+        seed.err_text_handle,
+        0,
+        line_len,
+        seed.err_severity
+      ),
+      stdout_code: 0,
+      stderr_code: host_stderr_write(seed.err_text_handle),
+      stdout_flushed: 0,
+      stderr_flushed: host_stderr_flush(),
+      tick_ns: tick_ns
+    };
+  }
+
+  fn summarize_cli_report_session_recipe(
+    prompt_handle: i64,
+    ok_text_handle: i64,
+    err_text_handle: i64,
+    timeout_limit: i64,
+    ok_severity: i64,
+    err_severity: i64
+  ) -> i64 {
+    let seed: CliReportSessionSeed = build_seed(
+      prompt_handle,
+      ok_text_handle,
+      err_text_handle,
+      timeout_limit,
+      ok_severity,
+      err_severity
+    );
+    let summary: CliReportSessionSummary = capture_cli_report_session(seed);
+    return summary.argv_count
+      + summary.line_handle
+      + summary.line_len
+      + summary.completed
+      + summary.timed_out
+      + summary.selected_value
+      + summary.diag_code
+      + summary.stdout_code
+      + summary.stderr_code
+      + summary.stdout_flushed
+      + summary.stderr_flushed
+      + summary.tick_ns;
+  }
+
+  fn main() {
+    print(summarize_cli_report_session_recipe(509, 1901, 1903, 0, 1, 2));
+  }
+}

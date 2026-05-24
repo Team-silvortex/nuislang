@@ -34,6 +34,45 @@ The practical current rule is:
 * kernel async lanes read closest to `task async result -> task async control`
 * this is a reading and design alignment, not a claim that shader/kernel are
   already implemented as `std`-first wrapper layers
+* the current checked-in project-first reuse point is still project-local
+  `cpu` helper modules rather than shared `std` wrappers, with:
+  [shader_task_async_shapes.ns](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shared/shader_task_async_shapes.ns)
+  and
+  [kernel_task_async_shapes.ns](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shared/kernel_task_async_shapes.ns)
+  carrying the shared task-shaped policy/fallback helpers reused by the async
+  shader/kernel demos
+* inside those helper modules, treat `task_*` names as the compatibility
+  layer and prefer `async_*_summary_*` exports when you want source that reads
+  most directly against the current scheduler/result/summary contract stack
+* when you want one checked-in source sample that also reads cleanly against
+  the current scheduler-contract stack, start with:
+  * [shader_async_policy_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_policy_profile_demo)
+  * [kernel_async_tensor_policy_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_policy_profile_demo)
+  Those two lanes now annotate the same high-level order directly in source:
+  `placement -> result observation -> async summary -> bridge-visible finalization`
+* when you want the next wider pair that also makes `windowed` summary stages
+  explicit in source and starts reusing shared task-shaped batch/windowed
+  helpers, continue with:
+  * [shader_async_windowed_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_windowed_batch_profile_demo)
+  * [kernel_async_tensor_windowed_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_windowed_batch_profile_demo)
+  Those two lanes now read most directly as:
+  `result observation -> async batch summary -> preview window -> final window`
+
+Current sample ladder:
+
+* narrow policy pair:
+  * [shader_async_policy_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_policy_profile_demo)
+  * [kernel_async_tensor_policy_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_policy_profile_demo)
+* wider windowed pair:
+  * [shader_async_windowed_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_windowed_batch_profile_demo)
+  * [kernel_async_tensor_windowed_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_windowed_batch_profile_demo)
+
+Shortest practical reading order:
+
+* shader:
+  policy -> windowed batch
+* kernel:
+  policy -> windowed batch
 
 ## Current Lane Shape
 
@@ -290,8 +329,8 @@ Current role split:
   and [kernel_async_roundtrip_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_roundtrip_profile_demo) is the route where that narrower profile batch is compressed into a roundtrip seed and joined with `data_profile_send_uplink(...)` and `data_profile_send_downlink(...)`
 * kernel async tensor:
   [kernel_async_tensor_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_batch_profile_demo) first compresses the tensor lane into scalar `KernelResult<i64>` observations,
-  [kernel_async_tensor_policy_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_policy_profile_demo) adds explicit CPU-side priority policy,
-  [kernel_async_tensor_fallback_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_fallback_profile_demo) adds explicit timeout fallback,
+  [kernel_async_tensor_policy_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_policy_profile_demo) adds explicit CPU-side priority policy and now uses a local `KernelTaskPolicySummary` / `capture_task_policy(...)` shape to make that policy read like the shared `task_policy` lane,
+  [kernel_async_tensor_fallback_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_fallback_profile_demo) adds explicit timeout fallback and now uses a local `KernelTaskFallbackSummary` / `capture_task_fallback(...)` shape to make that fallback read like the shared `task_fallback` lane,
   [kernel_async_tensor_windowed_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_windowed_batch_profile_demo) splits that tensor async batch into preview-window and final-window summaries,
   and [kernel_async_tensor_roundtrip_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_roundtrip_profile_demo) compresses that tensor async batch into a roundtrip seed and joins it with `data_profile_send_uplink(...)` and `data_profile_send_downlink(...)`
 * async branch alignment:
@@ -307,6 +346,9 @@ Current role split:
   shader async result ~= `task_result_family -> task_result_policy`
   kernel async control ~= `task_policy -> task_batch -> task_windowed_batch`
   kernel async result ~= `task_result_family -> task_result_batch -> task_result_windowed_batch`
+  kernel tensor policy/fallback now also use explicit local task-shaped helpers in source:
+  `KernelTaskPolicySummary` / `capture_task_policy(...)` and
+  `KernelTaskFallbackSummary` / `capture_task_fallback(...)`
 * `kernel_tensor_profile_demo` is the next narrow route where kernel profile
   metadata is already joined with source-facing tensor primitives such as
   `kernel_tensor(...)`, `kernel_matmul(...)`, `kernel_add_bias(...)`,

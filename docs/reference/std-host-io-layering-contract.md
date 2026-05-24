@@ -23,7 +23,7 @@ For checked-in `std`, that currently means:
 
 ```text
 io / stdin / tty / argv / env / process / command / subprocess
--> input / terminal_io / command_shell / cli_runtime / report_runtime
+-> input / terminal_io / cli_session / cli_shell_session / cli_report_session / command_shell / cli_runtime / report_runtime
 -> examples/ns/ffi mirrors and examples/projects companions
 ```
 
@@ -94,6 +94,9 @@ practical route.
 
 * [input_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/input_runtime_recipe.ns)
 * [terminal_io_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/terminal_io_recipe.ns)
+* [cli_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_session_recipe.ns)
+* [cli_shell_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_shell_session_recipe.ns)
+* [cli_report_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_report_session_recipe.ns)
 * [command_shell_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_shell_recipe.ns)
 * [cli_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_runtime_recipe.ns)
 * [report_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/report_runtime_recipe.ns)
@@ -102,6 +105,15 @@ Current role split:
 
 * `input_runtime` combines stdin-style observation and tty context
 * `terminal_io` combines output writes, flushes, stdin, and tty shape
+* `cli_session` combines argv count, line-oriented prompt input, terminal
+  output, timeout-sensitive task branching, and monotonic tick capture into
+  one narrow interactive CLI route
+* `cli_shell_session` combines prompt input, argv/program selection, shell
+  spawn/subprocess join, terminal writes, flushes, and monotonic tick capture
+  into one narrow interactive shell-session route
+* `cli_report_session` combines prompt input, timeout-sensitive task result
+  selection, diagnostic emission, terminal writes, flushes, and monotonic tick
+  capture into one narrow interactive report-session route
 * `command_shell` combines command and subprocess surfaces into one shell/tool
   route
 * `cli_runtime` pulls several host-I/O and tooling surfaces into one CLI lane

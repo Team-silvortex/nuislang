@@ -74,6 +74,9 @@ pub enum CommandKind {
     DumpYir {
         input: PathBuf,
     },
+    SchedulerView {
+        input: PathBuf,
+    },
     Rc {
         args: Vec<String>,
     },
@@ -423,6 +426,9 @@ where
         "dump-yir" => Ok(CommandKind::DumpYir {
             input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
         }),
+        "scheduler-view" => Ok(CommandKind::SchedulerView {
+            input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
+        }),
         "rc" => Ok(CommandKind::Rc {
             args: args.collect::<Vec<_>>(),
         }),
@@ -437,7 +443,7 @@ where
         }),
         "galaxy" => parse_galaxy_args(args),
         other => Err(format!(
-            "unknown nuis command `{other}`; expected `help`, `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `release-check`, `check`, `test`, `build`, `dump-ast`, `dump-nir`, `dump-yir`, `rc`, `project-status`, `project-doctor`, `project-lock-abi`, or `galaxy`"
+            "unknown nuis command `{other}`; expected `help`, `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `release-check`, `check`, `test`, `build`, `dump-ast`, `dump-nir`, `dump-yir`, `scheduler-view`, `rc`, `project-status`, `project-doctor`, `project-lock-abi`, or `galaxy`"
         )),
     }
 }

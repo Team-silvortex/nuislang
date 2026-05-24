@@ -35,6 +35,22 @@ fn json_escape(value: &str) -> String {
     out
 }
 
+fn scheduler_contract_stack_brief() -> &'static str {
+    "placement -> timing -> result observation -> async summary observation -> observer classification"
+}
+
+fn scheduler_result_roles_brief() -> &'static str {
+    "entry=result-entry, probe=result-ready-probe, value=result-payload-value"
+}
+
+fn scheduler_summary_api_brief() -> &'static str {
+    "policy=async-policy-summary, batch=async-batch-summary, windowed=async-windowed-summary"
+}
+
+fn scheduler_observer_classes_brief() -> &'static str {
+    "source=profile-backed|result-backed|summary-backed; stage=entry|ready|payload|policy|batch|windowed; scope=local|cross-lane|cross-domain|bridge-visible"
+}
+
 pub fn run(command: CommandKind) -> Result<(), String> {
     let frontend = frontend::frontend_name();
     let backend = codegen_wasm::backend_name();
@@ -123,6 +139,19 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 println!("  clock_epoch_kind: {}", manifest.clock_epoch_kind);
                 println!("  clock_resolution: {}", manifest.clock_resolution);
                 println!("  clock_bridge_default: {}", manifest.clock_bridge_default);
+                println!(
+                    "  scheduler_contract_stack: {}",
+                    scheduler_contract_stack_brief()
+                );
+                println!(
+                    "  scheduler_result_roles: {}",
+                    scheduler_result_roles_brief()
+                );
+                println!("  scheduler_summary_api: {}", scheduler_summary_api_brief());
+                println!(
+                    "  scheduler_observer_classes: {}",
+                    scheduler_observer_classes_brief()
+                );
                 println!("  profiles: {}", manifest.profiles.join(", "));
                 println!(
                     "  resource_families: {}",
