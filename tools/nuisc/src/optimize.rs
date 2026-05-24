@@ -1074,6 +1074,11 @@ fn collect_used_vars_expr(expr: &NirExpr, out: &mut BTreeSet<String>) {
         | NirExpr::DataProfileDownlinkLenRef { .. }
         | NirExpr::DataProfileHandleTableRef { .. }
         | NirExpr::DataProfileMarkerRef { .. }
+        | NirExpr::NetworkProfileBindCoreRef { .. }
+        | NirExpr::NetworkProfileEndpointKindRef { .. }
+        | NirExpr::NetworkProfileTimeoutBudgetRef { .. }
+        | NirExpr::NetworkProfileRetryBudgetRef { .. }
+        | NirExpr::NetworkProfileStreamWindowRef { .. }
         | NirExpr::KernelProfileBindCoreRef { .. }
         | NirExpr::KernelProfileQueueDepthRef { .. }
         | NirExpr::KernelProfileBatchLanesRef { .. }

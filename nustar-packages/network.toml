@@ -1,0 +1,35 @@
+manifest_schema = "nustar-manifest-v1"
+package_id = "official.network"
+domain_family = "network"
+frontend = "nustar-network"
+entry_crate = "crates/yir-domain-network"
+ast_entry = "network.ast.bootstrap.v1"
+nir_entry = "network.nir.bootstrap.v1"
+yir_lowering_entry = "network.yir.lowering.v1"
+part_verify_entry = "network.verify.partial.v1"
+ast_surface = ["network.mod-ast.v1", "network.endpoint-ast.v1"]
+nir_surface = ["nir.network.surface.v1", "nir.stream.surface.v1"]
+yir_lowering = ["yir.network.lowering.v1", "yir.socket-lowering.v1"]
+part_verify = ["verify.network.endpoint-shape.v1", "verify.network.flow-control.v1"]
+binary_extension = "nustar"
+package_layout = "single-envelope"
+machine_abi_policy = "exact-match"
+abi_profiles = ["network.socket.v1", "network.socket.macos.arm64.v1", "network.socket.linux.x86_64.v1", "network.socket.windows.x86_64.v1"]
+abi_capabilities = ["network.socket.v1:surface:network.profile.*|op:network.*", "network.socket.macos.arm64.v1:surface:network.profile.*|op:network.*", "network.socket.linux.x86_64.v1:surface:network.profile.*|op:network.*", "network.socket.windows.x86_64.v1:surface:network.profile.*|op:network.*"]
+abi_targets = ["network.socket.v1:arch=host|os=host|object=host|calling=host|clang=host", "network.socket.macos.arm64.v1:arch=arm64|os=darwin|object=mach-o|calling=aapcs64-darwin|clang=aarch64-apple-darwin", "network.socket.linux.x86_64.v1:arch=x86_64|os=linux|object=elf|calling=sysv64|clang=x86_64-unknown-linux-gnu", "network.socket.windows.x86_64.v1:arch=x86_64|os=windows|object=coff|calling=win64|clang=x86_64-pc-windows-msvc"]
+implementation_kinds = ["native-stub", "native-dylib", "llvm-bc"]
+loader_entry = "nustar.bootstrap.v1"
+loader_abi = "nustar-loader-v1"
+clock_domain_id = "network.clock.io.v1"
+clock_kind = "io-monotonic"
+clock_epoch_kind = "io-epoch"
+clock_resolution = "network-poll-step"
+clock_bridge_default = "global->io:bridge"
+support_surface = ["network.profile.bind-core.v1", "network.profile.connect.v1", "network.profile.accept.v1", "network.profile.send.v1", "network.profile.recv.v1", "network.profile.close.v1", "network.profile.timeout.v1", "network.profile.retry.v1", "network.profile.endpoint-kind.v1", "network.profile.stream-window.v1"]
+support_profile_slots = ["bind_core", "endpoint_kind", "local_port", "remote_port", "connect_timeout_ms", "read_timeout_ms", "write_timeout_ms", "retry_budget", "stream_window", "recv_window", "send_window"]
+default_lanes = ["network.bind_core=control", "network.endpoint=control", "network.listen=control", "network.connect=control", "network.accept=control", "network.poll=control", "network.close=control", "network.retry=control", "network.send=tx", "network.recv=rx"]
+profiles = ["aot"]
+resource_families = ["network", "network.stream", "cpu", "data"]
+unit_types = ["NetworkUnit", "SocketProgram", "EndpointHandle"]
+lowering_targets = ["socket-abi", "urlsession", "winsock"]
+ops = ["network.endpoint", "network.listen", "network.connect", "network.accept", "network.send", "network.recv", "network.close", "network.poll", "network.retry", "network.print"]

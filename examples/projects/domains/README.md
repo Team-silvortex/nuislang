@@ -52,6 +52,9 @@ Start here:
   async base ->
   async tensor ->
   tensor lane
+* network edge:
+  [network_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_demo) ->
+  `bind_core -> endpoint_kind`
 
 Shader branch index:
 

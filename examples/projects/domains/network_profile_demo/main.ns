@@ -1,0 +1,12 @@
+use network NetworkUnit;
+
+mod cpu Main {
+  fn main() {
+    let bind_core: i64 = network_profile_bind_core("NetworkUnit");
+    let endpoint_kind: i64 = network_profile_endpoint_kind("NetworkUnit");
+    let timeout_budget: i64 = network_profile_timeout_budget("NetworkUnit");
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    print(bind_core + endpoint_kind + timeout_budget + retry_budget + stream_window);
+  }
+}

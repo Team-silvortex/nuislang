@@ -1029,6 +1029,21 @@ pub enum NirExpr {
         unit: String,
         tag: String,
     },
+    NetworkProfileBindCoreRef {
+        unit: String,
+    },
+    NetworkProfileEndpointKindRef {
+        unit: String,
+    },
+    NetworkProfileTimeoutBudgetRef {
+        unit: String,
+    },
+    NetworkProfileRetryBudgetRef {
+        unit: String,
+    },
+    NetworkProfileStreamWindowRef {
+        unit: String,
+    },
     KernelProfileBindCoreRef {
         unit: String,
     },
@@ -1546,6 +1561,11 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::DataProfileDownlinkLenRef { .. }
         | NirExpr::DataProfileHandleTableRef { .. }
         | NirExpr::DataProfileMarkerRef { .. }
+        | NirExpr::NetworkProfileBindCoreRef { .. }
+        | NirExpr::NetworkProfileEndpointKindRef { .. }
+        | NirExpr::NetworkProfileTimeoutBudgetRef { .. }
+        | NirExpr::NetworkProfileRetryBudgetRef { .. }
+        | NirExpr::NetworkProfileStreamWindowRef { .. }
         | NirExpr::KernelProfileBindCoreRef { .. }
         | NirExpr::KernelProfileQueueDepthRef { .. }
         | NirExpr::KernelProfileBatchLanesRef { .. }
@@ -1717,6 +1737,11 @@ pub fn nir_expr_effect_class(expr: &NirExpr) -> NirExprEffectClass {
         | NirExpr::DataProfileDownlinkLenRef { .. }
         | NirExpr::DataProfileHandleTableRef { .. }
         | NirExpr::DataProfileMarkerRef { .. }
+        | NirExpr::NetworkProfileBindCoreRef { .. }
+        | NirExpr::NetworkProfileEndpointKindRef { .. }
+        | NirExpr::NetworkProfileTimeoutBudgetRef { .. }
+        | NirExpr::NetworkProfileRetryBudgetRef { .. }
+        | NirExpr::NetworkProfileStreamWindowRef { .. }
         | NirExpr::KernelProfileBindCoreRef { .. }
         | NirExpr::KernelProfileQueueDepthRef { .. }
         | NirExpr::KernelProfileBatchLanesRef { .. }

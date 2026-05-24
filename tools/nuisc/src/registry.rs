@@ -1597,4 +1597,39 @@ mod tests {
         assert_eq!(target.backend_family.as_deref(), Some("metal"));
         assert!(!target.host_adaptive);
     }
+
+    #[test]
+    fn network_manifest_skeleton_is_registered() {
+        let manifest = load_manifest_for_domain(Path::new("nustar-packages"), "network").unwrap();
+        assert_eq!(manifest.package_id, "official.network");
+        assert_eq!(manifest.clock_domain_id, "network.clock.io.v1");
+        assert_eq!(manifest.clock_kind, "io-monotonic");
+        assert!(manifest
+            .support_surface
+            .contains(&"network.profile.bind-core.v1".to_owned()));
+        assert!(manifest
+            .support_surface
+            .contains(&"network.profile.connect.v1".to_owned()));
+        assert!(manifest
+            .support_surface
+            .contains(&"network.profile.stream-window.v1".to_owned()));
+        assert!(manifest
+            .support_profile_slots
+            .contains(&"bind_core".to_owned()));
+        assert!(manifest
+            .support_profile_slots
+            .contains(&"endpoint_kind".to_owned()));
+        assert!(manifest
+            .support_profile_slots
+            .contains(&"retry_budget".to_owned()));
+        assert!(manifest
+            .support_profile_slots
+            .contains(&"stream_window".to_owned()));
+        assert!(manifest
+            .default_lanes
+            .contains(&"network.send=tx".to_owned()));
+        assert!(manifest
+            .default_lanes
+            .contains(&"network.recv=rx".to_owned()));
+    }
 }

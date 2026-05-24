@@ -474,6 +474,11 @@ fn verify_expr(
         | NirExpr::DataProfileDownlinkLenRef { .. }
         | NirExpr::DataProfileHandleTableRef { .. }
         | NirExpr::DataProfileMarkerRef { .. }
+        | NirExpr::NetworkProfileBindCoreRef { .. }
+        | NirExpr::NetworkProfileEndpointKindRef { .. }
+        | NirExpr::NetworkProfileTimeoutBudgetRef { .. }
+        | NirExpr::NetworkProfileRetryBudgetRef { .. }
+        | NirExpr::NetworkProfileStreamWindowRef { .. }
         | NirExpr::KernelProfileBindCoreRef { .. }
         | NirExpr::KernelProfileQueueDepthRef { .. }
         | NirExpr::KernelProfileBatchLanesRef { .. }
@@ -806,6 +811,11 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
         | NirExpr::DataProfileDownlinkLenRef { .. }
         | NirExpr::DataProfileHandleTableRef { .. }
         | NirExpr::DataProfileMarkerRef { .. }
+        | NirExpr::NetworkProfileBindCoreRef { .. }
+        | NirExpr::NetworkProfileEndpointKindRef { .. }
+        | NirExpr::NetworkProfileTimeoutBudgetRef { .. }
+        | NirExpr::NetworkProfileRetryBudgetRef { .. }
+        | NirExpr::NetworkProfileStreamWindowRef { .. }
         | NirExpr::KernelProfileBindCoreRef { .. }
         | NirExpr::KernelProfileQueueDepthRef { .. }
         | NirExpr::KernelProfileBatchLanesRef { .. }

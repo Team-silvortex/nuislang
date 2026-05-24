@@ -80,6 +80,15 @@ Use these when you want the shortest explanation of how the current layers stack
   [README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/README.md)
   and contract:
   [std-shader-kernel-project-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-shader-kernel-project-contract.md)
+* emerging domain skeleton:
+  [network-domain-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/network-domain-contract.md)
+  ->
+  [network-profile-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/network-profile-contract.md)
+  ->
+  [network_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_demo)
+  ->
+  [index.toml](/Users/Shared/chroot/dev/nuislang/nustar-packages/index.toml) /
+  [network.toml](/Users/Shared/chroot/dev/nuislang/nustar-packages/network.toml)
 
 ## Task-Facing `std`
 

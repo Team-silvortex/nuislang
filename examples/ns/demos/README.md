@@ -21,6 +21,9 @@ when you want the canonical multi-file project route.
   async base ->
   async tensor ->
   tensor lane
+* network edge:
+  [network_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_profile_demo.ns) ->
+  `bind_core -> endpoint_kind`
 
 ## Shader Mirrors
 

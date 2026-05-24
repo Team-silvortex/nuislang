@@ -247,6 +247,11 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         | NirExpr::DataProfileDownlinkLenRef { .. }
         | NirExpr::DataProfileHandleTableRef { .. }
         | NirExpr::DataProfileMarkerRef { .. }
+        | NirExpr::NetworkProfileBindCoreRef { .. }
+        | NirExpr::NetworkProfileEndpointKindRef { .. }
+        | NirExpr::NetworkProfileTimeoutBudgetRef { .. }
+        | NirExpr::NetworkProfileRetryBudgetRef { .. }
+        | NirExpr::NetworkProfileStreamWindowRef { .. }
         | NirExpr::KernelProfileBindCoreRef { .. }
         | NirExpr::KernelProfileQueueDepthRef { .. }
         | NirExpr::KernelProfileBatchLanesRef { .. }

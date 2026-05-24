@@ -670,6 +670,21 @@ fn render_nir_expr(value: &NirExpr) -> String {
                 escape_debug(tag)
             )
         }
+        NirExpr::NetworkProfileBindCoreRef { unit } => {
+            format!("network_profile_bind_core(\"{}\")", escape_debug(unit))
+        }
+        NirExpr::NetworkProfileEndpointKindRef { unit } => {
+            format!("network_profile_endpoint_kind(\"{}\")", escape_debug(unit))
+        }
+        NirExpr::NetworkProfileTimeoutBudgetRef { unit } => {
+            format!("network_profile_timeout_budget(\"{}\")", escape_debug(unit))
+        }
+        NirExpr::NetworkProfileRetryBudgetRef { unit } => {
+            format!("network_profile_retry_budget(\"{}\")", escape_debug(unit))
+        }
+        NirExpr::NetworkProfileStreamWindowRef { unit } => {
+            format!("network_profile_stream_window(\"{}\")", escape_debug(unit))
+        }
         NirExpr::KernelProfileBindCoreRef { unit } => {
             format!("kernel_profile_bind_core(\"{}\")", escape_debug(unit))
         }

@@ -3166,6 +3166,21 @@ fn lower_expr(
         NirExpr::DataProfileMarkerRef { unit, tag } => {
             lower_project_profile_ref(state, "data", unit, &format!("marker:{tag}"))
         }
+        NirExpr::NetworkProfileBindCoreRef { unit } => {
+            lower_project_profile_ref(state, "network", unit, "bind_core")
+        }
+        NirExpr::NetworkProfileEndpointKindRef { unit } => {
+            lower_project_profile_ref(state, "network", unit, "endpoint_kind")
+        }
+        NirExpr::NetworkProfileTimeoutBudgetRef { unit } => {
+            lower_project_profile_ref(state, "network", unit, "connect_timeout_ms")
+        }
+        NirExpr::NetworkProfileRetryBudgetRef { unit } => {
+            lower_project_profile_ref(state, "network", unit, "retry_budget")
+        }
+        NirExpr::NetworkProfileStreamWindowRef { unit } => {
+            lower_project_profile_ref(state, "network", unit, "stream_window")
+        }
         NirExpr::KernelProfileBindCoreRef { unit } => {
             lower_project_profile_ref(state, "kernel", unit, "bind_core")
         }

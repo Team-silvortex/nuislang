@@ -795,6 +795,11 @@ fn required_abi_surfaces_for_domain(
                     surfaces.insert((*surface).to_owned());
                 }
             }
+            "network" => {
+                for surface in network_support_surface_contract() {
+                    surfaces.insert((*surface).to_owned());
+                }
+            }
             "data" => {
                 for surface in data_support_surface_contract() {
                     surfaces.insert((*surface).to_owned());
@@ -3306,6 +3311,13 @@ fn kernel_support_surface_contract() -> &'static [&'static str] {
     ]
 }
 
+fn network_support_surface_contract() -> &'static [&'static str] {
+    &[
+        "network.profile.bind-core.v1",
+        "network.profile.endpoint-kind.v1",
+    ]
+}
+
 fn data_support_surface_contract() -> &'static [&'static str] {
     &[
         "data.profile.bind-core.v1",
@@ -3505,6 +3517,11 @@ fn apply_support_module_profile(ast: &AstModule, module: &mut YirModule) -> Resu
             ensure_project_resource(module, "kernel0", "kernel.apple");
             for stmt in &profile.body {
                 apply_kernel_profile_stmt(ast, stmt, module, &int_bindings)?;
+            }
+        }
+        "network" => {
+            for stmt in &profile.body {
+                apply_network_profile_stmt(ast, stmt, module)?;
             }
         }
         "data" => {
@@ -3723,6 +3740,32 @@ fn apply_kernel_profile_stmt(
         _ => return Ok(()),
     };
     push_profile_node(module, name, "kernel0", op);
+    Ok(())
+}
+
+fn apply_network_profile_stmt(
+    ast: &AstModule,
+    stmt: &AstStmt,
+    module: &mut YirModule,
+) -> Result<(), String> {
+    if let Some((node_name, value)) = extract_profile_int_binding(stmt) {
+        let name = format!(
+            "project_profile_{}_{}_{}",
+            sanitize_ident(&ast.domain),
+            sanitize_ident(&ast.unit),
+            sanitize_ident(node_name)
+        );
+        push_profile_node(
+            module,
+            name,
+            "cpu0",
+            Operation {
+                module: "cpu".to_owned(),
+                instruction: "const_i64".to_owned(),
+                args: vec![value.to_string()],
+            },
+        );
+    }
     Ok(())
 }
 
@@ -4034,6 +4077,49 @@ fn resolve_project_profile_target_name(domain: &str, unit: &str, slot: &str) -> 
         ),
         ("kernel", "batch_lanes") => format!(
             "project_profile_kernel_{}_batch_lanes",
+            sanitize_ident(unit)
+        ),
+        ("network", "bind_core") => {
+            format!("project_profile_network_{}_bind_core", sanitize_ident(unit))
+        }
+        ("network", "endpoint_kind") => format!(
+            "project_profile_network_{}_endpoint_kind",
+            sanitize_ident(unit)
+        ),
+        ("network", "local_port") => format!(
+            "project_profile_network_{}_local_port",
+            sanitize_ident(unit)
+        ),
+        ("network", "remote_port") => format!(
+            "project_profile_network_{}_remote_port",
+            sanitize_ident(unit)
+        ),
+        ("network", "connect_timeout_ms") => format!(
+            "project_profile_network_{}_connect_timeout_ms",
+            sanitize_ident(unit)
+        ),
+        ("network", "read_timeout_ms") => format!(
+            "project_profile_network_{}_read_timeout_ms",
+            sanitize_ident(unit)
+        ),
+        ("network", "write_timeout_ms") => format!(
+            "project_profile_network_{}_write_timeout_ms",
+            sanitize_ident(unit)
+        ),
+        ("network", "retry_budget") => format!(
+            "project_profile_network_{}_retry_budget",
+            sanitize_ident(unit)
+        ),
+        ("network", "stream_window") => format!(
+            "project_profile_network_{}_stream_window",
+            sanitize_ident(unit)
+        ),
+        ("network", "recv_window") => format!(
+            "project_profile_network_{}_recv_window",
+            sanitize_ident(unit)
+        ),
+        ("network", "send_window") => format!(
+            "project_profile_network_{}_send_window",
             sanitize_ident(unit)
         ),
         ("data", "bind_core") => format!(
@@ -4982,6 +5068,30 @@ mod tests {
         validate_project_modules(&project.modules).unwrap();
         validate_project_unit_bindings(&project.modules).unwrap();
         validate_project_uses(&project.modules).unwrap();
+    }
+
+    #[test]
+    fn network_profile_slot_targets_use_stable_names() {
+        assert_eq!(
+            resolve_project_profile_target_name("network", "NetworkUnit", "bind_core"),
+            "project_profile_network_NetworkUnit_bind_core"
+        );
+        assert_eq!(
+            resolve_project_profile_target_name("network", "NetworkUnit", "endpoint_kind"),
+            "project_profile_network_NetworkUnit_endpoint_kind"
+        );
+        assert_eq!(
+            resolve_project_profile_target_name("network", "NetworkUnit", "connect_timeout_ms"),
+            "project_profile_network_NetworkUnit_connect_timeout_ms"
+        );
+        assert_eq!(
+            resolve_project_profile_target_name("network", "NetworkUnit", "retry_budget"),
+            "project_profile_network_NetworkUnit_retry_budget"
+        );
+        assert_eq!(
+            resolve_project_profile_target_name("network", "NetworkUnit", "stream_window"),
+            "project_profile_network_NetworkUnit_stream_window"
+        );
     }
 
     #[test]
