@@ -25,6 +25,10 @@ Compared with a single `.ns` file, project mode currently adds:
 * project-level ABI locking or auto-resolution
 * project metadata outputs during `build`
 * compile-cache identity based on the whole project input set
+* a normalized compiler-side project organization view, now also emitted as
+  `nuis.project.organization.txt` during `build`
+* a normalized project exchange view, now also emitted as
+  `nuis.project.exchange.txt` during `build`
 
 Current project `links` are not only manifest hints anymore. They are checked
 against final `YIR` as real `source -> data -> target` exchange structure.
@@ -47,6 +51,27 @@ Per-domain lane defaults are also declared by each `nustar` package through
 and `nuisc` only applies declared policy plus narrow fallback rules.
 
 ## Core Commands
+
+Recommended project-management flow:
+
+```text
+project-doctor
+  -> project-status
+  -> scheduler-view
+  -> project-lock-abi
+  -> check
+  -> test
+  -> build
+```
+
+Useful test splits:
+
+```text
+nuis test --list <project-dir>
+nuis test --exact <project-dir> <test-name>
+nuis test --ignored <project-dir>
+nuis test --include-ignored <project-dir>
+```
 
 Inspect project state:
 

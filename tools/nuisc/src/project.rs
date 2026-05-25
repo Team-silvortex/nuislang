@@ -61,6 +61,8 @@ pub struct LoadedProject {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProjectBuildMetadata {
     pub manifest_copy_path: String,
+    pub organization_index_path: String,
+    pub exchange_index_path: String,
     pub modules_index_path: String,
     pub links_index_path: String,
     pub host_ffi_index_path: String,
@@ -68,9 +70,56 @@ pub struct ProjectBuildMetadata {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectOrganization {
+    pub entry: String,
+    pub domains: Vec<String>,
+    pub modules: Vec<ProjectOrganizationModule>,
+    pub links: Vec<ProjectOrganizationLink>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectOrganizationModule {
+    pub path: String,
+    pub domain: String,
+    pub unit: String,
+    pub is_entry: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectOrganizationLink {
+    pub from: String,
+    pub to: String,
+    pub via: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectExchangeOrganization {
+    pub routes: Vec<ProjectExchangeRoute>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectExchangeRoute {
+    pub from: String,
+    pub to: String,
+    pub via: Option<String>,
+    pub mode: String,
+    pub domains: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProjectAbiResolution {
     pub requirements: Vec<ProjectAbiRequirement>,
     pub explicit: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectCompilationPlan {
+    pub project_name: String,
+    pub entry: String,
+    pub organization: ProjectOrganization,
+    pub exchanges: ProjectExchangeOrganization,
+    pub abi_resolution: ProjectAbiResolution,
+    pub effective_input_path: PathBuf,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -148,28 +197,17 @@ pub fn load_project(input: &Path) -> Result<LoadedProject, String> {
 }
 
 pub fn describe_project(project: &LoadedProject) -> String {
-    let modules = project
+    let organization = organize_project(project);
+    let modules = organization
         .modules
         .iter()
-        .map(|module| {
-            let relative = module
-                .path
-                .strip_prefix(&project.root)
-                .unwrap_or(module.path.as_path());
-            format!(
-                "{} (mod {} {})",
-                relative.display(),
-                module.ast.domain,
-                module.ast.unit
-            )
-        })
+        .map(|module| format!("{} (mod {} {})", module.path, module.domain, module.unit))
         .collect::<Vec<_>>()
         .join(", ");
-    let links = if project.manifest.links.is_empty() {
+    let links = if organization.links.is_empty() {
         "<none>".to_owned()
     } else {
-        project
-            .manifest
+        organization
             .links
             .iter()
             .map(|link| {
@@ -218,6 +256,37 @@ pub fn describe_project(project: &LoadedProject) -> String {
     )
 }
 
+pub fn build_project_compilation_plan(
+    project: &LoadedProject,
+) -> Result<ProjectCompilationPlan, String> {
+    let organization = organize_project(project);
+    let exchanges = organize_project_exchanges(project);
+    let abi_resolution = resolve_project_abi(project)?;
+    let effective_input_path = project.root.join(format!("{}.ns", project.manifest.name));
+    Ok(ProjectCompilationPlan {
+        project_name: project.manifest.name.clone(),
+        entry: project.manifest.entry.clone(),
+        organization,
+        exchanges,
+        abi_resolution,
+        effective_input_path,
+    })
+}
+
+pub fn describe_project_compilation_plan(plan: &ProjectCompilationPlan) -> String {
+    format!(
+        "entry={} domains={} exchanges={} abi_mode={}",
+        plan.entry,
+        plan.organization.domains.join(", "),
+        plan.exchanges.routes.len(),
+        if plan.abi_resolution.explicit {
+            "explicit"
+        } else {
+            "auto-recommended"
+        }
+    )
+}
+
 pub fn write_project_metadata(
     output_dir: &Path,
     project: &LoadedProject,
@@ -225,6 +294,8 @@ pub fn write_project_metadata(
     fs::create_dir_all(output_dir)
         .map_err(|error| format!("failed to create `{}`: {error}", output_dir.display()))?;
     let manifest_copy_path = output_dir.join("nuis.project.toml");
+    let organization_index_path = output_dir.join("nuis.project.organization.txt");
+    let exchange_index_path = output_dir.join("nuis.project.exchange.txt");
     let modules_index_path = output_dir.join("nuis.project.modules.txt");
     let links_index_path = output_dir.join("nuis.project.links.txt");
     let host_ffi_index_path = output_dir.join("nuis.project.host_ffi.txt");
@@ -236,19 +307,28 @@ pub fn write_project_metadata(
             manifest_copy_path.display()
         )
     })?;
-    let modules_index = project
+    let organization_index = render_project_organization_index(project);
+    fs::write(&organization_index_path, organization_index).map_err(|error| {
+        format!(
+            "failed to write project organization index `{}`: {error}",
+            organization_index_path.display()
+        )
+    })?;
+    let exchange_index = render_project_exchange_index(project);
+    fs::write(&exchange_index_path, exchange_index).map_err(|error| {
+        format!(
+            "failed to write project exchange index `{}`: {error}",
+            exchange_index_path.display()
+        )
+    })?;
+    let organization = organize_project(project);
+    let modules_index = organization
         .modules
         .iter()
         .map(|module| {
-            let relative = module
-                .path
-                .strip_prefix(&project.root)
-                .unwrap_or(module.path.as_path());
             format!(
-                "{}\tmod {} {}\n",
-                relative.display(),
-                module.ast.domain,
-                module.ast.unit
+                "{}\tmod {} {}\tentry={}\n",
+                module.path, module.domain, module.unit, module.is_entry
             )
         })
         .collect::<String>();
@@ -258,11 +338,10 @@ pub fn write_project_metadata(
             modules_index_path.display()
         )
     })?;
-    let links_index = if project.manifest.links.is_empty() {
+    let links_index = if organization.links.is_empty() {
         String::new()
     } else {
-        project
-            .manifest
+        organization
             .links
             .iter()
             .map(|link| {
@@ -296,11 +375,153 @@ pub fn write_project_metadata(
     })?;
     Ok(ProjectBuildMetadata {
         manifest_copy_path: manifest_copy_path.display().to_string(),
+        organization_index_path: organization_index_path.display().to_string(),
+        exchange_index_path: exchange_index_path.display().to_string(),
         modules_index_path: modules_index_path.display().to_string(),
         links_index_path: links_index_path.display().to_string(),
         host_ffi_index_path: host_ffi_index_path.display().to_string(),
         abi_index_path: abi_index_path.display().to_string(),
     })
+}
+
+pub fn organize_project(project: &LoadedProject) -> ProjectOrganization {
+    let mut domains = project
+        .modules
+        .iter()
+        .map(|module| module.ast.domain.clone())
+        .collect::<BTreeSet<_>>();
+    for link in &project.manifest.links {
+        if let Some((domain, _)) = link.from.split_once('.') {
+            domains.insert(domain.to_owned());
+        }
+        if let Some((domain, _)) = link.to.split_once('.') {
+            domains.insert(domain.to_owned());
+        }
+        if let Some(via) = &link.via {
+            if let Some((domain, _)) = via.split_once('.') {
+                domains.insert(domain.to_owned());
+            }
+        }
+    }
+    let entry_relative = project
+        .entry_path
+        .strip_prefix(&project.root)
+        .unwrap_or(project.entry_path.as_path())
+        .display()
+        .to_string();
+    let modules = project
+        .modules
+        .iter()
+        .map(|module| {
+            let relative = module
+                .path
+                .strip_prefix(&project.root)
+                .unwrap_or(module.path.as_path())
+                .display()
+                .to_string();
+            ProjectOrganizationModule {
+                is_entry: relative == entry_relative,
+                path: relative,
+                domain: module.ast.domain.clone(),
+                unit: module.ast.unit.clone(),
+            }
+        })
+        .collect::<Vec<_>>();
+    let links = project
+        .manifest
+        .links
+        .iter()
+        .map(|link| ProjectOrganizationLink {
+            from: link.from.clone(),
+            to: link.to.clone(),
+            via: link.via.clone(),
+        })
+        .collect::<Vec<_>>();
+    ProjectOrganization {
+        entry: project.manifest.entry.clone(),
+        domains: domains.into_iter().collect(),
+        modules,
+        links,
+    }
+}
+
+pub fn organize_project_exchanges(project: &LoadedProject) -> ProjectExchangeOrganization {
+    let routes = project
+        .manifest
+        .links
+        .iter()
+        .map(|link| {
+            let mut domains = Vec::new();
+            if let Some((domain, _)) = link.from.split_once('.') {
+                domains.push(domain.to_owned());
+            }
+            if let Some((domain, _)) = link.to.split_once('.') {
+                if !domains.iter().any(|item| item == domain) {
+                    domains.push(domain.to_owned());
+                }
+            }
+            if let Some(via) = &link.via {
+                if let Some((domain, _)) = via.split_once('.') {
+                    if !domains.iter().any(|item| item == domain) {
+                        domains.push(domain.to_owned());
+                    }
+                }
+            }
+            ProjectExchangeRoute {
+                from: link.from.clone(),
+                to: link.to.clone(),
+                via: link.via.clone(),
+                mode: if link.via.is_some() {
+                    "bridged".to_owned()
+                } else {
+                    "direct".to_owned()
+                },
+                domains,
+            }
+        })
+        .collect();
+    ProjectExchangeOrganization { routes }
+}
+
+fn render_project_organization_index(project: &LoadedProject) -> String {
+    let organization = organize_project(project);
+    let mut lines = Vec::new();
+    lines.push(format!("entry\t{}", organization.entry));
+    lines.push(format!("domains\t{}", organization.domains.join(", ")));
+    for module in organization.modules {
+        lines.push(format!(
+            "module\t{}\t{}\t{}\tentry={}",
+            module.path, module.domain, module.unit, module.is_entry
+        ));
+    }
+    for link in organization.links {
+        lines.push(format!(
+            "link\t{}\t{}\t{}",
+            link.from,
+            link.to,
+            link.via.unwrap_or_else(|| "<direct>".to_owned())
+        ));
+    }
+    format!("{}\n", lines.join("\n"))
+}
+
+fn render_project_exchange_index(project: &LoadedProject) -> String {
+    let exchanges = organize_project_exchanges(project);
+    if exchanges.routes.is_empty() {
+        return String::new();
+    }
+    let mut lines = Vec::new();
+    for route in exchanges.routes {
+        lines.push(format!(
+            "route\t{}\t{}\t{}\tmode={}\tdomains={}",
+            route.from,
+            route.to,
+            route.via.unwrap_or_else(|| "<direct>".to_owned()),
+            route.mode,
+            route.domains.join(",")
+        ));
+    }
+    format!("{}\n", lines.join("\n"))
 }
 
 fn render_project_abi_index(project: &LoadedProject) -> Result<String, String> {
@@ -5135,6 +5356,111 @@ mod tests {
         assert_eq!(
             resolve_project_profile_target_name("network", "NetworkUnit", "protocol_header_bytes"),
             "project_profile_network_NetworkUnit_protocol_header_bytes"
+        );
+    }
+
+    #[test]
+    fn organizes_project_modules_domains_and_links() {
+        let mut project = project_with_modules(vec![
+            (
+                "main.ns",
+                r#"
+                mod cpu Main {
+                  fn main() -> i64 { return 1; }
+                }
+                "#,
+            ),
+            (
+                "network_unit.ns",
+                r#"
+                mod network NetworkUnit {
+                  fn ping() -> i64 { return 1; }
+                }
+                "#,
+            ),
+        ]);
+        project.manifest.links = vec![ProjectLink {
+            from: "cpu.Main".to_owned(),
+            to: "network.NetworkUnit".to_owned(),
+            via: Some("data.FabricPlane".to_owned()),
+        }];
+
+        let organization = organize_project(&project);
+        assert_eq!(organization.entry, "main.ns");
+        assert_eq!(
+            organization.domains,
+            vec!["cpu".to_owned(), "data".to_owned(), "network".to_owned()]
+        );
+        assert_eq!(organization.modules.len(), 2);
+        assert!(organization.modules.iter().any(|module| module.is_entry));
+        assert_eq!(organization.links.len(), 1);
+        assert_eq!(organization.links[0].from, "cpu.Main");
+        assert_eq!(organization.links[0].to, "network.NetworkUnit");
+        assert_eq!(
+            organization.links[0].via.as_deref(),
+            Some("data.FabricPlane")
+        );
+    }
+
+    #[test]
+    fn organizes_project_exchange_routes() {
+        let mut project = project_with_modules(vec![(
+            "main.ns",
+            r#"
+            mod cpu Main {
+              fn main() -> i64 { return 1; }
+            }
+            "#,
+        )]);
+        project.manifest.links = vec![
+            ProjectLink {
+                from: "cpu.Main".to_owned(),
+                to: "network.NetworkUnit".to_owned(),
+                via: Some("data.FabricPlane".to_owned()),
+            },
+            ProjectLink {
+                from: "cpu.Main".to_owned(),
+                to: "cpu.Observer".to_owned(),
+                via: None,
+            },
+        ];
+
+        let exchanges = organize_project_exchanges(&project);
+        assert_eq!(exchanges.routes.len(), 2);
+        assert_eq!(exchanges.routes[0].mode, "bridged");
+        assert_eq!(
+            exchanges.routes[0].domains,
+            vec!["cpu".to_owned(), "network".to_owned(), "data".to_owned()]
+        );
+        assert_eq!(exchanges.routes[1].mode, "direct");
+        assert_eq!(exchanges.routes[1].domains, vec!["cpu".to_owned()]);
+    }
+
+    #[test]
+    fn builds_project_compilation_plan_from_shared_organization_layers() {
+        let mut project = project_with_modules(vec![(
+            "main.ns",
+            r#"
+            mod cpu Main {
+              fn main() -> i64 { return 1; }
+            }
+            "#,
+        )]);
+        project.manifest.name = "demo".to_owned();
+        project.manifest.links = vec![ProjectLink {
+            from: "cpu.Main".to_owned(),
+            to: "network.NetworkUnit".to_owned(),
+            via: Some("data.FabricPlane".to_owned()),
+        }];
+
+        let plan = build_project_compilation_plan(&project).unwrap();
+        assert_eq!(plan.project_name, "demo");
+        assert_eq!(plan.entry, "main.ns");
+        assert_eq!(plan.exchanges.routes.len(), 1);
+        assert_eq!(plan.effective_input_path, PathBuf::from("./demo.ns"));
+        assert_eq!(
+            describe_project_compilation_plan(&plan),
+            "entry=main.ns domains=cpu, data, network exchanges=1 abi_mode=auto-recommended"
         );
     }
 

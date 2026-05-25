@@ -14,60 +14,74 @@ pub struct PipelineArtifacts {
 pub fn compile_source_path(path: &Path) -> Result<PipelineArtifacts, String> {
     if crate::project::is_project_input(path) {
         let project = crate::project::load_project(path)?;
-        let local_units = project
-            .modules
-            .iter()
-            .map(|module| (module.ast.domain.clone(), module.ast.unit.clone()))
-            .collect::<BTreeSet<_>>();
-        let ast = crate::frontend::parse_nuis_ast(&project.entry_source)?;
-        let helper_modules = project
-            .modules
-            .iter()
-            .filter(|module| module.path != project.entry_path)
-            .map(|module| module.ast.clone())
-            .collect::<Vec<_>>();
-        let mut nir = crate::frontend::lower_project_ast_to_nir(&ast, &helper_modules)?;
-        crate::optimize::simplify_nir_module(&mut nir);
-        crate::nir_verify::verify_nir_module(&nir)?;
-        let lowering_manifest =
-            crate::registry::load_manifest_for_domain(Path::new("nustar-packages"), &nir.domain)?;
-        validate_externs(&ast, &lowering_manifest)?;
-        crate::registry::validate_unit_binding(
-            std::slice::from_ref(&lowering_manifest),
-            &ast.domain,
-            &ast.unit,
-        )?;
-        validate_used_units_with_local_units(&nir, &local_units)?;
-        validate_instantiated_units(&nir)?;
-        crate::project::validate_project_links_against_nir(&project, &nir)?;
-        let yir = crate::lowering::lower_nir_to_yir(&nir, &lowering_manifest)?;
-        let mut loaded_nustar = collect_loaded_nustar(&nir, &yir, &lowering_manifest.package_id)?;
-        let mut artifacts = PipelineArtifacts {
-            ast,
-            nir,
-            yir,
-            llvm_ir: String::new(),
-            loaded_nustar: std::mem::take(&mut loaded_nustar),
-        };
-        crate::project::apply_project_support_modules_to_yir(&project, &mut artifacts.yir)?;
-        crate::project::apply_project_links_to_yir(&project, &mut artifacts.yir)?;
-        crate::project::validate_project_links_against_yir(&project, &artifacts.yir)?;
-        crate::project::validate_project_abi_against_yir(&project, &artifacts.yir)?;
-        artifacts.llvm_ir = yir_lower_llvm::emit_module(&artifacts.yir)?;
-        let lowering_manifest = crate::registry::load_manifest_for_domain(
-            Path::new("nustar-packages"),
-            &artifacts.nir.domain,
-        )?;
-        artifacts.loaded_nustar = collect_loaded_nustar(
-            &artifacts.nir,
-            &artifacts.yir,
-            &lowering_manifest.package_id,
-        )?;
-        return Ok(artifacts);
+        let plan = crate::project::build_project_compilation_plan(&project)?;
+        return compile_project_plan(&project, &plan);
     }
     let source = fs::read_to_string(path)
         .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
     compile_source(&source)
+}
+
+pub fn compile_project(path: &Path) -> Result<PipelineArtifacts, String> {
+    let project = crate::project::load_project(path)?;
+    let plan = crate::project::build_project_compilation_plan(&project)?;
+    compile_project_plan(&project, &plan)
+}
+
+pub fn compile_project_plan(
+    project: &crate::project::LoadedProject,
+    _plan: &crate::project::ProjectCompilationPlan,
+) -> Result<PipelineArtifacts, String> {
+    let local_units = project
+        .modules
+        .iter()
+        .map(|module| (module.ast.domain.clone(), module.ast.unit.clone()))
+        .collect::<BTreeSet<_>>();
+    let ast = crate::frontend::parse_nuis_ast(&project.entry_source)?;
+    let helper_modules = project
+        .modules
+        .iter()
+        .filter(|module| module.path != project.entry_path)
+        .map(|module| module.ast.clone())
+        .collect::<Vec<_>>();
+    let mut nir = crate::frontend::lower_project_ast_to_nir(&ast, &helper_modules)?;
+    crate::optimize::simplify_nir_module(&mut nir);
+    crate::nir_verify::verify_nir_module(&nir)?;
+    let lowering_manifest =
+        crate::registry::load_manifest_for_domain(Path::new("nustar-packages"), &nir.domain)?;
+    validate_externs(&ast, &lowering_manifest)?;
+    crate::registry::validate_unit_binding(
+        std::slice::from_ref(&lowering_manifest),
+        &ast.domain,
+        &ast.unit,
+    )?;
+    validate_used_units_with_local_units(&nir, &local_units)?;
+    validate_instantiated_units(&nir)?;
+    crate::project::validate_project_links_against_nir(project, &nir)?;
+    let yir = crate::lowering::lower_nir_to_yir(&nir, &lowering_manifest)?;
+    let mut loaded_nustar = collect_loaded_nustar(&nir, &yir, &lowering_manifest.package_id)?;
+    let mut artifacts = PipelineArtifacts {
+        ast,
+        nir,
+        yir,
+        llvm_ir: String::new(),
+        loaded_nustar: std::mem::take(&mut loaded_nustar),
+    };
+    crate::project::apply_project_support_modules_to_yir(project, &mut artifacts.yir)?;
+    crate::project::apply_project_links_to_yir(project, &mut artifacts.yir)?;
+    crate::project::validate_project_links_against_yir(project, &artifacts.yir)?;
+    crate::project::validate_project_abi_against_yir(project, &artifacts.yir)?;
+    artifacts.llvm_ir = yir_lower_llvm::emit_module(&artifacts.yir)?;
+    let lowering_manifest = crate::registry::load_manifest_for_domain(
+        Path::new("nustar-packages"),
+        &artifacts.nir.domain,
+    )?;
+    artifacts.loaded_nustar = collect_loaded_nustar(
+        &artifacts.nir,
+        &artifacts.yir,
+        &lowering_manifest.package_id,
+    )?;
+    Ok(artifacts)
 }
 
 pub fn compile_source(source: &str) -> Result<PipelineArtifacts, String> {

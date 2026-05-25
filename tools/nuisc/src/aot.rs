@@ -24,7 +24,11 @@ pub struct BuildManifestProjectInfo {
     pub name: String,
     pub abi_mode: String,
     pub abi_entries: Vec<(String, String)>,
+    pub plan_summary: Option<String>,
+    pub effective_input: Option<String>,
     pub manifest_copy_path: Option<String>,
+    pub organization_index_path: Option<String>,
+    pub exchange_index_path: Option<String>,
     pub modules_index_path: Option<String>,
     pub links_index_path: Option<String>,
     pub host_ffi_index_path: Option<String>,
@@ -429,6 +433,18 @@ pub fn write_build_manifest(
             "abi_mode = \"{}\"\n",
             escape_toml_string(&project.abi_mode)
         ));
+        if let Some(value) = &project.plan_summary {
+            out.push_str(&format!(
+                "plan_summary = \"{}\"\n",
+                escape_toml_string(value)
+            ));
+        }
+        if let Some(value) = &project.effective_input {
+            out.push_str(&format!(
+                "effective_input = \"{}\"\n",
+                escape_toml_string(value)
+            ));
+        }
         let mut abi_entries = project
             .abi_entries
             .iter()
@@ -439,6 +455,18 @@ pub fn write_build_manifest(
         if let Some(value) = &project.manifest_copy_path {
             out.push_str(&format!(
                 "manifest_copy = \"{}\"\n",
+                escape_toml_string(value)
+            ));
+        }
+        if let Some(value) = &project.organization_index_path {
+            out.push_str(&format!(
+                "organization_index = \"{}\"\n",
+                escape_toml_string(value)
+            ));
+        }
+        if let Some(value) = &project.exchange_index_path {
+            out.push_str(&format!(
+                "exchange_index = \"{}\"\n",
                 escape_toml_string(value)
             ));
         }
@@ -2505,7 +2533,11 @@ mod tests {
                     name: "demo".to_owned(),
                     abi_mode: "explicit".to_owned(),
                     abi_entries: vec![("cpu".to_owned(), cpu_target.abi.clone())],
+                    plan_summary: None,
+                    effective_input: None,
                     manifest_copy_path: None,
+                    organization_index_path: None,
+                    exchange_index_path: None,
                     modules_index_path: None,
                     links_index_path: None,
                     host_ffi_index_path: None,

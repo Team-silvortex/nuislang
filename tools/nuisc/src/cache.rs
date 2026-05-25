@@ -4,7 +4,7 @@ use std::{
     time::SystemTime,
 };
 
-use crate::project::LoadedProject;
+use crate::project::{LoadedProject, ProjectCompilationPlan};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompileCacheKey {
@@ -93,6 +93,14 @@ pub fn compute_compile_cache_key(
     input: &Path,
     project: Option<&LoadedProject>,
 ) -> Result<CompileCacheKey, String> {
+    compute_compile_cache_key_with_plan(input, project, None)
+}
+
+pub fn compute_compile_cache_key_with_plan(
+    input: &Path,
+    project: Option<&LoadedProject>,
+    plan: Option<&ProjectCompilationPlan>,
+) -> Result<CompileCacheKey, String> {
     let root = cache_root(input, project);
     let mut records = Vec::<(String, Vec<u8>)>::new();
 
@@ -110,6 +118,19 @@ pub fn compute_compile_cache_key(
     ));
 
     if let Some(project) = project {
+        if let Some(plan) = plan {
+            records.push((
+                "project.plan".to_owned(),
+                format!(
+                    "{}\n{}\n{}\n{}",
+                    plan.project_name,
+                    plan.entry,
+                    plan.organization.domains.join(","),
+                    plan.exchanges.routes.len()
+                )
+                .into_bytes(),
+            ));
+        }
         records.push((
             "project.manifest".to_owned(),
             fs::read(&project.manifest_path).map_err(|error| {
@@ -254,7 +275,15 @@ pub fn compile_cache_status(
     input: &Path,
     project: Option<&LoadedProject>,
 ) -> Result<CompileCacheStatus, String> {
-    let key = compute_compile_cache_key(input, project)?;
+    compile_cache_status_with_plan(input, project, None)
+}
+
+pub fn compile_cache_status_with_plan(
+    input: &Path,
+    project: Option<&LoadedProject>,
+    plan: Option<&ProjectCompilationPlan>,
+) -> Result<CompileCacheStatus, String> {
+    let key = compute_compile_cache_key_with_plan(input, project, plan)?;
     let entry_dir = key.root.join(&key.key);
     let (file_count, total_bytes) = if entry_dir.is_dir() {
         summarize_directory(&entry_dir)?
@@ -275,6 +304,14 @@ pub fn compile_cache_status(
 pub fn clean_compile_cache(
     input: &Path,
     project: Option<&LoadedProject>,
+) -> Result<CleanedCompileCache, String> {
+    clean_compile_cache_with_plan(input, project, None)
+}
+
+pub fn clean_compile_cache_with_plan(
+    input: &Path,
+    project: Option<&LoadedProject>,
+    _plan: Option<&ProjectCompilationPlan>,
 ) -> Result<CleanedCompileCache, String> {
     let root = cache_root(input, project);
     clean_compile_cache_root(&root)
@@ -306,6 +343,15 @@ pub fn clean_compile_cache_summary(
 pub fn prune_compile_cache(
     input: &Path,
     project: Option<&LoadedProject>,
+    keep: usize,
+) -> Result<PrunedCompileCache, String> {
+    prune_compile_cache_with_plan(input, project, None, keep)
+}
+
+pub fn prune_compile_cache_with_plan(
+    input: &Path,
+    project: Option<&LoadedProject>,
+    _plan: Option<&ProjectCompilationPlan>,
     keep: usize,
 ) -> Result<PrunedCompileCache, String> {
     let root = cache_root(input, project);

@@ -226,7 +226,8 @@ pub fn check(input: &Path) -> Result<CheckedGalaxy, String> {
     let manifest = parse_manifest(&source, &manifest_path)?;
     let project_path = root.join(&manifest.project);
     let project = nuisc::project::load_project(&project_path)?;
-    let abi = nuisc::project::resolve_project_abi(&project)?;
+    let plan = nuisc::project::build_project_compilation_plan(&project)?;
+    let abi = plan.abi_resolution.clone();
 
     let include_files = manifest
         .include

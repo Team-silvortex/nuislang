@@ -111,6 +111,22 @@ pub fn std_net_recipe_samples_brief(domain: &str) -> Option<&'static str> {
     }
 }
 
+pub fn project_management_navigation_brief() -> &'static str {
+    "health -> structure -> scheduler -> abi_lock -> check -> test -> build"
+}
+
+pub fn project_management_samples_brief() -> &'static str {
+    "health=nuis project-doctor <project-dir>; structure=nuis project-status <project-dir>; scheduler=nuis scheduler-view <project-dir>; abi_lock=nuis project-lock-abi <project-dir>; validate=nuis check <project-dir> -> nuis test <project-dir> -> nuis build <project-dir>"
+}
+
+pub fn project_management_test_samples_brief() -> &'static str {
+    "list=nuis test --list <project-dir>; exact=nuis test --exact <project-dir> <test-name>; ignored=nuis test --ignored <project-dir>; include_ignored=nuis test --include-ignored <project-dir>"
+}
+
+pub fn project_management_galaxy_samples_brief() -> &'static str {
+    "galaxy=nuis galaxy init <project-dir> -> nuis galaxy check <project-dir> -> nuis galaxy lock-deps <project-dir> -> nuis galaxy sync-deps <project-dir> -> nuis project-doctor <project-dir>"
+}
+
 pub fn run(command: CommandKind) -> Result<(), String> {
     let frontend = frontend::frontend_name();
     let backend = codegen_wasm::backend_name();
@@ -723,7 +739,16 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 } else {
                     None
                 };
-                let status = cache::compile_cache_status(&input, project.as_ref())?;
+                let project_plan = if let Some(project) = &project {
+                    Some(project::build_project_compilation_plan(project)?)
+                } else {
+                    None
+                };
+                let status = cache::compile_cache_status_with_plan(
+                    &input,
+                    project.as_ref(),
+                    project_plan.as_ref(),
+                )?;
                 if json {
                     print!(
                         "{{\"kind\":\"compile_cache_status\",\"input\":\"{}\",\"root\":\"{}\",\"key\":\"{}\",\"state\":\"{}\",\"entry_dir\":\"{}\",\"files\":{},\"bytes\":{},\"fingerprint_inputs\":{}",
@@ -815,7 +840,16 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 } else {
                     None
                 };
-                let cleaned = cache::clean_compile_cache(&input, project.as_ref())?;
+                let project_plan = if let Some(project) = &project {
+                    Some(project::build_project_compilation_plan(project)?)
+                } else {
+                    None
+                };
+                let cleaned = cache::clean_compile_cache_with_plan(
+                    &input,
+                    project.as_ref(),
+                    project_plan.as_ref(),
+                )?;
                 if json {
                     println!(
                         "{{\"kind\":\"compile_cache_cleaned\",\"input\":\"{}\",\"root\":\"{}\",\"removed_entries\":{},\"removed_bytes\":{}}}",
@@ -887,7 +921,17 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 } else {
                     None
                 };
-                let pruned = cache::prune_compile_cache(&input, project.as_ref(), keep)?;
+                let project_plan = if let Some(project) = &project {
+                    Some(project::build_project_compilation_plan(project)?)
+                } else {
+                    None
+                };
+                let pruned = cache::prune_compile_cache_with_plan(
+                    &input,
+                    project.as_ref(),
+                    project_plan.as_ref(),
+                    keep,
+                )?;
                 if json {
                     println!(
                         "{{\"kind\":\"compile_cache_pruned\",\"input\":\"{}\",\"root\":\"{}\",\"keep\":{},\"kept_entries\":{},\"removed_entries\":{},\"removed_bytes\":{}}}",
@@ -960,10 +1004,25 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             } else {
                 None
             };
-            let artifacts = pipeline::compile_source_path(&input)?;
+            let project_plan = if let Some(project) = &project {
+                Some(project::build_project_compilation_plan(project)?)
+            } else {
+                None
+            };
+            let artifacts = if let (Some(project), Some(plan)) = (&project, &project_plan) {
+                pipeline::compile_project_plan(project, plan)?
+            } else {
+                pipeline::compile_source_path(&input)?
+            };
             println!("checked nuis source: {}", input.display());
             if let Some(project) = &project {
                 println!("project: {}", project::describe_project(project));
+            }
+            if let Some(plan) = &project_plan {
+                println!(
+                    "project_plan: {}",
+                    project::describe_project_compilation_plan(plan)
+                );
             }
             println!(
                 "loaded_nustar: {}",
@@ -991,25 +1050,33 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             } else {
                 None
             };
-            let project_abi_resolution = if let Some(project) = &project {
-                Some(project::resolve_project_abi(project)?)
+            let project_plan = if let Some(project) = &project {
+                Some(project::build_project_compilation_plan(project)?)
             } else {
                 None
             };
             let cpu_target = aot::resolve_cpu_build_target(
                 Path::new("nustar-packages"),
-                project_abi_resolution.as_ref(),
+                project_plan.as_ref().map(|plan| &plan.abi_resolution),
                 cpu_abi.as_deref(),
                 target.as_deref(),
             )?;
-            let effective_input = if let Some(project) = &project {
-                project.root.join(format!("{}.ns", project.manifest.name))
+            let effective_input = if let Some(plan) = &project_plan {
+                plan.effective_input_path.clone()
             } else {
                 input.clone()
             };
-            let cache_key = cache::compute_compile_cache_key(&input, project.as_ref())?;
+            let cache_key = cache::compute_compile_cache_key_with_plan(
+                &input,
+                project.as_ref(),
+                project_plan.as_ref(),
+            )?;
             let cache_hit = cache::lookup_compile_cache(&cache_key)?;
-            let artifacts = pipeline::compile_source_path(&input)?;
+            let artifacts = if let (Some(project), Some(plan)) = (&project, &project_plan) {
+                pipeline::compile_project_plan(project, plan)?
+            } else {
+                pipeline::compile_source_path(&input)?
+            };
             let written = if let Some(entry) = &cache_hit {
                 cache::restore_compile_cache(entry, &output_dir)?;
                 aot::compile_artifacts_for_output_dir(
@@ -1053,31 +1120,31 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     }),
                     project: project
                         .as_ref()
-                        .map(|project| aot::BuildManifestProjectInfo {
+                        .zip(project_plan.as_ref())
+                        .map(|(project, plan)| aot::BuildManifestProjectInfo {
                             name: project.manifest.name.clone(),
-                            abi_mode: project_abi_resolution
-                                .as_ref()
-                                .map(|resolution| {
-                                    if resolution.explicit {
-                                        "explicit".to_owned()
-                                    } else {
-                                        "auto-recommended".to_owned()
-                                    }
-                                })
-                                .unwrap_or_else(|| "none".to_owned()),
-                            abi_entries: project_abi_resolution
-                                .as_ref()
-                                .map(|resolution| {
-                                    resolution
-                                        .requirements
-                                        .iter()
-                                        .map(|item| (item.domain.clone(), item.abi.clone()))
-                                        .collect::<Vec<_>>()
-                                })
-                                .unwrap_or_default(),
+                            abi_mode: if plan.abi_resolution.explicit {
+                                "explicit".to_owned()
+                            } else {
+                                "auto-recommended".to_owned()
+                            },
+                            abi_entries: plan
+                                .abi_resolution
+                                .requirements
+                                .iter()
+                                .map(|item| (item.domain.clone(), item.abi.clone()))
+                                .collect::<Vec<_>>(),
+                            plan_summary: Some(project::describe_project_compilation_plan(plan)),
+                            effective_input: Some(plan.effective_input_path.display().to_string()),
                             manifest_copy_path: project_metadata
                                 .as_ref()
                                 .map(|item| item.manifest_copy_path.clone()),
+                            organization_index_path: project_metadata
+                                .as_ref()
+                                .map(|item| item.organization_index_path.clone()),
+                            exchange_index_path: project_metadata
+                                .as_ref()
+                                .map(|item| item.exchange_index_path.clone()),
                             modules_index_path: project_metadata
                                 .as_ref()
                                 .map(|item| item.modules_index_path.clone()),
@@ -1109,6 +1176,12 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             if let Some(project) = &project {
                 println!("project: {}", project::describe_project(project));
             }
+            if let Some(plan) = &project_plan {
+                println!(
+                    "project_plan: {}",
+                    project::describe_project_compilation_plan(plan)
+                );
+            }
             println!(
                 "loaded_nustar: {}",
                 artifacts
@@ -1132,8 +1205,8 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     "false"
                 }
             );
-            if let Some(resolution) = &project_abi_resolution {
-                for item in &resolution.requirements {
+            if let Some(plan) = &project_plan {
+                for item in &plan.abi_resolution.requirements {
                     println!("abi: {}={}", item.domain, item.abi);
                     if let Ok(manifest) = registry::load_manifest_for_domain(
                         Path::new("nustar-packages"),
@@ -1171,6 +1244,8 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             println!("build_manifest: {}", build_manifest);
             if let Some(metadata) = &project_metadata {
                 println!("project_manifest: {}", metadata.manifest_copy_path);
+                println!("project_organization: {}", metadata.organization_index_path);
+                println!("project_exchange: {}", metadata.exchange_index_path);
                 println!("project_modules: {}", metadata.modules_index_path);
                 println!("project_links: {}", metadata.links_index_path);
                 println!("project_host_ffi: {}", metadata.host_ffi_index_path);

@@ -926,19 +926,26 @@ fn handle_scheduler_view(input: std::path::PathBuf, json: bool) -> Result<(), St
     println!("scheduler view: {}", input.display());
     if nuisc::project::is_project_input(&input) {
         let project = nuisc::project::load_project(&input)?;
-        let resolution = nuisc::project::resolve_project_abi(&project)?;
+        let plan = nuisc::project::build_project_compilation_plan(&project)?;
         println!("  source_kind: project");
         println!("  project: {}", project.manifest.name);
         println!(
+            "  project_plan: {}",
+            nuisc::project::describe_project_compilation_plan(&plan)
+        );
+        println!(
             "  abi_mode: {}",
-            if resolution.explicit {
+            if plan.abi_resolution.explicit {
                 "explicit"
             } else {
                 "auto-recommended"
             }
         );
-        println!("  resolved_domains: {}", resolution.requirements.len());
-        for item in resolution.requirements {
+        println!(
+            "  resolved_domains: {}",
+            plan.abi_resolution.requirements.len()
+        );
+        for item in plan.abi_resolution.requirements {
             println!("  domain: {}", item.domain);
             println!("    abi: {}", item.abi);
             if let Ok(manifest) = nuisc::registry::load_manifest_for_domain(
@@ -991,9 +998,9 @@ fn handle_scheduler_view(input: std::path::PathBuf, json: bool) -> Result<(), St
 fn handle_scheduler_view_json(input: std::path::PathBuf) -> Result<(), String> {
     if nuisc::project::is_project_input(&input) {
         let project = nuisc::project::load_project(&input)?;
-        let resolution = nuisc::project::resolve_project_abi(&project)?;
+        let plan = nuisc::project::build_project_compilation_plan(&project)?;
         let mut domains = Vec::new();
-        for item in resolution.requirements {
+        for item in plan.abi_resolution.requirements {
             domains.push(scheduler_view_domain_record(
                 &item.domain,
                 None,
@@ -1012,7 +1019,7 @@ fn handle_scheduler_view_json(input: std::path::PathBuf) -> Result<(), String> {
             json_field("project", &project.manifest.name),
             json_field(
                 "abi_mode",
-                if resolution.explicit {
+                if plan.abi_resolution.explicit {
                     "explicit"
                 } else {
                     "auto-recommended"
@@ -1054,38 +1061,29 @@ fn handle_scheduler_view_json(input: std::path::PathBuf) -> Result<(), String> {
 
 fn handle_project_status(input: std::path::PathBuf) -> Result<(), String> {
     let project = nuisc::project::load_project(&input)?;
-    let resolution = nuisc::project::resolve_project_abi(&project)?;
+    let plan = nuisc::project::build_project_compilation_plan(&project)?;
     let galaxy_lock_status = galaxy::verify_project_lock(&input);
+    let galaxy_manifest_path = project.root.join("galaxy.toml");
+    let include_galaxy_flow =
+        galaxy_manifest_path.exists() || !project.manifest.galaxy_dependencies.is_empty();
     let declared_tests = project
         .manifest
         .tests
         .iter()
         .map(|relative| project.root.join(relative))
         .collect::<Vec<_>>();
-    let mut domains = project
-        .modules
-        .iter()
-        .map(|module| module.ast.domain.clone())
-        .collect::<BTreeSet<_>>();
-    for link in &project.manifest.links {
-        if let Some((domain, _)) = link.from.split_once('.') {
-            domains.insert(domain.to_owned());
-        }
-        if let Some((domain, _)) = link.to.split_once('.') {
-            domains.insert(domain.to_owned());
-        }
-        if let Some(via) = &link.via {
-            if let Some((domain, _)) = via.split_once('.') {
-                domains.insert(domain.to_owned());
-            }
-        }
-    }
     println!("project status: {}", project.manifest.name);
     println!("  root: {}", project.root.display());
     println!("  manifest: {}", project.manifest_path.display());
     println!("  entry: {}", project.manifest.entry);
     println!("  modules: {}", project.modules.len());
     println!("  links: {}", project.manifest.links.len());
+    println!(
+        "  project_plan: {}",
+        nuisc::project::describe_project_compilation_plan(&plan)
+    );
+    println!("  project_organization_entry: {}", plan.organization.entry);
+    println!("  project_exchange_routes: {}", plan.exchanges.routes.len());
     println!("  tests: {}", declared_tests.len());
     for path in &declared_tests {
         println!(
@@ -1094,19 +1092,17 @@ fn handle_project_status(input: std::path::PathBuf) -> Result<(), String> {
             yes_no(path.exists())
         );
     }
-    println!(
-        "  domains: {}",
-        domains.into_iter().collect::<Vec<_>>().join(", ")
-    );
+    print_project_management_hints(include_galaxy_flow);
+    println!("  domains: {}", plan.organization.domains.join(", "));
     println!(
         "  abi_mode: {}",
-        if resolution.explicit {
+        if plan.abi_resolution.explicit {
             "explicit"
         } else {
             "auto-recommended"
         }
     );
-    for item in resolution.requirements {
+    for item in plan.abi_resolution.requirements {
         println!("  abi: {}={}", item.domain, item.abi);
         if let Ok(manifest) = nuisc::registry::load_manifest_for_domain(
             std::path::Path::new("nustar-packages"),
@@ -1181,7 +1177,7 @@ fn handle_project_status(input: std::path::PathBuf) -> Result<(), String> {
 
 fn handle_project_doctor(input: std::path::PathBuf) -> Result<(), String> {
     let project = nuisc::project::load_project(&input)?;
-    let resolution = nuisc::project::resolve_project_abi(&project)?;
+    let plan = nuisc::project::build_project_compilation_plan(&project)?;
     let declared_tests = project
         .manifest
         .tests
@@ -1207,6 +1203,8 @@ fn handle_project_doctor(input: std::path::PathBuf) -> Result<(), String> {
     let lock_status = galaxy_doctor.lock_status.clone();
     let lock_error = galaxy_doctor.lock_error.clone();
     let deps_len = galaxy_doctor.dependencies.len();
+    let include_galaxy_flow =
+        galaxy_manifest_exists || !project.manifest.galaxy_dependencies.is_empty();
     let mut any_local_missing = false;
     let mut any_lock_missing = false;
     let mut any_install_missing = false;
@@ -1217,6 +1215,10 @@ fn handle_project_doctor(input: std::path::PathBuf) -> Result<(), String> {
     println!("  entry: {}", project.manifest.entry);
     println!("  modules: {}", project.modules.len());
     println!("  links: {}", project.manifest.links.len());
+    println!(
+        "  project_plan: {}",
+        nuisc::project::describe_project_compilation_plan(&plan)
+    );
     println!("  tests_declared: {}", declared_tests.len());
     println!("  tests_missing: {}", missing_tests.len());
     for path in &declared_tests {
@@ -1226,15 +1228,16 @@ fn handle_project_doctor(input: std::path::PathBuf) -> Result<(), String> {
             yes_no(path.exists())
         );
     }
+    print_project_management_hints(include_galaxy_flow);
     println!(
         "  abi_mode: {}",
-        if resolution.explicit {
+        if plan.abi_resolution.explicit {
             "explicit"
         } else {
             "auto-recommended"
         }
     );
-    for item in &resolution.requirements {
+    for item in &plan.abi_resolution.requirements {
         println!("  abi: {}={}", item.domain, item.abi);
         print_project_scheduler_contract_view(&item.domain)?;
     }
@@ -1476,7 +1479,7 @@ fn handle_project_doctor(input: std::path::PathBuf) -> Result<(), String> {
             "run `nuis galaxy check <project-dir>` after fixing `galaxy.toml` or framework profile issues".to_owned(),
         );
     }
-    if !resolution.explicit {
+    if !plan.abi_resolution.explicit {
         next_steps.push(
             "run `nuis project-lock-abi <project-dir>` if you want to freeze the current ABI recommendations".to_owned(),
         );
@@ -1564,16 +1567,37 @@ fn print_scheduler_sample_field(label: &str, value: &str) {
     }
 }
 
+fn print_project_management_hints(include_galaxy_flow: bool) {
+    println!(
+        "  project_management_navigation: {}",
+        nuisc::project_management_navigation_brief()
+    );
+    print_scheduler_sample_field(
+        "project_management_samples",
+        nuisc::project_management_samples_brief(),
+    );
+    print_scheduler_sample_field(
+        "project_management_tests",
+        nuisc::project_management_test_samples_brief(),
+    );
+    if include_galaxy_flow {
+        print_scheduler_sample_field(
+            "project_management_galaxy",
+            nuisc::project_management_galaxy_samples_brief(),
+        );
+    }
+}
+
 fn handle_project_lock_abi(input: std::path::PathBuf) -> Result<(), String> {
     let project = nuisc::project::load_project(&input)?;
-    let resolution = nuisc::project::resolve_project_abi(&project)?;
+    let plan = nuisc::project::build_project_compilation_plan(&project)?;
     let manifest_source = fs::read_to_string(&project.manifest_path).map_err(|error| {
         format!(
             "failed to read `{}`: {error}",
             project.manifest_path.display()
         )
     })?;
-    let updated = upsert_abi_block(&manifest_source, &resolution.requirements);
+    let updated = upsert_abi_block(&manifest_source, &plan.abi_resolution.requirements);
     if updated == manifest_source {
         println!(
             "project abi already locked: {}",
@@ -1589,14 +1613,18 @@ fn handle_project_lock_abi(input: std::path::PathBuf) -> Result<(), String> {
         println!("locked project abi: {}", project.manifest_path.display());
     }
     println!(
+        "project_plan: {}",
+        nuisc::project::describe_project_compilation_plan(&plan)
+    );
+    println!(
         "  mode: {}",
-        if resolution.explicit {
+        if plan.abi_resolution.explicit {
             "explicit (normalized)"
         } else {
             "auto -> explicit"
         }
     );
-    for item in resolution.requirements {
+    for item in plan.abi_resolution.requirements {
         println!("  abi: {}={}", item.domain, item.abi);
     }
     Ok(())

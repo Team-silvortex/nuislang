@@ -295,6 +295,14 @@ Read that as:
   framework metadata
 * `project-status`
   structural and ABI-resolution view of the project itself
+  it now also reflects the compiler's normalized project organization model,
+  so entry selection and resolved domain coverage come from the same shared
+  `project` view used by build metadata
+* `check` / `build`
+  project inputs now first materialize a shared `ProjectCompilationPlan`
+  so organization, exchange routes, ABI resolution, and effective synthetic
+  project input naming come from one compiler-side plan instead of each front
+  door recomputing them separately
 * `scheduler-view`
   focused scheduler-contract view for the current input; use this when you
   want the short `placement / timing / result / summary / observer`
@@ -315,6 +323,9 @@ Read that as:
   `clock_policy` currently accepts only `bridge`, and only together with `clock_domain="global"` plus `timeout_ms=...`, so the front-door runner bridge remains explicit rather than implicit.
 * `build`
   artifact generation
+  current project builds now also emit `nuis.project.organization.txt`
+  and `nuis.project.exchange.txt` alongside the existing project
+  manifest/modules/links/ABI indexes
 
 For framework/package-aware projects, the current companion `galaxy` flow is:
 
@@ -325,6 +336,26 @@ galaxy init
   -> galaxy sync-deps
   -> project-doctor
 ```
+
+`nuis project-status` and `nuis project-doctor` now also print this same route
+as lightweight front-door hints:
+
+* `project_management_navigation`
+  * `health -> structure -> scheduler -> abi_lock -> check -> test -> build`
+* `project_management_samples`
+  * `health=nuis project-doctor <project-dir>`
+  * `structure=nuis project-status <project-dir>`
+  * `scheduler=nuis scheduler-view <project-dir>`
+  * `abi_lock=nuis project-lock-abi <project-dir>`
+  * `validate=nuis check <project-dir> -> nuis test <project-dir> -> nuis build <project-dir>`
+* `project_management_tests`
+  * `list=nuis test --list <project-dir>`
+  * `exact=nuis test --exact <project-dir> <test-name>`
+  * `ignored=nuis test --ignored <project-dir>`
+  * `include_ignored=nuis test --include-ignored <project-dir>`
+* `project_management_galaxy`
+  * printed when the project already has `galaxy.toml` or declared galaxy deps
+  * `nuis galaxy init <project-dir> -> nuis galaxy check <project-dir> -> nuis galaxy lock-deps <project-dir> -> nuis galaxy sync-deps <project-dir> -> nuis project-doctor <project-dir>`
 
 Typical commands:
 
