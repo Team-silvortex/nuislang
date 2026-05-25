@@ -203,6 +203,131 @@ It currently reads:
 * `stream_window / recv_window / local_port`
   -> `host_network_recv_probe`
 
+The first narrow result-facing companion for those probes is:
+
+* [network_transport_result_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_transport_result_demo)
+
+That sample proves the current bridge can already be read as:
+
+* `host_network_send_probe(...) -> network_result(...) -> network_send_ready / network_value`
+* `host_network_recv_probe(...) -> network_result(...) -> network_recv_ready / network_value`
+
+At the scheduler-contract layer, those transport-facing probes now also line up
+with stable observer-role variants:
+
+* `config_ready=config-ready-observer`
+* `send_ready=send-ready-observer`
+* `recv_ready=recv-ready-observer`
+
+The next narrow orchestration companion is:
+
+* [network_transport_result_task_policy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_transport_result_task_policy_demo)
+
+It shows that those same transport-facing probes can already flow into:
+
+* `spawn(...)`
+* `timeout(...)`
+* `join_result(...)`
+* shared task-shaped policy selection
+
+The next narrow split companion is:
+
+* [network_transport_result_policy_split_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_transport_result_policy_split_demo)
+
+It keeps the same transport-facing probes, but makes the split explicit:
+
+* `send_ready branch`
+* `recv_ready branch`
+* `fallback config_ready branch`
+* shared task-shaped final policy selection
+
+At the scheduler-contract layer, this split now also lines up with stable
+branch labels:
+
+* `send=send-branch`
+* `recv=recv-branch`
+* `fallback=fallback-branch`
+
+And the corresponding transport-side split summaries now line up with:
+
+* `transport_split=transport-split-summary`
+* `transport_windowed_split=transport-windowed-split-summary`
+* `transport_session_bridge_split=transport-session-bridge-split-summary`
+
+`nuis scheduler-view <network project>` now also surfaces the shortest checked-in
+sample hint for those classes through `scheduler_summary_samples`.
+
+The next narrow batch-split companion is:
+
+* [network_transport_result_batch_split_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_transport_result_batch_split_demo)
+
+It keeps the same three branches, but makes the fan-in shape more explicit as:
+
+* `send branch summary`
+* `recv branch summary`
+* `fallback branch summary`
+* merged batch value
+
+The next narrow windowed-split companion is:
+
+* [network_transport_result_windowed_split_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_transport_result_windowed_split_demo)
+
+It keeps the same three branches, but lets preview/final preserve branch
+identity as:
+
+* `send branch preview/final`
+* `recv branch preview/final`
+* `fallback branch preview/final`
+* merged preview/final values
+
+The next narrow fan-in companion is:
+
+* [network_transport_result_task_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_transport_result_task_batch_demo)
+
+It keeps the same narrow transport-facing inputs, but now collects them as:
+
+* `send result`
+* `recv result`
+* `fallback result`
+* shared task-shaped batch summary
+
+The next narrow windowed companion is:
+
+* [network_transport_result_task_windowed_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_transport_result_task_windowed_batch_demo)
+
+It keeps the same transport-facing inputs and shared helper layer, but now
+pushes them one step wider as:
+
+* `transport batch summary`
+* `preview summary`
+* `final summary`
+
+The next narrow bridge companion is:
+
+* [network_transport_result_session_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_transport_result_session_bridge_demo)
+
+It keeps the same transport-facing probes and shared helper layer, but now
+lets the transport windowed summary meet the existing session/task side as:
+
+* `transport windowed summary`
+* `session seed`
+* `session summary bridge`
+
+The next narrow bridge-split companion is:
+
+* [network_transport_result_session_bridge_split_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_transport_result_session_bridge_split_demo)
+
+It keeps the same transport-facing probes, but now lets branch identity reach
+the session side as:
+
+* `send branch session bridge`
+* `recv branch session bridge`
+* `fallback branch session bridge`
+* merged session bridge value
+
+That session-facing split is the current narrowest checked-in sample for the
+`transport_session_bridge_split` summary class.
+
 ## Bootstrap Scope
 
 The current bootstrap scope is intentionally narrow.

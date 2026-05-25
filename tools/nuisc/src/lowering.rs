@@ -203,14 +203,19 @@ pub fn materialize_registered_scheduler_contract_nodes(module: &mut YirModule) {
         let result_lane_contract_name = format!("scheduler_contract_{family}_result_lane_type");
         let result_capability_contract_name =
             format!("scheduler_contract_{family}_result_capability_type");
+        let observer_role_variant_contract_name =
+            format!("scheduler_contract_{family}_observer_role_variant_type");
         let summary_capability_contract_name =
             format!("scheduler_contract_{family}_summary_capability_type");
+        let summary_class_contract_name = format!("scheduler_contract_{family}_summary_class_type");
         let observer_source_class_contract_name =
             format!("scheduler_contract_{family}_observer_source_class_type");
         let observer_stage_class_contract_name =
             format!("scheduler_contract_{family}_observer_stage_class_type");
         let observer_scope_class_contract_name =
             format!("scheduler_contract_{family}_observer_scope_class_type");
+        let observer_branch_class_contract_name =
+            format!("scheduler_contract_{family}_observer_branch_class_type");
         let lane_contract_value = render_lane_policy_contract(&family, &manifest.default_lanes);
         let lane_capability_contract_value =
             render_lane_capability_contract(&family, &manifest.default_lanes);
@@ -219,10 +224,13 @@ pub fn materialize_registered_scheduler_contract_nodes(module: &mut YirModule) {
         let clock_contract_value = render_clock_contract(&family, &manifest);
         let result_lane_contract_value = render_result_lane_contract(&family);
         let result_capability_contract_value = render_result_capability_contract(&family);
+        let observer_role_variant_contract_value = render_observer_role_variant_contract(&family);
         let summary_capability_contract_value = render_summary_capability_contract(&family);
+        let summary_class_contract_value = render_summary_class_contract(&family);
         let observer_source_class_contract_value = render_observer_source_class_contract(&family);
         let observer_stage_class_contract_value = render_observer_stage_class_contract(&family);
         let observer_scope_class_contract_value = render_observer_scope_class_contract(&family);
+        let observer_branch_class_contract_value = render_observer_branch_class_contract(&family);
 
         push_scheduler_contract_text_node(
             module,
@@ -262,9 +270,21 @@ pub fn materialize_registered_scheduler_contract_nodes(module: &mut YirModule) {
         );
         push_scheduler_contract_text_node(
             module,
+            &observer_role_variant_contract_name,
+            &cpu_resource,
+            observer_role_variant_contract_value,
+        );
+        push_scheduler_contract_text_node(
+            module,
             &summary_capability_contract_name,
             &cpu_resource,
             summary_capability_contract_value,
+        );
+        push_scheduler_contract_text_node(
+            module,
+            &summary_class_contract_name,
+            &cpu_resource,
+            summary_class_contract_value,
         );
         push_scheduler_contract_text_node(
             module,
@@ -284,13 +304,25 @@ pub fn materialize_registered_scheduler_contract_nodes(module: &mut YirModule) {
             &cpu_resource,
             observer_scope_class_contract_value,
         );
+        push_scheduler_contract_text_node(
+            module,
+            &observer_branch_class_contract_name,
+            &cpu_resource,
+            observer_branch_class_contract_value,
+        );
         push_scheduler_contract_edge_if_missing(module, &lane_contract_name, &target);
         push_scheduler_contract_edge_if_missing(module, &lane_capability_contract_name, &target);
         push_scheduler_contract_edge_if_missing(module, &bridge_capability_contract_name, &target);
         push_scheduler_contract_edge_if_missing(module, &clock_contract_name, &target);
         push_scheduler_contract_edge_if_missing(module, &result_lane_contract_name, &target);
         push_scheduler_contract_edge_if_missing(module, &result_capability_contract_name, &target);
+        push_scheduler_contract_edge_if_missing(
+            module,
+            &observer_role_variant_contract_name,
+            &target,
+        );
         push_scheduler_contract_edge_if_missing(module, &summary_capability_contract_name, &target);
+        push_scheduler_contract_edge_if_missing(module, &summary_class_contract_name, &target);
         push_scheduler_contract_edge_if_missing(
             module,
             &observer_source_class_contract_name,
@@ -304,6 +336,11 @@ pub fn materialize_registered_scheduler_contract_nodes(module: &mut YirModule) {
         push_scheduler_contract_edge_if_missing(
             module,
             &observer_scope_class_contract_name,
+            &target,
+        );
+        push_scheduler_contract_edge_if_missing(
+            module,
+            &observer_branch_class_contract_name,
             &target,
         );
     }
@@ -402,9 +439,21 @@ fn render_result_capability_contract(family: &str) -> String {
     )
 }
 
+fn render_observer_role_variant_contract(family: &str) -> String {
+    format!(
+        "family={family};config_ready=config-ready-observer;send_ready=send-ready-observer;recv_ready=recv-ready-observer;connect_ready=connect-ready-observer;accept_ready=accept-ready-observer;closed=closed-observer"
+    )
+}
+
 fn render_summary_capability_contract(family: &str) -> String {
     format!(
         "family={family};policy=async-policy-summary;batch=async-batch-summary;windowed=async-windowed-summary"
+    )
+}
+
+fn render_summary_class_contract(family: &str) -> String {
+    format!(
+        "family={family};transport_split=transport-split-summary;transport_windowed_split=transport-windowed-split-summary;transport_session_bridge_split=transport-session-bridge-split-summary;control_split=control-split-summary;control_windowed=control-windowed-summary;control_session_bridge=control-session-bridge-summary"
     )
 }
 
@@ -421,6 +470,12 @@ fn render_observer_stage_class_contract(family: &str) -> String {
 fn render_observer_scope_class_contract(family: &str) -> String {
     format!(
         "family={family};local=local-scope;cross_lane=cross-lane-scope;cross_domain=cross-domain-scope;bridge_visible=bridge-visible-scope"
+    )
+}
+
+fn render_observer_branch_class_contract(family: &str) -> String {
+    format!(
+        "family={family};primary=primary-branch;secondary=secondary-branch;fallback=fallback-branch;send=send-branch;recv=recv-branch"
     )
 }
 
@@ -3223,6 +3278,22 @@ fn lower_expr(
             "network_config_ready",
             "is_config_ready",
         ),
+        NirExpr::NetworkSendReady(result) => lower_result_unary_value_effect(
+            state,
+            bindings,
+            ResultLoweringDomain::Network,
+            result,
+            "network_send_ready",
+            "is_send_ready",
+        ),
+        NirExpr::NetworkRecvReady(result) => lower_result_unary_value_effect(
+            state,
+            bindings,
+            ResultLoweringDomain::Network,
+            result,
+            "network_recv_ready",
+            "is_recv_ready",
+        ),
         NirExpr::NetworkValue(result) => lower_result_unary_value_effect(
             state,
             bindings,
@@ -5188,10 +5259,20 @@ mod tests {
             .iter()
             .find(|node| node.name == "scheduler_contract_cpu_result_capability_type")
             .unwrap();
+        let observer_role_variant_contract = yir
+            .nodes
+            .iter()
+            .find(|node| node.name == "scheduler_contract_cpu_observer_role_variant_type")
+            .unwrap();
         let summary_capability_contract = yir
             .nodes
             .iter()
             .find(|node| node.name == "scheduler_contract_cpu_summary_capability_type")
+            .unwrap();
+        let summary_class_contract = yir
+            .nodes
+            .iter()
+            .find(|node| node.name == "scheduler_contract_cpu_summary_class_type")
             .unwrap();
         let observer_source_class_contract = yir
             .nodes
@@ -5208,16 +5289,24 @@ mod tests {
             .iter()
             .find(|node| node.name == "scheduler_contract_cpu_observer_scope_class_type")
             .unwrap();
+        let observer_branch_class_contract = yir
+            .nodes
+            .iter()
+            .find(|node| node.name == "scheduler_contract_cpu_observer_branch_class_type")
+            .unwrap();
         assert_eq!(lane_contract.op.module, "cpu");
         assert_eq!(lane_capability_contract.op.module, "cpu");
         assert_eq!(bridge_capability_contract.op.module, "cpu");
         assert_eq!(clock_contract.op.module, "cpu");
         assert_eq!(result_lane_contract.op.module, "cpu");
         assert_eq!(result_capability_contract.op.module, "cpu");
+        assert_eq!(observer_role_variant_contract.op.module, "cpu");
         assert_eq!(summary_capability_contract.op.module, "cpu");
+        assert_eq!(summary_class_contract.op.module, "cpu");
         assert_eq!(observer_source_class_contract.op.module, "cpu");
         assert_eq!(observer_stage_class_contract.op.module, "cpu");
         assert_eq!(observer_scope_class_contract.op.module, "cpu");
+        assert_eq!(observer_branch_class_contract.op.module, "cpu");
         assert_eq!(
             yir.node_lanes
                 .get("scheduler_contract_cpu_lane_policy_type")
@@ -5250,7 +5339,19 @@ mod tests {
         );
         assert_eq!(
             yir.node_lanes
+                .get("scheduler_contract_cpu_observer_role_variant_type")
+                .map(String::as_str),
+            Some("contract")
+        );
+        assert_eq!(
+            yir.node_lanes
                 .get("scheduler_contract_cpu_summary_capability_type")
+                .map(String::as_str),
+            Some("contract")
+        );
+        assert_eq!(
+            yir.node_lanes
+                .get("scheduler_contract_cpu_summary_class_type")
                 .map(String::as_str),
             Some("contract")
         );
@@ -5272,6 +5373,12 @@ mod tests {
                 .map(String::as_str),
             Some("contract")
         );
+        assert_eq!(
+            yir.node_lanes
+                .get("scheduler_contract_cpu_observer_branch_class_type")
+                .map(String::as_str),
+            Some("contract")
+        );
         assert!(yir.edges.iter().any(|edge| {
             edge.from == "scheduler_contract_cpu_lane_policy_type"
                 && matches!(edge.kind, EdgeKind::Dep | EdgeKind::CrossDomainExchange)
@@ -5283,11 +5390,18 @@ mod tests {
         assert!(clock_contract.op.args[0].contains("domain=cpu.clock.host.v1"));
         assert!(result_lane_contract.op.args[0].contains("entry=main"));
         assert!(result_capability_contract.op.args[0].contains("probe=result-ready-probe"));
+        assert!(
+            observer_role_variant_contract.op.args[0].contains("send_ready=send-ready-observer")
+        );
         assert!(summary_capability_contract.op.args[0].contains("windowed=async-windowed-summary"));
+        assert!(
+            summary_class_contract.op.args[0].contains("transport_split=transport-split-summary")
+        );
         assert!(observer_source_class_contract.op.args[0].contains("summary=summary-backed"));
         assert!(observer_stage_class_contract.op.args[0].contains("payload=observer-payload-stage"));
         assert!(observer_scope_class_contract.op.args[0]
             .contains("bridge_visible=bridge-visible-scope"));
+        assert!(observer_branch_class_contract.op.args[0].contains("fallback=fallback-branch"));
     }
 
     #[test]

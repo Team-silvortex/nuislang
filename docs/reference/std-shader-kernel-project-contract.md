@@ -67,6 +67,23 @@ Current sample ladder:
   * [shader_async_windowed_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_windowed_batch_profile_demo)
   * [kernel_async_tensor_windowed_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_windowed_batch_profile_demo)
 
+Current CLI-facing summary sample hint:
+
+* `nuis scheduler-view <shader project>`
+  now also prints:
+  `scheduler_summary_samples`
+  with the shortest checked-in hint:
+  `policy=shader_async_policy_profile_demo -> shader_async_fallback_profile_demo`
+  and
+  `windowed=shader_async_batch_profile_demo -> shader_async_windowed_batch_profile_demo`
+* `nuis scheduler-view <kernel project>`
+  now also prints:
+  `scheduler_summary_samples`
+  with the shortest checked-in hint:
+  `policy=kernel_async_tensor_policy_profile_demo -> kernel_async_tensor_fallback_profile_demo`
+  and
+  `windowed=kernel_async_tensor_batch_profile_demo -> kernel_async_tensor_windowed_batch_profile_demo`
+
 Shortest practical reading order:
 
 * shader:

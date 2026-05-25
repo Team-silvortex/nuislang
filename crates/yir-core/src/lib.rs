@@ -170,6 +170,8 @@ pub enum SemanticOp {
     NetworkAccept,
     NetworkClose,
     NetworkIsConfigReady,
+    NetworkIsSendReady,
+    NetworkIsRecvReady,
     NetworkIsConnectReady,
     NetworkIsAcceptReady,
     NetworkIsClosed,
@@ -358,6 +360,8 @@ impl Operation {
             (OperationDomainFamily::Network, "accept") => SemanticOp::NetworkAccept,
             (OperationDomainFamily::Network, "close") => SemanticOp::NetworkClose,
             (OperationDomainFamily::Network, "is_config_ready") => SemanticOp::NetworkIsConfigReady,
+            (OperationDomainFamily::Network, "is_send_ready") => SemanticOp::NetworkIsSendReady,
+            (OperationDomainFamily::Network, "is_recv_ready") => SemanticOp::NetworkIsRecvReady,
             (OperationDomainFamily::Network, "is_connect_ready") => {
                 SemanticOp::NetworkIsConnectReady
             }
@@ -489,6 +493,8 @@ impl Operation {
             SemanticOp::NetworkAccept => "network.accept",
             SemanticOp::NetworkClose => "network.close",
             SemanticOp::NetworkIsConfigReady => "network.is_config_ready",
+            SemanticOp::NetworkIsSendReady => "network.is_send_ready",
+            SemanticOp::NetworkIsRecvReady => "network.is_recv_ready",
             SemanticOp::NetworkIsConnectReady => "network.is_connect_ready",
             SemanticOp::NetworkIsAcceptReady => "network.is_accept_ready",
             SemanticOp::NetworkIsClosed => "network.is_closed",
@@ -589,9 +595,10 @@ impl Operation {
             SemanticOp::KernelIsConfigReady | SemanticOp::KernelValue => {
                 Some(SemanticOp::KernelObserve)
             }
-            SemanticOp::NetworkIsConfigReady | SemanticOp::NetworkValue => {
-                Some(SemanticOp::NetworkObserve)
-            }
+            SemanticOp::NetworkIsConfigReady
+            | SemanticOp::NetworkIsSendReady
+            | SemanticOp::NetworkIsRecvReady
+            | SemanticOp::NetworkValue => Some(SemanticOp::NetworkObserve),
             SemanticOp::NetworkIsConnectReady => Some(SemanticOp::NetworkConnect),
             SemanticOp::NetworkIsAcceptReady => Some(SemanticOp::NetworkAccept),
             SemanticOp::NetworkIsClosed => Some(SemanticOp::NetworkClose),
@@ -622,6 +629,12 @@ impl Operation {
             }
             SemanticOp::NetworkIsConfigReady => {
                 Some(YirResultState::Network(NetworkFlowState::ConfigReady))
+            }
+            SemanticOp::NetworkIsSendReady => {
+                Some(YirResultState::Network(NetworkFlowState::SendReady))
+            }
+            SemanticOp::NetworkIsRecvReady => {
+                Some(YirResultState::Network(NetworkFlowState::RecvReady))
             }
             SemanticOp::NetworkIsConnectReady => {
                 Some(YirResultState::Network(NetworkFlowState::ConnectReady))
@@ -683,10 +696,25 @@ impl Operation {
             }
             SemanticOp::NetworkObserve => {
                 let direct_project_ref = source.semantic_op() == SemanticOp::CpuProjectProfileRef;
-                if !direct_project_ref {
-                    return Ok(false);
+                let host_transport_probe = source.module == "cpu"
+                    && source.instruction == "extern_call_i64"
+                    && source.args.len() >= 2
+                    && matches!(
+                        source.args[1].as_str(),
+                        "host_network_send_probe" | "host_network_recv_probe"
+                    );
+                if direct_project_ref {
+                    return Ok(state == "config_ready");
                 }
-                Ok(state == "config_ready")
+                if host_transport_probe {
+                    let expected = match source.args[1].as_str() {
+                        "host_network_send_probe" => "send_ready",
+                        "host_network_recv_probe" => "recv_ready",
+                        _ => return Ok(false),
+                    };
+                    return Ok(state == expected);
+                }
+                Ok(false)
             }
             SemanticOp::NetworkConnect => Ok(state == "connect_ready"),
             SemanticOp::NetworkAccept => Ok(state == "accept_ready"),
@@ -756,6 +784,8 @@ fn semantic_op_display_name(op: SemanticOp) -> &'static str {
         SemanticOp::NetworkAccept => ("network", "accept"),
         SemanticOp::NetworkClose => ("network", "close"),
         SemanticOp::NetworkIsConfigReady => ("network", "is_config_ready"),
+        SemanticOp::NetworkIsSendReady => ("network", "is_send_ready"),
+        SemanticOp::NetworkIsRecvReady => ("network", "is_recv_ready"),
         SemanticOp::NetworkIsConnectReady => ("network", "is_connect_ready"),
         SemanticOp::NetworkIsAcceptReady => ("network", "is_accept_ready"),
         SemanticOp::NetworkIsClosed => ("network", "is_closed"),
@@ -1766,6 +1796,8 @@ pub struct NetworkResultHandle {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NetworkFlowState {
     ConfigReady,
+    SendReady,
+    RecvReady,
     ConnectReady,
     AcceptReady,
     Closed,
@@ -2079,6 +2111,8 @@ impl fmt::Display for NetworkFlowState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::ConfigReady => f.write_str("config_ready"),
+            Self::SendReady => f.write_str("send_ready"),
+            Self::RecvReady => f.write_str("recv_ready"),
             Self::ConnectReady => f.write_str("connect_ready"),
             Self::AcceptReady => f.write_str("accept_ready"),
             Self::Closed => f.write_str("closed"),

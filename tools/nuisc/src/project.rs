@@ -5916,7 +5916,15 @@ mod tests {
         assert!(yir
             .nodes
             .iter()
+            .any(|node| node.name == "scheduler_contract_shader_observer_role_variant_type"));
+        assert!(yir
+            .nodes
+            .iter()
             .any(|node| node.name == "scheduler_contract_shader_summary_capability_type"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.name == "scheduler_contract_shader_summary_class_type"));
         assert!(yir
             .nodes
             .iter()
@@ -5929,6 +5937,10 @@ mod tests {
             .nodes
             .iter()
             .any(|node| node.name == "scheduler_contract_shader_observer_scope_class_type"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.name == "scheduler_contract_shader_observer_branch_class_type"));
     }
 
     #[test]

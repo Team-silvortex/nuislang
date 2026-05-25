@@ -677,6 +677,14 @@ fn verify_scheduler_contract_nodes(
                     value,
                 )?
             }
+            SchedulerContractKind::ObserverRoleVariant => {
+                verify_scheduler_observer_role_variant_contract_text(
+                    nodes,
+                    node.name.as_str(),
+                    contract.family,
+                    value,
+                )?
+            }
             SchedulerContractKind::SummaryCapability => {
                 verify_scheduler_summary_capability_contract_text(
                     nodes,
@@ -685,6 +693,12 @@ fn verify_scheduler_contract_nodes(
                     value,
                 )?
             }
+            SchedulerContractKind::SummaryClass => verify_scheduler_summary_class_contract_text(
+                nodes,
+                node.name.as_str(),
+                contract.family,
+                value,
+            )?,
             SchedulerContractKind::ObserverSourceClass => {
                 verify_scheduler_observer_source_class_contract_text(
                     nodes,
@@ -709,6 +723,14 @@ fn verify_scheduler_contract_nodes(
                     value,
                 )?
             }
+            SchedulerContractKind::ObserverBranchClass => {
+                verify_scheduler_observer_branch_class_contract_text(
+                    nodes,
+                    node.name.as_str(),
+                    contract.family,
+                    value,
+                )?
+            }
         }
     }
     Ok(())
@@ -722,10 +744,13 @@ enum SchedulerContractKind {
     Clock,
     ResultLane,
     ResultCapability,
+    ObserverRoleVariant,
     SummaryCapability,
+    SummaryClass,
     ObserverSourceClass,
     ObserverStageClass,
     ObserverScopeClass,
+    ObserverBranchClass,
 }
 
 struct SchedulerContract<'a> {
@@ -790,11 +815,29 @@ fn classify_scheduler_contract_node(name: &str) -> Option<SchedulerContract<'_>>
     }
     if let Some(family) = name
         .strip_prefix("scheduler_contract_")
+        .and_then(|suffix| suffix.strip_suffix("_observer_role_variant_type"))
+    {
+        return Some(SchedulerContract {
+            family,
+            kind: SchedulerContractKind::ObserverRoleVariant,
+        });
+    }
+    if let Some(family) = name
+        .strip_prefix("scheduler_contract_")
         .and_then(|suffix| suffix.strip_suffix("_summary_capability_type"))
     {
         return Some(SchedulerContract {
             family,
             kind: SchedulerContractKind::SummaryCapability,
+        });
+    }
+    if let Some(family) = name
+        .strip_prefix("scheduler_contract_")
+        .and_then(|suffix| suffix.strip_suffix("_summary_class_type"))
+    {
+        return Some(SchedulerContract {
+            family,
+            kind: SchedulerContractKind::SummaryClass,
         });
     }
     if let Some(family) = name
@@ -822,6 +865,15 @@ fn classify_scheduler_contract_node(name: &str) -> Option<SchedulerContract<'_>>
         return Some(SchedulerContract {
             family,
             kind: SchedulerContractKind::ObserverScopeClass,
+        });
+    }
+    if let Some(family) = name
+        .strip_prefix("scheduler_contract_")
+        .and_then(|suffix| suffix.strip_suffix("_observer_branch_class_type"))
+    {
+        return Some(SchedulerContract {
+            family,
+            kind: SchedulerContractKind::ObserverBranchClass,
         });
     }
     None
@@ -1185,6 +1237,51 @@ fn verify_scheduler_result_capability_contract_text(
     Ok(())
 }
 
+fn verify_scheduler_observer_role_variant_contract_text(
+    nodes: &BTreeMap<String, &Node>,
+    node_name: &str,
+    family: &str,
+    value: &str,
+) -> Result<(), String> {
+    let fields =
+        parse_semicolon_kv_contract(node_name, value, "scheduler observer role variant contract")?;
+    let declared_family = fields.get("family").ok_or_else(|| {
+        format!("scheduler contract node `{node_name}` is missing `family` field")
+    })?;
+    if *declared_family != family {
+        return Err(format!(
+            "scheduler contract node `{node_name}` declares `family={declared_family}`, expected `{family}`"
+        ));
+    }
+    let result_capability_name = format!("scheduler_contract_{family}_result_capability_type");
+    let _result_capability_node = nodes
+        .get(result_capability_name.as_str())
+        .copied()
+        .ok_or_else(|| {
+            format!(
+                "scheduler contract node `{node_name}` requires sibling result capability node `{result_capability_name}`"
+            )
+        })?;
+    for (key, expected) in [
+        ("config_ready", "config-ready-observer"),
+        ("send_ready", "send-ready-observer"),
+        ("recv_ready", "recv-ready-observer"),
+        ("connect_ready", "connect-ready-observer"),
+        ("accept_ready", "accept-ready-observer"),
+        ("closed", "closed-observer"),
+    ] {
+        let variant = fields.get(key).ok_or_else(|| {
+            format!("scheduler contract node `{node_name}` is missing `{key}` field")
+        })?;
+        if *variant != expected {
+            return Err(format!(
+                "scheduler contract node `{node_name}` declares `{key}={variant}`, expected `{expected}`"
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn verify_scheduler_summary_capability_contract_text(
     nodes: &BTreeMap<String, &Node>,
     node_name: &str,
@@ -1221,6 +1318,56 @@ fn verify_scheduler_summary_capability_contract_text(
         if *capability != expected {
             return Err(format!(
                 "scheduler contract node `{node_name}` declares `{key}={capability}`, expected `{expected}`"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn verify_scheduler_summary_class_contract_text(
+    nodes: &BTreeMap<String, &Node>,
+    node_name: &str,
+    family: &str,
+    value: &str,
+) -> Result<(), String> {
+    let fields = parse_semicolon_kv_contract(node_name, value, "scheduler summary class contract")?;
+    let declared_family = fields.get("family").ok_or_else(|| {
+        format!("scheduler contract node `{node_name}` is missing `family` field")
+    })?;
+    if *declared_family != family {
+        return Err(format!(
+            "scheduler contract node `{node_name}` declares `family={declared_family}`, expected `{family}`"
+        ));
+    }
+    let summary_capability_name = format!("scheduler_contract_{family}_summary_capability_type");
+    let _summary_capability_node = nodes
+        .get(summary_capability_name.as_str())
+        .copied()
+        .ok_or_else(|| {
+            format!(
+                "scheduler contract node `{node_name}` requires sibling summary capability node `{summary_capability_name}`"
+            )
+        })?;
+    for (key, expected) in [
+        ("transport_split", "transport-split-summary"),
+        (
+            "transport_windowed_split",
+            "transport-windowed-split-summary",
+        ),
+        (
+            "transport_session_bridge_split",
+            "transport-session-bridge-split-summary",
+        ),
+        ("control_split", "control-split-summary"),
+        ("control_windowed", "control-windowed-summary"),
+        ("control_session_bridge", "control-session-bridge-summary"),
+    ] {
+        let summary_class = fields.get(key).ok_or_else(|| {
+            format!("scheduler contract node `{node_name}` is missing `{key}` field")
+        })?;
+        if *summary_class != expected {
+            return Err(format!(
+                "scheduler contract node `{node_name}` declares `{key}={summary_class}`, expected `{expected}`"
             ));
         }
     }
@@ -1345,6 +1492,47 @@ fn verify_scheduler_observer_scope_class_contract_text(
         if *scope_class != expected {
             return Err(format!(
                 "scheduler contract node `{node_name}` declares `{key}={scope_class}`, expected `{expected}`"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn verify_scheduler_observer_branch_class_contract_text(
+    nodes: &BTreeMap<String, &Node>,
+    node_name: &str,
+    family: &str,
+    value: &str,
+) -> Result<(), String> {
+    let fields =
+        parse_semicolon_kv_contract(node_name, value, "scheduler observer branch class contract")?;
+    let declared_family = fields.get("family").ok_or_else(|| {
+        format!("scheduler contract node `{node_name}` is missing `family` field")
+    })?;
+    if *declared_family != family {
+        return Err(format!(
+            "scheduler contract node `{node_name}` declares `family={declared_family}`, expected `{family}`"
+        ));
+    }
+    let scope_class_name = format!("scheduler_contract_{family}_observer_scope_class_type");
+    let _scope_class_node = nodes.get(scope_class_name.as_str()).copied().ok_or_else(|| {
+        format!(
+            "scheduler contract node `{node_name}` requires sibling observer scope class node `{scope_class_name}`"
+        )
+    })?;
+    for (key, expected) in [
+        ("primary", "primary-branch"),
+        ("secondary", "secondary-branch"),
+        ("fallback", "fallback-branch"),
+        ("send", "send-branch"),
+        ("recv", "recv-branch"),
+    ] {
+        let branch_class = fields.get(key).ok_or_else(|| {
+            format!("scheduler contract node `{node_name}` is missing `{key}` field")
+        })?;
+        if *branch_class != expected {
+            return Err(format!(
+                "scheduler contract node `{node_name}` declares `{key}={branch_class}`, expected `{expected}`"
             ));
         }
     }
@@ -2083,15 +2271,26 @@ fn verify_result_state_nodes(module: &YirModule) -> Result<(), String> {
                 let direct_project_ref =
                     source.op.semantic_op() == SemanticOp::CpuProjectProfileRef;
                 let resolved_network_profile_slot = is_resolved_network_profile_slot(source);
-                if !direct_project_ref && !resolved_network_profile_slot {
+                let host_network_transport_probe = is_host_network_transport_probe_source(source);
+                if !direct_project_ref
+                    && !resolved_network_profile_slot
+                    && !host_network_transport_probe
+                {
                     return Err(format!(
-                        "node `{}` expects cpu.project_profile_ref input for network observe, got `{}`",
+                        "node `{}` expects cpu.project_profile_ref or host network transport probe input for network observe, got `{}`",
                         node.name,
                         source.op.full_name()
                     ));
                 }
                 let state_matches = if resolved_network_profile_slot {
                     actual == "config_ready"
+                } else if host_network_transport_probe {
+                    match source.op.args[1].as_str() {
+                        "host_network_send_probe" => actual == "send_ready",
+                        "host_network_recv_probe" => actual == "recv_ready",
+                        "host_network_close" => actual == "closed",
+                        _ => false,
+                    }
                 } else {
                     node.op.observe_state_matches_source(&source.op, actual)?
                 };
@@ -2103,6 +2302,12 @@ fn verify_result_state_nodes(module: &YirModule) -> Result<(), String> {
                 }
             }
             SemanticOp::NetworkIsConfigReady => {
+                require_observe_source(&nodes, node, SemanticOp::NetworkObserve)?;
+            }
+            SemanticOp::NetworkIsSendReady => {
+                require_observe_source(&nodes, node, SemanticOp::NetworkObserve)?;
+            }
+            SemanticOp::NetworkIsRecvReady => {
                 require_observe_source(&nodes, node, SemanticOp::NetworkObserve)?;
             }
             _ if node.op.result_source_semantic_op().is_some() => {
@@ -2125,6 +2330,16 @@ fn is_resolved_network_profile_slot(node: &Node) -> bool {
     node.name.starts_with("project_profile_network_")
         && node.op.module == "cpu"
         && node.op.instruction == "const_i64"
+}
+
+fn is_host_network_transport_probe_source(node: &Node) -> bool {
+    node.op.module == "cpu"
+        && node.op.instruction == "extern_call_i64"
+        && node.op.args.len() >= 2
+        && matches!(
+            node.op.args[1].as_str(),
+            "host_network_send_probe" | "host_network_recv_probe" | "host_network_close"
+        )
 }
 
 fn is_direct_kernel_scalar_source(node: &Node) -> bool {
@@ -3240,6 +3455,14 @@ mod tests {
                     ],
                 ),
                 node(
+                    "scheduler_contract_shader_observer_role_variant_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;config_ready=config-ready-observer;send_ready=send-ready-observer;recv_ready=recv-ready-observer;connect_ready=connect-ready-observer;accept_ready=accept-ready-observer;closed=closed-observer"#,
+                    ],
+                ),
+                node(
                     "scheduler_contract_shader_summary_capability_type",
                     "cpu0",
                     "cpu.text",
@@ -3298,6 +3521,10 @@ mod tests {
                 ),
                 dep(
                     "scheduler_contract_shader_result_capability_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_observer_role_variant_type",
                     "shader_target",
                 ),
                 dep(
@@ -3483,6 +3710,95 @@ mod tests {
     }
 
     #[test]
+    fn scheduler_contract_nodes_reject_invalid_observer_role_variant_label() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![
+                Resource {
+                    name: "cpu0".to_owned(),
+                    kind: ResourceKind::parse("cpu.arm64"),
+                },
+                Resource {
+                    name: "shader0".to_owned(),
+                    kind: ResourceKind::parse("shader.metal"),
+                },
+            ],
+            nodes: vec![
+                node(
+                    "scheduler_contract_shader_lane_policy_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;lanes=render,setup;defaults=shader.target=setup|shader.begin_pass=render"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_result_lane_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[r#"family=shader;entry=setup;probe=setup;value=setup"#],
+                ),
+                node(
+                    "scheduler_contract_shader_result_capability_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;entry=result-entry;probe=result-ready-probe;value=result-payload-value"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_observer_role_variant_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;config_ready=config-ready-observer;send_ready=send-ready-observer;recv_ready=recv-observer;connect_ready=connect-ready-observer;accept_ready=accept-ready-observer;closed=closed-observer"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_summary_capability_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;policy=async-policy-summary;batch=async-batch-summary;windowed=async-windowed-summary"#,
+                    ],
+                ),
+                node(
+                    "shader_target",
+                    "shader0",
+                    "shader.target",
+                    &["rgba8_unorm", "160", "120"],
+                ),
+            ],
+            edges: vec![
+                dep(
+                    "scheduler_contract_shader_lane_policy_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_result_lane_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_result_capability_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_observer_role_variant_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_summary_capability_type",
+                    "shader_target",
+                ),
+            ],
+            node_lanes: BTreeMap::new(),
+        };
+
+        let error = verify_module(&module).unwrap_err();
+        assert!(error.contains("expected `recv-ready-observer`"), "{error}");
+    }
+
+    #[test]
     fn scheduler_contract_nodes_reject_invalid_summary_capability_label() {
         let module = YirModule {
             version: "0.1".to_owned(),
@@ -3557,6 +3873,98 @@ mod tests {
 
         let error = verify_module(&module).unwrap_err();
         assert!(error.contains("expected `async-batch-summary`"), "{error}");
+    }
+
+    #[test]
+    fn scheduler_contract_nodes_reject_invalid_summary_class_label() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![
+                Resource {
+                    name: "cpu0".to_owned(),
+                    kind: ResourceKind::parse("cpu.arm64"),
+                },
+                Resource {
+                    name: "shader0".to_owned(),
+                    kind: ResourceKind::parse("shader.metal"),
+                },
+            ],
+            nodes: vec![
+                node(
+                    "scheduler_contract_shader_lane_policy_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;lanes=render,setup;defaults=shader.target=setup|shader.begin_pass=render"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_result_lane_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[r#"family=shader;entry=setup;probe=setup;value=setup"#],
+                ),
+                node(
+                    "scheduler_contract_shader_result_capability_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;entry=result-entry;probe=result-ready-probe;value=result-payload-value"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_summary_capability_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;policy=async-policy-summary;batch=async-batch-summary;windowed=async-windowed-summary"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_summary_class_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;transport_split=transport-summary;transport_windowed_split=transport-windowed-split-summary;transport_session_bridge_split=transport-session-bridge-split-summary;control_split=control-split-summary;control_windowed=control-windowed-summary;control_session_bridge=control-session-bridge-summary"#,
+                    ],
+                ),
+                node(
+                    "shader_target",
+                    "shader0",
+                    "shader.target",
+                    &["rgba8_unorm", "160", "120"],
+                ),
+            ],
+            edges: vec![
+                dep(
+                    "scheduler_contract_shader_lane_policy_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_result_lane_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_result_capability_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_summary_capability_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_summary_class_type",
+                    "shader_target",
+                ),
+            ],
+            node_lanes: BTreeMap::new(),
+        };
+
+        let error = verify_module(&module).unwrap_err();
+        assert!(
+            error.contains("expected `transport-split-summary`"),
+            "{error}"
+        );
     }
 
     #[test]
@@ -3819,6 +4227,14 @@ mod tests {
                     ],
                 ),
                 node(
+                    "scheduler_contract_shader_observer_branch_class_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;primary=primary-branch;secondary=secondary-branch;fallback=fallback-branch;send=send-branch;recv=recv-branch"#,
+                    ],
+                ),
+                node(
                     "shader_target",
                     "shader0",
                     "shader.target",
@@ -3854,12 +4270,141 @@ mod tests {
                     "scheduler_contract_shader_observer_scope_class_type",
                     "shader_target",
                 ),
+                dep(
+                    "scheduler_contract_shader_observer_branch_class_type",
+                    "shader_target",
+                ),
             ],
             node_lanes: BTreeMap::new(),
         };
 
         let error = verify_module(&module).unwrap_err();
         assert!(error.contains("expected `cross-lane-scope`"), "{error}");
+    }
+
+    #[test]
+    fn scheduler_contract_nodes_reject_invalid_observer_branch_class_label() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![
+                Resource {
+                    name: "cpu0".to_owned(),
+                    kind: ResourceKind::parse("cpu.arm64"),
+                },
+                Resource {
+                    name: "shader0".to_owned(),
+                    kind: ResourceKind::parse("shader.metal"),
+                },
+            ],
+            nodes: vec![
+                node(
+                    "scheduler_contract_shader_lane_policy_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;lanes=render,setup;defaults=shader.target=setup|shader.begin_pass=render"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_result_lane_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[r#"family=shader;entry=setup;probe=setup;value=setup"#],
+                ),
+                node(
+                    "scheduler_contract_shader_result_capability_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;entry=result-entry;probe=result-ready-probe;value=result-payload-value"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_summary_capability_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;policy=async-policy-summary;batch=async-batch-summary;windowed=async-windowed-summary"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_observer_source_class_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;profile=profile-backed;result=result-backed;summary=summary-backed"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_observer_stage_class_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;entry=observer-entry-stage;ready=observer-ready-stage;payload=observer-payload-stage;policy=observer-policy-stage;batch=observer-batch-stage;windowed=observer-windowed-stage"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_observer_scope_class_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;local=local-scope;cross_lane=cross-lane-scope;cross_domain=cross-domain-scope;bridge_visible=bridge-visible-scope"#,
+                    ],
+                ),
+                node(
+                    "scheduler_contract_shader_observer_branch_class_type",
+                    "cpu0",
+                    "cpu.text",
+                    &[
+                        r#"family=shader;primary=primary-branch;secondary=secondary-branch;fallback=default-branch;send=send-branch;recv=recv-branch"#,
+                    ],
+                ),
+                node(
+                    "shader_target",
+                    "shader0",
+                    "shader.target",
+                    &["rgba8_unorm", "160", "120"],
+                ),
+            ],
+            edges: vec![
+                dep(
+                    "scheduler_contract_shader_lane_policy_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_result_lane_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_result_capability_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_summary_capability_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_observer_source_class_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_observer_stage_class_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_observer_scope_class_type",
+                    "shader_target",
+                ),
+                dep(
+                    "scheduler_contract_shader_observer_branch_class_type",
+                    "shader_target",
+                ),
+            ],
+            node_lanes: BTreeMap::new(),
+        };
+
+        let error = verify_module(&module).unwrap_err();
+        assert!(error.contains("expected `fallback-branch`"), "{error}");
     }
 
     #[test]
@@ -4399,6 +4944,111 @@ mod tests {
                 dep("remote_port", "connect_result"),
                 dep("connect_timeout", "connect_result"),
                 dep("connect_result", "connect_value"),
+            ],
+            node_lanes: BTreeMap::new(),
+        };
+
+        verify_module(&module).unwrap();
+    }
+
+    #[test]
+    fn accepts_network_observe_from_host_transport_probe() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![
+                Resource {
+                    name: "cpu0".to_owned(),
+                    kind: ResourceKind::parse("cpu.arm64"),
+                },
+                Resource {
+                    name: "network0".to_owned(),
+                    kind: ResourceKind::parse("network.io"),
+                },
+            ],
+            nodes: vec![
+                node("stream_window", "cpu0", "cpu.const_i64", &["64"]),
+                node("send_window", "cpu0", "cpu.const_i64", &["32"]),
+                node("recv_window", "cpu0", "cpu.const_i64", &["32"]),
+                node("local_port", "cpu0", "cpu.const_i64", &["9000"]),
+                node("remote_port", "cpu0", "cpu.const_i64", &["443"]),
+                node(
+                    "send_probe",
+                    "cpu0",
+                    "cpu.extern_call_i64",
+                    &[
+                        "c",
+                        "host_network_send_probe",
+                        "stream_window",
+                        "send_window",
+                        "remote_port",
+                    ],
+                ),
+                node(
+                    "recv_probe",
+                    "cpu0",
+                    "cpu.extern_call_i64",
+                    &[
+                        "c",
+                        "host_network_recv_probe",
+                        "stream_window",
+                        "recv_window",
+                        "local_port",
+                    ],
+                ),
+                node(
+                    "send_seed",
+                    "network0",
+                    "network.observe",
+                    &["send_probe", "send_ready"],
+                ),
+                node(
+                    "close_probe",
+                    "cpu0",
+                    "cpu.extern_call_i64",
+                    &["c", "host_network_close", "local_port"],
+                ),
+                node(
+                    "close_seed",
+                    "network0",
+                    "network.observe",
+                    &["close_probe", "closed"],
+                ),
+                node(
+                    "recv_seed",
+                    "network0",
+                    "network.observe",
+                    &["recv_probe", "recv_ready"],
+                ),
+                node(
+                    "send_ready_probe",
+                    "network0",
+                    "network.is_send_ready",
+                    &["send_seed"],
+                ),
+                node(
+                    "recv_ready_probe",
+                    "network0",
+                    "network.is_recv_ready",
+                    &["recv_seed"],
+                ),
+                node("send_value", "network0", "network.value", &["send_seed"]),
+                node("recv_value", "network0", "network.value", &["recv_seed"]),
+            ],
+            edges: vec![
+                dep("stream_window", "send_probe"),
+                dep("send_window", "send_probe"),
+                dep("remote_port", "send_probe"),
+                dep("stream_window", "recv_probe"),
+                dep("recv_window", "recv_probe"),
+                dep("local_port", "recv_probe"),
+                dep("local_port", "close_probe"),
+                xfer("send_probe", "send_seed"),
+                xfer("close_probe", "close_seed"),
+                xfer("recv_probe", "recv_seed"),
+                dep("send_seed", "send_ready_probe"),
+                dep("recv_seed", "recv_ready_probe"),
+                dep("send_seed", "send_value"),
+                dep("recv_seed", "recv_value"),
             ],
             node_lanes: BTreeMap::new(),
         };

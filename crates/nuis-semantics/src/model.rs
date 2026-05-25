@@ -1073,6 +1073,8 @@ pub enum NirExpr {
         state: NirNetworkFlowState,
     },
     NetworkConfigReady(Box<NirExpr>),
+    NetworkSendReady(Box<NirExpr>),
+    NetworkRecvReady(Box<NirExpr>),
     NetworkValue(Box<NirExpr>),
     KernelProfileBindCoreRef {
         unit: String,
@@ -1370,7 +1372,10 @@ impl NirResultStage {
                 }
             },
             Self::Network(state) => match state {
-                NirNetworkFlowState::ConfigReady => {
+                NirNetworkFlowState::ConfigReady
+                | NirNetworkFlowState::SendReady
+                | NirNetworkFlowState::RecvReady
+                | NirNetworkFlowState::Closed => {
                     if !payload.is_integer_scalar() {
                         return Err(format!(
                             "`network_result(...)->{}` expects integer scalar payload, found `{}`",
@@ -1426,6 +1431,9 @@ pub enum NirKernelFlowState {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NirNetworkFlowState {
     ConfigReady,
+    SendReady,
+    RecvReady,
+    Closed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1506,6 +1514,9 @@ impl NirNetworkFlowState {
     pub fn render(self) -> &'static str {
         match self {
             Self::ConfigReady => "config_ready",
+            Self::SendReady => "send_ready",
+            Self::RecvReady => "recv_ready",
+            Self::Closed => "closed",
         }
     }
 
@@ -1643,6 +1654,8 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::NetworkProfileSendWindowRef { .. }
         | NirExpr::NetworkResult { .. }
         | NirExpr::NetworkConfigReady(_)
+        | NirExpr::NetworkSendReady(_)
+        | NirExpr::NetworkRecvReady(_)
         | NirExpr::NetworkValue(_)
         | NirExpr::KernelProfileBindCoreRef { .. }
         | NirExpr::KernelProfileQueueDepthRef { .. }
@@ -1829,6 +1842,8 @@ pub fn nir_expr_effect_class(expr: &NirExpr) -> NirExprEffectClass {
         | NirExpr::NetworkProfileSendWindowRef { .. }
         | NirExpr::NetworkResult { .. }
         | NirExpr::NetworkConfigReady(_)
+        | NirExpr::NetworkSendReady(_)
+        | NirExpr::NetworkRecvReady(_)
         | NirExpr::NetworkValue(_)
         | NirExpr::KernelProfileBindCoreRef { .. }
         | NirExpr::KernelProfileQueueDepthRef { .. }

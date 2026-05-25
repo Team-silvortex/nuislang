@@ -1,0 +1,54 @@
+use network NetworkUnit;
+
+mod cpu Main {
+  struct NetConnectSummary {
+    local_port_ready: i64,
+    remote_port_ready: i64,
+    connect_timeout_ready: i64,
+    connect_value: i64
+  }
+
+  fn encode_ready(result: NetworkResult<i64>) -> i64 {
+    if network_config_ready(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_value(result: NetworkResult<i64>) -> i64 {
+    if network_config_ready(result) {
+      return network_value(result);
+    }
+    return 0;
+  }
+
+  fn capture_net_connect_summary() -> NetConnectSummary {
+    let local_port: NetworkResult<i64> =
+      network_result(network_profile_local_port("NetworkUnit"));
+    let remote_port: NetworkResult<i64> =
+      network_result(network_profile_remote_port("NetworkUnit"));
+    let connect_timeout: NetworkResult<i64> =
+      network_result(network_profile_connect_timeout("NetworkUnit"));
+
+    return NetConnectSummary {
+      local_port_ready: encode_ready(local_port),
+      remote_port_ready: encode_ready(remote_port),
+      connect_timeout_ready: encode_ready(connect_timeout),
+      connect_value: encode_value(local_port)
+        + encode_value(remote_port)
+        + encode_value(connect_timeout)
+    };
+  }
+
+  fn summarize_net_connect_recipe() -> i64 {
+    let summary: NetConnectSummary = capture_net_connect_summary();
+    return summary.local_port_ready
+      + summary.remote_port_ready
+      + summary.connect_timeout_ready
+      + summary.connect_value;
+  }
+
+  fn main() {
+    print(summarize_net_connect_recipe());
+  }
+}

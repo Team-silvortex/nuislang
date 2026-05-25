@@ -1,0 +1,111 @@
+use cpu NetworkTaskAsyncShapes;
+
+mod cpu Main {
+  extern "c" fn host_network_send_probe(
+    stream_window: i64,
+    send_window: i64,
+    remote_port: i64
+  ) -> i64;
+  extern "c" fn host_network_recv_probe(
+    stream_window: i64,
+    recv_window: i64,
+    local_port: i64
+  ) -> i64;
+
+  struct NetworkTransportResultTaskBatchSummary {
+    send_completed: i64,
+    recv_completed: i64,
+    fallback_completed: i64,
+    batch_value: i64
+  }
+
+  struct NetworkTransportResultTaskWindowedBatchSummary {
+    preview_value: i64,
+    final_value: i64
+  }
+
+  async fn consume_network_result(result: NetworkResult<i64>) -> i64 {
+    if network_send_ready(result) {
+      return network_value(result) + 9;
+    }
+    if network_recv_ready(result) {
+      return network_value(result) + 9;
+    }
+    if network_config_ready(result) {
+      return network_value(result) + 9;
+    }
+    return 0;
+  }
+
+  fn capture_network_transport_result_task_batch_summary()
+    -> NetworkTransportResultTaskBatchSummary {
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+    let local_port: i64 = network_profile_local_port("NetworkUnit");
+    let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+
+    let send_probe: NetworkResult<i64> = network_result(
+      host_network_send_probe(stream_window, send_window, remote_port)
+    );
+    let recv_probe: NetworkResult<i64> = network_result(
+      host_network_recv_probe(stream_window, recv_window, local_port)
+    );
+    let fallback_probe: NetworkResult<i64> =
+      network_result(network_profile_stream_window("NetworkUnit"));
+
+    let send_task: Task<i64> = spawn(consume_network_result(send_probe));
+    let recv_task: Task<i64> = spawn(consume_network_result(recv_probe));
+    let fallback_task: Task<i64> = spawn(consume_network_result(fallback_probe));
+
+    let send_result: TaskResult<i64> = join_result(send_task);
+    let recv_result: TaskResult<i64> = join_result(recv_task);
+    let fallback_result: TaskResult<i64> = join_result(fallback_task);
+
+    return NetworkTransportResultTaskBatchSummary {
+      send_completed: NetworkTaskAsyncShapes.encode_completed(send_result),
+      recv_completed: NetworkTaskAsyncShapes.encode_completed(recv_result),
+      fallback_completed: NetworkTaskAsyncShapes.encode_completed(fallback_result),
+      batch_value: NetworkTaskAsyncShapes.async_batch_summary_value(
+        send_result,
+        recv_result,
+        fallback_result
+      )
+    };
+  }
+
+  fn capture_network_transport_result_task_windowed_batch_summary(
+    batch_summary: NetworkTransportResultTaskBatchSummary
+  ) -> NetworkTransportResultTaskWindowedBatchSummary {
+    return NetworkTransportResultTaskWindowedBatchSummary {
+      preview_value: batch_summary.send_completed
+        + batch_summary.recv_completed
+        + batch_summary.fallback_completed,
+      final_value: batch_summary.batch_value
+    };
+  }
+
+  fn main() {
+    let batch_summary: NetworkTransportResultTaskBatchSummary =
+      capture_network_transport_result_task_batch_summary();
+    let windowed_summary: NetworkTransportResultTaskWindowedBatchSummary =
+      capture_network_transport_result_task_windowed_batch_summary(batch_summary);
+    print(windowed_summary.preview_value + windowed_summary.final_value);
+  }
+}
+
+mod network NetworkUnit {
+  fn profile() {
+    const bind_core: i64 = 2;
+    const endpoint_kind: i64 = 1;
+    const local_port: i64 = 9000;
+    const remote_port: i64 = 443;
+    const connect_timeout_ms: i64 = 250;
+    const read_timeout_ms: i64 = 125;
+    const write_timeout_ms: i64 = 150;
+    const retry_budget: i64 = 3;
+    const stream_window: i64 = 64;
+    const recv_window: i64 = 32;
+    const send_window: i64 = 32;
+  }
+}

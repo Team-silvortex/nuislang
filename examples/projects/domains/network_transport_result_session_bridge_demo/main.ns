@@ -1,0 +1,188 @@
+use cpu NetworkTaskAsyncShapes;
+use network NetworkUnit;
+
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+  extern "c" fn host_monotonic_time_ns() -> i64;
+  extern "c" fn host_network_send_probe(
+    stream_window: i64,
+    send_window: i64,
+    remote_port: i64
+  ) -> i64;
+  extern "c" fn host_network_recv_probe(
+    stream_window: i64,
+    recv_window: i64,
+    local_port: i64
+  ) -> i64;
+
+  struct NetworkTransportProfileSummary {
+    timeout_budget: i64,
+    retry_budget: i64,
+    stream_window: i64,
+    recv_window: i64,
+    send_window: i64,
+    local_port: i64,
+    remote_port: i64
+  }
+
+  struct NetworkTransportResultTaskBatchSummary {
+    send_completed: i64,
+    recv_completed: i64,
+    fallback_completed: i64,
+    batch_value: i64
+  }
+
+  struct NetworkTransportResultTaskWindowedBatchSummary {
+    preview_value: i64,
+    final_value: i64
+  }
+
+  struct NetworkTransportResultSessionBridgeSummary {
+    argv_count: i64,
+    timeout_budget: i64,
+    retry_budget: i64,
+    preview_value: i64,
+    final_value: i64,
+    session_value: i64,
+    tick_ns: i64
+  }
+
+  async fn consume_network_result(result: NetworkResult<i64>) -> i64 {
+    if network_send_ready(result) {
+      return network_value(result) + 9;
+    }
+    if network_recv_ready(result) {
+      return network_value(result) + 9;
+    }
+    if network_config_ready(result) {
+      return network_value(result) + 9;
+    }
+    return 0;
+  }
+
+  async fn plan_transport_bridge_session(seed: i64) -> i64 {
+    return seed + 23;
+  }
+
+  fn capture_network_transport_profile_summary() -> NetworkTransportProfileSummary {
+    let timeout_budget: i64 = network_profile_timeout_budget("NetworkUnit");
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+    let local_port: i64 = network_profile_local_port("NetworkUnit");
+    let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+    return NetworkTransportProfileSummary {
+      timeout_budget: timeout_budget,
+      retry_budget: retry_budget,
+      stream_window: stream_window,
+      recv_window: recv_window,
+      send_window: send_window,
+      local_port: local_port,
+      remote_port: remote_port
+    };
+  }
+
+  fn capture_network_transport_result_task_batch_summary()
+    -> NetworkTransportResultTaskBatchSummary {
+    let profile: NetworkTransportProfileSummary =
+      capture_network_transport_profile_summary();
+
+    let send_probe: NetworkResult<i64> = network_result(
+      host_network_send_probe(
+        profile.stream_window,
+        profile.send_window,
+        profile.remote_port
+      )
+    );
+    let recv_probe: NetworkResult<i64> = network_result(
+      host_network_recv_probe(
+        profile.stream_window,
+        profile.recv_window,
+        profile.local_port
+      )
+    );
+    let fallback_probe: NetworkResult<i64> =
+      network_result(network_profile_stream_window("NetworkUnit"));
+
+    let send_task: Task<i64> = spawn(consume_network_result(send_probe));
+    let recv_task: Task<i64> = spawn(consume_network_result(recv_probe));
+    let fallback_task: Task<i64> = spawn(consume_network_result(fallback_probe));
+
+    let send_result: TaskResult<i64> = join_result(send_task);
+    let recv_result: TaskResult<i64> = join_result(recv_task);
+    let fallback_result: TaskResult<i64> = join_result(fallback_task);
+
+    return NetworkTransportResultTaskBatchSummary {
+      send_completed: NetworkTaskAsyncShapes.encode_completed(send_result),
+      recv_completed: NetworkTaskAsyncShapes.encode_completed(recv_result),
+      fallback_completed: NetworkTaskAsyncShapes.encode_completed(fallback_result),
+      batch_value: NetworkTaskAsyncShapes.async_batch_summary_value(
+        send_result,
+        recv_result,
+        fallback_result
+      )
+    };
+  }
+
+  fn capture_network_transport_result_task_windowed_batch_summary(
+    batch_summary: NetworkTransportResultTaskBatchSummary
+  ) -> NetworkTransportResultTaskWindowedBatchSummary {
+    return NetworkTransportResultTaskWindowedBatchSummary {
+      preview_value: batch_summary.send_completed
+        + batch_summary.recv_completed
+        + batch_summary.fallback_completed,
+      final_value: batch_summary.batch_value
+    };
+  }
+
+  fn capture_network_transport_result_session_bridge_summary()
+    -> NetworkTransportResultSessionBridgeSummary {
+    let argv_count: i64 = host_argv_count();
+    let tick_ns: i64 = host_monotonic_time_ns();
+    let profile: NetworkTransportProfileSummary =
+      capture_network_transport_profile_summary();
+    let batch_summary: NetworkTransportResultTaskBatchSummary =
+      capture_network_transport_result_task_batch_summary();
+    let windowed_summary: NetworkTransportResultTaskWindowedBatchSummary =
+      capture_network_transport_result_task_windowed_batch_summary(batch_summary);
+
+    let session_seed: i64 = argv_count
+      + profile.stream_window
+      + profile.recv_window
+      + profile.send_window
+      + profile.local_port
+      + profile.remote_port
+      + windowed_summary.preview_value
+      + windowed_summary.final_value;
+    let session_task: Task<i64> = timeout(
+      spawn(plan_transport_bridge_session(session_seed + profile.retry_budget)),
+      profile.timeout_budget
+    );
+    let session_result: TaskResult<i64> = join_result(session_task);
+
+    return NetworkTransportResultSessionBridgeSummary {
+      argv_count: argv_count,
+      timeout_budget: profile.timeout_budget,
+      retry_budget: profile.retry_budget,
+      preview_value: windowed_summary.preview_value,
+      final_value: windowed_summary.final_value,
+      session_value: NetworkTaskAsyncShapes.selected_task_value(session_result),
+      tick_ns: tick_ns
+    };
+  }
+
+  fn main() {
+    let summary: NetworkTransportResultSessionBridgeSummary =
+      capture_network_transport_result_session_bridge_summary();
+    print(
+      summary.argv_count
+        + summary.timeout_budget
+        + summary.retry_budget
+        + summary.preview_value
+        + summary.final_value
+        + summary.session_value
+        + summary.tick_ns
+    );
+  }
+}

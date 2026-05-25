@@ -86,7 +86,7 @@ Current `nustar` loading policy is:
 * each loaded `nustar` now also declares its `AST surface`, `NIR surface`, `YIR lowering`, and `part verify` responsibilities so `nuisc` can stay mod-agnostic while still seeing the full package role
 * each loaded `nustar` also declares unified entry names for those four surfaces, so future `nuisc` loading can bind through stable entry points instead of hard-coded per-mod assumptions
 * each loaded `nustar` can now also declare a small domain-owned clock contract through `clock_domain_id`, `clock_kind`, `clock_epoch_kind`, `clock_resolution`, and `clock_bridge_default`
-* lowering now also materializes the current scheduler registration into a
+  * lowering now also materializes the current scheduler registration into a
   short contract stack:
   * placement
     * `scheduler_contract_cpu_lane_policy_type`
@@ -97,18 +97,120 @@ Current `nustar` loading policy is:
   * result observation
     * `scheduler_contract_cpu_result_lane_type`
     * `scheduler_contract_cpu_result_capability_type`
+    * `scheduler_contract_cpu_observer_role_variant_type`
   * async summary observation
     * `scheduler_contract_cpu_summary_capability_type`
+    * `scheduler_contract_cpu_summary_class_type`
   * observer classification
     * `scheduler_contract_cpu_observer_source_class_type`
     * `scheduler_contract_cpu_observer_stage_class_type`
     * `scheduler_contract_cpu_observer_scope_class_type`
+    * `scheduler_contract_cpu_observer_branch_class_type`
 * `nuis registry` now also prints the short scheduler-facing reading view for
   each package:
   * `scheduler_contract_stack`
   * `scheduler_result_roles`
+  * `scheduler_sample_navigation`
+  * `scheduler_result_samples`
+  * `scheduler_transport_samples`
   * `scheduler_summary_api`
+  * `scheduler_summary_samples`
   * `scheduler_observer_classes`
+* `scheduler_sample_navigation` is the shortest CLI ordering hint for how to
+  read the sample lines that follow
+  * `official.shader`
+    * `policy -> windowed`
+  * `official.kernel`
+    * `policy -> windowed`
+  * `official.network`
+    * `result_ladder -> transport_split_ladder -> transport_summary_ladder -> summary_classes`
+* `nuis scheduler-view` now renders multi-segment sample hints as small
+  indented blocks, while `nuis registry` keeps the same content on one line
+  for compact scanning
+* `nuis project-status` and `nuis project-doctor` now also print a lightweight
+  `std net` reading hint for projects that resolve the `network` domain:
+  * `std_net_navigation`
+    * `profile_core -> result_spine -> task_spine`
+  * `std_net_samples`
+    * `profile_core`
+      * `net_endpoint_recipe`
+      * `net_endpoint_recipe_demo`
+    * `result_spine`
+      * `net_result_recipe`
+      * `net_result_bridge_recipe`
+      * `net_result_recipe_demo`
+      * `net_result_bridge_recipe_demo`
+    * `task_spine`
+      * `net_task_policy_recipe`
+      * `net_task_batch_recipe`
+      * `net_task_windowed_recipe`
+      * `net_task_windowed_bridge_recipe`
+      * `net_task_policy_recipe_demo`
+      * `net_task_batch_recipe_demo`
+      * `net_task_windowed_recipe_demo`
+      * `net_task_windowed_bridge_recipe_demo`
+* for result-facing ladders, `scheduler_result_samples` now acts as the
+  shortest CLI hint for “which checked-in samples best represent this domain's
+  current result reading order”
+  * `official.network` currently points to:
+    * `result_ladder`
+      * `network_result_profile_demo`
+      * `network_connect_result_demo`
+      * `network_accept_result_demo`
+      * `network_result_task_policy_demo`
+      * `network_result_task_batch_demo`
+      * `network_result_task_windowed_batch_demo`
+      * `network_result_session_bridge_demo`
+    * `control_ladder`
+      * `network_connect_result_demo`
+      * `network_accept_result_demo`
+      * `network_connect_accept_task_policy_demo`
+      * `network_connect_accept_task_batch_demo`
+      * `network_connect_accept_task_windowed_batch_demo`
+* for transport-facing ladders, `scheduler_transport_samples` now acts as the
+  shortest CLI hint for “which checked-in samples best represent this domain's
+  current transport runtime/split/summary progression”
+  * `official.network` currently points to:
+    * `transport_runtime`
+      * `network_host_transport_runtime_demo`
+      * `network_transport_result_demo`
+    * `transport_split_ladder`
+      * `network_transport_result_policy_split_demo`
+      * `network_transport_result_batch_split_demo`
+      * `network_transport_result_windowed_split_demo`
+      * `network_transport_result_session_bridge_split_demo`
+    * `transport_summary_ladder`
+      * `network_transport_result_task_policy_demo`
+      * `network_transport_result_task_batch_demo`
+      * `network_transport_result_task_windowed_batch_demo`
+      * `network_transport_result_session_bridge_demo`
+* for domain-owned split summaries, `scheduler_summary_samples` now acts as the
+  shortest CLI hint for “which checked-in sample ladder best represents this
+  summary class”
+  * `official.shader` currently points to:
+    * `policy`
+      * `shader_async_policy_profile_demo`
+      * `shader_async_fallback_profile_demo`
+    * `windowed`
+      * `shader_async_batch_profile_demo`
+      * `shader_async_windowed_batch_profile_demo`
+  * `official.kernel` currently points to:
+    * `policy`
+      * `kernel_async_tensor_policy_profile_demo`
+      * `kernel_async_tensor_fallback_profile_demo`
+    * `windowed`
+      * `kernel_async_tensor_batch_profile_demo`
+      * `kernel_async_tensor_windowed_batch_profile_demo`
+  * `official.network` currently points to:
+    * `transport_split`
+      * `network_transport_result_policy_split_demo`
+      * `network_transport_result_batch_split_demo`
+      * `network_transport_result_windowed_split_demo`
+      * `network_transport_result_session_bridge_split_demo`
+    * `control_split`
+      * `network_connect_accept_task_policy_demo`
+      * `network_connect_accept_task_batch_demo`
+      * `network_connect_accept_task_windowed_batch_demo`
 * `nuis loader-contract official.network` now also exposes the minimal control
   host symbol reservation through `required_metadata`, currently:
   * `host_symbol=network.connect:host_network_connect_probe`
@@ -127,6 +229,14 @@ Current `nustar` loading policy is:
   whose `dump-yir` output currently shows:
   * `cpu.extern_call_i64 ... c host_network_send_probe ...`
   * `cpu.extern_call_i64 ... c host_network_recv_probe ...`
+* the current narrow result-facing companion is
+  [network_transport_result_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_transport_result_demo),
+  which now verifies that those same host transport probes may be wrapped by:
+  * `network_result(...)`
+  * `network_config_ready(...)`
+  * `network_send_ready(...)`
+  * `network_recv_ready(...)`
+  * `network_value(...)`
 * `nuis project-status` and `nuis project-doctor` now also print the same
   scheduler-facing reading view per resolved domain requirement, plus the
   resolved clock/bridge line for that domain
@@ -189,6 +299,9 @@ Read that as:
   focused scheduler-contract view for the current input; use this when you
   want the short `placement / timing / result / summary / observer`
   projection without the rest of the project-health output
+  `--json` now emits the same view as structured data, including:
+  `scheduler_sample_navigation`, `scheduler_result_samples`,
+  `scheduler_transport_samples`, and `scheduler_summary_samples`
 * `project-lock-abi`
   optional materialization step once you want the current host-matching ABI set
   written into the manifest

@@ -56,7 +56,8 @@ impl RegisteredMod for NetworkMod {
                 }
                 Ok(InstructionSemantics::effect(node.op.args.clone()))
             }
-            "is_config_ready" | "is_connect_ready" | "is_accept_ready" | "is_closed" | "value" => {
+            "is_config_ready" | "is_send_ready" | "is_recv_ready" | "is_connect_ready"
+            | "is_accept_ready" | "is_closed" | "value" => {
                 if node.op.args.len() != 1 {
                     return Err(format!(
                         "node `{}` expects `network.{} <name> <resource> <result>`",
@@ -117,6 +118,20 @@ impl RegisteredMod for NetworkMod {
                     NetworkFlowState::ConfigReady
                 )))
             }
+            "is_send_ready" => {
+                let result = state.expect_network_result(&node.op.args[0])?;
+                Ok(Value::Bool(matches!(
+                    result.state,
+                    NetworkFlowState::SendReady
+                )))
+            }
+            "is_recv_ready" => {
+                let result = state.expect_network_result(&node.op.args[0])?;
+                Ok(Value::Bool(matches!(
+                    result.state,
+                    NetworkFlowState::RecvReady
+                )))
+            }
             "is_connect_ready" => {
                 let result = state.expect_network_result(&node.op.args[0])?;
                 Ok(Value::Bool(matches!(
@@ -163,11 +178,13 @@ fn require_network_resource(node: &Node, resource: &Resource) -> Result<(), Stri
 fn parse_network_flow_state(raw: &str) -> Result<NetworkFlowState, String> {
     match raw {
         "config_ready" => Ok(NetworkFlowState::ConfigReady),
+        "send_ready" => Ok(NetworkFlowState::SendReady),
+        "recv_ready" => Ok(NetworkFlowState::RecvReady),
         "connect_ready" => Ok(NetworkFlowState::ConnectReady),
         "accept_ready" => Ok(NetworkFlowState::AcceptReady),
         "closed" => Ok(NetworkFlowState::Closed),
         other => Err(format!(
-            "unknown network flow state `{other}`; expected config_ready, connect_ready, accept_ready, or closed"
+            "unknown network flow state `{other}`; expected config_ready, send_ready, recv_ready, connect_ready, accept_ready, or closed"
         )),
     }
 }

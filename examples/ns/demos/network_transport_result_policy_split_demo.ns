@@ -1,0 +1,161 @@
+use cpu NetworkTaskAsyncShapes;
+use network NetworkUnit;
+
+mod cpu NetworkTaskAsyncShapes {
+  fn encode_completed(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_timed_out(result: TaskResult<i64>) -> i64 {
+    if task_timed_out(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn async_policy_summary_selected_value(
+    primary_result: TaskResult<i64>,
+    secondary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    if task_completed(primary_result) {
+      return task_value(primary_result) + 100;
+    }
+    if task_completed(secondary_result) {
+      return task_value(secondary_result) + 10;
+    }
+    if task_timed_out(fallback_result) {
+      return 1;
+    }
+    return 0;
+  }
+}
+
+mod network NetworkUnit {
+  fn profile() {
+    const bind_core: i64 = 2;
+    const endpoint_kind: i64 = 1;
+    const local_port: i64 = 9000;
+    const remote_port: i64 = 443;
+    const connect_timeout_ms: i64 = 250;
+    const read_timeout_ms: i64 = 125;
+    const write_timeout_ms: i64 = 150;
+    const retry_budget: i64 = 3;
+    const stream_window: i64 = 64;
+    const recv_window: i64 = 32;
+    const send_window: i64 = 32;
+  }
+}
+
+mod cpu Main {
+  extern "c" fn host_network_send_probe(
+    stream_window: i64,
+    send_window: i64,
+    remote_port: i64
+  ) -> i64;
+  extern "c" fn host_network_recv_probe(
+    stream_window: i64,
+    recv_window: i64,
+    local_port: i64
+  ) -> i64;
+
+  struct NetworkTransportResultPolicySplitSummary {
+    send_branch_completed: i64,
+    recv_branch_completed: i64,
+    fallback_branch_timed_out: i64,
+    send_branch_selected: i64,
+    recv_branch_selected: i64,
+    final_selected_value: i64
+  }
+
+  async fn consume_send_result(result: NetworkResult<i64>) -> i64 {
+    if network_send_ready(result) {
+      return network_value(result) + 90;
+    }
+    return 0;
+  }
+
+  async fn consume_recv_result(result: NetworkResult<i64>) -> i64 {
+    if network_recv_ready(result) {
+      return network_value(result) + 9;
+    }
+    return 0;
+  }
+
+  async fn consume_fallback_result(result: NetworkResult<i64>) -> i64 {
+    if network_config_ready(result) {
+      return network_value(result) + 1;
+    }
+    return 0;
+  }
+
+  fn selected_completed_value(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return task_value(result);
+    }
+    return 0;
+  }
+
+  fn capture_network_transport_result_policy_split_summary()
+    -> NetworkTransportResultPolicySplitSummary {
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+    let local_port: i64 = network_profile_local_port("NetworkUnit");
+    let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+    let timeout_budget: i64 = network_profile_timeout_budget("NetworkUnit");
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+
+    let send_probe: NetworkResult<i64> = network_result(
+      host_network_send_probe(stream_window, send_window, remote_port)
+    );
+    let recv_probe: NetworkResult<i64> = network_result(
+      host_network_recv_probe(stream_window, recv_window, local_port)
+    );
+    let fallback_probe: NetworkResult<i64> =
+      network_result(network_profile_stream_window("NetworkUnit"));
+
+    let send_task: Task<i64> =
+      timeout(spawn(consume_send_result(send_probe)), timeout_budget);
+    let recv_task: Task<i64> =
+      timeout(spawn(consume_recv_result(recv_probe)), timeout_budget + retry_budget);
+    let fallback_task: Task<i64> =
+      timeout(spawn(consume_fallback_result(fallback_probe)), 0);
+
+    let send_result: TaskResult<i64> = join_result(send_task);
+    let recv_result: TaskResult<i64> = join_result(recv_task);
+    let fallback_result: TaskResult<i64> = join_result(fallback_task);
+
+    let send_branch_selected: i64 = selected_completed_value(send_result);
+    let recv_branch_selected: i64 = selected_completed_value(recv_result);
+
+    return NetworkTransportResultPolicySplitSummary {
+      send_branch_completed: NetworkTaskAsyncShapes.encode_completed(send_result),
+      recv_branch_completed: NetworkTaskAsyncShapes.encode_completed(recv_result),
+      fallback_branch_timed_out: NetworkTaskAsyncShapes.encode_timed_out(fallback_result),
+      send_branch_selected: send_branch_selected,
+      recv_branch_selected: recv_branch_selected,
+      final_selected_value: NetworkTaskAsyncShapes.async_policy_summary_selected_value(
+        send_result,
+        recv_result,
+        fallback_result
+      )
+    };
+  }
+
+  fn main() {
+    let summary: NetworkTransportResultPolicySplitSummary =
+      capture_network_transport_result_policy_split_summary();
+    print(
+      summary.send_branch_completed
+        + summary.recv_branch_completed
+        + summary.fallback_branch_timed_out
+        + summary.send_branch_selected
+        + summary.recv_branch_selected
+        + summary.final_selected_value
+    );
+  }
+}

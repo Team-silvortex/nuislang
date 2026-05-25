@@ -92,10 +92,13 @@ Today the important pieces are:
   * `scheduler_contract_<family>_clock_type`
   * `scheduler_contract_<family>_result_lane_type`
   * `scheduler_contract_<family>_result_capability_type`
+  * `scheduler_contract_<family>_observer_role_variant_type`
   * `scheduler_contract_<family>_summary_capability_type`
+  * `scheduler_contract_<family>_summary_class_type`
   * `scheduler_contract_<family>_observer_source_class_type`
   * `scheduler_contract_<family>_observer_stage_class_type`
   * `scheduler_contract_<family>_observer_scope_class_type`
+  * `scheduler_contract_<family>_observer_branch_class_type`
 
 Current reading rule:
 
@@ -106,11 +109,11 @@ Current reading rule:
   * timing
     * `clock`
   * result observation
-    * `result_lane -> result_capability`
+    * `result_lane -> result_capability -> observer_role_variant`
   * async summary observation
-    * `summary_capability`
+    * `summary_capability -> summary_class`
   * observer classification
-    * `observer_source_class -> observer_stage_class -> observer_scope_class`
+    * `observer_source_class -> observer_stage_class -> observer_scope_class -> observer_branch_class`
 * `nuis registry` now exposes the same stack in a shorter package-facing form:
   * `scheduler_contract_stack`
   * `scheduler_result_roles`

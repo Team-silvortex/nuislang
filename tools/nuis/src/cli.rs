@@ -76,6 +76,7 @@ pub enum CommandKind {
     },
     SchedulerView {
         input: PathBuf,
+        json: bool,
     },
     Rc {
         args: Vec<String>,
@@ -426,9 +427,26 @@ where
         "dump-yir" => Ok(CommandKind::DumpYir {
             input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
         }),
-        "scheduler-view" => Ok(CommandKind::SchedulerView {
-            input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
-        }),
+        "scheduler-view" => {
+            let mut json = false;
+            let mut input = None;
+            for arg in args.by_ref() {
+                if arg == "--json" {
+                    json = true;
+                } else if input.is_none() {
+                    input = Some(PathBuf::from(arg));
+                } else {
+                    return Err(
+                        "usage: nuis scheduler-view [--json] [input.ns|project-dir|nuis.toml]"
+                            .to_owned(),
+                    );
+                }
+            }
+            Ok(CommandKind::SchedulerView {
+                input: input.unwrap_or_else(|| PathBuf::from(".")),
+                json,
+            })
+        }
         "rc" => Ok(CommandKind::Rc {
             args: args.collect::<Vec<_>>(),
         }),

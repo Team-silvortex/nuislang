@@ -1,0 +1,104 @@
+use network NetworkUnit;
+
+mod cpu Main {
+  extern "c" fn host_network_send_probe(
+    stream_window: i64,
+    send_window: i64,
+    remote_port: i64
+  ) -> i64;
+  extern "c" fn host_network_recv_probe(
+    stream_window: i64,
+    recv_window: i64,
+    local_port: i64
+  ) -> i64;
+
+  struct NetResultSummary {
+    config_ready: i64,
+    send_ready: i64,
+    recv_ready: i64,
+    value: i64
+  }
+
+  fn encode_config_ready(result: NetworkResult<i64>) -> i64 {
+    if network_config_ready(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_send_ready(result: NetworkResult<i64>) -> i64 {
+    if network_send_ready(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_recv_ready(result: NetworkResult<i64>) -> i64 {
+    if network_recv_ready(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn config_value(result: NetworkResult<i64>) -> i64 {
+    if network_config_ready(result) {
+      return network_value(result);
+    }
+    return 0;
+  }
+
+  fn send_value(result: NetworkResult<i64>) -> i64 {
+    if network_send_ready(result) {
+      return network_value(result);
+    }
+    return 0;
+  }
+
+  fn recv_value(result: NetworkResult<i64>) -> i64 {
+    if network_recv_ready(result) {
+      return network_value(result);
+    }
+    return 0;
+  }
+
+  fn encode_value(
+    config_result: NetworkResult<i64>,
+    send_result: NetworkResult<i64>,
+    recv_result: NetworkResult<i64>
+  ) -> i64 {
+    return config_value(config_result) + send_value(send_result) + recv_value(recv_result);
+  }
+
+  fn capture_net_result_summary() -> NetResultSummary {
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+    let local_port: i64 = network_profile_local_port("NetworkUnit");
+    let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+
+    let config_result: NetworkResult<i64> =
+      network_result(network_profile_bind_core("NetworkUnit"));
+    let send_result: NetworkResult<i64> = network_result(
+      host_network_send_probe(stream_window, send_window, remote_port)
+    );
+    let recv_result: NetworkResult<i64> = network_result(
+      host_network_recv_probe(stream_window, recv_window, local_port)
+    );
+
+    return NetResultSummary {
+      config_ready: encode_config_ready(config_result),
+      send_ready: encode_send_ready(send_result),
+      recv_ready: encode_recv_ready(recv_result),
+      value: encode_value(config_result, send_result, recv_result)
+    };
+  }
+
+  fn summarize_net_result_recipe() -> i64 {
+    let summary: NetResultSummary = capture_net_result_summary();
+    return summary.config_ready + summary.send_ready + summary.recv_ready + summary.value;
+  }
+
+  fn main() {
+    print(summarize_net_result_recipe());
+  }
+}

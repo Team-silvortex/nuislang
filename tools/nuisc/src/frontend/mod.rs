@@ -11556,6 +11556,28 @@ fn lower_call_expr_with_async(
             NirResultFamily::Network,
             |expr| NirExpr::NetworkConfigReady(Box::new(expr)),
         ),
+        "network_send_ready" => lower_result_observer_call(
+            "network_send_ready",
+            args,
+            current_domain,
+            current_function_is_async,
+            bindings,
+            signatures,
+            struct_table,
+            NirResultFamily::Network,
+            |expr| NirExpr::NetworkSendReady(Box::new(expr)),
+        ),
+        "network_recv_ready" => lower_result_observer_call(
+            "network_recv_ready",
+            args,
+            current_domain,
+            current_function_is_async,
+            bindings,
+            signatures,
+            struct_table,
+            NirResultFamily::Network,
+            |expr| NirExpr::NetworkRecvReady(Box::new(expr)),
+        ),
         "network_value" => lower_result_observer_call(
             "network_value",
             args,
@@ -12883,6 +12905,15 @@ fn infer_result_stage(expr: &NirExpr) -> Option<NirResultStage> {
         | NirExpr::NetworkProfileSendWindowRef { .. } => {
             Some(NirNetworkFlowState::ConfigReady.into())
         }
+        NirExpr::CpuExternCall { callee, .. } if callee == "host_network_send_probe" => {
+            Some(NirNetworkFlowState::SendReady.into())
+        }
+        NirExpr::CpuExternCall { callee, .. } if callee == "host_network_recv_probe" => {
+            Some(NirNetworkFlowState::RecvReady.into())
+        }
+        NirExpr::CpuExternCall { callee, .. } if callee == "host_network_close" => {
+            Some(NirNetworkFlowState::Closed.into())
+        }
         NirExpr::KernelProfileBindCoreRef { .. }
         | NirExpr::KernelProfileQueueDepthRef { .. }
         | NirExpr::KernelProfileBatchLanesRef { .. }
@@ -13035,7 +13066,9 @@ fn infer_nir_expr_type(
             expr_type(value, bindings, signatures, struct_table)
                 .map(|inner| make_result_type(NirResultFamily::Network, inner))
         }
-        NirExpr::NetworkConfigReady(_) => Some(bool_type()),
+        NirExpr::NetworkConfigReady(_)
+        | NirExpr::NetworkSendReady(_)
+        | NirExpr::NetworkRecvReady(_) => Some(bool_type()),
         NirExpr::NetworkValue(result) => {
             result_payload_type(result, bindings, signatures, struct_table)
         }

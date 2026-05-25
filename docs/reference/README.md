@@ -21,6 +21,7 @@ Start in this order:
   - [std-mainline-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-mainline-layering-contract.md)
   - [std-host-io-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-host-io-layering-contract.md)
   - [std-data-window-fabric-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-data-window-fabric-layering-contract.md)
+  - [std-net-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-net-layering-contract.md)
   - [std-shader-kernel-project-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-shader-kernel-project-contract.md)
 * task-facing current contract
   - [cpu-task-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-contract.md)

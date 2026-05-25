@@ -1,0 +1,89 @@
+use network NetworkUnit;
+
+mod cpu Main {
+  struct NetTaskBatchSummary {
+    control_completed: i64,
+    tx_completed: i64,
+    rx_completed: i64,
+    batch_value: i64
+  }
+
+  struct NetTaskWindowedSummary {
+    preview_value: i64,
+    final_value: i64
+  }
+
+  async fn plan_control(seed: i64) -> i64 {
+    return seed + 29;
+  }
+
+  async fn plan_tx(seed: i64) -> i64 {
+    return seed + 17;
+  }
+
+  async fn plan_rx(seed: i64) -> i64 {
+    return seed + 13;
+  }
+
+  fn encode_completed(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_value(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return task_value(result);
+    }
+    return 0;
+  }
+
+  fn capture_net_task_batch_summary() -> NetTaskBatchSummary {
+    let bind_core: i64 = network_profile_bind_core("NetworkUnit");
+    let endpoint_kind: i64 = network_profile_endpoint_kind("NetworkUnit");
+    let timeout_budget: i64 = network_profile_timeout_budget("NetworkUnit");
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+
+    let control_task: Task<i64> = spawn(
+      plan_control(bind_core + endpoint_kind + timeout_budget + retry_budget)
+    );
+    let tx_task: Task<i64> = spawn(plan_tx(stream_window + send_window));
+    let rx_task: Task<i64> = spawn(plan_rx(stream_window + recv_window));
+
+    let control_result: TaskResult<i64> = join_result(control_task);
+    let tx_result: TaskResult<i64> = join_result(tx_task);
+    let rx_result: TaskResult<i64> = join_result(rx_task);
+
+    return NetTaskBatchSummary {
+      control_completed: encode_completed(control_result),
+      tx_completed: encode_completed(tx_result),
+      rx_completed: encode_completed(rx_result),
+      batch_value: encode_value(control_result)
+        + encode_value(tx_result)
+        + encode_value(rx_result)
+    };
+  }
+
+  fn capture_net_task_windowed_summary() -> NetTaskWindowedSummary {
+    let batch_summary: NetTaskBatchSummary = capture_net_task_batch_summary();
+    return NetTaskWindowedSummary {
+      preview_value: batch_summary.control_completed
+        + batch_summary.tx_completed
+        + batch_summary.rx_completed,
+      final_value: batch_summary.batch_value
+    };
+  }
+
+  fn summarize_net_task_windowed_recipe() -> i64 {
+    let summary: NetTaskWindowedSummary = capture_net_task_windowed_summary();
+    return summary.preview_value + summary.final_value;
+  }
+
+  fn main() {
+    print(summarize_net_task_windowed_recipe());
+  }
+}

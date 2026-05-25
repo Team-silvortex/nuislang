@@ -715,6 +715,12 @@ fn render_nir_expr(value: &NirExpr) -> String {
         NirExpr::NetworkConfigReady(result) => {
             format!("network_config_ready({})", render_nir_expr(result))
         }
+        NirExpr::NetworkSendReady(result) => {
+            format!("network_send_ready({})", render_nir_expr(result))
+        }
+        NirExpr::NetworkRecvReady(result) => {
+            format!("network_recv_ready({})", render_nir_expr(result))
+        }
         NirExpr::NetworkValue(result) => format!("network_value({})", render_nir_expr(result)),
         NirExpr::KernelProfileBindCoreRef { unit } => {
             format!("kernel_profile_bind_core(\"{}\")", escape_debug(unit))

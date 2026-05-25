@@ -26,10 +26,21 @@ when you want the canonical multi-file project route.
   [network_endpoint_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_endpoint_profile_demo.ns) ->
   [network_host_control_runtime_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_host_control_runtime_demo.ns) ->
   [network_host_transport_runtime_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_host_transport_runtime_demo.ns) ->
+  [network_transport_result_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_transport_result_demo.ns) ->
+  [network_transport_result_task_policy_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_transport_result_task_policy_demo.ns) ->
+  [network_transport_result_policy_split_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_transport_result_policy_split_demo.ns) ->
+  [network_transport_result_batch_split_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_transport_result_batch_split_demo.ns) ->
+  [network_transport_result_windowed_split_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_transport_result_windowed_split_demo.ns) ->
+  [network_transport_result_task_batch_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_transport_result_task_batch_demo.ns) ->
+  [network_transport_result_task_windowed_batch_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_transport_result_task_windowed_batch_demo.ns) ->
+  [network_transport_result_session_bridge_split_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_transport_result_session_bridge_split_demo.ns) ->
+  [network_transport_result_session_bridge_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_transport_result_session_bridge_demo.ns) ->
   result ladder ->
   session/task ladder
 * short network rule:
   `profile core -> endpoint/timing -> host control/runtime transport -> result observe -> session -> result-policy/result-batch/result-windowed/policy/fallback -> batch/windowed`
+* transport ladder rule:
+  `transport result -> transport policy -> transport split -> transport batch split -> transport windowed split -> transport batch -> transport windowed -> transport/session bridge`
 * connect/accept control rule:
   `connect result -> accept result -> connect/accept policy -> connect/accept batch -> connect/accept windowed`
 * network result ladder:

@@ -1,0 +1,206 @@
+use network NetworkUnit;
+
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+  extern "c" fn host_monotonic_time_ns() -> i64;
+  extern "c" fn host_network_send_probe(
+    stream_window: i64,
+    send_window: i64,
+    remote_port: i64
+  ) -> i64;
+  extern "c" fn host_network_recv_probe(
+    stream_window: i64,
+    recv_window: i64,
+    local_port: i64
+  ) -> i64;
+
+  struct NetResultWindowedSummary {
+    preview_value: i64,
+    final_value: i64
+  }
+
+  struct NetTaskWindowedSummary {
+    preview_value: i64,
+    final_value: i64
+  }
+
+  struct NetSessionSummary {
+    argv_count: i64,
+    bind_core: i64,
+    endpoint_kind: i64,
+    timeout_budget: i64,
+    retry_budget: i64,
+    result_preview_value: i64,
+    result_final_value: i64,
+    task_preview_value: i64,
+    task_final_value: i64,
+    session_value: i64,
+    tick_ns: i64
+  }
+
+  async fn consume_network_result(result: NetworkResult<i64>) -> i64 {
+    if network_config_ready(result) {
+      return network_value(result) + 5;
+    }
+    if network_send_ready(result) {
+      return network_value(result) + 50;
+    }
+    if network_recv_ready(result) {
+      return network_value(result) + 15;
+    }
+    return 0;
+  }
+
+  async fn plan_control(seed: i64) -> i64 {
+    return seed + 29;
+  }
+
+  async fn plan_tx(seed: i64) -> i64 {
+    return seed + 17;
+  }
+
+  async fn plan_rx(seed: i64) -> i64 {
+    return seed + 13;
+  }
+
+  async fn plan_session(seed: i64) -> i64 {
+    return seed + 31;
+  }
+
+  fn encode_completed(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_value(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return task_value(result);
+    }
+    return 0;
+  }
+
+  fn capture_net_result_windowed_summary() -> NetResultWindowedSummary {
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+    let local_port: i64 = network_profile_local_port("NetworkUnit");
+    let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+
+    let config_result: NetworkResult<i64> =
+      network_result(network_profile_bind_core("NetworkUnit"));
+    let send_result: NetworkResult<i64> = network_result(
+      host_network_send_probe(stream_window, send_window, remote_port)
+    );
+    let recv_result: NetworkResult<i64> = network_result(
+      host_network_recv_probe(stream_window, recv_window, local_port)
+    );
+
+    let config_task: Task<i64> = spawn(consume_network_result(config_result));
+    let send_task: Task<i64> = spawn(consume_network_result(send_result));
+    let recv_task: Task<i64> = spawn(consume_network_result(recv_result));
+
+    let config_joined: TaskResult<i64> = join_result(config_task);
+    let send_joined: TaskResult<i64> = join_result(send_task);
+    let recv_joined: TaskResult<i64> = join_result(recv_task);
+
+    return NetResultWindowedSummary {
+      preview_value: encode_completed(config_joined)
+        + encode_completed(send_joined)
+        + encode_completed(recv_joined),
+      final_value: encode_value(config_joined)
+        + encode_value(send_joined)
+        + encode_value(recv_joined)
+    };
+  }
+
+  fn capture_net_task_windowed_summary() -> NetTaskWindowedSummary {
+    let bind_core: i64 = network_profile_bind_core("NetworkUnit");
+    let endpoint_kind: i64 = network_profile_endpoint_kind("NetworkUnit");
+    let timeout_budget: i64 = network_profile_timeout_budget("NetworkUnit");
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+
+    let control_task: Task<i64> = spawn(
+      plan_control(bind_core + endpoint_kind + timeout_budget + retry_budget)
+    );
+    let tx_task: Task<i64> = spawn(plan_tx(stream_window + send_window));
+    let rx_task: Task<i64> = spawn(plan_rx(stream_window + recv_window));
+
+    let control_result: TaskResult<i64> = join_result(control_task);
+    let tx_result: TaskResult<i64> = join_result(tx_task);
+    let rx_result: TaskResult<i64> = join_result(rx_task);
+
+    return NetTaskWindowedSummary {
+      preview_value: encode_completed(control_result)
+        + encode_completed(tx_result)
+        + encode_completed(rx_result),
+      final_value: encode_value(control_result)
+        + encode_value(tx_result)
+        + encode_value(rx_result)
+    };
+  }
+
+  fn capture_net_session_summary() -> NetSessionSummary {
+    let argv_count: i64 = host_argv_count();
+    let bind_core: i64 = network_profile_bind_core("NetworkUnit");
+    let endpoint_kind: i64 = network_profile_endpoint_kind("NetworkUnit");
+    let timeout_budget: i64 = network_profile_timeout_budget("NetworkUnit");
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+    let result_summary: NetResultWindowedSummary = capture_net_result_windowed_summary();
+    let task_summary: NetTaskWindowedSummary = capture_net_task_windowed_summary();
+    let session_task: Task<i64> = timeout(
+      spawn(
+        plan_session(
+          argv_count
+            + bind_core
+            + endpoint_kind
+            + retry_budget
+            + result_summary.preview_value
+            + result_summary.final_value
+            + task_summary.preview_value
+            + task_summary.final_value
+        )
+      ),
+      timeout_budget
+    );
+    let session_result: TaskResult<i64> = join_result(session_task);
+    let tick_ns: i64 = host_monotonic_time_ns();
+
+    return NetSessionSummary {
+      argv_count: argv_count,
+      bind_core: bind_core,
+      endpoint_kind: endpoint_kind,
+      timeout_budget: timeout_budget,
+      retry_budget: retry_budget,
+      result_preview_value: result_summary.preview_value,
+      result_final_value: result_summary.final_value,
+      task_preview_value: task_summary.preview_value,
+      task_final_value: task_summary.final_value,
+      session_value: encode_value(session_result),
+      tick_ns: tick_ns
+    };
+  }
+
+  fn summarize_net_session_recipe() -> i64 {
+    let summary: NetSessionSummary = capture_net_session_summary();
+    return summary.argv_count
+      + summary.bind_core
+      + summary.endpoint_kind
+      + summary.timeout_budget
+      + summary.retry_budget
+      + summary.result_preview_value
+      + summary.result_final_value
+      + summary.task_preview_value
+      + summary.task_final_value
+      + summary.session_value
+      + summary.tick_ns;
+  }
+
+  fn main() {
+    print(summarize_net_session_recipe());
+  }
+}
