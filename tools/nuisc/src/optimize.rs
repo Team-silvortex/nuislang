@@ -1081,6 +1081,7 @@ fn collect_used_vars_expr(expr: &NirExpr, out: &mut BTreeSet<String>) {
         | NirExpr::DataProfileMarkerRef { .. }
         | NirExpr::NetworkProfileBindCoreRef { .. }
         | NirExpr::NetworkProfileEndpointKindRef { .. }
+        | NirExpr::NetworkProfileTransportFamilyRef { .. }
         | NirExpr::NetworkProfileLocalPortRef { .. }
         | NirExpr::NetworkProfileRemotePortRef { .. }
         | NirExpr::NetworkProfileConnectTimeoutRef { .. }
@@ -1091,6 +1092,9 @@ fn collect_used_vars_expr(expr: &NirExpr, out: &mut BTreeSet<String>) {
         | NirExpr::NetworkProfileStreamWindowRef { .. }
         | NirExpr::NetworkProfileRecvWindowRef { .. }
         | NirExpr::NetworkProfileSendWindowRef { .. }
+        | NirExpr::NetworkProfileProtocolKindRef { .. }
+        | NirExpr::NetworkProfileProtocolVersionRef { .. }
+        | NirExpr::NetworkProfileProtocolHeaderBytesRef { .. }
         | NirExpr::KernelProfileBindCoreRef { .. }
         | NirExpr::KernelProfileQueueDepthRef { .. }
         | NirExpr::KernelProfileBatchLanesRef { .. }

@@ -3232,6 +3232,9 @@ fn lower_expr(
         NirExpr::NetworkProfileEndpointKindRef { unit } => {
             lower_project_profile_ref(state, "network", unit, "endpoint_kind")
         }
+        NirExpr::NetworkProfileTransportFamilyRef { unit } => {
+            lower_project_profile_ref(state, "network", unit, "transport_family")
+        }
         NirExpr::NetworkProfileLocalPortRef { unit } => {
             lower_project_profile_ref(state, "network", unit, "local_port")
         }
@@ -3261,6 +3264,15 @@ fn lower_expr(
         }
         NirExpr::NetworkProfileSendWindowRef { unit } => {
             lower_project_profile_ref(state, "network", unit, "send_window")
+        }
+        NirExpr::NetworkProfileProtocolKindRef { unit } => {
+            lower_project_profile_ref(state, "network", unit, "protocol_kind")
+        }
+        NirExpr::NetworkProfileProtocolVersionRef { unit } => {
+            lower_project_profile_ref(state, "network", unit, "protocol_version")
+        }
+        NirExpr::NetworkProfileProtocolHeaderBytesRef { unit } => {
+            lower_project_profile_ref(state, "network", unit, "protocol_header_bytes")
         }
         NirExpr::NetworkResult { value, state: flow } => lower_result_observe_node(
             state,

@@ -1,0 +1,106 @@
+use network NetworkUnit;
+
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+  extern "c" fn host_monotonic_time_ns() -> i64;
+  extern "c" fn host_network_send_probe(
+    stream_window: i64,
+    send_window: i64,
+    remote_port: i64
+  ) -> i64;
+  extern "c" fn host_network_recv_probe(
+    stream_window: i64,
+    recv_window: i64,
+    local_port: i64
+  ) -> i64;
+
+  struct NetProtocolSessionSummary {
+    argv_count: i64,
+    timeout_budget: i64,
+    retry_budget: i64,
+    protocol_kind: i64,
+    protocol_version: i64,
+    protocol_header_bytes: i64,
+    send_ready: i64,
+    recv_ready: i64,
+    session_value: i64,
+    tick_ns: i64
+  }
+
+  fn encode_send_ready(result: NetworkResult<i64>) -> i64 {
+    if network_send_ready(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_recv_ready(result: NetworkResult<i64>) -> i64 {
+    if network_recv_ready(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_value(result: NetworkResult<i64>) -> i64 {
+    return network_value(result);
+  }
+
+  fn capture_net_protocol_session_summary() -> NetProtocolSessionSummary {
+    let argv_count: i64 = host_argv_count();
+    let timeout_budget: i64 = network_profile_timeout_budget("NetworkUnit");
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+    let protocol_kind: i64 = network_profile_protocol_kind("NetworkUnit");
+    let protocol_version: i64 = network_profile_protocol_version("NetworkUnit");
+    let protocol_header_bytes: i64 =
+      network_profile_protocol_header_bytes("NetworkUnit");
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+    let local_port: i64 = network_profile_local_port("NetworkUnit");
+    let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+    let send_result: NetworkResult<i64> = network_result(
+      host_network_send_probe(stream_window, send_window, remote_port)
+    );
+    let recv_result: NetworkResult<i64> = network_result(
+      host_network_recv_probe(stream_window, recv_window, local_port)
+    );
+    let tick_ns: i64 = host_monotonic_time_ns();
+
+    return NetProtocolSessionSummary {
+      argv_count: argv_count,
+      timeout_budget: timeout_budget,
+      retry_budget: retry_budget,
+      protocol_kind: protocol_kind,
+      protocol_version: protocol_version,
+      protocol_header_bytes: protocol_header_bytes,
+      send_ready: encode_send_ready(send_result),
+      recv_ready: encode_recv_ready(recv_result),
+      session_value: argv_count
+        + retry_budget
+        + protocol_kind
+        + protocol_version
+        + protocol_header_bytes
+        + encode_value(send_result)
+        + encode_value(recv_result),
+      tick_ns: tick_ns
+    };
+  }
+
+  fn summarize_net_protocol_session_recipe() -> i64 {
+    let summary: NetProtocolSessionSummary = capture_net_protocol_session_summary();
+    return summary.argv_count
+      + summary.timeout_budget
+      + summary.retry_budget
+      + summary.protocol_kind
+      + summary.protocol_version
+      + summary.protocol_header_bytes
+      + summary.send_ready
+      + summary.recv_ready
+      + summary.session_value
+      + summary.tick_ns;
+  }
+
+  fn main() {
+    print(summarize_net_protocol_session_recipe());
+  }
+}

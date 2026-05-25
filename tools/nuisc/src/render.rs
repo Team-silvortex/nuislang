@@ -676,6 +676,12 @@ fn render_nir_expr(value: &NirExpr) -> String {
         NirExpr::NetworkProfileEndpointKindRef { unit } => {
             format!("network_profile_endpoint_kind(\"{}\")", escape_debug(unit))
         }
+        NirExpr::NetworkProfileTransportFamilyRef { unit } => {
+            format!(
+                "network_profile_transport_family(\"{}\")",
+                escape_debug(unit)
+            )
+        }
         NirExpr::NetworkProfileLocalPortRef { unit } => {
             format!("network_profile_local_port(\"{}\")", escape_debug(unit))
         }
@@ -708,6 +714,21 @@ fn render_nir_expr(value: &NirExpr) -> String {
         }
         NirExpr::NetworkProfileSendWindowRef { unit } => {
             format!("network_profile_send_window(\"{}\")", escape_debug(unit))
+        }
+        NirExpr::NetworkProfileProtocolKindRef { unit } => {
+            format!("network_profile_protocol_kind(\"{}\")", escape_debug(unit))
+        }
+        NirExpr::NetworkProfileProtocolVersionRef { unit } => {
+            format!(
+                "network_profile_protocol_version(\"{}\")",
+                escape_debug(unit)
+            )
+        }
+        NirExpr::NetworkProfileProtocolHeaderBytesRef { unit } => {
+            format!(
+                "network_profile_protocol_header_bytes(\"{}\")",
+                escape_debug(unit)
+            )
         }
         NirExpr::NetworkResult { value, .. } => {
             format!("network_result({})", render_nir_expr(value))

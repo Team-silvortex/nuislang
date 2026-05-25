@@ -4,6 +4,11 @@ mod network NetworkUnit {
     const endpoint_kind: i64 = 1;
     const retry_budget: i64 = 3;
     const connect_timeout_ms: i64 = 250;
+    const read_timeout_ms: i64 = 125;
+    const write_timeout_ms: i64 = 150;
+    const protocol_kind: i64 = 101;
+    const protocol_version: i64 = 1;
+    const protocol_header_bytes: i64 = 24;
     const stream_window: i64 = 64;
     const recv_window: i64 = 32;
     const send_window: i64 = 32;

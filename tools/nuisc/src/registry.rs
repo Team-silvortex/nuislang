@@ -1614,6 +1614,9 @@ mod tests {
             .support_surface
             .contains(&"network.profile.stream-window.v1".to_owned()));
         assert!(manifest
+            .support_surface
+            .contains(&"network.profile.transport.v1".to_owned()));
+        assert!(manifest
             .support_profile_slots
             .contains(&"bind_core".to_owned()));
         assert!(manifest
@@ -1621,10 +1624,16 @@ mod tests {
             .contains(&"endpoint_kind".to_owned()));
         assert!(manifest
             .support_profile_slots
+            .contains(&"transport_family".to_owned()));
+        assert!(manifest
+            .support_profile_slots
             .contains(&"retry_budget".to_owned()));
         assert!(manifest
             .support_profile_slots
             .contains(&"stream_window".to_owned()));
+        assert!(manifest
+            .support_profile_slots
+            .contains(&"protocol_kind".to_owned()));
         assert!(manifest
             .default_lanes
             .contains(&"network.send=tx".to_owned()));

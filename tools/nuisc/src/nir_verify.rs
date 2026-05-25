@@ -476,6 +476,7 @@ fn verify_expr(
         | NirExpr::DataProfileMarkerRef { .. }
         | NirExpr::NetworkProfileBindCoreRef { .. }
         | NirExpr::NetworkProfileEndpointKindRef { .. }
+        | NirExpr::NetworkProfileTransportFamilyRef { .. }
         | NirExpr::NetworkProfileLocalPortRef { .. }
         | NirExpr::NetworkProfileRemotePortRef { .. }
         | NirExpr::NetworkProfileConnectTimeoutRef { .. }
@@ -486,6 +487,9 @@ fn verify_expr(
         | NirExpr::NetworkProfileStreamWindowRef { .. }
         | NirExpr::NetworkProfileRecvWindowRef { .. }
         | NirExpr::NetworkProfileSendWindowRef { .. }
+        | NirExpr::NetworkProfileProtocolKindRef { .. }
+        | NirExpr::NetworkProfileProtocolVersionRef { .. }
+        | NirExpr::NetworkProfileProtocolHeaderBytesRef { .. }
         | NirExpr::KernelProfileBindCoreRef { .. }
         | NirExpr::KernelProfileQueueDepthRef { .. }
         | NirExpr::KernelProfileBatchLanesRef { .. }
@@ -826,6 +830,7 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
         | NirExpr::DataProfileMarkerRef { .. }
         | NirExpr::NetworkProfileBindCoreRef { .. }
         | NirExpr::NetworkProfileEndpointKindRef { .. }
+        | NirExpr::NetworkProfileTransportFamilyRef { .. }
         | NirExpr::NetworkProfileLocalPortRef { .. }
         | NirExpr::NetworkProfileRemotePortRef { .. }
         | NirExpr::NetworkProfileConnectTimeoutRef { .. }
@@ -836,6 +841,9 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
         | NirExpr::NetworkProfileStreamWindowRef { .. }
         | NirExpr::NetworkProfileRecvWindowRef { .. }
         | NirExpr::NetworkProfileSendWindowRef { .. }
+        | NirExpr::NetworkProfileProtocolKindRef { .. }
+        | NirExpr::NetworkProfileProtocolVersionRef { .. }
+        | NirExpr::NetworkProfileProtocolHeaderBytesRef { .. }
         | NirExpr::KernelProfileBindCoreRef { .. }
         | NirExpr::KernelProfileQueueDepthRef { .. }
         | NirExpr::KernelProfileBatchLanesRef { .. }

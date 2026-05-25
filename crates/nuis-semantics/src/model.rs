@@ -1038,6 +1038,9 @@ pub enum NirExpr {
     NetworkProfileEndpointKindRef {
         unit: String,
     },
+    NetworkProfileTransportFamilyRef {
+        unit: String,
+    },
     NetworkProfileLocalPortRef {
         unit: String,
     },
@@ -1066,6 +1069,15 @@ pub enum NirExpr {
         unit: String,
     },
     NetworkProfileSendWindowRef {
+        unit: String,
+    },
+    NetworkProfileProtocolKindRef {
+        unit: String,
+    },
+    NetworkProfileProtocolVersionRef {
+        unit: String,
+    },
+    NetworkProfileProtocolHeaderBytesRef {
         unit: String,
     },
     NetworkResult {
@@ -1642,6 +1654,7 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::DataProfileMarkerRef { .. }
         | NirExpr::NetworkProfileBindCoreRef { .. }
         | NirExpr::NetworkProfileEndpointKindRef { .. }
+        | NirExpr::NetworkProfileTransportFamilyRef { .. }
         | NirExpr::NetworkProfileLocalPortRef { .. }
         | NirExpr::NetworkProfileRemotePortRef { .. }
         | NirExpr::NetworkProfileConnectTimeoutRef { .. }
@@ -1652,6 +1665,9 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::NetworkProfileStreamWindowRef { .. }
         | NirExpr::NetworkProfileRecvWindowRef { .. }
         | NirExpr::NetworkProfileSendWindowRef { .. }
+        | NirExpr::NetworkProfileProtocolKindRef { .. }
+        | NirExpr::NetworkProfileProtocolVersionRef { .. }
+        | NirExpr::NetworkProfileProtocolHeaderBytesRef { .. }
         | NirExpr::NetworkResult { .. }
         | NirExpr::NetworkConfigReady(_)
         | NirExpr::NetworkSendReady(_)
@@ -1830,6 +1846,7 @@ pub fn nir_expr_effect_class(expr: &NirExpr) -> NirExprEffectClass {
         | NirExpr::DataProfileMarkerRef { .. }
         | NirExpr::NetworkProfileBindCoreRef { .. }
         | NirExpr::NetworkProfileEndpointKindRef { .. }
+        | NirExpr::NetworkProfileTransportFamilyRef { .. }
         | NirExpr::NetworkProfileLocalPortRef { .. }
         | NirExpr::NetworkProfileRemotePortRef { .. }
         | NirExpr::NetworkProfileConnectTimeoutRef { .. }
@@ -1840,6 +1857,9 @@ pub fn nir_expr_effect_class(expr: &NirExpr) -> NirExprEffectClass {
         | NirExpr::NetworkProfileStreamWindowRef { .. }
         | NirExpr::NetworkProfileRecvWindowRef { .. }
         | NirExpr::NetworkProfileSendWindowRef { .. }
+        | NirExpr::NetworkProfileProtocolKindRef { .. }
+        | NirExpr::NetworkProfileProtocolVersionRef { .. }
+        | NirExpr::NetworkProfileProtocolHeaderBytesRef { .. }
         | NirExpr::NetworkResult { .. }
         | NirExpr::NetworkConfigReady(_)
         | NirExpr::NetworkSendReady(_)

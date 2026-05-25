@@ -11347,6 +11347,24 @@ fn lower_call_expr_with_async(
             };
             Ok(NirExpr::NetworkProfileEndpointKindRef { unit: unit.clone() })
         }
+        "network_profile_transport_family" => {
+            let [unit] = args else {
+                return Err("network_profile_transport_family(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "network_profile_transport_family(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err(
+                    "network_profile_transport_family(...) expects a string literal unit name"
+                        .to_owned(),
+                );
+            };
+            Ok(NirExpr::NetworkProfileTransportFamilyRef { unit: unit.clone() })
+        }
         "network_profile_local_port" => {
             let [unit] = args else {
                 return Err("network_profile_local_port(...) expects 1 arg".to_owned());
@@ -11525,6 +11543,60 @@ fn lower_call_expr_with_async(
                 );
             };
             Ok(NirExpr::NetworkProfileSendWindowRef { unit: unit.clone() })
+        }
+        "network_profile_protocol_kind" => {
+            let [unit] = args else {
+                return Err("network_profile_protocol_kind(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "network_profile_protocol_kind(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err(
+                    "network_profile_protocol_kind(...) expects a string literal unit name"
+                        .to_owned(),
+                );
+            };
+            Ok(NirExpr::NetworkProfileProtocolKindRef { unit: unit.clone() })
+        }
+        "network_profile_protocol_version" => {
+            let [unit] = args else {
+                return Err("network_profile_protocol_version(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "network_profile_protocol_version(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err(
+                    "network_profile_protocol_version(...) expects a string literal unit name"
+                        .to_owned(),
+                );
+            };
+            Ok(NirExpr::NetworkProfileProtocolVersionRef { unit: unit.clone() })
+        }
+        "network_profile_protocol_header_bytes" => {
+            let [unit] = args else {
+                return Err("network_profile_protocol_header_bytes(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "network_profile_protocol_header_bytes(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err(
+                    "network_profile_protocol_header_bytes(...) expects a string literal unit name"
+                        .to_owned(),
+                );
+            };
+            Ok(NirExpr::NetworkProfileProtocolHeaderBytesRef { unit: unit.clone() })
         }
         "network_result" => lower_result_wrapper_call(
             "network_result",
@@ -12893,6 +12965,7 @@ fn infer_result_stage(expr: &NirExpr) -> Option<NirResultStage> {
         }
         NirExpr::NetworkProfileBindCoreRef { .. }
         | NirExpr::NetworkProfileEndpointKindRef { .. }
+        | NirExpr::NetworkProfileTransportFamilyRef { .. }
         | NirExpr::NetworkProfileLocalPortRef { .. }
         | NirExpr::NetworkProfileRemotePortRef { .. }
         | NirExpr::NetworkProfileConnectTimeoutRef { .. }
@@ -12902,7 +12975,10 @@ fn infer_result_stage(expr: &NirExpr) -> Option<NirResultStage> {
         | NirExpr::NetworkProfileRetryBudgetRef { .. }
         | NirExpr::NetworkProfileStreamWindowRef { .. }
         | NirExpr::NetworkProfileRecvWindowRef { .. }
-        | NirExpr::NetworkProfileSendWindowRef { .. } => {
+        | NirExpr::NetworkProfileSendWindowRef { .. }
+        | NirExpr::NetworkProfileProtocolKindRef { .. }
+        | NirExpr::NetworkProfileProtocolVersionRef { .. }
+        | NirExpr::NetworkProfileProtocolHeaderBytesRef { .. } => {
             Some(NirNetworkFlowState::ConfigReady.into())
         }
         NirExpr::CpuExternCall { callee, .. } if callee == "host_network_send_probe" => {
@@ -13052,6 +13128,7 @@ fn infer_nir_expr_type(
         NirExpr::DataProfileMarkerRef { .. } => Some(named_type("Marker")),
         NirExpr::NetworkProfileBindCoreRef { .. } => Some(i64_type()),
         NirExpr::NetworkProfileEndpointKindRef { .. } => Some(i64_type()),
+        NirExpr::NetworkProfileTransportFamilyRef { .. } => Some(i64_type()),
         NirExpr::NetworkProfileLocalPortRef { .. } => Some(i64_type()),
         NirExpr::NetworkProfileRemotePortRef { .. } => Some(i64_type()),
         NirExpr::NetworkProfileConnectTimeoutRef { .. } => Some(i64_type()),
@@ -13062,6 +13139,9 @@ fn infer_nir_expr_type(
         NirExpr::NetworkProfileStreamWindowRef { .. } => Some(i64_type()),
         NirExpr::NetworkProfileRecvWindowRef { .. } => Some(i64_type()),
         NirExpr::NetworkProfileSendWindowRef { .. } => Some(i64_type()),
+        NirExpr::NetworkProfileProtocolKindRef { .. } => Some(i64_type()),
+        NirExpr::NetworkProfileProtocolVersionRef { .. } => Some(i64_type()),
+        NirExpr::NetworkProfileProtocolHeaderBytesRef { .. } => Some(i64_type()),
         NirExpr::NetworkResult { value, .. } => {
             expr_type(value, bindings, signatures, struct_table)
                 .map(|inner| make_result_type(NirResultFamily::Network, inner))

@@ -95,7 +95,9 @@ pub fn scheduler_summary_samples_brief(domain: &str) -> Option<&'static str> {
 
 pub fn std_net_sample_navigation_brief(domain: &str) -> Option<&'static str> {
     match domain {
-        "network" => Some("profile_core -> control_edge -> result_spine -> task_spine -> session"),
+        "network" => {
+            Some("profile_core -> transport_edge -> control_edge -> protocol_edge -> result_spine -> task_spine -> session")
+        }
         _ => None,
     }
 }
@@ -103,7 +105,7 @@ pub fn std_net_sample_navigation_brief(domain: &str) -> Option<&'static str> {
 pub fn std_net_recipe_samples_brief(domain: &str) -> Option<&'static str> {
     match domain {
         "network" => Some(
-            "profile_core=net_endpoint_recipe -> net_endpoint_recipe_demo; control_edge=net_connect_recipe -> net_listen_recipe -> net_close_recipe -> net_connect_recipe_demo -> net_listen_recipe_demo -> net_close_recipe_demo; result_spine=net_result_recipe -> net_result_bridge_recipe -> net_result_recipe_demo -> net_result_bridge_recipe_demo; task_spine=net_task_policy_recipe -> net_task_batch_recipe -> net_task_windowed_recipe -> net_task_windowed_bridge_recipe -> net_task_policy_recipe_demo -> net_task_batch_recipe_demo -> net_task_windowed_recipe_demo -> net_task_windowed_bridge_recipe_demo; session=net_control_session_recipe -> net_session_recipe -> net_control_session_recipe_demo -> net_session_recipe_demo",
+            "profile_core=net_endpoint_recipe -> net_endpoint_recipe_demo; transport_edge=net_tcp_stream_recipe -> net_udp_datagram_recipe -> net_tcp_stream_recipe_demo -> net_udp_datagram_recipe_demo; control_edge=net_connect_recipe -> net_listen_recipe -> net_close_recipe -> net_connect_recipe_demo -> net_listen_recipe_demo -> net_close_recipe_demo; protocol_edge=net_protocol_experiment_recipe -> net_line_protocol_recipe -> net_httpish_protocol_recipe -> net_httpish_request_recipe -> net_httpish_response_recipe -> net_httpish_roundtrip_recipe -> net_protocol_experiment_recipe_demo -> net_line_protocol_recipe_demo -> net_httpish_protocol_recipe_demo -> net_httpish_request_recipe_demo -> net_httpish_response_recipe_demo -> net_httpish_roundtrip_recipe_demo; result_spine=net_result_recipe -> net_result_bridge_recipe -> net_result_recipe_demo -> net_result_bridge_recipe_demo; task_spine=net_task_policy_recipe -> net_task_batch_recipe -> net_task_windowed_recipe -> net_task_windowed_bridge_recipe -> net_task_policy_recipe_demo -> net_task_batch_recipe_demo -> net_task_windowed_recipe_demo -> net_task_windowed_bridge_recipe_demo; session=net_control_session_recipe -> net_transport_session_recipe -> net_protocol_session_recipe -> net_httpish_session_recipe -> net_httpish_exchange_session_recipe -> net_session_recipe -> net_control_session_recipe_demo -> net_transport_session_recipe_demo -> net_protocol_session_recipe_demo -> net_httpish_session_recipe_demo -> net_httpish_exchange_session_recipe_demo -> net_session_recipe_demo",
         ),
         _ => None,
     }

@@ -4090,6 +4090,10 @@ fn resolve_project_profile_target_name(domain: &str, unit: &str, slot: &str) -> 
             "project_profile_network_{}_endpoint_kind",
             sanitize_ident(unit)
         ),
+        ("network", "transport_family") => format!(
+            "project_profile_network_{}_transport_family",
+            sanitize_ident(unit)
+        ),
         ("network", "local_port") => format!(
             "project_profile_network_{}_local_port",
             sanitize_ident(unit)
@@ -4124,6 +4128,18 @@ fn resolve_project_profile_target_name(domain: &str, unit: &str, slot: &str) -> 
         ),
         ("network", "send_window") => format!(
             "project_profile_network_{}_send_window",
+            sanitize_ident(unit)
+        ),
+        ("network", "protocol_kind") => format!(
+            "project_profile_network_{}_protocol_kind",
+            sanitize_ident(unit)
+        ),
+        ("network", "protocol_version") => format!(
+            "project_profile_network_{}_protocol_version",
+            sanitize_ident(unit)
+        ),
+        ("network", "protocol_header_bytes") => format!(
+            "project_profile_network_{}_protocol_header_bytes",
             sanitize_ident(unit)
         ),
         ("data", "bind_core") => format!(
@@ -5085,6 +5101,10 @@ mod tests {
             "project_profile_network_NetworkUnit_endpoint_kind"
         );
         assert_eq!(
+            resolve_project_profile_target_name("network", "NetworkUnit", "transport_family"),
+            "project_profile_network_NetworkUnit_transport_family"
+        );
+        assert_eq!(
             resolve_project_profile_target_name("network", "NetworkUnit", "connect_timeout_ms"),
             "project_profile_network_NetworkUnit_connect_timeout_ms"
         );
@@ -5103,6 +5123,18 @@ mod tests {
         assert_eq!(
             resolve_project_profile_target_name("network", "NetworkUnit", "send_window"),
             "project_profile_network_NetworkUnit_send_window"
+        );
+        assert_eq!(
+            resolve_project_profile_target_name("network", "NetworkUnit", "protocol_kind"),
+            "project_profile_network_NetworkUnit_protocol_kind"
+        );
+        assert_eq!(
+            resolve_project_profile_target_name("network", "NetworkUnit", "protocol_version"),
+            "project_profile_network_NetworkUnit_protocol_version"
+        );
+        assert_eq!(
+            resolve_project_profile_target_name("network", "NetworkUnit", "protocol_header_bytes"),
+            "project_profile_network_NetworkUnit_protocol_header_bytes"
         );
     }
 

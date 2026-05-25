@@ -2,6 +2,7 @@ mod network NetworkUnit {
   fn profile() {
     const bind_core: i64 = 2;
     const endpoint_kind: i64 = 1;
+    const transport_family: i64 = 6;
     const local_port: i64 = 9000;
     const remote_port: i64 = 443;
     const connect_timeout_ms: i64 = 250;

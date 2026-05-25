@@ -3,6 +3,7 @@ use network NetworkUnit;
 mod cpu Main {
   extern "c" fn host_argv_count() -> i64;
   extern "c" fn host_monotonic_time_ns() -> i64;
+  extern "c" fn host_network_close(handle: i64) -> i64;
   extern "c" fn host_network_send_probe(
     stream_window: i64,
     send_window: i64,
@@ -24,12 +25,37 @@ mod cpu Main {
     final_value: i64
   }
 
+  struct NetControlSessionSummary {
+    session_value: i64
+  }
+
+  struct NetTransportSessionSummary {
+    session_value: i64
+  }
+
+  struct NetProtocolSessionSummary {
+    session_value: i64
+  }
+
+  struct NetHttpishSessionSummary {
+    session_value: i64
+  }
+
+  struct NetHttpishExchangeSessionSummary {
+    session_value: i64
+  }
+
   struct NetSessionSummary {
     argv_count: i64,
     bind_core: i64,
     endpoint_kind: i64,
     timeout_budget: i64,
     retry_budget: i64,
+    control_session_value: i64,
+    transport_session_value: i64,
+    protocol_session_value: i64,
+    httpish_session_value: i64,
+    exchange_session_value: i64,
     result_preview_value: i64,
     result_final_value: i64,
     task_preview_value: i64,
@@ -79,6 +105,167 @@ mod cpu Main {
       return task_value(result);
     }
     return 0;
+  }
+
+  fn encode_result_value(result: NetworkResult<i64>) -> i64 {
+    return network_value(result);
+  }
+
+  fn capture_net_control_session_summary() -> NetControlSessionSummary {
+    let argv_count: i64 = host_argv_count();
+    let local_port_value: i64 = network_profile_local_port("NetworkUnit");
+    let local_port: NetworkResult<i64> =
+      network_result(network_profile_local_port("NetworkUnit"));
+    let remote_port: NetworkResult<i64> =
+      network_result(network_profile_remote_port("NetworkUnit"));
+    let connect_timeout: NetworkResult<i64> =
+      network_result(network_profile_connect_timeout("NetworkUnit"));
+    let read_timeout: NetworkResult<i64> =
+      network_result(network_profile_read_timeout("NetworkUnit"));
+    let write_timeout: NetworkResult<i64> =
+      network_result(network_profile_write_timeout("NetworkUnit"));
+    let close_result: NetworkResult<i64> = network_result(host_network_close(local_port_value));
+
+    return NetControlSessionSummary {
+      session_value: argv_count
+        + encode_result_value(local_port)
+        + encode_result_value(remote_port)
+        + encode_result_value(connect_timeout)
+        + encode_result_value(read_timeout)
+        + encode_result_value(write_timeout)
+        + encode_result_value(close_result)
+    };
+  }
+
+  fn capture_net_transport_session_summary() -> NetTransportSessionSummary {
+    let argv_count: i64 = host_argv_count();
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+    let local_port: i64 = network_profile_local_port("NetworkUnit");
+    let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+    let send_result: NetworkResult<i64> = network_result(
+      host_network_send_probe(stream_window, send_window, remote_port)
+    );
+    let recv_result: NetworkResult<i64> = network_result(
+      host_network_recv_probe(stream_window, recv_window, local_port)
+    );
+
+    return NetTransportSessionSummary {
+      session_value: argv_count
+        + retry_budget
+        + stream_window
+        + recv_window
+        + send_window
+        + local_port
+        + remote_port
+        + encode_result_value(send_result)
+        + encode_result_value(recv_result)
+    };
+  }
+
+  fn capture_net_protocol_session_summary() -> NetProtocolSessionSummary {
+    let argv_count: i64 = host_argv_count();
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+    let protocol_kind: i64 = network_profile_protocol_kind("NetworkUnit");
+    let protocol_version: i64 = network_profile_protocol_version("NetworkUnit");
+    let protocol_header_bytes: i64 =
+      network_profile_protocol_header_bytes("NetworkUnit");
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+    let local_port: i64 = network_profile_local_port("NetworkUnit");
+    let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+    let send_result: NetworkResult<i64> = network_result(
+      host_network_send_probe(stream_window, send_window, remote_port)
+    );
+    let recv_result: NetworkResult<i64> = network_result(
+      host_network_recv_probe(stream_window, recv_window, local_port)
+    );
+
+    return NetProtocolSessionSummary {
+      session_value: argv_count
+        + retry_budget
+        + protocol_kind
+        + protocol_version
+        + protocol_header_bytes
+        + encode_result_value(send_result)
+        + encode_result_value(recv_result)
+    };
+  }
+
+  fn capture_net_httpish_session_summary() -> NetHttpishSessionSummary {
+    let argv_count: i64 = host_argv_count();
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+    let protocol_kind: i64 = network_profile_protocol_kind("NetworkUnit");
+    let protocol_version: i64 = network_profile_protocol_version("NetworkUnit");
+    let protocol_header_bytes: i64 =
+      network_profile_protocol_header_bytes("NetworkUnit");
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+    let local_port: i64 = network_profile_local_port("NetworkUnit");
+    let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+    let send_result: NetworkResult<i64> = network_result(
+      host_network_send_probe(stream_window, send_window, remote_port)
+    );
+    let recv_result: NetworkResult<i64> = network_result(
+      host_network_recv_probe(stream_window, recv_window, local_port)
+    );
+    let request_line_bytes: i64 = protocol_header_bytes + protocol_version + 16;
+    let header_block_bytes: i64 = protocol_header_bytes + recv_window;
+    let body_window_bytes: i64 = stream_window + send_window + recv_window;
+
+    return NetHttpishSessionSummary {
+      session_value: argv_count
+        + retry_budget
+        + protocol_kind
+        + protocol_version
+        + protocol_header_bytes
+        + request_line_bytes
+        + header_block_bytes
+        + body_window_bytes
+        + encode_result_value(send_result)
+        + encode_result_value(recv_result)
+    };
+  }
+
+  fn capture_net_httpish_exchange_session_summary() -> NetHttpishExchangeSessionSummary {
+    let argv_count: i64 = host_argv_count();
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+    let protocol_kind: i64 = network_profile_protocol_kind("NetworkUnit");
+    let protocol_version: i64 = network_profile_protocol_version("NetworkUnit");
+    let protocol_header_bytes: i64 =
+      network_profile_protocol_header_bytes("NetworkUnit");
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+    let local_port: i64 = network_profile_local_port("NetworkUnit");
+    let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+    let send_result: NetworkResult<i64> = network_result(
+      host_network_send_probe(stream_window, send_window, remote_port)
+    );
+    let recv_result: NetworkResult<i64> = network_result(
+      host_network_recv_probe(stream_window, recv_window, local_port)
+    );
+    let method_code: i64 = 64 + protocol_kind;
+    let status_code: i64 = 200 + protocol_version;
+    let request_bytes: i64 =
+      protocol_header_bytes + protocol_version + 16 + protocol_header_bytes + send_window;
+    let response_bytes: i64 =
+      protocol_header_bytes + 12 + protocol_header_bytes + recv_window;
+
+    return NetHttpishExchangeSessionSummary {
+      session_value: argv_count
+        + retry_budget
+        + method_code
+        + status_code
+        + request_bytes
+        + response_bytes
+        + encode_result_value(send_result)
+        + encode_result_value(recv_result)
+    };
   }
 
   fn capture_net_result_windowed_summary() -> NetResultWindowedSummary {
@@ -150,6 +337,16 @@ mod cpu Main {
     let endpoint_kind: i64 = network_profile_endpoint_kind("NetworkUnit");
     let timeout_budget: i64 = network_profile_timeout_budget("NetworkUnit");
     let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+    let control_session_summary: NetControlSessionSummary =
+      capture_net_control_session_summary();
+    let transport_session_summary: NetTransportSessionSummary =
+      capture_net_transport_session_summary();
+    let protocol_session_summary: NetProtocolSessionSummary =
+      capture_net_protocol_session_summary();
+    let httpish_session_summary: NetHttpishSessionSummary =
+      capture_net_httpish_session_summary();
+    let exchange_session_summary: NetHttpishExchangeSessionSummary =
+      capture_net_httpish_exchange_session_summary();
     let result_summary: NetResultWindowedSummary = capture_net_result_windowed_summary();
     let task_summary: NetTaskWindowedSummary = capture_net_task_windowed_summary();
     let session_task: Task<i64> = timeout(
@@ -159,6 +356,11 @@ mod cpu Main {
             + bind_core
             + endpoint_kind
             + retry_budget
+            + control_session_summary.session_value
+            + transport_session_summary.session_value
+            + protocol_session_summary.session_value
+            + httpish_session_summary.session_value
+            + exchange_session_summary.session_value
             + result_summary.preview_value
             + result_summary.final_value
             + task_summary.preview_value
@@ -176,6 +378,11 @@ mod cpu Main {
       endpoint_kind: endpoint_kind,
       timeout_budget: timeout_budget,
       retry_budget: retry_budget,
+      control_session_value: control_session_summary.session_value,
+      transport_session_value: transport_session_summary.session_value,
+      protocol_session_value: protocol_session_summary.session_value,
+      httpish_session_value: httpish_session_summary.session_value,
+      exchange_session_value: exchange_session_summary.session_value,
       result_preview_value: result_summary.preview_value,
       result_final_value: result_summary.final_value,
       task_preview_value: task_summary.preview_value,
@@ -192,6 +399,11 @@ mod cpu Main {
       + summary.endpoint_kind
       + summary.timeout_budget
       + summary.retry_budget
+      + summary.control_session_value
+      + summary.transport_session_value
+      + summary.protocol_session_value
+      + summary.httpish_session_value
+      + summary.exchange_session_value
       + summary.result_preview_value
       + summary.result_final_value
       + summary.task_preview_value

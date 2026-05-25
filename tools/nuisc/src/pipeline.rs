@@ -249,6 +249,7 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         | NirExpr::DataProfileMarkerRef { .. }
         | NirExpr::NetworkProfileBindCoreRef { .. }
         | NirExpr::NetworkProfileEndpointKindRef { .. }
+        | NirExpr::NetworkProfileTransportFamilyRef { .. }
         | NirExpr::NetworkProfileLocalPortRef { .. }
         | NirExpr::NetworkProfileRemotePortRef { .. }
         | NirExpr::NetworkProfileConnectTimeoutRef { .. }
@@ -259,6 +260,9 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         | NirExpr::NetworkProfileStreamWindowRef { .. }
         | NirExpr::NetworkProfileRecvWindowRef { .. }
         | NirExpr::NetworkProfileSendWindowRef { .. }
+        | NirExpr::NetworkProfileProtocolKindRef { .. }
+        | NirExpr::NetworkProfileProtocolVersionRef { .. }
+        | NirExpr::NetworkProfileProtocolHeaderBytesRef { .. }
         | NirExpr::KernelProfileBindCoreRef { .. }
         | NirExpr::KernelProfileQueueDepthRef { .. }
         | NirExpr::KernelProfileBatchLanesRef { .. }
