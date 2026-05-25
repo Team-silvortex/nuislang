@@ -59,8 +59,8 @@ Current reference commands:
 * `cache-status [--all] [--verbose-cache] [--json] [input]`
 * `clean-cache [--all] [--json] [input]`
 * `cache-prune [--all] [--keep N] [--json] [input]`
-* `project-status <input.ns|project-dir|nuis.toml>`
-* `project-doctor <project-dir|nuis.toml>`
+* `project-status [--json] <input.ns|project-dir|nuis.toml>`
+* `project-doctor [--json] <project-dir|nuis.toml>`
 * `project-lock-abi <project-dir|nuis.toml>`
 * `scheduler-view <input.ns|project-dir|nuis.toml>`
 * `release-check <input> <output-dir>`
@@ -323,9 +323,12 @@ Read that as:
   `clock_policy` currently accepts only `bridge`, and only together with `clock_domain="global"` plus `timeout_ms=...`, so the front-door runner bridge remains explicit rather than implicit.
 * `build`
   artifact generation
+  current project builds now also emit `nuis.project.plan.txt`
   current project builds now also emit `nuis.project.organization.txt`
   and `nuis.project.exchange.txt` alongside the existing project
   manifest/modules/links/ABI indexes
+  `verify-build-manifest` now also checks the referenced `plan_index`
+  when the build manifest includes one
 
 For framework/package-aware projects, the current companion `galaxy` flow is:
 
@@ -356,6 +359,28 @@ as lightweight front-door hints:
 * `project_management_galaxy`
   * printed when the project already has `galaxy.toml` or declared galaxy deps
   * `nuis galaxy init <project-dir> -> nuis galaxy check <project-dir> -> nuis galaxy lock-deps <project-dir> -> nuis galaxy sync-deps <project-dir> -> nuis project-doctor <project-dir>`
+
+Current project-aware front doors now also share a normalized compiler-side
+plan summary:
+
+* `project_plan`
+  * printed by `project-status`, `project-doctor`, `scheduler-view`,
+    `project-lock-abi`, `galaxy check`, `galaxy doctor`,
+    `galaxy lock-deps`, `galaxy verify-lock`, and `galaxy sync-deps`
+  * current shape:
+    `entry=<entry> domains=<...> exchanges=<n> abi_mode=<...>`
+  * the emitted `nuis.project.plan.txt` now also records:
+    `dependencies`, `synthetic_input_kind/synthetic_input`, and `output_intents`
+  * dependency rows now also carry a category; current project-managed
+    package deps land in `package-registry`
+  * `scheduler-view --json <project-dir>` now also emits the project-side
+    classification fields directly:
+    `project_plan_dependency_categories`,
+    `project_plan_output_categories`,
+    `project_exchange_route_classes`
+  * `project-status --json <project-dir>` and
+    `project-doctor --json <project-dir>` now also emit the same project-plan
+    structure fields directly, plus their current workbench state
 
 Typical commands:
 

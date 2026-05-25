@@ -27,6 +27,7 @@ pub struct BuildManifestProjectInfo {
     pub plan_summary: Option<String>,
     pub effective_input: Option<String>,
     pub manifest_copy_path: Option<String>,
+    pub plan_index_path: Option<String>,
     pub organization_index_path: Option<String>,
     pub exchange_index_path: Option<String>,
     pub modules_index_path: Option<String>,
@@ -458,6 +459,9 @@ pub fn write_build_manifest(
                 escape_toml_string(value)
             ));
         }
+        if let Some(value) = &project.plan_index_path {
+            out.push_str(&format!("plan_index = \"{}\"\n", escape_toml_string(value)));
+        }
         if let Some(value) = &project.organization_index_path {
             out.push_str(&format!(
                 "organization_index = \"{}\"\n",
@@ -612,7 +616,9 @@ pub struct BuildManifestVerifyReport {
     pub compile_cache_status: Option<String>,
     pub compile_cache_key: Option<String>,
     pub compile_cache_root: Option<String>,
+    pub project_plan_index: Option<String>,
     pub artifacts_checked: usize,
+    pub project_metadata_checked: usize,
 }
 
 pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, String> {
@@ -642,6 +648,8 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
     let compile_cache_status = parse_optional_toml_string(&source, "compile_cache_status");
     let compile_cache_key = parse_optional_toml_string(&source, "compile_cache_key");
     let compile_cache_root = parse_optional_toml_string(&source, "compile_cache_root");
+    let project_plan_index = parse_optional_toml_string(&source, "plan_index");
+    let project_plan_summary = parse_optional_toml_string(&source, "plan_summary");
 
     let artifacts = parse_artifact_hash_blocks(&source, path)?;
     if artifacts.is_empty() {
@@ -672,6 +680,27 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
         }
     }
 
+    let mut project_metadata_checked = 0usize;
+    if let Some(plan_index) = &project_plan_index {
+        let plan_source = fs::read_to_string(plan_index).map_err(|error| {
+            format!(
+                "failed to read project plan index `{}` referenced by `{}`: {error}",
+                plan_index,
+                path.display()
+            )
+        })?;
+        if let Some(summary) = &project_plan_summary {
+            let expected = format!("summary {summary}");
+            if !plan_source.lines().any(|line| line.trim() == expected) {
+                return Err(format!(
+                    "project plan index `{}` summary mismatch: expected line `{}`",
+                    plan_index, expected
+                ));
+            }
+        }
+        project_metadata_checked += 1;
+    }
+
     Ok(BuildManifestVerifyReport {
         schema,
         input,
@@ -687,7 +716,9 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
         compile_cache_status,
         compile_cache_key,
         compile_cache_root,
+        project_plan_index,
         artifacts_checked: artifacts.len(),
+        project_metadata_checked,
     })
 }
 
@@ -2536,6 +2567,7 @@ mod tests {
                     plan_summary: None,
                     effective_input: None,
                     manifest_copy_path: None,
+                    plan_index_path: None,
                     organization_index_path: None,
                     exchange_index_path: None,
                     modules_index_path: None,
@@ -2555,6 +2587,7 @@ mod tests {
         assert_eq!(report.cpu_target_calling_abi, cpu_target.calling_abi);
         assert_eq!(report.cpu_target_clang, cpu_target.clang_target);
         assert!(report.cpu_target_cross);
+        assert_eq!(report.project_metadata_checked, 0);
     }
 
     #[test]

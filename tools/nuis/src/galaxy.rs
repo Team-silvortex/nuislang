@@ -58,6 +58,7 @@ pub struct CheckedGalaxy {
     pub manifest_path: PathBuf,
     pub manifest: GalaxyManifest,
     pub project: nuisc::project::LoadedProject,
+    pub project_plan_summary: String,
     pub include_files: Vec<PathBuf>,
     pub abi_entries: Vec<(String, String)>,
 }
@@ -125,24 +126,32 @@ pub struct GalaxyLockEntry {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WroteGalaxyLock {
+    pub project_root: PathBuf,
+    pub project_plan_summary: String,
     pub path: PathBuf,
     pub entries: Vec<GalaxyLockEntry>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InstalledProjectDeps {
+    pub project_root: PathBuf,
+    pub project_plan_summary: String,
     pub installed: Vec<InstalledGalaxyDependency>,
     pub lock: WroteGalaxyLock,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VerifiedGalaxyLock {
+    pub project_root: PathBuf,
+    pub project_plan_summary: String,
     pub path: PathBuf,
     pub entries: Vec<GalaxyLockEntry>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SyncedProjectDeps {
+    pub project_root: PathBuf,
+    pub project_plan_summary: String,
     pub root: PathBuf,
     pub entries: Vec<GalaxyLockEntry>,
 }
@@ -159,6 +168,7 @@ pub struct GalaxyDoctorDependency {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GalaxyDoctorReport {
     pub project_root: PathBuf,
+    pub project_plan_summary: String,
     pub deps_root: PathBuf,
     pub local_registry_root: PathBuf,
     pub lock_path: PathBuf,
@@ -227,6 +237,7 @@ pub fn check(input: &Path) -> Result<CheckedGalaxy, String> {
     let project_path = root.join(&manifest.project);
     let project = nuisc::project::load_project(&project_path)?;
     let plan = nuisc::project::build_project_compilation_plan(&project)?;
+    let project_plan_summary = nuisc::project::describe_project_compilation_plan(&plan);
     let abi = plan.abi_resolution.clone();
 
     let include_files = manifest
@@ -368,6 +379,7 @@ pub fn check(input: &Path) -> Result<CheckedGalaxy, String> {
         manifest_path,
         manifest,
         project,
+        project_plan_summary,
         include_files,
         abi_entries: abi
             .requirements
@@ -583,6 +595,8 @@ pub fn remove_local(name: &str, version: Option<&str>) -> Result<RemovedLocalGal
 pub fn install_project_deps(input: &Path) -> Result<InstalledProjectDeps, String> {
     ensure_local_layout()?;
     let project = nuisc::project::load_project(input)?;
+    let plan = nuisc::project::build_project_compilation_plan(&project)?;
+    let project_plan_summary = nuisc::project::describe_project_compilation_plan(&plan);
     let deps_root = project.root.join(".nuis").join("deps").join("galaxy");
     fs::create_dir_all(&deps_root)
         .map_err(|error| format!("failed to create `{}`: {error}", deps_root.display()))?;
@@ -603,13 +617,19 @@ pub fn install_project_deps(input: &Path) -> Result<InstalledProjectDeps, String
             bundle_fnv1a64: resolved.bundle_fnv1a64.unwrap_or_default(),
         });
     }
-    let lock = write_project_lock_from_installed(&project.root, &installed)?;
-    Ok(InstalledProjectDeps { installed, lock })
+    let lock = write_project_lock_from_installed(&project.root, &project_plan_summary, &installed)?;
+    Ok(InstalledProjectDeps {
+        project_root: project.root,
+        project_plan_summary,
+        installed,
+        lock,
+    })
 }
 
 pub fn lock_project_deps(input: &Path) -> Result<WroteGalaxyLock, String> {
     ensure_local_layout()?;
     let project = nuisc::project::load_project(input)?;
+    let plan = nuisc::project::build_project_compilation_plan(&project)?;
     let mut entries = Vec::new();
     for dependency in &project.manifest.galaxy_dependencies {
         let resolved = select_local_entry(&dependency.name, Some(&dependency.version))?;
@@ -622,12 +642,17 @@ pub fn lock_project_deps(input: &Path) -> Result<WroteGalaxyLock, String> {
             bundle_fnv1a64: verified.bundle_fnv1a64,
         });
     }
-    write_project_lock(&project.root, &entries)
+    write_project_lock(
+        &project.root,
+        &nuisc::project::describe_project_compilation_plan(&plan),
+        &entries,
+    )
 }
 
 pub fn verify_project_lock(input: &Path) -> Result<VerifiedGalaxyLock, String> {
     ensure_local_layout()?;
     let project = nuisc::project::load_project(input)?;
+    let plan = nuisc::project::build_project_compilation_plan(&project)?;
     let path = project.root.join("nuis.galaxy.lock");
     let source = fs::read_to_string(&path)
         .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
@@ -671,14 +696,22 @@ pub fn verify_project_lock(input: &Path) -> Result<VerifiedGalaxyLock, String> {
             ));
         }
     }
-    Ok(VerifiedGalaxyLock { path, entries })
+    Ok(VerifiedGalaxyLock {
+        project_root: project.root,
+        project_plan_summary: nuisc::project::describe_project_compilation_plan(&plan),
+        path,
+        entries,
+    })
 }
 
 pub fn sync_project_deps(input: &Path) -> Result<SyncedProjectDeps, String> {
     ensure_local_layout()?;
-    let project = nuisc::project::load_project(input)?;
     let verified = verify_project_lock(input)?;
-    let deps_root = project.root.join(".nuis").join("deps").join("galaxy");
+    let deps_root = verified
+        .project_root
+        .join(".nuis")
+        .join("deps")
+        .join("galaxy");
 
     if deps_root.exists() {
         fs::remove_dir_all(&deps_root)
@@ -701,6 +734,8 @@ pub fn sync_project_deps(input: &Path) -> Result<SyncedProjectDeps, String> {
     }
 
     Ok(SyncedProjectDeps {
+        project_root: verified.project_root,
+        project_plan_summary: verified.project_plan_summary,
         root: deps_root,
         entries: verified.entries,
     })
@@ -709,6 +744,7 @@ pub fn sync_project_deps(input: &Path) -> Result<SyncedProjectDeps, String> {
 pub fn doctor_project(input: &Path) -> Result<GalaxyDoctorReport, String> {
     ensure_local_layout()?;
     let project = nuisc::project::load_project(input)?;
+    let plan = nuisc::project::build_project_compilation_plan(&project)?;
     let deps_root = project.root.join(".nuis").join("deps").join("galaxy");
     let lock_path = project.root.join("nuis.galaxy.lock");
     let local_entries = list_local()?;
@@ -749,6 +785,7 @@ pub fn doctor_project(input: &Path) -> Result<GalaxyDoctorReport, String> {
 
     Ok(GalaxyDoctorReport {
         project_root: project.root,
+        project_plan_summary: nuisc::project::describe_project_compilation_plan(&plan),
         deps_root,
         local_registry_root: local_root(),
         lock_path,
@@ -1610,6 +1647,7 @@ fn fnv1a64_hex(bytes: &[u8]) -> String {
 
 fn write_project_lock_from_installed(
     project_root: &Path,
+    project_plan_summary: &str,
     installed: &[InstalledGalaxyDependency],
 ) -> Result<WroteGalaxyLock, String> {
     let entries = installed
@@ -1622,11 +1660,12 @@ fn write_project_lock_from_installed(
             bundle_fnv1a64: item.bundle_fnv1a64.clone(),
         })
         .collect::<Vec<_>>();
-    write_project_lock(project_root, &entries)
+    write_project_lock(project_root, project_plan_summary, &entries)
 }
 
 fn write_project_lock(
     project_root: &Path,
+    project_plan_summary: &str,
     entries: &[GalaxyLockEntry],
 ) -> Result<WroteGalaxyLock, String> {
     let path = project_root.join("nuis.galaxy.lock");
@@ -1655,6 +1694,8 @@ fn write_project_lock(
     fs::write(&path, source)
         .map_err(|error| format!("failed to write `{}`: {error}", path.display()))?;
     Ok(WroteGalaxyLock {
+        project_root: project_root.to_path_buf(),
+        project_plan_summary: project_plan_summary.to_owned(),
         path,
         entries: sorted,
     })

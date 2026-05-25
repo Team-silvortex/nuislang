@@ -61,6 +61,7 @@ pub struct LoadedProject {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProjectBuildMetadata {
     pub manifest_copy_path: String,
+    pub plan_index_path: String,
     pub organization_index_path: String,
     pub exchange_index_path: String,
     pub modules_index_path: String,
@@ -103,6 +104,7 @@ pub struct ProjectExchangeRoute {
     pub to: String,
     pub via: Option<String>,
     pub mode: String,
+    pub class: String,
     pub domains: Vec<String>,
 }
 
@@ -113,12 +115,36 @@ pub struct ProjectAbiResolution {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectCompilationDependency {
+    pub category: String,
+    pub name: String,
+    pub version: String,
+    pub source: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectSyntheticInput {
+    pub kind: String,
+    pub path: PathBuf,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectOutputIntent {
+    pub category: String,
+    pub kind: String,
+    pub path_hint: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProjectCompilationPlan {
     pub project_name: String,
     pub entry: String,
     pub organization: ProjectOrganization,
     pub exchanges: ProjectExchangeOrganization,
     pub abi_resolution: ProjectAbiResolution,
+    pub dependencies: Vec<ProjectCompilationDependency>,
+    pub synthetic_input: ProjectSyntheticInput,
+    pub output_intents: Vec<ProjectOutputIntent>,
     pub effective_input_path: PathBuf,
 }
 
@@ -263,12 +289,77 @@ pub fn build_project_compilation_plan(
     let exchanges = organize_project_exchanges(project);
     let abi_resolution = resolve_project_abi(project)?;
     let effective_input_path = project.root.join(format!("{}.ns", project.manifest.name));
+    let dependencies = project
+        .manifest
+        .galaxy_dependencies
+        .iter()
+        .map(|item| ProjectCompilationDependency {
+            category: "package-registry".to_owned(),
+            name: item.name.clone(),
+            version: item.version.clone(),
+            source: "galaxy-manifest".to_owned(),
+        })
+        .collect::<Vec<_>>();
+    let synthetic_input = ProjectSyntheticInput {
+        kind: "project-name-entry".to_owned(),
+        path: effective_input_path.clone(),
+    };
+    let output_intents = vec![
+        ProjectOutputIntent {
+            category: "core-artifacts".to_owned(),
+            kind: "build-manifest".to_owned(),
+            path_hint: "nuis.build.manifest.toml".to_owned(),
+        },
+        ProjectOutputIntent {
+            category: "project-metadata".to_owned(),
+            kind: "project-manifest-copy".to_owned(),
+            path_hint: "nuis.project.toml".to_owned(),
+        },
+        ProjectOutputIntent {
+            category: "project-metadata".to_owned(),
+            kind: "project-plan-index".to_owned(),
+            path_hint: "nuis.project.plan.txt".to_owned(),
+        },
+        ProjectOutputIntent {
+            category: "project-metadata".to_owned(),
+            kind: "project-organization-index".to_owned(),
+            path_hint: "nuis.project.organization.txt".to_owned(),
+        },
+        ProjectOutputIntent {
+            category: "project-metadata".to_owned(),
+            kind: "project-exchange-index".to_owned(),
+            path_hint: "nuis.project.exchange.txt".to_owned(),
+        },
+        ProjectOutputIntent {
+            category: "project-metadata".to_owned(),
+            kind: "project-modules-index".to_owned(),
+            path_hint: "nuis.project.modules.txt".to_owned(),
+        },
+        ProjectOutputIntent {
+            category: "project-metadata".to_owned(),
+            kind: "project-links-index".to_owned(),
+            path_hint: "nuis.project.links.txt".to_owned(),
+        },
+        ProjectOutputIntent {
+            category: "project-metadata".to_owned(),
+            kind: "project-host-ffi-index".to_owned(),
+            path_hint: "nuis.project.host_ffi.txt".to_owned(),
+        },
+        ProjectOutputIntent {
+            category: "verification-inputs".to_owned(),
+            kind: "project-abi-index".to_owned(),
+            path_hint: "nuis.project.abi.txt".to_owned(),
+        },
+    ];
     Ok(ProjectCompilationPlan {
         project_name: project.manifest.name.clone(),
         entry: project.manifest.entry.clone(),
         organization,
         exchanges,
         abi_resolution,
+        dependencies,
+        synthetic_input,
+        output_intents,
         effective_input_path,
     })
 }
@@ -287,13 +378,116 @@ pub fn describe_project_compilation_plan(plan: &ProjectCompilationPlan) -> Strin
     )
 }
 
+pub fn describe_project_output_intent_categories(plan: &ProjectCompilationPlan) -> String {
+    let mut counts = BTreeMap::<String, usize>::new();
+    for item in &plan.output_intents {
+        *counts.entry(item.category.clone()).or_insert(0) += 1;
+    }
+    if counts.is_empty() {
+        return "<none>".to_owned();
+    }
+    counts
+        .into_iter()
+        .map(|(category, count)| format!("{category}={count}"))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+pub fn describe_project_dependency_categories(plan: &ProjectCompilationPlan) -> String {
+    let mut counts = BTreeMap::<String, usize>::new();
+    for item in &plan.dependencies {
+        *counts.entry(item.category.clone()).or_insert(0) += 1;
+    }
+    if counts.is_empty() {
+        return "<none>".to_owned();
+    }
+    counts
+        .into_iter()
+        .map(|(category, count)| format!("{category}={count}"))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+pub fn describe_project_exchange_route_classes(plan: &ProjectCompilationPlan) -> String {
+    let mut counts = BTreeMap::<String, usize>::new();
+    for route in &plan.exchanges.routes {
+        *counts.entry(route.class.clone()).or_insert(0) += 1;
+    }
+    if counts.is_empty() {
+        return "<none>".to_owned();
+    }
+    counts
+        .into_iter()
+        .map(|(class, count)| format!("{class}={count}"))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+pub fn render_project_compilation_plan_index(plan: &ProjectCompilationPlan) -> String {
+    let abi_mode = if plan.abi_resolution.explicit {
+        "explicit"
+    } else {
+        "auto-recommended"
+    };
+    let abi_entries = if plan.abi_resolution.requirements.is_empty() {
+        "<none>".to_owned()
+    } else {
+        plan.abi_resolution
+            .requirements
+            .iter()
+            .map(|item| format!("{}={}", item.domain, item.abi))
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    let dependencies = if plan.dependencies.is_empty() {
+        "<none>".to_owned()
+    } else {
+        plan.dependencies
+            .iter()
+            .map(|item| {
+                format!(
+                    "{}:{}={} ({})",
+                    item.category, item.name, item.version, item.source
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    let output_intents = if plan.output_intents.is_empty() {
+        "<none>".to_owned()
+    } else {
+        plan.output_intents
+            .iter()
+            .map(|item| format!("{}:{}={}", item.category, item.kind, item.path_hint))
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    format!(
+        "project {}\nentry {}\ndomains {}\nexchanges {}\nabi_mode {}\nabi {}\ndependencies {}\nsynthetic_input_kind {}\nsynthetic_input {}\noutput_intents {}\neffective_input {}\nsummary {}\n",
+        plan.project_name,
+        plan.entry,
+        plan.organization.domains.join(", "),
+        plan.exchanges.routes.len(),
+        abi_mode,
+        abi_entries,
+        dependencies,
+        plan.synthetic_input.kind,
+        plan.synthetic_input.path.display(),
+        output_intents,
+        plan.effective_input_path.display(),
+        describe_project_compilation_plan(plan)
+    )
+}
+
 pub fn write_project_metadata(
     output_dir: &Path,
     project: &LoadedProject,
+    plan: &ProjectCompilationPlan,
 ) -> Result<ProjectBuildMetadata, String> {
     fs::create_dir_all(output_dir)
         .map_err(|error| format!("failed to create `{}`: {error}", output_dir.display()))?;
     let manifest_copy_path = output_dir.join("nuis.project.toml");
+    let plan_index_path = output_dir.join("nuis.project.plan.txt");
     let organization_index_path = output_dir.join("nuis.project.organization.txt");
     let exchange_index_path = output_dir.join("nuis.project.exchange.txt");
     let modules_index_path = output_dir.join("nuis.project.modules.txt");
@@ -305,6 +499,13 @@ pub fn write_project_metadata(
             "failed to copy project manifest `{}` -> `{}`: {error}",
             project.manifest_path.display(),
             manifest_copy_path.display()
+        )
+    })?;
+    let plan_index = render_project_compilation_plan_index(plan);
+    fs::write(&plan_index_path, plan_index).map_err(|error| {
+        format!(
+            "failed to write project plan index `{}`: {error}",
+            plan_index_path.display()
         )
     })?;
     let organization_index = render_project_organization_index(project);
@@ -375,6 +576,7 @@ pub fn write_project_metadata(
     })?;
     Ok(ProjectBuildMetadata {
         manifest_copy_path: manifest_copy_path.display().to_string(),
+        plan_index_path: plan_index_path.display().to_string(),
         organization_index_path: organization_index_path.display().to_string(),
         exchange_index_path: exchange_index_path.display().to_string(),
         modules_index_path: modules_index_path.display().to_string(),
@@ -476,6 +678,11 @@ pub fn organize_project_exchanges(project: &LoadedProject) -> ProjectExchangeOrg
                 } else {
                     "direct".to_owned()
                 },
+                class: if link.via.is_some() {
+                    "bridged".to_owned()
+                } else {
+                    "local".to_owned()
+                },
                 domains,
             }
         })
@@ -513,11 +720,12 @@ fn render_project_exchange_index(project: &LoadedProject) -> String {
     let mut lines = Vec::new();
     for route in exchanges.routes {
         lines.push(format!(
-            "route\t{}\t{}\t{}\tmode={}\tdomains={}",
+            "route\t{}\t{}\t{}\tmode={}\tclass={}\tdomains={}",
             route.from,
             route.to,
             route.via.unwrap_or_else(|| "<direct>".to_owned()),
             route.mode,
+            route.class,
             route.domains.join(",")
         ));
     }
@@ -5428,11 +5636,13 @@ mod tests {
         let exchanges = organize_project_exchanges(&project);
         assert_eq!(exchanges.routes.len(), 2);
         assert_eq!(exchanges.routes[0].mode, "bridged");
+        assert_eq!(exchanges.routes[0].class, "bridged");
         assert_eq!(
             exchanges.routes[0].domains,
             vec!["cpu".to_owned(), "network".to_owned(), "data".to_owned()]
         );
         assert_eq!(exchanges.routes[1].mode, "direct");
+        assert_eq!(exchanges.routes[1].class, "local");
         assert_eq!(exchanges.routes[1].domains, vec!["cpu".to_owned()]);
     }
 
@@ -5457,11 +5667,80 @@ mod tests {
         assert_eq!(plan.project_name, "demo");
         assert_eq!(plan.entry, "main.ns");
         assert_eq!(plan.exchanges.routes.len(), 1);
+        assert_eq!(describe_project_exchange_route_classes(&plan), "bridged=1");
+        assert!(plan.dependencies.is_empty());
+        assert_eq!(describe_project_dependency_categories(&plan), "<none>");
+        assert_eq!(plan.synthetic_input.kind, "project-name-entry");
         assert_eq!(plan.effective_input_path, PathBuf::from("./demo.ns"));
+        assert!(plan
+            .output_intents
+            .iter()
+            .any(|item| item.category == "project-metadata"
+                && item.kind == "project-plan-index"
+                && item.path_hint == "nuis.project.plan.txt"));
+        assert_eq!(
+            describe_project_output_intent_categories(&plan),
+            "core-artifacts=1, project-metadata=7, verification-inputs=1"
+        );
         assert_eq!(
             describe_project_compilation_plan(&plan),
             "entry=main.ns domains=cpu, data, network exchanges=1 abi_mode=auto-recommended"
         );
+    }
+
+    #[test]
+    fn renders_project_compilation_plan_index() {
+        let mut project = project_with_modules(vec![(
+            "main.ns",
+            r#"
+            mod cpu Main {
+              fn main() -> i64 { return 1; }
+            }
+            "#,
+        )]);
+        project.manifest.name = "demo".to_owned();
+        let plan = build_project_compilation_plan(&project).unwrap();
+        let rendered = render_project_compilation_plan_index(&plan);
+        assert!(rendered.contains("project demo"));
+        assert!(rendered.contains("entry main.ns"));
+        assert!(rendered.contains("domains cpu"));
+        assert!(rendered.contains("exchanges 0"));
+        assert!(rendered.contains("abi_mode auto-recommended"));
+        assert!(rendered.contains("dependencies <none>"));
+        assert!(rendered.contains("synthetic_input_kind project-name-entry"));
+        assert!(rendered
+            .contains("output_intents core-artifacts:build-manifest=nuis.build.manifest.toml"));
+        assert!(rendered.contains("effective_input ./demo.ns"));
+        assert!(rendered
+            .contains("summary entry=main.ns domains=cpu exchanges=0 abi_mode=auto-recommended"));
+    }
+
+    #[test]
+    fn categorizes_project_compilation_dependencies() {
+        let mut project = project_with_modules(vec![(
+            "main.ns",
+            r#"
+            mod cpu Main {
+              fn main() -> i64 { return 1; }
+            }
+            "#,
+        )]);
+        project.manifest.galaxy_dependencies = vec![ProjectGalaxyDependency {
+            name: "demo.dep".to_owned(),
+            version: "1.2.3".to_owned(),
+        }];
+
+        let plan = build_project_compilation_plan(&project).unwrap();
+        assert_eq!(plan.dependencies.len(), 1);
+        assert_eq!(plan.dependencies[0].category, "package-registry");
+        assert_eq!(plan.dependencies[0].source, "galaxy-manifest");
+        assert_eq!(
+            describe_project_dependency_categories(&plan),
+            "package-registry=1"
+        );
+
+        let rendered = render_project_compilation_plan_index(&plan);
+        assert!(rendered.contains("dependencies package-registry:demo.dep=1.2.3 (galaxy-manifest)"));
     }
 
     #[test]

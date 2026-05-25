@@ -15,11 +15,13 @@ The current `std net` lane prefers this order:
 ```text
 network profile truth
 -> endpoint recipe
+-> ip-packet recipe
 -> connect recipe
 -> listen recipe
 -> close recipe
 -> protocol-experiment recipe
 -> line-protocol recipe
+-> datagram-protocol recipe
 -> httpish-protocol recipe
 -> result recipe
 -> result-bridge recipe
@@ -46,6 +48,7 @@ The practical current rule is:
 ## Current Thin Recipes
 
 * [net_endpoint_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_endpoint_recipe.ns)
+* [net_ip_packet_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_ip_packet_recipe.ns)
 * [net_tcp_stream_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_stream_recipe.ns)
 * [net_udp_datagram_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_datagram_recipe.ns)
 * [net_connect_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_connect_recipe.ns)
@@ -53,6 +56,7 @@ The practical current rule is:
 * [net_close_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_close_recipe.ns)
 * [net_protocol_experiment_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_protocol_experiment_recipe.ns)
 * [net_line_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_line_protocol_recipe.ns)
+* [net_datagram_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_protocol_recipe.ns)
 * [net_httpish_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_protocol_recipe.ns)
 * [net_httpish_request_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_request_recipe.ns)
 * [net_httpish_response_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_response_recipe.ns)
@@ -73,6 +77,7 @@ The practical current rule is:
 Current companion validation routes:
 
 * [net_endpoint_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_endpoint_recipe_demo)
+* [net_ip_packet_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_ip_packet_recipe_demo)
 * [net_tcp_stream_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_stream_recipe_demo)
 * [net_udp_datagram_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_udp_datagram_recipe_demo)
 * [net_connect_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_connect_recipe_demo)
@@ -80,6 +85,7 @@ Current companion validation routes:
 * [net_close_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_close_recipe_demo)
 * [net_protocol_experiment_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_protocol_experiment_recipe_demo)
 * [net_line_protocol_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_line_protocol_recipe_demo)
+* [net_datagram_protocol_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_datagram_protocol_recipe_demo)
 * [net_httpish_protocol_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_protocol_recipe_demo)
 * [net_httpish_request_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_request_recipe_demo)
 * [net_httpish_response_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_response_recipe_demo)
@@ -102,6 +108,9 @@ Current role split:
 * `net_endpoint`
   reads:
   `bind_core -> endpoint_kind -> transport_family -> local/remote_port -> connect/read/write timeout`
+* `net_ip_packet`
+  reads:
+  `transport_family + protocol_header_bytes + send/recv probes -> ip packet summary`
 * `net_tcp_stream`
   reads:
   `transport_family + stream windows + send/recv probes -> tcp stream summary`
@@ -119,13 +128,16 @@ Current role split:
   `local_port -> close result -> close summary`
 * `net_protocol_experiment`
   reads:
-  `protocol slots + send/recv probes -> protocol experiment summary`
+  `transport_family + protocol slots + send/recv probes -> protocol experiment summary`
 * `net_line_protocol`
   reads:
-  `protocol slots + line framing + send/recv probes -> line protocol summary`
+  `tcp-stream-backed protocol slots + line framing + send/recv probes -> line protocol summary`
+* `net_datagram_protocol`
+  reads:
+  `udp-datagram-backed protocol slots + send/recv probes -> datagram protocol summary`
 * `net_httpish_protocol`
   reads:
-  `protocol slots + request/header/body framing + send/recv probes -> httpish protocol summary`
+  `tcp-stream-backed protocol slots + request/header/body framing + send/recv probes -> httpish protocol summary`
 * `net_httpish_request`
   reads:
   `httpish framing + send probe -> request summary`
@@ -179,6 +191,7 @@ The shortest practical route today is easiest to read in three grouped steps:
 * profile core
   [net_endpoint_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_endpoint_recipe.ns)
 * transport edge
+  [net_ip_packet_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_ip_packet_recipe.ns) ->
   [net_tcp_stream_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_stream_recipe.ns) ->
   [net_udp_datagram_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_datagram_recipe.ns)
 * control edge
@@ -188,6 +201,7 @@ The shortest practical route today is easiest to read in three grouped steps:
 * protocol edge
   [net_protocol_experiment_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_protocol_experiment_recipe.ns) ->
   [net_line_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_line_protocol_recipe.ns) ->
+  [net_datagram_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_protocol_recipe.ns) ->
   [net_httpish_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_protocol_recipe.ns) ->
   [net_httpish_request_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_request_recipe.ns) ->
   [net_httpish_response_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_response_recipe.ns) ->
@@ -214,6 +228,8 @@ Expanded route:
   [net_endpoint_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_endpoint_recipe.ns)
 * tcp stream:
   [net_tcp_stream_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_stream_recipe.ns)
+* ip packet:
+  [net_ip_packet_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_ip_packet_recipe.ns)
 * udp datagram:
   [net_udp_datagram_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_datagram_recipe.ns)
 * connect:
@@ -226,6 +242,8 @@ Expanded route:
   [net_protocol_experiment_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_protocol_experiment_recipe.ns)
 * line protocol:
   [net_line_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_line_protocol_recipe.ns)
+* datagram protocol:
+  [net_datagram_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_protocol_recipe.ns)
 * httpish protocol:
   [net_httpish_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_protocol_recipe.ns)
 * httpish request:

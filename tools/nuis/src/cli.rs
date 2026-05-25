@@ -83,9 +83,11 @@ pub enum CommandKind {
     },
     ProjectStatus {
         input: PathBuf,
+        json: bool,
     },
     ProjectDoctor {
         input: PathBuf,
+        json: bool,
     },
     ProjectLockAbi {
         input: PathBuf,
@@ -450,12 +452,46 @@ where
         "rc" => Ok(CommandKind::Rc {
             args: args.collect::<Vec<_>>(),
         }),
-        "project-status" => Ok(CommandKind::ProjectStatus {
-            input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
-        }),
-        "project-doctor" => Ok(CommandKind::ProjectDoctor {
-            input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
-        }),
+        "project-status" => {
+            let mut json = false;
+            let mut input = None;
+            for arg in args.by_ref() {
+                if arg == "--json" {
+                    json = true;
+                } else if input.is_none() {
+                    input = Some(PathBuf::from(arg));
+                } else {
+                    return Err(
+                        "usage: nuis project-status [--json] [project-dir|nuis.toml]"
+                            .to_owned(),
+                    );
+                }
+            }
+            Ok(CommandKind::ProjectStatus {
+                input: input.unwrap_or_else(|| PathBuf::from(".")),
+                json,
+            })
+        }
+        "project-doctor" => {
+            let mut json = false;
+            let mut input = None;
+            for arg in args.by_ref() {
+                if arg == "--json" {
+                    json = true;
+                } else if input.is_none() {
+                    input = Some(PathBuf::from(arg));
+                } else {
+                    return Err(
+                        "usage: nuis project-doctor [--json] [project-dir|nuis.toml]"
+                            .to_owned(),
+                    );
+                }
+            }
+            Ok(CommandKind::ProjectDoctor {
+                input: input.unwrap_or_else(|| PathBuf::from(".")),
+                json,
+            })
+        }
         "project-lock-abi" => Ok(CommandKind::ProjectLockAbi {
             input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
         }),

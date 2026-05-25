@@ -125,8 +125,8 @@ fn run() -> Result<(), String> {
         cli::CommandKind::Rc { args } => {
             run_nuis_rc(&args)?;
         }
-        cli::CommandKind::ProjectStatus { input } => handle_project_status(input)?,
-        cli::CommandKind::ProjectDoctor { input } => handle_project_doctor(input)?,
+        cli::CommandKind::ProjectStatus { input, json } => handle_project_status(input, json)?,
+        cli::CommandKind::ProjectDoctor { input, json } => handle_project_doctor(input, json)?,
         cli::CommandKind::ProjectLockAbi { input } => handle_project_lock_abi(input)?,
         cli::CommandKind::Galaxy(command) => handle_galaxy(command)?,
     }
@@ -829,6 +829,103 @@ fn json_optional_bool_field(name: &str, value: Option<bool>) -> String {
     }
 }
 
+fn json_bool_field(name: &str, value: bool) -> String {
+    format!("\"{}\":{}", name, if value { "true" } else { "false" })
+}
+
+fn json_usize_field(name: &str, value: usize) -> String {
+    format!("\"{}\":{}", name, value)
+}
+
+fn json_string_array_field(name: &str, values: &[String]) -> String {
+    let entries = values
+        .iter()
+        .map(|value| format!("\"{}\"", json_escape_local(value)))
+        .collect::<Vec<_>>()
+        .join(",");
+    format!("\"{}\":[{}]", name, entries)
+}
+
+fn json_object_array_field(name: &str, values: &[String]) -> String {
+    format!("\"{}\":[{}]", name, values.join(","))
+}
+
+fn project_plan_json_fields(plan: &nuisc::project::ProjectCompilationPlan) -> Vec<String> {
+    vec![
+        json_field(
+            "project_plan",
+            &nuisc::project::describe_project_compilation_plan(plan),
+        ),
+        json_field(
+            "project_plan_dependency_categories",
+            &nuisc::project::describe_project_dependency_categories(plan),
+        ),
+        json_usize_field("project_plan_dependency_count", plan.dependencies.len()),
+        json_field(
+            "project_plan_synthetic_input_kind",
+            &plan.synthetic_input.kind,
+        ),
+        json_field(
+            "project_plan_synthetic_input",
+            &plan.synthetic_input.path.display().to_string(),
+        ),
+        json_field(
+            "project_plan_output_categories",
+            &nuisc::project::describe_project_output_intent_categories(plan),
+        ),
+        json_usize_field("project_plan_output_count", plan.output_intents.len()),
+        json_field("project_organization_entry", &plan.organization.entry),
+        json_field("project_domains", &plan.organization.domains.join(", ")),
+        json_field(
+            "project_exchange_route_classes",
+            &nuisc::project::describe_project_exchange_route_classes(plan),
+        ),
+        json_usize_field("project_exchange_route_count", plan.exchanges.routes.len()),
+    ]
+}
+
+fn project_plan_domains_json(
+    plan: &nuisc::project::ProjectCompilationPlan,
+) -> Result<String, String> {
+    let mut domains = Vec::new();
+    for item in &plan.abi_resolution.requirements {
+        domains.push(scheduler_view_domain_record(
+            &item.domain,
+            None,
+            Some(item.abi.clone()),
+        )?);
+    }
+    Ok(domains
+        .iter()
+        .map(scheduler_view_domain_record_json)
+        .collect::<Vec<_>>()
+        .join(","))
+}
+
+fn project_management_json_fields(include_galaxy_flow: bool) -> Vec<String> {
+    let mut fields = vec![
+        json_field(
+            "project_management_navigation",
+            nuisc::project_management_navigation_brief(),
+        ),
+        json_field(
+            "project_management_samples",
+            nuisc::project_management_samples_brief(),
+        ),
+        json_field(
+            "project_management_tests",
+            nuisc::project_management_test_samples_brief(),
+        ),
+    ];
+    if include_galaxy_flow {
+        fields.push(json_field(
+            "project_management_galaxy",
+            nuisc::project_management_galaxy_samples_brief(),
+        ));
+    }
+    fields
+}
+
 fn scheduler_view_domain_record(
     domain: &str,
     package: Option<String>,
@@ -934,6 +1031,16 @@ fn handle_scheduler_view(input: std::path::PathBuf, json: bool) -> Result<(), St
             nuisc::project::describe_project_compilation_plan(&plan)
         );
         println!(
+            "  synthetic_input: {} ({})",
+            plan.synthetic_input.path.display(),
+            plan.synthetic_input.kind
+        );
+        println!("  output_intents: {}", plan.output_intents.len());
+        println!(
+            "  output_intent_categories: {}",
+            nuisc::project::describe_project_output_intent_categories(&plan)
+        );
+        println!(
             "  abi_mode: {}",
             if plan.abi_resolution.explicit {
                 "explicit"
@@ -1000,11 +1107,11 @@ fn handle_scheduler_view_json(input: std::path::PathBuf) -> Result<(), String> {
         let project = nuisc::project::load_project(&input)?;
         let plan = nuisc::project::build_project_compilation_plan(&project)?;
         let mut domains = Vec::new();
-        for item in plan.abi_resolution.requirements {
+        for item in &plan.abi_resolution.requirements {
             domains.push(scheduler_view_domain_record(
                 &item.domain,
                 None,
-                Some(item.abi),
+                Some(item.abi.clone()),
             )?);
         }
         let domain_json = domains
@@ -1012,8 +1119,7 @@ fn handle_scheduler_view_json(input: std::path::PathBuf) -> Result<(), String> {
             .map(scheduler_view_domain_record_json)
             .collect::<Vec<_>>()
             .join(",");
-        println!(
-            "{{{},{},{},{},\"domains\":[{}]}}",
+        let fields = vec![
             json_field("source_kind", "project"),
             json_field("input", &input.display().to_string()),
             json_field("project", &project.manifest.name),
@@ -1023,10 +1129,37 @@ fn handle_scheduler_view_json(input: std::path::PathBuf) -> Result<(), String> {
                     "explicit"
                 } else {
                     "auto-recommended"
-                }
+                },
             ),
-            domain_json
-        );
+            json_field(
+                "project_plan",
+                &nuisc::project::describe_project_compilation_plan(&plan),
+            ),
+            json_field(
+                "project_plan_dependency_categories",
+                &nuisc::project::describe_project_dependency_categories(&plan),
+            ),
+            json_usize_field("project_plan_dependency_count", plan.dependencies.len()),
+            json_field(
+                "project_plan_synthetic_input_kind",
+                &plan.synthetic_input.kind,
+            ),
+            json_field(
+                "project_plan_synthetic_input",
+                &plan.synthetic_input.path.display().to_string(),
+            ),
+            json_field(
+                "project_plan_output_categories",
+                &nuisc::project::describe_project_output_intent_categories(&plan),
+            ),
+            json_usize_field("project_plan_output_count", plan.output_intents.len()),
+            json_field(
+                "project_exchange_route_classes",
+                &nuisc::project::describe_project_exchange_route_classes(&plan),
+            ),
+            json_usize_field("project_exchange_route_count", plan.exchanges.routes.len()),
+        ];
+        println!("{{{},\"domains\":[{}]}}", fields.join(","), domain_json);
         return Ok(());
     }
 
@@ -1059,7 +1192,10 @@ fn handle_scheduler_view_json(input: std::path::PathBuf) -> Result<(), String> {
     Ok(())
 }
 
-fn handle_project_status(input: std::path::PathBuf) -> Result<(), String> {
+fn handle_project_status(input: std::path::PathBuf, json: bool) -> Result<(), String> {
+    if json {
+        return handle_project_status_json(input);
+    }
     let project = nuisc::project::load_project(&input)?;
     let plan = nuisc::project::build_project_compilation_plan(&project)?;
     let galaxy_lock_status = galaxy::verify_project_lock(&input);
@@ -1082,8 +1218,43 @@ fn handle_project_status(input: std::path::PathBuf) -> Result<(), String> {
         "  project_plan: {}",
         nuisc::project::describe_project_compilation_plan(&plan)
     );
+    println!(
+        "  project_plan_dependencies: {}",
+        if plan.dependencies.is_empty() {
+            "<none>".to_owned()
+        } else {
+            plan.dependencies
+                .iter()
+                .map(|item| {
+                    format!(
+                        "{}:{}={} ({})",
+                        item.category, item.name, item.version, item.source
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(", ")
+        }
+    );
+    println!(
+        "  project_plan_dependency_categories: {}",
+        nuisc::project::describe_project_dependency_categories(&plan)
+    );
+    println!(
+        "  project_plan_synthetic_input: {} ({})",
+        plan.synthetic_input.path.display(),
+        plan.synthetic_input.kind
+    );
+    println!("  project_plan_outputs: {}", plan.output_intents.len());
+    println!(
+        "  project_plan_output_categories: {}",
+        nuisc::project::describe_project_output_intent_categories(&plan)
+    );
     println!("  project_organization_entry: {}", plan.organization.entry);
     println!("  project_exchange_routes: {}", plan.exchanges.routes.len());
+    println!(
+        "  project_exchange_route_classes: {}",
+        nuisc::project::describe_project_exchange_route_classes(&plan)
+    );
     println!("  tests: {}", declared_tests.len());
     for path in &declared_tests {
         println!(
@@ -1175,7 +1346,121 @@ fn handle_project_status(input: std::path::PathBuf) -> Result<(), String> {
     Ok(())
 }
 
-fn handle_project_doctor(input: std::path::PathBuf) -> Result<(), String> {
+fn handle_project_status_json(input: std::path::PathBuf) -> Result<(), String> {
+    let project = nuisc::project::load_project(&input)?;
+    let plan = nuisc::project::build_project_compilation_plan(&project)?;
+    let galaxy_lock_status = galaxy::verify_project_lock(&input);
+    let galaxy_manifest_path = project.root.join("galaxy.toml");
+    let include_galaxy_flow =
+        galaxy_manifest_path.exists() || !project.manifest.galaxy_dependencies.is_empty();
+    let declared_tests = project
+        .manifest
+        .tests
+        .iter()
+        .map(|relative| project.root.join(relative))
+        .collect::<Vec<_>>();
+    let test_json = declared_tests
+        .iter()
+        .map(|path| {
+            format!(
+                "{{{},{}}}",
+                json_field("path", &path.display().to_string()),
+                json_bool_field("exists", path.exists())
+            )
+        })
+        .collect::<Vec<_>>();
+    let domain_json = project_plan_domains_json(&plan)?;
+    let mut fields = vec![
+        json_field("source_kind", "project"),
+        json_field("input", &input.display().to_string()),
+        json_field("project", &project.manifest.name),
+        json_field("root", &project.root.display().to_string()),
+        json_field("manifest", &project.manifest_path.display().to_string()),
+        json_field("entry", &project.manifest.entry),
+        json_usize_field("modules", project.modules.len()),
+        json_usize_field("links", project.manifest.links.len()),
+    ];
+    fields.extend(project_plan_json_fields(&plan));
+    fields.push(json_usize_field("tests_declared", declared_tests.len()));
+    fields.extend(project_management_json_fields(include_galaxy_flow));
+    fields.push(json_field(
+        "abi_mode",
+        if plan.abi_resolution.explicit {
+            "explicit"
+        } else {
+            "auto-recommended"
+        },
+    ));
+    fields.push(json_string_array_field(
+        "galaxy_dependencies",
+        &project
+            .manifest
+            .galaxy_dependencies
+            .iter()
+            .map(|item| format!("{}={}", item.name, item.version))
+            .collect::<Vec<_>>(),
+    ));
+    let lock_path = project.root.join("nuis.galaxy.lock");
+    match galaxy_lock_status {
+        Ok(lock) => {
+            let declared = project
+                .manifest
+                .galaxy_dependencies
+                .iter()
+                .map(|item| format!("{}={}", item.name, item.version))
+                .collect::<BTreeSet<_>>();
+            let locked = lock
+                .entries
+                .iter()
+                .map(|item| format!("{}={}", item.name, item.version))
+                .collect::<BTreeSet<_>>();
+            fields.push(json_field("galaxy_lock_status", "ok"));
+            fields.push(json_field(
+                "galaxy_lock_path",
+                &lock.path.display().to_string(),
+            ));
+            fields.push(json_usize_field(
+                "galaxy_lock_dependencies",
+                lock.entries.len(),
+            ));
+            fields.push(json_bool_field(
+                "galaxy_lock_matches_manifest",
+                declared == locked,
+            ));
+            fields.push(json_string_array_field(
+                "galaxy_lock_entries",
+                &lock
+                    .entries
+                    .iter()
+                    .map(|item| format!("{}={} {}", item.name, item.version, item.bundle_fnv1a64))
+                    .collect::<Vec<_>>(),
+            ));
+        }
+        Err(error) if lock_path.exists() => {
+            fields.push(json_field("galaxy_lock_status", "invalid"));
+            fields.push(json_field(
+                "galaxy_lock_path",
+                &lock_path.display().to_string(),
+            ));
+            fields.push(json_field("galaxy_lock_error", &error));
+        }
+        Err(_) => {
+            fields.push(json_field("galaxy_lock_status", "missing"));
+            fields.push(json_field(
+                "galaxy_lock_path",
+                &lock_path.display().to_string(),
+            ));
+        }
+    }
+    fields.push(json_object_array_field("tests", &test_json));
+    println!("{{{},\"domains\":[{}]}}", fields.join(","), domain_json);
+    Ok(())
+}
+
+fn handle_project_doctor(input: std::path::PathBuf, json: bool) -> Result<(), String> {
+    if json {
+        return handle_project_doctor_json(input);
+    }
     let project = nuisc::project::load_project(&input)?;
     let plan = nuisc::project::build_project_compilation_plan(&project)?;
     let declared_tests = project
@@ -1205,9 +1490,18 @@ fn handle_project_doctor(input: std::path::PathBuf) -> Result<(), String> {
     let deps_len = galaxy_doctor.dependencies.len();
     let include_galaxy_flow =
         galaxy_manifest_exists || !project.manifest.galaxy_dependencies.is_empty();
-    let mut any_local_missing = false;
-    let mut any_lock_missing = false;
-    let mut any_install_missing = false;
+    let any_local_missing = galaxy_doctor
+        .dependencies
+        .iter()
+        .any(|dependency| !dependency.local_available);
+    let any_lock_missing = galaxy_doctor
+        .dependencies
+        .iter()
+        .any(|dependency| !dependency.locked);
+    let any_install_missing = galaxy_doctor
+        .dependencies
+        .iter()
+        .any(|dependency| !dependency.installed);
 
     println!("project doctor: {}", project.manifest.name);
     println!("  root: {}", project.root.display());
@@ -1284,9 +1578,6 @@ fn handle_project_doctor(input: std::path::PathBuf) -> Result<(), String> {
         galaxy_doctor.dependencies.len()
     );
     for dependency in galaxy_doctor.dependencies {
-        any_local_missing |= !dependency.local_available;
-        any_lock_missing |= !dependency.locked;
-        any_install_missing |= !dependency.installed;
         println!(
             "  dep: {}={} local={} lock={} installed={}",
             dependency.name,
@@ -1512,6 +1803,290 @@ fn handle_project_doctor(input: std::path::PathBuf) -> Result<(), String> {
     Ok(())
 }
 
+fn handle_project_doctor_json(input: std::path::PathBuf) -> Result<(), String> {
+    let project = nuisc::project::load_project(&input)?;
+    let plan = nuisc::project::build_project_compilation_plan(&project)?;
+    let declared_tests = project
+        .manifest
+        .tests
+        .iter()
+        .map(|relative| project.root.join(relative))
+        .collect::<Vec<_>>();
+    let missing_tests = declared_tests
+        .iter()
+        .filter(|path| !path.exists())
+        .cloned()
+        .collect::<Vec<_>>();
+    let galaxy_manifest_path = project.root.join("galaxy.toml");
+    let galaxy_manifest_exists = galaxy_manifest_path.exists();
+    let galaxy_check = if galaxy_manifest_exists {
+        Some(galaxy::check(&project.root))
+    } else {
+        None
+    };
+    let galaxy_check_invalid = matches!(galaxy_check.as_ref(), Some(Err(_)));
+    let galaxy_doctor = galaxy::doctor_project(&project.root)?;
+    let nova_profile = galaxy::inspect_ns_nova_profile(&project.root)?;
+    let nova_stdlib = galaxy::inspect_ns_nova_stdlib(std::path::Path::new("."))?;
+    let lock_status = galaxy_doctor.lock_status.clone();
+    let lock_error = galaxy_doctor.lock_error.clone();
+    let deps_len = galaxy_doctor.dependencies.len();
+    let include_galaxy_flow =
+        galaxy_manifest_exists || !project.manifest.galaxy_dependencies.is_empty();
+    let any_local_missing = galaxy_doctor
+        .dependencies
+        .iter()
+        .any(|dependency| !dependency.local_available);
+    let any_lock_missing = galaxy_doctor
+        .dependencies
+        .iter()
+        .any(|dependency| !dependency.locked);
+    let any_install_missing = galaxy_doctor
+        .dependencies
+        .iter()
+        .any(|dependency| !dependency.installed);
+    let mut next_steps = Vec::new();
+    if !galaxy_manifest_exists {
+        next_steps.push(
+            "run `nuis galaxy init <project-dir>` if you want to package or share this project"
+                .to_owned(),
+        );
+    }
+    if let Some(profile) = nova_profile.as_ref() {
+        if !galaxy_manifest_exists {
+            next_steps.push(
+                "run `nuis galaxy init <project-dir> --framework ns-nova` if this project should be packaged as an `ns-nova` framework project".to_owned(),
+            );
+        }
+        if profile.family_schema.as_deref() == Some("ns-nova-family-v1")
+            && profile.family_layers.is_empty()
+        {
+            next_steps.push(
+                "fill `family_layers` in `ns-nova.toml` so the framework contract says whether this project is using `core`, `ui`, or `scene`".to_owned(),
+            );
+        }
+        if profile.render_schema.as_deref() == Some("ns-nova-render-v1")
+            && (profile.render_owner_unit.is_none()
+                || profile.render_bridge_unit.is_none()
+                || profile.render_surface_unit.is_none())
+        {
+            next_steps.push(
+                "fill `render_owner_unit`, `render_bridge_unit`, and `render_surface_unit` in `ns-nova.toml` to complete the render contract".to_owned(),
+            );
+        }
+        if profile.selection_schema.as_deref() == Some("ns-nova-selection-v1")
+            && (profile.selection_owner_unit.is_none()
+                || profile.selection_bridge_unit.is_none()
+                || profile.selection_render_unit.is_none()
+                || profile.selection_controls.is_empty())
+        {
+            next_steps.push(
+                "fill the `selection_*` units and `selection_controls` in `ns-nova.toml` to complete the shared selection contract".to_owned(),
+            );
+        }
+        if profile.stdlib_schema.as_deref() == Some("ns-nova-stdlib-v1")
+            && (profile.stdlib_manifest.is_none() || profile.stdlib_sources.is_empty())
+        {
+            next_steps.push(
+                "fill `stdlib_manifest` and `stdlib_sources` in `ns-nova.toml` so the framework profile points at its canonical stdlib source assets".to_owned(),
+            );
+        }
+    } else if nova_stdlib.is_some() {
+        next_steps.push(
+            "add `ns-nova.toml` if this project should carry explicit `ns-nova` framework metadata alongside the shared stdlib source asset catalog".to_owned(),
+        );
+    }
+    if let Some(summary) = nova_stdlib.as_ref() {
+        if summary.source_modules.is_empty() {
+            next_steps.push(
+                "fill `source_modules` in `stdlib/ns-nova/module.toml` so the framework declares its canonical `ns` source assets".to_owned(),
+            );
+        }
+        if !summary.missing_modules.is_empty() {
+            next_steps.push(
+                "some `ns-nova` source modules declared in `stdlib/ns-nova/module.toml` are missing on disk; add them or remove stale entries from `source_modules`".to_owned(),
+            );
+        }
+        if let Some(profile) = nova_profile.as_ref() {
+            if profile.stdlib_sources.len() != summary.source_modules.len() {
+                next_steps.push(
+                    "refresh `ns-nova.toml` so its `stdlib_sources` count matches `stdlib/ns-nova/module.toml`".to_owned(),
+                );
+            }
+        }
+    }
+    match lock_status.as_str() {
+        "missing" if deps_len > 0 => {
+            next_steps.push(
+                "run `nuis galaxy lock-deps <project-dir>` to create `nuis.galaxy.lock`".to_owned(),
+            );
+        }
+        "invalid" => {
+            next_steps.push(
+                "run `nuis galaxy verify-lock <project-dir>` after fixing the lock or regenerate it with `nuis galaxy lock-deps <project-dir>`".to_owned(),
+            );
+        }
+        _ => {}
+    }
+    if any_lock_missing && deps_len > 0 && lock_status == "ok" {
+        next_steps.push(
+            "run `nuis galaxy lock-deps <project-dir>` to refresh the lock so it matches the manifest".to_owned(),
+        );
+    }
+    if any_install_missing && lock_status == "ok" {
+        next_steps.push(
+            "run `nuis galaxy sync-deps <project-dir>` to materialize locked galaxy dependencies under `.nuis/deps/galaxy`".to_owned(),
+        );
+    }
+    if any_local_missing && deps_len > 0 {
+        next_steps.push(
+            "some galaxy deps are not available locally; use `nuis galaxy list` to inspect the local registry or publish/install the missing packages first".to_owned(),
+        );
+    }
+    if galaxy_check_invalid {
+        next_steps.push(
+            "run `nuis galaxy check <project-dir>` after fixing `galaxy.toml` or framework profile issues".to_owned(),
+        );
+    }
+    if !plan.abi_resolution.explicit {
+        next_steps.push(
+            "run `nuis project-lock-abi <project-dir>` if you want to freeze the current ABI recommendations".to_owned(),
+        );
+    }
+    if declared_tests.is_empty() {
+        next_steps.push(
+            "add `tests = [\"tests/smoke.ns\"]` to `nuis.toml` once you want `nuis test <project-dir>` to run explicit project test inputs".to_owned(),
+        );
+    }
+    if !missing_tests.is_empty() {
+        next_steps.push(
+            "some declared project tests are missing on disk; add those `.ns` files or remove stale entries from `tests = [...]` in `nuis.toml`".to_owned(),
+        );
+    }
+    let domain_json = project_plan_domains_json(&plan)?;
+    let tests_json = declared_tests
+        .iter()
+        .map(|path| {
+            format!(
+                "{{{},{}}}",
+                json_field("path", &path.display().to_string()),
+                json_bool_field("exists", path.exists())
+            )
+        })
+        .collect::<Vec<_>>();
+    let dependency_json = galaxy_doctor
+        .dependencies
+        .iter()
+        .map(|dependency| {
+            format!(
+                "{{{},{},{},{},{}}}",
+                json_field("name", &dependency.name),
+                json_field("version", &dependency.version),
+                json_bool_field("local_available", dependency.local_available),
+                json_bool_field("locked", dependency.locked),
+                json_bool_field("installed", dependency.installed),
+            )
+        })
+        .collect::<Vec<_>>();
+    let galaxy_manifest_display = if galaxy_manifest_exists {
+        galaxy_manifest_path.display().to_string()
+    } else {
+        "<missing>".to_owned()
+    };
+    let mut fields = vec![
+        json_field("source_kind", "project"),
+        json_field("input", &input.display().to_string()),
+        json_field("project", &project.manifest.name),
+        json_field("root", &project.root.display().to_string()),
+        json_field("manifest", &project.manifest_path.display().to_string()),
+        json_field("entry", &project.manifest.entry),
+        json_usize_field("modules", project.modules.len()),
+        json_usize_field("links", project.manifest.links.len()),
+    ];
+    fields.extend(project_plan_json_fields(&plan));
+    fields.push(json_usize_field("tests_declared", declared_tests.len()));
+    fields.push(json_usize_field("tests_missing", missing_tests.len()));
+    fields.extend(project_management_json_fields(include_galaxy_flow));
+    fields.push(json_field(
+        "abi_mode",
+        if plan.abi_resolution.explicit {
+            "explicit"
+        } else {
+            "auto-recommended"
+        },
+    ));
+    fields.push(json_field("galaxy_manifest", &galaxy_manifest_display));
+    match galaxy_check {
+        Some(Ok(checked)) => {
+            fields.push(json_field("galaxy_check_status", "ok"));
+            fields.push(json_field(
+                "galaxy_package_kind",
+                &checked.manifest.package_kind,
+            ));
+            fields.push(json_field(
+                "galaxy_framework",
+                checked.manifest.framework.as_deref().unwrap_or("<none>"),
+            ));
+            fields.push(json_usize_field(
+                "galaxy_include_files",
+                checked.include_files.len(),
+            ));
+        }
+        Some(Err(error)) => {
+            fields.push(json_field("galaxy_check_status", "invalid"));
+            fields.push(json_field("galaxy_error", &error));
+        }
+        None => {
+            fields.push(json_field("galaxy_check_status", "skipped"));
+        }
+    }
+    fields.push(json_field("galaxy_lock_status", &galaxy_doctor.lock_status));
+    fields.push(json_field(
+        "galaxy_lock_path",
+        &galaxy_doctor.lock_path.display().to_string(),
+    ));
+    if let Some(error) = galaxy_doctor.lock_error.as_deref() {
+        fields.push(json_field("galaxy_lock_error", error));
+    }
+    fields.push(json_field(
+        "galaxy_deps_root",
+        &galaxy_doctor.deps_root.display().to_string(),
+    ));
+    fields.push(json_field(
+        "galaxy_local_registry",
+        &galaxy_doctor.local_registry_root.display().to_string(),
+    ));
+    fields.push(json_usize_field(
+        "galaxy_dependencies_count",
+        galaxy_doctor.dependencies.len(),
+    ));
+    fields.push(json_optional_string_field(
+        "ns_nova_profile",
+        nova_profile
+            .as_ref()
+            .map(|profile| profile.path.display().to_string())
+            .as_deref(),
+    ));
+    fields.push(json_optional_string_field(
+        "ns_nova_stdlib_manifest",
+        nova_stdlib
+            .as_ref()
+            .map(|summary| summary.path.display().to_string())
+            .as_deref(),
+    ));
+    if let Some(error) = lock_error.as_deref() {
+        fields.push(json_field("note", error));
+    }
+    fields.push(json_string_array_field("next_steps", &next_steps));
+    fields.push(json_object_array_field("tests", &tests_json));
+    fields.push(json_object_array_field(
+        "galaxy_dependencies",
+        &dependency_json,
+    ));
+    println!("{{{},\"domains\":[{}]}}", fields.join(","), domain_json);
+    Ok(())
+}
+
 fn print_project_scheduler_contract_view(domain: &str) -> Result<(), String> {
     let manifest =
         nuisc::registry::load_manifest_for_domain(std::path::Path::new("nustar-packages"), domain)?;
@@ -1646,6 +2221,7 @@ fn handle_galaxy(command: cli::GalaxyCommand) -> Result<(), String> {
             println!("checked galaxy package: {}", checked.manifest.name);
             println!("  root: {}", checked.root.display());
             println!("  manifest: {}", checked.manifest_path.display());
+            println!("  project_plan: {}", checked.project_plan_summary);
             println!("  version: {}", checked.manifest.version);
             println!("  package_kind: {}", checked.manifest.package_kind);
             if let Some(framework) = &checked.manifest.framework {
@@ -1734,8 +2310,13 @@ fn handle_galaxy(command: cli::GalaxyCommand) -> Result<(), String> {
             let installed = galaxy::install_project_deps(&input)?;
             if installed.installed.is_empty() {
                 println!("project has no galaxy dependencies");
+                println!("  project_root: {}", installed.project_root.display());
+                println!("  project_plan: {}", installed.project_plan_summary);
+                println!("  lock: {}", installed.lock.path.display());
             } else {
                 println!("installed galaxy dependencies");
+                println!("  project_root: {}", installed.project_root.display());
+                println!("  project_plan: {}", installed.project_plan_summary);
                 for item in installed.installed {
                     println!("  dep: {}={}", item.name, item.version);
                     println!("  output: {}", item.output.display());
@@ -1750,6 +2331,7 @@ fn handle_galaxy(command: cli::GalaxyCommand) -> Result<(), String> {
             let report = galaxy::doctor_project(&input)?;
             println!("galaxy doctor");
             println!("  project_root: {}", report.project_root.display());
+            println!("  project_plan: {}", report.project_plan_summary);
             println!("  deps_root: {}", report.deps_root.display());
             println!(
                 "  local_registry_root: {}",
@@ -1776,8 +2358,13 @@ fn handle_galaxy(command: cli::GalaxyCommand) -> Result<(), String> {
             let synced = galaxy::sync_project_deps(&input)?;
             if synced.entries.is_empty() {
                 println!("galaxy lock has no dependencies");
+                println!("  project_root: {}", synced.project_root.display());
+                println!("  project_plan: {}", synced.project_plan_summary);
+                println!("  root: {}", synced.root.display());
             } else {
                 println!("synced galaxy dependencies");
+                println!("  project_root: {}", synced.project_root.display());
+                println!("  project_plan: {}", synced.project_plan_summary);
                 println!("  root: {}", synced.root.display());
                 println!("  dependencies: {}", synced.entries.len());
                 for entry in synced.entries {
@@ -1790,6 +2377,8 @@ fn handle_galaxy(command: cli::GalaxyCommand) -> Result<(), String> {
         cli::GalaxyCommand::LockDeps { input } => {
             let lock = galaxy::lock_project_deps(&input)?;
             println!("locked galaxy dependencies");
+            println!("  project_root: {}", lock.project_root.display());
+            println!("  project_plan: {}", lock.project_plan_summary);
             println!("  lock: {}", lock.path.display());
             println!("  dependencies: {}", lock.entries.len());
             for entry in lock.entries {
@@ -1801,6 +2390,8 @@ fn handle_galaxy(command: cli::GalaxyCommand) -> Result<(), String> {
         cli::GalaxyCommand::VerifyLock { input } => {
             let lock = galaxy::verify_project_lock(&input)?;
             println!("verified galaxy lock");
+            println!("  project_root: {}", lock.project_root.display());
+            println!("  project_plan: {}", lock.project_plan_summary);
             println!("  lock: {}", lock.path.display());
             println!("  dependencies: {}", lock.entries.len());
             for entry in lock.entries {
@@ -1872,8 +2463,8 @@ fn print_help() {
     println!("    nuis verify-build-manifest <nuis.build.manifest.toml>");
     println!();
     println!("  project workflow:");
-    println!("    nuis project-doctor [project-dir|nuis.toml]");
-    println!("    nuis project-status [project-dir|nuis.toml]");
+    println!("    nuis project-doctor [--json] [project-dir|nuis.toml]");
+    println!("    nuis project-status [--json] [project-dir|nuis.toml]");
     println!("    nuis project-lock-abi [project-dir|nuis.toml]");
     println!();
     println!("  cache:");

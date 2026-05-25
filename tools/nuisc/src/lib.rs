@@ -105,7 +105,7 @@ pub fn std_net_sample_navigation_brief(domain: &str) -> Option<&'static str> {
 pub fn std_net_recipe_samples_brief(domain: &str) -> Option<&'static str> {
     match domain {
         "network" => Some(
-            "profile_core=net_endpoint_recipe -> net_endpoint_recipe_demo; transport_edge=net_tcp_stream_recipe -> net_udp_datagram_recipe -> net_tcp_stream_recipe_demo -> net_udp_datagram_recipe_demo; control_edge=net_connect_recipe -> net_listen_recipe -> net_close_recipe -> net_connect_recipe_demo -> net_listen_recipe_demo -> net_close_recipe_demo; protocol_edge=net_protocol_experiment_recipe -> net_line_protocol_recipe -> net_httpish_protocol_recipe -> net_httpish_request_recipe -> net_httpish_response_recipe -> net_httpish_roundtrip_recipe -> net_protocol_experiment_recipe_demo -> net_line_protocol_recipe_demo -> net_httpish_protocol_recipe_demo -> net_httpish_request_recipe_demo -> net_httpish_response_recipe_demo -> net_httpish_roundtrip_recipe_demo; result_spine=net_result_recipe -> net_result_bridge_recipe -> net_result_recipe_demo -> net_result_bridge_recipe_demo; task_spine=net_task_policy_recipe -> net_task_batch_recipe -> net_task_windowed_recipe -> net_task_windowed_bridge_recipe -> net_task_policy_recipe_demo -> net_task_batch_recipe_demo -> net_task_windowed_recipe_demo -> net_task_windowed_bridge_recipe_demo; session=net_control_session_recipe -> net_transport_session_recipe -> net_protocol_session_recipe -> net_httpish_session_recipe -> net_httpish_exchange_session_recipe -> net_session_recipe -> net_control_session_recipe_demo -> net_transport_session_recipe_demo -> net_protocol_session_recipe_demo -> net_httpish_session_recipe_demo -> net_httpish_exchange_session_recipe_demo -> net_session_recipe_demo",
+            "profile_core=net_endpoint_recipe -> net_endpoint_recipe_demo; transport_edge=net_ip_packet_recipe -> net_tcp_stream_recipe -> net_udp_datagram_recipe -> net_ip_packet_recipe_demo -> net_tcp_stream_recipe_demo -> net_udp_datagram_recipe_demo; control_edge=net_connect_recipe -> net_listen_recipe -> net_close_recipe -> net_connect_recipe_demo -> net_listen_recipe_demo -> net_close_recipe_demo; protocol_edge=net_protocol_experiment_recipe -> net_line_protocol_recipe -> net_datagram_protocol_recipe -> net_httpish_protocol_recipe -> net_httpish_request_recipe -> net_httpish_response_recipe -> net_httpish_roundtrip_recipe -> net_protocol_experiment_recipe_demo -> net_line_protocol_recipe_demo -> net_datagram_protocol_recipe_demo -> net_httpish_protocol_recipe_demo -> net_httpish_request_recipe_demo -> net_httpish_response_recipe_demo -> net_httpish_roundtrip_recipe_demo; result_spine=net_result_recipe -> net_result_bridge_recipe -> net_result_recipe_demo -> net_result_bridge_recipe_demo; task_spine=net_task_policy_recipe -> net_task_batch_recipe -> net_task_windowed_recipe -> net_task_windowed_bridge_recipe -> net_task_policy_recipe_demo -> net_task_batch_recipe_demo -> net_task_windowed_recipe_demo -> net_task_windowed_bridge_recipe_demo; session=net_control_session_recipe -> net_transport_session_recipe -> net_protocol_session_recipe -> net_httpish_session_recipe -> net_httpish_exchange_session_recipe -> net_session_recipe -> net_control_session_recipe_demo -> net_transport_session_recipe_demo -> net_protocol_session_recipe_demo -> net_httpish_session_recipe_demo -> net_httpish_exchange_session_recipe_demo -> net_session_recipe_demo",
         ),
         _ => None,
     }
@@ -656,7 +656,14 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             if let Some(root) = report.compile_cache_root {
                 println!("  compile_cache_root: {}", root);
             }
+            if let Some(plan_index) = report.project_plan_index {
+                println!("  project_plan_index: {}", plan_index);
+            }
             println!("  artifacts_checked: {}", report.artifacts_checked);
+            println!(
+                "  project_metadata_checked: {}",
+                report.project_metadata_checked
+            );
         }
         CommandKind::CacheStatus {
             input,
@@ -1097,8 +1104,8 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 let _ = cache::store_compile_cache(&cache_key, &output_dir)?;
                 written
             };
-            let project_metadata = if let Some(project) = &project {
-                Some(project::write_project_metadata(&output_dir, project)?)
+            let project_metadata = if let (Some(project), Some(plan)) = (&project, &project_plan) {
+                Some(project::write_project_metadata(&output_dir, project, plan)?)
             } else {
                 None
             };
@@ -1139,6 +1146,9 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                             manifest_copy_path: project_metadata
                                 .as_ref()
                                 .map(|item| item.manifest_copy_path.clone()),
+                            plan_index_path: project_metadata
+                                .as_ref()
+                                .map(|item| item.plan_index_path.clone()),
                             organization_index_path: project_metadata
                                 .as_ref()
                                 .map(|item| item.organization_index_path.clone()),
@@ -1244,6 +1254,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             println!("build_manifest: {}", build_manifest);
             if let Some(metadata) = &project_metadata {
                 println!("project_manifest: {}", metadata.manifest_copy_path);
+                println!("project_plan_index: {}", metadata.plan_index_path);
                 println!("project_organization: {}", metadata.organization_index_path);
                 println!("project_exchange: {}", metadata.exchange_index_path);
                 println!("project_modules: {}", metadata.modules_index_path);

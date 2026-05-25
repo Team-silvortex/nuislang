@@ -16,6 +16,7 @@ mod cpu Main {
 
   struct NetProtocolExperimentSummary {
     argv_count: i64,
+    transport_family: i64,
     protocol_kind: i64,
     protocol_version: i64,
     protocol_header_bytes: i64,
@@ -50,6 +51,7 @@ mod cpu Main {
 
   fn capture_net_protocol_experiment_summary() -> NetProtocolExperimentSummary {
     let argv_count: i64 = host_argv_count();
+    let transport_family: i64 = network_profile_transport_family("NetworkUnit");
     let protocol_kind: i64 = network_profile_protocol_kind("NetworkUnit");
     let protocol_version: i64 = network_profile_protocol_version("NetworkUnit");
     let protocol_header_bytes: i64 =
@@ -69,6 +71,7 @@ mod cpu Main {
 
     return NetProtocolExperimentSummary {
       argv_count: argv_count,
+      transport_family: transport_family,
       protocol_kind: protocol_kind,
       protocol_version: protocol_version,
       protocol_header_bytes: protocol_header_bytes,
@@ -80,6 +83,7 @@ mod cpu Main {
       send_ready: encode_send_ready(send_result),
       recv_ready: encode_recv_ready(recv_result),
       experiment_value: protocol_kind
+        + transport_family
         + protocol_version
         + protocol_header_bytes
         + encode_value(send_result)
@@ -91,6 +95,7 @@ mod cpu Main {
   fn summarize_net_protocol_experiment_recipe() -> i64 {
     let summary: NetProtocolExperimentSummary = capture_net_protocol_experiment_summary();
     return summary.argv_count
+      + summary.transport_family
       + summary.protocol_kind
       + summary.protocol_version
       + summary.protocol_header_bytes

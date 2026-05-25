@@ -25,6 +25,8 @@ Compared with a single `.ns` file, project mode currently adds:
 * project-level ABI locking or auto-resolution
 * project metadata outputs during `build`
 * compile-cache identity based on the whole project input set
+* a normalized compiler-side project plan view, now also emitted as
+  `nuis.project.plan.txt` during `build`
 * a normalized compiler-side project organization view, now also emitted as
   `nuis.project.organization.txt` during `build`
 * a normalized project exchange view, now also emitted as
@@ -63,6 +65,36 @@ project-doctor
   -> test
   -> build
 ```
+
+Current project-aware front doors now also converge on the same compiler-side
+summary line:
+
+```text
+project_plan: entry=<entry> domains=<...> exchanges=<n> abi_mode=<...>
+```
+
+That summary is now printed by:
+
+* `project-status`
+* `project-doctor`
+* `scheduler-view`
+* `project-lock-abi`
+* `galaxy check`
+* `galaxy doctor`
+* `galaxy lock-deps`
+* `galaxy verify-lock`
+* `galaxy sync-deps`
+
+`project-status` and `project-doctor` now also accept `--json`, so the same
+project-plan structure can be consumed directly by tools instead of being read
+back out of text output.
+
+The emitted [nuis.project.plan.txt](/private/tmp/net_session_recipe_demo_out/nuis.project.plan.txt)
+now also captures three plan-local structure layers:
+
+* `dependencies`
+* `synthetic_input_kind` / `synthetic_input`
+* `output_intents`
 
 Useful test splits:
 

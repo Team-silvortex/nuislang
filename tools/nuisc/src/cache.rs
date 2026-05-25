@@ -121,14 +121,7 @@ pub fn compute_compile_cache_key_with_plan(
         if let Some(plan) = plan {
             records.push((
                 "project.plan".to_owned(),
-                format!(
-                    "{}\n{}\n{}\n{}",
-                    plan.project_name,
-                    plan.entry,
-                    plan.organization.domains.join(","),
-                    plan.exchanges.routes.len()
-                )
-                .into_bytes(),
+                crate::project::render_project_compilation_plan_index(plan).into_bytes(),
             ));
         }
         records.push((

@@ -14,18 +14,21 @@ mod cpu Main {
     local_port: i64
   ) -> i64;
 
-  struct NetLineProtocolSummary {
+  struct NetDatagramProtocolSummary {
     argv_count: i64,
     transport_family: i64,
     protocol_kind: i64,
     protocol_version: i64,
     protocol_header_bytes: i64,
-    line_delimiter: i64,
-    line_frame_bytes: i64,
-    line_window_bytes: i64,
+    local_port: i64,
+    remote_port: i64,
+    recv_window: i64,
+    send_window: i64,
+    read_timeout_ms: i64,
+    write_timeout_ms: i64,
     send_ready: i64,
     recv_ready: i64,
-    line_value: i64,
+    datagram_protocol_value: i64,
     tick_ns: i64
   }
 
@@ -47,7 +50,7 @@ mod cpu Main {
     return network_value(result);
   }
 
-  fn capture_net_line_protocol_summary() -> NetLineProtocolSummary {
+  fn capture_net_datagram_protocol_summary() -> NetDatagramProtocolSummary {
     let argv_count: i64 = host_argv_count();
     let transport_family: i64 = network_profile_transport_family("NetworkUnit");
     let protocol_kind: i64 = network_profile_protocol_kind("NetworkUnit");
@@ -59,58 +62,62 @@ mod cpu Main {
     let send_window: i64 = network_profile_send_window("NetworkUnit");
     let local_port: i64 = network_profile_local_port("NetworkUnit");
     let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+    let read_timeout_ms: i64 = network_profile_read_timeout("NetworkUnit");
+    let write_timeout_ms: i64 = network_profile_write_timeout("NetworkUnit");
     let send_result: NetworkResult<i64> = network_result(
       host_network_send_probe(stream_window, send_window, remote_port)
     );
     let recv_result: NetworkResult<i64> = network_result(
       host_network_recv_probe(stream_window, recv_window, local_port)
     );
-    let line_delimiter: i64 = 10 + protocol_version;
-    let line_frame_bytes: i64 = protocol_header_bytes + recv_window;
-    let line_window_bytes: i64 = recv_window + send_window;
     let tick_ns: i64 = host_monotonic_time_ns();
 
-    return NetLineProtocolSummary {
+    return NetDatagramProtocolSummary {
       argv_count: argv_count,
       transport_family: transport_family,
       protocol_kind: protocol_kind,
       protocol_version: protocol_version,
       protocol_header_bytes: protocol_header_bytes,
-      line_delimiter: line_delimiter,
-      line_frame_bytes: line_frame_bytes,
-      line_window_bytes: line_window_bytes,
+      local_port: local_port,
+      remote_port: remote_port,
+      recv_window: recv_window,
+      send_window: send_window,
+      read_timeout_ms: read_timeout_ms,
+      write_timeout_ms: write_timeout_ms,
       send_ready: encode_send_ready(send_result),
       recv_ready: encode_recv_ready(recv_result),
-      line_value: protocol_kind
-        + transport_family
+      datagram_protocol_value: transport_family
+        + protocol_kind
         + protocol_version
         + protocol_header_bytes
-        + line_delimiter
-        + line_frame_bytes
-        + line_window_bytes
+        + recv_window
+        + send_window
         + encode_value(send_result)
         + encode_value(recv_result),
       tick_ns: tick_ns
     };
   }
 
-  fn summarize_net_line_protocol_recipe() -> i64 {
-    let summary: NetLineProtocolSummary = capture_net_line_protocol_summary();
+  fn summarize_net_datagram_protocol_recipe() -> i64 {
+    let summary: NetDatagramProtocolSummary = capture_net_datagram_protocol_summary();
     return summary.argv_count
       + summary.transport_family
       + summary.protocol_kind
       + summary.protocol_version
       + summary.protocol_header_bytes
-      + summary.line_delimiter
-      + summary.line_frame_bytes
-      + summary.line_window_bytes
+      + summary.local_port
+      + summary.remote_port
+      + summary.recv_window
+      + summary.send_window
+      + summary.read_timeout_ms
+      + summary.write_timeout_ms
       + summary.send_ready
       + summary.recv_ready
-      + summary.line_value
+      + summary.datagram_protocol_value
       + summary.tick_ns;
   }
 
   fn main() {
-    print(summarize_net_line_protocol_recipe());
+    print(summarize_net_datagram_protocol_recipe());
   }
 }
