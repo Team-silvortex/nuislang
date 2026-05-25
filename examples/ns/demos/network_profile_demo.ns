@@ -7,7 +7,9 @@ mod cpu Main {
     let timeout_budget: i64 = network_profile_timeout_budget("NetworkUnit");
     let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
     let stream_window: i64 = network_profile_stream_window("NetworkUnit");
-    print(bind_core + endpoint_kind + timeout_budget + retry_budget + stream_window);
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+    print(bind_core + endpoint_kind + timeout_budget + retry_budget + stream_window + recv_window + send_window);
   }
 }
 

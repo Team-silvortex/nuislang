@@ -23,7 +23,33 @@ when you want the canonical multi-file project route.
   tensor lane
 * network edge:
   [network_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_profile_demo.ns) ->
-  `bind_core -> endpoint_kind`
+  [network_endpoint_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_endpoint_profile_demo.ns) ->
+  [network_host_control_runtime_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_host_control_runtime_demo.ns) ->
+  [network_host_transport_runtime_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_host_transport_runtime_demo.ns) ->
+  result ladder ->
+  session/task ladder
+* short network rule:
+  `profile core -> endpoint/timing -> host control/runtime transport -> result observe -> session -> result-policy/result-batch/result-windowed/policy/fallback -> batch/windowed`
+* connect/accept control rule:
+  `connect result -> accept result -> connect/accept policy -> connect/accept batch -> connect/accept windowed`
+* network result ladder:
+  [network_result_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_result_profile_demo.ns) ->
+  [network_connect_result_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_connect_result_demo.ns) ->
+  [network_accept_result_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_accept_result_demo.ns) ->
+  [network_connect_accept_task_policy_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_connect_accept_task_policy_demo.ns) ->
+  [network_connect_accept_task_batch_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_connect_accept_task_batch_demo.ns) ->
+  [network_connect_accept_task_windowed_batch_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_connect_accept_task_windowed_batch_demo.ns) ->
+  [network_result_task_policy_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_result_task_policy_demo.ns) ->
+  [network_result_task_batch_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_result_task_batch_demo.ns) ->
+  [network_result_task_windowed_batch_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_result_task_windowed_batch_demo.ns) ->
+  [network_result_session_bridge_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_result_session_bridge_demo.ns)
+* network session/task ladder:
+  [network_profile_summary_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_profile_summary_demo.ns) ->
+  [network_profile_session_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_profile_session_demo.ns) ->
+  [network_profile_task_policy_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_profile_task_policy_demo.ns) ->
+  [network_profile_task_fallback_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_profile_task_fallback_demo.ns) ->
+  [network_profile_task_batch_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_profile_task_batch_demo.ns) ->
+  [network_profile_task_windowed_batch_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_profile_task_windowed_batch_demo.ns)
 
 ## Shader Mirrors
 

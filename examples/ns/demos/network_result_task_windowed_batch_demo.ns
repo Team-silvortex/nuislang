@@ -1,0 +1,84 @@
+use cpu NetworkTaskAsyncShapes;
+use network NetworkUnit;
+
+mod cpu Main {
+  struct NetworkResultTaskBatchSummary {
+    control_completed: i64,
+    rx_completed: i64,
+    tx_completed: i64,
+    batch_value: i64
+  }
+
+  struct NetworkResultTaskWindowedBatchSummary {
+    preview_value: i64,
+    final_value: i64
+  }
+
+  async fn consume_network_result(result: NetworkResult<i64>) -> i64 {
+    if network_config_ready(result) {
+      return network_value(result) + 5;
+    }
+    return 0;
+  }
+
+  fn capture_network_result_task_batch_summary() -> NetworkResultTaskBatchSummary {
+    let control: NetworkResult<i64> =
+      network_result(network_profile_bind_core("NetworkUnit"));
+    let rx: NetworkResult<i64> =
+      network_result(network_profile_recv_window("NetworkUnit"));
+    let tx: NetworkResult<i64> =
+      network_result(network_profile_send_window("NetworkUnit"));
+
+    let control_task: Task<i64> = spawn(consume_network_result(control));
+    let rx_task: Task<i64> = spawn(consume_network_result(rx));
+    let tx_task: Task<i64> = spawn(consume_network_result(tx));
+
+    let control_result: TaskResult<i64> = join_result(control_task);
+    let rx_result: TaskResult<i64> = join_result(rx_task);
+    let tx_result: TaskResult<i64> = join_result(tx_task);
+
+    return NetworkResultTaskBatchSummary {
+      control_completed: NetworkTaskAsyncShapes.encode_completed(control_result),
+      rx_completed: NetworkTaskAsyncShapes.encode_completed(rx_result),
+      tx_completed: NetworkTaskAsyncShapes.encode_completed(tx_result),
+      batch_value: NetworkTaskAsyncShapes.async_batch_summary_value(
+        control_result,
+        rx_result,
+        tx_result
+      )
+    };
+  }
+
+  fn capture_network_result_task_windowed_batch_summary(
+    batch_summary: NetworkResultTaskBatchSummary
+  ) -> NetworkResultTaskWindowedBatchSummary {
+    return NetworkResultTaskWindowedBatchSummary {
+      preview_value: batch_summary.control_completed
+        + batch_summary.rx_completed
+        + batch_summary.tx_completed,
+      final_value: batch_summary.batch_value
+    };
+  }
+
+  fn main() {
+    let batch_summary: NetworkResultTaskBatchSummary =
+      capture_network_result_task_batch_summary();
+    let windowed_summary: NetworkResultTaskWindowedBatchSummary =
+      capture_network_result_task_windowed_batch_summary(batch_summary);
+    print(windowed_summary.preview_value + windowed_summary.final_value);
+  }
+}
+
+mod network NetworkUnit {
+  fn profile() {
+    const bind_core: i64 = 2;
+    const endpoint_kind: i64 = 1;
+    const local_port: i64 = 9000;
+    const remote_port: i64 = 443;
+    const connect_timeout_ms: i64 = 250;
+    const retry_budget: i64 = 3;
+    const stream_window: i64 = 64;
+    const recv_window: i64 = 32;
+    const send_window: i64 = 32;
+  }
+}

@@ -1,0 +1,8 @@
+name = "network_host_transport_runtime_demo"
+version = "0.1.0"
+entry = "main.ns"
+modules = ["main.ns", "network_unit.ns"]
+abi = [
+  "cpu=cpu.arm64.apple_aapcs64",
+  "network=network.socket.macos.arm64.v1",
+]

@@ -1,7 +1,7 @@
 # Shared Domain Helpers
 
 This folder holds project-local helper modules that are intentionally shared by
-multiple `shader` / `kernel` project-first demos.
+multiple `shader` / `kernel` / `network` project-first demos.
 
 These are not `std` wrappers.
 They are the current checked-in reuse point for project-local `cpu` helper
@@ -15,6 +15,9 @@ Current shared helpers:
 * [kernel_task_async_shapes.ns](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shared/kernel_task_async_shapes.ns)
   task-shaped async control helpers reused by kernel async tensor
   policy/fallback companions
+* [network_task_async_shapes.ns](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shared/network_task_async_shapes.ns)
+  task-shaped async session/policy/fallback/batch/windowed and result
+  policy/batch/windowed/bridge helpers reused by network companions
 
 Current stable helper reading rule:
 

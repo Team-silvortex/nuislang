@@ -1,0 +1,20 @@
+use network NetworkUnit;
+
+mod cpu Main {
+  fn main() {
+    let endpoint_kind: i64 = network_profile_endpoint_kind("NetworkUnit");
+    let local_port: i64 = network_profile_local_port("NetworkUnit");
+    let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+    let connect_timeout: i64 = network_profile_connect_timeout("NetworkUnit");
+    let read_timeout: i64 = network_profile_read_timeout("NetworkUnit");
+    let write_timeout: i64 = network_profile_write_timeout("NetworkUnit");
+    print(
+      endpoint_kind
+        + local_port
+        + remote_port
+        + connect_timeout
+        + read_timeout
+        + write_timeout
+    );
+  }
+}

@@ -850,6 +850,8 @@ fn collect_used_vars_expr(expr: &NirExpr, out: &mut BTreeSet<String>) {
         | NirExpr::CpuTaskCancelled(inner)
         | NirExpr::CpuTaskValue(inner)
         | NirExpr::CpuPresentFrame(inner)
+        | NirExpr::NetworkConfigReady(inner)
+        | NirExpr::NetworkValue(inner)
         | NirExpr::KernelShape(inner)
         | NirExpr::KernelRows(inner)
         | NirExpr::KernelCols(inner)
@@ -874,6 +876,7 @@ fn collect_used_vars_expr(expr: &NirExpr, out: &mut BTreeSet<String>) {
         | NirExpr::ShaderPassReady(inner)
         | NirExpr::ShaderFrameReady(inner)
         | NirExpr::ShaderValue(inner)
+        | NirExpr::NetworkResult { value: inner, .. }
         | NirExpr::Free(inner)
         | NirExpr::IsNull(inner) => collect_used_vars_expr(inner, out),
         NirExpr::KernelMatmul { lhs, rhs } => {
@@ -1076,9 +1079,16 @@ fn collect_used_vars_expr(expr: &NirExpr, out: &mut BTreeSet<String>) {
         | NirExpr::DataProfileMarkerRef { .. }
         | NirExpr::NetworkProfileBindCoreRef { .. }
         | NirExpr::NetworkProfileEndpointKindRef { .. }
+        | NirExpr::NetworkProfileLocalPortRef { .. }
+        | NirExpr::NetworkProfileRemotePortRef { .. }
+        | NirExpr::NetworkProfileConnectTimeoutRef { .. }
+        | NirExpr::NetworkProfileReadTimeoutRef { .. }
+        | NirExpr::NetworkProfileWriteTimeoutRef { .. }
         | NirExpr::NetworkProfileTimeoutBudgetRef { .. }
         | NirExpr::NetworkProfileRetryBudgetRef { .. }
         | NirExpr::NetworkProfileStreamWindowRef { .. }
+        | NirExpr::NetworkProfileRecvWindowRef { .. }
+        | NirExpr::NetworkProfileSendWindowRef { .. }
         | NirExpr::KernelProfileBindCoreRef { .. }
         | NirExpr::KernelProfileQueueDepthRef { .. }
         | NirExpr::KernelProfileBatchLanesRef { .. }

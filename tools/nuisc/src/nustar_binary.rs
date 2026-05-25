@@ -58,6 +58,28 @@ fn render_abi_target_contracts(manifest: &NustarPackageManifest) -> Vec<String> 
         .collect::<Vec<_>>()
 }
 
+fn render_runtime_symbol_contracts(manifest: &NustarPackageManifest) -> Vec<String> {
+    match manifest.domain_family.as_str() {
+        "network" => vec![
+            "host_symbol=network.connect:host_network_connect_probe".to_owned(),
+            "host_symbol=network.accept:host_network_accept_probe".to_owned(),
+            "host_symbol=network.close:host_network_close".to_owned(),
+            "host_symbol=network.send:host_network_send_probe".to_owned(),
+            "host_symbol=network.recv:host_network_recv_probe".to_owned(),
+        ],
+        _ => Vec::new(),
+    }
+}
+
+fn append_runtime_symbol_notes(base: &str, manifest: &NustarPackageManifest) -> String {
+    match manifest.domain_family.as_str() {
+        "network" => format!(
+            "{base}; runtime symbol contract currently reserves host_network_connect_probe, host_network_accept_probe, host_network_close, host_network_send_probe, and host_network_recv_probe as the minimal control/transport syscall bridge surface"
+        ),
+        _ => base.to_owned(),
+    }
+}
+
 pub fn validate_manifest_for_packaging(manifest: &NustarPackageManifest) -> Result<(), String> {
     if manifest.abi_profiles.is_empty() {
         return Err(format!(
@@ -474,10 +496,14 @@ fn implementation_contract(binary: &NustarBinary, kind: &str) -> ImplementationC
             ]
             .into_iter()
             .chain(render_abi_target_contracts(&binary.manifest))
+            .chain(render_runtime_symbol_contracts(&binary.manifest))
             .collect(),
             link_mode: "host-dynamic-load".to_owned(),
             machine_abi_policy: binary.manifest.machine_abi_policy.clone(),
-            notes: "expects a host-loadable shared library exporting the canonical loader entry with the canonical host/result structs".to_owned(),
+            notes: append_runtime_symbol_notes(
+                "expects a host-loadable shared library exporting the canonical loader entry with the canonical host/result structs",
+                &binary.manifest,
+            ),
         },
         "llvm-bc" => ImplementationContract {
             kind: kind.to_owned(),
@@ -502,10 +528,14 @@ fn implementation_contract(binary: &NustarBinary, kind: &str) -> ImplementationC
             ]
             .into_iter()
             .chain(render_abi_target_contracts(&binary.manifest))
+            .chain(render_runtime_symbol_contracts(&binary.manifest))
             .collect(),
             link_mode: "nuisc-link-or-lower".to_owned(),
             machine_abi_policy: binary.manifest.machine_abi_policy.clone(),
-            notes: "expects LLVM bitcode carrying the canonical loader entry symbol and the same bootstrap signature for later lowering/link integration".to_owned(),
+            notes: append_runtime_symbol_notes(
+                "expects LLVM bitcode carrying the canonical loader entry symbol and the same bootstrap signature for later lowering/link integration",
+                &binary.manifest,
+            ),
         },
         "native-stub" => ImplementationContract {
             kind: kind.to_owned(),
@@ -521,10 +551,14 @@ fn implementation_contract(binary: &NustarBinary, kind: &str) -> ImplementationC
             required_metadata: vec!["prototype_only=true".to_owned()]
                 .into_iter()
                 .chain(render_abi_target_contracts(&binary.manifest))
+                .chain(render_runtime_symbol_contracts(&binary.manifest))
                 .collect(),
             link_mode: "non-loadable".to_owned(),
             machine_abi_policy: binary.manifest.machine_abi_policy.clone(),
-            notes: "prototype-only placeholder implementation; may be inspected and packaged but does not provide executable domain code".to_owned(),
+            notes: append_runtime_symbol_notes(
+                "prototype-only placeholder implementation; may be inspected and packaged but does not provide executable domain code",
+                &binary.manifest,
+            ),
         },
         other => ImplementationContract {
             kind: kind.to_owned(),
@@ -544,11 +578,15 @@ fn implementation_contract(binary: &NustarBinary, kind: &str) -> ImplementationC
             required_metadata: vec!["custom_kind_requires_explicit_loader_adapter=true".to_owned()]
                 .into_iter()
                 .chain(render_abi_target_contracts(&binary.manifest))
+                .chain(render_runtime_symbol_contracts(&binary.manifest))
                 .collect(),
             link_mode: "custom".to_owned(),
             machine_abi_policy: binary.manifest.machine_abi_policy.clone(),
-            notes: format!(
-                "custom implementation kind `{other}` must still satisfy the canonical loader ABI and entry contract"
+            notes: append_runtime_symbol_notes(
+                &format!(
+                    "custom implementation kind `{other}` must still satisfy the canonical loader ABI and entry contract"
+                ),
+                &binary.manifest,
             ),
         },
     }
@@ -940,6 +978,65 @@ mod tests {
                     .iter()
                     .any(|item| item.starts_with("abi_target=")),
                 "missing abi_target metadata in {} contract",
+                contract.kind
+            );
+        }
+    }
+
+    #[test]
+    fn network_loader_contracts_include_control_host_symbol_metadata() {
+        let mut manifest = make_manifest("network");
+        manifest.implementation_kinds = vec![
+            "native-stub".to_owned(),
+            "native-dylib".to_owned(),
+            "llvm-bc".to_owned(),
+        ];
+        let binary = default_binary(manifest, Vec::new());
+        let contracts = implementation_contracts(&binary);
+        for contract in contracts {
+            assert!(
+                contract
+                    .required_metadata
+                    .iter()
+                    .any(|item| item == "host_symbol=network.connect:host_network_connect_probe"),
+                "missing network.connect host symbol metadata in {} contract",
+                contract.kind
+            );
+            assert!(
+                contract
+                    .required_metadata
+                    .iter()
+                    .any(|item| item == "host_symbol=network.accept:host_network_accept_probe"),
+                "missing network.accept host symbol metadata in {} contract",
+                contract.kind
+            );
+            assert!(
+                contract
+                    .required_metadata
+                    .iter()
+                    .any(|item| item == "host_symbol=network.close:host_network_close"),
+                "missing network.close host symbol metadata in {} contract",
+                contract.kind
+            );
+            assert!(
+                contract
+                    .required_metadata
+                    .iter()
+                    .any(|item| item == "host_symbol=network.send:host_network_send_probe"),
+                "missing network.send host symbol metadata in {} contract",
+                contract.kind
+            );
+            assert!(
+                contract
+                    .required_metadata
+                    .iter()
+                    .any(|item| item == "host_symbol=network.recv:host_network_recv_probe"),
+                "missing network.recv host symbol metadata in {} contract",
+                contract.kind
+            );
+            assert!(
+                contract.notes.contains("host_network_connect_probe"),
+                "missing runtime symbol note in {} contract",
                 contract.kind
             );
         }

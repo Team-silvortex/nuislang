@@ -476,9 +476,16 @@ fn verify_expr(
         | NirExpr::DataProfileMarkerRef { .. }
         | NirExpr::NetworkProfileBindCoreRef { .. }
         | NirExpr::NetworkProfileEndpointKindRef { .. }
+        | NirExpr::NetworkProfileLocalPortRef { .. }
+        | NirExpr::NetworkProfileRemotePortRef { .. }
+        | NirExpr::NetworkProfileConnectTimeoutRef { .. }
+        | NirExpr::NetworkProfileReadTimeoutRef { .. }
+        | NirExpr::NetworkProfileWriteTimeoutRef { .. }
         | NirExpr::NetworkProfileTimeoutBudgetRef { .. }
         | NirExpr::NetworkProfileRetryBudgetRef { .. }
         | NirExpr::NetworkProfileStreamWindowRef { .. }
+        | NirExpr::NetworkProfileRecvWindowRef { .. }
+        | NirExpr::NetworkProfileSendWindowRef { .. }
         | NirExpr::KernelProfileBindCoreRef { .. }
         | NirExpr::KernelProfileQueueDepthRef { .. }
         | NirExpr::KernelProfileBatchLanesRef { .. }
@@ -502,6 +509,8 @@ fn verify_expr(
         | NirExpr::ShaderPassReady(inner)
         | NirExpr::ShaderFrameReady(inner)
         | NirExpr::ShaderValue(inner)
+        | NirExpr::NetworkConfigReady(inner)
+        | NirExpr::NetworkValue(inner)
         | NirExpr::KernelConfigReady(inner)
         | NirExpr::KernelValue(inner)
         | NirExpr::KernelShape(inner)
@@ -513,7 +522,9 @@ fn verify_expr(
         | NirExpr::KernelReduceSum(inner) => {
             verify_expr(inner, moved, borrows, borrow_bindings, data_bindings)?
         }
-        NirExpr::KernelReduceMax(inner) | NirExpr::KernelReduceMean(inner) => {
+        NirExpr::KernelReduceMax(inner)
+        | NirExpr::KernelReduceMean(inner)
+        | NirExpr::NetworkResult { value: inner, .. } => {
             verify_expr(inner, moved, borrows, borrow_bindings, data_bindings)?
         }
         NirExpr::KernelArgmax(inner) | NirExpr::KernelArgmin(inner) => {
@@ -813,9 +824,16 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
         | NirExpr::DataProfileMarkerRef { .. }
         | NirExpr::NetworkProfileBindCoreRef { .. }
         | NirExpr::NetworkProfileEndpointKindRef { .. }
+        | NirExpr::NetworkProfileLocalPortRef { .. }
+        | NirExpr::NetworkProfileRemotePortRef { .. }
+        | NirExpr::NetworkProfileConnectTimeoutRef { .. }
+        | NirExpr::NetworkProfileReadTimeoutRef { .. }
+        | NirExpr::NetworkProfileWriteTimeoutRef { .. }
         | NirExpr::NetworkProfileTimeoutBudgetRef { .. }
         | NirExpr::NetworkProfileRetryBudgetRef { .. }
         | NirExpr::NetworkProfileStreamWindowRef { .. }
+        | NirExpr::NetworkProfileRecvWindowRef { .. }
+        | NirExpr::NetworkProfileSendWindowRef { .. }
         | NirExpr::KernelProfileBindCoreRef { .. }
         | NirExpr::KernelProfileQueueDepthRef { .. }
         | NirExpr::KernelProfileBatchLanesRef { .. }
@@ -839,6 +857,8 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
         | NirExpr::ShaderPassReady(inner)
         | NirExpr::ShaderFrameReady(inner)
         | NirExpr::ShaderValue(inner)
+        | NirExpr::NetworkConfigReady(inner)
+        | NirExpr::NetworkValue(inner)
         | NirExpr::KernelConfigReady(inner)
         | NirExpr::KernelValue(inner)
         | NirExpr::KernelShape(inner)
@@ -848,9 +868,9 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
         | NirExpr::KernelCol(inner)
         | NirExpr::KernelRelu(inner)
         | NirExpr::KernelReduceSum(inner) => verify_expr_uses(inner, moved)?,
-        NirExpr::KernelReduceMax(inner) | NirExpr::KernelReduceMean(inner) => {
-            verify_expr_uses(inner, moved)?
-        }
+        NirExpr::KernelReduceMax(inner)
+        | NirExpr::KernelReduceMean(inner)
+        | NirExpr::NetworkResult { value: inner, .. } => verify_expr_uses(inner, moved)?,
         NirExpr::KernelArgmax(inner) | NirExpr::KernelArgmin(inner) => {
             verify_expr_uses(inner, moved)?
         }

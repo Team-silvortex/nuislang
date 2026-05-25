@@ -734,6 +734,20 @@ fn render_host_ffi_stub(symbol: &str, arg_count: usize) -> String {
         "    return host_radius_curve(arg0);".to_owned()
     } else if symbol.ends_with("mix_tick") && arg_count >= 2 {
         "    return host_mix_tick(arg0, arg1);".to_owned()
+    } else if symbol == "host_network_connect_probe" && arg_count >= 3 {
+        "    if (arg0 <= 0 || arg1 <= 0 || arg2 < 0) return 0;\n    return arg0 + arg1 + arg2;"
+            .to_owned()
+    } else if symbol == "host_network_accept_probe" && arg_count >= 3 {
+        "    if (arg0 <= 0 || arg1 < 0 || arg2 < 0) return 0;\n    return arg0 + arg1 + arg2;"
+            .to_owned()
+    } else if symbol == "host_network_close" && arg_count >= 1 {
+        "    return arg0 > 0 ? 1 : 0;".to_owned()
+    } else if symbol == "host_network_send_probe" && arg_count >= 3 {
+        "    if (arg0 <= 0 || arg1 <= 0 || arg2 <= 0) return 0;\n    return arg0 + arg1 + arg2;"
+            .to_owned()
+    } else if symbol == "host_network_recv_probe" && arg_count >= 3 {
+        "    if (arg0 <= 0 || arg1 <= 0 || arg2 <= 0) return 0;\n    return arg0 + arg1 + arg2;"
+            .to_owned()
     } else if arg_count == 0 {
         "    return 0;".to_owned()
     } else if arg_count == 1 {

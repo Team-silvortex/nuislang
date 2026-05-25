@@ -3919,6 +3919,10 @@ fn resolve_project_profile_refs(module: &mut YirModule) -> Result<(), String> {
         for arg in &mut node.op.args {
             if let Some(target) = replacements.get(arg) {
                 *arg = target.clone();
+            } else if let Some((field, value)) = arg.split_once('=') {
+                if let Some(target) = replacements.get(value) {
+                    *arg = format!("{field}={target}");
+                }
             }
         }
     }
@@ -5091,6 +5095,14 @@ mod tests {
         assert_eq!(
             resolve_project_profile_target_name("network", "NetworkUnit", "stream_window"),
             "project_profile_network_NetworkUnit_stream_window"
+        );
+        assert_eq!(
+            resolve_project_profile_target_name("network", "NetworkUnit", "recv_window"),
+            "project_profile_network_NetworkUnit_recv_window"
+        );
+        assert_eq!(
+            resolve_project_profile_target_name("network", "NetworkUnit", "send_window"),
+            "project_profile_network_NetworkUnit_send_window"
         );
     }
 

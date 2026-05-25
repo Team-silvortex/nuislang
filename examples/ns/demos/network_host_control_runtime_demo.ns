@@ -1,0 +1,81 @@
+use network NetworkUnit;
+
+mod cpu Main {
+  extern "c" fn host_network_connect_probe(
+    local_port: i64,
+    remote_port: i64,
+    connect_timeout_ms: i64
+  ) -> i64;
+  extern "c" fn host_network_accept_probe(
+    local_port: i64,
+    read_timeout_ms: i64,
+    write_timeout_ms: i64
+  ) -> i64;
+  extern "c" fn host_network_close(handle: i64) -> i64;
+
+  struct NetworkHostControlSummary {
+    local_port: i64,
+    remote_port: i64,
+    connect_timeout_ms: i64,
+    read_timeout_ms: i64,
+    write_timeout_ms: i64,
+    connect_probe: i64,
+    accept_probe: i64,
+    close_code: i64
+  }
+
+  fn capture_network_host_control_summary() -> NetworkHostControlSummary {
+    let local_port: i64 = network_profile_local_port("NetworkUnit");
+    let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+    let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
+    let read_timeout_ms: i64 = network_profile_read_timeout("NetworkUnit");
+    let write_timeout_ms: i64 = network_profile_write_timeout("NetworkUnit");
+
+    let connect_probe: i64 =
+      host_network_connect_probe(local_port, remote_port, connect_timeout_ms);
+    let accept_probe: i64 =
+      host_network_accept_probe(local_port, read_timeout_ms, write_timeout_ms);
+    let close_code: i64 = host_network_close(local_port);
+
+    return NetworkHostControlSummary {
+      local_port: local_port,
+      remote_port: remote_port,
+      connect_timeout_ms: connect_timeout_ms,
+      read_timeout_ms: read_timeout_ms,
+      write_timeout_ms: write_timeout_ms,
+      connect_probe: connect_probe,
+      accept_probe: accept_probe,
+      close_code: close_code
+    };
+  }
+
+  fn main() {
+    let summary: NetworkHostControlSummary = capture_network_host_control_summary();
+    print(
+      summary.local_port
+        + summary.remote_port
+        + summary.connect_timeout_ms
+        + summary.read_timeout_ms
+        + summary.write_timeout_ms
+        + summary.connect_probe
+        + summary.accept_probe
+        + summary.close_code
+    );
+  }
+}
+
+mod network NetworkUnit {
+  fn profile() {
+    const bind_core: i64 = 2;
+    const endpoint_kind: i64 = 1;
+    const local_port: i64 = 9000;
+    const remote_port: i64 = 443;
+    const connect_timeout_ms: i64 = 250;
+    const read_timeout_ms: i64 = 125;
+    const write_timeout_ms: i64 = 150;
+    const retry_budget: i64 = 3;
+    const stream_window: i64 = 64;
+    const recv_window: i64 = 32;
+    const send_window: i64 = 32;
+  }
+}

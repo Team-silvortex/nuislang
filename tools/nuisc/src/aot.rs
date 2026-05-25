@@ -1057,6 +1057,49 @@ static int64_t nuis_host_file_close(int64_t file_handle) {
     return close((int)file_handle) == 0 ? 1 : 0;
 }
 
+static int64_t nuis_host_network_connect_probe(
+    int64_t local_port,
+    int64_t remote_port,
+    int64_t connect_timeout_ms
+) {
+    if (local_port <= 0 || remote_port <= 0) return 0;
+    if (connect_timeout_ms < 0) return 0;
+    return local_port + remote_port + connect_timeout_ms;
+}
+
+static int64_t nuis_host_network_accept_probe(
+    int64_t local_port,
+    int64_t read_timeout_ms,
+    int64_t write_timeout_ms
+) {
+    if (local_port <= 0) return 0;
+    if (read_timeout_ms < 0 || write_timeout_ms < 0) return 0;
+    return local_port + read_timeout_ms + write_timeout_ms;
+}
+
+static int64_t nuis_host_network_close(int64_t handle) {
+    if (handle <= 0) return 0;
+    return 1;
+}
+
+static int64_t nuis_host_network_send_probe(
+    int64_t stream_window,
+    int64_t send_window,
+    int64_t remote_port
+) {
+    if (stream_window <= 0 || send_window <= 0 || remote_port <= 0) return 0;
+    return stream_window + send_window + remote_port;
+}
+
+static int64_t nuis_host_network_recv_probe(
+    int64_t stream_window,
+    int64_t recv_window,
+    int64_t local_port
+) {
+    if (stream_window <= 0 || recv_window <= 0 || local_port <= 0) return 0;
+    return stream_window + recv_window + local_port;
+}
+
 static int64_t nuis_host_dir_open(int64_t path_handle) {
     const char* path = nuis_host_text_lookup(path_handle);
     if (path == NULL || path[0] == '\0') return 0;
@@ -1938,6 +1981,39 @@ fn render_host_ffi_stub(symbol: &str, function: AstExternFunction) -> String {
         format!(
             "    return nuis_host_file_close({});",
             arg_name(0, &function)
+        )
+    } else if symbol == "host_network_connect_probe" {
+        format!(
+            "    return nuis_host_network_connect_probe({}, {}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function),
+            arg_name(2, &function)
+        )
+    } else if symbol == "host_network_accept_probe" {
+        format!(
+            "    return nuis_host_network_accept_probe({}, {}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function),
+            arg_name(2, &function)
+        )
+    } else if symbol == "host_network_close" {
+        format!(
+            "    return nuis_host_network_close({});",
+            arg_name(0, &function)
+        )
+    } else if symbol == "host_network_send_probe" {
+        format!(
+            "    return nuis_host_network_send_probe({}, {}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function),
+            arg_name(2, &function)
+        )
+    } else if symbol == "host_network_recv_probe" {
+        format!(
+            "    return nuis_host_network_recv_probe({}, {}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function),
+            arg_name(2, &function)
         )
     } else if symbol == "host_dir_open" {
         format!("    return nuis_host_dir_open({});", arg_name(0, &function))
@@ -2918,6 +2994,134 @@ mod tests {
         assert!(shim.contains("return nuis_host_file_write(file_handle, text_handle);"));
         assert!(shim.contains("return nuis_host_stdin_read(buffer_handle, len);"));
         assert!(shim.contains("return nuis_host_tty_width(fd);"));
+    }
+
+    #[test]
+    fn c_shim_source_includes_network_control_hooks() {
+        fn i64_ty() -> AstTypeRef {
+            AstTypeRef {
+                name: "i64".to_owned(),
+                generic_args: Vec::new(),
+                is_optional: false,
+                is_ref: false,
+            }
+        }
+
+        let ast = AstModule {
+            uses: Vec::new(),
+            domain: "cpu".to_owned(),
+            unit: "Main".to_owned(),
+            externs: vec![
+                AstExternFunction {
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_network_connect_probe".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "local_port".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "remote_port".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "connect_timeout_ms".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                },
+                AstExternFunction {
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_network_accept_probe".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "local_port".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "read_timeout_ms".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "write_timeout_ms".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                },
+                AstExternFunction {
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_network_close".to_owned(),
+                    params: vec![nuis_semantics::model::AstParam {
+                        name: "handle".to_owned(),
+                        ty: i64_ty(),
+                    }],
+                    return_type: i64_ty(),
+                },
+                AstExternFunction {
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_network_send_probe".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "stream_window".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "send_window".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "remote_port".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                },
+                AstExternFunction {
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_network_recv_probe".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "stream_window".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "recv_window".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "local_port".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                },
+            ],
+            extern_interfaces: Vec::new(),
+            structs: Vec::new(),
+            functions: Vec::new(),
+        };
+
+        let shim = c_shim_source(&ast);
+        assert!(shim.contains(
+            "return nuis_host_network_connect_probe(local_port, remote_port, connect_timeout_ms);"
+        ));
+        assert!(shim.contains(
+            "return nuis_host_network_accept_probe(local_port, read_timeout_ms, write_timeout_ms);"
+        ));
+        assert!(shim.contains("return nuis_host_network_close(handle);"));
+        assert!(shim.contains(
+            "return nuis_host_network_send_probe(stream_window, send_window, remote_port);"
+        ));
+        assert!(shim.contains(
+            "return nuis_host_network_recv_probe(stream_window, recv_window, local_port);"
+        ));
     }
 
     #[test]

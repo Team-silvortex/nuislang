@@ -109,6 +109,24 @@ Current `nustar` loading policy is:
   * `scheduler_result_roles`
   * `scheduler_summary_api`
   * `scheduler_observer_classes`
+* `nuis loader-contract official.network` now also exposes the minimal control
+  host symbol reservation through `required_metadata`, currently:
+  * `host_symbol=network.connect:host_network_connect_probe`
+  * `host_symbol=network.accept:host_network_accept_probe`
+  * `host_symbol=network.close:host_network_close`
+  * `host_symbol=network.send:host_network_send_probe`
+  * `host_symbol=network.recv:host_network_recv_probe`
+* the current narrow project-first bridge sample is
+  [network_host_control_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_control_runtime_demo),
+  whose `dump-yir` output currently shows:
+  * `cpu.extern_call_i64 ... c host_network_connect_probe ...`
+  * `cpu.extern_call_i64 ... c host_network_accept_probe ...`
+  * `cpu.extern_call_i64 ... c host_network_close ...`
+* the current narrow transport companion is
+  [network_host_transport_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_transport_runtime_demo),
+  whose `dump-yir` output currently shows:
+  * `cpu.extern_call_i64 ... c host_network_send_probe ...`
+  * `cpu.extern_call_i64 ... c host_network_recv_probe ...`
 * `nuis project-status` and `nuis project-doctor` now also print the same
   scheduler-facing reading view per resolved domain requirement, plus the
   resolved clock/bridge line for that domain
@@ -213,6 +231,7 @@ cargo run -p nuis -- galaxy init examples/projects/window_controls_demo --framew
 cargo run -p nuis -- galaxy check examples/projects/window_controls_demo
 cargo run -p nuis -- galaxy lock-deps examples/projects/window_controls_demo
 cargo run -p nuis -- galaxy sync-deps examples/projects/window_controls_demo
+cargo run -p nuis -- dump-yir examples/projects/domains/network_host_control_runtime_demo
 ```
 
 Important current distinction:

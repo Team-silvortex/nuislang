@@ -6,6 +6,7 @@ members = [
     "crates/yir-core",
     "crates/yir-domain-cpu",
     "crates/yir-domain-kernel",
+    "crates/yir-domain-network",
     "crates/yir-domain-npu",
     "crates/yir-domain-shader",
     "crates/yir-host-render",

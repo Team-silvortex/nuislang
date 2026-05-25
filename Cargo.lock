@@ -54,6 +54,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "yir-domain-network"
+version = "0.1.0"
+dependencies = [
+ "yir-core",
+]
+
+[[package]]
 name = "yir-domain-npu"
 version = "0.1.0"
 dependencies = [
@@ -166,6 +173,7 @@ dependencies = [
  "yir-core",
  "yir-domain-cpu",
  "yir-domain-kernel",
+ "yir-domain-network",
  "yir-domain-npu",
  "yir-domain-shader",
 ]

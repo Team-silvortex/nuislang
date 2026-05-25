@@ -1,0 +1,126 @@
+use cpu NetworkTaskAsyncShapes;
+use network NetworkUnit;
+
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+
+  struct NetworkProfileSummary {
+    bind_core: i64,
+    endpoint_kind: i64,
+    timeout_budget: i64,
+    retry_budget: i64,
+    stream_window: i64,
+    recv_window: i64,
+    send_window: i64
+  }
+
+  struct NetworkTaskBatchSummary {
+    control_completed: i64,
+    tx_completed: i64,
+    rx_completed: i64,
+    batch_value: i64
+  }
+
+  struct NetworkTaskWindowedBatchSummary {
+    argv_count: i64,
+    preview_value: i64,
+    final_value: i64
+  }
+
+  async fn plan_control(seed: i64) -> i64 {
+    return seed + 29;
+  }
+
+  async fn plan_tx(seed: i64) -> i64 {
+    return seed + 17;
+  }
+
+  async fn plan_rx(seed: i64) -> i64 {
+    return seed + 13;
+  }
+
+  fn capture_network_profile_summary() -> NetworkProfileSummary {
+    let bind_core: i64 = network_profile_bind_core("NetworkUnit");
+    let endpoint_kind: i64 = network_profile_endpoint_kind("NetworkUnit");
+    let timeout_budget: i64 = network_profile_timeout_budget("NetworkUnit");
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+    return NetworkProfileSummary {
+      bind_core: bind_core,
+      endpoint_kind: endpoint_kind,
+      timeout_budget: timeout_budget,
+      retry_budget: retry_budget,
+      stream_window: stream_window,
+      recv_window: recv_window,
+      send_window: send_window
+    };
+  }
+
+  fn capture_network_task_batch_summary() -> NetworkTaskBatchSummary {
+    let argv_count: i64 = host_argv_count();
+    let profile: NetworkProfileSummary = capture_network_profile_summary();
+
+    let control_task: Task<i64> = spawn(
+      plan_control(
+        argv_count
+          + profile.bind_core
+          + profile.endpoint_kind
+          + profile.timeout_budget
+          + profile.retry_budget
+      )
+    );
+    let tx_task: Task<i64> =
+      spawn(plan_tx(argv_count + profile.stream_window + profile.send_window));
+    let rx_task: Task<i64> =
+      spawn(plan_rx(argv_count + profile.stream_window + profile.recv_window));
+
+    let control_result: TaskResult<i64> = join_result(control_task);
+    let tx_result: TaskResult<i64> = join_result(tx_task);
+    let rx_result: TaskResult<i64> = join_result(rx_task);
+
+    return NetworkTaskBatchSummary {
+      control_completed: NetworkTaskAsyncShapes.encode_completed(control_result),
+      tx_completed: NetworkTaskAsyncShapes.encode_completed(tx_result),
+      rx_completed: NetworkTaskAsyncShapes.encode_completed(rx_result),
+      batch_value: NetworkTaskAsyncShapes.async_batch_summary_value(
+        control_result,
+        rx_result,
+        tx_result
+      )
+    };
+  }
+
+  fn capture_network_task_windowed_batch_summary() -> NetworkTaskWindowedBatchSummary {
+    let argv_count: i64 = host_argv_count();
+    let batch_summary: NetworkTaskBatchSummary = capture_network_task_batch_summary();
+    return NetworkTaskWindowedBatchSummary {
+      argv_count: argv_count,
+      preview_value: batch_summary.control_completed
+        + batch_summary.tx_completed
+        + batch_summary.rx_completed,
+      final_value: batch_summary.batch_value
+    };
+  }
+
+  fn main() {
+    let summary: NetworkTaskWindowedBatchSummary =
+      capture_network_task_windowed_batch_summary();
+    print(summary.argv_count + summary.preview_value + summary.final_value);
+  }
+}
+
+mod network NetworkUnit {
+  fn profile() {
+    const bind_core: i64 = 2;
+    const endpoint_kind: i64 = 1;
+    const local_port: i64 = 9000;
+    const remote_port: i64 = 443;
+    const connect_timeout_ms: i64 = 250;
+    const retry_budget: i64 = 3;
+    const stream_window: i64 = 64;
+    const recv_window: i64 = 32;
+    const send_window: i64 = 32;
+  }
+}

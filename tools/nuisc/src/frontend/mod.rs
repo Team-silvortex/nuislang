@@ -6,9 +6,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use nuis_semantics::model::{
     AstBinaryOp, AstExpr, AstFunction, AstModule, AstParam, AstStmt, AstTypeRef, NirBinaryOp,
     NirDataFlowState, NirExpr, NirExternFunction, NirExternInterface, NirFunction, NirKernelAxis,
-    NirKernelFlowState, NirKernelMapOp, NirKernelZipOp, NirModule, NirParam, NirResultFamily,
-    NirResultStage, NirShaderFlowState, NirStmt, NirStructDef, NirStructField, NirTypeRef, NirUse,
-    NirWindowMode,
+    NirKernelFlowState, NirKernelMapOp, NirKernelZipOp, NirModule, NirNetworkFlowState, NirParam,
+    NirResultFamily, NirResultStage, NirShaderFlowState, NirStmt, NirStructDef, NirStructField,
+    NirTypeRef, NirUse, NirWindowMode,
 };
 
 pub fn frontend_name() -> &'static str {
@@ -11347,6 +11347,95 @@ fn lower_call_expr_with_async(
             };
             Ok(NirExpr::NetworkProfileEndpointKindRef { unit: unit.clone() })
         }
+        "network_profile_local_port" => {
+            let [unit] = args else {
+                return Err("network_profile_local_port(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "network_profile_local_port(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err(
+                    "network_profile_local_port(...) expects a string literal unit name".to_owned(),
+                );
+            };
+            Ok(NirExpr::NetworkProfileLocalPortRef { unit: unit.clone() })
+        }
+        "network_profile_remote_port" => {
+            let [unit] = args else {
+                return Err("network_profile_remote_port(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "network_profile_remote_port(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err(
+                    "network_profile_remote_port(...) expects a string literal unit name"
+                        .to_owned(),
+                );
+            };
+            Ok(NirExpr::NetworkProfileRemotePortRef { unit: unit.clone() })
+        }
+        "network_profile_connect_timeout" => {
+            let [unit] = args else {
+                return Err("network_profile_connect_timeout(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "network_profile_connect_timeout(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err(
+                    "network_profile_connect_timeout(...) expects a string literal unit name"
+                        .to_owned(),
+                );
+            };
+            Ok(NirExpr::NetworkProfileConnectTimeoutRef { unit: unit.clone() })
+        }
+        "network_profile_read_timeout" => {
+            let [unit] = args else {
+                return Err("network_profile_read_timeout(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "network_profile_read_timeout(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err(
+                    "network_profile_read_timeout(...) expects a string literal unit name"
+                        .to_owned(),
+                );
+            };
+            Ok(NirExpr::NetworkProfileReadTimeoutRef { unit: unit.clone() })
+        }
+        "network_profile_write_timeout" => {
+            let [unit] = args else {
+                return Err("network_profile_write_timeout(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "network_profile_write_timeout(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err(
+                    "network_profile_write_timeout(...) expects a string literal unit name"
+                        .to_owned(),
+                );
+            };
+            Ok(NirExpr::NetworkProfileWriteTimeoutRef { unit: unit.clone() })
+        }
         "network_profile_timeout_budget" => {
             let [unit] = args else {
                 return Err("network_profile_timeout_budget(...) expects 1 arg".to_owned());
@@ -11401,6 +11490,83 @@ fn lower_call_expr_with_async(
             };
             Ok(NirExpr::NetworkProfileStreamWindowRef { unit: unit.clone() })
         }
+        "network_profile_recv_window" => {
+            let [unit] = args else {
+                return Err("network_profile_recv_window(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "network_profile_recv_window(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err(
+                    "network_profile_recv_window(...) expects a string literal unit name"
+                        .to_owned(),
+                );
+            };
+            Ok(NirExpr::NetworkProfileRecvWindowRef { unit: unit.clone() })
+        }
+        "network_profile_send_window" => {
+            let [unit] = args else {
+                return Err("network_profile_send_window(...) expects 1 arg".to_owned());
+            };
+            if current_domain != "cpu" {
+                return Err(
+                    "network_profile_send_window(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let AstExpr::Text(unit) = unit else {
+                return Err(
+                    "network_profile_send_window(...) expects a string literal unit name"
+                        .to_owned(),
+                );
+            };
+            Ok(NirExpr::NetworkProfileSendWindowRef { unit: unit.clone() })
+        }
+        "network_result" => lower_result_wrapper_call(
+            "network_result",
+            args,
+            current_domain,
+            current_function_is_async,
+            bindings,
+            signatures,
+            struct_table,
+            NirResultFamily::Network,
+            infer_result_stage,
+            |value, stage| match stage {
+                NirResultStage::Network(state) => Ok(NirExpr::NetworkResult { value, state }),
+                other => Err(format!(
+                    "expected network result stage, found `{}`",
+                    other.render()
+                )),
+            },
+            "expects a direct network profile/config expression",
+        ),
+        "network_config_ready" => lower_result_observer_call(
+            "network_config_ready",
+            args,
+            current_domain,
+            current_function_is_async,
+            bindings,
+            signatures,
+            struct_table,
+            NirResultFamily::Network,
+            |expr| NirExpr::NetworkConfigReady(Box::new(expr)),
+        ),
+        "network_value" => lower_result_observer_call(
+            "network_value",
+            args,
+            current_domain,
+            current_function_is_async,
+            bindings,
+            signatures,
+            struct_table,
+            NirResultFamily::Network,
+            |expr| NirExpr::NetworkValue(Box::new(expr)),
+        ),
         "kernel_profile_bind_core" => {
             let [unit] = args else {
                 return Err("kernel_profile_bind_core(...) expects 1 arg".to_owned());
@@ -12703,6 +12869,20 @@ fn infer_result_stage(expr: &NirExpr) -> Option<NirResultStage> {
         NirExpr::ShaderDrawInstanced { .. } | NirExpr::ShaderProfileRender { .. } => {
             Some(NirShaderFlowState::FrameReady.into())
         }
+        NirExpr::NetworkProfileBindCoreRef { .. }
+        | NirExpr::NetworkProfileEndpointKindRef { .. }
+        | NirExpr::NetworkProfileLocalPortRef { .. }
+        | NirExpr::NetworkProfileRemotePortRef { .. }
+        | NirExpr::NetworkProfileConnectTimeoutRef { .. }
+        | NirExpr::NetworkProfileReadTimeoutRef { .. }
+        | NirExpr::NetworkProfileWriteTimeoutRef { .. }
+        | NirExpr::NetworkProfileTimeoutBudgetRef { .. }
+        | NirExpr::NetworkProfileRetryBudgetRef { .. }
+        | NirExpr::NetworkProfileStreamWindowRef { .. }
+        | NirExpr::NetworkProfileRecvWindowRef { .. }
+        | NirExpr::NetworkProfileSendWindowRef { .. } => {
+            Some(NirNetworkFlowState::ConfigReady.into())
+        }
         NirExpr::KernelProfileBindCoreRef { .. }
         | NirExpr::KernelProfileQueueDepthRef { .. }
         | NirExpr::KernelProfileBatchLanesRef { .. }
@@ -12841,9 +13021,24 @@ fn infer_nir_expr_type(
         NirExpr::DataProfileMarkerRef { .. } => Some(named_type("Marker")),
         NirExpr::NetworkProfileBindCoreRef { .. } => Some(i64_type()),
         NirExpr::NetworkProfileEndpointKindRef { .. } => Some(i64_type()),
+        NirExpr::NetworkProfileLocalPortRef { .. } => Some(i64_type()),
+        NirExpr::NetworkProfileRemotePortRef { .. } => Some(i64_type()),
+        NirExpr::NetworkProfileConnectTimeoutRef { .. } => Some(i64_type()),
+        NirExpr::NetworkProfileReadTimeoutRef { .. } => Some(i64_type()),
+        NirExpr::NetworkProfileWriteTimeoutRef { .. } => Some(i64_type()),
         NirExpr::NetworkProfileTimeoutBudgetRef { .. } => Some(i64_type()),
         NirExpr::NetworkProfileRetryBudgetRef { .. } => Some(i64_type()),
         NirExpr::NetworkProfileStreamWindowRef { .. } => Some(i64_type()),
+        NirExpr::NetworkProfileRecvWindowRef { .. } => Some(i64_type()),
+        NirExpr::NetworkProfileSendWindowRef { .. } => Some(i64_type()),
+        NirExpr::NetworkResult { value, .. } => {
+            expr_type(value, bindings, signatures, struct_table)
+                .map(|inner| make_result_type(NirResultFamily::Network, inner))
+        }
+        NirExpr::NetworkConfigReady(_) => Some(bool_type()),
+        NirExpr::NetworkValue(result) => {
+            result_payload_type(result, bindings, signatures, struct_table)
+        }
         NirExpr::KernelProfileBindCoreRef { .. } => Some(i64_type()),
         NirExpr::KernelProfileQueueDepthRef { .. } => Some(i64_type()),
         NirExpr::KernelProfileBatchLanesRef { .. } => Some(i64_type()),
@@ -13985,7 +14180,7 @@ fn async_parameter_violation_detail_inner(
 ) -> Option<String> {
     if let Some(result_family) = ty.result_family() {
         match result_family {
-            NirResultFamily::Shader | NirResultFamily::Kernel => {
+            NirResultFamily::Shader | NirResultFamily::Kernel | NirResultFamily::Network => {
                 let payload = ty.result_payload().expect("result payload");
                 if !payload.is_async_boundary_safe() {
                     return Some(format!(

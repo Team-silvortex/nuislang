@@ -109,6 +109,16 @@ remains `Stateful` in compiler effect classification.
 This is intentional for now: the compiler does not yet pretend that every host
 FFI function is a safe read-only probe.
 
+One concrete current example is the bootstrap `network` control bridge:
+
+* [network_host_control_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_control_runtime_demo)
+
+That sample lowers `host_network_connect_probe(...)`,
+`host_network_accept_probe(...)`, and `host_network_close(...)` through
+`cpu.extern_call_i64`. So even though those calls now participate in an
+explicit `network` loader/runtime symbol contract, they still remain on the
+conservative CPU host-FFI side of the current effect model.
+
 ## Current Contract
 
 The safe thing to assume today is:

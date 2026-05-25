@@ -31,6 +31,7 @@ enum ResultLoweringDomain {
     Data,
     Shader,
     Kernel,
+    Network,
 }
 
 impl ResultLoweringDomain {
@@ -39,6 +40,7 @@ impl ResultLoweringDomain {
             Self::Data => "data",
             Self::Shader => "shader",
             Self::Kernel => "kernel",
+            Self::Network => "network",
         }
     }
 
@@ -47,6 +49,7 @@ impl ResultLoweringDomain {
             Self::Data => "fabric0",
             Self::Shader => "shader0",
             Self::Kernel => "kernel0",
+            Self::Network => "network0",
         }
     }
 
@@ -55,6 +58,7 @@ impl ResultLoweringDomain {
             Self::Data => ensure_fabric_resource(yir),
             Self::Shader => ensure_shader_resource(yir),
             Self::Kernel => ensure_kernel_resource(yir),
+            Self::Network => ensure_network_resource(yir),
         }
     }
 }
@@ -385,6 +389,7 @@ fn render_result_lane_contract(family: &str) -> String {
         "cpu" => "main",
         "data" => "fabric",
         "shader" => "setup",
+        "network" => "control",
         "kernel" | "npu" => "compute",
         _ => "main",
     };
@@ -3172,6 +3177,21 @@ fn lower_expr(
         NirExpr::NetworkProfileEndpointKindRef { unit } => {
             lower_project_profile_ref(state, "network", unit, "endpoint_kind")
         }
+        NirExpr::NetworkProfileLocalPortRef { unit } => {
+            lower_project_profile_ref(state, "network", unit, "local_port")
+        }
+        NirExpr::NetworkProfileRemotePortRef { unit } => {
+            lower_project_profile_ref(state, "network", unit, "remote_port")
+        }
+        NirExpr::NetworkProfileConnectTimeoutRef { unit } => {
+            lower_project_profile_ref(state, "network", unit, "connect_timeout_ms")
+        }
+        NirExpr::NetworkProfileReadTimeoutRef { unit } => {
+            lower_project_profile_ref(state, "network", unit, "read_timeout_ms")
+        }
+        NirExpr::NetworkProfileWriteTimeoutRef { unit } => {
+            lower_project_profile_ref(state, "network", unit, "write_timeout_ms")
+        }
         NirExpr::NetworkProfileTimeoutBudgetRef { unit } => {
             lower_project_profile_ref(state, "network", unit, "connect_timeout_ms")
         }
@@ -3181,6 +3201,36 @@ fn lower_expr(
         NirExpr::NetworkProfileStreamWindowRef { unit } => {
             lower_project_profile_ref(state, "network", unit, "stream_window")
         }
+        NirExpr::NetworkProfileRecvWindowRef { unit } => {
+            lower_project_profile_ref(state, "network", unit, "recv_window")
+        }
+        NirExpr::NetworkProfileSendWindowRef { unit } => {
+            lower_project_profile_ref(state, "network", unit, "send_window")
+        }
+        NirExpr::NetworkResult { value, state: flow } => lower_result_observe_node(
+            state,
+            bindings,
+            ResultLoweringDomain::Network,
+            value,
+            "network_result",
+            flow.render(),
+        ),
+        NirExpr::NetworkConfigReady(result) => lower_result_unary_value_effect(
+            state,
+            bindings,
+            ResultLoweringDomain::Network,
+            result,
+            "network_config_ready",
+            "is_config_ready",
+        ),
+        NirExpr::NetworkValue(result) => lower_result_unary_value_effect(
+            state,
+            bindings,
+            ResultLoweringDomain::Network,
+            result,
+            "network_value",
+            "value",
+        ),
         NirExpr::KernelProfileBindCoreRef { unit } => {
             lower_project_profile_ref(state, "kernel", unit, "bind_core")
         }
@@ -4953,6 +5003,20 @@ fn ensure_kernel_resource(yir: &mut YirModule) {
     yir.resources.push(Resource {
         name: "kernel0".to_owned(),
         kind: ResourceKind::parse("kernel.compute"),
+    });
+}
+
+fn ensure_network_resource(yir: &mut YirModule) {
+    if yir
+        .resources
+        .iter()
+        .any(|resource| resource.name == "network0")
+    {
+        return;
+    }
+    yir.resources.push(Resource {
+        name: "network0".to_owned(),
+        kind: ResourceKind::parse("network.io"),
     });
 }
 

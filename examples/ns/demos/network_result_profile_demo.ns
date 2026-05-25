@@ -1,0 +1,43 @@
+use network NetworkUnit;
+
+mod cpu Main {
+  fn encode_ready(result: NetworkResult<i64>) -> i64 {
+    if network_config_ready(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_value(result: NetworkResult<i64>) -> i64 {
+    if network_config_ready(result) {
+      return network_value(result);
+    }
+    return 0;
+  }
+
+  fn main() {
+    let bind_core: NetworkResult<i64> =
+      network_result(network_profile_bind_core("NetworkUnit"));
+    let recv_window: NetworkResult<i64> =
+      network_result(network_profile_recv_window("NetworkUnit"));
+
+    let ready_score: i64 = encode_ready(bind_core) + encode_ready(recv_window);
+    let value_score: i64 = encode_value(bind_core) + encode_value(recv_window);
+
+    print(ready_score + value_score);
+  }
+}
+
+mod network NetworkUnit {
+  fn profile() {
+    const bind_core: i64 = 2;
+    const endpoint_kind: i64 = 1;
+    const local_port: i64 = 9000;
+    const remote_port: i64 = 443;
+    const connect_timeout_ms: i64 = 250;
+    const retry_budget: i64 = 3;
+    const stream_window: i64 = 64;
+    const recv_window: i64 = 32;
+    const send_window: i64 = 32;
+  }
+}

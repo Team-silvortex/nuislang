@@ -277,6 +277,7 @@ pub enum NirResultFamily {
     Data,
     Shader,
     Kernel,
+    Network,
 }
 
 impl NirResultFamily {
@@ -286,6 +287,7 @@ impl NirResultFamily {
             Self::Data => "DataResult",
             Self::Shader => "ShaderResult",
             Self::Kernel => "KernelResult",
+            Self::Network => "NetworkResult",
         }
     }
 
@@ -479,6 +481,7 @@ impl NirTypeRef {
             "DataResult" => Some(NirResultFamily::Data),
             "ShaderResult" => Some(NirResultFamily::Shader),
             "KernelResult" => Some(NirResultFamily::Kernel),
+            "NetworkResult" => Some(NirResultFamily::Network),
             _ => None,
         }
     }
@@ -1035,6 +1038,21 @@ pub enum NirExpr {
     NetworkProfileEndpointKindRef {
         unit: String,
     },
+    NetworkProfileLocalPortRef {
+        unit: String,
+    },
+    NetworkProfileRemotePortRef {
+        unit: String,
+    },
+    NetworkProfileConnectTimeoutRef {
+        unit: String,
+    },
+    NetworkProfileReadTimeoutRef {
+        unit: String,
+    },
+    NetworkProfileWriteTimeoutRef {
+        unit: String,
+    },
     NetworkProfileTimeoutBudgetRef {
         unit: String,
     },
@@ -1044,6 +1062,18 @@ pub enum NirExpr {
     NetworkProfileStreamWindowRef {
         unit: String,
     },
+    NetworkProfileRecvWindowRef {
+        unit: String,
+    },
+    NetworkProfileSendWindowRef {
+        unit: String,
+    },
+    NetworkResult {
+        value: Box<NirExpr>,
+        state: NirNetworkFlowState,
+    },
+    NetworkConfigReady(Box<NirExpr>),
+    NetworkValue(Box<NirExpr>),
     KernelProfileBindCoreRef {
         unit: String,
     },
@@ -1250,6 +1280,7 @@ pub enum NirResultStage {
     Data(NirDataFlowState),
     Shader(NirShaderFlowState),
     Kernel(NirKernelFlowState),
+    Network(NirNetworkFlowState),
 }
 
 impl NirResultStage {
@@ -1258,6 +1289,7 @@ impl NirResultStage {
             Self::Data(_) => NirResultFamily::Data,
             Self::Shader(_) => NirResultFamily::Shader,
             Self::Kernel(_) => NirResultFamily::Kernel,
+            Self::Network(_) => NirResultFamily::Network,
         }
     }
 
@@ -1266,6 +1298,7 @@ impl NirResultStage {
             Self::Data(state) => state.render(),
             Self::Shader(state) => state.render(),
             Self::Kernel(state) => state.render(),
+            Self::Network(state) => state.render(),
         }
     }
 
@@ -1336,6 +1369,18 @@ impl NirResultStage {
                     Ok(())
                 }
             },
+            Self::Network(state) => match state {
+                NirNetworkFlowState::ConfigReady => {
+                    if !payload.is_integer_scalar() {
+                        return Err(format!(
+                            "`network_result(...)->{}` expects integer scalar payload, found `{}`",
+                            self.render(),
+                            payload.render()
+                        ));
+                    }
+                    Ok(())
+                }
+            },
         }
     }
 }
@@ -1375,6 +1420,11 @@ impl NirShaderFlowState {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NirKernelFlowState {
+    ConfigReady,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NirNetworkFlowState {
     ConfigReady,
 }
 
@@ -1452,6 +1502,18 @@ impl NirKernelFlowState {
     }
 }
 
+impl NirNetworkFlowState {
+    pub fn render(self) -> &'static str {
+        match self {
+            Self::ConfigReady => "config_ready",
+        }
+    }
+
+    pub fn validate_payload(self, payload: &NirTypeRef) -> Result<(), String> {
+        NirResultStage::from(self).validate_payload(payload)
+    }
+}
+
 impl From<NirDataFlowState> for NirResultStage {
     fn from(value: NirDataFlowState) -> Self {
         Self::Data(value)
@@ -1467,6 +1529,12 @@ impl From<NirShaderFlowState> for NirResultStage {
 impl From<NirKernelFlowState> for NirResultStage {
     fn from(value: NirKernelFlowState) -> Self {
         Self::Kernel(value)
+    }
+}
+
+impl From<NirNetworkFlowState> for NirResultStage {
+    fn from(value: NirNetworkFlowState) -> Self {
+        Self::Network(value)
     }
 }
 
@@ -1563,9 +1631,19 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::DataProfileMarkerRef { .. }
         | NirExpr::NetworkProfileBindCoreRef { .. }
         | NirExpr::NetworkProfileEndpointKindRef { .. }
+        | NirExpr::NetworkProfileLocalPortRef { .. }
+        | NirExpr::NetworkProfileRemotePortRef { .. }
+        | NirExpr::NetworkProfileConnectTimeoutRef { .. }
+        | NirExpr::NetworkProfileReadTimeoutRef { .. }
+        | NirExpr::NetworkProfileWriteTimeoutRef { .. }
         | NirExpr::NetworkProfileTimeoutBudgetRef { .. }
         | NirExpr::NetworkProfileRetryBudgetRef { .. }
         | NirExpr::NetworkProfileStreamWindowRef { .. }
+        | NirExpr::NetworkProfileRecvWindowRef { .. }
+        | NirExpr::NetworkProfileSendWindowRef { .. }
+        | NirExpr::NetworkResult { .. }
+        | NirExpr::NetworkConfigReady(_)
+        | NirExpr::NetworkValue(_)
         | NirExpr::KernelProfileBindCoreRef { .. }
         | NirExpr::KernelProfileQueueDepthRef { .. }
         | NirExpr::KernelProfileBatchLanesRef { .. }
@@ -1739,9 +1817,19 @@ pub fn nir_expr_effect_class(expr: &NirExpr) -> NirExprEffectClass {
         | NirExpr::DataProfileMarkerRef { .. }
         | NirExpr::NetworkProfileBindCoreRef { .. }
         | NirExpr::NetworkProfileEndpointKindRef { .. }
+        | NirExpr::NetworkProfileLocalPortRef { .. }
+        | NirExpr::NetworkProfileRemotePortRef { .. }
+        | NirExpr::NetworkProfileConnectTimeoutRef { .. }
+        | NirExpr::NetworkProfileReadTimeoutRef { .. }
+        | NirExpr::NetworkProfileWriteTimeoutRef { .. }
         | NirExpr::NetworkProfileTimeoutBudgetRef { .. }
         | NirExpr::NetworkProfileRetryBudgetRef { .. }
         | NirExpr::NetworkProfileStreamWindowRef { .. }
+        | NirExpr::NetworkProfileRecvWindowRef { .. }
+        | NirExpr::NetworkProfileSendWindowRef { .. }
+        | NirExpr::NetworkResult { .. }
+        | NirExpr::NetworkConfigReady(_)
+        | NirExpr::NetworkValue(_)
         | NirExpr::KernelProfileBindCoreRef { .. }
         | NirExpr::KernelProfileQueueDepthRef { .. }
         | NirExpr::KernelProfileBatchLanesRef { .. }

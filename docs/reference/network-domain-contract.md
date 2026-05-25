@@ -139,6 +139,70 @@ placement
 -> observer classification
 ```
 
+There is now also a minimal `YIR`-level control-result skeleton for the host
+bridge side:
+
+* `network.observe ... config_ready`
+* `network.connect ... -> network.is_connect_ready / network.value`
+* `network.accept ... -> network.is_accept_ready / network.value`
+* `network.close ... -> network.is_closed / network.value`
+
+That means the repository still does not claim a finished socket runtime, but it
+does now have a stable place in `YIR` where `connect / accept / close` syscalls
+can land.
+
+The current loader-facing symbol reservation is also explicit now. The minimal
+host bridge names are:
+
+* `host_network_connect_probe`
+* `host_network_accept_probe`
+* `host_network_close`
+* `host_network_send_probe`
+* `host_network_recv_probe`
+
+`nuis loader-contract official.network` now surfaces those names so the bridge
+contract is visible before a full runtime implementation exists.
+
+## Current CPU Host-Bridge Interpretation
+
+The current `connect / accept / close` bridge is still routed through the
+existing CPU host-FFI path rather than a dedicated `network.syscall_*` opcode.
+
+The current honest reading is:
+
+```text
+source extern "c" fn host_network_* ...
+-> YIR cpu.extern_call_i64 ... c host_network_* ...
+-> loader-contract reserved host_symbol=network.*:host_network_* ...
+-> runtime/AOT stub symbol
+```
+
+The narrow checked-in sample for this is:
+
+* [network_host_control_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_control_runtime_demo)
+
+If you inspect its `YIR`, you will currently see `cpu.extern_call_i64` nodes
+such as:
+
+* `cpu.extern_call_i64 ... c host_network_connect_probe ...`
+* `cpu.extern_call_i64 ... c host_network_accept_probe ...`
+* `cpu.extern_call_i64 ... c host_network_close ...`
+
+That means the repository now has a stable syscall-facing interpretation path,
+even though the `network` family does not yet claim a full socket runtime or a
+dedicated `network`-native host-call instruction surface.
+
+The first narrow checked-in transport sample for that bridge is:
+
+* [network_host_transport_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_transport_runtime_demo)
+
+It currently reads:
+
+* `stream_window / send_window / remote_port`
+  -> `host_network_send_probe`
+* `stream_window / recv_window / local_port`
+  -> `host_network_recv_probe`
+
 ## Bootstrap Scope
 
 The current bootstrap scope is intentionally narrow.

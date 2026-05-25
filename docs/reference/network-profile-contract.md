@@ -14,15 +14,189 @@ The current answer is:
 ```text
 bind_core
 -> endpoint kind
+-> endpoint ports
+-> connect/read/write timeout
+-> result observe
 -> timeout / retry budget
 -> stream window shape
 ```
+
+Current short reading rule:
+
+* `profile core`
+  `bind_core -> endpoint_kind -> local/remote_port -> connect/read/write timeout -> timeout/retry -> stream/recv/send`
+* `host control runtime`
+  `endpoint/timing profile -> host_network_connect/accept/close`
+* `host transport runtime`
+  `stream/recv/send profile -> host_network_send/recv`
+* `shared helper layer`
+  `network_task_async_shapes -> async_session_summary / async_policy_summary / async_fallback_summary / async_batch_summary / async_windowed_summary`
+* `result observe`
+  `result -> config_ready -> value`
+* `result ladder`
+  `result observe -> result policy -> result batch -> result windowed`
+* `connect/accept control ladder`
+  `connect result -> accept result -> connect/accept policy -> connect/accept batch -> connect/accept windowed`
+* `session`
+  `summary -> session seed`
+* `task control`
+  `result policy -> profile policy -> fallback`
+* `task summary`
+  `result batch -> result windowed -> batch -> windowed`
 
 Current narrow companion:
 
 * [network_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_demo)
   now reads:
-  `bind_core -> endpoint_kind -> timeout_budget -> retry_budget -> stream_window`
+  `bind_core -> endpoint_kind -> timeout_budget -> retry_budget -> stream_window -> recv_window -> send_window`
+* [network_endpoint_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_endpoint_profile_demo)
+  now reads:
+  `endpoint_kind -> local_port -> remote_port -> connect_timeout -> read_timeout -> write_timeout`
+* [network_host_control_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_control_runtime_demo)
+  now reads:
+  `local_port -> remote_port -> connect_timeout -> read_timeout -> write_timeout -> host_network_connect/accept/close`
+* [network_host_transport_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_transport_runtime_demo)
+  now reads:
+  `stream_window -> recv_window -> send_window -> local_port -> remote_port -> host_network_send/recv`
+* [network_task_async_shapes.ns](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shared/network_task_async_shapes.ns)
+  now reads:
+  `shared task-shaped session/result/batch/windowed helper layer`
+* [network_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_result_profile_demo)
+  now reads:
+  `network_result -> network_config_ready -> network_value`
+* [network_connect_result_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_connect_result_demo)
+  now reads:
+  `local_port -> remote_port -> connect_timeout -> network_result -> network_config_ready -> network_value`
+* [network_accept_result_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_accept_result_demo)
+  now reads:
+  `local_port -> read_timeout -> write_timeout -> network_result -> network_config_ready -> network_value`
+* [network_connect_accept_task_policy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_connect_accept_task_policy_demo)
+  now reads:
+  `connect result -> accept result -> fallback timeout -> task policy`
+* [network_connect_accept_task_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_connect_accept_task_batch_demo)
+  now reads:
+  `connect result -> accept result -> timeout result -> task batch`
+* [network_connect_accept_task_windowed_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_connect_accept_task_windowed_batch_demo)
+  now reads:
+  `connect/accept batch summary -> preview summary -> final summary`
+* [network_result_task_policy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_result_task_policy_demo)
+  now reads:
+  `network result -> async helper -> primary/secondary/fallback task policy`
+* [network_result_task_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_result_task_batch_demo)
+  now reads:
+  `network result -> control/rx/tx task batch`
+* [network_result_task_windowed_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_result_task_windowed_batch_demo)
+  now reads:
+  `result batch summary -> preview summary -> final summary`
+* [network_result_session_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_result_session_bridge_demo)
+  now reads:
+  `result windowed summary -> session summary bridge`
+* [network_profile_summary_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_summary_demo)
+  now reads:
+  `profile slot observers -> summary struct capture`
+* [network_profile_session_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_session_demo)
+  now reads:
+  `profile summary -> task seed -> timeout/join -> session summary`
+* [network_profile_task_policy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_task_policy_demo)
+  now reads:
+  `profile summary -> primary/secondary/fallback task policy`
+* [network_profile_task_fallback_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_task_fallback_demo)
+  now reads:
+  `primary timeout -> retry fallback -> shape fallback -> budget default`
+* [network_profile_task_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_task_batch_demo)
+  now reads:
+  `profile summary -> control/tx/rx task batch`
+* [network_profile_task_windowed_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_task_windowed_batch_demo)
+  now reads:
+  `batch summary -> preview summary -> final summary`
+
+Suggested current reading ladder:
+
+1. [network_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_demo)
+2. [network_endpoint_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_endpoint_profile_demo)
+3. [network_host_control_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_control_runtime_demo)
+4. [network_host_transport_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_transport_runtime_demo)
+5. [network_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_result_profile_demo)
+6. [network_connect_result_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_connect_result_demo)
+7. [network_accept_result_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_accept_result_demo)
+8. [network_connect_accept_task_policy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_connect_accept_task_policy_demo)
+9. [network_connect_accept_task_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_connect_accept_task_batch_demo)
+10. [network_connect_accept_task_windowed_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_connect_accept_task_windowed_batch_demo)
+11. [network_result_task_policy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_result_task_policy_demo)
+12. [network_result_task_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_result_task_batch_demo)
+13. [network_result_task_windowed_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_result_task_windowed_batch_demo)
+14. [network_result_session_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_result_session_bridge_demo)
+15. [network_profile_summary_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_summary_demo)
+16. [network_profile_session_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_session_demo)
+17. [network_profile_task_policy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_task_policy_demo)
+18. [network_profile_task_fallback_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_task_fallback_demo)
+19. [network_profile_task_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_task_batch_demo)
+20. [network_profile_task_windowed_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_task_windowed_batch_demo)
+
+Compressed ladder:
+
+* `shared helper`
+  [network_task_async_shapes.ns](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shared/network_task_async_shapes.ns)
+* `result ladder`
+  [network_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_result_profile_demo) ->
+  [network_connect_result_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_connect_result_demo) ->
+  [network_accept_result_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_accept_result_demo) ->
+  [network_connect_accept_task_policy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_connect_accept_task_policy_demo) ->
+  [network_connect_accept_task_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_connect_accept_task_batch_demo) ->
+  [network_connect_accept_task_windowed_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_connect_accept_task_windowed_batch_demo) ->
+  [network_result_task_policy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_result_task_policy_demo) ->
+  [network_result_task_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_result_task_batch_demo) ->
+  [network_result_task_windowed_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_result_task_windowed_batch_demo) ->
+  [network_result_session_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_result_session_bridge_demo)
+* `session/task ladder`
+  [network_profile_summary_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_summary_demo) ->
+  [network_profile_session_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_session_demo) ->
+  [network_profile_task_policy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_task_policy_demo) ->
+  [network_profile_task_fallback_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_task_fallback_demo) ->
+  [network_profile_task_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_task_batch_demo) ->
+  [network_profile_task_windowed_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_task_windowed_batch_demo)
+
+Shared helper reading rule:
+
+* prefer `async_session_summary_*` when reading session seed / timeout / join
+  shapes
+* prefer `async_policy_summary_*` and `async_fallback_summary_*` when reading
+  task control shapes
+* prefer `async_batch_summary_*` and `async_windowed_*_summary_*` when reading
+  both result and session/task fan-in ladders
+
+Host control runtime reading rule:
+
+* treat [network_host_control_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_control_runtime_demo)
+  as the current narrow bridge from `network profile refs` into host-visible
+  control symbols
+* if you want the implementation-truth view, inspect its `YIR` and look for:
+  `cpu.extern_call_i64 ... c host_network_connect_probe`,
+  `cpu.extern_call_i64 ... c host_network_accept_probe`,
+  `cpu.extern_call_i64 ... c host_network_close`
+* read those as:
+  `network endpoint/timing profile -> cpu host ffi bridge -> reserved network control symbol`
+
+Host transport runtime reading rule:
+
+* treat [network_host_transport_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_transport_runtime_demo)
+  as the current narrow bridge from `network stream/recv/send profile refs`
+  into host-visible transport symbols
+* if you want the implementation-truth view, inspect its `YIR` and look for:
+  `cpu.extern_call_i64 ... c host_network_send_probe`,
+  `cpu.extern_call_i64 ... c host_network_recv_probe`
+* read those as:
+  `network transport shape profile -> cpu host ffi bridge -> reserved network transport symbol`
+
+Connect/accept control reading rule:
+
+* start with endpoint-facing result observation:
+  [network_connect_result_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_connect_result_demo),
+  [network_accept_result_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_accept_result_demo)
+* then read control orchestration:
+  [network_connect_accept_task_policy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_connect_accept_task_policy_demo) ->
+  [network_connect_accept_task_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_connect_accept_task_batch_demo) ->
+  [network_connect_accept_task_windowed_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_connect_accept_task_windowed_batch_demo)
 
 ## Scope
 
@@ -36,8 +210,22 @@ This document is only about the current manifest-first profile surface:
 It is not yet a promise that the repository already has:
 
 * a complete `network` frontend
-* a complete `NetworkResult<T>` language surface
+* a complete transport/runtime-facing `NetworkResult<T>` surface
 * real socket lowering or runtime execution
+
+What it does have now is a minimal control-result host skeleton in `YIR`:
+
+* `network.connect`
+* `network.accept`
+* `network.close`
+* matching probes:
+  `network.is_connect_ready`, `network.is_accept_ready`, `network.is_closed`
+
+So the safe current reading is:
+
+* profile/demo lanes still explain intent at the source level
+* `YIR` now has explicit control-result landing points for future syscall
+  bridging
 
 ## Current Support Surface
 
@@ -157,9 +345,14 @@ growth order:
 
 1. `network_profile_bind_core(...)`
 2. `network_profile_endpoint_kind(...)`
-3. `network_profile_timeout_budget(...)`
-4. `network_profile_retry_budget(...)`
-5. `network_profile_stream_window(...)`
+3. `network_profile_local_port(...)`
+4. `network_profile_remote_port(...)`
+5. `network_profile_connect_timeout(...)`
+6. `network_profile_read_timeout(...)`
+7. `network_profile_write_timeout(...)`
+8. `network_profile_timeout_budget(...)`
+9. `network_profile_retry_budget(...)`
+10. `network_profile_stream_window(...)`
 
 That order keeps the first checked-in `network` route aligned with the current
 manifest contract instead of jumping straight to a large socket or HTTP facade.

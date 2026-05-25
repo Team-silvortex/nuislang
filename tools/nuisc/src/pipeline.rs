@@ -249,9 +249,16 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         | NirExpr::DataProfileMarkerRef { .. }
         | NirExpr::NetworkProfileBindCoreRef { .. }
         | NirExpr::NetworkProfileEndpointKindRef { .. }
+        | NirExpr::NetworkProfileLocalPortRef { .. }
+        | NirExpr::NetworkProfileRemotePortRef { .. }
+        | NirExpr::NetworkProfileConnectTimeoutRef { .. }
+        | NirExpr::NetworkProfileReadTimeoutRef { .. }
+        | NirExpr::NetworkProfileWriteTimeoutRef { .. }
         | NirExpr::NetworkProfileTimeoutBudgetRef { .. }
         | NirExpr::NetworkProfileRetryBudgetRef { .. }
         | NirExpr::NetworkProfileStreamWindowRef { .. }
+        | NirExpr::NetworkProfileRecvWindowRef { .. }
+        | NirExpr::NetworkProfileSendWindowRef { .. }
         | NirExpr::KernelProfileBindCoreRef { .. }
         | NirExpr::KernelProfileQueueDepthRef { .. }
         | NirExpr::KernelProfileBatchLanesRef { .. }
@@ -319,6 +326,8 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         | NirExpr::ShaderPassReady(inner)
         | NirExpr::ShaderFrameReady(inner)
         | NirExpr::ShaderValue(inner)
+        | NirExpr::NetworkConfigReady(inner)
+        | NirExpr::NetworkValue(inner)
         | NirExpr::KernelConfigReady(inner)
         | NirExpr::KernelValue(inner)
         | NirExpr::KernelShape(inner)
@@ -340,6 +349,7 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         | NirExpr::KernelSort(inner)
         | NirExpr::KernelSortAxis { input: inner, .. }
         | NirExpr::KernelTopkAxis { input: inner, .. }
+        | NirExpr::NetworkResult { value: inner, .. }
         | NirExpr::DataOutputPipe(inner)
         | NirExpr::DataInputPipe(inner)
         | NirExpr::CpuPresentFrame(inner)

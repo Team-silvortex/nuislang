@@ -1,0 +1,187 @@
+mod cpu NetworkTaskAsyncShapes {
+  fn encode_completed(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_timed_out(result: TaskResult<i64>) -> i64 {
+    if task_timed_out(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn selected_task_value(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return task_value(result);
+    }
+    return 0;
+  }
+
+  fn task_policy_completed(
+    primary_result: TaskResult<i64>,
+    secondary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    return encode_completed(primary_result)
+      + encode_completed(secondary_result)
+      + encode_timed_out(fallback_result);
+  }
+
+  fn task_policy_selected_value(
+    primary_result: TaskResult<i64>,
+    secondary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    if task_completed(primary_result) {
+      return task_value(primary_result) + 100;
+    }
+    if task_completed(secondary_result) {
+      return task_value(secondary_result) + 10;
+    }
+    if task_timed_out(fallback_result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn task_batch_completed(
+    control_result: TaskResult<i64>,
+    rx_result: TaskResult<i64>,
+    tx_result: TaskResult<i64>
+  ) -> i64 {
+    return encode_completed(control_result)
+      + encode_completed(rx_result)
+      + encode_completed(tx_result);
+  }
+
+  fn task_batch_value(
+    control_result: TaskResult<i64>,
+    rx_result: TaskResult<i64>,
+    tx_result: TaskResult<i64>
+  ) -> i64 {
+    return selected_task_value(control_result)
+      + selected_task_value(rx_result)
+      + selected_task_value(tx_result);
+  }
+
+  fn task_windowed_preview_value(
+    control_result: TaskResult<i64>,
+    rx_result: TaskResult<i64>,
+    tx_result: TaskResult<i64>
+  ) -> i64 {
+    return task_batch_completed(control_result, rx_result, tx_result);
+  }
+
+  fn task_windowed_final_value(
+    control_result: TaskResult<i64>,
+    rx_result: TaskResult<i64>,
+    tx_result: TaskResult<i64>
+  ) -> i64 {
+    return task_batch_value(control_result, rx_result, tx_result);
+  }
+
+  fn async_policy_summary_completed(
+    primary_result: TaskResult<i64>,
+    secondary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    return task_policy_completed(primary_result, secondary_result, fallback_result);
+  }
+
+  fn async_policy_summary_selected_value(
+    primary_result: TaskResult<i64>,
+    secondary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    return task_policy_selected_value(primary_result, secondary_result, fallback_result);
+  }
+
+  fn async_session_summary_completed(result: TaskResult<i64>) -> i64 {
+    return encode_completed(result);
+  }
+
+  fn async_session_summary_timed_out(result: TaskResult<i64>) -> i64 {
+    return encode_timed_out(result);
+  }
+
+  fn async_session_summary_selected_value(result: TaskResult<i64>) -> i64 {
+    return selected_task_value(result);
+  }
+
+  fn async_batch_summary_completed(
+    control_result: TaskResult<i64>,
+    rx_result: TaskResult<i64>,
+    tx_result: TaskResult<i64>
+  ) -> i64 {
+    return task_batch_completed(control_result, rx_result, tx_result);
+  }
+
+  fn async_batch_summary_value(
+    control_result: TaskResult<i64>,
+    rx_result: TaskResult<i64>,
+    tx_result: TaskResult<i64>
+  ) -> i64 {
+    return task_batch_value(control_result, rx_result, tx_result);
+  }
+
+  fn async_windowed_preview_summary_value(
+    control_result: TaskResult<i64>,
+    rx_result: TaskResult<i64>,
+    tx_result: TaskResult<i64>
+  ) -> i64 {
+    return task_windowed_preview_value(control_result, rx_result, tx_result);
+  }
+
+  fn async_windowed_final_summary_value(
+    control_result: TaskResult<i64>,
+    rx_result: TaskResult<i64>,
+    tx_result: TaskResult<i64>
+  ) -> i64 {
+    return task_windowed_final_value(control_result, rx_result, tx_result);
+  }
+
+  fn async_fallback_summary_default_selected(
+    primary_result: TaskResult<i64>,
+    first_fallback_result: TaskResult<i64>,
+    second_fallback_result: TaskResult<i64>,
+    default_result: TaskResult<i64>
+  ) -> i64 {
+    if task_completed(first_fallback_result) {
+      return 0;
+    }
+    if task_completed(second_fallback_result) {
+      return 0;
+    }
+    if task_completed(default_result) {
+      return 0;
+    }
+    if task_timed_out(primary_result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn async_fallback_summary_selected_value(
+    primary_result: TaskResult<i64>,
+    first_fallback_result: TaskResult<i64>,
+    second_fallback_result: TaskResult<i64>,
+    default_result: TaskResult<i64>
+  ) -> i64 {
+    if task_completed(primary_result) {
+      return task_value(primary_result) + 1000;
+    }
+    if task_completed(first_fallback_result) {
+      return task_value(first_fallback_result) + 100;
+    }
+    if task_completed(second_fallback_result) {
+      return task_value(second_fallback_result) + 10;
+    }
+    if task_completed(default_result) {
+      return task_value(default_result) + 1;
+    }
+    return 0;
+  }
+}

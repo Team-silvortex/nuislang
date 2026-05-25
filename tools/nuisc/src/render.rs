@@ -676,6 +676,24 @@ fn render_nir_expr(value: &NirExpr) -> String {
         NirExpr::NetworkProfileEndpointKindRef { unit } => {
             format!("network_profile_endpoint_kind(\"{}\")", escape_debug(unit))
         }
+        NirExpr::NetworkProfileLocalPortRef { unit } => {
+            format!("network_profile_local_port(\"{}\")", escape_debug(unit))
+        }
+        NirExpr::NetworkProfileRemotePortRef { unit } => {
+            format!("network_profile_remote_port(\"{}\")", escape_debug(unit))
+        }
+        NirExpr::NetworkProfileConnectTimeoutRef { unit } => {
+            format!(
+                "network_profile_connect_timeout(\"{}\")",
+                escape_debug(unit)
+            )
+        }
+        NirExpr::NetworkProfileReadTimeoutRef { unit } => {
+            format!("network_profile_read_timeout(\"{}\")", escape_debug(unit))
+        }
+        NirExpr::NetworkProfileWriteTimeoutRef { unit } => {
+            format!("network_profile_write_timeout(\"{}\")", escape_debug(unit))
+        }
         NirExpr::NetworkProfileTimeoutBudgetRef { unit } => {
             format!("network_profile_timeout_budget(\"{}\")", escape_debug(unit))
         }
@@ -685,6 +703,19 @@ fn render_nir_expr(value: &NirExpr) -> String {
         NirExpr::NetworkProfileStreamWindowRef { unit } => {
             format!("network_profile_stream_window(\"{}\")", escape_debug(unit))
         }
+        NirExpr::NetworkProfileRecvWindowRef { unit } => {
+            format!("network_profile_recv_window(\"{}\")", escape_debug(unit))
+        }
+        NirExpr::NetworkProfileSendWindowRef { unit } => {
+            format!("network_profile_send_window(\"{}\")", escape_debug(unit))
+        }
+        NirExpr::NetworkResult { value, .. } => {
+            format!("network_result({})", render_nir_expr(value))
+        }
+        NirExpr::NetworkConfigReady(result) => {
+            format!("network_config_ready({})", render_nir_expr(result))
+        }
+        NirExpr::NetworkValue(result) => format!("network_value({})", render_nir_expr(result)),
         NirExpr::KernelProfileBindCoreRef { unit } => {
             format!("kernel_profile_bind_core(\"{}\")", escape_debug(unit))
         }

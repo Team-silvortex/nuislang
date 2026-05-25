@@ -1,0 +1,33 @@
+use network NetworkUnit;
+
+mod cpu Main {
+  fn encode_ready(result: NetworkResult<i64>) -> i64 {
+    if network_config_ready(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_value(result: NetworkResult<i64>) -> i64 {
+    if network_config_ready(result) {
+      return network_value(result);
+    }
+    return 0;
+  }
+
+  fn main() {
+    let local_port: NetworkResult<i64> =
+      network_result(network_profile_local_port("NetworkUnit"));
+    let remote_port: NetworkResult<i64> =
+      network_result(network_profile_remote_port("NetworkUnit"));
+    let connect_timeout: NetworkResult<i64> =
+      network_result(network_profile_connect_timeout("NetworkUnit"));
+
+    let ready_score: i64 =
+      encode_ready(local_port) + encode_ready(remote_port) + encode_ready(connect_timeout);
+    let value_score: i64 =
+      encode_value(local_port) + encode_value(remote_port) + encode_value(connect_timeout);
+
+    print(ready_score + value_score);
+  }
+}

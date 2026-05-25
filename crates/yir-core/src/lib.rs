@@ -112,6 +112,7 @@ pub enum OperationDomainFamily {
     Data,
     Shader,
     Kernel,
+    Network,
     Npu,
     Unknown,
 }
@@ -164,6 +165,15 @@ pub enum SemanticOp {
     KernelObserve,
     KernelIsConfigReady,
     KernelValue,
+    NetworkObserve,
+    NetworkConnect,
+    NetworkAccept,
+    NetworkClose,
+    NetworkIsConfigReady,
+    NetworkIsConnectReady,
+    NetworkIsAcceptReady,
+    NetworkIsClosed,
+    NetworkValue,
     ShaderBeginPass,
     ShaderDrawInstanced,
     ShaderPipeline,
@@ -217,6 +227,7 @@ pub enum YirResultFamily {
     Data,
     Shader,
     Kernel,
+    Network,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -225,6 +236,7 @@ pub enum YirResultState {
     Data(DataFlowState),
     Shader(ShaderFlowState),
     Kernel(KernelFlowState),
+    Network(NetworkFlowState),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -279,6 +291,7 @@ impl Operation {
             "data" | "fabric" => OperationDomainFamily::Data,
             "shader" => OperationDomainFamily::Shader,
             "kernel" => OperationDomainFamily::Kernel,
+            "network" => OperationDomainFamily::Network,
             "npu" => OperationDomainFamily::Npu,
             _ => OperationDomainFamily::Unknown,
         }
@@ -340,6 +353,17 @@ impl Operation {
             (OperationDomainFamily::Kernel, "observe") => SemanticOp::KernelObserve,
             (OperationDomainFamily::Kernel, "is_config_ready") => SemanticOp::KernelIsConfigReady,
             (OperationDomainFamily::Kernel, "value") => SemanticOp::KernelValue,
+            (OperationDomainFamily::Network, "observe") => SemanticOp::NetworkObserve,
+            (OperationDomainFamily::Network, "connect") => SemanticOp::NetworkConnect,
+            (OperationDomainFamily::Network, "accept") => SemanticOp::NetworkAccept,
+            (OperationDomainFamily::Network, "close") => SemanticOp::NetworkClose,
+            (OperationDomainFamily::Network, "is_config_ready") => SemanticOp::NetworkIsConfigReady,
+            (OperationDomainFamily::Network, "is_connect_ready") => {
+                SemanticOp::NetworkIsConnectReady
+            }
+            (OperationDomainFamily::Network, "is_accept_ready") => SemanticOp::NetworkIsAcceptReady,
+            (OperationDomainFamily::Network, "is_closed") => SemanticOp::NetworkIsClosed,
+            (OperationDomainFamily::Network, "value") => SemanticOp::NetworkValue,
             _ => SemanticOp::Other,
         }
     }
@@ -460,6 +484,15 @@ impl Operation {
             SemanticOp::KernelObserve => "kernel.observe",
             SemanticOp::KernelIsConfigReady => "kernel.is_config_ready",
             SemanticOp::KernelValue => "kernel.value",
+            SemanticOp::NetworkObserve => "network.observe",
+            SemanticOp::NetworkConnect => "network.connect",
+            SemanticOp::NetworkAccept => "network.accept",
+            SemanticOp::NetworkClose => "network.close",
+            SemanticOp::NetworkIsConfigReady => "network.is_config_ready",
+            SemanticOp::NetworkIsConnectReady => "network.is_connect_ready",
+            SemanticOp::NetworkIsAcceptReady => "network.is_accept_ready",
+            SemanticOp::NetworkIsClosed => "network.is_closed",
+            SemanticOp::NetworkValue => "network.value",
             SemanticOp::DataBindCore => "data.bind_core",
             SemanticOp::DataMarker => "data.marker",
             SemanticOp::DataHandleTable => "data.handle_table",
@@ -495,6 +528,15 @@ impl Operation {
             SemanticOp::KernelObserve
             | SemanticOp::KernelIsConfigReady
             | SemanticOp::KernelValue => Some(YirResultFamily::Kernel),
+            SemanticOp::NetworkObserve
+            | SemanticOp::NetworkConnect
+            | SemanticOp::NetworkAccept
+            | SemanticOp::NetworkClose
+            | SemanticOp::NetworkIsConfigReady
+            | SemanticOp::NetworkIsConnectReady
+            | SemanticOp::NetworkIsAcceptReady
+            | SemanticOp::NetworkIsClosed
+            | SemanticOp::NetworkValue => Some(YirResultFamily::Network),
             _ => None,
         }
     }
@@ -504,7 +546,11 @@ impl Operation {
             SemanticOp::CpuJoinResult
             | SemanticOp::DataObserve
             | SemanticOp::ShaderObserve
-            | SemanticOp::KernelObserve => Some(YirResultRole::Entry),
+            | SemanticOp::KernelObserve
+            | SemanticOp::NetworkObserve
+            | SemanticOp::NetworkConnect
+            | SemanticOp::NetworkAccept
+            | SemanticOp::NetworkClose => Some(YirResultRole::Entry),
             SemanticOp::CpuTaskCompleted
             | SemanticOp::CpuTaskTimedOut
             | SemanticOp::CpuTaskCancelled
@@ -513,11 +559,16 @@ impl Operation {
             | SemanticOp::DataIsWindowed
             | SemanticOp::ShaderIsPassReady
             | SemanticOp::ShaderIsFrameReady
-            | SemanticOp::KernelIsConfigReady => Some(YirResultRole::StateProbe),
+            | SemanticOp::KernelIsConfigReady
+            | SemanticOp::NetworkIsConfigReady
+            | SemanticOp::NetworkIsConnectReady
+            | SemanticOp::NetworkIsAcceptReady
+            | SemanticOp::NetworkIsClosed => Some(YirResultRole::StateProbe),
             SemanticOp::CpuTaskValue
             | SemanticOp::DataValue
             | SemanticOp::ShaderValue
-            | SemanticOp::KernelValue => Some(YirResultRole::PayloadExtractor),
+            | SemanticOp::KernelValue
+            | SemanticOp::NetworkValue => Some(YirResultRole::PayloadExtractor),
             _ => None,
         }
     }
@@ -538,6 +589,12 @@ impl Operation {
             SemanticOp::KernelIsConfigReady | SemanticOp::KernelValue => {
                 Some(SemanticOp::KernelObserve)
             }
+            SemanticOp::NetworkIsConfigReady | SemanticOp::NetworkValue => {
+                Some(SemanticOp::NetworkObserve)
+            }
+            SemanticOp::NetworkIsConnectReady => Some(SemanticOp::NetworkConnect),
+            SemanticOp::NetworkIsAcceptReady => Some(SemanticOp::NetworkAccept),
+            SemanticOp::NetworkIsClosed => Some(SemanticOp::NetworkClose),
             _ => None,
         }
     }
@@ -563,6 +620,16 @@ impl Operation {
             SemanticOp::KernelIsConfigReady => {
                 Some(YirResultState::Kernel(KernelFlowState::ConfigReady))
             }
+            SemanticOp::NetworkIsConfigReady => {
+                Some(YirResultState::Network(NetworkFlowState::ConfigReady))
+            }
+            SemanticOp::NetworkIsConnectReady => {
+                Some(YirResultState::Network(NetworkFlowState::ConnectReady))
+            }
+            SemanticOp::NetworkIsAcceptReady => {
+                Some(YirResultState::Network(NetworkFlowState::AcceptReady))
+            }
+            SemanticOp::NetworkIsClosed => Some(YirResultState::Network(NetworkFlowState::Closed)),
             _ => None,
         }
     }
@@ -614,6 +681,16 @@ impl Operation {
                 }
                 Ok(state == "config_ready")
             }
+            SemanticOp::NetworkObserve => {
+                let direct_project_ref = source.semantic_op() == SemanticOp::CpuProjectProfileRef;
+                if !direct_project_ref {
+                    return Ok(false);
+                }
+                Ok(state == "config_ready")
+            }
+            SemanticOp::NetworkConnect => Ok(state == "connect_ready"),
+            SemanticOp::NetworkAccept => Ok(state == "accept_ready"),
+            SemanticOp::NetworkClose => Ok(state == "closed"),
             _ => Err(format!(
                 "operation `{}` does not define an observe-state contract",
                 self.full_name()
@@ -674,6 +751,15 @@ fn semantic_op_display_name(op: SemanticOp) -> &'static str {
         SemanticOp::KernelObserve => ("kernel", "observe"),
         SemanticOp::KernelIsConfigReady => ("kernel", "is_config_ready"),
         SemanticOp::KernelValue => ("kernel", "value"),
+        SemanticOp::NetworkObserve => ("network", "observe"),
+        SemanticOp::NetworkConnect => ("network", "connect"),
+        SemanticOp::NetworkAccept => ("network", "accept"),
+        SemanticOp::NetworkClose => ("network", "close"),
+        SemanticOp::NetworkIsConfigReady => ("network", "is_config_ready"),
+        SemanticOp::NetworkIsConnectReady => ("network", "is_connect_ready"),
+        SemanticOp::NetworkIsAcceptReady => ("network", "is_accept_ready"),
+        SemanticOp::NetworkIsClosed => ("network", "is_closed"),
+        SemanticOp::NetworkValue => ("network", "value"),
         SemanticOp::DataBindCore => ("data", "bind_core"),
         SemanticOp::DataMarker => ("data", "marker"),
         SemanticOp::DataHandleTable => ("data", "handle_table"),
@@ -799,6 +885,7 @@ pub enum Value {
     DataCoreBinding(DataCoreBinding),
     ShaderResult(ShaderResultHandle),
     KernelResult(KernelResultHandle),
+    NetworkResult(NetworkResultHandle),
     Target(SurfaceTarget),
     Viewport(Viewport),
     Pipeline(RenderPipeline),
@@ -964,10 +1051,11 @@ mod tests {
     use super::{
         AsyncCoreOp, CpuLlvmLoweringClass, DataFabricPrimitive, DataFlowState, DataMod,
         DataResultHandle, DataWindow, ExecutionState, GlmBridgeObjectKind, GlmEffect,
-        GlmSketchValueClass, GlmUseMode, GlmValueClass, KernelFlowState, KernelResultHandle, Node,
-        Operation, OperationDomainFamily, RegisteredMod, Resource, ResourceKind, SemanticOp,
-        ShaderFlowState, ShaderResultHandle, TaskLifecycleState, TaskResultHandle, Value,
-        YirResultFamily, YirResultRole, YirResultState,
+        GlmSketchValueClass, GlmUseMode, GlmValueClass, KernelFlowState, KernelResultHandle,
+        NetworkFlowState, NetworkResultHandle, Node, Operation, OperationDomainFamily,
+        RegisteredMod, Resource, ResourceKind, SemanticOp, ShaderFlowState, ShaderResultHandle,
+        TaskLifecycleState, TaskResultHandle, Value, YirResultFamily, YirResultRole,
+        YirResultState,
     };
 
     #[test]
@@ -1156,6 +1244,10 @@ mod tests {
             state: KernelFlowState::ConfigReady,
             value: Box::new(Value::Int(17)),
         });
+        let network = Value::NetworkResult(NetworkResultHandle {
+            state: NetworkFlowState::AcceptReady,
+            value: Box::new(Value::Int(19)),
+        });
 
         assert_eq!(task.result_family(), Some(YirResultFamily::Task));
         assert_eq!(
@@ -1184,6 +1276,13 @@ mod tests {
             Some(YirResultState::Kernel(KernelFlowState::ConfigReady))
         );
         assert_eq!(kernel.result_payload(), Some(&Value::Int(17)));
+
+        assert_eq!(network.result_family(), Some(YirResultFamily::Network));
+        assert_eq!(
+            network.result_state(),
+            Some(YirResultState::Network(NetworkFlowState::AcceptReady))
+        );
+        assert_eq!(network.result_payload(), Some(&Value::Int(19)));
     }
 
     #[test]
@@ -1223,6 +1322,19 @@ mod tests {
         assert!(kernel_observe
             .observe_state_matches_source(&kernel_source, "config_ready")
             .unwrap());
+
+        let network_connect = Operation::parse(
+            "network.connect",
+            vec![
+                "local_port".to_owned(),
+                "remote_port".to_owned(),
+                "connect_timeout".to_owned(),
+            ],
+        )
+        .unwrap();
+        assert!(network_connect
+            .observe_state_matches_source(&network_connect, "connect_ready")
+            .unwrap());
     }
 
     #[test]
@@ -1232,6 +1344,8 @@ mod tests {
         let shader_ready =
             Operation::parse("shader.is_frame_ready", vec!["shader_result".to_owned()]).unwrap();
         let data_moved = Operation::parse("data.is_moved", vec!["data_result".to_owned()]).unwrap();
+        let network_closed =
+            Operation::parse("network.is_closed", vec!["network_result".to_owned()]).unwrap();
 
         assert_eq!(
             task_completed.result_role(),
@@ -1248,6 +1362,10 @@ mod tests {
         assert_eq!(
             data_moved.result_probe_state(),
             Some(YirResultState::Data(DataFlowState::Moved))
+        );
+        assert_eq!(
+            network_closed.result_probe_state(),
+            Some(YirResultState::Network(NetworkFlowState::Closed))
         );
     }
 
@@ -1640,6 +1758,20 @@ pub enum KernelFlowState {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NetworkResultHandle {
+    pub state: NetworkFlowState,
+    pub value: Box<Value>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NetworkFlowState {
+    ConfigReady,
+    ConnectReady,
+    AcceptReady,
+    Closed,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SurfaceTarget {
     pub format: String,
     pub width: usize,
@@ -1810,6 +1942,7 @@ impl fmt::Display for Value {
             Self::DataCoreBinding(binding) => write!(f, "{binding}"),
             Self::ShaderResult(result) => write!(f, "{result}"),
             Self::KernelResult(result) => write!(f, "{result}"),
+            Self::NetworkResult(result) => write!(f, "{result}"),
             Self::Target(target) => write!(f, "{target}"),
             Self::Viewport(viewport) => write!(f, "{viewport}"),
             Self::Pipeline(pipeline) => write!(f, "{pipeline}"),
@@ -1863,6 +1996,7 @@ impl Value {
             Self::DataResult(_) => Some(YirResultFamily::Data),
             Self::ShaderResult(_) => Some(YirResultFamily::Shader),
             Self::KernelResult(_) => Some(YirResultFamily::Kernel),
+            Self::NetworkResult(_) => Some(YirResultFamily::Network),
             _ => None,
         }
     }
@@ -1873,6 +2007,7 @@ impl Value {
             Self::DataResult(result) => Some(YirResultState::Data(result.state)),
             Self::ShaderResult(result) => Some(YirResultState::Shader(result.state)),
             Self::KernelResult(result) => Some(YirResultState::Kernel(result.state)),
+            Self::NetworkResult(result) => Some(YirResultState::Network(result.state)),
             _ => None,
         }
     }
@@ -1883,6 +2018,7 @@ impl Value {
             Self::DataResult(result) => Some(result.value.as_ref()),
             Self::ShaderResult(result) => Some(result.value.as_ref()),
             Self::KernelResult(result) => Some(result.value.as_ref()),
+            Self::NetworkResult(result) => Some(result.value.as_ref()),
             _ => None,
         }
     }
@@ -1929,6 +2065,23 @@ impl fmt::Display for KernelFlowState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::ConfigReady => f.write_str("config_ready"),
+        }
+    }
+}
+
+impl fmt::Display for NetworkResultHandle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "network_result<{}:{}>", self.state, self.value)
+    }
+}
+
+impl fmt::Display for NetworkFlowState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ConfigReady => f.write_str("config_ready"),
+            Self::ConnectReady => f.write_str("connect_ready"),
+            Self::AcceptReady => f.write_str("accept_ready"),
+            Self::Closed => f.write_str("closed"),
         }
     }
 }
@@ -2259,6 +2412,9 @@ impl ExecutionState {
             }
             Some(Value::ShaderResult(_)) => Err(format!("`{name}` is shader-result, expected int")),
             Some(Value::KernelResult(_)) => Err(format!("`{name}` is kernel-result, expected int")),
+            Some(Value::NetworkResult(_)) => {
+                Err(format!("`{name}` is network-result, expected int"))
+            }
             Some(Value::Target(_)) => Err(format!("`{name}` is target, expected int")),
             Some(Value::Viewport(_)) => Err(format!("`{name}` is viewport, expected int")),
             Some(Value::Pipeline(_)) => Err(format!("`{name}` is pipeline, expected int")),
@@ -2322,6 +2478,10 @@ impl ExecutionState {
         }
     }
 
+    pub fn bind_value(&mut self, name: impl Into<String>, value: Value) {
+        self.values.insert(name.into(), value);
+    }
+
     pub fn expect_value(&self, name: &str) -> Result<&Value, String> {
         self.values
             .get(name)
@@ -2380,6 +2540,14 @@ impl ExecutionState {
         match self.values.get(name) {
             Some(Value::KernelResult(result)) => Ok(result),
             Some(other) => Err(format!("`{name}` is {other}, expected kernel-result")),
+            None => Err(format!("missing value for `{name}`")),
+        }
+    }
+
+    pub fn expect_network_result(&self, name: &str) -> Result<&NetworkResultHandle, String> {
+        match self.values.get(name) {
+            Some(Value::NetworkResult(result)) => Ok(result),
+            Some(other) => Err(format!("`{name}` is {other}, expected network-result")),
             None => Err(format!("missing value for `{name}`")),
         }
     }

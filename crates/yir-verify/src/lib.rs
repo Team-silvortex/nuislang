@@ -12,6 +12,7 @@ pub fn default_registry() -> ModRegistry {
     registry.register(yir_domain_cpu::CpuMod);
     registry.register(yir_domain_kernel::KernelMod);
     registry.register(yir_domain_kernel::LegacyNpuMod);
+    registry.register(yir_domain_network::NetworkMod);
     registry.register(yir_domain_npu::NpuMod);
     registry.register(yir_domain_shader::ShaderMod);
     registry
@@ -2076,6 +2077,34 @@ fn verify_result_state_nodes(module: &YirModule) -> Result<(), String> {
             SemanticOp::KernelIsConfigReady | SemanticOp::KernelValue => {
                 require_observe_source(&nodes, node, SemanticOp::KernelObserve)?;
             }
+            SemanticOp::NetworkObserve => {
+                let source = observe_source_node(&nodes, node)?;
+                let actual = observe_state_arg(node)?;
+                let direct_project_ref =
+                    source.op.semantic_op() == SemanticOp::CpuProjectProfileRef;
+                let resolved_network_profile_slot = is_resolved_network_profile_slot(source);
+                if !direct_project_ref && !resolved_network_profile_slot {
+                    return Err(format!(
+                        "node `{}` expects cpu.project_profile_ref input for network observe, got `{}`",
+                        node.name,
+                        source.op.full_name()
+                    ));
+                }
+                let state_matches = if resolved_network_profile_slot {
+                    actual == "config_ready"
+                } else {
+                    node.op.observe_state_matches_source(&source.op, actual)?
+                };
+                if !state_matches {
+                    return Err(format!(
+                        "node `{}` observes network state `{actual}`, but `{}` does not support that state",
+                        node.name, source.name
+                    ));
+                }
+            }
+            SemanticOp::NetworkIsConfigReady => {
+                require_observe_source(&nodes, node, SemanticOp::NetworkObserve)?;
+            }
             _ if node.op.result_source_semantic_op().is_some() => {
                 require_expected_result_source(&nodes, node)?;
             }
@@ -2092,6 +2121,12 @@ fn is_resolved_kernel_profile_slot(node: &Node) -> bool {
         && node.op.instruction == "const_i64"
 }
 
+fn is_resolved_network_profile_slot(node: &Node) -> bool {
+    node.name.starts_with("project_profile_network_")
+        && node.op.module == "cpu"
+        && node.op.instruction == "const_i64"
+}
+
 fn is_direct_kernel_scalar_source(node: &Node) -> bool {
     node.op.module == "kernel"
         && matches!(
@@ -2104,6 +2139,36 @@ fn require_expected_result_source(
     nodes: &BTreeMap<&str, &Node>,
     node: &Node,
 ) -> Result<(), String> {
+    if node.op.semantic_op() == SemanticOp::NetworkValue {
+        let source = node
+            .op
+            .args
+            .first()
+            .ok_or_else(|| format!("node `{}` is missing result source arg", node.name))
+            .and_then(|name| {
+                nodes.get(name.as_str()).copied().ok_or_else(|| {
+                    format!(
+                        "node `{}` references unknown result source `{name}`",
+                        node.name
+                    )
+                })
+            })?;
+        let actual = source.op.semantic_op();
+        if matches!(
+            actual,
+            SemanticOp::NetworkObserve
+                | SemanticOp::NetworkConnect
+                | SemanticOp::NetworkAccept
+                | SemanticOp::NetworkClose
+        ) {
+            return Ok(());
+        }
+        return Err(format!(
+            "node `{}` expects one of `network.observe`, `network.connect`, `network.accept`, or `network.close`, got `{}`",
+            node.name,
+            source.op.full_name()
+        ));
+    }
     let expected = node.op.result_source_semantic_op().ok_or_else(|| {
         format!(
             "node `{}` has no expected result source contract",
@@ -2187,6 +2252,15 @@ fn semantic_op_name(op: SemanticOp) -> &'static str {
         SemanticOp::KernelObserve => "kernel.observe",
         SemanticOp::KernelIsConfigReady => "kernel.is_config_ready",
         SemanticOp::KernelValue => "kernel.value",
+        SemanticOp::NetworkObserve => "network.observe",
+        SemanticOp::NetworkConnect => "network.connect",
+        SemanticOp::NetworkAccept => "network.accept",
+        SemanticOp::NetworkClose => "network.close",
+        SemanticOp::NetworkIsConfigReady => "network.is_config_ready",
+        SemanticOp::NetworkIsConnectReady => "network.is_connect_ready",
+        SemanticOp::NetworkIsAcceptReady => "network.is_accept_ready",
+        SemanticOp::NetworkIsClosed => "network.is_closed",
+        SemanticOp::NetworkValue => "network.value",
         SemanticOp::DataBindCore => "data.bind_core",
         SemanticOp::DataMarker => "data.marker",
         SemanticOp::DataHandleTable => "data.handle_table",
@@ -4005,6 +4079,326 @@ mod tests {
                     "kernel_result",
                 ),
                 dep("kernel_result", "kernel_ready"),
+            ],
+            node_lanes: BTreeMap::new(),
+        };
+
+        verify_module(&module).unwrap();
+    }
+
+    #[test]
+    fn accepts_network_control_result_probes() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![
+                Resource {
+                    name: "cpu0".to_owned(),
+                    kind: ResourceKind::parse("cpu.arm64"),
+                },
+                Resource {
+                    name: "network0".to_owned(),
+                    kind: ResourceKind::parse("network.io"),
+                },
+            ],
+            nodes: vec![
+                node(
+                    "project_profile_network_NetworkUnit_local_port",
+                    "cpu0",
+                    "cpu.const_i64",
+                    &["7001"],
+                ),
+                node(
+                    "project_profile_network_NetworkUnit_remote_port",
+                    "cpu0",
+                    "cpu.const_i64",
+                    &["7443"],
+                ),
+                node(
+                    "project_profile_network_NetworkUnit_connect_timeout_ms",
+                    "cpu0",
+                    "cpu.const_i64",
+                    &["1500"],
+                ),
+                node(
+                    "project_profile_network_NetworkUnit_read_timeout_ms",
+                    "cpu0",
+                    "cpu.const_i64",
+                    &["800"],
+                ),
+                node(
+                    "project_profile_network_NetworkUnit_write_timeout_ms",
+                    "cpu0",
+                    "cpu.const_i64",
+                    &["900"],
+                ),
+                node(
+                    "local_port_seed",
+                    "network0",
+                    "network.observe",
+                    &[
+                        "project_profile_network_NetworkUnit_local_port",
+                        "config_ready",
+                    ],
+                ),
+                node(
+                    "remote_port_seed",
+                    "network0",
+                    "network.observe",
+                    &[
+                        "project_profile_network_NetworkUnit_remote_port",
+                        "config_ready",
+                    ],
+                ),
+                node(
+                    "connect_timeout_seed",
+                    "network0",
+                    "network.observe",
+                    &[
+                        "project_profile_network_NetworkUnit_connect_timeout_ms",
+                        "config_ready",
+                    ],
+                ),
+                node(
+                    "read_timeout_seed",
+                    "network0",
+                    "network.observe",
+                    &[
+                        "project_profile_network_NetworkUnit_read_timeout_ms",
+                        "config_ready",
+                    ],
+                ),
+                node(
+                    "write_timeout_seed",
+                    "network0",
+                    "network.observe",
+                    &[
+                        "project_profile_network_NetworkUnit_write_timeout_ms",
+                        "config_ready",
+                    ],
+                ),
+                node(
+                    "local_port",
+                    "network0",
+                    "network.value",
+                    &["local_port_seed"],
+                ),
+                node(
+                    "remote_port",
+                    "network0",
+                    "network.value",
+                    &["remote_port_seed"],
+                ),
+                node(
+                    "connect_timeout",
+                    "network0",
+                    "network.value",
+                    &["connect_timeout_seed"],
+                ),
+                node(
+                    "read_timeout",
+                    "network0",
+                    "network.value",
+                    &["read_timeout_seed"],
+                ),
+                node(
+                    "write_timeout",
+                    "network0",
+                    "network.value",
+                    &["write_timeout_seed"],
+                ),
+                node(
+                    "socket_handle",
+                    "network0",
+                    "network.value",
+                    &["local_port_seed"],
+                ),
+                node(
+                    "connect_result",
+                    "network0",
+                    "network.connect",
+                    &["local_port", "remote_port", "connect_timeout"],
+                ),
+                node(
+                    "accept_result",
+                    "network0",
+                    "network.accept",
+                    &["local_port", "read_timeout", "write_timeout"],
+                ),
+                node(
+                    "close_result",
+                    "network0",
+                    "network.close",
+                    &["socket_handle"],
+                ),
+                node(
+                    "connect_ready",
+                    "network0",
+                    "network.is_connect_ready",
+                    &["connect_result"],
+                ),
+                node(
+                    "accept_ready",
+                    "network0",
+                    "network.is_accept_ready",
+                    &["accept_result"],
+                ),
+                node("closed", "network0", "network.is_closed", &["close_result"]),
+            ],
+            edges: vec![
+                xfer(
+                    "project_profile_network_NetworkUnit_local_port",
+                    "local_port_seed",
+                ),
+                xfer(
+                    "project_profile_network_NetworkUnit_remote_port",
+                    "remote_port_seed",
+                ),
+                xfer(
+                    "project_profile_network_NetworkUnit_connect_timeout_ms",
+                    "connect_timeout_seed",
+                ),
+                xfer(
+                    "project_profile_network_NetworkUnit_read_timeout_ms",
+                    "read_timeout_seed",
+                ),
+                xfer(
+                    "project_profile_network_NetworkUnit_write_timeout_ms",
+                    "write_timeout_seed",
+                ),
+                dep("local_port_seed", "local_port"),
+                dep("remote_port_seed", "remote_port"),
+                dep("connect_timeout_seed", "connect_timeout"),
+                dep("read_timeout_seed", "read_timeout"),
+                dep("write_timeout_seed", "write_timeout"),
+                dep("local_port_seed", "socket_handle"),
+                dep("local_port", "connect_result"),
+                dep("remote_port", "connect_result"),
+                dep("connect_timeout", "connect_result"),
+                dep("local_port", "accept_result"),
+                dep("read_timeout", "accept_result"),
+                dep("write_timeout", "accept_result"),
+                dep("socket_handle", "close_result"),
+                dep("connect_result", "connect_ready"),
+                dep("accept_result", "accept_ready"),
+                dep("close_result", "closed"),
+            ],
+            node_lanes: BTreeMap::new(),
+        };
+
+        verify_module(&module).unwrap();
+    }
+
+    #[test]
+    fn accepts_network_value_from_connect_result() {
+        let module = YirModule {
+            version: "0.1".to_owned(),
+            resources: vec![
+                Resource {
+                    name: "cpu0".to_owned(),
+                    kind: ResourceKind::parse("cpu.arm64"),
+                },
+                Resource {
+                    name: "network0".to_owned(),
+                    kind: ResourceKind::parse("network.io"),
+                },
+            ],
+            nodes: vec![
+                node(
+                    "project_profile_network_NetworkUnit_local_port",
+                    "cpu0",
+                    "cpu.const_i64",
+                    &["7001"],
+                ),
+                node(
+                    "project_profile_network_NetworkUnit_remote_port",
+                    "cpu0",
+                    "cpu.const_i64",
+                    &["7443"],
+                ),
+                node(
+                    "project_profile_network_NetworkUnit_connect_timeout_ms",
+                    "cpu0",
+                    "cpu.const_i64",
+                    &["1500"],
+                ),
+                node(
+                    "local_port_seed",
+                    "network0",
+                    "network.observe",
+                    &[
+                        "project_profile_network_NetworkUnit_local_port",
+                        "config_ready",
+                    ],
+                ),
+                node(
+                    "remote_port_seed",
+                    "network0",
+                    "network.observe",
+                    &[
+                        "project_profile_network_NetworkUnit_remote_port",
+                        "config_ready",
+                    ],
+                ),
+                node(
+                    "connect_timeout_seed",
+                    "network0",
+                    "network.observe",
+                    &[
+                        "project_profile_network_NetworkUnit_connect_timeout_ms",
+                        "config_ready",
+                    ],
+                ),
+                node(
+                    "local_port",
+                    "network0",
+                    "network.value",
+                    &["local_port_seed"],
+                ),
+                node(
+                    "remote_port",
+                    "network0",
+                    "network.value",
+                    &["remote_port_seed"],
+                ),
+                node(
+                    "connect_timeout",
+                    "network0",
+                    "network.value",
+                    &["connect_timeout_seed"],
+                ),
+                node(
+                    "connect_result",
+                    "network0",
+                    "network.connect",
+                    &["local_port", "remote_port", "connect_timeout"],
+                ),
+                node(
+                    "connect_value",
+                    "network0",
+                    "network.value",
+                    &["connect_result"],
+                ),
+            ],
+            edges: vec![
+                xfer(
+                    "project_profile_network_NetworkUnit_local_port",
+                    "local_port_seed",
+                ),
+                xfer(
+                    "project_profile_network_NetworkUnit_remote_port",
+                    "remote_port_seed",
+                ),
+                xfer(
+                    "project_profile_network_NetworkUnit_connect_timeout_ms",
+                    "connect_timeout_seed",
+                ),
+                dep("local_port_seed", "local_port"),
+                dep("remote_port_seed", "remote_port"),
+                dep("connect_timeout_seed", "connect_timeout"),
+                dep("local_port", "connect_result"),
+                dep("remote_port", "connect_result"),
+                dep("connect_timeout", "connect_result"),
+                dep("connect_result", "connect_value"),
             ],
             node_lanes: BTreeMap::new(),
         };
