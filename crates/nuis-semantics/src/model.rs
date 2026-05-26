@@ -151,6 +151,12 @@ pub enum AstStmt {
         then_body: Vec<AstStmt>,
         else_body: Vec<AstStmt>,
     },
+    While {
+        condition: AstExpr,
+        body: Vec<AstStmt>,
+    },
+    Break,
+    Continue,
     Expr(AstExpr),
     Return(Option<AstExpr>),
 }
@@ -679,6 +685,12 @@ pub enum NirStmt {
         then_body: Vec<NirStmt>,
         else_body: Vec<NirStmt>,
     },
+    While {
+        condition: NirExpr,
+        body: Vec<NirStmt>,
+    },
+    Break,
+    Continue,
     Expr(NirExpr),
     Return(Option<NirExpr>),
 }

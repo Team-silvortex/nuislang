@@ -103,6 +103,31 @@ fn rewrite_stmt(
                 }
             }
         }
+        NirStmt::While {
+            condition,
+            mut body,
+        } => {
+            let loop_input_env = BTreeMap::new();
+            let (condition, mut changed) = simplify_expr(condition, &loop_input_env);
+            let mut loop_env = BTreeMap::new();
+            let original_body = std::mem::take(&mut body);
+            let mut rewritten_body = Vec::with_capacity(original_body.len());
+            for stmt in original_body {
+                changed |= rewrite_stmt(stmt, &mut rewritten_body, &mut loop_env);
+            }
+            body = rewritten_body;
+            out.push(NirStmt::While { condition, body });
+            env.clear();
+            changed
+        }
+        NirStmt::Break => {
+            out.push(NirStmt::Break);
+            false
+        }
+        NirStmt::Continue => {
+            out.push(NirStmt::Continue);
+            false
+        }
     }
 }
 
@@ -759,6 +784,14 @@ fn prune_stmt(
                 changed,
             )
         }
+        NirStmt::While { condition, body } => {
+            let mut live_before = live_after.clone();
+            live_before.extend(live_before_block(&body, live_after));
+            collect_used_vars_expr(&condition, &mut live_before);
+            (Some(NirStmt::While { condition, body }), live_before, false)
+        }
+        NirStmt::Break => (Some(NirStmt::Break), live_after.clone(), false),
+        NirStmt::Continue => (Some(NirStmt::Continue), live_after.clone(), false),
     }
 }
 
@@ -803,6 +836,13 @@ fn live_before_stmt(stmt: &NirStmt, live_after: &BTreeSet<String>) -> BTreeSet<S
             collect_used_vars_expr(condition, &mut live_before);
             live_before
         }
+        NirStmt::While { condition, body } => {
+            let mut live_before = live_after.clone();
+            live_before.extend(live_before_block(body, live_after));
+            collect_used_vars_expr(condition, &mut live_before);
+            live_before
+        }
+        NirStmt::Break | NirStmt::Continue => live_after.clone(),
     }
 }
 
@@ -1248,6 +1288,66 @@ mod tests {
         assert_eq!(
             module.functions[0].body,
             vec![NirStmt::Print(NirExpr::Int(5))]
+        );
+    }
+
+    #[test]
+    fn does_not_propagate_outer_literal_into_while_condition_or_body() {
+        let mut module = sample_module(vec![
+            NirStmt::Let {
+                name: "value".to_owned(),
+                ty: None,
+                value: NirExpr::Int(0),
+            },
+            NirStmt::While {
+                condition: NirExpr::Binary {
+                    op: NirBinaryOp::Lt,
+                    lhs: Box::new(NirExpr::Var("value".to_owned())),
+                    rhs: Box::new(NirExpr::Int(4)),
+                },
+                body: vec![NirStmt::Let {
+                    name: "value".to_owned(),
+                    ty: None,
+                    value: NirExpr::Binary {
+                        op: NirBinaryOp::Add,
+                        lhs: Box::new(NirExpr::Var("value".to_owned())),
+                        rhs: Box::new(NirExpr::Int(1)),
+                    },
+                }],
+            },
+            NirStmt::Print(NirExpr::Var("value".to_owned())),
+            NirStmt::Return(Some(NirExpr::Var("value".to_owned()))),
+        ]);
+        let _changed = simplify_nir_module(&mut module);
+        let NirStmt::While { condition, body } = &module.functions[0].body[1] else {
+            panic!("expected while statement to remain in place");
+        };
+        assert_eq!(
+            condition,
+            &NirExpr::Binary {
+                op: NirBinaryOp::Lt,
+                lhs: Box::new(NirExpr::Var("value".to_owned())),
+                rhs: Box::new(NirExpr::Int(4)),
+            }
+        );
+        let NirStmt::Let { value, .. } = &body[0] else {
+            panic!("expected loop body binding");
+        };
+        assert_eq!(
+            value,
+            &NirExpr::Binary {
+                op: NirBinaryOp::Add,
+                lhs: Box::new(NirExpr::Var("value".to_owned())),
+                rhs: Box::new(NirExpr::Int(1)),
+            }
+        );
+        assert_eq!(
+            module.functions[0].body[2],
+            NirStmt::Print(NirExpr::Var("value".to_owned()))
+        );
+        assert_eq!(
+            module.functions[0].body[3],
+            NirStmt::Return(Some(NirExpr::Var("value".to_owned())))
         );
     }
 

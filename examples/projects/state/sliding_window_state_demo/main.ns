@@ -1,0 +1,151 @@
+mod cpu Main {
+  struct SlidingWindowState {
+    slot0: i64,
+    slot1: i64,
+    slot2: i64,
+    sum: i64,
+    completed_steps: i64,
+    timed_out_steps: i64
+  }
+
+  struct SlidingWindowSummary {
+    preview_value: i64,
+    final_value: i64,
+    branch_value: i64
+  }
+
+  async fn emit_sample(seed: i64) -> i64 {
+    return seed + 10;
+  }
+
+  fn seed_window() -> SlidingWindowState {
+    return SlidingWindowState {
+      slot0: 0,
+      slot1: 0,
+      slot2: 0,
+      sum: 0,
+      completed_steps: 0,
+      timed_out_steps: 0
+    };
+  }
+
+  fn push_first(state: SlidingWindowState, seed: i64) -> SlidingWindowState {
+    let result: TaskResult<i64> = join_result(spawn(emit_sample(seed)));
+    if task_completed(result) {
+      let value: i64 = task_value(result);
+      return SlidingWindowState {
+        slot0: value,
+        slot1: state.slot1,
+        slot2: state.slot2,
+        sum: value,
+        completed_steps: state.completed_steps + 1,
+        timed_out_steps: state.timed_out_steps
+      };
+    } else {
+      return state;
+    }
+  }
+
+  fn push_second(state: SlidingWindowState, seed: i64) -> SlidingWindowState {
+    let result: TaskResult<i64> = join_result(spawn(emit_sample(seed)));
+    if task_completed(result) {
+      let value: i64 = task_value(result);
+      return SlidingWindowState {
+        slot0: state.slot0,
+        slot1: value,
+        slot2: state.slot2,
+        sum: state.slot0 + value,
+        completed_steps: state.completed_steps + 1,
+        timed_out_steps: state.timed_out_steps
+      };
+    } else {
+      return state;
+    }
+  }
+
+  fn push_third(state: SlidingWindowState, seed: i64) -> SlidingWindowState {
+    let result: TaskResult<i64> = join_result(spawn(emit_sample(seed)));
+    if task_completed(result) {
+      let value: i64 = task_value(result);
+      return SlidingWindowState {
+        slot0: state.slot0,
+        slot1: state.slot1,
+        slot2: value,
+        sum: state.slot0 + state.slot1 + value,
+        completed_steps: state.completed_steps + 1,
+        timed_out_steps: state.timed_out_steps
+      };
+    } else {
+      return state;
+    }
+  }
+
+  fn rotate_push(state: SlidingWindowState, seed: i64) -> SlidingWindowState {
+    let result: TaskResult<i64> = join_result(spawn(emit_sample(seed)));
+    if task_completed(result) {
+      let value: i64 = task_value(result);
+      return SlidingWindowState {
+        slot0: state.slot1,
+        slot1: state.slot2,
+        slot2: value,
+        sum: state.slot1 + state.slot2 + value,
+        completed_steps: state.completed_steps + 1,
+        timed_out_steps: state.timed_out_steps
+      };
+    } else {
+      return state;
+    }
+  }
+
+  fn probe_timeout(state: SlidingWindowState, seed: i64) -> SlidingWindowState {
+    let result: TaskResult<i64> = join_result(timeout(spawn(emit_sample(seed)), 0));
+    if task_timed_out(result) {
+      return SlidingWindowState {
+        slot0: state.slot0,
+        slot1: state.slot1,
+        slot2: state.slot2,
+        sum: state.sum,
+        completed_steps: state.completed_steps,
+        timed_out_steps: state.timed_out_steps + 1
+      };
+    } else {
+      return SlidingWindowState {
+        slot0: state.slot0,
+        slot1: state.slot1,
+        slot2: state.slot2,
+        sum: state.sum,
+        completed_steps: state.completed_steps + 1,
+        timed_out_steps: state.timed_out_steps
+      };
+    }
+  }
+
+  fn capture_sliding_window_summary() -> SlidingWindowSummary {
+    let seeded: SlidingWindowState = seed_window();
+    let first: SlidingWindowState = push_first(seeded, 4);
+    let second: SlidingWindowState = push_second(first, 7);
+    let third: SlidingWindowState = push_third(second, 9);
+    let rotated: SlidingWindowState = rotate_push(third, 11);
+    let final_state: SlidingWindowState = probe_timeout(rotated, 13);
+
+    return SlidingWindowSummary {
+      preview_value: third.sum + rotated.sum,
+      final_value: final_state.sum
+        + final_state.slot0
+        + final_state.slot1
+        + final_state.slot2,
+      branch_value: final_state.completed_steps + final_state.timed_out_steps
+    };
+  }
+
+  fn summarize_sliding_window_state_demo() -> i64 {
+    let summary: SlidingWindowSummary = capture_sliding_window_summary();
+    return summary.preview_value + summary.final_value + summary.branch_value;
+  }
+
+  fn main() -> i64 {
+    let value: i64 = summarize_sliding_window_state_demo();
+    print(value);
+    return value;
+  }
+}

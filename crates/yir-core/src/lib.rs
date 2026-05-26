@@ -759,9 +759,13 @@ impl Operation {
                 CpuLlvmLoweringClass::Memory
             }
             "input_i64" | "extern_call_i64" => CpuLlvmLoweringClass::Runtime,
-            "print" | "guard_return" | "guard_print_return" | "branch_print_return" => {
-                CpuLlvmLoweringClass::Effect
-            }
+            "print"
+            | "loop_while_i64"
+            | "loop_while_i64_accumulate"
+            | "guard_print"
+            | "guard_return"
+            | "guard_print_return"
+            | "branch_print_return" => CpuLlvmLoweringClass::Effect,
             _ if self.is_async_core_op() => CpuLlvmLoweringClass::Effect,
             _ => CpuLlvmLoweringClass::Other,
         }

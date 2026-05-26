@@ -522,6 +522,79 @@ impl RegisteredMod for CpuMod {
 
                 Ok(InstructionSemantics::effect(node.op.args.clone()))
             }
+            "guard_print" => {
+                if node.op.args.len() != 2 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.guard_print <name> <resource> <condition> <print>`",
+                        node.name
+                    ));
+                }
+
+                Ok(InstructionSemantics::effect(node.op.args.clone()))
+            }
+            "loop_while_i64" => {
+                if node.op.args.len() != 5 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.loop_while_i64 <name> <resource> <initial> <limit> <step> <cmp> <step_kind>`",
+                        node.name
+                    ));
+                }
+                match node.op.args[3].as_str() {
+                    "lt" | "le" | "gt" | "ge" => {}
+                    other => {
+                        return Err(format!(
+                            "node `{}` has invalid loop compare kind `{}`",
+                            node.name, other
+                        ));
+                    }
+                }
+                match node.op.args[4].as_str() {
+                    "add" | "sub" => {}
+                    other => {
+                        return Err(format!(
+                            "node `{}` has invalid loop step kind `{}`",
+                            node.name, other
+                        ));
+                    }
+                }
+                Ok(InstructionSemantics::effect(node.op.args[..3].to_vec()))
+            }
+            "loop_while_i64_accumulate" => {
+                if node.op.args.len() != 7 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.loop_while_i64_accumulate <name> <resource> <initial> <carry_initial> <limit> <step> <cmp> <step_kind> <carry_kind>`",
+                        node.name
+                    ));
+                }
+                match node.op.args[4].as_str() {
+                    "lt" | "le" | "gt" | "ge" => {}
+                    other => {
+                        return Err(format!(
+                            "node `{}` has invalid loop compare kind `{}`",
+                            node.name, other
+                        ));
+                    }
+                }
+                match node.op.args[5].as_str() {
+                    "add" | "sub" => {}
+                    other => {
+                        return Err(format!(
+                            "node `{}` has invalid loop step kind `{}`",
+                            node.name, other
+                        ));
+                    }
+                }
+                match node.op.args[6].as_str() {
+                    "add_current" => {}
+                    other => {
+                        return Err(format!(
+                            "node `{}` has invalid carry kind `{}`",
+                            node.name, other
+                        ));
+                    }
+                }
+                Ok(InstructionSemantics::effect(node.op.args[..4].to_vec()))
+            }
             "guard_return" => {
                 if node.op.args.len() != 2 {
                     return Err(format!(
@@ -1367,6 +1440,58 @@ impl RegisteredMod for CpuMod {
                     format!(
                         "effect cpu.print @{} [{}]: {}",
                         node.resource, resource.kind.raw, value
+                    ),
+                );
+                Ok(Value::Unit)
+            }
+            "guard_print" => {
+                let condition = state.expect_value(&node.op.args[0])?.clone();
+                let printed = state.expect_value(&node.op.args[1])?.clone();
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.guard_print @{} [{}]: if {} then print {}",
+                        node.resource, resource.kind.raw, condition, printed
+                    ),
+                );
+                Ok(Value::Unit)
+            }
+            "loop_while_i64" => {
+                let initial = state.expect_value(&node.op.args[0])?.clone();
+                let limit = state.expect_value(&node.op.args[1])?.clone();
+                let step = state.expect_value(&node.op.args[2])?.clone();
+                let cmp = node.op.args.get(3).map_or("<missing>", String::as_str);
+                let step_kind = node.op.args.get(4).map_or("<missing>", String::as_str);
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.loop_while_i64 @{} [{}]: start {}, loop while current {} {}, step {} {}",
+                        node.resource, resource.kind.raw, initial, cmp, limit, step_kind, step
+                    ),
+                );
+                Ok(Value::Unit)
+            }
+            "loop_while_i64_accumulate" => {
+                let initial = state.expect_value(&node.op.args[0])?.clone();
+                let carry_initial = state.expect_value(&node.op.args[1])?.clone();
+                let limit = state.expect_value(&node.op.args[2])?.clone();
+                let step = state.expect_value(&node.op.args[3])?.clone();
+                let cmp = node.op.args.get(4).map_or("<missing>", String::as_str);
+                let step_kind = node.op.args.get(5).map_or("<missing>", String::as_str);
+                let carry_kind = node.op.args.get(6).map_or("<missing>", String::as_str);
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.loop_while_i64_accumulate @{} [{}]: start {}, carry {}, loop while current {} {}, step {} {}, carry {}",
+                        node.resource,
+                        resource.kind.raw,
+                        initial,
+                        carry_initial,
+                        cmp,
+                        limit,
+                        step_kind,
+                        step,
+                        carry_kind
                     ),
                 );
                 Ok(Value::Unit)

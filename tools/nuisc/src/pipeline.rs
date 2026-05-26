@@ -228,6 +228,13 @@ fn collect_instantiated_units_stmt(stmt: &NirStmt, units: &mut Vec<(String, Stri
                 collect_instantiated_units_stmt(stmt, units);
             }
         }
+        NirStmt::While { condition, body } => {
+            collect_instantiated_units_expr(condition, units);
+            for stmt in body {
+                collect_instantiated_units_stmt(stmt, units);
+            }
+        }
+        NirStmt::Break | NirStmt::Continue => {}
         NirStmt::Return(value) => {
             if let Some(value) = value {
                 collect_instantiated_units_expr(value, units);

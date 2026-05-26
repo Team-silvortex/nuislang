@@ -11,6 +11,10 @@ Start here:
 * [location_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/location_runtime_demo)
 * [config_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/config_runtime_demo)
 * [config_cache_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/config_cache_demo)
+* [guarded_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/guarded_while_demo)
+* [counted_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/counted_while_demo)
+* [accumulating_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/accumulating_while_demo)
+* [sliding_window_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/sliding_window_state_demo)
 
 Reading rule:
 

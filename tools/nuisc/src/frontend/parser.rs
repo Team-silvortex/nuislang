@@ -448,6 +448,21 @@ impl Parser {
         if self.peek_word("if") {
             return self.parse_if_stmt();
         }
+        if self.peek_word("while") {
+            return self.parse_while_stmt();
+        }
+        if self.peek_word("loop") {
+            return Err(
+                "`loop` is not supported yet; current control flow supports `if` branches, but indefinite loop syntax still needs explicit AST/NIR/YIR loop support"
+                    .to_owned(),
+            );
+        }
+        if self.peek_word("break") {
+            return self.parse_break_stmt();
+        }
+        if self.peek_word("continue") {
+            return self.parse_continue_stmt();
+        }
         if self.peek_word("return") {
             return self.parse_return_stmt();
         }
@@ -572,6 +587,25 @@ impl Parser {
             then_body,
             else_body,
         })
+    }
+
+    fn parse_while_stmt(&mut self) -> Result<AstStmt, String> {
+        self.expect_word("while")?;
+        let condition = self.parse_expr()?;
+        let body = self.parse_block()?;
+        Ok(AstStmt::While { condition, body })
+    }
+
+    fn parse_break_stmt(&mut self) -> Result<AstStmt, String> {
+        self.expect_word("break")?;
+        self.expect_symbol(';')?;
+        Ok(AstStmt::Break)
+    }
+
+    fn parse_continue_stmt(&mut self) -> Result<AstStmt, String> {
+        self.expect_word("continue")?;
+        self.expect_symbol(';')?;
+        Ok(AstStmt::Continue)
     }
 
     fn parse_expr(&mut self) -> Result<AstExpr, String> {

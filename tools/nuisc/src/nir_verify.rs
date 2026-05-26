@@ -62,7 +62,10 @@ fn verify_declared_types(module: &NirModule) -> Result<(), String> {
                 | NirStmt::Await(_)
                 | NirStmt::Expr(_)
                 | NirStmt::Return(_)
-                | NirStmt::If { .. } => {}
+                | NirStmt::If { .. }
+                | NirStmt::While { .. }
+                | NirStmt::Break
+                | NirStmt::Continue => {}
             }
         }
     }
@@ -157,6 +160,23 @@ fn verify_stmt(
                 &else_borrows,
             );
         }
+        NirStmt::While { condition, body } => {
+            verify_expr(condition, moved, borrows, borrow_bindings, data_bindings)?;
+            let mut loop_moved = moved.clone();
+            let mut loop_borrows = borrows.clone();
+            let mut loop_borrow_bindings = borrow_bindings.clone();
+            let mut loop_data_bindings = data_bindings.clone();
+            for stmt in body {
+                verify_stmt(
+                    stmt,
+                    &mut loop_moved,
+                    &mut loop_borrows,
+                    &mut loop_borrow_bindings,
+                    &mut loop_data_bindings,
+                )?;
+            }
+        }
+        NirStmt::Break | NirStmt::Continue => {}
         NirStmt::Return(value) => {
             if let Some(value) = value {
                 verify_expr(value, moved, borrows, borrow_bindings, data_bindings)?;

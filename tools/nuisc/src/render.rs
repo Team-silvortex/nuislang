@@ -115,6 +115,14 @@ pub fn render_ast(module: &AstModule) -> String {
                         out.push_str(&format!("      else {}\n", render_ast_stmt_inline(stmt)));
                     }
                 }
+                AstStmt::While { condition, body } => {
+                    out.push_str(&format!("    while {}\n", render_ast_expr(condition)));
+                    for stmt in body {
+                        out.push_str(&format!("      do {}\n", render_ast_stmt_inline(stmt)));
+                    }
+                }
+                AstStmt::Break => out.push_str("    break\n"),
+                AstStmt::Continue => out.push_str("    continue\n"),
                 AstStmt::Expr(expr) => {
                     out.push_str(&format!("    expr {}\n", render_ast_expr(expr)));
                 }
@@ -241,6 +249,14 @@ pub fn render_nir(module: &NirModule) -> String {
                         out.push_str(&format!("      else {}\n", render_nir_stmt_inline(stmt)));
                     }
                 }
+                NirStmt::While { condition, body } => {
+                    out.push_str(&format!("    while {}\n", render_nir_expr(condition)));
+                    for stmt in body {
+                        out.push_str(&format!("      do {}\n", render_nir_stmt_inline(stmt)));
+                    }
+                }
+                NirStmt::Break => out.push_str("    break\n"),
+                NirStmt::Continue => out.push_str("    continue\n"),
                 NirStmt::Expr(expr) => {
                     out.push_str(&format!("    expr {}\n", render_nir_expr(expr)));
                 }
@@ -1187,6 +1203,9 @@ fn render_ast_stmt_inline(stmt: &AstStmt) -> String {
         AstStmt::Await(value) => format!("await {}", render_ast_expr(value)),
         AstStmt::Expr(expr) => render_ast_expr(expr),
         AstStmt::If { .. } => "if ...".to_owned(),
+        AstStmt::While { .. } => "while ...".to_owned(),
+        AstStmt::Break => "break".to_owned(),
+        AstStmt::Continue => "continue".to_owned(),
         AstStmt::Return(value) => match value {
             Some(value) => format!("return {}", render_ast_expr(value)),
             None => "return".to_owned(),
@@ -1215,6 +1234,9 @@ fn render_nir_stmt_inline(stmt: &NirStmt) -> String {
         NirStmt::Await(value) => format!("await {}", render_nir_expr(value)),
         NirStmt::Expr(expr) => render_nir_expr(expr),
         NirStmt::If { .. } => "if ...".to_owned(),
+        NirStmt::While { .. } => "while ...".to_owned(),
+        NirStmt::Break => "break".to_owned(),
+        NirStmt::Continue => "continue".to_owned(),
         NirStmt::Return(value) => match value {
             Some(value) => format!("return {}", render_nir_expr(value)),
             None => "return".to_owned(),

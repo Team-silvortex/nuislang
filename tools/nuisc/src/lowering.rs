@@ -695,6 +695,23 @@ fn lower_function_body(
                     return Ok(Some(returned));
                 }
             }
+            NirStmt::While { condition, body } => {
+                if let Some(returned) = lower_while_stmt(condition, body, state, bindings)? {
+                    return Ok(Some(returned));
+                }
+            }
+            NirStmt::Break => {
+                return Err(
+                    "`break` parsed successfully, but loop execution lowering is not implemented yet"
+                        .to_owned(),
+                );
+            }
+            NirStmt::Continue => {
+                return Err(
+                    "`continue` parsed successfully, but loop execution lowering is not implemented yet"
+                        .to_owned(),
+                );
+            }
             NirStmt::Expr(expr) => {
                 let _ = lower_expr(expr, state, bindings)?;
             }
@@ -4210,6 +4227,40 @@ fn lower_if_stmt(
     }
 }
 
+fn lower_while_stmt(
+    condition: &NirExpr,
+    body: &[NirStmt],
+    state: &mut LoweringState<'_>,
+    bindings: &mut BTreeMap<String, String>,
+) -> Result<Option<String>, String> {
+    if let Some(prepared) = prepare_accumulating_while(condition, body, &state.pure_helpers) {
+        lower_accumulating_while(prepared, state, bindings)?;
+        return Ok(None);
+    }
+
+    if let Some(prepared) = prepare_counted_while(condition, body, &state.pure_helpers) {
+        lower_counted_while(prepared, state, bindings)?;
+        return Ok(None);
+    }
+
+    let condition_name = lower_expr(condition, state, bindings)?;
+    if let Some(prepared) = prepare_guarded_loop_body(body, &state.pure_helpers) {
+        return lower_prepared_loop_body(condition_name, &prepared, state, bindings);
+    }
+
+    match lower_if_stmt(condition, body, &[], state, bindings) {
+        Ok(Some(returned)) => return Ok(Some(returned)),
+        Ok(None) => return Ok(None),
+        Err(error) if error.contains("minimal nuisc lowering currently only supports `if`") => {}
+        Err(error) => return Err(error),
+    }
+
+    Err(
+        "minimal nuisc lowering can currently execute only guard-style `while` loops or simple counted `while` loops like `let i = 0; while i < limit { let i = i + 1; }`; general iterative loop/backedge lowering is still not implemented"
+            .to_owned(),
+    )
+}
+
 enum LoweredIfOutcome {
     Continued,
     Bind { name: String, value: String },
@@ -4220,6 +4271,54 @@ enum LoweredIfOutcome {
 enum PreparedTerminalBranch {
     Return(NirExpr),
     PrintReturn { print: NirExpr, returned: NirExpr },
+}
+
+enum PreparedLoopBody {
+    ExitOnly,
+    PrintExit {
+        print: NirExpr,
+    },
+    Return {
+        returned: NirExpr,
+    },
+    PrintReturn {
+        print: NirExpr,
+        returned: NirExpr,
+    },
+    Branch {
+        condition: NirExpr,
+        then_body: Box<PreparedLoopBody>,
+        else_body: Box<PreparedLoopBody>,
+    },
+}
+
+#[derive(Clone, Copy)]
+enum PreparedLoopCompare {
+    Lt,
+    Gt,
+}
+
+#[derive(Clone, Copy)]
+enum PreparedLoopStepKind {
+    Add,
+    Sub,
+}
+
+struct PreparedCountedWhile {
+    binding_name: String,
+    limit: NirExpr,
+    step: NirExpr,
+    compare: PreparedLoopCompare,
+    step_kind: PreparedLoopStepKind,
+}
+
+struct PreparedAccumulatingWhile {
+    binding_name: String,
+    carry_name: String,
+    limit: NirExpr,
+    step: NirExpr,
+    compare: PreparedLoopCompare,
+    step_kind: PreparedLoopStepKind,
 }
 
 fn lower_if_pair(
@@ -4380,6 +4479,220 @@ fn prepare_terminal_branch(
     }
 }
 
+fn prepare_guarded_loop_body(
+    stmts: &[NirStmt],
+    pure_helpers: &BTreeSet<String>,
+) -> Option<PreparedLoopBody> {
+    match stmts {
+        [NirStmt::Break] | [NirStmt::Continue] => Some(PreparedLoopBody::ExitOnly),
+        [NirStmt::Print(print), NirStmt::Break] | [NirStmt::Print(print), NirStmt::Continue] => {
+            Some(PreparedLoopBody::PrintExit {
+                print: print.clone(),
+            })
+        }
+        [NirStmt::Return(Some(returned))] => Some(PreparedLoopBody::Return {
+            returned: returned.clone(),
+        }),
+        [NirStmt::Print(print), NirStmt::Return(Some(returned))] => {
+            Some(PreparedLoopBody::PrintReturn {
+                print: print.clone(),
+                returned: returned.clone(),
+            })
+        }
+        [NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+        }] => {
+            let then_prepared = prepare_guarded_loop_body(then_body, pure_helpers)?;
+            let else_prepared = prepare_guarded_loop_body(else_body, pure_helpers)?;
+            Some(PreparedLoopBody::Branch {
+                condition: condition.clone(),
+                then_body: Box::new(then_prepared),
+                else_body: Box::new(else_prepared),
+            })
+        }
+        [binding @ (NirStmt::Let { .. } | NirStmt::Const { .. }), tail @ ..] => {
+            let (name, value) = extract_pure_branch_binding(binding, pure_helpers)?;
+            let prepared = prepare_guarded_loop_body(tail, pure_helpers)?;
+            Some(substitute_prepared_loop_body(prepared, &name, &value))
+        }
+        _ => None,
+    }
+}
+
+fn prepare_counted_while(
+    condition: &NirExpr,
+    body: &[NirStmt],
+    pure_helpers: &BTreeSet<String>,
+) -> Option<PreparedCountedWhile> {
+    let (binding_name, limit, compare) = match condition {
+        NirExpr::Binary {
+            op: NirBinaryOp::Lt,
+            lhs,
+            rhs,
+        } => match lhs.as_ref() {
+            NirExpr::Var(name) if is_terminal_branch_pure_expr(rhs, pure_helpers) => {
+                (name.clone(), (**rhs).clone(), PreparedLoopCompare::Lt)
+            }
+            _ => return None,
+        },
+        NirExpr::Binary {
+            op: NirBinaryOp::Gt,
+            lhs,
+            rhs,
+        } => match lhs.as_ref() {
+            NirExpr::Var(name) if is_terminal_branch_pure_expr(rhs, pure_helpers) => {
+                (name.clone(), (**rhs).clone(), PreparedLoopCompare::Gt)
+            }
+            _ => return None,
+        },
+        _ => return None,
+    };
+
+    match body {
+        [binding @ (NirStmt::Let { .. } | NirStmt::Const { .. })] => {
+            let (name, step_expr) = extract_pure_branch_binding(binding, pure_helpers)?;
+            if name != binding_name {
+                return None;
+            }
+            match step_expr {
+                NirExpr::Binary {
+                    op: NirBinaryOp::Add,
+                    lhs,
+                    rhs,
+                } => match lhs.as_ref() {
+                    NirExpr::Var(name)
+                        if name == &binding_name
+                            && is_terminal_branch_pure_expr(&rhs, pure_helpers) =>
+                    {
+                        Some(PreparedCountedWhile {
+                            binding_name,
+                            limit,
+                            step: (*rhs).clone(),
+                            compare,
+                            step_kind: PreparedLoopStepKind::Add,
+                        })
+                    }
+                    _ => None,
+                },
+                NirExpr::Binary {
+                    op: NirBinaryOp::Sub,
+                    lhs,
+                    rhs,
+                } => match lhs.as_ref() {
+                    NirExpr::Var(name)
+                        if name == &binding_name
+                            && is_terminal_branch_pure_expr(&rhs, pure_helpers) =>
+                    {
+                        Some(PreparedCountedWhile {
+                            binding_name,
+                            limit,
+                            step: (*rhs).clone(),
+                            compare,
+                            step_kind: PreparedLoopStepKind::Sub,
+                        })
+                    }
+                    _ => None,
+                },
+                _ => None,
+            }
+        }
+        _ => None,
+    }
+}
+
+fn prepare_accumulating_while(
+    condition: &NirExpr,
+    body: &[NirStmt],
+    pure_helpers: &BTreeSet<String>,
+) -> Option<PreparedAccumulatingWhile> {
+    let (binding_name, limit, compare) = match condition {
+        NirExpr::Binary {
+            op: NirBinaryOp::Lt,
+            lhs,
+            rhs,
+        } => match lhs.as_ref() {
+            NirExpr::Var(name) if is_terminal_branch_pure_expr(rhs, pure_helpers) => {
+                (name.clone(), (**rhs).clone(), PreparedLoopCompare::Lt)
+            }
+            _ => return None,
+        },
+        NirExpr::Binary {
+            op: NirBinaryOp::Gt,
+            lhs,
+            rhs,
+        } => match lhs.as_ref() {
+            NirExpr::Var(name) if is_terminal_branch_pure_expr(rhs, pure_helpers) => {
+                (name.clone(), (**rhs).clone(), PreparedLoopCompare::Gt)
+            }
+            _ => return None,
+        },
+        _ => return None,
+    };
+
+    let [step_binding @ (NirStmt::Let { .. } | NirStmt::Const { .. }), carry_binding @ (NirStmt::Let { .. } | NirStmt::Const { .. })] =
+        body
+    else {
+        return None;
+    };
+    let (step_name, step_expr) = extract_pure_branch_binding(step_binding, pure_helpers)?;
+    if step_name != binding_name {
+        return None;
+    }
+    let (step, step_kind) = match step_expr {
+        NirExpr::Binary {
+            op: NirBinaryOp::Add,
+            lhs,
+            rhs,
+        } => match lhs.as_ref() {
+            NirExpr::Var(name)
+                if name == &binding_name && is_terminal_branch_pure_expr(&rhs, pure_helpers) =>
+            {
+                ((*rhs).clone(), PreparedLoopStepKind::Add)
+            }
+            _ => return None,
+        },
+        NirExpr::Binary {
+            op: NirBinaryOp::Sub,
+            lhs,
+            rhs,
+        } => match lhs.as_ref() {
+            NirExpr::Var(name)
+                if name == &binding_name && is_terminal_branch_pure_expr(&rhs, pure_helpers) =>
+            {
+                ((*rhs).clone(), PreparedLoopStepKind::Sub)
+            }
+            _ => return None,
+        },
+        _ => return None,
+    };
+
+    let (carry_name, carry_expr) = extract_pure_branch_binding(carry_binding, pure_helpers)?;
+    match carry_expr {
+        NirExpr::Binary {
+            op: NirBinaryOp::Add,
+            lhs,
+            rhs,
+        } => match (lhs.as_ref(), rhs.as_ref()) {
+            (NirExpr::Var(lhs_name), NirExpr::Var(rhs_name))
+                if lhs_name == &carry_name && rhs_name == &binding_name =>
+            {
+                Some(PreparedAccumulatingWhile {
+                    binding_name,
+                    carry_name,
+                    limit,
+                    step,
+                    compare,
+                    step_kind,
+                })
+            }
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
 fn extract_pure_branch_binding(
     stmt: &NirStmt,
     pure_helpers: &BTreeSet<String>,
@@ -4399,11 +4712,20 @@ fn extract_pure_branch_binding(
 fn is_terminal_branch_pure_expr(expr: &NirExpr, pure_helpers: &BTreeSet<String>) -> bool {
     match expr {
         NirExpr::Call { callee, args } => {
-            pure_helpers.contains(callee)
+            (pure_helpers.contains(callee) || is_branch_safe_observer_call(callee))
                 && args
                     .iter()
                     .all(|arg| is_terminal_branch_pure_expr(arg, pure_helpers))
         }
+        NirExpr::CpuTaskCompleted(inner)
+        | NirExpr::CpuTaskTimedOut(inner)
+        | NirExpr::CpuTaskCancelled(inner)
+        | NirExpr::CpuTaskValue(inner)
+        | NirExpr::NetworkConfigReady(inner)
+        | NirExpr::NetworkSendReady(inner)
+        | NirExpr::NetworkRecvReady(inner)
+        | NirExpr::NetworkAcceptReady(inner)
+        | NirExpr::NetworkValue(inner) => is_terminal_branch_pure_expr(inner, pure_helpers),
         NirExpr::MethodCall { .. } => false,
         NirExpr::Await(_) | NirExpr::Instantiate { .. } => false,
         NirExpr::StructLiteral { fields, .. } => fields
@@ -4414,8 +4736,31 @@ fn is_terminal_branch_pure_expr(expr: &NirExpr, pure_helpers: &BTreeSet<String>)
             is_terminal_branch_pure_expr(lhs, pure_helpers)
                 && is_terminal_branch_pure_expr(rhs, pure_helpers)
         }
-        _ => nir_expr_effect_class(expr) == NirExprEffectClass::Pure,
+        _ => matches!(
+            nir_expr_effect_class(expr),
+            NirExprEffectClass::Pure
+                | NirExprEffectClass::LocalReadOnly
+                | NirExprEffectClass::HostReadOnly
+                | NirExprEffectClass::DomainReadOnly
+        ),
     }
+}
+
+fn is_branch_safe_observer_call(callee: &str) -> bool {
+    matches!(
+        callee,
+        "task_completed"
+            | "task_timed_out"
+            | "task_cancelled"
+            | "task_value"
+            | "network_config_ready"
+            | "network_send_ready"
+            | "network_recv_ready"
+            | "network_connect_ready"
+            | "network_accept_ready"
+            | "network_closed"
+            | "network_value"
+    )
 }
 
 fn collect_pure_helper_functions(module: &NirModule) -> BTreeSet<String> {
@@ -4570,6 +4915,288 @@ fn substitute_prepared_terminal_branch(
     }
 }
 
+fn substitute_prepared_loop_body(
+    body: PreparedLoopBody,
+    binding_name: &str,
+    binding_value: &NirExpr,
+) -> PreparedLoopBody {
+    match body {
+        PreparedLoopBody::ExitOnly => PreparedLoopBody::ExitOnly,
+        PreparedLoopBody::PrintExit { print } => PreparedLoopBody::PrintExit {
+            print: substitute_branch_binding(&print, binding_name, binding_value),
+        },
+        PreparedLoopBody::Return { returned } => PreparedLoopBody::Return {
+            returned: substitute_branch_binding(&returned, binding_name, binding_value),
+        },
+        PreparedLoopBody::PrintReturn { print, returned } => PreparedLoopBody::PrintReturn {
+            print: substitute_branch_binding(&print, binding_name, binding_value),
+            returned: substitute_branch_binding(&returned, binding_name, binding_value),
+        },
+        PreparedLoopBody::Branch {
+            condition,
+            then_body,
+            else_body,
+        } => PreparedLoopBody::Branch {
+            condition: substitute_branch_binding(&condition, binding_name, binding_value),
+            then_body: Box::new(substitute_prepared_loop_body(
+                *then_body,
+                binding_name,
+                binding_value,
+            )),
+            else_body: Box::new(substitute_prepared_loop_body(
+                *else_body,
+                binding_name,
+                binding_value,
+            )),
+        },
+    }
+}
+
+fn lower_prepared_loop_body(
+    condition_name: String,
+    body: &PreparedLoopBody,
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<Option<String>, String> {
+    match body {
+        PreparedLoopBody::ExitOnly => Ok(None),
+        PreparedLoopBody::PrintExit { print } => {
+            let print_name = lower_expr(print, state, bindings)?;
+            lower_guard_print(condition_name, print_name, state);
+            Ok(None)
+        }
+        PreparedLoopBody::Return { returned } => {
+            let return_name = lower_expr(returned, state, bindings)?;
+            lower_guard_return(condition_name, return_name, state);
+            Ok(None)
+        }
+        PreparedLoopBody::PrintReturn { print, returned } => {
+            let print_name = lower_expr(print, state, bindings)?;
+            let return_name = lower_expr(returned, state, bindings)?;
+            lower_guard_print_return(condition_name, print_name, return_name, state);
+            Ok(None)
+        }
+        PreparedLoopBody::Branch {
+            condition,
+            then_body,
+            else_body,
+        } => match (then_body.as_ref(), else_body.as_ref()) {
+            (PreparedLoopBody::ExitOnly, PreparedLoopBody::ExitOnly) => Ok(None),
+            (
+                PreparedLoopBody::PrintExit { print: then_print },
+                PreparedLoopBody::PrintExit { print: else_print },
+            ) => {
+                let branch_condition = lower_expr(condition, state, bindings)?;
+                let then_print_name = lower_expr(then_print, state, bindings)?;
+                let else_print_name = lower_expr(else_print, state, bindings)?;
+                let selected = lower_select(
+                    branch_condition,
+                    then_print_name,
+                    else_print_name,
+                    state,
+                )?;
+                lower_guard_print(condition_name, selected, state);
+                Ok(None)
+            }
+            (
+                PreparedLoopBody::Return { returned: then_return },
+                PreparedLoopBody::Return { returned: else_return },
+            ) => {
+                let branch_condition = lower_expr(condition, state, bindings)?;
+                let then_return_name = lower_expr(then_return, state, bindings)?;
+                let else_return_name = lower_expr(else_return, state, bindings)?;
+                let selected = lower_select(
+                    branch_condition,
+                    then_return_name,
+                    else_return_name,
+                    state,
+                )?;
+                lower_guard_return(condition_name, selected, state);
+                Ok(None)
+            }
+            (
+                PreparedLoopBody::PrintReturn {
+                    print: then_print,
+                    returned: then_return,
+                },
+                PreparedLoopBody::PrintReturn {
+                    print: else_print,
+                    returned: else_return,
+                },
+            ) => {
+                let branch_condition = lower_expr(condition, state, bindings)?;
+                let then_print_name = lower_expr(then_print, state, bindings)?;
+                let else_print_name = lower_expr(else_print, state, bindings)?;
+                let selected_print = lower_select(
+                    branch_condition.clone(),
+                    then_print_name,
+                    else_print_name,
+                    state,
+                )?;
+                let then_return_name = lower_expr(then_return, state, bindings)?;
+                let else_return_name = lower_expr(else_return, state, bindings)?;
+                let selected_return = lower_select(
+                    branch_condition,
+                    then_return_name,
+                    else_return_name,
+                    state,
+                )?;
+                lower_guard_print_return(condition_name, selected_print, selected_return, state);
+                Ok(None)
+            }
+            _ => Err(
+                "guarded `while` currently supports nested `if` only when both branches share the same guarded terminal shape: `break/continue`, `print(...); break/continue;`, `return ...;`, or `print(...); return ...;`"
+                    .to_owned(),
+            ),
+        },
+    }
+}
+
+fn lower_counted_while(
+    prepared: PreparedCountedWhile,
+    state: &mut LoweringState<'_>,
+    bindings: &mut BTreeMap<String, String>,
+) -> Result<(), String> {
+    let Some(initial_name) = bindings.get(&prepared.binding_name).cloned() else {
+        return Err(format!(
+            "counted `while` expected an existing binding for `{}` before the loop",
+            prepared.binding_name
+        ));
+    };
+    let limit_name = lower_expr(&prepared.limit, state, bindings)?;
+    let step_name = lower_expr(&prepared.step, state, bindings)?;
+    let name = next_name(state, "loop_while_i64");
+    let compare = match prepared.compare {
+        PreparedLoopCompare::Lt => "lt",
+        PreparedLoopCompare::Gt => "gt",
+    };
+    let step_kind = match prepared.step_kind {
+        PreparedLoopStepKind::Add => "add",
+        PreparedLoopStepKind::Sub => "sub",
+    };
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "loop_while_i64".to_owned(),
+            args: vec![
+                initial_name.clone(),
+                limit_name.clone(),
+                step_name.clone(),
+                compare.to_owned(),
+                step_kind.to_owned(),
+            ],
+        },
+    });
+    push_dep_edges(state, &initial_name, &name);
+    push_dep_edges(state, &limit_name, &name);
+    push_dep_edges(state, &step_name, &name);
+    state.yir.edges.push(Edge {
+        kind: EdgeKind::Effect,
+        from: initial_name,
+        to: name.clone(),
+    });
+    state.yir.edges.push(Edge {
+        kind: EdgeKind::Effect,
+        from: limit_name,
+        to: name.clone(),
+    });
+    state.yir.edges.push(Edge {
+        kind: EdgeKind::Effect,
+        from: step_name,
+        to: name.clone(),
+    });
+    bindings.insert(prepared.binding_name, name);
+    Ok(())
+}
+
+fn lower_accumulating_while(
+    prepared: PreparedAccumulatingWhile,
+    state: &mut LoweringState<'_>,
+    bindings: &mut BTreeMap<String, String>,
+) -> Result<(), String> {
+    let Some(initial_name) = bindings.get(&prepared.binding_name).cloned() else {
+        return Err(format!(
+            "accumulating `while` expected an existing binding for `{}` before the loop",
+            prepared.binding_name
+        ));
+    };
+    let Some(carry_initial_name) = bindings.get(&prepared.carry_name).cloned() else {
+        return Err(format!(
+            "accumulating `while` expected an existing binding for `{}` before the loop",
+            prepared.carry_name
+        ));
+    };
+    let limit_name = lower_expr(&prepared.limit, state, bindings)?;
+    let step_name = lower_expr(&prepared.step, state, bindings)?;
+    let name = next_name(state, "loop_while_i64_accumulate");
+    let compare = match prepared.compare {
+        PreparedLoopCompare::Lt => "lt",
+        PreparedLoopCompare::Gt => "gt",
+    };
+    let step_kind = match prepared.step_kind {
+        PreparedLoopStepKind::Add => "add",
+        PreparedLoopStepKind::Sub => "sub",
+    };
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "loop_while_i64_accumulate".to_owned(),
+            args: vec![
+                initial_name.clone(),
+                carry_initial_name.clone(),
+                limit_name.clone(),
+                step_name.clone(),
+                compare.to_owned(),
+                step_kind.to_owned(),
+                "add_current".to_owned(),
+            ],
+        },
+    });
+    push_dep_edges(state, &initial_name, &name);
+    push_dep_edges(state, &carry_initial_name, &name);
+    push_dep_edges(state, &limit_name, &name);
+    push_dep_edges(state, &step_name, &name);
+    for source in [&initial_name, &carry_initial_name, &limit_name, &step_name] {
+        state.yir.edges.push(Edge {
+            kind: EdgeKind::Effect,
+            from: source.clone(),
+            to: name.clone(),
+        });
+    }
+
+    let current_name = next_name(state, "loop_current");
+    state.yir.nodes.push(Node {
+        name: current_name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "field".to_owned(),
+            args: vec![name.clone(), "current".to_owned()],
+        },
+    });
+    push_dep_edges(state, &name, &current_name);
+
+    let carry_name = next_name(state, "loop_carry");
+    state.yir.nodes.push(Node {
+        name: carry_name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "field".to_owned(),
+            args: vec![name.clone(), "carry".to_owned()],
+        },
+    });
+    push_dep_edges(state, &name, &carry_name);
+
+    bindings.insert(prepared.binding_name, current_name);
+    bindings.insert(prepared.carry_name, carry_name);
+    Ok(())
+}
+
 fn lower_guard_return(condition_name: String, return_name: String, state: &mut LoweringState<'_>) {
     let name = next_name(state, "guard_return");
     state.yir.nodes.push(Node {
@@ -4591,6 +5218,31 @@ fn lower_guard_return(condition_name: String, return_name: String, state: &mut L
     state.yir.edges.push(Edge {
         kind: EdgeKind::Effect,
         from: return_name,
+        to: name,
+    });
+}
+
+fn lower_guard_print(condition_name: String, print_name: String, state: &mut LoweringState<'_>) {
+    let name = next_name(state, "guard_print");
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "guard_print".to_owned(),
+            args: vec![condition_name.clone(), print_name.clone()],
+        },
+    });
+    push_dep_edges(state, &condition_name, &name);
+    push_dep_edges(state, &print_name, &name);
+    state.yir.edges.push(Edge {
+        kind: EdgeKind::Effect,
+        from: condition_name,
+        to: name.clone(),
+    });
+    state.yir.edges.push(Edge {
+        kind: EdgeKind::Effect,
+        from: print_name,
         to: name,
     });
 }
@@ -6587,5 +7239,346 @@ mod tests {
         assert!(yir.nodes.iter().any(|node| {
             node.op.module == "cpu" && node.op.instruction == "branch_print_return"
         }));
+    }
+
+    #[test]
+    fn lowers_branch_local_task_value_binding_before_return() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              async fn ping(seed: i64) -> i64 {
+                return seed + 7;
+              }
+
+              struct SampleSummary {
+                value: i64,
+                branch: i64
+              }
+
+              fn main() -> i64 {
+                let task: Task<i64> = spawn(ping(5));
+                let result: TaskResult<i64> = join_result(task);
+                if task_completed(result) {
+                  let observed: i64 = task_value(result);
+                  return SampleSummary {
+                    value: observed,
+                    branch: 1
+                  }.value;
+                } else {
+                  return 0;
+                }
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "cpu" && node.op.instruction == "task_value"));
+    }
+
+    #[test]
+    fn lowers_guard_break_only_while_into_noop_loop_guard() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let value: i64 = 0;
+                while value < 3 {
+                  break;
+                }
+                return value;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+        assert!(!yir
+            .nodes
+            .iter()
+            .any(|node| node.op.instruction == "guard_print"));
+    }
+
+    #[test]
+    fn lowers_guard_print_break_while_into_guard_print() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                while true {
+                  print(7);
+                  break;
+                }
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "cpu" && node.op.instruction == "guard_print"));
+    }
+
+    #[test]
+    fn lowers_guard_print_continue_while_into_guard_print() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                while true {
+                  let shown: i64 = 7 + 0;
+                  print(shown);
+                  continue;
+                }
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "cpu" && node.op.instruction == "guard_print"));
+    }
+
+    #[test]
+    fn lowers_guarded_branching_while_into_select_plus_guard_print() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                while true {
+                  if 2 < 5 {
+                    print(7);
+                    break;
+                  } else {
+                    print(9);
+                    continue;
+                  }
+                }
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "cpu" && node.op.instruction == "select"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "cpu" && node.op.instruction == "guard_print"));
+    }
+
+    #[test]
+    fn lowers_guarded_while_return_body_into_guard_return() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                while 2 < 5 {
+                  return 9;
+                }
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "cpu" && node.op.instruction == "guard_return"));
+    }
+
+    #[test]
+    fn lowers_guarded_branching_while_into_select_plus_guard_return() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                while true {
+                  if 2 < 5 {
+                    return 7;
+                  } else {
+                    return 9;
+                  }
+                }
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "cpu" && node.op.instruction == "select"));
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "cpu" && node.op.instruction == "guard_return"));
+    }
+
+    #[test]
+    fn lowers_guarded_branching_while_into_select_plus_guard_print_return() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                while true {
+                  if 2 < 5 {
+                    print(7);
+                    return 17;
+                  } else {
+                    print(9);
+                    return 19;
+                  }
+                }
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+        assert!(yir
+            .nodes
+            .iter()
+            .any(|node| node.op.module == "cpu" && node.op.instruction == "select"));
+        assert!(yir.nodes.iter().any(|node| {
+            node.op.module == "cpu" && node.op.instruction == "guard_print_return"
+        }));
+    }
+
+    #[test]
+    fn lowers_simple_counted_while_into_loop_while_i64() {
+        let mut module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let value: i64 = 0;
+                while value < 3 {
+                  let value: i64 = value + 1;
+                }
+                return value;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        crate::optimize::simplify_nir_module(&mut module);
+
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+        let loop_node = yir
+            .nodes
+            .iter()
+            .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64")
+            .expect("expected loop_while_i64 node");
+        assert_eq!(loop_node.op.args[3], "lt");
+        assert_eq!(loop_node.op.args[4], "add");
+    }
+
+    #[test]
+    fn lowers_descending_counted_while_into_loop_while_i64() {
+        let mut module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let value: i64 = 7;
+                while value > 1 {
+                  let value: i64 = value - 2;
+                }
+                return value;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        crate::optimize::simplify_nir_module(&mut module);
+
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+        let loop_node = yir
+            .nodes
+            .iter()
+            .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64")
+            .expect("expected loop_while_i64 node");
+        assert_eq!(loop_node.op.args[3], "gt");
+        assert_eq!(loop_node.op.args[4], "sub");
+    }
+
+    #[test]
+    fn lowers_accumulating_counted_while_into_loop_while_i64_accumulate() {
+        let mut module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let value: i64 = 0;
+                let acc: i64 = 0;
+                while value < 4 {
+                  let value: i64 = value + 1;
+                  let acc: i64 = acc + value;
+                }
+                return acc;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        crate::optimize::simplify_nir_module(&mut module);
+
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+        let loop_node = yir
+            .nodes
+            .iter()
+            .find(|node| {
+                node.op.module == "cpu" && node.op.instruction == "loop_while_i64_accumulate"
+            })
+            .expect("expected loop_while_i64_accumulate node");
+        assert_eq!(loop_node.op.args[4], "lt");
+        assert_eq!(loop_node.op.args[5], "add");
+        assert_eq!(loop_node.op.args[6], "add_current");
+    }
+
+    #[test]
+    fn rejects_general_iterative_while_until_loop_lowering_exists() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let value: i64 = 0;
+                while value < 3 {
+                  print(value);
+                }
+                return value;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let error = lower_nir_to_yir_builtin_cpu(&module).unwrap_err();
+        assert!(error.contains("guard-style `while` loops or simple counted `while` loops"));
     }
 }

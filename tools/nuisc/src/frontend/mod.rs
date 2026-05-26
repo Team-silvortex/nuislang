@@ -449,6 +449,37 @@ fn lower_stmt_with_async(
                     .collect::<Result<Vec<_>, _>>()?,
             }
         }
+        AstStmt::While { condition, body } => {
+            let mut loop_bindings = bindings.clone();
+            NirStmt::While {
+                condition: lower_expr_with_async(
+                    condition,
+                    current_domain,
+                    current_function_is_async,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    Some(&bool_type()),
+                    false,
+                )?,
+                body: body
+                    .iter()
+                    .map(|stmt| {
+                        lower_stmt_with_async(
+                            stmt,
+                            current_domain,
+                            current_function_is_async,
+                            &mut loop_bindings,
+                            return_type,
+                            signatures,
+                            struct_table,
+                        )
+                    })
+                    .collect::<Result<Vec<_>, _>>()?,
+            }
+        }
+        AstStmt::Break => NirStmt::Break,
+        AstStmt::Continue => NirStmt::Continue,
         AstStmt::Expr(expr) => NirStmt::Expr(lower_expr_with_async(
             expr,
             current_domain,
@@ -14292,7 +14323,10 @@ fn validate_declared_nir_types(module: &NirModule) -> Result<(), String> {
                 | NirStmt::Await(_)
                 | NirStmt::Expr(_)
                 | NirStmt::Return(_)
-                | NirStmt::If { .. } => {}
+                | NirStmt::If { .. }
+                | NirStmt::While { .. }
+                | NirStmt::Break
+                | NirStmt::Continue => {}
             }
         }
     }
@@ -15407,6 +15441,89 @@ mod tests {
             function.body.get(1),
             Some(NirStmt::Return(Some(NirExpr::Binary { lhs, .. })))
                 if matches!(lhs.as_ref(), NirExpr::Await(_))
+        ));
+    }
+
+    #[test]
+    fn lowers_while_into_nir_statement() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let value: i64 = 0;
+                while value < 3 {
+                  print(value);
+                  continue;
+                }
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            function.body.get(1),
+            Some(NirStmt::While { condition, body })
+                if matches!(condition, NirExpr::Binary { .. })
+                    && matches!(body.as_slice(), [NirStmt::Print(_), NirStmt::Continue])
+        ));
+    }
+
+    #[test]
+    fn lowers_break_into_nir_statement() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() {
+                while true {
+                  break;
+                }
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            function.body.first(),
+            Some(NirStmt::While { body, .. }) if matches!(body.as_slice(), [NirStmt::Break])
+        ));
+    }
+
+    #[test]
+    fn lowers_continue_into_nir_statement() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() {
+                while true {
+                  continue;
+                }
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            function.body.first(),
+            Some(NirStmt::While { body, .. }) if matches!(body.as_slice(), [NirStmt::Continue])
         ));
     }
 

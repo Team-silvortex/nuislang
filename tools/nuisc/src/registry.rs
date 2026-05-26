@@ -542,6 +542,13 @@ fn collect_support_usage_stmt(
                 collect_support_usage_stmt(stmt, domain_family, surfaces, slots);
             }
         }
+        NirStmt::While { condition, body } => {
+            collect_support_usage_expr(condition, domain_family, surfaces, slots);
+            for stmt in body {
+                collect_support_usage_stmt(stmt, domain_family, surfaces, slots);
+            }
+        }
+        NirStmt::Break | NirStmt::Continue => {}
         NirStmt::Return(value) => {
             if let Some(value) = value {
                 collect_support_usage_expr(value, domain_family, surfaces, slots);

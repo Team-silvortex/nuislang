@@ -1663,340 +1663,108 @@ fn nir_uses_kernel_profile_batch_lanes(module: &NirModule, unit: &str) -> bool {
 }
 
 fn stmt_uses_shader_profile_render(stmt: &NirStmt, unit: &str) -> bool {
-    match stmt {
-        NirStmt::Let { value, .. }
-        | NirStmt::Const { value, .. }
-        | NirStmt::Print(value)
-        | NirStmt::Await(value)
-        | NirStmt::Expr(value) => expr_uses_shader_profile_render(value, unit),
-        NirStmt::If {
-            condition,
-            then_body,
-            else_body,
-        } => {
-            expr_uses_shader_profile_render(condition, unit)
-                || then_body
-                    .iter()
-                    .any(|stmt| stmt_uses_shader_profile_render(stmt, unit))
-                || else_body
-                    .iter()
-                    .any(|stmt| stmt_uses_shader_profile_render(stmt, unit))
-        }
-        NirStmt::Return(value) => value
-            .as_ref()
-            .is_some_and(|value| expr_uses_shader_profile_render(value, unit)),
-    }
+    stmt_uses_expr_predicate(stmt, &|value| expr_uses_shader_profile_render(value, unit))
 }
 
 fn stmt_uses_shader_profile_draw_instanced(stmt: &NirStmt, unit: &str) -> bool {
-    match stmt {
-        NirStmt::Let { value, .. }
-        | NirStmt::Const { value, .. }
-        | NirStmt::Print(value)
-        | NirStmt::Await(value)
-        | NirStmt::Expr(value) => expr_uses_shader_profile_draw_instanced(value, unit),
-        NirStmt::If {
-            condition,
-            then_body,
-            else_body,
-        } => {
-            expr_uses_shader_profile_draw_instanced(condition, unit)
-                || then_body
-                    .iter()
-                    .any(|stmt| stmt_uses_shader_profile_draw_instanced(stmt, unit))
-                || else_body
-                    .iter()
-                    .any(|stmt| stmt_uses_shader_profile_draw_instanced(stmt, unit))
-        }
-        NirStmt::Return(value) => value
-            .as_ref()
-            .is_some_and(|value| expr_uses_shader_profile_draw_instanced(value, unit)),
-    }
+    stmt_uses_expr_predicate(stmt, &|value| {
+        expr_uses_shader_profile_draw_instanced(value, unit)
+    })
 }
 
 fn stmt_uses_shader_profile_packet(stmt: &NirStmt, unit: &str) -> bool {
-    match stmt {
-        NirStmt::Let { value, .. }
-        | NirStmt::Const { value, .. }
-        | NirStmt::Print(value)
-        | NirStmt::Await(value)
-        | NirStmt::Expr(value) => expr_uses_shader_profile_packet(value, unit),
-        NirStmt::If {
-            condition,
-            then_body,
-            else_body,
-        } => {
-            expr_uses_shader_profile_packet(condition, unit)
-                || then_body
-                    .iter()
-                    .any(|stmt| stmt_uses_shader_profile_packet(stmt, unit))
-                || else_body
-                    .iter()
-                    .any(|stmt| stmt_uses_shader_profile_packet(stmt, unit))
-        }
-        NirStmt::Return(value) => value
-            .as_ref()
-            .is_some_and(|value| expr_uses_shader_profile_packet(value, unit)),
-    }
+    stmt_uses_expr_predicate(stmt, &|value| expr_uses_shader_profile_packet(value, unit))
 }
 
 fn stmt_uses_shader_profile_color_seed(stmt: &NirStmt, unit: &str) -> bool {
-    match stmt {
-        NirStmt::Let { value, .. }
-        | NirStmt::Const { value, .. }
-        | NirStmt::Print(value)
-        | NirStmt::Await(value)
-        | NirStmt::Expr(value) => expr_uses_shader_profile_color_seed(value, unit),
-        NirStmt::If {
-            condition,
-            then_body,
-            else_body,
-        } => {
-            expr_uses_shader_profile_color_seed(condition, unit)
-                || then_body
-                    .iter()
-                    .any(|stmt| stmt_uses_shader_profile_color_seed(stmt, unit))
-                || else_body
-                    .iter()
-                    .any(|stmt| stmt_uses_shader_profile_color_seed(stmt, unit))
-        }
-        NirStmt::Return(value) => value
-            .as_ref()
-            .is_some_and(|value| expr_uses_shader_profile_color_seed(value, unit)),
-    }
+    stmt_uses_expr_predicate(stmt, &|value| {
+        expr_uses_shader_profile_color_seed(value, unit)
+    })
 }
 
 fn stmt_uses_shader_profile_speed_seed(stmt: &NirStmt, unit: &str) -> bool {
-    match stmt {
-        NirStmt::Let { value, .. }
-        | NirStmt::Const { value, .. }
-        | NirStmt::Print(value)
-        | NirStmt::Await(value)
-        | NirStmt::Expr(value) => expr_uses_shader_profile_speed_seed(value, unit),
-        NirStmt::If {
-            condition,
-            then_body,
-            else_body,
-        } => {
-            expr_uses_shader_profile_speed_seed(condition, unit)
-                || then_body
-                    .iter()
-                    .any(|stmt| stmt_uses_shader_profile_speed_seed(stmt, unit))
-                || else_body
-                    .iter()
-                    .any(|stmt| stmt_uses_shader_profile_speed_seed(stmt, unit))
-        }
-        NirStmt::Return(value) => value
-            .as_ref()
-            .is_some_and(|value| expr_uses_shader_profile_speed_seed(value, unit)),
-    }
+    stmt_uses_expr_predicate(stmt, &|value| {
+        expr_uses_shader_profile_speed_seed(value, unit)
+    })
 }
 
 fn stmt_uses_shader_profile_radius_seed(stmt: &NirStmt, unit: &str) -> bool {
-    match stmt {
-        NirStmt::Let { value, .. }
-        | NirStmt::Const { value, .. }
-        | NirStmt::Print(value)
-        | NirStmt::Await(value)
-        | NirStmt::Expr(value) => expr_uses_shader_profile_radius_seed(value, unit),
-        NirStmt::If {
-            condition,
-            then_body,
-            else_body,
-        } => {
-            expr_uses_shader_profile_radius_seed(condition, unit)
-                || then_body
-                    .iter()
-                    .any(|stmt| stmt_uses_shader_profile_radius_seed(stmt, unit))
-                || else_body
-                    .iter()
-                    .any(|stmt| stmt_uses_shader_profile_radius_seed(stmt, unit))
-        }
-        NirStmt::Return(value) => value
-            .as_ref()
-            .is_some_and(|value| expr_uses_shader_profile_radius_seed(value, unit)),
-    }
+    stmt_uses_expr_predicate(stmt, &|value| {
+        expr_uses_shader_profile_radius_seed(value, unit)
+    })
 }
 
 fn stmt_uses_data_profile_bind_core(stmt: &NirStmt, unit: &str) -> bool {
-    match stmt {
-        NirStmt::Let { value, .. }
-        | NirStmt::Const { value, .. }
-        | NirStmt::Print(value)
-        | NirStmt::Await(value)
-        | NirStmt::Expr(value) => expr_uses_data_profile_bind_core(value, unit),
-        NirStmt::If {
-            condition,
-            then_body,
-            else_body,
-        } => {
-            expr_uses_data_profile_bind_core(condition, unit)
-                || then_body
-                    .iter()
-                    .any(|stmt| stmt_uses_data_profile_bind_core(stmt, unit))
-                || else_body
-                    .iter()
-                    .any(|stmt| stmt_uses_data_profile_bind_core(stmt, unit))
-        }
-        NirStmt::Return(value) => value
-            .as_ref()
-            .is_some_and(|value| expr_uses_data_profile_bind_core(value, unit)),
-    }
+    stmt_uses_expr_predicate(stmt, &|value| expr_uses_data_profile_bind_core(value, unit))
 }
 
 fn stmt_uses_data_profile_handle_table(stmt: &NirStmt, unit: &str) -> bool {
-    match stmt {
-        NirStmt::Let { value, .. }
-        | NirStmt::Const { value, .. }
-        | NirStmt::Print(value)
-        | NirStmt::Await(value)
-        | NirStmt::Expr(value) => expr_uses_data_profile_handle_table(value, unit),
-        NirStmt::If {
-            condition,
-            then_body,
-            else_body,
-        } => {
-            expr_uses_data_profile_handle_table(condition, unit)
-                || then_body
-                    .iter()
-                    .any(|stmt| stmt_uses_data_profile_handle_table(stmt, unit))
-                || else_body
-                    .iter()
-                    .any(|stmt| stmt_uses_data_profile_handle_table(stmt, unit))
-        }
-        NirStmt::Return(value) => value
-            .as_ref()
-            .is_some_and(|value| expr_uses_data_profile_handle_table(value, unit)),
-    }
+    stmt_uses_expr_predicate(stmt, &|value| {
+        expr_uses_data_profile_handle_table(value, unit)
+    })
 }
 
 fn stmt_uses_data_profile_send_uplink(stmt: &NirStmt, unit: &str) -> bool {
-    match stmt {
-        NirStmt::Let { value, .. }
-        | NirStmt::Const { value, .. }
-        | NirStmt::Print(value)
-        | NirStmt::Await(value)
-        | NirStmt::Expr(value) => expr_uses_data_profile_send_uplink(value, unit),
-        NirStmt::If {
-            condition,
-            then_body,
-            else_body,
-        } => {
-            expr_uses_data_profile_send_uplink(condition, unit)
-                || then_body
-                    .iter()
-                    .any(|stmt| stmt_uses_data_profile_send_uplink(stmt, unit))
-                || else_body
-                    .iter()
-                    .any(|stmt| stmt_uses_data_profile_send_uplink(stmt, unit))
-        }
-        NirStmt::Return(value) => value
-            .as_ref()
-            .is_some_and(|value| expr_uses_data_profile_send_uplink(value, unit)),
-    }
+    stmt_uses_expr_predicate(stmt, &|value| {
+        expr_uses_data_profile_send_uplink(value, unit)
+    })
 }
 
 fn stmt_uses_data_profile_send_downlink(stmt: &NirStmt, unit: &str) -> bool {
-    match stmt {
-        NirStmt::Let { value, .. }
-        | NirStmt::Const { value, .. }
-        | NirStmt::Print(value)
-        | NirStmt::Await(value)
-        | NirStmt::Expr(value) => expr_uses_data_profile_send_downlink(value, unit),
-        NirStmt::If {
-            condition,
-            then_body,
-            else_body,
-        } => {
-            expr_uses_data_profile_send_downlink(condition, unit)
-                || then_body
-                    .iter()
-                    .any(|stmt| stmt_uses_data_profile_send_downlink(stmt, unit))
-                || else_body
-                    .iter()
-                    .any(|stmt| stmt_uses_data_profile_send_downlink(stmt, unit))
-        }
-        NirStmt::Return(value) => value
-            .as_ref()
-            .is_some_and(|value| expr_uses_data_profile_send_downlink(value, unit)),
-    }
+    stmt_uses_expr_predicate(stmt, &|value| {
+        expr_uses_data_profile_send_downlink(value, unit)
+    })
 }
 
 fn stmt_uses_kernel_profile_bind_core(stmt: &NirStmt, unit: &str) -> bool {
-    match stmt {
-        NirStmt::Let { value, .. }
-        | NirStmt::Const { value, .. }
-        | NirStmt::Print(value)
-        | NirStmt::Await(value)
-        | NirStmt::Expr(value) => expr_uses_kernel_profile_bind_core(value, unit),
-        NirStmt::If {
-            condition,
-            then_body,
-            else_body,
-        } => {
-            expr_uses_kernel_profile_bind_core(condition, unit)
-                || then_body
-                    .iter()
-                    .any(|stmt| stmt_uses_kernel_profile_bind_core(stmt, unit))
-                || else_body
-                    .iter()
-                    .any(|stmt| stmt_uses_kernel_profile_bind_core(stmt, unit))
-        }
-        NirStmt::Return(value) => value
-            .as_ref()
-            .is_some_and(|value| expr_uses_kernel_profile_bind_core(value, unit)),
-    }
+    stmt_uses_expr_predicate(stmt, &|value| {
+        expr_uses_kernel_profile_bind_core(value, unit)
+    })
 }
 
 fn stmt_uses_kernel_profile_queue_depth(stmt: &NirStmt, unit: &str) -> bool {
-    match stmt {
-        NirStmt::Let { value, .. }
-        | NirStmt::Const { value, .. }
-        | NirStmt::Print(value)
-        | NirStmt::Await(value)
-        | NirStmt::Expr(value) => expr_uses_kernel_profile_queue_depth(value, unit),
-        NirStmt::If {
-            condition,
-            then_body,
-            else_body,
-        } => {
-            expr_uses_kernel_profile_queue_depth(condition, unit)
-                || then_body
-                    .iter()
-                    .any(|stmt| stmt_uses_kernel_profile_queue_depth(stmt, unit))
-                || else_body
-                    .iter()
-                    .any(|stmt| stmt_uses_kernel_profile_queue_depth(stmt, unit))
-        }
-        NirStmt::Return(value) => value
-            .as_ref()
-            .is_some_and(|value| expr_uses_kernel_profile_queue_depth(value, unit)),
-    }
+    stmt_uses_expr_predicate(stmt, &|value| {
+        expr_uses_kernel_profile_queue_depth(value, unit)
+    })
 }
 
 fn stmt_uses_kernel_profile_batch_lanes(stmt: &NirStmt, unit: &str) -> bool {
+    stmt_uses_expr_predicate(stmt, &|value| {
+        expr_uses_kernel_profile_batch_lanes(value, unit)
+    })
+}
+
+fn stmt_uses_expr_predicate<F>(stmt: &NirStmt, predicate: &F) -> bool
+where
+    F: Fn(&NirExpr) -> bool,
+{
     match stmt {
         NirStmt::Let { value, .. }
         | NirStmt::Const { value, .. }
         | NirStmt::Print(value)
         | NirStmt::Await(value)
-        | NirStmt::Expr(value) => expr_uses_kernel_profile_batch_lanes(value, unit),
+        | NirStmt::Expr(value) => predicate(value),
         NirStmt::If {
             condition,
             then_body,
             else_body,
         } => {
-            expr_uses_kernel_profile_batch_lanes(condition, unit)
+            predicate(condition)
                 || then_body
                     .iter()
-                    .any(|stmt| stmt_uses_kernel_profile_batch_lanes(stmt, unit))
+                    .any(|stmt| stmt_uses_expr_predicate(stmt, predicate))
                 || else_body
                     .iter()
-                    .any(|stmt| stmt_uses_kernel_profile_batch_lanes(stmt, unit))
+                    .any(|stmt| stmt_uses_expr_predicate(stmt, predicate))
         }
-        NirStmt::Return(value) => value
-            .as_ref()
-            .is_some_and(|value| expr_uses_kernel_profile_batch_lanes(value, unit)),
+        NirStmt::While { condition, body } => {
+            predicate(condition)
+                || body
+                    .iter()
+                    .any(|stmt| stmt_uses_expr_predicate(stmt, predicate))
+        }
+        NirStmt::Break | NirStmt::Continue => false,
+        NirStmt::Return(value) => value.as_ref().is_some_and(predicate),
     }
 }
 
@@ -3242,7 +3010,17 @@ fn find_route_payload_type_in_stmts(
                     return Some(ty);
                 }
             }
-            NirStmt::Print(_) | NirStmt::Await(_) | NirStmt::Expr(_) | NirStmt::Return(_) => {}
+            NirStmt::While { body, .. } => {
+                if let Some(ty) = find_route_payload_type_in_stmts(body, data_unit, uplink) {
+                    return Some(ty);
+                }
+            }
+            NirStmt::Print(_)
+            | NirStmt::Await(_)
+            | NirStmt::Expr(_)
+            | NirStmt::Return(_)
+            | NirStmt::Break
+            | NirStmt::Continue => {}
             NirStmt::Let { ty: None, .. } => {}
         }
     }

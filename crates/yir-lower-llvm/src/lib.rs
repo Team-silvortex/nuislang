@@ -1419,6 +1419,232 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                     ));
                 }
             }
+            ("cpu", "loop_while_i64") => {
+                let initial_value = registers.get(&node.op.args[0]).cloned();
+                let limit_value = registers.get(&node.op.args[1]).cloned();
+                let step_value = registers.get(&node.op.args[2]).cloned();
+                let (Some(initial_value), Some(limit_value), Some(step_value)) =
+                    (initial_value, limit_value, step_value)
+                else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.loop_while_i64 `{}` because one or more inputs are outside the current CPU LLVM slice",
+                        node.name
+                    ));
+                    continue;
+                };
+                let Some(initial) = coerce_to_i64(&initial_value, &mut body, &mut next_reg) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.loop_while_i64 `{}` because its initial value is not coercible to i64",
+                        node.name
+                    ));
+                    continue;
+                };
+                let Some(limit) = coerce_to_i64(&limit_value, &mut body, &mut next_reg) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.loop_while_i64 `{}` because its limit value is not coercible to i64",
+                        node.name
+                    ));
+                    continue;
+                };
+                let Some(step) = coerce_to_i64(&step_value, &mut body, &mut next_reg) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.loop_while_i64 `{}` because its step value is not coercible to i64",
+                        node.name
+                    ));
+                    continue;
+                };
+                let cmp_kind = node.op.args[3].as_str();
+                let step_kind = node.op.args[4].as_str();
+                let loop_slot = fresh_reg(&mut next_reg);
+                body.push(format!("  {loop_slot} = alloca i64"));
+                body.push(format!("  store i64 {initial}, ptr {loop_slot}"));
+                let loop_cond = fresh_block(&mut next_block, "loop_while_i64_cond");
+                let loop_body = fresh_block(&mut next_block, "loop_while_i64_body");
+                let loop_exit = fresh_block(&mut next_block, "loop_while_i64_exit");
+                body.push(format!("  br label %{loop_cond}"));
+                body.push(format!("{loop_cond}:"));
+                let current = fresh_reg(&mut next_reg);
+                body.push(format!("  {current} = load i64, ptr {loop_slot}"));
+                let cmp = fresh_reg(&mut next_reg);
+                let pred = match cmp_kind {
+                    "lt" => "slt",
+                    "le" => "sle",
+                    "gt" => "sgt",
+                    "ge" => "sge",
+                    other => {
+                        return Err(format!(
+                            "cpu.loop_while_i64 `{}` has unsupported compare kind `{other}` during LLVM lowering",
+                            node.name
+                        ));
+                    }
+                };
+                body.push(format!("  {cmp} = icmp {pred} i64 {current}, {limit}"));
+                body.push(format!(
+                    "  br i1 {cmp}, label %{loop_body}, label %{loop_exit}"
+                ));
+                body.push(format!("{loop_body}:"));
+                let next_value = match step_kind {
+                    "add" => {
+                        let reg = fresh_reg(&mut next_reg);
+                        body.push(format!("  {reg} = add i64 {current}, {step}"));
+                        reg
+                    }
+                    "sub" => {
+                        let reg = fresh_reg(&mut next_reg);
+                        body.push(format!("  {reg} = sub i64 {current}, {step}"));
+                        reg
+                    }
+                    other => {
+                        return Err(format!(
+                            "cpu.loop_while_i64 `{}` has unsupported step kind `{other}` during LLVM lowering",
+                            node.name
+                        ));
+                    }
+                };
+                body.push(format!("  store i64 {next_value}, ptr {loop_slot}"));
+                body.push(format!("  br label %{loop_cond}"));
+                body.push(format!("{loop_exit}:"));
+                registers.insert(node.name.clone(), LlvmValueRef::I64(current.clone()));
+                *last_cpu_value = Some(current);
+            }
+            ("cpu", "loop_while_i64_accumulate") => {
+                let initial_value = registers.get(&node.op.args[0]).cloned();
+                let carry_initial_value = registers.get(&node.op.args[1]).cloned();
+                let limit_value = registers.get(&node.op.args[2]).cloned();
+                let step_value = registers.get(&node.op.args[3]).cloned();
+                let (
+                    Some(initial_value),
+                    Some(carry_initial_value),
+                    Some(limit_value),
+                    Some(step_value),
+                ) = (initial_value, carry_initial_value, limit_value, step_value)
+                else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.loop_while_i64_accumulate `{}` because one or more inputs are outside the current CPU LLVM slice",
+                        node.name
+                    ));
+                    continue;
+                };
+                let Some(initial) = coerce_to_i64(&initial_value, &mut body, &mut next_reg) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.loop_while_i64_accumulate `{}` because its initial value is not coercible to i64",
+                        node.name
+                    ));
+                    continue;
+                };
+                let Some(carry_initial) =
+                    coerce_to_i64(&carry_initial_value, &mut body, &mut next_reg)
+                else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.loop_while_i64_accumulate `{}` because its carry initial value is not coercible to i64",
+                        node.name
+                    ));
+                    continue;
+                };
+                let Some(limit) = coerce_to_i64(&limit_value, &mut body, &mut next_reg) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.loop_while_i64_accumulate `{}` because its limit value is not coercible to i64",
+                        node.name
+                    ));
+                    continue;
+                };
+                let Some(step) = coerce_to_i64(&step_value, &mut body, &mut next_reg) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.loop_while_i64_accumulate `{}` because its step value is not coercible to i64",
+                        node.name
+                    ));
+                    continue;
+                };
+                let cmp_kind = node.op.args[4].as_str();
+                let step_kind = node.op.args[5].as_str();
+                let carry_kind = node.op.args[6].as_str();
+                let current_slot = fresh_reg(&mut next_reg);
+                body.push(format!("  {current_slot} = alloca i64"));
+                body.push(format!("  store i64 {initial}, ptr {current_slot}"));
+                let carry_slot = fresh_reg(&mut next_reg);
+                body.push(format!("  {carry_slot} = alloca i64"));
+                body.push(format!("  store i64 {carry_initial}, ptr {carry_slot}"));
+                let loop_cond = fresh_block(&mut next_block, "loop_while_i64_acc_cond");
+                let loop_body = fresh_block(&mut next_block, "loop_while_i64_acc_body");
+                let loop_exit = fresh_block(&mut next_block, "loop_while_i64_acc_exit");
+                body.push(format!("  br label %{loop_cond}"));
+                body.push(format!("{loop_cond}:"));
+                let current = fresh_reg(&mut next_reg);
+                body.push(format!("  {current} = load i64, ptr {current_slot}"));
+                let cmp = fresh_reg(&mut next_reg);
+                let pred = match cmp_kind {
+                    "lt" => "slt",
+                    "le" => "sle",
+                    "gt" => "sgt",
+                    "ge" => "sge",
+                    other => {
+                        return Err(format!(
+                            "cpu.loop_while_i64_accumulate `{}` has unsupported compare kind `{other}` during LLVM lowering",
+                            node.name
+                        ));
+                    }
+                };
+                body.push(format!("  {cmp} = icmp {pred} i64 {current}, {limit}"));
+                body.push(format!(
+                    "  br i1 {cmp}, label %{loop_body}, label %{loop_exit}"
+                ));
+                body.push(format!("{loop_body}:"));
+                let next_current = match step_kind {
+                    "add" => {
+                        let reg = fresh_reg(&mut next_reg);
+                        body.push(format!("  {reg} = add i64 {current}, {step}"));
+                        reg
+                    }
+                    "sub" => {
+                        let reg = fresh_reg(&mut next_reg);
+                        body.push(format!("  {reg} = sub i64 {current}, {step}"));
+                        reg
+                    }
+                    other => {
+                        return Err(format!(
+                            "cpu.loop_while_i64_accumulate `{}` has unsupported step kind `{other}` during LLVM lowering",
+                            node.name
+                        ));
+                    }
+                };
+                let carry_before = fresh_reg(&mut next_reg);
+                body.push(format!("  {carry_before} = load i64, ptr {carry_slot}"));
+                let next_carry = match carry_kind {
+                    "add_current" => {
+                        let reg = fresh_reg(&mut next_reg);
+                        body.push(format!("  {reg} = add i64 {carry_before}, {next_current}"));
+                        reg
+                    }
+                    other => {
+                        return Err(format!(
+                            "cpu.loop_while_i64_accumulate `{}` has unsupported carry kind `{other}` during LLVM lowering",
+                            node.name
+                        ));
+                    }
+                };
+                body.push(format!("  store i64 {next_current}, ptr {current_slot}"));
+                body.push(format!("  store i64 {next_carry}, ptr {carry_slot}"));
+                body.push(format!("  br label %{loop_cond}"));
+                body.push(format!("{loop_exit}:"));
+                let final_current = fresh_reg(&mut next_reg);
+                body.push(format!("  {final_current} = load i64, ptr {current_slot}"));
+                let final_carry = fresh_reg(&mut next_reg);
+                body.push(format!("  {final_carry} = load i64, ptr {carry_slot}"));
+                registers.insert(
+                    node.name.clone(),
+                    LlvmValueRef::Struct(StructLlvmValueRef {
+                        type_name: "LoopPair".to_owned(),
+                        fields: vec![
+                            (
+                                "current".to_owned(),
+                                LlvmValueRef::I64(final_current.clone()),
+                            ),
+                            ("carry".to_owned(), LlvmValueRef::I64(final_carry.clone())),
+                        ],
+                    }),
+                );
+                *last_cpu_value = Some(final_carry);
+            }
             ("cpu", "guard_return") => {
                 let cond_value = registers.get(&node.op.args[0]).cloned();
                 let return_value = registers.get(&node.op.args[1]).cloned();
@@ -1452,6 +1678,45 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 ));
                 body.push(format!("{then_label}:"));
                 body.push(format!("  ret i64 {returned}"));
+                body.push(format!("{cont_label}:"));
+            }
+            ("cpu", "guard_print") => {
+                let cond_value = registers.get(&node.op.args[0]).cloned();
+                let print_value = registers.get(&node.op.args[1]).cloned();
+                let (Some(cond_value), Some(print_value)) = (cond_value, print_value) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.guard_print `{}` because one or more inputs are outside the current CPU LLVM slice",
+                        node.name
+                    ));
+                    continue;
+                };
+                let Some(cond) = coerce_to_i64(&cond_value, &mut body, &mut next_reg) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.guard_print `{}` because its condition is not coercible to i64",
+                        node.name
+                    ));
+                    continue;
+                };
+                let cond_bool = fresh_reg(&mut next_reg);
+                body.push(format!("  {cond_bool} = icmp ne i64 {cond}, 0"));
+                let then_label = fresh_block(&mut next_block, "guard_print_then");
+                let cont_label = fresh_block(&mut next_block, "guard_print_cont");
+                body.push(format!(
+                    "  br i1 {cond_bool}, label %{then_label}, label %{cont_label}"
+                ));
+                body.push(format!("{then_label}:"));
+                if let Some(input) = coerce_to_cstr(&print_value, &mut body, &mut next_reg) {
+                    let print_reg = fresh_reg(&mut next_reg);
+                    body.push(format!("  {print_reg} = call i32 @puts(ptr {input})"));
+                } else if let Some(input) = coerce_to_i64(&print_value, &mut body, &mut next_reg) {
+                    body.push(format!("  call void @nuis_debug_print_i64(i64 {input})"));
+                } else {
+                    body.push(format!(
+                        "  ; deferred lowering inside cpu.guard_print `{}` because its print value is not printable in the current CPU LLVM slice",
+                        node.name
+                    ));
+                }
+                body.push(format!("  br label %{cont_label}"));
                 body.push(format!("{cont_label}:"));
             }
             ("cpu", "guard_print_return") => {

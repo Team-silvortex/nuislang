@@ -1,0 +1,17 @@
+mod cpu Main {
+  fn main() -> i64 {
+    let seed: i64 = 7;
+    while seed > 3 {
+      if seed > 5 {
+        let shown: i64 = seed + 0;
+        print(shown);
+        break;
+      } else {
+        let fallback: i64 = seed + 2;
+        print(fallback);
+        continue;
+      }
+    }
+    return seed + 1;
+  }
+}
