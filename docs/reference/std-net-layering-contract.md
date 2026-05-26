@@ -32,6 +32,7 @@ network profile truth
 -> control-session recipe
 -> transport-session recipe
 -> protocol-session recipe
+-> dnsish-exchange-session recipe
 -> session recipe
 ```
 
@@ -57,6 +58,7 @@ The practical current rule is:
 * [net_protocol_experiment_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_protocol_experiment_recipe.ns)
 * [net_line_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_line_protocol_recipe.ns)
 * [net_datagram_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_protocol_recipe.ns)
+* [net_dnsish_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_protocol_recipe.ns)
 * [net_httpish_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_protocol_recipe.ns)
 * [net_httpish_request_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_request_recipe.ns)
 * [net_httpish_response_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_response_recipe.ns)
@@ -70,6 +72,10 @@ The practical current rule is:
 * [net_control_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_control_session_recipe.ns)
 * [net_transport_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_transport_session_recipe.ns)
 * [net_protocol_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_protocol_session_recipe.ns)
+* [net_datagram_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_session_recipe.ns)
+* [net_datagram_exchange_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_exchange_session_recipe.ns)
+* [net_datagram_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_pipeline_recipe.ns)
+* [net_dnsish_exchange_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_exchange_session_recipe.ns)
 * [net_httpish_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_session_recipe.ns)
 * [net_httpish_exchange_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_exchange_session_recipe.ns)
 * [net_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_session_recipe.ns)
@@ -86,6 +92,7 @@ Current companion validation routes:
 * [net_protocol_experiment_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_protocol_experiment_recipe_demo)
 * [net_line_protocol_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_line_protocol_recipe_demo)
 * [net_datagram_protocol_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_datagram_protocol_recipe_demo)
+* [net_dnsish_protocol_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_dnsish_protocol_recipe_demo)
 * [net_httpish_protocol_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_protocol_recipe_demo)
 * [net_httpish_request_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_request_recipe_demo)
 * [net_httpish_response_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_response_recipe_demo)
@@ -99,6 +106,10 @@ Current companion validation routes:
 * [net_control_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_control_session_recipe_demo)
 * [net_transport_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_transport_session_recipe_demo)
 * [net_protocol_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_protocol_session_recipe_demo)
+* [net_datagram_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_datagram_session_recipe_demo)
+* [net_datagram_exchange_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_datagram_exchange_session_recipe_demo)
+* [net_datagram_pipeline_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_datagram_pipeline_recipe_demo)
+* [net_dnsish_exchange_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_dnsish_exchange_session_recipe_demo)
 * [net_httpish_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_session_recipe_demo)
 * [net_httpish_exchange_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_exchange_session_recipe_demo)
 * [net_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_session_recipe_demo)
@@ -135,6 +146,9 @@ Current role split:
 * `net_datagram_protocol`
   reads:
   `udp-datagram-backed protocol slots + send/recv probes -> datagram protocol summary`
+* `net_dnsish_protocol`
+  reads:
+  `udp-datagram-backed dns-ish framing + send/recv probes -> dns-ish protocol summary`
 * `net_httpish_protocol`
   reads:
   `tcp-stream-backed protocol slots + request/header/body framing + send/recv probes -> httpish protocol summary`
@@ -174,6 +188,18 @@ Current role split:
 * `net_protocol_session`
   reads:
   `protocol experiment + transport shape -> protocol session summary`
+* `net_datagram_session`
+  reads:
+  `udp-datagram-backed protocol summary + timeout/retry -> datagram session summary`
+* `net_datagram_exchange_session`
+  reads:
+  `udp-datagram-backed exchange summary + timeout/retry -> datagram exchange session summary`
+* `net_datagram_pipeline`
+  reads:
+  `multiple udp-datagram-backed exchanges -> datagram pipeline summary`
+* `net_dnsish_exchange_session`
+  reads:
+  `dns-ish query/answer framing + timeout/retry -> dns-ish exchange session summary`
 * `net_httpish_session`
   reads:
   `httpish protocol summary + transport shape -> httpish session summary`
@@ -182,7 +208,7 @@ Current role split:
   `httpish roundtrip + timeout/retry -> exchange session summary`
 * `net_session`
   reads:
-  `control session + transport session + protocol session + httpish session + exchange session + result bridge + task bridge -> session summary`
+  `control session + transport session + protocol session + datagram session + datagram exchange session + datagram pipeline + dns-ish exchange session + httpish session + exchange session + result bridge + task bridge -> session summary`
 
 ## Current Reading Rule
 
@@ -202,6 +228,7 @@ The shortest practical route today is easiest to read in three grouped steps:
   [net_protocol_experiment_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_protocol_experiment_recipe.ns) ->
   [net_line_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_line_protocol_recipe.ns) ->
   [net_datagram_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_protocol_recipe.ns) ->
+  [net_dnsish_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_protocol_recipe.ns) ->
   [net_httpish_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_protocol_recipe.ns) ->
   [net_httpish_request_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_request_recipe.ns) ->
   [net_httpish_response_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_response_recipe.ns) ->
@@ -218,6 +245,10 @@ The shortest practical route today is easiest to read in three grouped steps:
   [net_control_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_control_session_recipe.ns) ->
   [net_transport_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_transport_session_recipe.ns) ->
   [net_protocol_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_protocol_session_recipe.ns) ->
+  [net_datagram_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_session_recipe.ns) ->
+  [net_datagram_exchange_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_exchange_session_recipe.ns) ->
+  [net_datagram_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_pipeline_recipe.ns) ->
+  [net_dnsish_exchange_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_exchange_session_recipe.ns) ->
   [net_httpish_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_session_recipe.ns) ->
   [net_httpish_exchange_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_exchange_session_recipe.ns) ->
   [net_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_session_recipe.ns)
@@ -244,6 +275,8 @@ Expanded route:
   [net_line_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_line_protocol_recipe.ns)
 * datagram protocol:
   [net_datagram_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_protocol_recipe.ns)
+* dns-ish protocol:
+  [net_dnsish_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_protocol_recipe.ns)
 * httpish protocol:
   [net_httpish_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_protocol_recipe.ns)
 * httpish request:
@@ -270,6 +303,14 @@ Expanded route:
   [net_transport_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_transport_session_recipe.ns)
 * protocol session:
   [net_protocol_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_protocol_session_recipe.ns)
+* datagram session:
+  [net_datagram_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_session_recipe.ns)
+* datagram exchange session:
+  [net_datagram_exchange_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_exchange_session_recipe.ns)
+* datagram pipeline:
+  [net_datagram_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_pipeline_recipe.ns)
+* dns-ish exchange session:
+  [net_dnsish_exchange_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_exchange_session_recipe.ns)
 * httpish session:
   [net_httpish_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_session_recipe.ns)
 * httpish exchange session:
@@ -299,6 +340,7 @@ endpoint/timing
 -> control session
 -> transport session
 -> protocol session
+-> dns-ish exchange session
 -> httpish session
 -> httpish exchange session
 -> session
@@ -324,9 +366,9 @@ Project-facing CLI hint:
 Those now surface:
 
 * `std_net_navigation`
-  `profile_core -> control_edge -> protocol_edge -> result_spine -> task_spine -> session`
+  `profile_core -> transport_edge -> control_edge -> protocol_edge -> result_spine -> task_spine -> session`
 * `std_net_samples`
-  the shortest checked-in recipe/demo companion route for each of those four groups
+  the shortest checked-in recipe/demo companion route for each of those grouped lanes
 
 Current validation rule:
 

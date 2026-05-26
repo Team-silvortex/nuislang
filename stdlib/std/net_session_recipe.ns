@@ -37,6 +37,22 @@ mod cpu Main {
     session_value: i64
   }
 
+  struct NetDatagramSessionSummary {
+    session_value: i64
+  }
+
+  struct NetDatagramExchangeSessionSummary {
+    session_value: i64
+  }
+
+  struct NetDatagramPipelineSummary {
+    session_value: i64
+  }
+
+  struct NetDnsishExchangeSessionSummary {
+    session_value: i64
+  }
+
   struct NetHttpishSessionSummary {
     session_value: i64
   }
@@ -54,6 +70,10 @@ mod cpu Main {
     control_session_value: i64,
     transport_session_value: i64,
     protocol_session_value: i64,
+    datagram_session_value: i64,
+    datagram_exchange_session_value: i64,
+    datagram_pipeline_value: i64,
+    dnsish_exchange_session_value: i64,
     httpish_session_value: i64,
     exchange_session_value: i64,
     result_preview_value: i64,
@@ -109,6 +129,20 @@ mod cpu Main {
 
   fn encode_result_value(result: NetworkResult<i64>) -> i64 {
     return network_value(result);
+  }
+
+  fn encode_send_ready(result: NetworkResult<i64>) -> i64 {
+    if network_send_ready(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_recv_ready(result: NetworkResult<i64>) -> i64 {
+    if network_recv_ready(result) {
+      return 1;
+    }
+    return 0;
   }
 
   fn capture_net_control_session_summary() -> NetControlSessionSummary {
@@ -231,6 +265,175 @@ mod cpu Main {
     };
   }
 
+  fn capture_net_datagram_session_summary() -> NetDatagramSessionSummary {
+    let argv_count: i64 = host_argv_count();
+    let timeout_budget: i64 = network_profile_timeout_budget("NetworkUnit");
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+    let transport_family: i64 = network_profile_transport_family("NetworkUnit");
+    let protocol_kind: i64 = network_profile_protocol_kind("NetworkUnit");
+    let protocol_version: i64 = network_profile_protocol_version("NetworkUnit");
+    let protocol_header_bytes: i64 =
+      network_profile_protocol_header_bytes("NetworkUnit");
+    let local_port: i64 = network_profile_local_port("NetworkUnit");
+    let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+    let read_timeout_ms: i64 = network_profile_read_timeout("NetworkUnit");
+    let write_timeout_ms: i64 = network_profile_write_timeout("NetworkUnit");
+    let send_result: NetworkResult<i64> = network_result(
+      host_network_send_probe(stream_window, send_window, remote_port)
+    );
+    let recv_result: NetworkResult<i64> = network_result(
+      host_network_recv_probe(stream_window, recv_window, local_port)
+    );
+    let send_ready: i64 = encode_send_ready(send_result);
+    let recv_ready: i64 = encode_recv_ready(recv_result);
+    let send_value: i64 = network_value(send_result);
+    let recv_value: i64 = network_value(recv_result);
+
+    return NetDatagramSessionSummary {
+      session_value: argv_count
+        + timeout_budget
+        + retry_budget
+        + transport_family
+        + protocol_kind
+        + protocol_version
+        + protocol_header_bytes
+        + local_port
+        + remote_port
+        + recv_window
+        + send_window
+        + read_timeout_ms
+        + write_timeout_ms
+        + send_ready
+        + recv_ready
+        + send_value
+        + recv_value
+    };
+  }
+
+  fn capture_net_dnsish_exchange_session_summary() -> NetDnsishExchangeSessionSummary {
+    let argv_count: i64 = host_argv_count();
+    let timeout_budget: i64 = network_profile_timeout_budget("NetworkUnit");
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+    let transport_family: i64 = network_profile_transport_family("NetworkUnit");
+    let protocol_kind: i64 = network_profile_protocol_kind("NetworkUnit");
+    let protocol_version: i64 = network_profile_protocol_version("NetworkUnit");
+    let protocol_header_bytes: i64 =
+      network_profile_protocol_header_bytes("NetworkUnit");
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+    let local_port: i64 = network_profile_local_port("NetworkUnit");
+    let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+    let send_result: NetworkResult<i64> = network_result(
+      host_network_send_probe(stream_window, send_window, remote_port)
+    );
+    let recv_result: NetworkResult<i64> = network_result(
+      host_network_recv_probe(stream_window, recv_window, local_port)
+    );
+    let query_code: i64 = transport_family + protocol_kind + protocol_version;
+    let question_bytes: i64 = protocol_header_bytes + send_window + protocol_version;
+    let answer_bytes: i64 = protocol_header_bytes + recv_window + retry_budget + 4;
+
+    return NetDnsishExchangeSessionSummary {
+      session_value: argv_count
+        + retry_budget
+        + transport_family
+        + protocol_kind
+        + protocol_version
+        + protocol_header_bytes
+        + query_code
+        + question_bytes
+        + answer_bytes
+        + encode_result_value(send_result)
+        + encode_result_value(recv_result)
+    };
+  }
+
+  fn capture_net_datagram_pipeline_summary() -> NetDatagramPipelineSummary {
+    let argv_count: i64 = host_argv_count();
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+    let transport_family: i64 = network_profile_transport_family("NetworkUnit");
+    let protocol_kind: i64 = network_profile_protocol_kind("NetworkUnit");
+    let protocol_version: i64 = network_profile_protocol_version("NetworkUnit");
+    let protocol_header_bytes: i64 =
+      network_profile_protocol_header_bytes("NetworkUnit");
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+    let local_port: i64 = network_profile_local_port("NetworkUnit");
+    let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+    let send_result: NetworkResult<i64> = network_result(
+      host_network_send_probe(stream_window, send_window, remote_port)
+    );
+    let recv_result: NetworkResult<i64> = network_result(
+      host_network_recv_probe(stream_window, recv_window, local_port)
+    );
+    let pipeline_code: i64 =
+      transport_family + protocol_kind + protocol_version + retry_budget;
+    let preview_value: i64 =
+      encode_send_ready(send_result) + encode_recv_ready(recv_result) + protocol_header_bytes;
+    let final_value: i64 =
+      encode_result_value(send_result)
+        + encode_result_value(recv_result)
+        + stream_window
+        + recv_window
+        + send_window;
+
+    return NetDatagramPipelineSummary {
+      session_value: argv_count
+        + retry_budget
+        + transport_family
+        + protocol_kind
+        + protocol_version
+        + protocol_header_bytes
+        + pipeline_code
+        + preview_value
+        + final_value
+    };
+  }
+
+  fn capture_net_datagram_exchange_session_summary() -> NetDatagramExchangeSessionSummary {
+    let argv_count: i64 = host_argv_count();
+    let timeout_budget: i64 = network_profile_timeout_budget("NetworkUnit");
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+    let transport_family: i64 = network_profile_transport_family("NetworkUnit");
+    let protocol_kind: i64 = network_profile_protocol_kind("NetworkUnit");
+    let protocol_version: i64 = network_profile_protocol_version("NetworkUnit");
+    let protocol_header_bytes: i64 =
+      network_profile_protocol_header_bytes("NetworkUnit");
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+    let local_port: i64 = network_profile_local_port("NetworkUnit");
+    let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+    let send_result: NetworkResult<i64> = network_result(
+      host_network_send_probe(stream_window, send_window, remote_port)
+    );
+    let recv_result: NetworkResult<i64> = network_result(
+      host_network_recv_probe(stream_window, recv_window, local_port)
+    );
+    let exchange_code: i64 = transport_family + protocol_kind + protocol_version;
+    let request_bytes: i64 = protocol_header_bytes + send_window + protocol_version;
+    let response_bytes: i64 = protocol_header_bytes + recv_window + retry_budget;
+
+    return NetDatagramExchangeSessionSummary {
+      session_value: argv_count
+        + retry_budget
+        + transport_family
+        + protocol_kind
+        + protocol_version
+        + protocol_header_bytes
+        + exchange_code
+        + request_bytes
+        + response_bytes
+        + encode_result_value(send_result)
+        + encode_result_value(recv_result)
+    };
+  }
+
   fn capture_net_httpish_exchange_session_summary() -> NetHttpishExchangeSessionSummary {
     let argv_count: i64 = host_argv_count();
     let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
@@ -343,6 +546,14 @@ mod cpu Main {
       capture_net_transport_session_summary();
     let protocol_session_summary: NetProtocolSessionSummary =
       capture_net_protocol_session_summary();
+    let datagram_session_summary: NetDatagramSessionSummary =
+      capture_net_datagram_session_summary();
+    let datagram_exchange_session_summary: NetDatagramExchangeSessionSummary =
+      capture_net_datagram_exchange_session_summary();
+    let datagram_pipeline_summary: NetDatagramPipelineSummary =
+      capture_net_datagram_pipeline_summary();
+    let dnsish_exchange_session_summary: NetDnsishExchangeSessionSummary =
+      capture_net_dnsish_exchange_session_summary();
     let httpish_session_summary: NetHttpishSessionSummary =
       capture_net_httpish_session_summary();
     let exchange_session_summary: NetHttpishExchangeSessionSummary =
@@ -359,6 +570,10 @@ mod cpu Main {
             + control_session_summary.session_value
             + transport_session_summary.session_value
             + protocol_session_summary.session_value
+            + datagram_session_summary.session_value
+            + datagram_exchange_session_summary.session_value
+            + datagram_pipeline_summary.session_value
+            + dnsish_exchange_session_summary.session_value
             + httpish_session_summary.session_value
             + exchange_session_summary.session_value
             + result_summary.preview_value
@@ -381,6 +596,10 @@ mod cpu Main {
       control_session_value: control_session_summary.session_value,
       transport_session_value: transport_session_summary.session_value,
       protocol_session_value: protocol_session_summary.session_value,
+      datagram_session_value: datagram_session_summary.session_value,
+      datagram_exchange_session_value: datagram_exchange_session_summary.session_value,
+      datagram_pipeline_value: datagram_pipeline_summary.session_value,
+      dnsish_exchange_session_value: dnsish_exchange_session_summary.session_value,
       httpish_session_value: httpish_session_summary.session_value,
       exchange_session_value: exchange_session_summary.session_value,
       result_preview_value: result_summary.preview_value,
@@ -402,6 +621,10 @@ mod cpu Main {
       + summary.control_session_value
       + summary.transport_session_value
       + summary.protocol_session_value
+      + summary.datagram_session_value
+      + summary.datagram_exchange_session_value
+      + summary.datagram_pipeline_value
+      + summary.dnsish_exchange_session_value
       + summary.httpish_session_value
       + summary.exchange_session_value
       + summary.result_preview_value
