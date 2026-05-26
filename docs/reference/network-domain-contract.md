@@ -155,8 +155,13 @@ The current loader-facing symbol reservation is also explicit now. The minimal
 host bridge names are:
 
 * `host_network_connect_probe`
+* `host_network_open_tcp_stream`
+* `host_network_open_udp_datagram`
 * `host_network_accept_probe`
 * `host_network_close`
+* `host_network_close_owned`
+* `host_network_send_owned`
+* `host_network_recv_owned`
 * `host_network_send_probe`
 * `host_network_recv_probe`
 
@@ -192,11 +197,63 @@ That means the repository now has a stable syscall-facing interpretation path,
 even though the `network` family does not yet claim a full socket runtime or a
 dedicated `network`-native host-call instruction surface.
 
+At the current binary/AOT layer, that bridge has now moved one step closer to
+real runtime behavior:
+
+* `host_network_connect_probe`
+  now first attempts a loopback `socket/bind/listen/connect/accept/close`
+  handshake inside the generated host shim
+* `host_network_open_tcp_stream`
+  now reserves a binary-owned TCP socket-handle acquisition path
+* `host_network_open_udp_datagram`
+  now reserves a binary-owned UDP datagram socket-handle acquisition path
+* `host_network_accept_probe`
+  now first attempts a local listener/client handshake before falling back
+* `host_network_close_owned`
+  now closes only binary-owned network handles recorded by the generated host shim
+* `host_network_send_owned`
+  now attempts `send(..., MSG_DONTWAIT)` against a binary-owned network handle
+* `host_network_recv_owned`
+  now attempts `recv(..., MSG_DONTWAIT)` against a binary-owned network handle
+* `host_network_send_probe`
+  now first attempts a local `socketpair + send`
+* `host_network_recv_probe`
+  now first attempts a local `socketpair + recv`
+
+The current contract is still intentionally conservative:
+
+* those probes keep the same `i64`-shaped host symbol surface
+* successful syscall attempts do not yet expose stable socket handles upward
+* `host_network_close` remains conservative and now delegates only to owned-handle
+  close when the incoming value is known to the binary-owned network handle table
+
 The first narrow checked-in transport sample for that bridge is:
 
+* [network_host_handle_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_handle_runtime_demo)
+* [network_host_handle_transport_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_handle_transport_runtime_demo)
 * [network_host_transport_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_transport_runtime_demo)
 
-It currently reads:
+The handle-facing sample currently reads:
+
+* `remote_port / connect_timeout`
+  -> `host_network_open_tcp_stream`
+* `local_port / remote_port`
+  -> `host_network_open_udp_datagram`
+* `tcp_handle / udp_handle`
+  -> `host_network_close_owned`
+
+The handle-transport sample currently reads:
+
+* `local_port / remote_port`
+  -> `host_network_open_udp_datagram`
+* `handle / stream_window / send_window`
+  -> `host_network_send_owned`
+* `handle / stream_window / recv_window`
+  -> `host_network_recv_owned`
+* `handle`
+  -> `host_network_close_owned`
+
+The transport probe sample currently reads:
 
 * `stream_window / send_window / remote_port`
   -> `host_network_send_probe`

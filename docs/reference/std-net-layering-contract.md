@@ -59,6 +59,7 @@ The practical current rule is:
 * [net_line_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_line_protocol_recipe.ns)
 * [net_datagram_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_protocol_recipe.ns)
 * [net_dnsish_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_protocol_recipe.ns)
+* [net_dnsish_query_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_query_recipe.ns)
 * [net_httpish_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_protocol_recipe.ns)
 * [net_httpish_request_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_request_recipe.ns)
 * [net_httpish_response_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_response_recipe.ns)
@@ -71,11 +72,19 @@ The practical current rule is:
 * [net_task_windowed_bridge_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_task_windowed_bridge_recipe.ns)
 * [net_control_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_control_session_recipe.ns)
 * [net_transport_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_transport_session_recipe.ns)
+* [net_owned_transport_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_transport_session_recipe.ns)
+* [net_transport_path_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_transport_path_compare_recipe.ns)
+* [net_dnsish_path_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_path_compare_recipe.ns)
+* [net_httpish_path_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_path_compare_recipe.ns)
 * [net_protocol_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_protocol_session_recipe.ns)
 * [net_datagram_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_session_recipe.ns)
+* [net_owned_datagram_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_datagram_session_recipe.ns)
 * [net_datagram_exchange_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_exchange_session_recipe.ns)
 * [net_datagram_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_pipeline_recipe.ns)
 * [net_dnsish_exchange_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_exchange_session_recipe.ns)
+* [net_owned_dnsish_exchange_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_dnsish_exchange_session_recipe.ns)
+* [net_dnsish_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_pipeline_recipe.ns)
+* [net_owned_dnsish_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_dnsish_pipeline_recipe.ns)
 * [net_httpish_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_session_recipe.ns)
 * [net_httpish_exchange_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_exchange_session_recipe.ns)
 * [net_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_session_recipe.ns)
@@ -93,6 +102,7 @@ Current companion validation routes:
 * [net_line_protocol_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_line_protocol_recipe_demo)
 * [net_datagram_protocol_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_datagram_protocol_recipe_demo)
 * [net_dnsish_protocol_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_dnsish_protocol_recipe_demo)
+* [net_dnsish_query_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_dnsish_query_recipe_demo)
 * [net_httpish_protocol_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_protocol_recipe_demo)
 * [net_httpish_request_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_request_recipe_demo)
 * [net_httpish_response_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_response_recipe_demo)
@@ -105,11 +115,19 @@ Current companion validation routes:
 * [net_task_windowed_bridge_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_task_windowed_bridge_recipe_demo)
 * [net_control_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_control_session_recipe_demo)
 * [net_transport_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_transport_session_recipe_demo)
+* [net_owned_transport_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_owned_transport_session_recipe_demo)
+* [net_transport_path_compare_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_transport_path_compare_recipe_demo)
+* [net_dnsish_path_compare_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_dnsish_path_compare_recipe_demo)
+* [net_httpish_path_compare_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_path_compare_recipe_demo)
 * [net_protocol_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_protocol_session_recipe_demo)
 * [net_datagram_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_datagram_session_recipe_demo)
+* [net_owned_datagram_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_owned_datagram_session_recipe_demo)
 * [net_datagram_exchange_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_datagram_exchange_session_recipe_demo)
 * [net_datagram_pipeline_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_datagram_pipeline_recipe_demo)
 * [net_dnsish_exchange_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_dnsish_exchange_session_recipe_demo)
+* [net_owned_dnsish_exchange_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_owned_dnsish_exchange_session_recipe_demo)
+* [net_dnsish_pipeline_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_dnsish_pipeline_recipe_demo)
+* [net_owned_dnsish_pipeline_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_owned_dnsish_pipeline_recipe_demo)
 * [net_httpish_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_session_recipe_demo)
 * [net_httpish_exchange_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_exchange_session_recipe_demo)
 * [net_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_session_recipe_demo)
@@ -149,6 +167,9 @@ Current role split:
 * `net_dnsish_protocol`
   reads:
   `udp-datagram-backed dns-ish framing + send/recv probes -> dns-ish protocol summary`
+* `net_dnsish_query`
+  reads:
+  `dns-ish framing + send probe -> query summary`
 * `net_httpish_protocol`
   reads:
   `tcp-stream-backed protocol slots + request/header/body framing + send/recv probes -> httpish protocol summary`
@@ -200,6 +221,9 @@ Current role split:
 * `net_dnsish_exchange_session`
   reads:
   `dns-ish query/answer framing + timeout/retry -> dns-ish exchange session summary`
+* `net_dnsish_pipeline`
+  reads:
+  `multiple dns-ish exchanges -> dns-ish pipeline summary`
 * `net_httpish_session`
   reads:
   `httpish protocol summary + transport shape -> httpish session summary`
@@ -208,7 +232,7 @@ Current role split:
   `httpish roundtrip + timeout/retry -> exchange session summary`
 * `net_session`
   reads:
-  `control session + transport session + protocol session + datagram session + datagram exchange session + datagram pipeline + dns-ish exchange session + httpish session + exchange session + result bridge + task bridge -> session summary`
+  `control session + transport session + protocol session + datagram session + datagram exchange session + datagram pipeline + dns-ish exchange session + dns-ish pipeline + httpish session + exchange session + result bridge + task bridge -> session summary`
 
 ## Current Reading Rule
 
@@ -229,6 +253,7 @@ The shortest practical route today is easiest to read in three grouped steps:
   [net_line_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_line_protocol_recipe.ns) ->
   [net_datagram_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_protocol_recipe.ns) ->
   [net_dnsish_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_protocol_recipe.ns) ->
+  [net_dnsish_query_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_query_recipe.ns) ->
   [net_httpish_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_protocol_recipe.ns) ->
   [net_httpish_request_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_request_recipe.ns) ->
   [net_httpish_response_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_response_recipe.ns) ->
@@ -244,14 +269,32 @@ The shortest practical route today is easiest to read in three grouped steps:
 * session
   [net_control_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_control_session_recipe.ns) ->
   [net_transport_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_transport_session_recipe.ns) ->
+  [net_owned_transport_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_transport_session_recipe.ns) ->
+  [net_transport_path_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_transport_path_compare_recipe.ns) ->
   [net_protocol_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_protocol_session_recipe.ns) ->
   [net_datagram_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_session_recipe.ns) ->
+  [net_owned_datagram_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_datagram_session_recipe.ns) ->
   [net_datagram_exchange_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_exchange_session_recipe.ns) ->
   [net_datagram_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_pipeline_recipe.ns) ->
   [net_dnsish_exchange_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_exchange_session_recipe.ns) ->
+  [net_owned_dnsish_exchange_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_dnsish_exchange_session_recipe.ns) ->
+  [net_dnsish_path_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_path_compare_recipe.ns) ->
+  [net_dnsish_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_pipeline_recipe.ns) ->
+  [net_owned_dnsish_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_dnsish_pipeline_recipe.ns) ->
   [net_httpish_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_session_recipe.ns) ->
   [net_httpish_exchange_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_exchange_session_recipe.ns) ->
+  [net_httpish_path_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_path_compare_recipe.ns) ->
   [net_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_session_recipe.ns)
+* owned session rule
+  `owned transport session -> owned datagram session -> owned dns-ish exchange -> owned dns-ish pipeline`
+* compare rule
+  `probe transport session -> owned transport session -> transport path compare`
+* dns-ish compare rule
+  `dns-ish exchange session -> owned dns-ish exchange session -> dns-ish path compare`
+* httpish compare rule
+  `httpish exchange session -> httpish path compare`
+* grouped compare rule
+  `transport compare -> dns-ish compare -> httpish compare`
 
 Expanded route:
 
@@ -277,6 +320,8 @@ Expanded route:
   [net_datagram_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_protocol_recipe.ns)
 * dns-ish protocol:
   [net_dnsish_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_protocol_recipe.ns)
+* dns-ish query:
+  [net_dnsish_query_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_query_recipe.ns)
 * httpish protocol:
   [net_httpish_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_protocol_recipe.ns)
 * httpish request:
@@ -301,16 +346,32 @@ Expanded route:
   [net_control_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_control_session_recipe.ns)
 * transport session:
   [net_transport_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_transport_session_recipe.ns)
+* owned transport session:
+  [net_owned_transport_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_transport_session_recipe.ns)
+* transport path compare:
+  [net_transport_path_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_transport_path_compare_recipe.ns)
+* dns-ish path compare:
+  [net_dnsish_path_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_path_compare_recipe.ns)
+* httpish path compare:
+  [net_httpish_path_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_path_compare_recipe.ns)
 * protocol session:
   [net_protocol_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_protocol_session_recipe.ns)
 * datagram session:
   [net_datagram_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_session_recipe.ns)
+* owned datagram session:
+  [net_owned_datagram_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_datagram_session_recipe.ns)
 * datagram exchange session:
   [net_datagram_exchange_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_exchange_session_recipe.ns)
 * datagram pipeline:
   [net_datagram_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_pipeline_recipe.ns)
 * dns-ish exchange session:
   [net_dnsish_exchange_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_exchange_session_recipe.ns)
+* owned dns-ish exchange session:
+  [net_owned_dnsish_exchange_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_dnsish_exchange_session_recipe.ns)
+* dns-ish pipeline:
+  [net_dnsish_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_pipeline_recipe.ns)
+* owned dns-ish pipeline:
+  [net_owned_dnsish_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_dnsish_pipeline_recipe.ns)
 * httpish session:
   [net_httpish_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_session_recipe.ns)
 * httpish exchange session:
@@ -327,6 +388,7 @@ endpoint/timing
 -> connect/listen/close
 -> protocol experiment
 -> line protocol
+-> dns-ish query
 -> httpish protocol
 -> httpish request
 -> httpish response
@@ -341,6 +403,7 @@ endpoint/timing
 -> transport session
 -> protocol session
 -> dns-ish exchange session
+-> dns-ish pipeline
 -> httpish session
 -> httpish exchange session
 -> session

@@ -12984,7 +12984,13 @@ fn infer_result_stage(expr: &NirExpr) -> Option<NirResultStage> {
         NirExpr::CpuExternCall { callee, .. } if callee == "host_network_send_probe" => {
             Some(NirNetworkFlowState::SendReady.into())
         }
+        NirExpr::CpuExternCall { callee, .. } if callee == "host_network_send_owned" => {
+            Some(NirNetworkFlowState::SendReady.into())
+        }
         NirExpr::CpuExternCall { callee, .. } if callee == "host_network_recv_probe" => {
+            Some(NirNetworkFlowState::RecvReady.into())
+        }
+        NirExpr::CpuExternCall { callee, .. } if callee == "host_network_recv_owned" => {
             Some(NirNetworkFlowState::RecvReady.into())
         }
         NirExpr::CpuExternCall { callee, .. } if callee == "host_network_close" => {

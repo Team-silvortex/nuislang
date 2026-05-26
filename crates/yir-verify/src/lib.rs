@@ -2287,7 +2287,9 @@ fn verify_result_state_nodes(module: &YirModule) -> Result<(), String> {
                 } else if host_network_transport_probe {
                     match source.op.args[1].as_str() {
                         "host_network_send_probe" => actual == "send_ready",
+                        "host_network_send_owned" => actual == "send_ready",
                         "host_network_recv_probe" => actual == "recv_ready",
+                        "host_network_recv_owned" => actual == "recv_ready",
                         "host_network_close" => actual == "closed",
                         _ => false,
                     }
@@ -2338,7 +2340,11 @@ fn is_host_network_transport_probe_source(node: &Node) -> bool {
         && node.op.args.len() >= 2
         && matches!(
             node.op.args[1].as_str(),
-            "host_network_send_probe" | "host_network_recv_probe" | "host_network_close"
+            "host_network_send_probe"
+                | "host_network_send_owned"
+                | "host_network_recv_probe"
+                | "host_network_recv_owned"
+                | "host_network_close"
         )
 }
 
@@ -4984,6 +4990,18 @@ mod tests {
                     ],
                 ),
                 node(
+                    "send_owned",
+                    "cpu0",
+                    "cpu.extern_call_i64",
+                    &[
+                        "c",
+                        "host_network_send_owned",
+                        "remote_port",
+                        "stream_window",
+                        "send_window",
+                    ],
+                ),
+                node(
                     "recv_probe",
                     "cpu0",
                     "cpu.extern_call_i64",
@@ -4996,10 +5014,28 @@ mod tests {
                     ],
                 ),
                 node(
+                    "recv_owned",
+                    "cpu0",
+                    "cpu.extern_call_i64",
+                    &[
+                        "c",
+                        "host_network_recv_owned",
+                        "local_port",
+                        "stream_window",
+                        "recv_window",
+                    ],
+                ),
+                node(
                     "send_seed",
                     "network0",
                     "network.observe",
                     &["send_probe", "send_ready"],
+                ),
+                node(
+                    "send_owned_seed",
+                    "network0",
+                    "network.observe",
+                    &["send_owned", "send_ready"],
                 ),
                 node(
                     "close_probe",
@@ -5020,6 +5056,12 @@ mod tests {
                     &["recv_probe", "recv_ready"],
                 ),
                 node(
+                    "recv_owned_seed",
+                    "network0",
+                    "network.observe",
+                    &["recv_owned", "recv_ready"],
+                ),
+                node(
                     "send_ready_probe",
                     "network0",
                     "network.is_send_ready",
@@ -5038,13 +5080,21 @@ mod tests {
                 dep("stream_window", "send_probe"),
                 dep("send_window", "send_probe"),
                 dep("remote_port", "send_probe"),
+                dep("remote_port", "send_owned"),
+                dep("stream_window", "send_owned"),
+                dep("send_window", "send_owned"),
                 dep("stream_window", "recv_probe"),
                 dep("recv_window", "recv_probe"),
                 dep("local_port", "recv_probe"),
+                dep("local_port", "recv_owned"),
+                dep("stream_window", "recv_owned"),
+                dep("recv_window", "recv_owned"),
                 dep("local_port", "close_probe"),
                 xfer("send_probe", "send_seed"),
+                xfer("send_owned", "send_owned_seed"),
                 xfer("close_probe", "close_seed"),
                 xfer("recv_probe", "recv_seed"),
+                xfer("recv_owned", "recv_owned_seed"),
                 dep("send_seed", "send_ready_probe"),
                 dep("recv_seed", "recv_ready_probe"),
                 dep("send_seed", "send_value"),

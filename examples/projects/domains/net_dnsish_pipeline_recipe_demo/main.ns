@@ -1,0 +1,131 @@
+use network NetworkUnit;
+
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+  extern "c" fn host_monotonic_time_ns() -> i64;
+  extern "c" fn host_network_send_probe(
+    stream_window: i64,
+    send_window: i64,
+    remote_port: i64
+  ) -> i64;
+  extern "c" fn host_network_recv_probe(
+    stream_window: i64,
+    recv_window: i64,
+    local_port: i64
+  ) -> i64;
+
+  struct NetDnsishPipelineSummary {
+    argv_count: i64,
+    timeout_budget: i64,
+    retry_budget: i64,
+    transport_family: i64,
+    protocol_kind: i64,
+    protocol_version: i64,
+    protocol_header_bytes: i64,
+    pipeline_code: i64,
+    preview_value: i64,
+    final_value: i64,
+    send_ready: i64,
+    recv_ready: i64,
+    pipeline_value: i64,
+    tick_ns: i64
+  }
+
+  fn encode_send_ready(result: NetworkResult<i64>) -> i64 {
+    if network_send_ready(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_recv_ready(result: NetworkResult<i64>) -> i64 {
+    if network_recv_ready(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_value(result: NetworkResult<i64>) -> i64 {
+    return network_value(result);
+  }
+
+  fn capture_net_dnsish_pipeline_summary() -> NetDnsishPipelineSummary {
+    let argv_count: i64 = host_argv_count();
+    let timeout_budget: i64 = network_profile_timeout_budget("NetworkUnit");
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+    let transport_family: i64 = network_profile_transport_family("NetworkUnit");
+    let protocol_kind: i64 = network_profile_protocol_kind("NetworkUnit");
+    let protocol_version: i64 = network_profile_protocol_version("NetworkUnit");
+    let protocol_header_bytes: i64 =
+      network_profile_protocol_header_bytes("NetworkUnit");
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+    let local_port: i64 = network_profile_local_port("NetworkUnit");
+    let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+    let send_result: NetworkResult<i64> = network_result(
+      host_network_send_probe(stream_window, send_window, remote_port)
+    );
+    let recv_result: NetworkResult<i64> = network_result(
+      host_network_recv_probe(stream_window, recv_window, local_port)
+    );
+    let send_ready: i64 = encode_send_ready(send_result);
+    let recv_ready: i64 = encode_recv_ready(recv_result);
+    let send_value: i64 = encode_value(send_result);
+    let recv_value: i64 = encode_value(recv_result);
+    let pipeline_code: i64 =
+      transport_family + protocol_kind + protocol_version + retry_budget + 4;
+    let preview_value: i64 =
+      send_ready + recv_ready + protocol_header_bytes + protocol_version;
+    let final_value: i64 =
+      send_value + recv_value + stream_window + recv_window + send_window + retry_budget;
+    let tick_ns: i64 = host_monotonic_time_ns();
+
+    return NetDnsishPipelineSummary {
+      argv_count: argv_count,
+      timeout_budget: timeout_budget,
+      retry_budget: retry_budget,
+      transport_family: transport_family,
+      protocol_kind: protocol_kind,
+      protocol_version: protocol_version,
+      protocol_header_bytes: protocol_header_bytes,
+      pipeline_code: pipeline_code,
+      preview_value: preview_value,
+      final_value: final_value,
+      send_ready: send_ready,
+      recv_ready: recv_ready,
+      pipeline_value: argv_count
+        + retry_budget
+        + transport_family
+        + protocol_kind
+        + protocol_version
+        + protocol_header_bytes
+        + pipeline_code
+        + preview_value
+        + final_value,
+      tick_ns: tick_ns
+    };
+  }
+
+  fn summarize_net_dnsish_pipeline_recipe() -> i64 {
+    let summary: NetDnsishPipelineSummary = capture_net_dnsish_pipeline_summary();
+    return summary.argv_count
+      + summary.timeout_budget
+      + summary.retry_budget
+      + summary.transport_family
+      + summary.protocol_kind
+      + summary.protocol_version
+      + summary.protocol_header_bytes
+      + summary.pipeline_code
+      + summary.preview_value
+      + summary.final_value
+      + summary.send_ready
+      + summary.recv_ready
+      + summary.pipeline_value
+      + summary.tick_ns;
+  }
+
+  fn main() {
+    print(summarize_net_dnsish_pipeline_recipe());
+  }
+}

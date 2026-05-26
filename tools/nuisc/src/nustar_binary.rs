@@ -62,8 +62,13 @@ fn render_runtime_symbol_contracts(manifest: &NustarPackageManifest) -> Vec<Stri
     match manifest.domain_family.as_str() {
         "network" => vec![
             "host_symbol=network.connect:host_network_connect_probe".to_owned(),
+            "host_symbol=network.open_tcp:host_network_open_tcp_stream".to_owned(),
+            "host_symbol=network.open_udp:host_network_open_udp_datagram".to_owned(),
             "host_symbol=network.accept:host_network_accept_probe".to_owned(),
             "host_symbol=network.close:host_network_close".to_owned(),
+            "host_symbol=network.close_owned:host_network_close_owned".to_owned(),
+            "host_symbol=network.send_owned:host_network_send_owned".to_owned(),
+            "host_symbol=network.recv_owned:host_network_recv_owned".to_owned(),
             "host_symbol=network.send:host_network_send_probe".to_owned(),
             "host_symbol=network.recv:host_network_recv_probe".to_owned(),
         ],
@@ -74,7 +79,7 @@ fn render_runtime_symbol_contracts(manifest: &NustarPackageManifest) -> Vec<Stri
 fn append_runtime_symbol_notes(base: &str, manifest: &NustarPackageManifest) -> String {
     match manifest.domain_family.as_str() {
         "network" => format!(
-            "{base}; runtime symbol contract currently reserves host_network_connect_probe, host_network_accept_probe, host_network_close, host_network_send_probe, and host_network_recv_probe as the minimal control/transport syscall bridge surface"
+            "{base}; runtime symbol contract currently reserves host_network_connect_probe, host_network_open_tcp_stream, host_network_open_udp_datagram, host_network_accept_probe, host_network_close, host_network_close_owned, host_network_send_owned, host_network_recv_owned, host_network_send_probe, and host_network_recv_probe as the minimal control/transport syscall bridge surface"
         ),
         _ => base.to_owned(),
     }
@@ -1016,6 +1021,22 @@ mod tests {
                     .iter()
                     .any(|item| item == "host_symbol=network.close:host_network_close"),
                 "missing network.close host symbol metadata in {} contract",
+                contract.kind
+            );
+            assert!(
+                contract
+                    .required_metadata
+                    .iter()
+                    .any(|item| item == "host_symbol=network.send_owned:host_network_send_owned"),
+                "missing network.send_owned host symbol metadata in {} contract",
+                contract.kind
+            );
+            assert!(
+                contract
+                    .required_metadata
+                    .iter()
+                    .any(|item| item == "host_symbol=network.recv_owned:host_network_recv_owned"),
+                "missing network.recv_owned host symbol metadata in {} contract",
                 contract.kind
             );
             assert!(

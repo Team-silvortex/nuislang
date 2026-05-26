@@ -1,0 +1,96 @@
+use cpu NetworkTaskAsyncShapes;
+use network NetworkUnit;
+
+mod cpu Main {
+  extern "c" fn host_network_open_udp_datagram(
+    local_port: i64,
+    remote_port: i64
+  ) -> i64;
+  extern "c" fn host_network_send_owned(
+    handle: i64,
+    stream_window: i64,
+    send_window: i64
+  ) -> i64;
+  extern "c" fn host_network_recv_owned(
+    handle: i64,
+    stream_window: i64,
+    recv_window: i64
+  ) -> i64;
+  extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+  struct NetworkOwnedTransportResultTaskPolicySummary {
+    send_completed: i64,
+    recv_completed: i64,
+    fallback_timed_out: i64,
+    selected_value: i64
+  }
+
+  async fn consume_network_result(result: NetworkResult<i64>) -> i64 {
+    if network_send_ready(result) {
+      return network_value(result) + 9;
+    }
+    if network_recv_ready(result) {
+      return network_value(result) + 9;
+    }
+    if network_config_ready(result) {
+      return network_value(result) + 9;
+    }
+    return 0;
+  }
+
+  fn capture_network_owned_transport_result_task_policy_summary()
+    -> NetworkOwnedTransportResultTaskPolicySummary {
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+    let local_port: i64 = network_profile_local_port("NetworkUnit");
+    let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+    let timeout_budget: i64 = network_profile_timeout_budget("NetworkUnit");
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+
+    let handle: i64 = host_network_open_udp_datagram(local_port, remote_port);
+    let send_result: NetworkResult<i64> = network_result(
+      host_network_send_owned(handle, stream_window, send_window)
+    );
+    let recv_result: NetworkResult<i64> = network_result(
+      host_network_recv_owned(handle, stream_window, recv_window)
+    );
+    let fallback_result: NetworkResult<i64> =
+      network_result(network_profile_stream_window("NetworkUnit"));
+
+    let primary_task: Task<i64> =
+      timeout(spawn(consume_network_result(send_result)), timeout_budget);
+    let secondary_task: Task<i64> =
+      spawn(consume_network_result(recv_result));
+    let fallback_task: Task<i64> =
+      timeout(spawn(consume_network_result(fallback_result)), 0);
+
+    let primary_result: TaskResult<i64> = join_result(primary_task);
+    let secondary_result: TaskResult<i64> = join_result(secondary_task);
+    let fallback_task_result: TaskResult<i64> = join_result(fallback_task);
+    let close_code: i64 = host_network_close_owned(handle);
+
+    return NetworkOwnedTransportResultTaskPolicySummary {
+      send_completed: NetworkTaskAsyncShapes.encode_completed(primary_result),
+      recv_completed: NetworkTaskAsyncShapes.encode_completed(secondary_result),
+      fallback_timed_out:
+        NetworkTaskAsyncShapes.encode_timed_out(fallback_task_result),
+      selected_value: NetworkTaskAsyncShapes.async_policy_summary_selected_value(
+        primary_result,
+        secondary_result,
+        fallback_task_result
+      ) + retry_budget + close_code
+    };
+  }
+
+  fn main() {
+    let summary: NetworkOwnedTransportResultTaskPolicySummary =
+      capture_network_owned_transport_result_task_policy_summary();
+    print(
+      summary.send_completed
+        + summary.recv_completed
+        + summary.fallback_timed_out
+        + summary.selected_value
+    );
+  }
+}

@@ -25,6 +25,13 @@ when you want the canonical multi-file project route.
   [network_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_profile_demo.ns) ->
   [network_endpoint_profile_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_endpoint_profile_demo.ns) ->
   [network_host_control_runtime_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_host_control_runtime_demo.ns) ->
+  [network_host_handle_runtime_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_host_handle_runtime_demo.ns) ->
+  [network_host_handle_transport_runtime_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_host_handle_transport_runtime_demo.ns) ->
+  [network_owned_transport_result_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_owned_transport_result_demo.ns) ->
+  [network_owned_transport_result_task_policy_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_owned_transport_result_task_policy_demo.ns) ->
+  [network_owned_transport_result_task_batch_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_owned_transport_result_task_batch_demo.ns) ->
+  [network_owned_transport_result_task_windowed_batch_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_owned_transport_result_task_windowed_batch_demo.ns) ->
+  [network_owned_transport_result_session_bridge_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_owned_transport_result_session_bridge_demo.ns) ->
   [network_host_transport_runtime_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_host_transport_runtime_demo.ns) ->
   [network_transport_result_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_transport_result_demo.ns) ->
   [network_transport_result_task_policy_demo.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/demos/network_transport_result_task_policy_demo.ns) ->

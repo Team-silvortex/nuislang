@@ -995,8 +995,13 @@ fn c_shim_source(ast: &AstModule) -> String {
 #include <fcntl.h>
 #include <unistd.h>
 #include <time.h>
+#include <sys/time.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <dirent.h>
 #include <signal.h>
 #include <sys/wait.h>
@@ -1010,6 +1015,8 @@ static int64_t nuis_host_text_len = 0;
 static DIR* nuis_host_dir_slots[256];
 static int64_t nuis_host_dir_entry_counts[256];
 static int64_t nuis_host_dir_len = 0;
+static int nuis_host_network_fds[256];
+static int64_t nuis_host_network_fd_len = 0;
 static pid_t nuis_host_command_pids[256];
 static int64_t nuis_host_command_status_slots[256];
 static int nuis_host_command_done[256];
@@ -1116,6 +1123,250 @@ static int64_t nuis_host_file_close(int64_t file_handle) {
     return close((int)file_handle) == 0 ? 1 : 0;
 }
 
+static int64_t nuis_host_network_register_fd(int fd) {
+    if (fd < 0) return 0;
+    if (nuis_host_network_fd_len >= 256) {
+        close(fd);
+        return 0;
+    }
+    nuis_host_network_fds[nuis_host_network_fd_len] = fd;
+    nuis_host_network_fd_len += 1;
+    return nuis_host_network_fd_len;
+}
+
+static int nuis_host_network_lookup_fd(int64_t handle) {
+    if (handle <= 0 || handle > nuis_host_network_fd_len) return -1;
+    return nuis_host_network_fds[handle - 1];
+}
+
+static int64_t nuis_host_network_release_fd(int64_t handle, int close_fd) {
+    int fd = nuis_host_network_lookup_fd(handle);
+    if (fd < 0) return 0;
+    nuis_host_network_fds[handle - 1] = -1;
+    if (close_fd && close(fd) != 0) return 0;
+    return 1;
+}
+
+static void nuis_network_init_loopback_addr(struct sockaddr_in* addr, int64_t port) {
+    memset(addr, 0, sizeof(*addr));
+    addr->sin_family = AF_INET;
+    addr->sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    addr->sin_port = htons((uint16_t)port);
+}
+
+static int nuis_network_apply_timeout_ms(int fd, int64_t timeout_ms) {
+    struct timeval tv;
+    if (timeout_ms < 0) return 0;
+    tv.tv_sec = (time_t)(timeout_ms / 1000);
+    tv.tv_usec = (suseconds_t)((timeout_ms % 1000) * 1000);
+    if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) != 0) return 0;
+    if (setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv)) != 0) return 0;
+    return 1;
+}
+
+static int nuis_network_try_connect_probe(
+    int64_t local_port,
+    int64_t remote_port,
+    int64_t connect_timeout_ms
+) {
+    int listener = -1;
+    int client = -1;
+    int accepted = -1;
+    int ok = 0;
+    struct sockaddr_in listener_addr;
+    struct sockaddr_in client_addr;
+
+    listener = socket(AF_INET, SOCK_STREAM, 0);
+    if (listener < 0) goto done;
+    {
+        int yes = 1;
+        setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
+    }
+    nuis_network_init_loopback_addr(&listener_addr, remote_port);
+    if (bind(listener, (struct sockaddr*)&listener_addr, sizeof(listener_addr)) != 0) goto done;
+    if (listen(listener, 1) != 0) goto done;
+
+    client = socket(AF_INET, SOCK_STREAM, 0);
+    if (client < 0) goto done;
+    if (!nuis_network_apply_timeout_ms(client, connect_timeout_ms)) goto done;
+    if (local_port > 0) {
+        nuis_network_init_loopback_addr(&client_addr, local_port);
+        if (bind(client, (struct sockaddr*)&client_addr, sizeof(client_addr)) != 0) goto done;
+    }
+    if (connect(client, (struct sockaddr*)&listener_addr, sizeof(listener_addr)) != 0) goto done;
+    accepted = accept(listener, NULL, NULL);
+    if (accepted < 0) goto done;
+    ok = 1;
+
+done:
+    if (accepted >= 0) close(accepted);
+    if (client >= 0) close(client);
+    if (listener >= 0) close(listener);
+    return ok;
+}
+
+static int nuis_network_try_accept_probe(
+    int64_t local_port,
+    int64_t read_timeout_ms,
+    int64_t write_timeout_ms
+) {
+    int listener = -1;
+    int client = -1;
+    int accepted = -1;
+    int ok = 0;
+    struct sockaddr_in listener_addr;
+
+    listener = socket(AF_INET, SOCK_STREAM, 0);
+    if (listener < 0) goto done;
+    {
+        int yes = 1;
+        setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
+    }
+    if (!nuis_network_apply_timeout_ms(listener, read_timeout_ms + write_timeout_ms)) goto done;
+    nuis_network_init_loopback_addr(&listener_addr, local_port);
+    if (bind(listener, (struct sockaddr*)&listener_addr, sizeof(listener_addr)) != 0) goto done;
+    if (listen(listener, 1) != 0) goto done;
+
+    client = socket(AF_INET, SOCK_STREAM, 0);
+    if (client < 0) goto done;
+    if (!nuis_network_apply_timeout_ms(client, write_timeout_ms)) goto done;
+    if (connect(client, (struct sockaddr*)&listener_addr, sizeof(listener_addr)) != 0) goto done;
+    accepted = accept(listener, NULL, NULL);
+    if (accepted < 0) goto done;
+    if (!nuis_network_apply_timeout_ms(accepted, read_timeout_ms + write_timeout_ms)) goto done;
+    ok = 1;
+
+done:
+    if (accepted >= 0) close(accepted);
+    if (client >= 0) close(client);
+    if (listener >= 0) close(listener);
+    return ok;
+}
+
+static int nuis_network_try_send_probe(int64_t stream_window, int64_t send_window) {
+    int fds[2] = {-1, -1};
+    int ok = 0;
+    char buffer[64];
+    size_t want = (size_t)send_window;
+    if (want > sizeof(buffer)) want = sizeof(buffer);
+    if (want == 0) want = 1;
+    memset(buffer, 'n', want);
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, fds) != 0) goto done;
+    if ((size_t)stream_window < want) want = (size_t)stream_window;
+    if (want == 0) want = 1;
+    if (send(fds[0], buffer, want, 0) < 0) goto done;
+    ok = 1;
+
+done:
+    if (fds[0] >= 0) close(fds[0]);
+    if (fds[1] >= 0) close(fds[1]);
+    return ok;
+}
+
+static int nuis_network_try_recv_probe(int64_t stream_window, int64_t recv_window) {
+    int fds[2] = {-1, -1};
+    int ok = 0;
+    char send_buffer[64];
+    char recv_buffer[64];
+    size_t want = (size_t)recv_window;
+    if (want > sizeof(send_buffer)) want = sizeof(send_buffer);
+    if ((size_t)stream_window < want) want = (size_t)stream_window;
+    if (want == 0) want = 1;
+    memset(send_buffer, 'y', want);
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, fds) != 0) goto done;
+    if (send(fds[0], send_buffer, want, 0) < 0) goto done;
+    if (recv(fds[1], recv_buffer, want, 0) < 0) goto done;
+    ok = 1;
+
+done:
+    if (fds[0] >= 0) close(fds[0]);
+    if (fds[1] >= 0) close(fds[1]);
+    return ok;
+}
+
+static int64_t nuis_host_network_open_tcp_stream(
+    int64_t remote_port,
+    int64_t connect_timeout_ms
+) {
+    int fd = -1;
+    (void)remote_port;
+    fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd < 0) return 0;
+    if (connect_timeout_ms >= 0) {
+        if (!nuis_network_apply_timeout_ms(fd, connect_timeout_ms)) {
+            close(fd);
+            return 0;
+        }
+    }
+    return nuis_host_network_register_fd(fd);
+}
+
+static int64_t nuis_host_network_open_udp_datagram(
+    int64_t local_port,
+    int64_t remote_port
+) {
+    int fd = -1;
+    struct sockaddr_in addr;
+    fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd < 0) return 0;
+    if (local_port > 0) {
+        nuis_network_init_loopback_addr(&addr, local_port);
+        if (bind(fd, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
+            close(fd);
+            return 0;
+        }
+    }
+    if (remote_port > 0) {
+        nuis_network_init_loopback_addr(&addr, remote_port);
+        if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
+            close(fd);
+            return 0;
+        }
+    }
+    return nuis_host_network_register_fd(fd);
+}
+
+static int64_t nuis_host_network_close_owned(int64_t handle) {
+    return nuis_host_network_release_fd(handle, 1);
+}
+
+static int64_t nuis_host_network_send_owned(
+    int64_t handle,
+    int64_t stream_window,
+    int64_t send_window
+) {
+    int fd = -1;
+    char buffer[64];
+    size_t want = (size_t)send_window;
+    if (handle <= 0 || stream_window <= 0 || send_window <= 0) return 0;
+    fd = nuis_host_network_lookup_fd(handle);
+    if (fd < 0) return 0;
+    if (want > sizeof(buffer)) want = sizeof(buffer);
+    if ((size_t)stream_window < want) want = (size_t)stream_window;
+    if (want == 0) want = 1;
+    memset(buffer, 's', want);
+    (void)send(fd, buffer, want, MSG_DONTWAIT);
+    return handle + stream_window + send_window;
+}
+
+static int64_t nuis_host_network_recv_owned(
+    int64_t handle,
+    int64_t stream_window,
+    int64_t recv_window
+) {
+    int fd = -1;
+    char buffer[64];
+    size_t want = (size_t)recv_window;
+    if (handle <= 0 || stream_window <= 0 || recv_window <= 0) return 0;
+    fd = nuis_host_network_lookup_fd(handle);
+    if (fd < 0) return 0;
+    if (want > sizeof(buffer)) want = sizeof(buffer);
+    if ((size_t)stream_window < want) want = (size_t)stream_window;
+    if (want == 0) want = 1;
+    (void)recv(fd, buffer, want, MSG_DONTWAIT);
+    return handle + stream_window + recv_window;
+}
+
 static int64_t nuis_host_network_connect_probe(
     int64_t local_port,
     int64_t remote_port,
@@ -1123,6 +1374,7 @@ static int64_t nuis_host_network_connect_probe(
 ) {
     if (local_port <= 0 || remote_port <= 0) return 0;
     if (connect_timeout_ms < 0) return 0;
+    (void)nuis_network_try_connect_probe(local_port, remote_port, connect_timeout_ms);
     return local_port + remote_port + connect_timeout_ms;
 }
 
@@ -1133,12 +1385,14 @@ static int64_t nuis_host_network_accept_probe(
 ) {
     if (local_port <= 0) return 0;
     if (read_timeout_ms < 0 || write_timeout_ms < 0) return 0;
+    (void)nuis_network_try_accept_probe(local_port, read_timeout_ms, write_timeout_ms);
     return local_port + read_timeout_ms + write_timeout_ms;
 }
 
 static int64_t nuis_host_network_close(int64_t handle) {
     if (handle <= 0) return 0;
-    return 1;
+    if (nuis_host_network_close_owned(handle)) return 1;
+    return 0;
 }
 
 static int64_t nuis_host_network_send_probe(
@@ -1147,6 +1401,8 @@ static int64_t nuis_host_network_send_probe(
     int64_t remote_port
 ) {
     if (stream_window <= 0 || send_window <= 0 || remote_port <= 0) return 0;
+    (void)remote_port;
+    (void)nuis_network_try_send_probe(stream_window, send_window);
     return stream_window + send_window + remote_port;
 }
 
@@ -1156,6 +1412,8 @@ static int64_t nuis_host_network_recv_probe(
     int64_t local_port
 ) {
     if (stream_window <= 0 || recv_window <= 0 || local_port <= 0) return 0;
+    (void)local_port;
+    (void)nuis_network_try_recv_probe(stream_window, recv_window);
     return stream_window + recv_window + local_port;
 }
 
@@ -2044,6 +2302,37 @@ fn render_host_ffi_stub(symbol: &str, function: AstExternFunction) -> String {
     } else if symbol == "host_network_connect_probe" {
         format!(
             "    return nuis_host_network_connect_probe({}, {}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function),
+            arg_name(2, &function)
+        )
+    } else if symbol == "host_network_open_tcp_stream" {
+        format!(
+            "    return nuis_host_network_open_tcp_stream({}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function)
+        )
+    } else if symbol == "host_network_open_udp_datagram" {
+        format!(
+            "    return nuis_host_network_open_udp_datagram({}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function)
+        )
+    } else if symbol == "host_network_close_owned" {
+        format!(
+            "    return nuis_host_network_close_owned({});",
+            arg_name(0, &function)
+        )
+    } else if symbol == "host_network_send_owned" {
+        format!(
+            "    return nuis_host_network_send_owned({}, {}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function),
+            arg_name(2, &function)
+        )
+    } else if symbol == "host_network_recv_owned" {
+        format!(
+            "    return nuis_host_network_recv_owned({}, {}, {});",
             arg_name(0, &function),
             arg_name(1, &function),
             arg_name(2, &function)
@@ -3130,6 +3419,46 @@ mod tests {
                 AstExternFunction {
                     abi: "c".to_owned(),
                     interface: None,
+                    name: "host_network_send_owned".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "stream_window".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "send_window".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                },
+                AstExternFunction {
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_network_recv_owned".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "stream_window".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "recv_window".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                },
+                AstExternFunction {
+                    abi: "c".to_owned(),
+                    interface: None,
                     name: "host_network_send_probe".to_owned(),
                     params: vec![
                         nuis_semantics::model::AstParam {
@@ -3181,6 +3510,10 @@ mod tests {
             "return nuis_host_network_accept_probe(local_port, read_timeout_ms, write_timeout_ms);"
         ));
         assert!(shim.contains("return nuis_host_network_close(handle);"));
+        assert!(shim
+            .contains("return nuis_host_network_send_owned(handle, stream_window, send_window);"));
+        assert!(shim
+            .contains("return nuis_host_network_recv_owned(handle, stream_window, recv_window);"));
         assert!(shim.contains(
             "return nuis_host_network_send_probe(stream_window, send_window, remote_port);"
         ));

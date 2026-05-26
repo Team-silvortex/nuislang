@@ -1,0 +1,162 @@
+use network NetworkUnit;
+
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+  extern "c" fn host_monotonic_time_ns() -> i64;
+  extern "c" fn host_network_send_probe(
+    stream_window: i64,
+    send_window: i64,
+    remote_port: i64
+  ) -> i64;
+  extern "c" fn host_network_recv_probe(
+    stream_window: i64,
+    recv_window: i64,
+    local_port: i64
+  ) -> i64;
+  extern "c" fn host_network_open_udp_datagram(
+    local_port: i64,
+    remote_port: i64
+  ) -> i64;
+  extern "c" fn host_network_send_owned(
+    handle: i64,
+    stream_window: i64,
+    send_window: i64
+  ) -> i64;
+  extern "c" fn host_network_recv_owned(
+    handle: i64,
+    stream_window: i64,
+    recv_window: i64
+  ) -> i64;
+  extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+  struct NetTransportPathCompareSummary {
+    argv_count: i64,
+    timeout_budget: i64,
+    retry_budget: i64,
+    stream_window: i64,
+    recv_window: i64,
+    send_window: i64,
+    local_port: i64,
+    remote_port: i64,
+    probe_send_ready: i64,
+    probe_recv_ready: i64,
+    probe_session_value: i64,
+    owned_send_ready: i64,
+    owned_recv_ready: i64,
+    owned_close_value: i64,
+    owned_session_value: i64,
+    path_delta: i64,
+    tick_ns: i64
+  }
+
+  fn encode_send_ready(result: NetworkResult<i64>) -> i64 {
+    if network_send_ready(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_recv_ready(result: NetworkResult<i64>) -> i64 {
+    if network_recv_ready(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_value(result: NetworkResult<i64>) -> i64 {
+    return network_value(result);
+  }
+
+  fn capture_net_transport_path_compare_summary() -> NetTransportPathCompareSummary {
+    let argv_count: i64 = host_argv_count();
+    let timeout_budget: i64 = network_profile_timeout_budget("NetworkUnit");
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+    let local_port: i64 = network_profile_local_port("NetworkUnit");
+    let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+
+    let probe_send_result: NetworkResult<i64> = network_result(
+      host_network_send_probe(stream_window, send_window, remote_port)
+    );
+    let probe_recv_result: NetworkResult<i64> = network_result(
+      host_network_recv_probe(stream_window, recv_window, local_port)
+    );
+    let probe_session_value: i64 = argv_count
+      + retry_budget
+      + stream_window
+      + recv_window
+      + send_window
+      + local_port
+      + remote_port
+      + encode_value(probe_send_result)
+      + encode_value(probe_recv_result);
+
+    let handle: i64 = host_network_open_udp_datagram(local_port, remote_port);
+    let owned_send_result: NetworkResult<i64> = network_result(
+      host_network_send_owned(handle, stream_window, send_window)
+    );
+    let owned_recv_result: NetworkResult<i64> = network_result(
+      host_network_recv_owned(handle, stream_window, recv_window)
+    );
+    let owned_close_value: i64 = host_network_close_owned(handle);
+    let owned_session_value: i64 = argv_count
+      + retry_budget
+      + stream_window
+      + recv_window
+      + send_window
+      + local_port
+      + remote_port
+      + encode_value(owned_send_result)
+      + encode_value(owned_recv_result)
+      + owned_close_value;
+    let tick_ns: i64 = host_monotonic_time_ns();
+
+    return NetTransportPathCompareSummary {
+      argv_count: argv_count,
+      timeout_budget: timeout_budget,
+      retry_budget: retry_budget,
+      stream_window: stream_window,
+      recv_window: recv_window,
+      send_window: send_window,
+      local_port: local_port,
+      remote_port: remote_port,
+      probe_send_ready: encode_send_ready(probe_send_result),
+      probe_recv_ready: encode_recv_ready(probe_recv_result),
+      probe_session_value: probe_session_value,
+      owned_send_ready: encode_send_ready(owned_send_result),
+      owned_recv_ready: encode_recv_ready(owned_recv_result),
+      owned_close_value: owned_close_value,
+      owned_session_value: owned_session_value,
+      path_delta: owned_session_value - probe_session_value,
+      tick_ns: tick_ns
+    };
+  }
+
+  fn summarize_net_transport_path_compare_recipe() -> i64 {
+    let summary: NetTransportPathCompareSummary =
+      capture_net_transport_path_compare_summary();
+    return summary.argv_count
+      + summary.timeout_budget
+      + summary.retry_budget
+      + summary.stream_window
+      + summary.recv_window
+      + summary.send_window
+      + summary.local_port
+      + summary.remote_port
+      + summary.probe_send_ready
+      + summary.probe_recv_ready
+      + summary.probe_session_value
+      + summary.owned_send_ready
+      + summary.owned_recv_ready
+      + summary.owned_close_value
+      + summary.owned_session_value
+      + summary.path_delta
+      + summary.tick_ns;
+  }
+
+  fn main() {
+    print(summarize_net_transport_path_compare_recipe());
+  }
+}
