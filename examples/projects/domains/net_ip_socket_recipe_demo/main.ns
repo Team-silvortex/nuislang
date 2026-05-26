@@ -1,0 +1,164 @@
+use network NetworkUnit;
+
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+  extern "c" fn host_monotonic_time_ns() -> i64;
+  extern "c" fn host_network_open_udp_datagram(
+    local_port: i64,
+    remote_port: i64
+  ) -> i64;
+  extern "c" fn host_network_send_owned(
+    handle: i64,
+    stream_window: i64,
+    send_window: i64
+  ) -> i64;
+  extern "c" fn host_network_recv_owned(
+    handle: i64,
+    stream_window: i64,
+    recv_window: i64
+  ) -> i64;
+  extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+  struct NetIpSocketSummary {
+    argv_count: i64,
+    transport_family: i64,
+    endpoint_kind: i64,
+    timeout_budget: i64,
+    retry_budget: i64,
+    protocol_kind: i64,
+    protocol_version: i64,
+    protocol_header_bytes: i64,
+    local_port: i64,
+    remote_port: i64,
+    recv_window: i64,
+    send_window: i64,
+    read_timeout_ms: i64,
+    write_timeout_ms: i64,
+    open_handle: i64,
+    send_ready: i64,
+    recv_ready: i64,
+    send_value: i64,
+    recv_value: i64,
+    close_value: i64,
+    socket_value: i64,
+    tick_ns: i64
+  }
+
+  fn encode_send_ready(result: NetworkResult<i64>) -> i64 {
+    if network_send_ready(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_recv_ready(result: NetworkResult<i64>) -> i64 {
+    if network_recv_ready(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_value(result: NetworkResult<i64>) -> i64 {
+    return network_value(result);
+  }
+
+  fn capture_net_ip_socket_summary() -> NetIpSocketSummary {
+    let argv_count: i64 = host_argv_count();
+    let transport_family: i64 = network_profile_transport_family("NetworkUnit");
+    let endpoint_kind: i64 = network_profile_endpoint_kind("NetworkUnit");
+    let timeout_budget: i64 = network_profile_timeout_budget("NetworkUnit");
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+    let protocol_kind: i64 = network_profile_protocol_kind("NetworkUnit");
+    let protocol_version: i64 = network_profile_protocol_version("NetworkUnit");
+    let protocol_header_bytes: i64 =
+      network_profile_protocol_header_bytes("NetworkUnit");
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+    let local_port: i64 = network_profile_local_port("NetworkUnit");
+    let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+    let read_timeout_ms: i64 = network_profile_read_timeout("NetworkUnit");
+    let write_timeout_ms: i64 = network_profile_write_timeout("NetworkUnit");
+    let open_handle: i64 = host_network_open_udp_datagram(local_port, remote_port);
+    let send_result: NetworkResult<i64> = network_result(
+      host_network_send_owned(open_handle, stream_window, send_window)
+    );
+    let recv_result: NetworkResult<i64> = network_result(
+      host_network_recv_owned(open_handle, stream_window, recv_window)
+    );
+    let send_value: i64 = encode_value(send_result);
+    let recv_value: i64 = encode_value(recv_result);
+    let close_value: i64 = host_network_close_owned(open_handle);
+    let tick_ns: i64 = host_monotonic_time_ns();
+
+    return NetIpSocketSummary {
+      argv_count: argv_count,
+      transport_family: transport_family,
+      endpoint_kind: endpoint_kind,
+      timeout_budget: timeout_budget,
+      retry_budget: retry_budget,
+      protocol_kind: protocol_kind,
+      protocol_version: protocol_version,
+      protocol_header_bytes: protocol_header_bytes,
+      local_port: local_port,
+      remote_port: remote_port,
+      recv_window: recv_window,
+      send_window: send_window,
+      read_timeout_ms: read_timeout_ms,
+      write_timeout_ms: write_timeout_ms,
+      open_handle: open_handle,
+      send_ready: encode_send_ready(send_result),
+      recv_ready: encode_recv_ready(recv_result),
+      send_value: send_value,
+      recv_value: recv_value,
+      close_value: close_value,
+      socket_value: transport_family
+        + endpoint_kind
+        + retry_budget
+        + protocol_kind
+        + protocol_version
+        + protocol_header_bytes
+        + local_port
+        + remote_port
+        + recv_window
+        + send_window
+        + read_timeout_ms
+        + write_timeout_ms
+        + open_handle
+        + send_value
+        + recv_value
+        + close_value,
+      tick_ns: tick_ns
+    };
+  }
+
+  fn summarize_net_ip_socket_recipe() -> i64 {
+    let summary: NetIpSocketSummary = capture_net_ip_socket_summary();
+    return summary.argv_count
+      + summary.transport_family
+      + summary.endpoint_kind
+      + summary.timeout_budget
+      + summary.retry_budget
+      + summary.protocol_kind
+      + summary.protocol_version
+      + summary.protocol_header_bytes
+      + summary.local_port
+      + summary.remote_port
+      + summary.recv_window
+      + summary.send_window
+      + summary.read_timeout_ms
+      + summary.write_timeout_ms
+      + summary.open_handle
+      + summary.send_ready
+      + summary.recv_ready
+      + summary.send_value
+      + summary.recv_value
+      + summary.close_value
+      + summary.socket_value
+      + summary.tick_ns;
+  }
+
+  fn main() {
+    print(summarize_net_ip_socket_recipe());
+  }
+}

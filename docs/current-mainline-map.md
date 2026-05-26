@@ -56,6 +56,10 @@ Use these when you want the shortest explanation of how the current layers stack
   [net_ip_packet_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_ip_packet_recipe.ns) ->
   [net_tcp_stream_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_stream_recipe.ns) ->
   [net_udp_datagram_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_datagram_recipe.ns)
+  socket edge:
+  [net_tcp_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_socket_recipe.ns) ->
+  [net_udp_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_socket_recipe.ns) ->
+  [net_ip_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_ip_socket_recipe.ns)
   control edge:
   [net_connect_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_connect_recipe.ns) ->
   [net_listen_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_listen_recipe.ns) ->
@@ -67,6 +71,18 @@ Use these when you want the shortest explanation of how the current layers stack
   [net_dnsish_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_protocol_recipe.ns) ->
   [net_dnsish_query_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_query_recipe.ns) ->
   [net_httpish_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_protocol_recipe.ns) ->
+  [net_http_client_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_recipe.ns) ->
+  [net_http_request_builder_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_request_builder_recipe.ns) ->
+  [net_http_client_headers_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_headers_recipe.ns) ->
+  [net_http_client_url_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_url_recipe.ns) ->
+  [net_http_client_body_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_body_recipe.ns) ->
+  [net_http_client_status_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_status_recipe.ns) ->
+  [net_http_request_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_request_recipe.ns) ->
+  [net_http_response_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_response_recipe.ns) ->
+  [net_http_client_exchange_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_exchange_recipe.ns) ->
+  [net_http_client_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_session_recipe.ns) ->
+  [net_http_client_get_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_get_recipe.ns) ->
+  [net_http_client_post_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_post_recipe.ns) ->
   [net_httpish_request_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_request_recipe.ns) ->
   [net_httpish_response_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_response_recipe.ns) ->
   [net_httpish_roundtrip_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_roundtrip_recipe.ns)
@@ -105,6 +121,8 @@ Use these when you want the shortest explanation of how the current layers stack
   `dns-ish exchange session -> owned dns-ish exchange session -> dns-ish path compare`
   httpish compare rule:
   `httpish exchange session -> httpish path compare`
+  http edge rule:
+  `tcp socket -> http client -> http request builder -> http client headers -> http client url -> http client body -> http client status -> http request -> http response -> http client exchange -> http client session -> http client GET/POST`
   grouped compare rule:
   `transport compare -> dns-ish compare -> httpish compare`
   companion validation:
@@ -121,6 +139,18 @@ Use these when you want the shortest explanation of how the current layers stack
   [net_dnsish_protocol_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_dnsish_protocol_recipe_demo) ->
   [net_dnsish_query_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_dnsish_query_recipe_demo) ->
   [net_httpish_protocol_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_protocol_recipe_demo) ->
+  [net_http_client_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_recipe_demo) ->
+  [net_http_request_builder_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_request_builder_recipe_demo) ->
+  [net_http_client_headers_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_headers_recipe_demo) ->
+  [net_http_client_url_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_url_recipe_demo) ->
+  [net_http_client_body_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_body_recipe_demo) ->
+  [net_http_client_status_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_status_recipe_demo) ->
+  [net_http_request_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_request_recipe_demo) ->
+  [net_http_response_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_response_recipe_demo) ->
+  [net_http_client_exchange_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_exchange_recipe_demo) ->
+  [net_http_client_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_session_recipe_demo) ->
+  [net_http_client_get_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_get_recipe_demo) ->
+  [net_http_client_post_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_post_recipe_demo) ->
   [net_httpish_request_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_request_recipe_demo) ->
   [net_httpish_response_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_response_recipe_demo) ->
   [net_httpish_roundtrip_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_roundtrip_recipe_demo) ->

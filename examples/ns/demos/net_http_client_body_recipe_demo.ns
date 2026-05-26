@@ -1,0 +1,134 @@
+use network NetworkUnit;
+
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+  extern "c" fn host_monotonic_time_ns() -> i64;
+  extern "c" fn host_network_open_tcp_stream(
+    remote_port: i64,
+    connect_timeout_ms: i64
+  ) -> i64;
+  extern "c" fn host_network_send_owned(
+    handle: i64,
+    stream_window: i64,
+    send_window: i64
+  ) -> i64;
+  extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+  struct NetHttpClientBodySummary {
+    argv_count: i64,
+    transport_family: i64,
+    timeout_budget: i64,
+    retry_budget: i64,
+    protocol_kind: i64,
+    protocol_version: i64,
+    protocol_header_bytes: i64,
+    method_code: i64,
+    body_kind: i64,
+    body_bytes: i64,
+    content_length_bytes: i64,
+    framing_bytes: i64,
+    open_handle: i64,
+    send_ready: i64,
+    send_value: i64,
+    close_value: i64,
+    body_value: i64,
+    tick_ns: i64
+  }
+
+  fn encode_send_ready(result: NetworkResult<i64>) -> i64 {
+    if network_send_ready(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_value(result: NetworkResult<i64>) -> i64 {
+    return network_value(result);
+  }
+
+  fn capture_net_http_client_body_summary() -> NetHttpClientBodySummary {
+    let argv_count: i64 = host_argv_count();
+    let transport_family: i64 = network_profile_transport_family("NetworkUnit");
+    let timeout_budget: i64 = network_profile_timeout_budget("NetworkUnit");
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+    let protocol_kind: i64 = network_profile_protocol_kind("NetworkUnit");
+    let protocol_version: i64 = network_profile_protocol_version("NetworkUnit");
+    let protocol_header_bytes: i64 =
+      network_profile_protocol_header_bytes("NetworkUnit");
+    let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+    let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+    let method_code: i64 = 74 + protocol_kind + protocol_version;
+    let body_kind: i64 = 1 + retry_budget;
+    let body_bytes: i64 = stream_window + send_window + protocol_version;
+    let content_length_bytes: i64 = protocol_header_bytes + 8;
+    let framing_bytes: i64 = protocol_header_bytes + timeout_budget + 4;
+    let open_handle: i64 = host_network_open_tcp_stream(
+      remote_port,
+      connect_timeout_ms
+    );
+    let send_result: NetworkResult<i64> = network_result(
+      host_network_send_owned(open_handle, stream_window, send_window)
+    );
+    let send_value: i64 = encode_value(send_result);
+    let close_value: i64 = host_network_close_owned(open_handle);
+    let tick_ns: i64 = host_monotonic_time_ns();
+
+    return NetHttpClientBodySummary {
+      argv_count: argv_count,
+      transport_family: transport_family,
+      timeout_budget: timeout_budget,
+      retry_budget: retry_budget,
+      protocol_kind: protocol_kind,
+      protocol_version: protocol_version,
+      protocol_header_bytes: protocol_header_bytes,
+      method_code: method_code,
+      body_kind: body_kind,
+      body_bytes: body_bytes,
+      content_length_bytes: content_length_bytes,
+      framing_bytes: framing_bytes,
+      open_handle: open_handle,
+      send_ready: encode_send_ready(send_result),
+      send_value: send_value,
+      close_value: close_value,
+      body_value: transport_family
+        + retry_budget
+        + method_code
+        + body_kind
+        + body_bytes
+        + content_length_bytes
+        + framing_bytes
+        + open_handle
+        + send_value
+        + close_value,
+      tick_ns: tick_ns
+    };
+  }
+
+  fn summarize_net_http_client_body_recipe() -> i64 {
+    let summary: NetHttpClientBodySummary = capture_net_http_client_body_summary();
+    return summary.argv_count
+      + summary.transport_family
+      + summary.timeout_budget
+      + summary.retry_budget
+      + summary.protocol_kind
+      + summary.protocol_version
+      + summary.protocol_header_bytes
+      + summary.method_code
+      + summary.body_kind
+      + summary.body_bytes
+      + summary.content_length_bytes
+      + summary.framing_bytes
+      + summary.open_handle
+      + summary.send_ready
+      + summary.send_value
+      + summary.close_value
+      + summary.body_value
+      + summary.tick_ns;
+  }
+
+  fn main() {
+    print(summarize_net_http_client_body_recipe());
+  }
+}

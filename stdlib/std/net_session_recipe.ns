@@ -9,6 +9,10 @@ mod cpu Main {
     send_window: i64,
     remote_port: i64
   ) -> i64;
+  extern "c" fn host_network_open_tcp_stream(
+    remote_port: i64,
+    connect_timeout_ms: i64
+  ) -> i64;
   extern "c" fn host_network_recv_probe(
     stream_window: i64,
     recv_window: i64,
@@ -92,6 +96,10 @@ mod cpu Main {
     session_value: i64
   }
 
+  struct NetHttpClientSessionSummary {
+    session_value: i64
+  }
+
   struct NetHttpishExchangeSessionSummary {
     session_value: i64
   }
@@ -114,6 +122,7 @@ mod cpu Main {
     owned_dnsish_exchange_session_value: i64,
     dnsish_pipeline_value: i64,
     owned_dnsish_pipeline_value: i64,
+    http_client_session_value: i64,
     httpish_session_value: i64,
     exchange_session_value: i64,
     result_preview_value: i64,
@@ -333,6 +342,49 @@ mod cpu Main {
         + body_window_bytes
         + encode_result_value(send_result)
         + encode_result_value(recv_result)
+    };
+  }
+
+  fn capture_net_http_client_session_summary() -> NetHttpClientSessionSummary {
+    let argv_count: i64 = host_argv_count();
+    let transport_family: i64 = network_profile_transport_family("NetworkUnit");
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+    let protocol_kind: i64 = network_profile_protocol_kind("NetworkUnit");
+    let protocol_version: i64 = network_profile_protocol_version("NetworkUnit");
+    let protocol_header_bytes: i64 =
+      network_profile_protocol_header_bytes("NetworkUnit");
+    let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+    let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+    let method_code: i64 = 64 + protocol_kind;
+    let status_code: i64 = 200 + protocol_version;
+    let request_bytes: i64 =
+      protocol_header_bytes + protocol_version + 16 + protocol_header_bytes + send_window;
+    let response_bytes: i64 =
+      protocol_header_bytes + 12 + protocol_header_bytes + recv_window;
+    let handle: i64 = host_network_open_tcp_stream(remote_port, connect_timeout_ms);
+    let send_result: NetworkResult<i64> = network_result(
+      host_network_send_owned(handle, stream_window, send_window)
+    );
+    let recv_result: NetworkResult<i64> = network_result(
+      host_network_recv_owned(handle, stream_window, recv_window)
+    );
+    let close_value: i64 = host_network_close_owned(handle);
+
+    return NetHttpClientSessionSummary {
+      session_value: argv_count
+        + transport_family
+        + retry_budget
+        + method_code
+        + status_code
+        + request_bytes
+        + response_bytes
+        + handle
+        + encode_result_value(send_result)
+        + encode_result_value(recv_result)
+        + close_value
     };
   }
 
@@ -811,6 +863,8 @@ mod cpu Main {
       capture_net_dnsish_pipeline_summary();
     let owned_dnsish_pipeline_summary: NetOwnedDnsishPipelineSummary =
       capture_net_owned_dnsish_pipeline_summary();
+    let http_client_session_summary: NetHttpClientSessionSummary =
+      capture_net_http_client_session_summary();
     let httpish_session_summary: NetHttpishSessionSummary =
       capture_net_httpish_session_summary();
     let exchange_session_summary: NetHttpishExchangeSessionSummary =
@@ -836,6 +890,7 @@ mod cpu Main {
             + owned_dnsish_exchange_session_summary.session_value
             + dnsish_pipeline_summary.session_value
             + owned_dnsish_pipeline_summary.session_value
+            + http_client_session_summary.session_value
             + httpish_session_summary.session_value
             + exchange_session_summary.session_value
             + result_summary.preview_value
@@ -868,6 +923,7 @@ mod cpu Main {
         owned_dnsish_exchange_session_summary.session_value,
       dnsish_pipeline_value: dnsish_pipeline_summary.session_value,
       owned_dnsish_pipeline_value: owned_dnsish_pipeline_summary.session_value,
+      http_client_session_value: http_client_session_summary.session_value,
       httpish_session_value: httpish_session_summary.session_value,
       exchange_session_value: exchange_session_summary.session_value,
       result_preview_value: result_summary.preview_value,
@@ -898,6 +954,7 @@ mod cpu Main {
       + summary.owned_dnsish_exchange_session_value
       + summary.dnsish_pipeline_value
       + summary.owned_dnsish_pipeline_value
+      + summary.http_client_session_value
       + summary.httpish_session_value
       + summary.exchange_session_value
       + summary.result_preview_value

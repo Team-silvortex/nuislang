@@ -52,6 +52,9 @@ The practical current rule is:
 * [net_ip_packet_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_ip_packet_recipe.ns)
 * [net_tcp_stream_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_stream_recipe.ns)
 * [net_udp_datagram_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_datagram_recipe.ns)
+* [net_tcp_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_socket_recipe.ns)
+* [net_udp_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_socket_recipe.ns)
+* [net_ip_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_ip_socket_recipe.ns)
 * [net_connect_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_connect_recipe.ns)
 * [net_listen_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_listen_recipe.ns)
 * [net_close_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_close_recipe.ns)
@@ -95,6 +98,9 @@ Current companion validation routes:
 * [net_ip_packet_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_ip_packet_recipe_demo)
 * [net_tcp_stream_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_stream_recipe_demo)
 * [net_udp_datagram_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_udp_datagram_recipe_demo)
+* [net_tcp_socket_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_socket_recipe_demo)
+* [net_udp_socket_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_udp_socket_recipe_demo)
+* [net_ip_socket_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_ip_socket_recipe_demo)
 * [net_connect_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_connect_recipe_demo)
 * [net_listen_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_listen_recipe_demo)
 * [net_close_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_close_recipe_demo)
@@ -182,6 +188,42 @@ Current role split:
 * `net_httpish_roundtrip`
   reads:
   `httpish request + response shape -> roundtrip summary`
+* `net_http_client`
+  reads:
+  `tcp-socket-backed request/response exchange + close -> http client summary`
+* `net_http_request_builder`
+  reads:
+  `tcp-socket-backed method/path/header/body builder + close -> http request builder summary`
+* `net_http_client_headers`
+  reads:
+  `tcp-socket-backed header shaping + close -> http client headers summary`
+* `net_http_client_url`
+  reads:
+  `tcp-socket-backed url authority/path/query shaping + close -> http client url summary`
+* `net_http_client_body`
+  reads:
+  `tcp-socket-backed body shaping + close -> http client body summary`
+* `net_http_client_status`
+  reads:
+  `tcp-socket-backed response status shaping + close -> http client status summary`
+* `net_http_request`
+  reads:
+  `tcp-socket-backed request send + close -> http request summary`
+* `net_http_response`
+  reads:
+  `tcp-socket-backed response recv + close -> http response summary`
+* `net_http_client_exchange`
+  reads:
+  `tcp-socket-backed request/response exchange + timeout/retry + close -> http client exchange summary`
+* `net_http_client_session`
+  reads:
+  `http client/request/response/exchange summaries -> http client session summary`
+* `net_http_client_get`
+  reads:
+  `tcp-socket-backed GET exchange + close -> http client GET summary`
+* `net_http_client_post`
+  reads:
+  `tcp-socket-backed POST exchange + close -> http client POST summary`
 * `net_result`
   reads:
   `config_ready + send_ready + recv_ready -> network_value`
@@ -244,6 +286,10 @@ The shortest practical route today is easiest to read in three grouped steps:
   [net_ip_packet_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_ip_packet_recipe.ns) ->
   [net_tcp_stream_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_stream_recipe.ns) ->
   [net_udp_datagram_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_datagram_recipe.ns)
+* socket edge
+  [net_tcp_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_socket_recipe.ns) ->
+  [net_udp_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_socket_recipe.ns) ->
+  [net_ip_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_ip_socket_recipe.ns)
 * control edge
   [net_connect_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_connect_recipe.ns) ->
   [net_listen_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_listen_recipe.ns) ->
@@ -324,6 +370,30 @@ Expanded route:
   [net_dnsish_query_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_query_recipe.ns)
 * httpish protocol:
   [net_httpish_protocol_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_protocol_recipe.ns)
+* http client:
+  [net_http_client_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_recipe.ns)
+* http request builder:
+  [net_http_request_builder_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_request_builder_recipe.ns)
+* http client headers:
+  [net_http_client_headers_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_headers_recipe.ns)
+* http client url:
+  [net_http_client_url_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_url_recipe.ns)
+* http client body:
+  [net_http_client_body_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_body_recipe.ns)
+* http client status:
+  [net_http_client_status_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_status_recipe.ns)
+* http request:
+  [net_http_request_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_request_recipe.ns)
+* http response:
+  [net_http_response_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_response_recipe.ns)
+* http client exchange:
+  [net_http_client_exchange_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_exchange_recipe.ns)
+* http client session:
+  [net_http_client_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_session_recipe.ns)
+* http client GET:
+  [net_http_client_get_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_get_recipe.ns)
+* http client POST:
+  [net_http_client_post_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_post_recipe.ns)
 * httpish request:
   [net_httpish_request_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_request_recipe.ns)
 * httpish response:
@@ -390,6 +460,18 @@ endpoint/timing
 -> line protocol
 -> dns-ish query
 -> httpish protocol
+-> http client
+-> http request builder
+-> http client headers
+-> http client url
+-> http client body
+-> http client status
+-> http request
+-> http response
+-> http client exchange
+-> http client session
+-> http client GET
+-> http client POST
 -> httpish request
 -> httpish response
 -> httpish roundtrip
@@ -414,8 +496,10 @@ Grouped rule:
 ```text
 profile core
 -> transport edge
+-> socket edge
 -> control edge
 -> protocol edge
+-> http edge
 -> result spine
 -> task spine
 -> session
@@ -429,7 +513,7 @@ Project-facing CLI hint:
 Those now surface:
 
 * `std_net_navigation`
-  `profile_core -> transport_edge -> control_edge -> protocol_edge -> result_spine -> task_spine -> session`
+  `profile_core -> transport_edge -> socket_edge -> control_edge -> protocol_edge -> http_edge -> result_spine -> task_spine -> session`
 * `std_net_samples`
   the shortest checked-in recipe/demo companion route for each of those grouped lanes
 

@@ -1,0 +1,8 @@
+name = "net_http_client_session_recipe_demo"
+version = "0.1.0"
+entry = "main.ns"
+modules = ["main.ns", "network_unit.ns"]
+
+abis = [
+  { name = "cpu-main", kind = "staticlib", target = "host-native" }
+]

@@ -56,12 +56,15 @@ Start here:
   tensor lane
 * network edge:
   std-net grouped rule:
-  `profile core -> transport edge -> control edge -> result spine -> task spine -> session`
+  `profile core -> transport edge -> socket edge -> control edge -> protocol edge -> http edge -> result spine -> task spine -> session`
   std-front-door validation:
   [net_endpoint_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_endpoint_recipe_demo) ->
   [net_ip_packet_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_ip_packet_recipe_demo) ->
   [net_tcp_stream_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_stream_recipe_demo) ->
   [net_udp_datagram_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_udp_datagram_recipe_demo) ->
+  [net_tcp_socket_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_socket_recipe_demo) ->
+  [net_udp_socket_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_udp_socket_recipe_demo) ->
+  [net_ip_socket_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_ip_socket_recipe_demo) ->
   [net_connect_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_connect_recipe_demo) ->
   [net_listen_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_listen_recipe_demo) ->
   [net_close_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_close_recipe_demo) ->
@@ -71,6 +74,18 @@ Start here:
   [net_dnsish_protocol_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_dnsish_protocol_recipe_demo) ->
   [net_dnsish_query_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_dnsish_query_recipe_demo) ->
   [net_httpish_protocol_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_protocol_recipe_demo) ->
+  [net_http_client_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_recipe_demo) ->
+  [net_http_request_builder_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_request_builder_recipe_demo) ->
+  [net_http_client_headers_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_headers_recipe_demo) ->
+  [net_http_client_url_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_url_recipe_demo) ->
+  [net_http_client_body_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_body_recipe_demo) ->
+  [net_http_client_status_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_status_recipe_demo) ->
+  [net_http_request_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_request_recipe_demo) ->
+  [net_http_response_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_response_recipe_demo) ->
+  [net_http_client_exchange_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_exchange_recipe_demo) ->
+  [net_http_client_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_session_recipe_demo) ->
+  [net_http_client_get_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_get_recipe_demo) ->
+  [net_http_client_post_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_post_recipe_demo) ->
   [net_httpish_request_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_request_recipe_demo) ->
   [net_httpish_response_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_response_recipe_demo) ->
   [net_httpish_roundtrip_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_roundtrip_recipe_demo) ->
