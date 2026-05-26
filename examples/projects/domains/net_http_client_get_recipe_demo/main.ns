@@ -17,6 +17,11 @@ mod cpu Main {
     stream_window: i64,
     recv_window: i64
   ) -> i64;
+  extern "c" fn host_network_recv_http_status_owned(
+    handle: i64,
+    stream_window: i64,
+    recv_window: i64
+  ) -> i64;
   extern "c" fn host_network_close_owned(handle: i64) -> i64;
 
   struct NetHttpClientGetSummary {
@@ -71,7 +76,6 @@ mod cpu Main {
     let send_window: i64 = network_profile_send_window("NetworkUnit");
     let remote_port: i64 = network_profile_remote_port("NetworkUnit");
     let method_code: i64 = 71 + protocol_kind;
-    let status_code: i64 = 200 + protocol_version;
     let request_bytes: i64 =
       protocol_header_bytes + protocol_version + 8 + protocol_header_bytes + send_window;
     let response_bytes: i64 =
@@ -83,9 +87,14 @@ mod cpu Main {
     let send_result: NetworkResult<i64> = network_result(
       host_network_send_owned(open_handle, stream_window, send_window)
     );
+    let send_value: i64 = encode_value(send_result);
+    let status_result: NetworkResult<i64> = network_result(
+      host_network_recv_http_status_owned(open_handle, stream_window, recv_window)
+    );
     let recv_result: NetworkResult<i64> = network_result(
       host_network_recv_owned(open_handle, stream_window, recv_window)
     );
+    let status_code: i64 = encode_value(status_result);
     let close_value: i64 = host_network_close_owned(open_handle);
     let tick_ns: i64 = host_monotonic_time_ns();
 
@@ -103,7 +112,7 @@ mod cpu Main {
       response_bytes: response_bytes,
       open_handle: open_handle,
       send_ready: encode_send_ready(send_result),
-      recv_ready: encode_recv_ready(recv_result),
+      recv_ready: encode_recv_ready(status_result),
       get_value: transport_family
         + retry_budget
         + method_code
@@ -111,7 +120,7 @@ mod cpu Main {
         + request_bytes
         + response_bytes
         + open_handle
-        + encode_value(send_result)
+        + send_value
         + encode_value(recv_result)
         + close_value,
       tick_ns: tick_ns

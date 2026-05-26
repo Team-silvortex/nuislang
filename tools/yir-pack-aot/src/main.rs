@@ -739,8 +739,17 @@ fn render_host_ffi_stub(symbol: &str, arg_count: usize) -> String {
             .to_owned()
     } else if symbol == "host_network_open_tcp_stream" && arg_count >= 2 {
         "    if (arg0 <= 0 || arg1 < 0) return 0;\n    return arg0 + arg1 + 1;".to_owned()
+    } else if symbol == "host_network_open_tcp_listener" && arg_count >= 3 {
+        "    if (arg0 <= 0 || arg1 < 0 || arg2 < 0) return 0;\n    return arg0 + arg1 + arg2 + 1;"
+            .to_owned()
     } else if symbol == "host_network_open_udp_datagram" && arg_count >= 2 {
         "    if (arg0 <= 0 && arg1 <= 0) return 0;\n    return arg0 + arg1 + 1;".to_owned()
+    } else if symbol == "host_network_bind_udp_datagram" && arg_count >= 3 {
+        "    if (arg0 <= 0 || arg1 < 0 || arg2 < 0) return 0;\n    return arg0 + arg1 + arg2 + 1;"
+            .to_owned()
+    } else if symbol == "host_network_accept_owned" && arg_count >= 3 {
+        "    if (arg0 <= 0 || arg1 < 0 || arg2 < 0) return 0;\n    return arg0 + arg1 + arg2 + 1;"
+            .to_owned()
     } else if symbol == "host_network_close_owned" && arg_count >= 1 {
         "    return arg0 > 0 ? 1 : 0;".to_owned()
     } else if symbol == "host_network_send_owned" && arg_count >= 3 {
@@ -749,6 +758,8 @@ fn render_host_ffi_stub(symbol: &str, arg_count: usize) -> String {
     } else if symbol == "host_network_recv_owned" && arg_count >= 3 {
         "    if (arg0 <= 0 || arg1 <= 0 || arg2 <= 0) return 0;\n    return arg0 + arg1 + arg2;"
             .to_owned()
+    } else if symbol == "host_network_recv_http_status_owned" && arg_count >= 3 {
+        "    if (arg0 <= 0 || arg1 <= 0 || arg2 <= 0) return 0;\n    return 200;".to_owned()
     } else if symbol == "host_network_accept_probe" && arg_count >= 3 {
         "    if (arg0 <= 0 || arg1 < 0 || arg2 < 0) return 0;\n    return arg0 + arg1 + arg2;"
             .to_owned()

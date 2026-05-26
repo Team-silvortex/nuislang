@@ -1016,6 +1016,7 @@ static DIR* nuis_host_dir_slots[256];
 static int64_t nuis_host_dir_entry_counts[256];
 static int64_t nuis_host_dir_len = 0;
 static int nuis_host_network_fds[256];
+static int64_t nuis_host_network_fd_kinds[256];
 static int64_t nuis_host_network_fd_len = 0;
 static pid_t nuis_host_command_pids[256];
 static int64_t nuis_host_command_status_slots[256];
@@ -1123,13 +1124,14 @@ static int64_t nuis_host_file_close(int64_t file_handle) {
     return close((int)file_handle) == 0 ? 1 : 0;
 }
 
-static int64_t nuis_host_network_register_fd(int fd) {
+static int64_t nuis_host_network_register_fd(int fd, int64_t kind) {
     if (fd < 0) return 0;
     if (nuis_host_network_fd_len >= 256) {
         close(fd);
         return 0;
     }
     nuis_host_network_fds[nuis_host_network_fd_len] = fd;
+    nuis_host_network_fd_kinds[nuis_host_network_fd_len] = kind;
     nuis_host_network_fd_len += 1;
     return nuis_host_network_fd_len;
 }
@@ -1139,10 +1141,16 @@ static int nuis_host_network_lookup_fd(int64_t handle) {
     return nuis_host_network_fds[handle - 1];
 }
 
+static int64_t nuis_host_network_lookup_kind(int64_t handle) {
+    if (handle <= 0 || handle > nuis_host_network_fd_len) return 0;
+    return nuis_host_network_fd_kinds[handle - 1];
+}
+
 static int64_t nuis_host_network_release_fd(int64_t handle, int close_fd) {
     int fd = nuis_host_network_lookup_fd(handle);
     if (fd < 0) return 0;
     nuis_host_network_fds[handle - 1] = -1;
+    nuis_host_network_fd_kinds[handle - 1] = 0;
     if (close_fd && close(fd) != 0) return 0;
     return 1;
 }
@@ -1289,7 +1297,8 @@ static int64_t nuis_host_network_open_tcp_stream(
     int64_t connect_timeout_ms
 ) {
     int fd = -1;
-    (void)remote_port;
+    struct sockaddr_in addr;
+    if (remote_port <= 0) return 0;
     fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) return 0;
     if (connect_timeout_ms >= 0) {
@@ -1298,7 +1307,40 @@ static int64_t nuis_host_network_open_tcp_stream(
             return 0;
         }
     }
-    return nuis_host_network_register_fd(fd);
+    nuis_network_init_loopback_addr(&addr, remote_port);
+    if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
+        close(fd);
+        return 0;
+    }
+    return nuis_host_network_register_fd(fd, 1);
+}
+
+static int64_t nuis_host_network_open_tcp_listener(
+    int64_t local_port,
+    int64_t read_timeout_ms,
+    int64_t write_timeout_ms
+) {
+    int fd = -1;
+    struct sockaddr_in addr;
+    int yes = 1;
+    if (local_port <= 0 || read_timeout_ms < 0 || write_timeout_ms < 0) return 0;
+    fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd < 0) return 0;
+    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
+    if (!nuis_network_apply_timeout_ms(fd, read_timeout_ms + write_timeout_ms)) {
+        close(fd);
+        return 0;
+    }
+    nuis_network_init_loopback_addr(&addr, local_port);
+    if (bind(fd, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
+        close(fd);
+        return 0;
+    }
+    if (listen(fd, 1) != 0) {
+        close(fd);
+        return 0;
+    }
+    return nuis_host_network_register_fd(fd, 3);
 }
 
 static int64_t nuis_host_network_open_udp_datagram(
@@ -1323,7 +1365,49 @@ static int64_t nuis_host_network_open_udp_datagram(
             return 0;
         }
     }
-    return nuis_host_network_register_fd(fd);
+    return nuis_host_network_register_fd(fd, 2);
+}
+
+static int64_t nuis_host_network_bind_udp_datagram(
+    int64_t local_port,
+    int64_t read_timeout_ms,
+    int64_t write_timeout_ms
+) {
+    int fd = -1;
+    struct sockaddr_in addr;
+    if (local_port <= 0 || read_timeout_ms < 0 || write_timeout_ms < 0) return 0;
+    fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd < 0) return 0;
+    if (!nuis_network_apply_timeout_ms(fd, read_timeout_ms + write_timeout_ms)) {
+        close(fd);
+        return 0;
+    }
+    nuis_network_init_loopback_addr(&addr, local_port);
+    if (bind(fd, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
+        close(fd);
+        return 0;
+    }
+    return nuis_host_network_register_fd(fd, 2);
+}
+
+static int64_t nuis_host_network_accept_owned(
+    int64_t listener_handle,
+    int64_t read_timeout_ms,
+    int64_t write_timeout_ms
+) {
+    int listener_fd = -1;
+    int accepted_fd = -1;
+    if (listener_handle <= 0 || read_timeout_ms < 0 || write_timeout_ms < 0) return 0;
+    if (nuis_host_network_lookup_kind(listener_handle) != 3) return 0;
+    listener_fd = nuis_host_network_lookup_fd(listener_handle);
+    if (listener_fd < 0) return 0;
+    accepted_fd = accept(listener_fd, NULL, NULL);
+    if (accepted_fd < 0) return 0;
+    if (!nuis_network_apply_timeout_ms(accepted_fd, read_timeout_ms + write_timeout_ms)) {
+        close(accepted_fd);
+        return 0;
+    }
+    return nuis_host_network_register_fd(accepted_fd, 1);
 }
 
 static int64_t nuis_host_network_close_owned(int64_t handle) {
@@ -1336,17 +1420,31 @@ static int64_t nuis_host_network_send_owned(
     int64_t send_window
 ) {
     int fd = -1;
+    int64_t kind = 0;
+    ssize_t sent = 0;
     char buffer[64];
     size_t want = (size_t)send_window;
     if (handle <= 0 || stream_window <= 0 || send_window <= 0) return 0;
     fd = nuis_host_network_lookup_fd(handle);
     if (fd < 0) return 0;
+    kind = nuis_host_network_lookup_kind(handle);
     if (want > sizeof(buffer)) want = sizeof(buffer);
     if ((size_t)stream_window < want) want = (size_t)stream_window;
     if (want == 0) want = 1;
-    memset(buffer, 's', want);
-    (void)send(fd, buffer, want, MSG_DONTWAIT);
-    return handle + stream_window + send_window;
+    if (kind == 1) {
+        const char* request = "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
+        size_t request_len = strlen(request);
+        if (want > request_len) want = request_len;
+        memcpy(buffer, request, want);
+    } else {
+        memset(buffer, 's', want);
+    }
+    sent = send(fd, buffer, want, 0);
+    if (sent <= 0) return 0;
+    if (kind == 1) {
+        shutdown(fd, SHUT_WR);
+    }
+    return handle + (int64_t)sent;
 }
 
 static int64_t nuis_host_network_recv_owned(
@@ -1355,6 +1453,7 @@ static int64_t nuis_host_network_recv_owned(
     int64_t recv_window
 ) {
     int fd = -1;
+    ssize_t received = 0;
     char buffer[64];
     size_t want = (size_t)recv_window;
     if (handle <= 0 || stream_window <= 0 || recv_window <= 0) return 0;
@@ -1363,8 +1462,34 @@ static int64_t nuis_host_network_recv_owned(
     if (want > sizeof(buffer)) want = sizeof(buffer);
     if ((size_t)stream_window < want) want = (size_t)stream_window;
     if (want == 0) want = 1;
-    (void)recv(fd, buffer, want, MSG_DONTWAIT);
-    return handle + stream_window + recv_window;
+    received = recv(fd, buffer, want, 0);
+    if (received <= 0) return 0;
+    return handle + (int64_t)received;
+}
+
+static int64_t nuis_host_network_recv_http_status_owned(
+    int64_t handle,
+    int64_t stream_window,
+    int64_t recv_window
+) {
+    int fd = -1;
+    ssize_t received = 0;
+    char buffer[128];
+    size_t want = (size_t)recv_window;
+    int status = 0;
+    if (handle <= 0 || stream_window <= 0 || recv_window <= 0) return 0;
+    fd = nuis_host_network_lookup_fd(handle);
+    if (fd < 0) return 0;
+    if (want > sizeof(buffer) - 1) want = sizeof(buffer) - 1;
+    if ((size_t)stream_window < want) want = (size_t)stream_window;
+    if (want == 0) want = 1;
+    received = recv(fd, buffer, want, 0);
+    if (received <= 0) return 0;
+    buffer[received] = '\0';
+    if (sscanf(buffer, "HTTP/%*d.%*d %d", &status) == 1 && status > 0) {
+        return (int64_t)status;
+    }
+    return handle + (int64_t)received;
 }
 
 static int64_t nuis_host_network_connect_probe(
@@ -2312,11 +2437,32 @@ fn render_host_ffi_stub(symbol: &str, function: AstExternFunction) -> String {
             arg_name(0, &function),
             arg_name(1, &function)
         )
+    } else if symbol == "host_network_open_tcp_listener" {
+        format!(
+            "    return nuis_host_network_open_tcp_listener({}, {}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function),
+            arg_name(2, &function)
+        )
     } else if symbol == "host_network_open_udp_datagram" {
         format!(
             "    return nuis_host_network_open_udp_datagram({}, {});",
             arg_name(0, &function),
             arg_name(1, &function)
+        )
+    } else if symbol == "host_network_bind_udp_datagram" {
+        format!(
+            "    return nuis_host_network_bind_udp_datagram({}, {}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function),
+            arg_name(2, &function)
+        )
+    } else if symbol == "host_network_accept_owned" {
+        format!(
+            "    return nuis_host_network_accept_owned({}, {}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function),
+            arg_name(2, &function)
         )
     } else if symbol == "host_network_close_owned" {
         format!(
@@ -2333,6 +2479,13 @@ fn render_host_ffi_stub(symbol: &str, function: AstExternFunction) -> String {
     } else if symbol == "host_network_recv_owned" {
         format!(
             "    return nuis_host_network_recv_owned({}, {}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function),
+            arg_name(2, &function)
+        )
+    } else if symbol == "host_network_recv_http_status_owned" {
+        format!(
+            "    return nuis_host_network_recv_http_status_owned({}, {}, {});",
             arg_name(0, &function),
             arg_name(1, &function),
             arg_name(2, &function)
@@ -3409,6 +3562,66 @@ mod tests {
                 AstExternFunction {
                     abi: "c".to_owned(),
                     interface: None,
+                    name: "host_network_open_tcp_listener".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "local_port".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "read_timeout_ms".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "write_timeout_ms".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                },
+                AstExternFunction {
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_network_bind_udp_datagram".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "local_port".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "read_timeout_ms".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "write_timeout_ms".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                },
+                AstExternFunction {
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_network_accept_owned".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "listener_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "read_timeout_ms".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "write_timeout_ms".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                },
+                AstExternFunction {
+                    abi: "c".to_owned(),
+                    interface: None,
                     name: "host_network_close".to_owned(),
                     params: vec![nuis_semantics::model::AstParam {
                         name: "handle".to_owned(),
@@ -3440,6 +3653,26 @@ mod tests {
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_network_recv_owned".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "stream_window".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "recv_window".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                },
+                AstExternFunction {
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_network_recv_http_status_owned".to_owned(),
                     params: vec![
                         nuis_semantics::model::AstParam {
                             name: "handle".to_owned(),
@@ -3509,11 +3742,23 @@ mod tests {
         assert!(shim.contains(
             "return nuis_host_network_accept_probe(local_port, read_timeout_ms, write_timeout_ms);"
         ));
+        assert!(shim.contains(
+            "return nuis_host_network_open_tcp_listener(local_port, read_timeout_ms, write_timeout_ms);"
+        ));
+        assert!(shim.contains(
+            "return nuis_host_network_bind_udp_datagram(local_port, read_timeout_ms, write_timeout_ms);"
+        ));
+        assert!(shim.contains(
+            "return nuis_host_network_accept_owned(listener_handle, read_timeout_ms, write_timeout_ms);"
+        ));
         assert!(shim.contains("return nuis_host_network_close(handle);"));
         assert!(shim
             .contains("return nuis_host_network_send_owned(handle, stream_window, send_window);"));
         assert!(shim
             .contains("return nuis_host_network_recv_owned(handle, stream_window, recv_window);"));
+        assert!(shim.contains(
+            "return nuis_host_network_recv_http_status_owned(handle, stream_window, recv_window);"
+        ));
         assert!(shim.contains(
             "return nuis_host_network_send_probe(stream_window, send_window, remote_port);"
         ));

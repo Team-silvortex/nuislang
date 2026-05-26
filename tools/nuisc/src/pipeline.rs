@@ -347,6 +347,7 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         | NirExpr::NetworkConfigReady(inner)
         | NirExpr::NetworkSendReady(inner)
         | NirExpr::NetworkRecvReady(inner)
+        | NirExpr::NetworkAcceptReady(inner)
         | NirExpr::NetworkValue(inner)
         | NirExpr::KernelConfigReady(inner)
         | NirExpr::KernelValue(inner)

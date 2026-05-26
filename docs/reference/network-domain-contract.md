@@ -156,12 +156,16 @@ host bridge names are:
 
 * `host_network_connect_probe`
 * `host_network_open_tcp_stream`
+* `host_network_open_tcp_listener`
 * `host_network_open_udp_datagram`
+* `host_network_bind_udp_datagram`
 * `host_network_accept_probe`
+* `host_network_accept_owned`
 * `host_network_close`
 * `host_network_close_owned`
 * `host_network_send_owned`
 * `host_network_recv_owned`
+* `host_network_recv_http_status_owned`
 * `host_network_send_probe`
 * `host_network_recv_probe`
 
@@ -205,16 +209,26 @@ real runtime behavior:
   handshake inside the generated host shim
 * `host_network_open_tcp_stream`
   now reserves a binary-owned TCP socket-handle acquisition path
+* `host_network_open_tcp_listener`
+  now reserves a binary-owned TCP listener-handle acquisition path
 * `host_network_open_udp_datagram`
   now reserves a binary-owned UDP datagram socket-handle acquisition path
+* `host_network_bind_udp_datagram`
+  now reserves a binary-owned UDP bind-only socket-handle acquisition path
 * `host_network_accept_probe`
   now first attempts a local listener/client handshake before falling back
+* `host_network_accept_owned`
+  now attempts a real `accept(...)` on a binary-owned listener handle and returns a
+  binary-owned accepted stream handle
 * `host_network_close_owned`
   now closes only binary-owned network handles recorded by the generated host shim
 * `host_network_send_owned`
   now attempts `send(..., MSG_DONTWAIT)` against a binary-owned network handle
 * `host_network_recv_owned`
   now attempts `recv(..., MSG_DONTWAIT)` against a binary-owned network handle
+* `host_network_recv_http_status_owned`
+  now attempts a recv and parses an `HTTP/<version> <status>` response line into
+  a minimal status code
 * `host_network_send_probe`
   now first attempts a local `socketpair + send`
 * `host_network_recv_probe`
@@ -250,6 +264,8 @@ The handle-transport sample currently reads:
   -> `host_network_send_owned`
 * `handle / stream_window / recv_window`
   -> `host_network_recv_owned`
+* `handle / stream_window / recv_window`
+  -> `host_network_recv_http_status_owned`
 * `handle`
   -> `host_network_close_owned`
 

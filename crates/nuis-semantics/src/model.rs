@@ -1087,6 +1087,7 @@ pub enum NirExpr {
     NetworkConfigReady(Box<NirExpr>),
     NetworkSendReady(Box<NirExpr>),
     NetworkRecvReady(Box<NirExpr>),
+    NetworkAcceptReady(Box<NirExpr>),
     NetworkValue(Box<NirExpr>),
     KernelProfileBindCoreRef {
         unit: String,
@@ -1387,6 +1388,7 @@ impl NirResultStage {
                 NirNetworkFlowState::ConfigReady
                 | NirNetworkFlowState::SendReady
                 | NirNetworkFlowState::RecvReady
+                | NirNetworkFlowState::AcceptReady
                 | NirNetworkFlowState::Closed => {
                     if !payload.is_integer_scalar() {
                         return Err(format!(
@@ -1445,6 +1447,7 @@ pub enum NirNetworkFlowState {
     ConfigReady,
     SendReady,
     RecvReady,
+    AcceptReady,
     Closed,
 }
 
@@ -1528,6 +1531,7 @@ impl NirNetworkFlowState {
             Self::ConfigReady => "config_ready",
             Self::SendReady => "send_ready",
             Self::RecvReady => "recv_ready",
+            Self::AcceptReady => "accept_ready",
             Self::Closed => "closed",
         }
     }
@@ -1672,6 +1676,7 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::NetworkConfigReady(_)
         | NirExpr::NetworkSendReady(_)
         | NirExpr::NetworkRecvReady(_)
+        | NirExpr::NetworkAcceptReady(_)
         | NirExpr::NetworkValue(_)
         | NirExpr::KernelProfileBindCoreRef { .. }
         | NirExpr::KernelProfileQueueDepthRef { .. }
@@ -1864,6 +1869,7 @@ pub fn nir_expr_effect_class(expr: &NirExpr) -> NirExprEffectClass {
         | NirExpr::NetworkConfigReady(_)
         | NirExpr::NetworkSendReady(_)
         | NirExpr::NetworkRecvReady(_)
+        | NirExpr::NetworkAcceptReady(_)
         | NirExpr::NetworkValue(_)
         | NirExpr::KernelProfileBindCoreRef { .. }
         | NirExpr::KernelProfileQueueDepthRef { .. }

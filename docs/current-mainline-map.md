@@ -45,8 +45,12 @@ Use these when you want the shortest explanation of how the current layers stack
   [cli_report_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_report_session_recipe.ns)
 * `std net`:
   profile core ->
+  transport edge ->
+  syscall edge ->
+  socket edge ->
   control edge ->
   protocol edge ->
+  http edge ->
   result spine ->
   task spine ->
   session
@@ -56,8 +60,29 @@ Use these when you want the shortest explanation of how the current layers stack
   [net_ip_packet_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_ip_packet_recipe.ns) ->
   [net_tcp_stream_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_stream_recipe.ns) ->
   [net_udp_datagram_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_datagram_recipe.ns)
+  syscall edge:
+  [net_tcp_open_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_open_recipe.ns) ->
+  [net_udp_open_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_open_recipe.ns) ->
+  [net_udp_bind_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_bind_recipe.ns) ->
+  [net_udp_bound_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_bound_socket_recipe.ns) ->
+  [net_udp_datagram_flow_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_datagram_flow_recipe.ns) ->
+  [net_tcp_listener_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_listener_recipe.ns) ->
+  [net_tcp_client_flow_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_client_flow_recipe.ns) ->
+  [net_tcp_server_flow_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_server_flow_recipe.ns) ->
+  [net_tcp_accepted_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_accepted_socket_recipe.ns) ->
+  [net_owned_send_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_send_recipe.ns) ->
+  [net_owned_recv_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_recv_recipe.ns) ->
+  [net_owned_accept_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_accept_recipe.ns) ->
+  [net_owned_close_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_close_recipe.ns)
   socket edge:
+  [net_tcp_connect_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_connect_socket_recipe.ns) ->
+  [net_tcp_client_flow_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_client_flow_recipe.ns) ->
   [net_tcp_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_socket_recipe.ns) ->
+  [net_tcp_server_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_server_socket_recipe.ns) ->
+  [net_tcp_server_flow_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_server_flow_recipe.ns) ->
+  [net_tcp_accepted_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_accepted_socket_recipe.ns) ->
+  [net_udp_bound_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_bound_socket_recipe.ns) ->
+  [net_udp_datagram_flow_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_datagram_flow_recipe.ns) ->
   [net_udp_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_socket_recipe.ns) ->
   [net_ip_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_ip_socket_recipe.ns)
   control edge:
@@ -98,10 +123,12 @@ Use these when you want the shortest explanation of how the current layers stack
   [net_control_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_control_session_recipe.ns) ->
   [net_transport_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_transport_session_recipe.ns) ->
   [net_owned_transport_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_transport_session_recipe.ns) ->
+  [net_tcp_listener_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_listener_session_recipe.ns) ->
   [net_transport_path_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_transport_path_compare_recipe.ns) ->
   [net_protocol_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_protocol_session_recipe.ns) ->
   [net_datagram_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_session_recipe.ns) ->
   [net_owned_datagram_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_datagram_session_recipe.ns) ->
+  [net_udp_bound_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_bound_session_recipe.ns) ->
   [net_datagram_exchange_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_exchange_session_recipe.ns) ->
   [net_datagram_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_pipeline_recipe.ns) ->
   [net_dnsish_exchange_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_exchange_session_recipe.ns) ->
@@ -115,6 +142,8 @@ Use these when you want the shortest explanation of how the current layers stack
   [net_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_session_recipe.ns)
   owned std net rule:
   `owned transport session -> owned datagram session -> owned dns-ish exchange -> owned dns-ish pipeline`
+  syscall edge rule:
+  `tcp open -> udp open -> udp bind -> tcp listener -> owned send -> owned recv -> owned accept -> owned close`
   compare rule:
   `probe transport session -> owned transport session -> transport path compare`
   dns-ish compare rule:

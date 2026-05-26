@@ -853,6 +853,7 @@ fn collect_used_vars_expr(expr: &NirExpr, out: &mut BTreeSet<String>) {
         | NirExpr::NetworkConfigReady(inner)
         | NirExpr::NetworkSendReady(inner)
         | NirExpr::NetworkRecvReady(inner)
+        | NirExpr::NetworkAcceptReady(inner)
         | NirExpr::NetworkValue(inner)
         | NirExpr::KernelShape(inner)
         | NirExpr::KernelRows(inner)

@@ -1,0 +1,78 @@
+use network NetworkUnit;
+
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+  extern "c" fn host_monotonic_time_ns() -> i64;
+  extern "c" fn host_network_bind_udp_datagram(
+    local_port: i64,
+    read_timeout_ms: i64,
+    write_timeout_ms: i64
+  ) -> i64;
+  extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+  struct NetUdpBindSummary {
+    argv_count: i64,
+    transport_family: i64,
+    endpoint_kind: i64,
+    local_port: i64,
+    read_timeout_ms: i64,
+    write_timeout_ms: i64,
+    bind_handle: i64,
+    close_value: i64,
+    bind_value: i64,
+    tick_ns: i64
+  }
+
+  fn capture_net_udp_bind_summary() -> NetUdpBindSummary {
+    let argv_count: i64 = host_argv_count();
+    let transport_family: i64 = network_profile_transport_family("NetworkUnit");
+    let endpoint_kind: i64 = network_profile_endpoint_kind("NetworkUnit");
+    let local_port: i64 = network_profile_local_port("NetworkUnit");
+    let read_timeout_ms: i64 = network_profile_read_timeout("NetworkUnit");
+    let write_timeout_ms: i64 = network_profile_write_timeout("NetworkUnit");
+    let bind_handle: i64 = host_network_bind_udp_datagram(
+      local_port,
+      read_timeout_ms,
+      write_timeout_ms
+    );
+    let close_value: i64 = host_network_close_owned(bind_handle);
+    let tick_ns: i64 = host_monotonic_time_ns();
+
+    return NetUdpBindSummary {
+      argv_count: argv_count,
+      transport_family: transport_family,
+      endpoint_kind: endpoint_kind,
+      local_port: local_port,
+      read_timeout_ms: read_timeout_ms,
+      write_timeout_ms: write_timeout_ms,
+      bind_handle: bind_handle,
+      close_value: close_value,
+      bind_value: transport_family
+        + endpoint_kind
+        + local_port
+        + read_timeout_ms
+        + write_timeout_ms
+        + bind_handle
+        + close_value,
+      tick_ns: tick_ns
+    };
+  }
+
+  fn summarize_net_udp_bind_recipe() -> i64 {
+    let summary: NetUdpBindSummary = capture_net_udp_bind_summary();
+    return summary.argv_count
+      + summary.transport_family
+      + summary.endpoint_kind
+      + summary.local_port
+      + summary.read_timeout_ms
+      + summary.write_timeout_ms
+      + summary.bind_handle
+      + summary.close_value
+      + summary.bind_value
+      + summary.tick_ns;
+  }
+
+  fn main() {
+    print(summarize_net_udp_bind_recipe());
+  }
+}

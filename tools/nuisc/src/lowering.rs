@@ -3306,6 +3306,14 @@ fn lower_expr(
             "network_recv_ready",
             "is_recv_ready",
         ),
+        NirExpr::NetworkAcceptReady(result) => lower_result_unary_value_effect(
+            state,
+            bindings,
+            ResultLoweringDomain::Network,
+            result,
+            "network_accept_ready",
+            "is_accept_ready",
+        ),
         NirExpr::NetworkValue(result) => lower_result_unary_value_effect(
             state,
             bindings,

@@ -16,6 +16,14 @@ The current `std net` lane prefers this order:
 network profile truth
 -> endpoint recipe
 -> ip-packet recipe
+-> tcp-open recipe
+-> udp-open recipe
+-> udp-bind recipe
+-> tcp-listener recipe
+-> owned-send recipe
+-> owned-recv recipe
+-> owned-accept recipe
+-> owned-close recipe
 -> connect recipe
 -> listen recipe
 -> close recipe
@@ -52,7 +60,19 @@ The practical current rule is:
 * [net_ip_packet_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_ip_packet_recipe.ns)
 * [net_tcp_stream_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_stream_recipe.ns)
 * [net_udp_datagram_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_datagram_recipe.ns)
+* [net_tcp_open_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_open_recipe.ns)
+* [net_udp_open_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_open_recipe.ns)
+* [net_udp_bind_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_bind_recipe.ns)
+* [net_udp_bound_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_bound_socket_recipe.ns)
+* [net_tcp_listener_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_listener_recipe.ns)
+* [net_tcp_accepted_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_accepted_socket_recipe.ns)
+* [net_owned_send_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_send_recipe.ns)
+* [net_owned_recv_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_recv_recipe.ns)
+* [net_owned_accept_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_accept_recipe.ns)
+* [net_owned_close_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_close_recipe.ns)
+* [net_tcp_connect_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_connect_socket_recipe.ns)
 * [net_tcp_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_socket_recipe.ns)
+* [net_tcp_server_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_server_socket_recipe.ns)
 * [net_udp_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_socket_recipe.ns)
 * [net_ip_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_ip_socket_recipe.ns)
 * [net_connect_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_connect_recipe.ns)
@@ -75,6 +95,7 @@ The practical current rule is:
 * [net_task_windowed_bridge_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_task_windowed_bridge_recipe.ns)
 * [net_control_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_control_session_recipe.ns)
 * [net_transport_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_transport_session_recipe.ns)
+* [net_tcp_listener_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_listener_session_recipe.ns)
 * [net_owned_transport_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_transport_session_recipe.ns)
 * [net_transport_path_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_transport_path_compare_recipe.ns)
 * [net_dnsish_path_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_path_compare_recipe.ns)
@@ -82,6 +103,7 @@ The practical current rule is:
 * [net_protocol_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_protocol_session_recipe.ns)
 * [net_datagram_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_session_recipe.ns)
 * [net_owned_datagram_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_datagram_session_recipe.ns)
+* [net_udp_bound_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_bound_session_recipe.ns)
 * [net_datagram_exchange_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_exchange_session_recipe.ns)
 * [net_datagram_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_pipeline_recipe.ns)
 * [net_dnsish_exchange_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_exchange_session_recipe.ns)
@@ -98,7 +120,19 @@ Current companion validation routes:
 * [net_ip_packet_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_ip_packet_recipe_demo)
 * [net_tcp_stream_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_stream_recipe_demo)
 * [net_udp_datagram_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_udp_datagram_recipe_demo)
+* [net_tcp_open_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_open_recipe_demo)
+* [net_udp_open_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_udp_open_recipe_demo)
+* [net_udp_bind_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_udp_bind_recipe_demo)
+* [net_udp_bound_socket_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_udp_bound_socket_recipe_demo)
+* [net_tcp_listener_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_listener_recipe_demo)
+* [net_tcp_accepted_socket_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_accepted_socket_recipe_demo)
+* [net_owned_send_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_owned_send_recipe_demo)
+* [net_owned_recv_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_owned_recv_recipe_demo)
+* [net_owned_accept_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_owned_accept_recipe_demo)
+* [net_owned_close_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_owned_close_recipe_demo)
+* [net_tcp_connect_socket_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_connect_socket_recipe_demo)
 * [net_tcp_socket_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_socket_recipe_demo)
+* [net_tcp_server_socket_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_server_socket_recipe_demo)
 * [net_udp_socket_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_udp_socket_recipe_demo)
 * [net_ip_socket_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_ip_socket_recipe_demo)
 * [net_connect_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_connect_recipe_demo)
@@ -121,6 +155,7 @@ Current companion validation routes:
 * [net_task_windowed_bridge_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_task_windowed_bridge_recipe_demo)
 * [net_control_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_control_session_recipe_demo)
 * [net_transport_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_transport_session_recipe_demo)
+* [net_tcp_listener_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_listener_session_recipe_demo)
 * [net_owned_transport_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_owned_transport_session_recipe_demo)
 * [net_transport_path_compare_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_transport_path_compare_recipe_demo)
 * [net_dnsish_path_compare_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_dnsish_path_compare_recipe_demo)
@@ -128,6 +163,7 @@ Current companion validation routes:
 * [net_protocol_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_protocol_session_recipe_demo)
 * [net_datagram_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_datagram_session_recipe_demo)
 * [net_owned_datagram_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_owned_datagram_session_recipe_demo)
+* [net_udp_bound_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_udp_bound_session_recipe_demo)
 * [net_datagram_exchange_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_datagram_exchange_session_recipe_demo)
 * [net_datagram_pipeline_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_datagram_pipeline_recipe_demo)
 * [net_dnsish_exchange_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_dnsish_exchange_session_recipe_demo)
@@ -152,6 +188,30 @@ Current role split:
 * `net_udp_datagram`
   reads:
   `transport_family + datagram windows + send/recv probes -> udp datagram summary`
+* `net_tcp_open`
+  reads:
+  `remote_port + connect_timeout -> owned tcp handle summary`
+* `net_udp_open`
+  reads:
+  `local_port + remote_port + timeout -> owned udp handle summary`
+* `net_udp_bind`
+  reads:
+  `local_port + read/write timeout -> owned udp bind summary`
+* `net_tcp_listener`
+  reads:
+  `local_port + read/write timeout -> owned tcp listener summary`
+* `net_owned_send`
+  reads:
+  `owned handle + send window -> owned send summary`
+* `net_owned_recv`
+  reads:
+  `owned handle + recv window -> owned recv summary`
+* `net_owned_accept`
+  reads:
+  `owned listener handle + timeout -> owned accept summary`
+* `net_owned_close`
+  reads:
+  `owned handle -> owned close summary`
 * `net_connect`
   reads:
   `local_port -> remote_port -> connect_timeout -> connect summary`
@@ -161,6 +221,27 @@ Current role split:
 * `net_close`
   reads:
   `local_port -> close result -> close summary`
+* `net_tcp_server_socket`
+  reads:
+  `listener handle + accept result + owned closes -> tcp server socket summary`
+* `net_tcp_server_flow`
+  reads:
+  `listener + accept + owned send/recv + owned closes -> tcp server flow summary`
+* `net_tcp_connect_socket`
+  reads:
+  `remote_port + connect_timeout + owned send/recv/close -> tcp connect socket summary`
+* `net_tcp_client_flow`
+  reads:
+  `connect + owned send/recv/close -> tcp client flow summary`
+* `net_tcp_accepted_socket`
+  reads:
+  `listener + accept + owned send/recv/close -> tcp accepted socket summary`
+* `net_udp_bound_socket`
+  reads:
+  `local_port + read/write timeout + owned send/recv/close -> udp bound socket summary`
+* `net_udp_datagram_flow`
+  reads:
+  `bind + owned send/recv/close -> udp datagram flow summary`
 * `net_protocol_experiment`
   reads:
   `transport_family + protocol slots + send/recv probes -> protocol experiment summary`
@@ -287,7 +368,11 @@ The shortest practical route today is easiest to read in three grouped steps:
   [net_tcp_stream_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_stream_recipe.ns) ->
   [net_udp_datagram_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_datagram_recipe.ns)
 * socket edge
+  [net_tcp_connect_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_connect_socket_recipe.ns) ->
   [net_tcp_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_socket_recipe.ns) ->
+  [net_tcp_server_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_server_socket_recipe.ns) ->
+  [net_tcp_accepted_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_accepted_socket_recipe.ns) ->
+  [net_udp_bound_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_bound_socket_recipe.ns) ->
   [net_udp_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_socket_recipe.ns) ->
   [net_ip_socket_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_ip_socket_recipe.ns)
 * control edge
@@ -315,11 +400,13 @@ The shortest practical route today is easiest to read in three grouped steps:
 * session
   [net_control_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_control_session_recipe.ns) ->
   [net_transport_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_transport_session_recipe.ns) ->
+  [net_tcp_listener_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_tcp_listener_session_recipe.ns) ->
   [net_owned_transport_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_transport_session_recipe.ns) ->
   [net_transport_path_compare_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_transport_path_compare_recipe.ns) ->
   [net_protocol_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_protocol_session_recipe.ns) ->
   [net_datagram_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_session_recipe.ns) ->
   [net_owned_datagram_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_datagram_session_recipe.ns) ->
+  [net_udp_bound_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_bound_session_recipe.ns) ->
   [net_datagram_exchange_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_exchange_session_recipe.ns) ->
   [net_datagram_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_pipeline_recipe.ns) ->
   [net_dnsish_exchange_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_exchange_session_recipe.ns) ->
@@ -339,6 +426,8 @@ The shortest practical route today is easiest to read in three grouped steps:
   `dns-ish exchange session -> owned dns-ish exchange session -> dns-ish path compare`
 * httpish compare rule
   `httpish exchange session -> httpish path compare`
+* flow rule
+  `tcp client flow -> tcp server flow -> udp datagram flow`
 * grouped compare rule
   `transport compare -> dns-ish compare -> httpish compare`
 
@@ -430,6 +519,8 @@ Expanded route:
   [net_datagram_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_session_recipe.ns)
 * owned datagram session:
   [net_owned_datagram_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_datagram_session_recipe.ns)
+* udp bound session:
+  [net_udp_bound_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_udp_bound_session_recipe.ns)
 * datagram exchange session:
   [net_datagram_exchange_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_datagram_exchange_session_recipe.ns)
 * datagram pipeline:
@@ -513,9 +604,13 @@ Project-facing CLI hint:
 Those now surface:
 
 * `std_net_navigation`
-  `profile_core -> transport_edge -> socket_edge -> control_edge -> protocol_edge -> http_edge -> result_spine -> task_spine -> session`
+  `profile_core -> transport_edge -> syscall_edge -> socket_edge -> control_edge -> protocol_edge -> http_edge -> result_spine -> task_spine -> session`
 * `std_net_samples`
   the shortest checked-in recipe/demo companion route for each of those grouped lanes
+
+Low-level syscall rule:
+
+* `tcp open -> udp open -> owned send -> owned recv -> owned close`
 
 Current validation rule:
 

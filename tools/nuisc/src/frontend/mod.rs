@@ -11650,6 +11650,17 @@ fn lower_call_expr_with_async(
             NirResultFamily::Network,
             |expr| NirExpr::NetworkRecvReady(Box::new(expr)),
         ),
+        "network_accept_ready" => lower_result_observer_call(
+            "network_accept_ready",
+            args,
+            current_domain,
+            current_function_is_async,
+            bindings,
+            signatures,
+            struct_table,
+            NirResultFamily::Network,
+            |expr| NirExpr::NetworkAcceptReady(Box::new(expr)),
+        ),
         "network_value" => lower_result_observer_call(
             "network_value",
             args,
@@ -12987,10 +12998,21 @@ fn infer_result_stage(expr: &NirExpr) -> Option<NirResultStage> {
         NirExpr::CpuExternCall { callee, .. } if callee == "host_network_send_owned" => {
             Some(NirNetworkFlowState::SendReady.into())
         }
+        NirExpr::CpuExternCall { callee, .. } if callee == "host_network_accept_probe" => {
+            Some(NirNetworkFlowState::AcceptReady.into())
+        }
+        NirExpr::CpuExternCall { callee, .. } if callee == "host_network_accept_owned" => {
+            Some(NirNetworkFlowState::AcceptReady.into())
+        }
         NirExpr::CpuExternCall { callee, .. } if callee == "host_network_recv_probe" => {
             Some(NirNetworkFlowState::RecvReady.into())
         }
         NirExpr::CpuExternCall { callee, .. } if callee == "host_network_recv_owned" => {
+            Some(NirNetworkFlowState::RecvReady.into())
+        }
+        NirExpr::CpuExternCall { callee, .. }
+            if callee == "host_network_recv_http_status_owned" =>
+        {
             Some(NirNetworkFlowState::RecvReady.into())
         }
         NirExpr::CpuExternCall { callee, .. } if callee == "host_network_close" => {
@@ -13154,7 +13176,8 @@ fn infer_nir_expr_type(
         }
         NirExpr::NetworkConfigReady(_)
         | NirExpr::NetworkSendReady(_)
-        | NirExpr::NetworkRecvReady(_) => Some(bool_type()),
+        | NirExpr::NetworkRecvReady(_)
+        | NirExpr::NetworkAcceptReady(_) => Some(bool_type()),
         NirExpr::NetworkValue(result) => {
             result_payload_type(result, bindings, signatures, struct_table)
         }

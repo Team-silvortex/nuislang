@@ -4,7 +4,7 @@ mod network NetworkUnit {
     const endpoint_kind: i64 = 1;
     const transport_family: i64 = 6;
     const local_port: i64 = 9011;
-    const remote_port: i64 = 443;
+    const remote_port: i64 = 18080;
     const connect_timeout_ms: i64 = 250;
     const read_timeout_ms: i64 = 125;
     const write_timeout_ms: i64 = 150;

@@ -1,0 +1,16 @@
+mod network NetworkUnit {
+  fn profile() {
+    const bind_core: i64 = 2;
+    const endpoint_kind: i64 = 1;
+    const transport_family: i64 = 17;
+    const local_port: i64 = 18083;
+    const remote_port: i64 = 18080;
+    const connect_timeout_ms: i64 = 250;
+    const read_timeout_ms: i64 = 250;
+    const write_timeout_ms: i64 = 250;
+    const retry_budget: i64 = 3;
+    const stream_window: i64 = 64;
+    const recv_window: i64 = 32;
+    const send_window: i64 = 32;
+  }
+}

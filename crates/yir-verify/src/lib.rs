@@ -2288,8 +2288,11 @@ fn verify_result_state_nodes(module: &YirModule) -> Result<(), String> {
                     match source.op.args[1].as_str() {
                         "host_network_send_probe" => actual == "send_ready",
                         "host_network_send_owned" => actual == "send_ready",
+                        "host_network_accept_probe" => actual == "accept_ready",
+                        "host_network_accept_owned" => actual == "accept_ready",
                         "host_network_recv_probe" => actual == "recv_ready",
                         "host_network_recv_owned" => actual == "recv_ready",
+                        "host_network_recv_http_status_owned" => actual == "recv_ready",
                         "host_network_close" => actual == "closed",
                         _ => false,
                     }
@@ -2340,10 +2343,13 @@ fn is_host_network_transport_probe_source(node: &Node) -> bool {
         && node.op.args.len() >= 2
         && matches!(
             node.op.args[1].as_str(),
-            "host_network_send_probe"
+            "host_network_accept_probe"
+                | "host_network_accept_owned"
+                | "host_network_send_probe"
                 | "host_network_send_owned"
                 | "host_network_recv_probe"
                 | "host_network_recv_owned"
+                | "host_network_recv_http_status_owned"
                 | "host_network_close"
         )
 }
@@ -4770,10 +4776,22 @@ mod tests {
                     &["local_port", "remote_port", "connect_timeout"],
                 ),
                 node(
+                    "accept_probe",
+                    "cpu0",
+                    "cpu.extern_call_i64",
+                    &[
+                        "c",
+                        "host_network_accept_probe",
+                        "local_port",
+                        "read_timeout",
+                        "write_timeout",
+                    ],
+                ),
+                node(
                     "accept_result",
                     "network0",
-                    "network.accept",
-                    &["local_port", "read_timeout", "write_timeout"],
+                    "network.observe",
+                    &["accept_probe", "accept_ready"],
                 ),
                 node(
                     "close_result",
@@ -4788,7 +4806,7 @@ mod tests {
                     &["connect_result"],
                 ),
                 node(
-                    "accept_ready",
+                    "accept_ready_probe",
                     "network0",
                     "network.is_accept_ready",
                     &["accept_result"],
@@ -4825,12 +4843,13 @@ mod tests {
                 dep("local_port", "connect_result"),
                 dep("remote_port", "connect_result"),
                 dep("connect_timeout", "connect_result"),
-                dep("local_port", "accept_result"),
-                dep("read_timeout", "accept_result"),
-                dep("write_timeout", "accept_result"),
+                xfer("local_port", "accept_probe"),
+                xfer("read_timeout", "accept_probe"),
+                xfer("write_timeout", "accept_probe"),
+                xfer("accept_probe", "accept_result"),
                 dep("socket_handle", "close_result"),
                 dep("connect_result", "connect_ready"),
-                dep("accept_result", "accept_ready"),
+                dep("accept_result", "accept_ready_probe"),
                 dep("close_result", "closed"),
             ],
             node_lanes: BTreeMap::new(),

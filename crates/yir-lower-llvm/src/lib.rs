@@ -1916,6 +1916,21 @@ fn topological_order(module: &YirModule) -> Result<Vec<String>, String> {
         }
     }
 
+    let mut last_cpu_extern_on_resource = BTreeMap::<String, String>::new();
+    for node in &module.nodes {
+        if node.op.module == "cpu" && node.op.instruction == "extern_call_i64" {
+            if let Some(previous) =
+                last_cpu_extern_on_resource.insert(node.resource.clone(), node.name.clone())
+            {
+                adjacency
+                    .entry(previous)
+                    .or_default()
+                    .push(node.name.clone());
+                *indegree.entry(node.name.clone()).or_insert(0) += 1;
+            }
+        }
+    }
+
     let mut ready = indegree
         .iter()
         .filter_map(|(name, degree)| (*degree == 0).then_some(name.clone()))

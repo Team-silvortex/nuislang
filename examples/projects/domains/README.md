@@ -62,7 +62,14 @@ Start here:
   [net_ip_packet_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_ip_packet_recipe_demo) ->
   [net_tcp_stream_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_stream_recipe_demo) ->
   [net_udp_datagram_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_udp_datagram_recipe_demo) ->
+  [net_tcp_connect_socket_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_connect_socket_recipe_demo) ->
+  [net_tcp_client_flow_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_client_flow_recipe_demo) ->
   [net_tcp_socket_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_socket_recipe_demo) ->
+  [net_tcp_server_socket_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_server_socket_recipe_demo) ->
+  [net_tcp_server_flow_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_server_flow_recipe_demo) ->
+  [net_tcp_accepted_socket_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_accepted_socket_recipe_demo) ->
+  [net_udp_bound_socket_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_udp_bound_socket_recipe_demo) ->
+  [net_udp_datagram_flow_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_udp_datagram_flow_recipe_demo) ->
   [net_udp_socket_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_udp_socket_recipe_demo) ->
   [net_ip_socket_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_ip_socket_recipe_demo) ->
   [net_connect_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_connect_recipe_demo) ->
@@ -102,6 +109,8 @@ Start here:
   [net_protocol_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_protocol_session_recipe_demo) ->
   [net_datagram_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_datagram_session_recipe_demo) ->
   [net_owned_datagram_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_owned_datagram_session_recipe_demo) ->
+  [net_udp_bound_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_udp_bound_session_recipe_demo) ->
+  [net_tcp_listener_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_listener_session_recipe_demo) ->
   [net_datagram_exchange_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_datagram_exchange_session_recipe_demo) ->
   [net_datagram_pipeline_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_datagram_pipeline_recipe_demo) ->
   [net_dnsish_exchange_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_dnsish_exchange_session_recipe_demo) ->
@@ -140,6 +149,8 @@ Start here:
   `profile core -> endpoint/timing -> host control/runtime transport -> shared helper -> result observe -> session -> result-policy/result-batch/result-windowed/policy/fallback -> batch/windowed`
 * owned transport rule:
   `owned transport result -> owned policy -> owned batch -> owned windowed -> owned session bridge`
+* syscall edge rule:
+  `tcp open -> udp open -> udp bind -> tcp listener -> owned send -> owned recv -> owned accept -> owned close`
 * owned std net rule:
   `owned transport session -> owned datagram session -> owned dns-ish exchange -> owned dns-ish pipeline`
 * compare rule:
@@ -148,6 +159,8 @@ Start here:
   `dns-ish exchange session -> owned dns-ish exchange session -> dns-ish path compare`
 * httpish compare rule:
   `httpish exchange session -> httpish path compare`
+* flow rule:
+  `tcp client flow -> tcp server flow -> udp datagram flow`
 * grouped compare rule:
   `transport compare -> dns-ish compare -> httpish compare`
 * transport ladder rule:

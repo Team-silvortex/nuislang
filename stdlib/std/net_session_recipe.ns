@@ -22,6 +22,21 @@ mod cpu Main {
     local_port: i64,
     remote_port: i64
   ) -> i64;
+  extern "c" fn host_network_bind_udp_datagram(
+    local_port: i64,
+    read_timeout_ms: i64,
+    write_timeout_ms: i64
+  ) -> i64;
+  extern "c" fn host_network_open_tcp_listener(
+    local_port: i64,
+    read_timeout_ms: i64,
+    write_timeout_ms: i64
+  ) -> i64;
+  extern "c" fn host_network_accept_owned(
+    listener_handle: i64,
+    read_timeout_ms: i64,
+    write_timeout_ms: i64
+  ) -> i64;
   extern "c" fn host_network_send_owned(
     handle: i64,
     stream_window: i64,
@@ -56,6 +71,10 @@ mod cpu Main {
     session_value: i64
   }
 
+  struct NetTcpListenerSessionSummary {
+    session_value: i64
+  }
+
   struct NetProtocolSessionSummary {
     session_value: i64
   }
@@ -65,6 +84,10 @@ mod cpu Main {
   }
 
   struct NetOwnedDatagramSessionSummary {
+    session_value: i64
+  }
+
+  struct NetUdpBoundSessionSummary {
     session_value: i64
   }
 
@@ -113,9 +136,11 @@ mod cpu Main {
     control_session_value: i64,
     transport_session_value: i64,
     owned_transport_session_value: i64,
+    tcp_listener_session_value: i64,
     protocol_session_value: i64,
     datagram_session_value: i64,
     owned_datagram_session_value: i64,
+    udp_bound_session_value: i64,
     datagram_exchange_session_value: i64,
     datagram_pipeline_value: i64,
     dnsish_exchange_session_value: i64,
@@ -182,6 +207,13 @@ mod cpu Main {
 
   fn encode_send_ready(result: NetworkResult<i64>) -> i64 {
     if network_send_ready(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_accept_ready(result: NetworkResult<i64>) -> i64 {
+    if network_accept_ready(result) {
       return 1;
     }
     return 0;
@@ -276,6 +308,57 @@ mod cpu Main {
         + encode_result_value(send_result)
         + encode_result_value(recv_result)
         + close_value
+    };
+  }
+
+  fn capture_net_tcp_listener_session_summary() -> NetTcpListenerSessionSummary {
+    let argv_count: i64 = host_argv_count();
+    let transport_family: i64 = network_profile_transport_family("NetworkUnit");
+    let endpoint_kind: i64 = network_profile_endpoint_kind("NetworkUnit");
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+    let local_port: i64 = network_profile_local_port("NetworkUnit");
+    let read_timeout_ms: i64 = network_profile_read_timeout("NetworkUnit");
+    let write_timeout_ms: i64 = network_profile_write_timeout("NetworkUnit");
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+    let listener_handle: i64 = host_network_open_tcp_listener(
+      local_port,
+      read_timeout_ms,
+      write_timeout_ms
+    );
+    let accept_result: NetworkResult<i64> = network_result(
+      host_network_accept_owned(listener_handle, read_timeout_ms, write_timeout_ms)
+    );
+    let accepted_handle: i64 = encode_result_value(accept_result);
+    let send_result: NetworkResult<i64> = network_result(
+      host_network_send_owned(accepted_handle, stream_window, send_window)
+    );
+    let recv_result: NetworkResult<i64> = network_result(
+      host_network_recv_owned(accepted_handle, stream_window, recv_window)
+    );
+    let accepted_close_value: i64 = host_network_close_owned(accepted_handle);
+    let listener_close_value: i64 = host_network_close_owned(listener_handle);
+
+    return NetTcpListenerSessionSummary {
+      session_value: argv_count
+        + transport_family
+        + endpoint_kind
+        + retry_budget
+        + local_port
+        + read_timeout_ms
+        + write_timeout_ms
+        + stream_window
+        + recv_window
+        + send_window
+        + encode_accept_ready(accept_result)
+        + encode_send_ready(send_result)
+        + encode_recv_ready(recv_result)
+        + accepted_handle
+        + encode_result_value(send_result)
+        + encode_result_value(recv_result)
+        + accepted_close_value
+        + listener_close_value
     };
   }
 
@@ -473,6 +556,48 @@ mod cpu Main {
         + send_window
         + read_timeout_ms
         + write_timeout_ms
+        + encode_result_value(send_result)
+        + encode_result_value(recv_result)
+        + close_value
+    };
+  }
+
+  fn capture_net_udp_bound_session_summary() -> NetUdpBoundSessionSummary {
+    let argv_count: i64 = host_argv_count();
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+    let transport_family: i64 = network_profile_transport_family("NetworkUnit");
+    let endpoint_kind: i64 = network_profile_endpoint_kind("NetworkUnit");
+    let local_port: i64 = network_profile_local_port("NetworkUnit");
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+    let read_timeout_ms: i64 = network_profile_read_timeout("NetworkUnit");
+    let write_timeout_ms: i64 = network_profile_write_timeout("NetworkUnit");
+    let bind_handle: i64 = host_network_bind_udp_datagram(
+      local_port,
+      read_timeout_ms,
+      write_timeout_ms
+    );
+    let send_result: NetworkResult<i64> = network_result(
+      host_network_send_owned(bind_handle, stream_window, send_window)
+    );
+    let recv_result: NetworkResult<i64> = network_result(
+      host_network_recv_owned(bind_handle, stream_window, recv_window)
+    );
+    let close_value: i64 = host_network_close_owned(bind_handle);
+
+    return NetUdpBoundSessionSummary {
+      session_value: argv_count
+        + retry_budget
+        + transport_family
+        + endpoint_kind
+        + local_port
+        + stream_window
+        + recv_window
+        + send_window
+        + read_timeout_ms
+        + write_timeout_ms
+        + bind_handle
         + encode_result_value(send_result)
         + encode_result_value(recv_result)
         + close_value
@@ -845,12 +970,16 @@ mod cpu Main {
       capture_net_transport_session_summary();
     let owned_transport_session_summary: NetOwnedTransportSessionSummary =
       capture_net_owned_transport_session_summary();
+    let tcp_listener_session_summary: NetTcpListenerSessionSummary =
+      capture_net_tcp_listener_session_summary();
     let protocol_session_summary: NetProtocolSessionSummary =
       capture_net_protocol_session_summary();
     let datagram_session_summary: NetDatagramSessionSummary =
       capture_net_datagram_session_summary();
     let owned_datagram_session_summary: NetOwnedDatagramSessionSummary =
       capture_net_owned_datagram_session_summary();
+    let udp_bound_session_summary: NetUdpBoundSessionSummary =
+      capture_net_udp_bound_session_summary();
     let datagram_exchange_session_summary: NetDatagramExchangeSessionSummary =
       capture_net_datagram_exchange_session_summary();
     let datagram_pipeline_summary: NetDatagramPipelineSummary =
@@ -881,9 +1010,11 @@ mod cpu Main {
             + control_session_summary.session_value
             + transport_session_summary.session_value
             + owned_transport_session_summary.session_value
+            + tcp_listener_session_summary.session_value
             + protocol_session_summary.session_value
             + datagram_session_summary.session_value
             + owned_datagram_session_summary.session_value
+            + udp_bound_session_summary.session_value
             + datagram_exchange_session_summary.session_value
             + datagram_pipeline_summary.session_value
             + dnsish_exchange_session_summary.session_value
@@ -913,9 +1044,11 @@ mod cpu Main {
       control_session_value: control_session_summary.session_value,
       transport_session_value: transport_session_summary.session_value,
       owned_transport_session_value: owned_transport_session_summary.session_value,
+      tcp_listener_session_value: tcp_listener_session_summary.session_value,
       protocol_session_value: protocol_session_summary.session_value,
       datagram_session_value: datagram_session_summary.session_value,
       owned_datagram_session_value: owned_datagram_session_summary.session_value,
+      udp_bound_session_value: udp_bound_session_summary.session_value,
       datagram_exchange_session_value: datagram_exchange_session_summary.session_value,
       datagram_pipeline_value: datagram_pipeline_summary.session_value,
       dnsish_exchange_session_value: dnsish_exchange_session_summary.session_value,
@@ -945,9 +1078,11 @@ mod cpu Main {
       + summary.control_session_value
       + summary.transport_session_value
       + summary.owned_transport_session_value
+      + summary.tcp_listener_session_value
       + summary.protocol_session_value
       + summary.datagram_session_value
       + summary.owned_datagram_session_value
+      + summary.udp_bound_session_value
       + summary.datagram_exchange_session_value
       + summary.datagram_pipeline_value
       + summary.dnsish_exchange_session_value

@@ -598,9 +598,9 @@ impl Operation {
             SemanticOp::NetworkIsConfigReady
             | SemanticOp::NetworkIsSendReady
             | SemanticOp::NetworkIsRecvReady
+            | SemanticOp::NetworkIsAcceptReady
             | SemanticOp::NetworkValue => Some(SemanticOp::NetworkObserve),
             SemanticOp::NetworkIsConnectReady => Some(SemanticOp::NetworkConnect),
-            SemanticOp::NetworkIsAcceptReady => Some(SemanticOp::NetworkAccept),
             SemanticOp::NetworkIsClosed => Some(SemanticOp::NetworkClose),
             _ => None,
         }
@@ -701,7 +701,12 @@ impl Operation {
                     && source.args.len() >= 2
                     && matches!(
                         source.args[1].as_str(),
-                        "host_network_send_probe" | "host_network_recv_probe"
+                        "host_network_send_probe"
+                            | "host_network_send_owned"
+                            | "host_network_recv_probe"
+                            | "host_network_recv_owned"
+                            | "host_network_accept_probe"
+                            | "host_network_accept_owned"
                     );
                 if direct_project_ref {
                     return Ok(state == "config_ready");
@@ -709,7 +714,11 @@ impl Operation {
                 if host_transport_probe {
                     let expected = match source.args[1].as_str() {
                         "host_network_send_probe" => "send_ready",
+                        "host_network_send_owned" => "send_ready",
                         "host_network_recv_probe" => "recv_ready",
+                        "host_network_recv_owned" => "recv_ready",
+                        "host_network_accept_probe" => "accept_ready",
+                        "host_network_accept_owned" => "accept_ready",
                         _ => return Ok(false),
                     };
                     return Ok(state == expected);
