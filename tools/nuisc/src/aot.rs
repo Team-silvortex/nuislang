@@ -2320,6 +2320,10 @@ int64_t host_mix_tick(int64_t base, int64_t tick) {
         out.push('\n');
         out.push_str(&render_host_ffi_stub(&symbol, function));
     }
+    for export_name in collect_exported_entry_symbols(ast) {
+        out.push('\n');
+        out.push_str(&render_exported_entry_wrapper(&export_name));
+    }
     out.push_str(
         r#"
 
@@ -2331,6 +2335,28 @@ int main(int argc, char** argv) {
 "#,
     );
     out
+}
+
+fn collect_exported_entry_symbols(ast: &AstModule) -> Vec<String> {
+    ast.functions
+        .iter()
+        .filter(|function| function.name == "main")
+        .filter_map(|function| {
+            function
+                .attributes
+                .iter()
+                .find(|attribute| attribute.name == "export")
+                .and_then(|attribute| attribute.args.first())
+                .and_then(|arg| match &arg.value {
+                    nuis_semantics::model::AstAttributeValue::String(value) => Some(value.clone()),
+                    _ => None,
+                })
+        })
+        .collect()
+}
+
+fn render_exported_entry_wrapper(symbol: &str) -> String {
+    format!("int64_t {symbol}(void) {{\n    return nuis_yir_entry();\n}}\n")
 }
 
 fn collect_host_ffi_symbols(ast: &AstModule) -> BTreeMap<String, AstExternFunction> {
@@ -4034,5 +4060,56 @@ mod tests {
         };
         let shim = c_shim_source(&ast);
         assert!(!shim.contains("int32_t usleep("));
+    }
+
+    #[test]
+    fn c_shim_source_includes_exported_main_wrapper() {
+        fn ty(name: &str) -> AstTypeRef {
+            AstTypeRef {
+                name: name.to_owned(),
+                generic_args: Vec::new(),
+                is_optional: false,
+                is_ref: false,
+            }
+        }
+
+        let ast = AstModule {
+            uses: Vec::new(),
+            domain: "cpu".to_owned(),
+            unit: "Main".to_owned(),
+            externs: Vec::new(),
+            extern_interfaces: Vec::new(),
+            structs: Vec::new(),
+            traits: Vec::new(),
+            impls: Vec::new(),
+            functions: vec![nuis_semantics::model::AstFunction {
+                name: "main".to_owned(),
+                attributes: vec![nuis_semantics::model::AstAttribute {
+                    name: "export".to_owned(),
+                    args: vec![nuis_semantics::model::AstAttributeArg {
+                        name: Some("name".to_owned()),
+                        value: nuis_semantics::model::AstAttributeValue::String(
+                            "entry_main".to_owned(),
+                        ),
+                    }],
+                }],
+                test_name: None,
+                test_ignored: false,
+                test_should_fail: false,
+                test_reason: None,
+                test_timeout_ms: None,
+                test_clock_domain: None,
+                test_clock_policy: None,
+                is_async: false,
+                generic_params: Vec::new(),
+                params: Vec::new(),
+                return_type: Some(ty("i64")),
+                body: Vec::new(),
+            }],
+        };
+
+        let shim = c_shim_source(&ast);
+        assert!(shim.contains("int64_t entry_main(void) {"));
+        assert!(shim.contains("return nuis_yir_entry();"));
     }
 }

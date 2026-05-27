@@ -31,6 +31,7 @@ pub fn lower_project_ast_to_nir(
     module: &AstModule,
     local_modules: &[AstModule],
 ) -> Result<NirModule, String> {
+    validate_export_annotations(module)?;
     for function in &module.functions {
         validate_function_annotations(function)?;
     }
@@ -368,6 +369,61 @@ pub fn parse_nuis_module(input: &str) -> Result<NirModule, String> {
     lower_ast_to_nir(&ast)
 }
 
+fn validate_export_annotations(module: &AstModule) -> Result<(), String> {
+    let mut seen_export_names = BTreeSet::new();
+    for function in &module.functions {
+        let export_name = function_export_name(function)?;
+        let Some(export_name) = export_name else {
+            continue;
+        };
+        if module.domain != "cpu" {
+            return Err(format!(
+                "function `{}::{}` can only use `@export(name = \"...\")` inside `mod cpu` in the current MVP",
+                module.unit, function.name
+            ));
+        }
+        if function.name != "main" {
+            return Err(format!(
+                "function `{}` uses `@export(name = \"{}\")`, but only `fn main()` can be exported in the current MVP",
+                function.name, export_name
+            ));
+        }
+        if !function.params.is_empty() {
+            return Err(format!(
+                "function `{}` uses `@export(name = \"{}\")`, but exported `fn main()` cannot take parameters in the current MVP",
+                function.name, export_name
+            ));
+        }
+        if !seen_export_names.insert(export_name.clone()) {
+            return Err(format!(
+                "module `{} {}` repeats exported symbol `{}`",
+                module.domain, module.unit, export_name
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn function_export_name(function: &AstFunction) -> Result<Option<String>, String> {
+    let Some(attribute) = function
+        .attributes
+        .iter()
+        .find(|attribute| attribute.name == "export")
+    else {
+        return Ok(None);
+    };
+    let Some(arg) = attribute.args.first() else {
+        return Ok(None);
+    };
+    match &arg.value {
+        AstAttributeValue::String(value) => Ok(Some(value.clone())),
+        _ => Err(format!(
+            "function `{}` annotation `@export` expects `name = \"...\"`",
+            function.name
+        )),
+    }
+}
+
 fn validate_function_annotations(function: &AstFunction) -> Result<(), String> {
     let mut seen = BTreeSet::new();
     let mut has_inline = false;
@@ -444,7 +500,15 @@ fn validate_export_annotation(
         ));
     }
     match &arg.value {
-        AstAttributeValue::String(value) if !value.is_empty() => Ok(()),
+        AstAttributeValue::String(value) if !value.is_empty() => {
+            if !is_valid_export_symbol_name(value) {
+                return Err(format!(
+                    "function `{}` annotation `@export(name = \"...\")` requires a C-style symbol name",
+                    function.name
+                ));
+            }
+            Ok(())
+        }
         AstAttributeValue::String(_) => Err(format!(
             "function `{}` annotation `@export(name = \"...\")` requires a non-empty export name",
             function.name
@@ -454,6 +518,17 @@ fn validate_export_annotation(
             function.name
         )),
     }
+}
+
+fn is_valid_export_symbol_name(name: &str) -> bool {
+    let mut chars = name.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    if !(first == '_' || first.is_ascii_alphabetic()) {
+        return false;
+    }
+    chars.all(|ch| ch == '_' || ch.is_ascii_alphanumeric())
 }
 
 fn validate_host_symbol_annotation(
@@ -16649,6 +16724,44 @@ mod tests {
         .unwrap_err();
 
         assert!(error.contains("annotation `@export` expects `name = \"...\"`"));
+    }
+
+    #[test]
+    fn rejects_export_annotation_on_non_main_function() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              @export(name = "entry_main")
+              fn helper() -> i64 {
+                return 0;
+              }
+
+              fn main() -> i64 {
+                return helper();
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("only `fn main()` can be exported"));
+    }
+
+    #[test]
+    fn rejects_export_annotation_with_non_c_symbol_name() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              @export(name = "entry.main")
+              fn main() -> i64 {
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("requires a C-style symbol name"));
     }
 
     #[test]
