@@ -1,6 +1,8 @@
 use nuis_semantics::model::{
-    AstBinaryOp, AstExpr, AstExternInterface, AstModule, AstStmt, AstStructDef, NirBinaryOp,
-    NirExpr, NirExternInterface, NirModule, NirStmt, NirStructDef,
+    AstBinaryOp, AstExpr, AstExternInterface, AstFunction, AstGenericParam, AstImplDef,
+    AstImplMethod, AstModule, AstStmt, AstStructDef, AstTraitDef, AstTraitMethodSig, NirBinaryOp,
+    NirExpr, NirExternInterface, NirFunction, NirGenericParam, NirImplDef, NirImplMethod,
+    NirModule, NirStmt, NirStructDef, NirTraitDef, NirTraitMethodSig,
 };
 use yir_core::YirModule;
 
@@ -31,49 +33,14 @@ pub fn render_ast(module: &AstModule) -> String {
     for definition in &module.structs {
         out.push_str(&render_ast_struct(definition));
     }
+    for definition in &module.traits {
+        out.push_str(&render_ast_trait(definition));
+    }
+    for definition in &module.impls {
+        out.push_str(&render_ast_impl(definition));
+    }
     for function in &module.functions {
-        let params = function
-            .params
-            .iter()
-            .map(|param| format!("{}: {}", param.name, render_ast_type(&param.ty)))
-            .collect::<Vec<_>>()
-            .join(", ");
-        let return_suffix = function
-            .return_type
-            .as_ref()
-            .map(|ty| format!(" -> {}", render_ast_type(ty)))
-            .unwrap_or_default();
-        let test_prefix = function
-            .test_name
-            .as_ref()
-            .map(|name| {
-                let mut parts = vec![format!("\"{}\"", name)];
-                if function.test_ignored {
-                    parts.push("ignored=true".to_owned());
-                }
-                if function.test_should_fail {
-                    parts.push("should_fail=true".to_owned());
-                }
-                if let Some(reason) = &function.test_reason {
-                    parts.push(format!("reason=\"{}\"", reason));
-                }
-                if let Some(timeout_ms) = function.test_timeout_ms {
-                    parts.push(format!("timeout_ms={timeout_ms}"));
-                }
-                if let Some(clock_domain) = &function.test_clock_domain {
-                    parts.push(format!("clock_domain=\"{}\"", clock_domain.as_str()));
-                }
-                if let Some(clock_policy) = &function.test_clock_policy {
-                    parts.push(format!("clock_policy=\"{}\"", clock_policy.as_str()));
-                }
-                format!("test({}) ", parts.join(", "))
-            })
-            .unwrap_or_default();
-        let async_prefix = if function.is_async { "async " } else { "" };
-        out.push_str(&format!(
-            "  {}{}fn {}({}){}\n",
-            test_prefix, async_prefix, function.name, params, return_suffix
-        ));
+        out.push_str(&render_ast_function_header(function));
         for stmt in &function.body {
             match stmt {
                 AstStmt::Let { name, ty, value } => {
@@ -165,49 +132,14 @@ pub fn render_nir(module: &NirModule) -> String {
     for definition in &module.structs {
         out.push_str(&render_nir_struct(definition));
     }
+    for definition in &module.traits {
+        out.push_str(&render_nir_trait(definition));
+    }
+    for definition in &module.impls {
+        out.push_str(&render_nir_impl(definition));
+    }
     for function in &module.functions {
-        let params = function
-            .params
-            .iter()
-            .map(|param| format!("{}: {}", param.name, render_nir_type(&param.ty)))
-            .collect::<Vec<_>>()
-            .join(", ");
-        let return_suffix = function
-            .return_type
-            .as_ref()
-            .map(|ty| format!(" -> {}", render_nir_type(ty)))
-            .unwrap_or_default();
-        let test_prefix = function
-            .test_name
-            .as_ref()
-            .map(|name| {
-                let mut parts = vec![format!("\"{}\"", name)];
-                if function.test_ignored {
-                    parts.push("ignored=true".to_owned());
-                }
-                if function.test_should_fail {
-                    parts.push("should_fail=true".to_owned());
-                }
-                if let Some(reason) = &function.test_reason {
-                    parts.push(format!("reason=\"{}\"", reason));
-                }
-                if let Some(timeout_ms) = function.test_timeout_ms {
-                    parts.push(format!("timeout_ms={timeout_ms}"));
-                }
-                if let Some(clock_domain) = &function.test_clock_domain {
-                    parts.push(format!("clock_domain=\"{}\"", clock_domain.as_str()));
-                }
-                if let Some(clock_policy) = &function.test_clock_policy {
-                    parts.push(format!("clock_policy=\"{}\"", clock_policy.as_str()));
-                }
-                format!("test({}) ", parts.join(", "))
-            })
-            .unwrap_or_default();
-        let async_prefix = if function.is_async { "async " } else { "" };
-        out.push_str(&format!(
-            "  {}{}fn {}({}){}\n",
-            test_prefix, async_prefix, function.name, params, return_suffix
-        ));
+        out.push_str(&render_nir_function_header(function));
         for stmt in &function.body {
             match stmt {
                 NirStmt::Let { name, ty, value } => {
@@ -374,6 +306,26 @@ fn render_ast_struct(definition: &AstStructDef) -> String {
             field.name,
             render_ast_type(&field.ty)
         ));
+    }
+    out
+}
+
+fn render_ast_trait(definition: &AstTraitDef) -> String {
+    let mut out = format!("  trait {}\n", definition.name);
+    for method in &definition.methods {
+        out.push_str(&render_ast_trait_method_sig(method));
+    }
+    out
+}
+
+fn render_ast_impl(definition: &AstImplDef) -> String {
+    let mut out = format!(
+        "  impl {} for {}\n",
+        definition.trait_name,
+        render_ast_type(&definition.for_type)
+    );
+    for method in &definition.methods {
+        out.push_str(&render_ast_impl_method(method));
     }
     out
 }
@@ -1089,6 +1041,26 @@ fn render_nir_struct(definition: &NirStructDef) -> String {
     out
 }
 
+fn render_nir_trait(definition: &NirTraitDef) -> String {
+    let mut out = format!("  trait {}\n", definition.name);
+    for method in &definition.methods {
+        out.push_str(&render_nir_trait_method_sig(method));
+    }
+    out
+}
+
+fn render_nir_impl(definition: &NirImplDef) -> String {
+    let mut out = format!(
+        "  impl {} for {}\n",
+        definition.trait_name,
+        render_nir_type(&definition.for_type)
+    );
+    for method in &definition.methods {
+        out.push_str(&render_nir_impl_method(method));
+    }
+    out
+}
+
 fn render_nir_extern_interface(interface: &NirExternInterface) -> String {
     let mut out = String::new();
     out.push_str(&format!(
@@ -1159,6 +1131,21 @@ fn render_ast_type(ty: &nuis_semantics::model::AstTypeRef) -> String {
     out
 }
 
+fn render_ast_generic_params(params: &[AstGenericParam]) -> String {
+    if params.is_empty() {
+        return String::new();
+    }
+    let parts = params
+        .iter()
+        .map(|param| match &param.bound {
+            Some(bound) => format!("{}: {}", param.name, render_ast_type(bound)),
+            None => param.name.clone(),
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("<{}>", parts)
+}
+
 fn render_nir_type(ty: &nuis_semantics::model::NirTypeRef) -> String {
     let mut out = String::new();
     if ty.is_ref {
@@ -1180,6 +1167,181 @@ fn render_nir_type(ty: &nuis_semantics::model::NirTypeRef) -> String {
         out.push('?');
     }
     out
+}
+
+fn render_nir_generic_params(params: &[NirGenericParam]) -> String {
+    if params.is_empty() {
+        return String::new();
+    }
+    let parts = params
+        .iter()
+        .map(|param| match &param.bound {
+            Some(bound) => format!("{}: {}", param.name, render_nir_type(bound)),
+            None => param.name.clone(),
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("<{}>", parts)
+}
+
+fn render_ast_function_header(function: &AstFunction) -> String {
+    let params = function
+        .params
+        .iter()
+        .map(|param| format!("{}: {}", param.name, render_ast_type(&param.ty)))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let return_suffix = function
+        .return_type
+        .as_ref()
+        .map(|ty| format!(" -> {}", render_ast_type(ty)))
+        .unwrap_or_default();
+    let test_prefix = function
+        .test_name
+        .as_ref()
+        .map(|name| {
+            let mut parts = vec![format!("\"{}\"", name)];
+            if function.test_ignored {
+                parts.push("ignored=true".to_owned());
+            }
+            if function.test_should_fail {
+                parts.push("should_fail=true".to_owned());
+            }
+            if let Some(reason) = &function.test_reason {
+                parts.push(format!("reason=\"{}\"", reason));
+            }
+            if let Some(timeout_ms) = function.test_timeout_ms {
+                parts.push(format!("timeout_ms={timeout_ms}"));
+            }
+            if let Some(clock_domain) = &function.test_clock_domain {
+                parts.push(format!("clock_domain=\"{}\"", clock_domain.as_str()));
+            }
+            if let Some(clock_policy) = &function.test_clock_policy {
+                parts.push(format!("clock_policy=\"{}\"", clock_policy.as_str()));
+            }
+            format!("test({}) ", parts.join(", "))
+        })
+        .unwrap_or_default();
+    let async_prefix = if function.is_async { "async " } else { "" };
+    format!(
+        "  {}{}fn {}{}({}){}\n",
+        test_prefix,
+        async_prefix,
+        function.name,
+        render_ast_generic_params(&function.generic_params),
+        params,
+        return_suffix
+    )
+}
+
+fn render_nir_function_header(function: &NirFunction) -> String {
+    let params = function
+        .params
+        .iter()
+        .map(|param| format!("{}: {}", param.name, render_nir_type(&param.ty)))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let return_suffix = function
+        .return_type
+        .as_ref()
+        .map(|ty| format!(" -> {}", render_nir_type(ty)))
+        .unwrap_or_default();
+    let test_prefix = function
+        .test_name
+        .as_ref()
+        .map(|name| {
+            let mut parts = vec![format!("\"{}\"", name)];
+            if function.test_ignored {
+                parts.push("ignored=true".to_owned());
+            }
+            if function.test_should_fail {
+                parts.push("should_fail=true".to_owned());
+            }
+            if let Some(reason) = &function.test_reason {
+                parts.push(format!("reason=\"{}\"", reason));
+            }
+            if let Some(timeout_ms) = function.test_timeout_ms {
+                parts.push(format!("timeout_ms={timeout_ms}"));
+            }
+            if let Some(clock_domain) = &function.test_clock_domain {
+                parts.push(format!("clock_domain=\"{}\"", clock_domain.as_str()));
+            }
+            if let Some(clock_policy) = &function.test_clock_policy {
+                parts.push(format!("clock_policy=\"{}\"", clock_policy.as_str()));
+            }
+            format!("test({}) ", parts.join(", "))
+        })
+        .unwrap_or_default();
+    let async_prefix = if function.is_async { "async " } else { "" };
+    format!(
+        "  {}{}fn {}{}({}){}\n",
+        test_prefix,
+        async_prefix,
+        function.name,
+        render_nir_generic_params(&function.generic_params),
+        params,
+        return_suffix
+    )
+}
+
+fn render_ast_trait_method_sig(method: &AstTraitMethodSig) -> String {
+    let params = method
+        .params
+        .iter()
+        .map(|param| format!("{}: {}", param.name, render_ast_type(&param.ty)))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let return_suffix = method
+        .return_type
+        .as_ref()
+        .map(|ty| format!(" -> {}", render_ast_type(ty)))
+        .unwrap_or_default();
+    format!("    fn {}({}){}\n", method.name, params, return_suffix)
+}
+
+fn render_nir_trait_method_sig(method: &NirTraitMethodSig) -> String {
+    let params = method
+        .params
+        .iter()
+        .map(|param| format!("{}: {}", param.name, render_nir_type(&param.ty)))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let return_suffix = method
+        .return_type
+        .as_ref()
+        .map(|ty| format!(" -> {}", render_nir_type(ty)))
+        .unwrap_or_default();
+    format!("    fn {}({}){}\n", method.name, params, return_suffix)
+}
+
+fn render_ast_impl_method(method: &AstImplMethod) -> String {
+    let params = method
+        .params
+        .iter()
+        .map(|param| format!("{}: {}", param.name, render_ast_type(&param.ty)))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let return_suffix = method
+        .return_type
+        .as_ref()
+        .map(|ty| format!(" -> {}", render_ast_type(ty)))
+        .unwrap_or_default();
+    format!("    fn {}({}){} ...\n", method.name, params, return_suffix)
+}
+
+fn render_nir_impl_method(method: &NirImplMethod) -> String {
+    let params = method
+        .params
+        .iter()
+        .map(|param| format!("{}: {}", param.name, render_nir_type(&param.ty)))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let return_suffix = method
+        .return_type
+        .as_ref()
+        .map(|ty| format!(" -> {}", render_nir_type(ty)))
+        .unwrap_or_default();
+    format!("    fn {}({}){} ...\n", method.name, params, return_suffix)
 }
 
 fn render_ast_stmt_inline(stmt: &AstStmt) -> String {

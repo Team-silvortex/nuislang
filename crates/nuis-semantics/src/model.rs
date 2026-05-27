@@ -17,6 +17,8 @@ pub struct AstModule {
     pub externs: Vec<AstExternFunction>,
     pub extern_interfaces: Vec<AstExternInterface>,
     pub structs: Vec<AstStructDef>,
+    pub traits: Vec<AstTraitDef>,
+    pub impls: Vec<AstImplDef>,
     pub functions: Vec<AstFunction>,
 }
 
@@ -46,6 +48,40 @@ pub struct AstStructField {
 pub struct AstStructDef {
     pub name: String,
     pub fields: Vec<AstStructField>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AstGenericParam {
+    pub name: String,
+    pub bound: Option<AstTypeRef>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AstTraitMethodSig {
+    pub name: String,
+    pub params: Vec<AstParam>,
+    pub return_type: Option<AstTypeRef>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AstTraitDef {
+    pub name: String,
+    pub methods: Vec<AstTraitMethodSig>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AstImplMethod {
+    pub name: String,
+    pub params: Vec<AstParam>,
+    pub return_type: Option<AstTypeRef>,
+    pub body: Vec<AstStmt>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AstImplDef {
+    pub trait_name: String,
+    pub for_type: AstTypeRef,
+    pub methods: Vec<AstImplMethod>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -127,6 +163,7 @@ pub struct AstFunction {
     pub test_clock_domain: Option<TestClockDomain>,
     pub test_clock_policy: Option<TestClockPolicy>,
     pub is_async: bool,
+    pub generic_params: Vec<AstGenericParam>,
     pub params: Vec<AstParam>,
     pub return_type: Option<AstTypeRef>,
     pub body: Vec<AstStmt>,
@@ -221,6 +258,8 @@ pub struct NirModule {
     pub externs: Vec<NirExternFunction>,
     pub extern_interfaces: Vec<NirExternInterface>,
     pub structs: Vec<NirStructDef>,
+    pub traits: Vec<NirTraitDef>,
+    pub impls: Vec<NirImplDef>,
     pub functions: Vec<NirFunction>,
 }
 
@@ -256,6 +295,40 @@ impl NirStructDef {
     pub fn field(&self, name: &str) -> Option<&NirStructField> {
         self.fields.iter().find(|field| field.name == name)
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NirGenericParam {
+    pub name: String,
+    pub bound: Option<NirTypeRef>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NirTraitMethodSig {
+    pub name: String,
+    pub params: Vec<NirParam>,
+    pub return_type: Option<NirTypeRef>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NirTraitDef {
+    pub name: String,
+    pub methods: Vec<NirTraitMethodSig>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NirImplMethod {
+    pub name: String,
+    pub params: Vec<NirParam>,
+    pub return_type: Option<NirTypeRef>,
+    pub body: Vec<NirStmt>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NirImplDef {
+    pub trait_name: String,
+    pub for_type: NirTypeRef,
+    pub methods: Vec<NirImplMethod>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -661,6 +734,7 @@ pub struct NirFunction {
     pub test_clock_domain: Option<TestClockDomain>,
     pub test_clock_policy: Option<TestClockPolicy>,
     pub is_async: bool,
+    pub generic_params: Vec<NirGenericParam>,
     pub params: Vec<NirParam>,
     pub return_type: Option<NirTypeRef>,
     pub body: Vec<NirStmt>,

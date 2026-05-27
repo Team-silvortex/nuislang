@@ -3072,6 +3072,8 @@ mod tests {
             ],
             extern_interfaces: Vec::new(),
             structs: Vec::new(),
+            traits: Vec::new(),
+            impls: Vec::new(),
             functions: Vec::new(),
         };
         let shim = c_shim_source(&ast);
@@ -3387,6 +3389,8 @@ mod tests {
             ],
             extern_interfaces: Vec::new(),
             structs: Vec::new(),
+            traits: Vec::new(),
+            impls: Vec::new(),
             functions: Vec::new(),
         };
         let shim = c_shim_source(&ast);
@@ -3494,6 +3498,8 @@ mod tests {
             ],
             extern_interfaces: Vec::new(),
             structs: Vec::new(),
+            traits: Vec::new(),
+            impls: Vec::new(),
             functions: Vec::new(),
         };
         let shim = c_shim_source(&ast);
@@ -3732,6 +3738,8 @@ mod tests {
             ],
             extern_interfaces: Vec::new(),
             structs: Vec::new(),
+            traits: Vec::new(),
+            impls: Vec::new(),
             functions: Vec::new(),
         };
 
@@ -3884,6 +3892,8 @@ mod tests {
             ],
             extern_interfaces: Vec::new(),
             structs: Vec::new(),
+            traits: Vec::new(),
+            impls: Vec::new(),
             functions: Vec::new(),
         };
         let shim = c_shim_source(&ast);
@@ -3938,6 +3948,8 @@ mod tests {
             ],
             extern_interfaces: Vec::new(),
             structs: Vec::new(),
+            traits: Vec::new(),
+            impls: Vec::new(),
             functions: Vec::new(),
         };
         let shim = c_shim_source(&ast);
@@ -3980,6 +3992,8 @@ mod tests {
             }],
             extern_interfaces: Vec::new(),
             structs: Vec::new(),
+            traits: Vec::new(),
+            impls: Vec::new(),
             functions: Vec::new(),
         };
         let shim = c_shim_source(&ast);
@@ -4014,6 +4028,8 @@ mod tests {
             }],
             extern_interfaces: Vec::new(),
             structs: Vec::new(),
+            traits: Vec::new(),
+            impls: Vec::new(),
             functions: Vec::new(),
         };
         let shim = c_shim_source(&ast);

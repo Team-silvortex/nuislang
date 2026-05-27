@@ -689,6 +689,7 @@ fn build_test_main_function(test_function: &AstFunction) -> AstFunction {
         test_clock_domain: None,
         test_clock_policy: None,
         is_async: test_function.is_async,
+        generic_params: vec![],
         params: vec![],
         return_type: Some(i64_type_ref()),
         body,

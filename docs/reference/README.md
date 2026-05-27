@@ -33,6 +33,7 @@ Start in this order:
 * task-facing future edge
   - [cpu-task-external-handle-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-external-handle-contract.md)
   - [cpu-task-external-handle-glm-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-external-handle-glm-sketch.md)
+  - [trait-generic-monomorphization-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/trait-generic-monomorphization-sketch.md)
   - [network-domain-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/network-domain-contract.md)
   - [network-profile-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/network-profile-contract.md)
   - [yir-hot-sync-contraction-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-hot-sync-contraction-sketch.md)

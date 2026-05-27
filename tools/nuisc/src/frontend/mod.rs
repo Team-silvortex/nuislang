@@ -4,11 +4,12 @@ mod parser;
 use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{
-    AstBinaryOp, AstExpr, AstFunction, AstModule, AstParam, AstStmt, AstTypeRef, NirBinaryOp,
-    NirDataFlowState, NirExpr, NirExternFunction, NirExternInterface, NirFunction, NirKernelAxis,
-    NirKernelFlowState, NirKernelMapOp, NirKernelZipOp, NirModule, NirNetworkFlowState, NirParam,
-    NirResultFamily, NirResultStage, NirShaderFlowState, NirStmt, NirStructDef, NirStructField,
-    NirTypeRef, NirUse, NirWindowMode,
+    AstBinaryOp, AstExpr, AstFunction, AstImplDef, AstModule, AstParam, AstStmt, AstStructDef,
+    AstTypeRef, NirBinaryOp, NirDataFlowState, NirExpr, NirExternFunction, NirExternInterface,
+    NirFunction, NirGenericParam, NirImplDef, NirImplMethod, NirKernelAxis, NirKernelFlowState,
+    NirKernelMapOp, NirKernelZipOp, NirModule, NirNetworkFlowState, NirParam, NirResultFamily,
+    NirResultStage, NirShaderFlowState, NirStmt, NirStructDef, NirStructField, NirTraitDef,
+    NirTraitMethodSig, NirTypeRef, NirUse, NirWindowMode,
 };
 
 pub fn frontend_name() -> &'static str {
@@ -112,23 +113,46 @@ pub fn lower_project_ast_to_nir(
             );
         }
     }
+    let module_struct_table = module
+        .structs
+        .iter()
+        .map(|definition| (definition.name.clone(), definition.clone()))
+        .collect::<BTreeMap<_, _>>();
+    let impl_lookup = module
+        .impls
+        .iter()
+        .map(|definition| {
+            (
+                (
+                    definition.trait_name.clone(),
+                    lower_type_ref(&definition.for_type).render(),
+                ),
+                definition.clone(),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let mut generic_templates = BTreeMap::<String, AstFunction>::new();
+    let mut concrete_module_functions = Vec::new();
     for function in &module.functions {
-        signatures.insert(
-            function.name.clone(),
-            FunctionSignature {
-                abi: "nuis".to_owned(),
-                interface: None,
-                symbol_name: function.name.clone(),
-                params: function
-                    .params
-                    .iter()
-                    .map(|param| lower_type_ref(&param.ty))
-                    .collect(),
-                return_type: function.return_type.as_ref().map(lower_type_ref),
-                is_extern: false,
-                is_async: function.is_async,
-            },
-        );
+        let signature = FunctionSignature {
+            abi: "nuis".to_owned(),
+            interface: None,
+            symbol_name: function.name.clone(),
+            params: function
+                .params
+                .iter()
+                .map(|param| lower_type_ref(&param.ty))
+                .collect(),
+            return_type: function.return_type.as_ref().map(lower_type_ref),
+            is_extern: false,
+            is_async: function.is_async,
+        };
+        signatures.insert(function.name.clone(), signature);
+        if function.generic_params.is_empty() {
+            concrete_module_functions.push(function.clone());
+        } else {
+            generic_templates.insert(function.name.clone(), function.clone());
+        }
     }
     for helper in &local_cpu_helpers {
         for function in &helper.functions {
@@ -153,11 +177,72 @@ pub fn lower_project_ast_to_nir(
         }
     }
 
-    let mut lowered_functions = module
-        .functions
+    let function_return_types = build_function_return_type_table(
+        module,
+        &concrete_module_functions,
+        &generic_templates,
+        &local_cpu_helpers,
+    );
+    let mut specialized_functions = Vec::new();
+    let mut specialized_signatures = Vec::new();
+    let mut specialization_cache = BTreeSet::new();
+    let mut rewritten_module_functions = concrete_module_functions
+        .iter()
+        .map(|function| {
+            rewrite_generic_calls_in_function(
+                function,
+                &generic_templates,
+                &impl_lookup,
+                &module_struct_table,
+                &function_return_types,
+                &mut specialization_cache,
+                &mut specialized_functions,
+                &mut specialized_signatures,
+            )
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    for (name, signature) in specialized_signatures {
+        signatures.insert(name, signature);
+    }
+    for definition in &module.impls {
+        let lowered_for_type = lower_type_ref(&definition.for_type);
+        for method in &definition.methods {
+            let symbol_name =
+                impl_method_symbol_name(&definition.trait_name, &lowered_for_type, &method.name);
+            signatures.insert(
+                impl_method_lookup_key(&lowered_for_type, &method.name),
+                FunctionSignature {
+                    abi: "nuis".to_owned(),
+                    interface: None,
+                    symbol_name: symbol_name.clone(),
+                    params: method
+                        .params
+                        .iter()
+                        .map(|param| lower_type_ref(&param.ty))
+                        .collect(),
+                    return_type: method.return_type.as_ref().map(lower_type_ref),
+                    is_extern: false,
+                    is_async: false,
+                },
+            );
+            rewritten_module_functions.push(build_impl_method_function(
+                definition,
+                method,
+                &symbol_name,
+            ));
+        }
+    }
+
+    let mut lowered_functions = rewritten_module_functions
         .iter()
         .map(|function| lower_function(function, &module.domain, &signatures, &struct_table))
         .collect::<Result<Vec<_>, _>>()?;
+    lowered_functions.extend(
+        specialized_functions
+            .iter()
+            .map(|function| lower_function(function, &module.domain, &signatures, &struct_table))
+            .collect::<Result<Vec<_>, _>>()?,
+    );
     for helper in &local_cpu_helpers {
         for function in &helper.functions {
             let mut renamed = function.clone();
@@ -169,6 +254,59 @@ pub fn lower_project_ast_to_nir(
                 &struct_table,
             )?);
         }
+    }
+
+    let lowered_traits = module
+        .traits
+        .iter()
+        .map(|definition| NirTraitDef {
+            name: definition.name.clone(),
+            methods: definition
+                .methods
+                .iter()
+                .map(|method| NirTraitMethodSig {
+                    name: method.name.clone(),
+                    params: method.params.iter().map(lower_param).collect(),
+                    return_type: method.return_type.as_ref().map(lower_type_ref),
+                })
+                .collect(),
+        })
+        .collect::<Vec<_>>();
+    let mut lowered_impls = Vec::new();
+    for definition in &module.impls {
+        let mut methods = Vec::new();
+        for method in &definition.methods {
+            let mut bindings = BTreeMap::<String, NirTypeRef>::new();
+            for param in &method.params {
+                bindings.insert(param.name.clone(), lower_type_ref(&param.ty));
+            }
+            let body = method
+                .body
+                .iter()
+                .map(|stmt| {
+                    lower_stmt_with_async(
+                        stmt,
+                        &module.domain,
+                        false,
+                        &mut bindings,
+                        method.return_type.as_ref(),
+                        &signatures,
+                        &struct_table,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            methods.push(NirImplMethod {
+                name: method.name.clone(),
+                params: method.params.iter().map(lower_param).collect(),
+                return_type: method.return_type.as_ref().map(lower_type_ref),
+                body,
+            });
+        }
+        lowered_impls.push(NirImplDef {
+            trait_name: definition.trait_name.clone(),
+            for_type: lower_type_ref(&definition.for_type),
+            methods,
+        });
     }
 
     let nir = NirModule {
@@ -213,6 +351,8 @@ pub fn lower_project_ast_to_nir(
             })
             .collect(),
         structs: struct_defs,
+        traits: lowered_traits,
+        impls: lowered_impls,
         functions: lowered_functions,
     };
     validate_declared_nir_types(&nir)?;
@@ -243,6 +383,51 @@ struct FunctionSignature {
     is_async: bool,
 }
 
+fn impl_method_lookup_key(for_type: &NirTypeRef, method: &str) -> String {
+    format!("{}.{}", for_type.render(), method)
+}
+
+fn impl_method_symbol_name(trait_name: &str, for_type: &NirTypeRef, method: &str) -> String {
+    let rendered = for_type
+        .render()
+        .chars()
+        .map(|ch| match ch {
+            'a'..='z' | 'A'..='Z' | '0'..='9' => ch,
+            _ => '_',
+        })
+        .collect::<String>();
+    format!("impl.{}.for.{}.{}", trait_name, rendered, method)
+}
+
+fn build_impl_method_function(
+    definition: &AstImplDef,
+    method: &nuis_semantics::model::AstImplMethod,
+    symbol_name: &str,
+) -> AstFunction {
+    AstFunction {
+        name: symbol_name.to_owned(),
+        test_name: None,
+        test_ignored: false,
+        test_should_fail: false,
+        test_reason: None,
+        test_timeout_ms: None,
+        test_clock_domain: None,
+        test_clock_policy: None,
+        is_async: false,
+        generic_params: vec![],
+        params: method.params.clone(),
+        return_type: method.return_type.clone().or_else(|| {
+            Some(AstTypeRef {
+                name: definition.for_type.name.clone(),
+                generic_args: definition.for_type.generic_args.clone(),
+                is_optional: definition.for_type.is_optional,
+                is_ref: definition.for_type.is_ref,
+            })
+        }),
+        body: method.body.clone(),
+    }
+}
+
 fn lower_function(
     function: &AstFunction,
     current_domain: &str,
@@ -264,6 +449,14 @@ fn lower_function(
         test_clock_domain: function.test_clock_domain.clone(),
         test_clock_policy: function.test_clock_policy,
         is_async: function.is_async,
+        generic_params: function
+            .generic_params
+            .iter()
+            .map(|param| NirGenericParam {
+                name: param.name.clone(),
+                bound: param.bound.as_ref().map(lower_type_ref),
+            })
+            .collect(),
         params: function.params.iter().map(lower_param).collect(),
         return_type: function.return_type.as_ref().map(lower_type_ref),
         body: function
@@ -298,6 +491,1335 @@ fn lower_type_ref(ty: &AstTypeRef) -> NirTypeRef {
         is_optional: ty.is_optional,
         is_ref: ty.is_ref,
     }
+}
+
+fn build_function_return_type_table(
+    module: &AstModule,
+    concrete_module_functions: &[AstFunction],
+    generic_templates: &BTreeMap<String, AstFunction>,
+    local_cpu_helpers: &[&AstModule],
+) -> BTreeMap<String, Option<AstTypeRef>> {
+    let mut table = BTreeMap::new();
+    for function in &module.externs {
+        table.insert(function.name.clone(), Some(function.return_type.clone()));
+    }
+    for function in concrete_module_functions {
+        table.insert(function.name.clone(), function.return_type.clone());
+    }
+    for (name, function) in generic_templates {
+        table.insert(name.clone(), function.return_type.clone());
+    }
+    for helper in local_cpu_helpers {
+        for function in &helper.functions {
+            table.insert(function.name.clone(), function.return_type.clone());
+            table.insert(
+                format!("{}.{}", helper.unit, function.name),
+                function.return_type.clone(),
+            );
+        }
+    }
+    table
+}
+
+fn rewrite_generic_calls_in_function(
+    function: &AstFunction,
+    generic_templates: &BTreeMap<String, AstFunction>,
+    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
+    struct_table: &BTreeMap<String, AstStructDef>,
+    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
+    specialization_cache: &mut BTreeSet<String>,
+    specialized_functions: &mut Vec<AstFunction>,
+    specialized_signatures: &mut Vec<(String, FunctionSignature)>,
+) -> Result<AstFunction, String> {
+    let mut env = BTreeMap::<String, AstTypeRef>::new();
+    for param in &function.params {
+        env.insert(param.name.clone(), param.ty.clone());
+    }
+    let body = rewrite_generic_calls_in_block(
+        &function.body,
+        function.return_type.as_ref(),
+        &mut env,
+        generic_templates,
+        impl_lookup,
+        struct_table,
+        function_return_types,
+        specialization_cache,
+        specialized_functions,
+        specialized_signatures,
+    )?;
+    let mut rewritten = function.clone();
+    rewritten.body = body;
+    Ok(rewritten)
+}
+
+fn rewrite_generic_calls_in_block(
+    body: &[AstStmt],
+    current_return_type: Option<&AstTypeRef>,
+    env: &mut BTreeMap<String, AstTypeRef>,
+    generic_templates: &BTreeMap<String, AstFunction>,
+    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
+    struct_table: &BTreeMap<String, AstStructDef>,
+    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
+    specialization_cache: &mut BTreeSet<String>,
+    specialized_functions: &mut Vec<AstFunction>,
+    specialized_signatures: &mut Vec<(String, FunctionSignature)>,
+) -> Result<Vec<AstStmt>, String> {
+    let mut rewritten = Vec::new();
+    for stmt in body {
+        rewritten.extend(rewrite_generic_stmt_with_hoists(
+            stmt,
+            current_return_type,
+            env,
+            generic_templates,
+            impl_lookup,
+            struct_table,
+            function_return_types,
+            specialization_cache,
+            specialized_functions,
+            specialized_signatures,
+        )?);
+    }
+    Ok(rewritten)
+}
+
+fn rewrite_generic_stmt_with_hoists(
+    stmt: &AstStmt,
+    current_return_type: Option<&AstTypeRef>,
+    env: &mut BTreeMap<String, AstTypeRef>,
+    generic_templates: &BTreeMap<String, AstFunction>,
+    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
+    struct_table: &BTreeMap<String, AstStructDef>,
+    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
+    specialization_cache: &mut BTreeSet<String>,
+    specialized_functions: &mut Vec<AstFunction>,
+    specialized_signatures: &mut Vec<(String, FunctionSignature)>,
+) -> Result<Vec<AstStmt>, String> {
+    match stmt {
+        AstStmt::Let { name, ty, value } => {
+            let AstExpr::Call { callee, args } = value else {
+                return Ok(vec![rewrite_generic_calls_in_stmt(
+                    stmt,
+                    current_return_type,
+                    env,
+                    generic_templates,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    specialization_cache,
+                    specialized_functions,
+                    specialized_signatures,
+                )?]);
+            };
+            if !generic_templates.contains_key(callee) {
+                return Ok(vec![rewrite_generic_calls_in_stmt(
+                    stmt,
+                    current_return_type,
+                    env,
+                    generic_templates,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    specialization_cache,
+                    specialized_functions,
+                    specialized_signatures,
+                )?]);
+            }
+
+            let (mut hoisted, rewritten_args) = hoist_direct_result_wrapper_args(
+                args,
+                name,
+                env,
+                generic_templates,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                specialization_cache,
+                specialized_functions,
+                specialized_signatures,
+                callee,
+            )?;
+            let rewritten_value = rewrite_generic_calls_in_expr(
+                &AstExpr::Call {
+                    callee: callee.clone(),
+                    args: rewritten_args,
+                },
+                ty.as_ref(),
+                env,
+                generic_templates,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                specialization_cache,
+                specialized_functions,
+                specialized_signatures,
+            )?;
+            let inferred = ty.clone().or_else(|| {
+                infer_ast_expr_type(
+                    &rewritten_value,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                )
+            });
+            if let Some(inferred_ty) = &inferred {
+                env.insert(name.clone(), inferred_ty.clone());
+            }
+            hoisted.push(AstStmt::Let {
+                name: name.clone(),
+                ty: ty.clone(),
+                value: rewritten_value,
+            });
+            Ok(hoisted)
+        }
+        AstStmt::Return(Some(AstExpr::Call { callee, args }))
+            if generic_templates.contains_key(callee) =>
+        {
+            let (mut hoisted, rewritten_args) = hoist_direct_result_wrapper_args(
+                args,
+                "__nuis_generic_return_arg",
+                env,
+                generic_templates,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                specialization_cache,
+                specialized_functions,
+                specialized_signatures,
+                callee,
+            )?;
+            let rewritten_value = rewrite_generic_calls_in_expr(
+                &AstExpr::Call {
+                    callee: callee.clone(),
+                    args: rewritten_args,
+                },
+                current_return_type,
+                env,
+                generic_templates,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                specialization_cache,
+                specialized_functions,
+                specialized_signatures,
+            )?;
+            hoisted.push(AstStmt::Return(Some(rewritten_value)));
+            Ok(hoisted)
+        }
+        _ => Ok(vec![rewrite_generic_calls_in_stmt(
+            stmt,
+            current_return_type,
+            env,
+            generic_templates,
+            impl_lookup,
+            struct_table,
+            function_return_types,
+            specialization_cache,
+            specialized_functions,
+            specialized_signatures,
+        )?]),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn hoist_direct_result_wrapper_args(
+    args: &[AstExpr],
+    temp_prefix: &str,
+    env: &mut BTreeMap<String, AstTypeRef>,
+    generic_templates: &BTreeMap<String, AstFunction>,
+    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
+    struct_table: &BTreeMap<String, AstStructDef>,
+    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
+    specialization_cache: &mut BTreeSet<String>,
+    specialized_functions: &mut Vec<AstFunction>,
+    specialized_signatures: &mut Vec<(String, FunctionSignature)>,
+    callee: &str,
+) -> Result<(Vec<AstStmt>, Vec<AstExpr>), String> {
+    let mut hoisted = Vec::new();
+    let mut rewritten_args = Vec::new();
+    for (index, arg) in args.iter().enumerate() {
+        let rewritten_arg = rewrite_generic_calls_in_expr(
+            arg,
+            None,
+            env,
+            generic_templates,
+            impl_lookup,
+            struct_table,
+            function_return_types,
+            specialization_cache,
+            specialized_functions,
+            specialized_signatures,
+        )?;
+        if is_direct_result_wrapper_expr(&rewritten_arg) {
+            let Some(inferred_ty) = infer_ast_expr_type(
+                &rewritten_arg,
+                env,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+            ) else {
+                return Err(format!(
+                    "could not infer type for hoisted generic argument {} in call to `{}`",
+                    index, callee
+                ));
+            };
+            let temp_name = format!("{temp_prefix}_{index}");
+            env.insert(temp_name.clone(), inferred_ty.clone());
+            hoisted.push(AstStmt::Let {
+                name: temp_name.clone(),
+                ty: Some(inferred_ty),
+                value: rewritten_arg,
+            });
+            rewritten_args.push(AstExpr::Var(temp_name));
+        } else {
+            rewritten_args.push(rewritten_arg);
+        }
+    }
+    Ok((hoisted, rewritten_args))
+}
+
+fn is_direct_result_wrapper_expr(expr: &AstExpr) -> bool {
+    matches!(
+        expr,
+        AstExpr::Call { callee, .. }
+            if matches!(
+                callee.as_str(),
+                "data_result" | "join_result" | "shader_result" | "kernel_result" | "network_result"
+            )
+    )
+}
+
+fn rewrite_generic_calls_in_stmt(
+    stmt: &AstStmt,
+    current_return_type: Option<&AstTypeRef>,
+    env: &mut BTreeMap<String, AstTypeRef>,
+    generic_templates: &BTreeMap<String, AstFunction>,
+    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
+    struct_table: &BTreeMap<String, AstStructDef>,
+    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
+    specialization_cache: &mut BTreeSet<String>,
+    specialized_functions: &mut Vec<AstFunction>,
+    specialized_signatures: &mut Vec<(String, FunctionSignature)>,
+) -> Result<AstStmt, String> {
+    Ok(match stmt {
+        AstStmt::Let { name, ty, value } => {
+            let rewritten_value = rewrite_generic_calls_in_expr(
+                value,
+                ty.as_ref(),
+                env,
+                generic_templates,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                specialization_cache,
+                specialized_functions,
+                specialized_signatures,
+            )?;
+            let inferred = ty.clone().or_else(|| {
+                infer_ast_expr_type(
+                    &rewritten_value,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                )
+            });
+            if let Some(inferred_ty) = &inferred {
+                env.insert(name.clone(), inferred_ty.clone());
+            }
+            AstStmt::Let {
+                name: name.clone(),
+                ty: ty.clone(),
+                value: rewritten_value,
+            }
+        }
+        AstStmt::Const { name, ty, value } => {
+            let rewritten_value = rewrite_generic_calls_in_expr(
+                value,
+                Some(ty),
+                env,
+                generic_templates,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                specialization_cache,
+                specialized_functions,
+                specialized_signatures,
+            )?;
+            env.insert(name.clone(), ty.clone());
+            AstStmt::Const {
+                name: name.clone(),
+                ty: ty.clone(),
+                value: rewritten_value,
+            }
+        }
+        AstStmt::Print(value) => AstStmt::Print(rewrite_generic_calls_in_expr(
+            value,
+            None,
+            env,
+            generic_templates,
+            impl_lookup,
+            struct_table,
+            function_return_types,
+            specialization_cache,
+            specialized_functions,
+            specialized_signatures,
+        )?),
+        AstStmt::Await(value) => AstStmt::Await(rewrite_generic_calls_in_expr(
+            value,
+            None,
+            env,
+            generic_templates,
+            impl_lookup,
+            struct_table,
+            function_return_types,
+            specialization_cache,
+            specialized_functions,
+            specialized_signatures,
+        )?),
+        AstStmt::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            let rewritten_condition = rewrite_generic_calls_in_expr(
+                condition,
+                None,
+                env,
+                generic_templates,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                specialization_cache,
+                specialized_functions,
+                specialized_signatures,
+            )?;
+            let mut then_env = env.clone();
+            let mut else_env = env.clone();
+            AstStmt::If {
+                condition: rewritten_condition,
+                then_body: rewrite_generic_calls_in_block(
+                    then_body,
+                    current_return_type,
+                    &mut then_env,
+                    generic_templates,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    specialization_cache,
+                    specialized_functions,
+                    specialized_signatures,
+                )?,
+                else_body: rewrite_generic_calls_in_block(
+                    else_body,
+                    current_return_type,
+                    &mut else_env,
+                    generic_templates,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    specialization_cache,
+                    specialized_functions,
+                    specialized_signatures,
+                )?,
+            }
+        }
+        AstStmt::While { condition, body } => {
+            let rewritten_condition = rewrite_generic_calls_in_expr(
+                condition,
+                None,
+                env,
+                generic_templates,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                specialization_cache,
+                specialized_functions,
+                specialized_signatures,
+            )?;
+            let mut loop_env = env.clone();
+            AstStmt::While {
+                condition: rewritten_condition,
+                body: rewrite_generic_calls_in_block(
+                    body,
+                    current_return_type,
+                    &mut loop_env,
+                    generic_templates,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    specialization_cache,
+                    specialized_functions,
+                    specialized_signatures,
+                )?,
+            }
+        }
+        AstStmt::Expr(expr) => AstStmt::Expr(rewrite_generic_calls_in_expr(
+            expr,
+            None,
+            env,
+            generic_templates,
+            impl_lookup,
+            struct_table,
+            function_return_types,
+            specialization_cache,
+            specialized_functions,
+            specialized_signatures,
+        )?),
+        AstStmt::Return(value) => AstStmt::Return(match value {
+            Some(value) => Some(rewrite_generic_calls_in_expr(
+                value,
+                current_return_type,
+                env,
+                generic_templates,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                specialization_cache,
+                specialized_functions,
+                specialized_signatures,
+            )?),
+            None => None,
+        }),
+        AstStmt::Break => AstStmt::Break,
+        AstStmt::Continue => AstStmt::Continue,
+    })
+}
+
+fn rewrite_generic_calls_in_expr(
+    expr: &AstExpr,
+    expected: Option<&AstTypeRef>,
+    env: &BTreeMap<String, AstTypeRef>,
+    generic_templates: &BTreeMap<String, AstFunction>,
+    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
+    struct_table: &BTreeMap<String, AstStructDef>,
+    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
+    specialization_cache: &mut BTreeSet<String>,
+    specialized_functions: &mut Vec<AstFunction>,
+    specialized_signatures: &mut Vec<(String, FunctionSignature)>,
+) -> Result<AstExpr, String> {
+    Ok(match expr {
+        AstExpr::Await(value) => AstExpr::Await(Box::new(rewrite_generic_calls_in_expr(
+            value,
+            expected,
+            env,
+            generic_templates,
+            impl_lookup,
+            struct_table,
+            function_return_types,
+            specialization_cache,
+            specialized_functions,
+            specialized_signatures,
+        )?)),
+        AstExpr::Call { callee, args } => {
+            let rewritten_args = args
+                .iter()
+                .map(|arg| {
+                    rewrite_generic_calls_in_expr(
+                        arg,
+                        None,
+                        env,
+                        generic_templates,
+                        impl_lookup,
+                        struct_table,
+                        function_return_types,
+                        specialization_cache,
+                        specialized_functions,
+                        specialized_signatures,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            if let Some(template) = generic_templates.get(callee) {
+                let specialized_name = ensure_generic_specialization(
+                    template,
+                    &rewritten_args,
+                    expected,
+                    env,
+                    generic_templates,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    specialization_cache,
+                    specialized_functions,
+                    specialized_signatures,
+                )?;
+                AstExpr::Call {
+                    callee: specialized_name,
+                    args: rewritten_args,
+                }
+            } else {
+                AstExpr::Call {
+                    callee: callee.clone(),
+                    args: rewritten_args,
+                }
+            }
+        }
+        AstExpr::MethodCall {
+            receiver,
+            method,
+            args,
+        } => AstExpr::MethodCall {
+            receiver: Box::new(rewrite_generic_calls_in_expr(
+                receiver,
+                None,
+                env,
+                generic_templates,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                specialization_cache,
+                specialized_functions,
+                specialized_signatures,
+            )?),
+            method: method.clone(),
+            args: args
+                .iter()
+                .map(|arg| {
+                    rewrite_generic_calls_in_expr(
+                        arg,
+                        None,
+                        env,
+                        generic_templates,
+                        impl_lookup,
+                        struct_table,
+                        function_return_types,
+                        specialization_cache,
+                        specialized_functions,
+                        specialized_signatures,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+        },
+        AstExpr::StructLiteral { type_name, fields } => AstExpr::StructLiteral {
+            type_name: type_name.clone(),
+            fields: fields
+                .iter()
+                .map(|(name, value)| {
+                    Ok((
+                        name.clone(),
+                        rewrite_generic_calls_in_expr(
+                            value,
+                            None,
+                            env,
+                            generic_templates,
+                            impl_lookup,
+                            struct_table,
+                            function_return_types,
+                            specialization_cache,
+                            specialized_functions,
+                            specialized_signatures,
+                        )?,
+                    ))
+                })
+                .collect::<Result<Vec<_>, String>>()?,
+        },
+        AstExpr::FieldAccess { base, field } => AstExpr::FieldAccess {
+            base: Box::new(rewrite_generic_calls_in_expr(
+                base,
+                None,
+                env,
+                generic_templates,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                specialization_cache,
+                specialized_functions,
+                specialized_signatures,
+            )?),
+            field: field.clone(),
+        },
+        AstExpr::Binary { op, lhs, rhs } => AstExpr::Binary {
+            op: *op,
+            lhs: Box::new(rewrite_generic_calls_in_expr(
+                lhs,
+                None,
+                env,
+                generic_templates,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                specialization_cache,
+                specialized_functions,
+                specialized_signatures,
+            )?),
+            rhs: Box::new(rewrite_generic_calls_in_expr(
+                rhs,
+                None,
+                env,
+                generic_templates,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                specialization_cache,
+                specialized_functions,
+                specialized_signatures,
+            )?),
+        },
+        other => other.clone(),
+    })
+}
+
+fn ensure_generic_specialization(
+    template: &AstFunction,
+    args: &[AstExpr],
+    expected: Option<&AstTypeRef>,
+    env: &BTreeMap<String, AstTypeRef>,
+    generic_templates: &BTreeMap<String, AstFunction>,
+    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
+    struct_table: &BTreeMap<String, AstStructDef>,
+    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
+    specialization_cache: &mut BTreeSet<String>,
+    specialized_functions: &mut Vec<AstFunction>,
+    specialized_signatures: &mut Vec<(String, FunctionSignature)>,
+) -> Result<String, String> {
+    let substitutions = infer_generic_substitutions(
+        template,
+        args,
+        expected,
+        env,
+        impl_lookup,
+        struct_table,
+        function_return_types,
+    )?;
+    let specialized_name = format!(
+        "{}__{}",
+        template.name,
+        template
+            .generic_params
+            .iter()
+            .map(|param| substitutions[&param.name]
+                .render()
+                .replace(|ch: char| !ch.is_ascii_alphanumeric(), "_"))
+            .collect::<Vec<_>>()
+            .join("__")
+    );
+    if specialization_cache.insert(specialized_name.clone()) {
+        let specialized =
+            specialize_function_template(template, &specialized_name, &substitutions)?;
+        let rewritten = rewrite_generic_calls_in_function(
+            &specialized,
+            generic_templates,
+            impl_lookup,
+            struct_table,
+            function_return_types,
+            specialization_cache,
+            specialized_functions,
+            specialized_signatures,
+        )?;
+        specialized_signatures.push((
+            specialized_name.clone(),
+            FunctionSignature {
+                abi: "nuis".to_owned(),
+                interface: None,
+                symbol_name: specialized_name.clone(),
+                params: rewritten
+                    .params
+                    .iter()
+                    .map(|param| lower_type_ref(&param.ty))
+                    .collect(),
+                return_type: rewritten.return_type.as_ref().map(lower_type_ref),
+                is_extern: false,
+                is_async: rewritten.is_async,
+            },
+        ));
+        specialized_functions.push(rewritten);
+    }
+    Ok(specialized_name)
+}
+
+fn infer_generic_substitutions(
+    template: &AstFunction,
+    args: &[AstExpr],
+    expected: Option<&AstTypeRef>,
+    env: &BTreeMap<String, AstTypeRef>,
+    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
+    struct_table: &BTreeMap<String, AstStructDef>,
+    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
+) -> Result<BTreeMap<String, NirTypeRef>, String> {
+    if template.params.len() != args.len() {
+        return Err(format!(
+            "generic function `{}` expects {} args, found {}",
+            template.name,
+            template.params.len(),
+            args.len()
+        ));
+    }
+    let generic_names = template
+        .generic_params
+        .iter()
+        .map(|param| param.name.clone())
+        .collect::<BTreeSet<_>>();
+    let mut substitutions = BTreeMap::<String, AstTypeRef>::new();
+    for (param, arg) in template.params.iter().zip(args) {
+        let Some(arg_ty) =
+            infer_ast_expr_type(arg, env, impl_lookup, struct_table, function_return_types)
+        else {
+            return Err(format!(
+                "cannot infer concrete type for generic arg `{}` in call to `{}`",
+                param.name, template.name
+            ));
+        };
+        unify_generic_type_pattern(
+            &param.ty,
+            &arg_ty,
+            &generic_names,
+            &mut substitutions,
+            &template.name,
+        )?;
+    }
+    if let (Some(return_pattern), Some(expected_ty)) = (template.return_type.as_ref(), expected) {
+        unify_generic_type_pattern(
+            return_pattern,
+            expected_ty,
+            &generic_names,
+            &mut substitutions,
+            &template.name,
+        )?;
+    }
+    let lowered_substitutions = substitutions
+        .into_iter()
+        .map(|(name, ty)| (name, lower_type_ref(&ty)))
+        .collect::<BTreeMap<_, _>>();
+    for generic in &template.generic_params {
+        let Some(concrete) = lowered_substitutions.get(&generic.name) else {
+            return Err(format!(
+                "generic function `{}` currently requires inferring concrete type for `{}` from direct parameter positions or explicit expected type",
+                template.name, generic.name
+            ));
+        };
+        if let Some(bound) = &generic.bound {
+            let bound_key = (bound.name.clone(), concrete.render());
+            if !impl_lookup.contains_key(&bound_key) {
+                return Err(format!(
+                    "type `{}` does not satisfy bound `{}` for generic parameter `{}`",
+                    concrete.render(),
+                    bound.name,
+                    generic.name
+                ));
+            }
+        }
+    }
+    Ok(lowered_substitutions)
+}
+
+fn unify_generic_type_pattern(
+    pattern: &AstTypeRef,
+    concrete: &AstTypeRef,
+    generic_names: &BTreeSet<String>,
+    substitutions: &mut BTreeMap<String, AstTypeRef>,
+    function_name: &str,
+) -> Result<(), String> {
+    if generic_names.contains(&pattern.name) && pattern.generic_args.is_empty() {
+        if let Some(existing) = substitutions.get(&pattern.name) {
+            if lower_type_ref(existing).render() != lower_type_ref(concrete).render() {
+                return Err(format!(
+                    "generic parameter `{}` in `{}` resolved to conflicting types `{}` and `{}`",
+                    pattern.name,
+                    function_name,
+                    lower_type_ref(existing).render(),
+                    lower_type_ref(concrete).render()
+                ));
+            }
+        } else {
+            substitutions.insert(pattern.name.clone(), concrete.clone());
+        }
+        return Ok(());
+    }
+    if pattern.name != concrete.name
+        || pattern.generic_args.len() != concrete.generic_args.len()
+        || pattern.is_optional != concrete.is_optional
+        || pattern.is_ref != concrete.is_ref
+    {
+        return Err(format!(
+            "generic function `{}` could not match expected type pattern `{}` with concrete type `{}`",
+            function_name,
+            lower_type_ref(pattern).render(),
+            lower_type_ref(concrete).render()
+        ));
+    }
+    for (pattern_arg, concrete_arg) in pattern.generic_args.iter().zip(&concrete.generic_args) {
+        unify_generic_type_pattern(
+            pattern_arg,
+            concrete_arg,
+            generic_names,
+            substitutions,
+            function_name,
+        )?;
+    }
+    Ok(())
+}
+
+fn specialize_function_template(
+    template: &AstFunction,
+    specialized_name: &str,
+    substitutions: &BTreeMap<String, NirTypeRef>,
+) -> Result<AstFunction, String> {
+    Ok(AstFunction {
+        name: specialized_name.to_owned(),
+        test_name: None,
+        test_ignored: false,
+        test_should_fail: false,
+        test_reason: None,
+        test_timeout_ms: None,
+        test_clock_domain: None,
+        test_clock_policy: None,
+        is_async: template.is_async,
+        generic_params: vec![],
+        params: template
+            .params
+            .iter()
+            .map(|param| {
+                Ok(AstParam {
+                    name: param.name.clone(),
+                    ty: specialize_ast_type_ref(&param.ty, substitutions)?,
+                })
+            })
+            .collect::<Result<Vec<_>, String>>()?,
+        return_type: template
+            .return_type
+            .as_ref()
+            .map(|ty| specialize_ast_type_ref(ty, substitutions))
+            .transpose()?,
+        body: specialize_stmt_types(&template.body, substitutions)?,
+    })
+}
+
+fn specialize_stmt_types(
+    body: &[AstStmt],
+    substitutions: &BTreeMap<String, NirTypeRef>,
+) -> Result<Vec<AstStmt>, String> {
+    body.iter()
+        .map(|stmt| {
+            Ok(match stmt {
+                AstStmt::Let { name, ty, value } => AstStmt::Let {
+                    name: name.clone(),
+                    ty: ty
+                        .as_ref()
+                        .map(|ty| specialize_ast_type_ref(ty, substitutions))
+                        .transpose()?,
+                    value: value.clone(),
+                },
+                AstStmt::Const { name, ty, value } => AstStmt::Const {
+                    name: name.clone(),
+                    ty: specialize_ast_type_ref(ty, substitutions)?,
+                    value: value.clone(),
+                },
+                AstStmt::If {
+                    condition,
+                    then_body,
+                    else_body,
+                } => AstStmt::If {
+                    condition: condition.clone(),
+                    then_body: specialize_stmt_types(then_body, substitutions)?,
+                    else_body: specialize_stmt_types(else_body, substitutions)?,
+                },
+                AstStmt::While { condition, body } => AstStmt::While {
+                    condition: condition.clone(),
+                    body: specialize_stmt_types(body, substitutions)?,
+                },
+                other => other.clone(),
+            })
+        })
+        .collect()
+}
+
+fn specialize_ast_type_ref(
+    ty: &AstTypeRef,
+    substitutions: &BTreeMap<String, NirTypeRef>,
+) -> Result<AstTypeRef, String> {
+    if ty.generic_args.is_empty() {
+        if let Some(substitution) = substitutions.get(&ty.name) {
+            return Ok(ast_type_from_nir(substitution));
+        }
+    }
+    Ok(AstTypeRef {
+        name: ty.name.clone(),
+        generic_args: ty
+            .generic_args
+            .iter()
+            .map(|arg| specialize_ast_type_ref(arg, substitutions))
+            .collect::<Result<Vec<_>, _>>()?,
+        is_optional: ty.is_optional,
+        is_ref: ty.is_ref,
+    })
+}
+
+fn ast_type_from_nir(ty: &NirTypeRef) -> AstTypeRef {
+    AstTypeRef {
+        name: ty.name.clone(),
+        generic_args: ty.generic_args.iter().map(ast_type_from_nir).collect(),
+        is_optional: ty.is_optional,
+        is_ref: ty.is_ref,
+    }
+}
+
+fn ast_named_type(name: &str) -> AstTypeRef {
+    AstTypeRef {
+        name: name.to_owned(),
+        generic_args: vec![],
+        is_optional: false,
+        is_ref: false,
+    }
+}
+
+fn ast_generic_named_type(name: &str, generic_args: Vec<AstTypeRef>) -> AstTypeRef {
+    AstTypeRef {
+        name: name.to_owned(),
+        generic_args,
+        is_optional: false,
+        is_ref: false,
+    }
+}
+
+fn ast_make_result_type(family: NirResultFamily, payload: AstTypeRef) -> AstTypeRef {
+    let name = match family {
+        NirResultFamily::Task => "TaskResult",
+        NirResultFamily::Data => "DataResult",
+        NirResultFamily::Shader => "ShaderResult",
+        NirResultFamily::Kernel => "KernelResult",
+        NirResultFamily::Network => "NetworkResult",
+    };
+    ast_generic_named_type(name, vec![payload])
+}
+
+fn infer_ast_expr_type(
+    expr: &AstExpr,
+    env: &BTreeMap<String, AstTypeRef>,
+    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
+    struct_table: &BTreeMap<String, AstStructDef>,
+    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
+) -> Option<AstTypeRef> {
+    infer_ast_expr_type_inner(
+        expr,
+        env,
+        impl_lookup,
+        struct_table,
+        function_return_types,
+        &mut BTreeSet::new(),
+    )
+}
+
+fn infer_ast_expr_type_inner(
+    expr: &AstExpr,
+    env: &BTreeMap<String, AstTypeRef>,
+    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
+    struct_table: &BTreeMap<String, AstStructDef>,
+    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
+    active_exprs: &mut BTreeSet<usize>,
+) -> Option<AstTypeRef> {
+    let expr_key = expr as *const AstExpr as usize;
+    if !active_exprs.insert(expr_key) {
+        return None;
+    }
+    let inferred = match expr {
+        AstExpr::Bool(_) => Some(ast_named_type("bool")),
+        AstExpr::Text(_) => Some(ast_named_type("Text")),
+        AstExpr::Int(_) => Some(ast_named_type("i64")),
+        AstExpr::Var(name) => env.get(name).cloned(),
+        AstExpr::Await(value) => infer_ast_expr_type_inner(
+            value,
+            env,
+            impl_lookup,
+            struct_table,
+            function_return_types,
+            active_exprs,
+        )
+        .and_then(|ty| {
+            if ty.name == "Task" && ty.generic_args.len() == 1 {
+                ty.generic_args.first().cloned()
+            } else {
+                Some(ty)
+            }
+        }),
+        AstExpr::Call { callee, args } => match callee.as_str() {
+            "spawn" => {
+                let [call] = args.as_slice() else {
+                    return None;
+                };
+                let AstExpr::Call {
+                    callee: spawned_callee,
+                    ..
+                } = call
+                else {
+                    return None;
+                };
+                let payload = function_return_types
+                    .get(spawned_callee)
+                    .cloned()
+                    .flatten()?;
+                Some(ast_generic_named_type("Task", vec![payload]))
+            }
+            "timeout" => {
+                let [task, _] = args.as_slice() else {
+                    return None;
+                };
+                infer_ast_expr_type_inner(
+                    task,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )
+            }
+            "join" => {
+                let [task] = args.as_slice() else {
+                    return None;
+                };
+                let task_ty = infer_ast_expr_type_inner(
+                    task,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                if task_ty.name == "Task" && task_ty.generic_args.len() == 1 {
+                    Some(task_ty.generic_args[0].clone())
+                } else {
+                    None
+                }
+            }
+            "join_result" => {
+                let [task] = args.as_slice() else {
+                    return None;
+                };
+                let task_ty = infer_ast_expr_type_inner(
+                    task,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                if task_ty.name == "Task" && task_ty.generic_args.len() == 1 {
+                    Some(ast_make_result_type(
+                        NirResultFamily::Task,
+                        task_ty.generic_args[0].clone(),
+                    ))
+                } else {
+                    None
+                }
+            }
+            "task_completed" | "task_timed_out" | "task_cancelled" | "data_ready"
+            | "data_moved" | "data_windowed" => Some(ast_named_type("bool")),
+            "task_value" => {
+                let [result] = args.as_slice() else {
+                    return None;
+                };
+                let result_ty = infer_ast_expr_type_inner(
+                    result,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                if result_ty.name == "TaskResult" && result_ty.generic_args.len() == 1 {
+                    Some(result_ty.generic_args[0].clone())
+                } else {
+                    None
+                }
+            }
+            "data_output_pipe" => {
+                let [value] = args.as_slice() else {
+                    return None;
+                };
+                let inner = infer_ast_expr_type_inner(
+                    value,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                Some(ast_generic_named_type("Pipe", vec![inner]))
+            }
+            "data_input_pipe" => {
+                let [pipe] = args.as_slice() else {
+                    return None;
+                };
+                let pipe_ty = infer_ast_expr_type_inner(
+                    pipe,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                pipe_ty.generic_args.first().cloned()
+            }
+            "data_copy_window" => {
+                let [input, _, _] = args.as_slice() else {
+                    return None;
+                };
+                let inner = infer_ast_expr_type_inner(
+                    input,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                let payload = if inner.is_ref && inner.name == "Buffer" {
+                    ast_named_type("i64")
+                } else {
+                    inner
+                };
+                Some(ast_generic_named_type("WindowMut", vec![payload]))
+            }
+            "data_freeze_window" => {
+                let [input] = args.as_slice() else {
+                    return None;
+                };
+                let input_ty = infer_ast_expr_type_inner(
+                    input,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                if (input_ty.name == "Window" || input_ty.name == "WindowMut")
+                    && input_ty.generic_args.len() == 1
+                {
+                    Some(ast_generic_named_type(
+                        "Window",
+                        vec![input_ty.generic_args[0].clone()],
+                    ))
+                } else {
+                    None
+                }
+            }
+            "data_read_window" => {
+                let [window, _] = args.as_slice() else {
+                    return None;
+                };
+                let window_ty = infer_ast_expr_type_inner(
+                    window,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                if (window_ty.name == "Window" || window_ty.name == "WindowMut")
+                    && window_ty.generic_args.len() == 1
+                {
+                    Some(window_ty.generic_args[0].clone())
+                } else {
+                    None
+                }
+            }
+            "data_result" => {
+                let [value] = args.as_slice() else {
+                    return None;
+                };
+                let payload = infer_ast_expr_type_inner(
+                    value,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                Some(ast_make_result_type(NirResultFamily::Data, payload))
+            }
+            "data_value" => {
+                let [result] = args.as_slice() else {
+                    return None;
+                };
+                let result_ty = infer_ast_expr_type_inner(
+                    result,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                if result_ty.name == "DataResult" && result_ty.generic_args.len() == 1 {
+                    Some(result_ty.generic_args[0].clone())
+                } else {
+                    None
+                }
+            }
+            _ => function_return_types.get(callee).cloned().flatten(),
+        },
+        AstExpr::MethodCall {
+            receiver,
+            method,
+            args: _,
+        } => {
+            let receiver_ty = infer_ast_expr_type_inner(
+                receiver,
+                env,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                active_exprs,
+            )?;
+            for ((_, for_type), definition) in impl_lookup {
+                if *for_type != lower_type_ref(&receiver_ty).render() {
+                    continue;
+                }
+                if let Some(method_def) =
+                    definition.methods.iter().find(|item| item.name == *method)
+                {
+                    return method_def
+                        .return_type
+                        .clone()
+                        .or_else(|| Some(receiver_ty.clone()));
+                }
+            }
+            None
+        }
+        AstExpr::StructLiteral { type_name, .. } => Some(ast_named_type(type_name)),
+        AstExpr::FieldAccess { base, field } => {
+            let base_ty = infer_ast_expr_type_inner(
+                base,
+                env,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                active_exprs,
+            )?;
+            let definition = struct_table.get(&base_ty.name)?;
+            definition
+                .fields
+                .iter()
+                .find(|item| item.name == *field)
+                .map(|field| field.ty.clone())
+        }
+        AstExpr::Binary { op, lhs, rhs } => match op {
+            AstBinaryOp::Eq | AstBinaryOp::Lt | AstBinaryOp::Gt => Some(ast_named_type("bool")),
+            AstBinaryOp::Add | AstBinaryOp::Sub | AstBinaryOp::Mul | AstBinaryOp::Div => {
+                let lhs_ty = infer_ast_expr_type_inner(
+                    lhs,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                let rhs_ty = infer_ast_expr_type_inner(
+                    rhs,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                if lower_type_ref(&lhs_ty).render() == lower_type_ref(&rhs_ty).render() {
+                    Some(lhs_ty)
+                } else {
+                    None
+                }
+            }
+        },
+        AstExpr::Instantiate { .. } => None,
+    };
+    active_exprs.remove(&expr_key);
+    inferred
 }
 
 #[allow(dead_code)]
@@ -666,16 +2188,53 @@ fn lower_expr_with_async(
                     });
                 }
             }
+            let lowered_receiver = lower_nested_expr_with_async(
+                receiver,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            if let Some(receiver_ty) =
+                infer_nir_expr_type(&lowered_receiver, bindings, signatures, struct_table)
+            {
+                let signature_key = impl_method_lookup_key(&receiver_ty, method);
+                if let Some(signature) = signatures.get(&signature_key) {
+                    let mut lowered_args = vec![lowered_receiver.clone()];
+                    lowered_args.extend(
+                        args.iter()
+                            .map(|arg| {
+                                lower_nested_expr_with_async(
+                                    arg,
+                                    current_domain,
+                                    current_function_is_async,
+                                    bindings,
+                                    signatures,
+                                    struct_table,
+                                    None,
+                                )
+                            })
+                            .collect::<Result<Vec<_>, _>>()?,
+                    );
+                    if signature.params.len() != lowered_args.len() {
+                        return Err(format!(
+                            "method `{}` for `{}` expects {} args, found {}",
+                            method,
+                            receiver_ty.render(),
+                            signature.params.len(),
+                            lowered_args.len()
+                        ));
+                    }
+                    return Ok(NirExpr::Call {
+                        callee: signature.symbol_name.clone(),
+                        args: lowered_args,
+                    });
+                }
+            }
             NirExpr::MethodCall {
-                receiver: Box::new(lower_nested_expr_with_async(
-                    receiver,
-                    current_domain,
-                    current_function_is_async,
-                    bindings,
-                    signatures,
-                    struct_table,
-                    None,
-                )?),
+                receiver: Box::new(lowered_receiver),
                 method: method.clone(),
                 args: args
                     .iter()
@@ -12772,21 +14331,22 @@ fn lower_call_expr_with_async(
             Ok(NirExpr::IsNull(Box::new(lowered)))
         }
         _ => {
-            let lowered_args = args
-                .iter()
-                .map(|arg| {
-                    lower_nested_expr_with_async(
-                        arg,
-                        current_domain,
-                        current_function_is_async,
-                        bindings,
-                        signatures,
-                        struct_table,
-                        None,
-                    )
-                })
-                .collect::<Result<Vec<_>, _>>()?;
             if let Some(signature) = signatures.get(callee) {
+                let lowered_args = args
+                    .iter()
+                    .zip(signature.params.iter())
+                    .map(|(arg, expected_param)| {
+                        lower_nested_expr_with_async(
+                            arg,
+                            current_domain,
+                            current_function_is_async,
+                            bindings,
+                            signatures,
+                            struct_table,
+                            Some(expected_param),
+                        )
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
                 if signature.params.len() != lowered_args.len() {
                     return Err(format!(
                         "function `{callee}` expects {} args, found {}",
@@ -12824,6 +14384,20 @@ fn lower_call_expr_with_async(
                     args: lowered_args,
                 });
             }
+            let lowered_args = args
+                .iter()
+                .map(|arg| {
+                    lower_nested_expr_with_async(
+                        arg,
+                        current_domain,
+                        current_function_is_async,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        None,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?;
             Ok(NirExpr::Call {
                 callee: callee.to_owned(),
                 args: lowered_args,
@@ -14609,6 +16183,52 @@ mod tests {
     }
 
     #[test]
+    fn parses_trait_impl_and_generic_function_into_ast() {
+        let ast = parse_nuis_ast(
+            r#"
+            mod cpu Main {
+              trait Addable {
+                fn add(lhs: Self, rhs: Self) -> Self;
+              }
+
+              impl Addable for i64 {
+                fn add(lhs: i64, rhs: i64) -> i64 {
+                  return lhs + rhs;
+                }
+              }
+
+              fn sum_two<T: Addable>(lhs: T, rhs: T) -> T {
+                return lhs;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(ast.traits.len(), 1);
+        assert_eq!(ast.traits[0].name, "Addable");
+        assert_eq!(ast.traits[0].methods.len(), 1);
+        assert_eq!(ast.impls.len(), 1);
+        assert_eq!(ast.impls[0].trait_name, "Addable");
+        assert_eq!(ast.impls[0].for_type.name, "i64");
+
+        let function = ast
+            .functions
+            .iter()
+            .find(|function| function.name == "sum_two")
+            .unwrap();
+        assert_eq!(function.generic_params.len(), 1);
+        assert_eq!(function.generic_params[0].name, "T");
+        assert_eq!(
+            function.generic_params[0]
+                .bound
+                .as_ref()
+                .map(|bound| bound.name.as_str()),
+            Some("Addable")
+        );
+    }
+
+    #[test]
     fn parses_test_function_without_explicit_label_into_ast() {
         let ast = parse_nuis_ast(
             r#"
@@ -14706,6 +16326,451 @@ mod tests {
         assert_eq!(function.test_name.as_deref(), Some("smoke_add"));
         assert!(!function.test_ignored);
         assert!(!function.test_should_fail);
+    }
+
+    #[test]
+    fn lowers_trait_impl_and_generic_function_into_nir() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              trait Addable {
+                fn add(lhs: Self, rhs: Self) -> Self;
+              }
+
+              impl Addable for i64 {
+                fn add(lhs: i64, rhs: i64) -> i64 {
+                  return lhs + rhs;
+                }
+              }
+
+              fn sum_two<T: Addable>(lhs: T, rhs: T) -> T {
+                return lhs;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(module.traits.len(), 1);
+        assert_eq!(module.traits[0].name, "Addable");
+        assert_eq!(module.traits[0].methods.len(), 1);
+        assert_eq!(module.impls.len(), 1);
+        assert_eq!(module.impls[0].trait_name, "Addable");
+        assert_eq!(module.impls[0].methods.len(), 1);
+        assert!(module
+            .functions
+            .iter()
+            .all(|function| function.name != "sum_two"));
+    }
+
+    #[test]
+    fn monomorphizes_generic_function_call_into_concrete_nir_function() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              trait Addable {
+                fn add(lhs: Self, rhs: Self) -> Self;
+              }
+
+              impl Addable for i64 {
+                fn add(lhs: i64, rhs: i64) -> i64 {
+                  return lhs + rhs;
+                }
+              }
+
+              fn sum_two<T: Addable>(lhs: T, rhs: T) -> T {
+                return lhs.add(rhs);
+              }
+
+              fn main() -> i64 {
+                return sum_two(1, 2);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let main = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            main.body.last(),
+            Some(NirStmt::Return(Some(NirExpr::Call { callee, .. }))) if callee == "sum_two__i64"
+        ));
+
+        let specialized = module
+            .functions
+            .iter()
+            .find(|function| function.name == "sum_two__i64")
+            .unwrap();
+        assert!(specialized.generic_params.is_empty());
+        assert!(matches!(
+            specialized.body.last(),
+            Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
+                if callee == "impl.Addable.for.i64.add"
+        ));
+    }
+
+    #[test]
+    fn monomorphizes_multi_generic_function_call_into_concrete_nir_function() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              trait Keepable {
+                fn keep(lhs: Self, rhs: Self) -> Self;
+              }
+
+              impl Keepable for i64 {
+                fn keep(lhs: i64, rhs: i64) -> i64 {
+                  return lhs;
+                }
+              }
+
+              impl Keepable for bool {
+                fn keep(lhs: bool, rhs: bool) -> bool {
+                  return rhs;
+                }
+              }
+
+              fn choose_second<A: Keepable, B: Keepable>(a0: A, a1: A, b0: B, b1: B) -> B {
+                return b0.keep(b1);
+              }
+
+              fn main() -> bool {
+                return choose_second(1, 2, true, false);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let main = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            main.body.last(),
+            Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
+                if callee == "choose_second__i64__bool"
+        ));
+
+        let specialized = module
+            .functions
+            .iter()
+            .find(|function| function.name == "choose_second__i64__bool")
+            .unwrap();
+        assert!(specialized.generic_params.is_empty());
+        assert!(matches!(
+            specialized.return_type.as_ref().map(|ty| ty.name.as_str()),
+            Some("bool")
+        ));
+        assert!(matches!(
+            specialized.body.last(),
+            Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
+                if callee == "impl.Keepable.for.bool.keep"
+        ));
+    }
+
+    #[test]
+    fn monomorphizes_zero_arg_generic_from_local_type_annotation() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn typed_zero<T>() -> T {
+                return 0;
+              }
+
+              fn main() -> i64 {
+                let value: i64 = typed_zero();
+                return value;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let main = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            main.body.first(),
+            Some(NirStmt::Let { value: NirExpr::Call { callee, .. }, .. })
+                if callee == "typed_zero__i64"
+        ));
+        let specialized = module
+            .functions
+            .iter()
+            .find(|function| function.name == "typed_zero__i64")
+            .unwrap();
+        assert!(matches!(
+            specialized.return_type.as_ref().map(|ty| ty.name.as_str()),
+            Some("i64")
+        ));
+    }
+
+    #[test]
+    fn monomorphizes_zero_arg_generic_from_return_expectation() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn typed_zero<T>() -> T {
+                return 0;
+              }
+
+              fn main() -> i64 {
+                return typed_zero();
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let main = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            main.body.last(),
+            Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
+                if callee == "typed_zero__i64"
+        ));
+    }
+
+    #[test]
+    fn monomorphizes_generic_function_from_pipe_shaped_argument() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn roundtrip_pipe<T>(pipe: Pipe<T>) -> T {
+                return data_input_pipe(pipe);
+              }
+
+              fn main() -> i64 {
+                return roundtrip_pipe(data_output_pipe(7));
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let main = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            main.body.last(),
+            Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
+                if callee == "roundtrip_pipe__i64"
+        ));
+
+        let specialized = module
+            .functions
+            .iter()
+            .find(|function| function.name == "roundtrip_pipe__i64")
+            .unwrap();
+        assert!(specialized.generic_params.is_empty());
+        assert_eq!(
+            specialized.params.first().map(|param| param.ty.render()),
+            Some("Pipe<i64>".to_owned())
+        );
+        assert!(matches!(
+            specialized.return_type.as_ref().map(|ty| ty.render()),
+            Some(rendered) if rendered == "i64"
+        ));
+    }
+
+    #[test]
+    fn monomorphizes_generic_function_from_window_shaped_argument_and_expected_return() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn keep_window<T>(window: Window<T>) -> Window<T> {
+                return window;
+              }
+
+              fn main() -> i64 {
+                let frozen: Window<i64> = keep_window(data_freeze_window(data_copy_window(7, 0, 1)));
+                return data_read_window(frozen, 0);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let main = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            main.body.first(),
+            Some(NirStmt::Let { value: NirExpr::Call { callee, .. }, .. })
+                if callee == "keep_window__i64"
+        ));
+
+        let specialized = module
+            .functions
+            .iter()
+            .find(|function| function.name == "keep_window__i64")
+            .unwrap();
+        assert!(specialized.generic_params.is_empty());
+        assert_eq!(
+            specialized.params.first().map(|param| param.ty.render()),
+            Some("Window<i64>".to_owned())
+        );
+        assert!(matches!(
+            specialized.return_type.as_ref().map(|ty| ty.render()),
+            Some(rendered) if rendered == "Window<i64>"
+        ));
+    }
+
+    #[test]
+    fn monomorphizes_generic_function_from_task_shaped_argument() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              async fn ping() -> i64 {
+                return 7;
+              }
+
+              fn keep_task<T>(task: Task<T>) -> Task<T> {
+                return task;
+              }
+
+              fn main() -> i64 {
+                let task: Task<i64> = keep_task(spawn(ping()));
+                return join(task);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let main = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            main.body.first(),
+            Some(NirStmt::Let { value: NirExpr::Call { callee, .. }, .. })
+                if callee == "keep_task__i64"
+        ));
+
+        let specialized = module
+            .functions
+            .iter()
+            .find(|function| function.name == "keep_task__i64")
+            .unwrap();
+        assert!(specialized.generic_params.is_empty());
+        assert_eq!(
+            specialized.params.first().map(|param| param.ty.render()),
+            Some("Task<i64>".to_owned())
+        );
+        assert!(matches!(
+            specialized.return_type.as_ref().map(|ty| ty.render()),
+            Some(rendered) if rendered == "Task<i64>"
+        ));
+    }
+
+    #[test]
+    fn monomorphizes_generic_function_from_data_result_shaped_argument() {
+        let ast = super::parse_nuis_ast(
+            r#"
+            mod cpu Main {
+              fn keep_data<T>(result: DataResult<T>) -> DataResult<T> {
+                return result;
+              }
+
+              fn main() -> i64 {
+                let result: DataResult<i64> = keep_data(data_result(data_input_pipe(data_output_pipe(7))));
+                return data_value(result);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let module = super::lower_ast_to_nir(&ast).unwrap();
+
+        let main = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            main.body.iter().find(|stmt| matches!(
+                stmt,
+                NirStmt::Let {
+                    name,
+                    value: NirExpr::Call { callee, .. },
+                    ..
+                } if name == "result" && callee == "keep_data__i64"
+            )),
+            Some(_)
+        ));
+
+        let specialized = module
+            .functions
+            .iter()
+            .find(|function| function.name == "keep_data__i64")
+            .unwrap();
+        assert!(specialized.generic_params.is_empty());
+        assert_eq!(
+            specialized.params.first().map(|param| param.ty.render()),
+            Some("DataResult<i64>".to_owned())
+        );
+        assert!(matches!(
+            specialized.return_type.as_ref().map(|ty| ty.render()),
+            Some(rendered) if rendered == "DataResult<i64>"
+        ));
+    }
+
+    #[test]
+    fn monomorphizes_generic_function_from_data_result_shaped_argument_in_return() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn keep_data<T>(result: DataResult<T>) -> DataResult<T> {
+                return result;
+              }
+
+              fn produce() -> DataResult<i64> {
+                return keep_data(data_result(data_input_pipe(data_output_pipe(7))));
+              }
+
+              fn main() -> i64 {
+                return data_value(produce());
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let produce = module
+            .functions
+            .iter()
+            .find(|function| function.name == "produce")
+            .unwrap();
+        assert!(matches!(
+            produce.body.first(),
+            Some(NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::DataResult { .. },
+            }) if name == "__nuis_generic_return_arg_0" && ty.render() == "DataResult<i64>"
+        ));
+        assert!(matches!(
+            produce.body.get(1),
+            Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
+                if callee == "keep_data__i64"
+        ));
     }
 
     #[test]

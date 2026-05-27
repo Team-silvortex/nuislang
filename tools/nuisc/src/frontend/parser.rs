@@ -1,6 +1,7 @@
 use nuis_semantics::model::{
-    AstBinaryOp, AstExpr, AstExternFunction, AstExternInterface, AstFunction, AstModule, AstParam,
-    AstStmt, AstStructDef, AstStructField, AstTypeRef, TestClockDomain, TestClockPolicy,
+    AstBinaryOp, AstExpr, AstExternFunction, AstExternInterface, AstFunction, AstGenericParam,
+    AstImplDef, AstImplMethod, AstModule, AstParam, AstStmt, AstStructDef, AstStructField,
+    AstTraitDef, AstTraitMethodSig, AstTypeRef, TestClockDomain, TestClockPolicy,
 };
 
 use super::lexer::{describe_token, Token};
@@ -36,6 +37,8 @@ impl Parser {
         self.expect_symbol('{')?;
 
         let mut structs = Vec::new();
+        let mut traits = Vec::new();
+        let mut impls = Vec::new();
         let mut functions = Vec::new();
         while !self.peek_symbol('}') {
             if self.peek_word("mod") {
@@ -50,6 +53,10 @@ impl Parser {
                 }
             } else if self.peek_word("struct") {
                 structs.push(self.parse_struct_def()?);
+            } else if self.peek_word("trait") {
+                traits.push(self.parse_trait_def()?);
+            } else if self.peek_word("impl") {
+                impls.push(self.parse_impl_def()?);
             } else {
                 functions.push(self.parse_function()?);
             }
@@ -65,6 +72,8 @@ impl Parser {
             externs,
             extern_interfaces,
             structs,
+            traits,
+            impls,
             functions,
         })
     }
@@ -98,6 +107,85 @@ impl Parser {
         }
         self.expect_symbol('}')?;
         Ok(AstStructDef { name, fields })
+    }
+
+    fn parse_trait_def(&mut self) -> Result<AstTraitDef, String> {
+        self.expect_word("trait")?;
+        let name = self.expect_ident()?;
+        self.expect_symbol('{')?;
+        let mut methods = Vec::new();
+        while !self.peek_symbol('}') {
+            methods.push(self.parse_trait_method_sig()?);
+        }
+        self.expect_symbol('}')?;
+        Ok(AstTraitDef { name, methods })
+    }
+
+    fn parse_trait_method_sig(&mut self) -> Result<AstTraitMethodSig, String> {
+        self.expect_word("fn")?;
+        let name = self.expect_ident()?;
+        self.expect_symbol('(')?;
+        let params = if self.peek_symbol(')') {
+            Vec::new()
+        } else {
+            self.parse_param_list()?
+        };
+        self.expect_symbol(')')?;
+        let return_type = if self.peek_arrow() {
+            self.expect_arrow()?;
+            Some(self.parse_type_ref()?)
+        } else {
+            None
+        };
+        self.expect_symbol(';')?;
+        Ok(AstTraitMethodSig {
+            name,
+            params,
+            return_type,
+        })
+    }
+
+    fn parse_impl_def(&mut self) -> Result<AstImplDef, String> {
+        self.expect_word("impl")?;
+        let trait_name = self.expect_ident()?;
+        self.expect_word("for")?;
+        let for_type = self.parse_type_ref()?;
+        self.expect_symbol('{')?;
+        let mut methods = Vec::new();
+        while !self.peek_symbol('}') {
+            methods.push(self.parse_impl_method()?);
+        }
+        self.expect_symbol('}')?;
+        Ok(AstImplDef {
+            trait_name,
+            for_type,
+            methods,
+        })
+    }
+
+    fn parse_impl_method(&mut self) -> Result<AstImplMethod, String> {
+        self.expect_word("fn")?;
+        let name = self.expect_ident()?;
+        self.expect_symbol('(')?;
+        let params = if self.peek_symbol(')') {
+            Vec::new()
+        } else {
+            self.parse_param_list()?
+        };
+        self.expect_symbol(')')?;
+        let return_type = if self.peek_arrow() {
+            self.expect_arrow()?;
+            Some(self.parse_type_ref()?)
+        } else {
+            None
+        };
+        let body = self.parse_block()?;
+        Ok(AstImplMethod {
+            name,
+            params,
+            return_type,
+            body,
+        })
     }
 
     fn parse_extern_abi(&mut self) -> Result<String, String> {
@@ -179,6 +267,11 @@ impl Parser {
         };
         self.expect_word("fn")?;
         let name = self.expect_ident()?;
+        let generic_params = if self.peek_symbol('<') {
+            self.parse_generic_param_decl_list()?
+        } else {
+            Vec::new()
+        };
         let test_name = declared_test_name.map(|label| {
             if label.is_empty() {
                 name.clone()
@@ -218,10 +311,33 @@ impl Parser {
             test_clock_domain,
             test_clock_policy,
             is_async,
+            generic_params,
             params,
             return_type,
             body,
         })
+    }
+
+    fn parse_generic_param_decl_list(&mut self) -> Result<Vec<AstGenericParam>, String> {
+        self.expect_symbol('<')?;
+        let mut params = Vec::new();
+        loop {
+            let name = self.expect_ident()?;
+            let bound = if self.peek_symbol(':') {
+                self.expect_symbol(':')?;
+                Some(self.parse_type_ref()?)
+            } else {
+                None
+            };
+            params.push(AstGenericParam { name, bound });
+            if self.peek_symbol(',') {
+                self.expect_symbol(',')?;
+            } else {
+                break;
+            }
+        }
+        self.expect_symbol('>')?;
+        Ok(params)
     }
 
     fn parse_test_decl_call_syntax(

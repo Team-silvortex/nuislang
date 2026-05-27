@@ -1183,6 +1183,8 @@ mod tests {
             externs: vec![],
             extern_interfaces: vec![],
             structs: vec![],
+            traits: vec![],
+            impls: vec![],
             functions: vec![NirFunction {
                 name: "main".to_owned(),
                 test_name: None,
@@ -1193,6 +1195,7 @@ mod tests {
                 test_clock_domain: None,
                 test_clock_policy: None,
                 is_async: false,
+                generic_params: vec![],
                 params: vec![],
                 return_type: None,
                 body,
