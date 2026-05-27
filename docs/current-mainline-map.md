@@ -22,6 +22,8 @@ local README for the area you are actively touching.
   [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
 * `std` growth path:
   [stdlib/std/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
+* annotation / intrinsic future edge:
+  [reference/annotation-intrinsic-stdlib-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/annotation-intrinsic-stdlib-sketch.md)
 * trait/generic future edge:
   [reference/trait-generic-monomorphization-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/trait-generic-monomorphization-sketch.md)
 

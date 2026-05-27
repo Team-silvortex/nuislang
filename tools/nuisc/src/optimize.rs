@@ -1200,6 +1200,7 @@ mod tests {
             impls: vec![],
             functions: vec![NirFunction {
                 name: "main".to_owned(),
+                annotations: vec![],
                 test_name: None,
                 test_ignored: false,
                 test_should_fail: false,

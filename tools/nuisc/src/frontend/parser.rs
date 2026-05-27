@@ -1,7 +1,8 @@
 use nuis_semantics::model::{
-    AstBinaryOp, AstExpr, AstExternFunction, AstExternInterface, AstFunction, AstGenericParam,
-    AstImplDef, AstImplMethod, AstModule, AstParam, AstStmt, AstStructDef, AstStructField,
-    AstTraitDef, AstTraitMethodSig, AstTypeRef, TestClockDomain, TestClockPolicy,
+    AstAttribute, AstAttributeArg, AstAttributeValue, AstBinaryOp, AstExpr, AstExternFunction,
+    AstExternInterface, AstFunction, AstGenericParam, AstImplDef, AstImplMethod, AstModule,
+    AstParam, AstStmt, AstStructDef, AstStructField, AstTraitDef, AstTraitMethodSig, AstTypeRef,
+    TestClockDomain, TestClockPolicy,
 };
 
 use super::lexer::{describe_token, Token};
@@ -239,6 +240,7 @@ impl Parser {
     }
 
     fn parse_function(&mut self) -> Result<AstFunction, String> {
+        let mut attributes = self.parse_attribute_list()?;
         let (
             declared_test_name,
             test_ignored,
@@ -272,7 +274,48 @@ impl Parser {
         } else {
             Vec::new()
         };
-        let test_name = declared_test_name.map(|label| {
+        let test_from_attribute = attributes
+            .iter()
+            .find(|attribute| attribute.name == "test")
+            .map(|attribute| self.parse_test_attribute_metadata(&attribute.args))
+            .transpose()?;
+        if declared_test_name.is_some() && test_from_attribute.is_some() {
+            return Err(format!(
+                "function `{name}` cannot use both `test(...)` and `@test(...)`; choose one test declaration style"
+            ));
+        }
+        if declared_test_name.is_some() {
+            attributes.push(self.build_test_attribute(
+                declared_test_name.clone(),
+                test_ignored,
+                test_should_fail,
+                test_reason.clone(),
+                test_timeout_ms,
+                test_clock_domain,
+                test_clock_policy,
+            ));
+        }
+        let (
+            raw_test_name,
+            test_ignored,
+            test_should_fail,
+            test_reason,
+            test_timeout_ms,
+            test_clock_domain,
+            test_clock_policy,
+        ) = match test_from_attribute {
+            Some(values) => values,
+            None => (
+                declared_test_name,
+                test_ignored,
+                test_should_fail,
+                test_reason,
+                test_timeout_ms,
+                test_clock_domain,
+                test_clock_policy,
+            ),
+        };
+        let test_name = raw_test_name.map(|label| {
             if label.is_empty() {
                 name.clone()
             } else {
@@ -303,6 +346,7 @@ impl Parser {
 
         Ok(AstFunction {
             name,
+            attributes,
             test_name,
             test_ignored,
             test_should_fail,
@@ -316,6 +360,252 @@ impl Parser {
             return_type,
             body,
         })
+    }
+
+    fn build_test_attribute(
+        &self,
+        label: Option<String>,
+        ignored: bool,
+        should_fail: bool,
+        reason: Option<String>,
+        timeout_ms: Option<i64>,
+        clock_domain: Option<TestClockDomain>,
+        clock_policy: Option<TestClockPolicy>,
+    ) -> AstAttribute {
+        let mut args = Vec::new();
+        if let Some(label) = label {
+            if !label.is_empty() {
+                args.push(AstAttributeArg {
+                    name: None,
+                    value: AstAttributeValue::String(label),
+                });
+            }
+        }
+        if ignored {
+            args.push(AstAttributeArg {
+                name: Some("ignored".to_owned()),
+                value: AstAttributeValue::Bool(true),
+            });
+        }
+        if should_fail {
+            args.push(AstAttributeArg {
+                name: Some("should_fail".to_owned()),
+                value: AstAttributeValue::Bool(true),
+            });
+        }
+        if let Some(reason) = reason {
+            args.push(AstAttributeArg {
+                name: Some("reason".to_owned()),
+                value: AstAttributeValue::String(reason),
+            });
+        }
+        if let Some(timeout_ms) = timeout_ms {
+            args.push(AstAttributeArg {
+                name: Some("timeout_ms".to_owned()),
+                value: AstAttributeValue::Int(timeout_ms),
+            });
+        }
+        if let Some(clock_domain) = clock_domain {
+            args.push(AstAttributeArg {
+                name: Some("clock_domain".to_owned()),
+                value: AstAttributeValue::String(clock_domain.as_str().to_owned()),
+            });
+        }
+        if let Some(clock_policy) = clock_policy {
+            args.push(AstAttributeArg {
+                name: Some("clock_policy".to_owned()),
+                value: AstAttributeValue::String(clock_policy.as_str().to_owned()),
+            });
+        }
+        AstAttribute {
+            name: "test".to_owned(),
+            args,
+        }
+    }
+
+    fn parse_test_attribute_metadata(
+        &self,
+        args: &[AstAttributeArg],
+    ) -> Result<
+        (
+            Option<String>,
+            bool,
+            bool,
+            Option<String>,
+            Option<i64>,
+            Option<TestClockDomain>,
+            Option<TestClockPolicy>,
+        ),
+        String,
+    > {
+        let mut label = Some(String::new());
+        let mut ignored = false;
+        let mut should_fail = false;
+        let mut reason = None;
+        let mut timeout_ms = None;
+        let mut clock_domain = None;
+        let mut clock_policy = None;
+
+        for arg in args {
+            match (&arg.name, &arg.value) {
+                (None, AstAttributeValue::String(value)) => {
+                    if label.is_some() && label.as_ref().is_some_and(|item| item.is_empty()) {
+                        label = Some(value.clone());
+                    } else {
+                        return Err(
+                            "`@test(...)` accepts at most one positional string label".to_owned()
+                        );
+                    }
+                }
+                (None, AstAttributeValue::Ident(flag)) => match flag.as_str() {
+                    "ignored" => ignored = true,
+                    "should_fail" => should_fail = true,
+                    other => {
+                        return Err(format!(
+                            "unknown positional test flag `{other}` in `@test(...)`"
+                        ));
+                    }
+                },
+                (Some(name), AstAttributeValue::Bool(value)) => match name.as_str() {
+                    "ignored" => ignored = *value,
+                    "should_fail" => should_fail = *value,
+                    other => {
+                        return Err(format!(
+                            "unknown test metadata key `{other}` in `@test(...)`"
+                        ));
+                    }
+                },
+                (Some(name), AstAttributeValue::String(value)) => match name.as_str() {
+                    "reason" => reason = Some(value.clone()),
+                    "clock_domain" => clock_domain = Some(TestClockDomain::parse(value).ok_or_else(|| format!(
+                        "unsupported `clock_domain=\"{}\"`; expected `monotonic`, `wall`, or `global`",
+                        value
+                    ))?),
+                    "clock_policy" => clock_policy = Some(TestClockPolicy::parse(value).ok_or_else(|| format!(
+                        "unsupported `clock_policy=\"{}\"`; expected `bridge`",
+                        value
+                    ))?),
+                    "name" => label = Some(value.clone()),
+                    other => {
+                        return Err(format!(
+                            "unknown test metadata key `{other}` in `@test(...)`"
+                        ));
+                    }
+                },
+                (Some(name), AstAttributeValue::Int(value)) => match name.as_str() {
+                    "timeout_ms" => timeout_ms = Some(*value),
+                    other => {
+                        return Err(format!(
+                            "unknown test metadata key `{other}` in `@test(...)`"
+                        ));
+                    }
+                },
+                (Some(name), _) => {
+                    return Err(format!(
+                        "test metadata key `{name}` has unsupported value shape in `@test(...)`"
+                    ));
+                }
+                (None, _) => {
+                    return Err(
+                        "expected string label or bare flag in `@test(...)` positional arguments"
+                            .to_owned(),
+                    );
+                }
+            }
+        }
+
+        Ok((
+            label,
+            ignored,
+            should_fail,
+            reason,
+            timeout_ms,
+            clock_domain,
+            clock_policy,
+        ))
+    }
+
+    fn parse_attribute_list(&mut self) -> Result<Vec<AstAttribute>, String> {
+        let mut attributes = Vec::new();
+        while self.peek_symbol('@') {
+            attributes.push(self.parse_attribute()?);
+        }
+        Ok(attributes)
+    }
+
+    fn parse_attribute(&mut self) -> Result<AstAttribute, String> {
+        self.expect_symbol('@')?;
+        let name = self.expect_ident()?;
+        let args = if self.peek_symbol('(') {
+            self.parse_attribute_arg_list()?
+        } else {
+            Vec::new()
+        };
+        Ok(AstAttribute { name, args })
+    }
+
+    fn parse_attribute_arg_list(&mut self) -> Result<Vec<AstAttributeArg>, String> {
+        self.expect_symbol('(')?;
+        let mut args = Vec::new();
+        if self.peek_symbol(')') {
+            self.expect_symbol(')')?;
+            return Ok(args);
+        }
+        loop {
+            let (name, value) = if let Some(Token::Word(word)) = self.tokens.get(self.cursor) {
+                if matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol('='))) {
+                    let label = word.clone();
+                    self.cursor += 1;
+                    self.expect_symbol('=')?;
+                    (Some(label), self.parse_attribute_value()?)
+                } else {
+                    (None, self.parse_attribute_value()?)
+                }
+            } else {
+                (None, self.parse_attribute_value()?)
+            };
+            args.push(AstAttributeArg { name, value });
+            if self.peek_symbol(',') {
+                self.expect_symbol(',')?;
+            } else {
+                break;
+            }
+        }
+        self.expect_symbol(')')?;
+        Ok(args)
+    }
+
+    fn parse_attribute_value(&mut self) -> Result<AstAttributeValue, String> {
+        match self.tokens.get(self.cursor) {
+            Some(Token::Word(word)) if word == "true" => {
+                self.cursor += 1;
+                Ok(AstAttributeValue::Bool(true))
+            }
+            Some(Token::Word(word)) if word == "false" => {
+                self.cursor += 1;
+                Ok(AstAttributeValue::Bool(false))
+            }
+            Some(Token::Word(word)) => {
+                let ident = word.clone();
+                self.cursor += 1;
+                Ok(AstAttributeValue::Ident(ident))
+            }
+            Some(Token::Integer(value)) => {
+                let value = *value;
+                self.cursor += 1;
+                Ok(AstAttributeValue::Int(value))
+            }
+            Some(Token::String(value)) => {
+                let value = value.clone();
+                self.cursor += 1;
+                Ok(AstAttributeValue::String(value))
+            }
+            Some(token) => Err(format!(
+                "expected annotation attribute value, found {}",
+                describe_token(token)
+            )),
+            None => Err("expected annotation attribute value, found end of file".to_owned()),
+        }
     }
 
     fn parse_generic_param_decl_list(&mut self) -> Result<Vec<AstGenericParam>, String> {

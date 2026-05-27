@@ -51,6 +51,26 @@ pub struct AstStructDef {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AstAttributeValue {
+    Bool(bool),
+    Int(i64),
+    String(String),
+    Ident(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AstAttributeArg {
+    pub name: Option<String>,
+    pub value: AstAttributeValue,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AstAttribute {
+    pub name: String,
+    pub args: Vec<AstAttributeArg>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AstGenericParam {
     pub name: String,
     pub bound: Option<AstTypeRef>,
@@ -155,6 +175,7 @@ impl TestClockPolicy {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AstFunction {
     pub name: String,
+    pub attributes: Vec<AstAttribute>,
     pub test_name: Option<String>,
     pub test_ignored: bool,
     pub test_should_fail: bool,
@@ -301,6 +322,26 @@ impl NirStructDef {
 pub struct NirGenericParam {
     pub name: String,
     pub bound: Option<NirTypeRef>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NirAttributeValue {
+    Bool(bool),
+    Int(i64),
+    String(String),
+    Ident(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NirAttributeArg {
+    pub name: Option<String>,
+    pub value: NirAttributeValue,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NirAnnotation {
+    pub name: String,
+    pub args: Vec<NirAttributeArg>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -726,6 +767,7 @@ pub struct NirParam {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NirFunction {
     pub name: String,
+    pub annotations: Vec<NirAnnotation>,
     pub test_name: Option<String>,
     pub test_ignored: bool,
     pub test_should_fail: bool,

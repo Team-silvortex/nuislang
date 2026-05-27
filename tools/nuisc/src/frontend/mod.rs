@@ -4,12 +4,13 @@ mod parser;
 use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{
-    AstBinaryOp, AstExpr, AstFunction, AstImplDef, AstModule, AstParam, AstStmt, AstStructDef,
-    AstTypeRef, NirBinaryOp, NirDataFlowState, NirExpr, NirExternFunction, NirExternInterface,
-    NirFunction, NirGenericParam, NirImplDef, NirImplMethod, NirKernelAxis, NirKernelFlowState,
-    NirKernelMapOp, NirKernelZipOp, NirModule, NirNetworkFlowState, NirParam, NirResultFamily,
-    NirResultStage, NirShaderFlowState, NirStmt, NirStructDef, NirStructField, NirTraitDef,
-    NirTraitMethodSig, NirTypeRef, NirUse, NirWindowMode,
+    AstAttributeValue, AstBinaryOp, AstExpr, AstFunction, AstImplDef, AstModule, AstParam, AstStmt,
+    AstStructDef, AstTypeRef, NirAnnotation, NirAttributeArg, NirAttributeValue, NirBinaryOp,
+    NirDataFlowState, NirExpr, NirExternFunction, NirExternInterface, NirFunction, NirGenericParam,
+    NirImplDef, NirImplMethod, NirKernelAxis, NirKernelFlowState, NirKernelMapOp, NirKernelZipOp,
+    NirModule, NirNetworkFlowState, NirParam, NirResultFamily, NirResultStage, NirShaderFlowState,
+    NirStmt, NirStructDef, NirStructField, NirTraitDef, NirTraitMethodSig, NirTypeRef, NirUse,
+    NirWindowMode,
 };
 
 pub fn frontend_name() -> &'static str {
@@ -30,6 +31,9 @@ pub fn lower_project_ast_to_nir(
     module: &AstModule,
     local_modules: &[AstModule],
 ) -> Result<NirModule, String> {
+    for function in &module.functions {
+        validate_function_annotations(function)?;
+    }
     let local_cpu_helpers = module
         .uses
         .iter()
@@ -364,6 +368,124 @@ pub fn parse_nuis_module(input: &str) -> Result<NirModule, String> {
     lower_ast_to_nir(&ast)
 }
 
+fn validate_function_annotations(function: &AstFunction) -> Result<(), String> {
+    let mut seen = BTreeSet::new();
+    let mut has_inline = false;
+    let mut has_noinline = false;
+
+    for attribute in &function.attributes {
+        match attribute.name.as_str() {
+            "test" => {}
+            "inline" => {
+                validate_zero_arg_function_annotation(function, "inline", &attribute.args)?;
+                has_inline = true;
+            }
+            "noinline" => {
+                validate_zero_arg_function_annotation(function, "noinline", &attribute.args)?;
+                has_noinline = true;
+            }
+            "export" => validate_export_annotation(function, &attribute.args)?,
+            "host_symbol" => validate_host_symbol_annotation(function, &attribute.args)?,
+            other => {
+                return Err(format!(
+                    "function `{}` uses unknown annotation `@{other}`",
+                    function.name
+                ));
+            }
+        }
+
+        if !seen.insert(attribute.name.as_str()) {
+            return Err(format!(
+                "function `{}` repeats annotation `@{}`",
+                function.name, attribute.name
+            ));
+        }
+    }
+
+    if has_inline && has_noinline {
+        return Err(format!(
+            "function `{}` cannot use both `@inline` and `@noinline`",
+            function.name
+        ));
+    }
+
+    Ok(())
+}
+
+fn validate_zero_arg_function_annotation(
+    function: &AstFunction,
+    annotation: &str,
+    args: &[nuis_semantics::model::AstAttributeArg],
+) -> Result<(), String> {
+    if args.is_empty() {
+        return Ok(());
+    }
+    Err(format!(
+        "function `{}` annotation `@{annotation}` does not take arguments",
+        function.name
+    ))
+}
+
+fn validate_export_annotation(
+    function: &AstFunction,
+    args: &[nuis_semantics::model::AstAttributeArg],
+) -> Result<(), String> {
+    if args.len() != 1 {
+        return Err(format!(
+            "function `{}` annotation `@export` expects exactly one argument: `name = \"...\"`",
+            function.name
+        ));
+    }
+    let arg = &args[0];
+    if arg.name.as_deref() != Some("name") {
+        return Err(format!(
+            "function `{}` annotation `@export` expects `name = \"...\"`",
+            function.name
+        ));
+    }
+    match &arg.value {
+        AstAttributeValue::String(value) if !value.is_empty() => Ok(()),
+        AstAttributeValue::String(_) => Err(format!(
+            "function `{}` annotation `@export(name = \"...\")` requires a non-empty export name",
+            function.name
+        )),
+        _ => Err(format!(
+            "function `{}` annotation `@export` expects `name = \"...\"`",
+            function.name
+        )),
+    }
+}
+
+fn validate_host_symbol_annotation(
+    function: &AstFunction,
+    args: &[nuis_semantics::model::AstAttributeArg],
+) -> Result<(), String> {
+    if args.len() != 1 {
+        return Err(format!(
+            "function `{}` annotation `@host_symbol` expects exactly one string argument",
+            function.name
+        ));
+    }
+    let arg = &args[0];
+    if arg.name.is_some() {
+        return Err(format!(
+            "function `{}` annotation `@host_symbol` expects `@host_symbol(\"...\")`",
+            function.name
+        ));
+    }
+    match &arg.value {
+        AstAttributeValue::String(value) if !value.is_empty() => Ok(()),
+        AstAttributeValue::String(_) => Err(format!(
+            "function `{}` annotation `@host_symbol(\"...\")` requires a non-empty host symbol",
+            function.name
+        )),
+        _ => Err(format!(
+            "function `{}` annotation `@host_symbol` expects a string literal",
+            function.name
+        )),
+    }
+}
+
 pub fn collect_nir_tests<'a>(module: &'a NirModule) -> Vec<&'a NirFunction> {
     module
         .functions
@@ -406,6 +528,7 @@ fn build_impl_method_function(
 ) -> AstFunction {
     AstFunction {
         name: symbol_name.to_owned(),
+        attributes: vec![],
         test_name: None,
         test_ignored: false,
         test_should_fail: false,
@@ -441,6 +564,30 @@ fn lower_function(
 
     Ok(NirFunction {
         name: function.name.clone(),
+        annotations: function
+            .attributes
+            .iter()
+            .map(|attribute| NirAnnotation {
+                name: attribute.name.clone(),
+                args: attribute
+                    .args
+                    .iter()
+                    .map(|arg| NirAttributeArg {
+                        name: arg.name.clone(),
+                        value: match &arg.value {
+                            AstAttributeValue::Bool(value) => NirAttributeValue::Bool(*value),
+                            AstAttributeValue::Int(value) => NirAttributeValue::Int(*value),
+                            AstAttributeValue::String(value) => {
+                                NirAttributeValue::String(value.clone())
+                            }
+                            AstAttributeValue::Ident(value) => {
+                                NirAttributeValue::Ident(value.clone())
+                            }
+                        },
+                    })
+                    .collect(),
+            })
+            .collect(),
         test_name: function.test_name.clone(),
         test_ignored: function.test_ignored,
         test_should_fail: function.test_should_fail,
@@ -1356,6 +1503,7 @@ fn specialize_function_template(
 ) -> Result<AstFunction, String> {
     Ok(AstFunction {
         name: specialized_name.to_owned(),
+        attributes: template.attributes.clone(),
         test_name: None,
         test_ignored: false,
         test_should_fail: false,
@@ -16229,6 +16377,34 @@ mod tests {
     }
 
     #[test]
+    fn parses_function_annotations_into_ast() {
+        let ast = parse_nuis_ast(
+            r#"
+            mod cpu Main {
+              @inline
+              @export(name = "main")
+              @host_symbol("network.open_tcp")
+              fn main() -> i64 {
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = ast
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert_eq!(function.attributes.len(), 3);
+        assert_eq!(function.attributes[0].name, "inline");
+        assert_eq!(function.attributes[1].name, "export");
+        assert_eq!(function.attributes[1].args.len(), 1);
+        assert_eq!(function.attributes[2].name, "host_symbol");
+    }
+
+    #[test]
     fn parses_test_function_without_explicit_label_into_ast() {
         let ast = parse_nuis_ast(
             r#"
@@ -16299,6 +16475,39 @@ mod tests {
         assert_eq!(function.test_timeout_ms, Some(25));
         assert_eq!(function.test_clock_domain, Some(TestClockDomain::Wall));
         assert_eq!(function.test_clock_policy, None);
+        assert!(function
+            .attributes
+            .iter()
+            .any(|attribute| attribute.name == "test"));
+    }
+
+    #[test]
+    fn parses_at_test_function_into_ast() {
+        let ast = parse_nuis_ast(
+            r#"
+            mod cpu Main {
+              @test("slow_global", timeout_ms=25, clock_domain="global", clock_policy="bridge")
+              async fn slow_global() -> i64 {
+                return 1;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = ast
+            .functions
+            .iter()
+            .find(|function| function.name == "slow_global")
+            .unwrap();
+        assert_eq!(function.test_name.as_deref(), Some("slow_global"));
+        assert_eq!(function.test_timeout_ms, Some(25));
+        assert_eq!(function.test_clock_domain, Some(TestClockDomain::Global));
+        assert_eq!(function.test_clock_policy, Some(TestClockPolicy::Bridge));
+        assert!(function
+            .attributes
+            .iter()
+            .any(|attribute| attribute.name == "test"));
     }
 
     #[test]
@@ -16361,6 +16570,102 @@ mod tests {
             .functions
             .iter()
             .all(|function| function.name != "sum_two"));
+    }
+
+    #[test]
+    fn lowers_function_annotations_into_nir() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              @inline
+              @export(name = "main")
+              @host_symbol("network.open_tcp")
+              fn main() -> i64 {
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert_eq!(function.annotations.len(), 3);
+        assert_eq!(function.annotations[0].name, "inline");
+        assert_eq!(function.annotations[1].name, "export");
+        assert_eq!(function.annotations[2].name, "host_symbol");
+    }
+
+    #[test]
+    fn rejects_unknown_function_annotation() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              @mystery
+              fn main() -> i64 {
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("unknown annotation `@mystery`"));
+    }
+
+    #[test]
+    fn rejects_conflicting_inline_annotations() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              @inline
+              @noinline
+              fn main() -> i64 {
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("cannot use both `@inline` and `@noinline`"));
+    }
+
+    #[test]
+    fn rejects_malformed_export_annotation() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              @export("main")
+              fn main() -> i64 {
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("annotation `@export` expects `name = \"...\"`"));
+    }
+
+    #[test]
+    fn rejects_malformed_host_symbol_annotation() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              @host_symbol(name = "network.open_tcp")
+              fn main() -> i64 {
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("annotation `@host_symbol` expects `@host_symbol(\"...\")`"));
     }
 
     #[test]
@@ -16893,6 +17198,61 @@ mod tests {
             .unwrap();
         assert_eq!(function.test_clock_domain, Some(TestClockDomain::Global));
         assert_eq!(function.test_clock_policy, Some(TestClockPolicy::Bridge));
+        assert!(function
+            .annotations
+            .iter()
+            .any(|annotation| annotation.name == "test"));
+    }
+
+    #[test]
+    fn lowers_at_test_function_into_nir() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              @test("smoke_add", should_fail=true, reason="must reject zero", timeout_ms=25, clock_domain="monotonic")
+              fn smoke_add() -> i64 {
+                return 0;
+              }
+
+              fn main() -> i64 {
+                return 1;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "smoke_add")
+            .unwrap();
+        assert_eq!(function.test_name.as_deref(), Some("smoke_add"));
+        assert!(function.test_should_fail);
+        assert_eq!(function.test_reason.as_deref(), Some("must reject zero"));
+        assert_eq!(function.test_timeout_ms, Some(25));
+        assert_eq!(function.test_clock_domain, Some(TestClockDomain::Monotonic));
+        assert!(function
+            .annotations
+            .iter()
+            .any(|annotation| annotation.name == "test"));
+    }
+
+    #[test]
+    fn rejects_mixing_test_declaration_styles() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              @test
+              test() fn smoke_add() -> i64 {
+                return 1;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("cannot use both `test(...)` and `@test(...)`"));
     }
 
     #[test]

@@ -1,6 +1,7 @@
 use nuis_semantics::model::{
-    AstBinaryOp, AstExpr, AstExternInterface, AstFunction, AstGenericParam, AstImplDef,
-    AstImplMethod, AstModule, AstStmt, AstStructDef, AstTraitDef, AstTraitMethodSig, NirBinaryOp,
+    AstAttribute, AstAttributeArg, AstAttributeValue, AstBinaryOp, AstExpr, AstExternInterface,
+    AstFunction, AstGenericParam, AstImplDef, AstImplMethod, AstModule, AstStmt, AstStructDef,
+    AstTraitDef, AstTraitMethodSig, NirAnnotation, NirAttributeArg, NirAttributeValue, NirBinaryOp,
     NirExpr, NirExternInterface, NirFunction, NirGenericParam, NirImplDef, NirImplMethod,
     NirModule, NirStmt, NirStructDef, NirTraitDef, NirTraitMethodSig,
 };
@@ -1223,8 +1224,10 @@ fn render_ast_function_header(function: &AstFunction) -> String {
         })
         .unwrap_or_default();
     let async_prefix = if function.is_async { "async " } else { "" };
+    let attribute_prefix = render_ast_attributes(&function.attributes);
     format!(
-        "  {}{}fn {}{}({}){}\n",
+        "  {}{}{}fn {}{}({}){}\n",
+        attribute_prefix,
         test_prefix,
         async_prefix,
         function.name,
@@ -1273,8 +1276,10 @@ fn render_nir_function_header(function: &NirFunction) -> String {
         })
         .unwrap_or_default();
     let async_prefix = if function.is_async { "async " } else { "" };
+    let annotation_prefix = render_nir_annotations(&function.annotations);
     format!(
-        "  {}{}fn {}{}({}){}\n",
+        "  {}{}{}fn {}{}({}){}\n",
+        annotation_prefix,
         test_prefix,
         async_prefix,
         function.name,
@@ -1282,6 +1287,92 @@ fn render_nir_function_header(function: &NirFunction) -> String {
         params,
         return_suffix
     )
+}
+
+fn render_ast_attributes(attributes: &[AstAttribute]) -> String {
+    if attributes.is_empty() {
+        return String::new();
+    }
+    format!(
+        "{} ",
+        attributes
+            .iter()
+            .map(render_ast_attribute)
+            .collect::<Vec<_>>()
+            .join(" ")
+    )
+}
+
+fn render_ast_attribute(attribute: &AstAttribute) -> String {
+    if attribute.args.is_empty() {
+        return format!("@{}", attribute.name);
+    }
+    format!(
+        "@{}({})",
+        attribute.name,
+        attribute
+            .args
+            .iter()
+            .map(render_ast_attribute_arg)
+            .collect::<Vec<_>>()
+            .join(", ")
+    )
+}
+
+fn render_ast_attribute_arg(arg: &AstAttributeArg) -> String {
+    let value = match &arg.value {
+        AstAttributeValue::Bool(value) => value.to_string(),
+        AstAttributeValue::Int(value) => value.to_string(),
+        AstAttributeValue::String(value) => format!("\"{}\"", escape_debug(value)),
+        AstAttributeValue::Ident(value) => value.clone(),
+    };
+    match &arg.name {
+        Some(name) => format!("{name} = {value}"),
+        None => value,
+    }
+}
+
+fn render_nir_annotations(annotations: &[NirAnnotation]) -> String {
+    if annotations.is_empty() {
+        return String::new();
+    }
+    format!(
+        "{} ",
+        annotations
+            .iter()
+            .map(render_nir_annotation)
+            .collect::<Vec<_>>()
+            .join(" ")
+    )
+}
+
+fn render_nir_annotation(annotation: &NirAnnotation) -> String {
+    if annotation.args.is_empty() {
+        return format!("@{}", annotation.name);
+    }
+    format!(
+        "@{}({})",
+        annotation.name,
+        annotation
+            .args
+            .iter()
+            .map(render_nir_annotation_arg)
+            .collect::<Vec<_>>()
+            .join(", ")
+    )
+}
+
+fn render_nir_annotation_arg(arg: &NirAttributeArg) -> String {
+    let value = match &arg.value {
+        NirAttributeValue::Bool(value) => value.to_string(),
+        NirAttributeValue::Int(value) => value.to_string(),
+        NirAttributeValue::String(value) => format!("\"{}\"", escape_debug(value)),
+        NirAttributeValue::Ident(value) => value.clone(),
+    };
+    match &arg.name {
+        Some(name) => format!("{name} = {value}"),
+        None => value,
+    }
 }
 
 fn render_ast_trait_method_sig(method: &AstTraitMethodSig) -> String {
