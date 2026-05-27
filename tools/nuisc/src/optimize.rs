@@ -30,6 +30,18 @@ fn simplify_stmt_block(stmts: &mut Vec<NirStmt>, env: &mut BTreeMap<String, NirE
     changed
 }
 
+fn rewrite_stmt_block_without_prune(
+    stmts: Vec<NirStmt>,
+    env: &mut BTreeMap<String, NirExpr>,
+) -> (Vec<NirStmt>, bool) {
+    let mut changed = false;
+    let mut rewritten = Vec::with_capacity(stmts.len());
+    for stmt in stmts {
+        changed |= rewrite_stmt(stmt, &mut rewritten, env);
+    }
+    (rewritten, changed)
+}
+
 fn rewrite_stmt(
     stmt: NirStmt,
     out: &mut Vec<NirStmt>,
@@ -82,8 +94,20 @@ fn rewrite_stmt(
             let (condition, mut changed) = simplify_expr(condition, env);
             let mut then_env = env.clone();
             let mut else_env = env.clone();
-            changed |= simplify_stmt_block(&mut then_body, &mut then_env);
-            changed |= simplify_stmt_block(&mut else_body, &mut else_env);
+            if env.is_empty() {
+                let original_then = std::mem::take(&mut then_body);
+                let original_else = std::mem::take(&mut else_body);
+                let (rewritten_then, then_changed) =
+                    rewrite_stmt_block_without_prune(original_then, &mut then_env);
+                let (rewritten_else, else_changed) =
+                    rewrite_stmt_block_without_prune(original_else, &mut else_env);
+                then_body = rewritten_then;
+                else_body = rewritten_else;
+                changed |= then_changed || else_changed;
+            } else {
+                changed |= simplify_stmt_block(&mut then_body, &mut then_env);
+                changed |= simplify_stmt_block(&mut else_body, &mut else_env);
+            }
             match condition {
                 NirExpr::Bool(true) => {
                     out.extend(then_body);
@@ -1366,5 +1390,75 @@ mod tests {
         let changed = simplify_nir_module(&mut module);
         assert!(!changed);
         assert_eq!(module.functions[0].body.len(), 1);
+    }
+
+    #[test]
+    fn preserves_branch_local_carry_updates_inside_while() {
+        let mut module = sample_module(vec![
+            NirStmt::Let {
+                name: "value".to_owned(),
+                ty: None,
+                value: NirExpr::Int(0),
+            },
+            NirStmt::Let {
+                name: "acc".to_owned(),
+                ty: None,
+                value: NirExpr::Int(0),
+            },
+            NirStmt::While {
+                condition: NirExpr::Binary {
+                    op: NirBinaryOp::Lt,
+                    lhs: Box::new(NirExpr::Var("value".to_owned())),
+                    rhs: Box::new(NirExpr::Int(5)),
+                },
+                body: vec![
+                    NirStmt::Let {
+                        name: "value".to_owned(),
+                        ty: None,
+                        value: NirExpr::Binary {
+                            op: NirBinaryOp::Add,
+                            lhs: Box::new(NirExpr::Var("value".to_owned())),
+                            rhs: Box::new(NirExpr::Int(1)),
+                        },
+                    },
+                    NirStmt::If {
+                        condition: NirExpr::Binary {
+                            op: NirBinaryOp::Gt,
+                            lhs: Box::new(NirExpr::Var("value".to_owned())),
+                            rhs: Box::new(NirExpr::Int(2)),
+                        },
+                        then_body: vec![NirStmt::Let {
+                            name: "acc".to_owned(),
+                            ty: None,
+                            value: NirExpr::Binary {
+                                op: NirBinaryOp::Add,
+                                lhs: Box::new(NirExpr::Var("acc".to_owned())),
+                                rhs: Box::new(NirExpr::Var("value".to_owned())),
+                            },
+                        }],
+                        else_body: vec![NirStmt::Let {
+                            name: "acc".to_owned(),
+                            ty: None,
+                            value: NirExpr::Var("acc".to_owned()),
+                        }],
+                    },
+                ],
+            },
+            NirStmt::Return(Some(NirExpr::Var("acc".to_owned()))),
+        ]);
+        let _changed = simplify_nir_module(&mut module);
+        let NirStmt::While { body, .. } = &module.functions[0].body[2] else {
+            panic!("expected while statement to remain in place");
+        };
+        let NirStmt::If {
+            then_body,
+            else_body,
+            ..
+        } = &body[1]
+        else {
+            panic!("expected inner if statement to remain in loop body");
+        };
+        assert!(matches!(then_body.first(), Some(NirStmt::Let { name, .. }) if name == "acc"));
+        assert!(matches!(else_body.first(), Some(NirStmt::Let { name, .. }) if name == "acc"));
     }
 }

@@ -761,7 +761,12 @@ impl Operation {
             "input_i64" | "extern_call_i64" => CpuLlvmLoweringClass::Runtime,
             "print"
             | "loop_while_i64"
-            | "loop_while_i64_accumulate"
+            | "loop_while_i64_chain"
+            | "loop_while_i64_cond_chain"
+            | "loop_while_i64_flow_chain"
+            | "loop_while_i64_flow_cond_chain"
+            | "loop_while_i64_post_flow_chain"
+            | "loop_while_i64_post_flow_cond_chain"
             | "guard_print"
             | "guard_return"
             | "guard_print_return"

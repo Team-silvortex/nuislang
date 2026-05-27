@@ -559,14 +559,14 @@ impl RegisteredMod for CpuMod {
                 }
                 Ok(InstructionSemantics::effect(node.op.args[..3].to_vec()))
             }
-            "loop_while_i64_accumulate" => {
-                if node.op.args.len() != 7 {
+            "loop_while_i64_chain" => {
+                if node.op.args.len() < 7 || (node.op.args.len() - 5) % 2 != 0 {
                     return Err(format!(
-                        "node `{}` expects `cpu.loop_while_i64_accumulate <name> <resource> <initial> <carry_initial> <limit> <step> <cmp> <step_kind> <carry_kind>`",
+                        "node `{}` expects `cpu.loop_while_i64_chain <name> <resource> <initial> <limit> <step> <cmp> <step_kind> (<carry_initial> <carry_kind>)+`",
                         node.name
                     ));
                 }
-                match node.op.args[4].as_str() {
+                match node.op.args[3].as_str() {
                     "lt" | "le" | "gt" | "ge" => {}
                     other => {
                         return Err(format!(
@@ -575,7 +575,7 @@ impl RegisteredMod for CpuMod {
                         ));
                     }
                 }
-                match node.op.args[5].as_str() {
+                match node.op.args[4].as_str() {
                     "add" | "sub" => {}
                     other => {
                         return Err(format!(
@@ -584,16 +584,521 @@ impl RegisteredMod for CpuMod {
                         ));
                     }
                 }
-                match node.op.args[6].as_str() {
-                    "add_current" => {}
+                for carry_kind in node.op.args[6..].iter().step_by(2) {
+                    if carry_kind == "add_current" {
+                        continue;
+                    }
+                    if let Some(index) = carry_kind.strip_prefix("add_carry") {
+                        index.parse::<usize>().map_err(|_| {
+                            format!(
+                                "node `{}` has invalid carry kind `{}`",
+                                node.name, carry_kind
+                            )
+                        })?;
+                        continue;
+                    }
+                    return Err(format!(
+                        "node `{}` has invalid carry kind `{}`",
+                        node.name, carry_kind
+                    ));
+                }
+                Ok(InstructionSemantics::effect(
+                    node.op
+                        .args
+                        .iter()
+                        .enumerate()
+                        .filter(|(index, _)| *index < 3 || (*index >= 5 && index % 2 == 1))
+                        .map(|(_, arg)| arg.clone())
+                        .collect(),
+                ))
+            }
+            "loop_while_i64_cond_chain" => {
+                if node.op.args.len() < 10 || (node.op.args.len() - 5) % 5 != 0 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.loop_while_i64_cond_chain <name> <resource> <initial> <limit> <step> <cmp> <step_kind> (<carry_initial> <cond_kind> <cond_rhs> <then_kind> <else_kind>)+`",
+                        node.name
+                    ));
+                }
+                match node.op.args[3].as_str() {
+                    "lt" | "le" | "gt" | "ge" => {}
                     other => {
                         return Err(format!(
-                            "node `{}` has invalid carry kind `{}`",
+                            "node `{}` has invalid loop compare kind `{}`",
                             node.name, other
                         ));
                     }
                 }
-                Ok(InstructionSemantics::effect(node.op.args[..4].to_vec()))
+                match node.op.args[4].as_str() {
+                    "add" | "sub" => {}
+                    other => {
+                        return Err(format!(
+                            "node `{}` has invalid loop step kind `{}`",
+                            node.name, other
+                        ));
+                    }
+                }
+                for chunk in node.op.args[5..].chunks(5) {
+                    let cond_kind = &chunk[1];
+                    match cond_kind.as_str() {
+                        "always" | "current_lt" | "current_gt" => {}
+                        _ if cond_kind.starts_with("carry") && cond_kind.ends_with("_lt") => {
+                            cond_kind[5..cond_kind.len() - 3]
+                                .parse::<usize>()
+                                .map_err(|_| {
+                                    format!(
+                                        "node `{}` has invalid conditional carry kind `{}`",
+                                        node.name, cond_kind
+                                    )
+                                })?;
+                        }
+                        _ if cond_kind.starts_with("carry") && cond_kind.ends_with("_gt") => {
+                            cond_kind[5..cond_kind.len() - 3]
+                                .parse::<usize>()
+                                .map_err(|_| {
+                                    format!(
+                                        "node `{}` has invalid conditional carry kind `{}`",
+                                        node.name, cond_kind
+                                    )
+                                })?;
+                        }
+                        _ => {
+                            return Err(format!(
+                                "node `{}` has invalid conditional carry kind `{}`",
+                                node.name, cond_kind
+                            ));
+                        }
+                    }
+                    for carry_kind in [&chunk[3], &chunk[4]] {
+                        if carry_kind == "keep" || carry_kind == "add_current" {
+                            continue;
+                        }
+                        if let Some(index) = carry_kind.strip_prefix("add_carry") {
+                            index.parse::<usize>().map_err(|_| {
+                                format!(
+                                    "node `{}` has invalid carry kind `{}`",
+                                    node.name, carry_kind
+                                )
+                            })?;
+                            continue;
+                        }
+                        return Err(format!(
+                            "node `{}` has invalid carry kind `{}`",
+                            node.name, carry_kind
+                        ));
+                    }
+                }
+                let mut inputs = node.op.args[..3].to_vec();
+                for chunk in node.op.args[5..].chunks(5) {
+                    inputs.push(chunk[0].clone());
+                    if chunk[1] != "always" {
+                        inputs.push(chunk[2].clone());
+                    }
+                }
+                Ok(InstructionSemantics::effect(inputs))
+            }
+            "loop_while_i64_flow_chain" => {
+                if node.op.args.len() < 8 || (node.op.args.len() - 8) % 2 != 0 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.loop_while_i64_flow_chain <name> <resource> <initial> <limit> <step> <cmp> <step_kind> <control_kind> <control_rhs> <control_action> (<carry_initial> <carry_kind>)*`",
+                        node.name
+                    ));
+                }
+                match node.op.args[3].as_str() {
+                    "lt" | "le" | "gt" | "ge" => {}
+                    other => {
+                        return Err(format!(
+                            "node `{}` has invalid loop compare kind `{}`",
+                            node.name, other
+                        ));
+                    }
+                }
+                match node.op.args[4].as_str() {
+                    "add" | "sub" => {}
+                    other => {
+                        return Err(format!(
+                            "node `{}` has invalid loop step kind `{}`",
+                            node.name, other
+                        ));
+                    }
+                }
+                match node.op.args[5].as_str() {
+                    "current_lt" | "current_gt" => {}
+                    other if other.starts_with("carry") && other.ends_with("_lt") => {
+                        other[5..other.len() - 3].parse::<usize>().map_err(|_| {
+                            format!(
+                                "node `{}` has invalid flow control kind `{}`",
+                                node.name, other
+                            )
+                        })?;
+                    }
+                    other if other.starts_with("carry") && other.ends_with("_gt") => {
+                        other[5..other.len() - 3].parse::<usize>().map_err(|_| {
+                            format!(
+                                "node `{}` has invalid flow control kind `{}`",
+                                node.name, other
+                            )
+                        })?;
+                    }
+                    other => {
+                        return Err(format!(
+                            "node `{}` has invalid flow control kind `{}`",
+                            node.name, other
+                        ));
+                    }
+                }
+                match node.op.args[7].as_str() {
+                    "break" | "continue" => {}
+                    other => {
+                        return Err(format!(
+                            "node `{}` has invalid flow control action `{}`",
+                            node.name, other
+                        ));
+                    }
+                }
+                for carry_kind in node.op.args[9..].iter().step_by(2) {
+                    if carry_kind == "add_current" {
+                        continue;
+                    }
+                    if let Some(index) = carry_kind.strip_prefix("add_carry") {
+                        index.parse::<usize>().map_err(|_| {
+                            format!(
+                                "node `{}` has invalid carry kind `{}`",
+                                node.name, carry_kind
+                            )
+                        })?;
+                        continue;
+                    }
+                    return Err(format!(
+                        "node `{}` has invalid carry kind `{}`",
+                        node.name, carry_kind
+                    ));
+                }
+                let mut inputs = node.op.args[..3].to_vec();
+                inputs.push(node.op.args[6].clone());
+                for chunk in node.op.args[8..].chunks(2) {
+                    inputs.push(chunk[0].clone());
+                }
+                Ok(InstructionSemantics::effect(inputs))
+            }
+            "loop_while_i64_post_flow_chain" => {
+                if node.op.args.len() < 10 || (node.op.args.len() - 8) % 2 != 0 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.loop_while_i64_post_flow_chain <name> <resource> <initial> <limit> <step> <cmp> <step_kind> <control_kind> <control_rhs> <control_action> (<carry_initial> <carry_kind>)+`",
+                        node.name
+                    ));
+                }
+                match node.op.args[3].as_str() {
+                    "lt" | "le" | "gt" | "ge" => {}
+                    other => {
+                        return Err(format!(
+                            "node `{}` has invalid loop compare kind `{}`",
+                            node.name, other
+                        ));
+                    }
+                }
+                match node.op.args[4].as_str() {
+                    "add" | "sub" => {}
+                    other => {
+                        return Err(format!(
+                            "node `{}` has invalid loop step kind `{}`",
+                            node.name, other
+                        ));
+                    }
+                }
+                match node.op.args[5].as_str() {
+                    "current_lt" | "current_gt" => {}
+                    other if other.starts_with("carry") && other.ends_with("_lt") => {
+                        other[5..other.len() - 3].parse::<usize>().map_err(|_| {
+                            format!(
+                                "node `{}` has invalid flow control kind `{}`",
+                                node.name, other
+                            )
+                        })?;
+                    }
+                    other if other.starts_with("carry") && other.ends_with("_gt") => {
+                        other[5..other.len() - 3].parse::<usize>().map_err(|_| {
+                            format!(
+                                "node `{}` has invalid flow control kind `{}`",
+                                node.name, other
+                            )
+                        })?;
+                    }
+                    other => {
+                        return Err(format!(
+                            "node `{}` has invalid flow control kind `{}`",
+                            node.name, other
+                        ));
+                    }
+                }
+                match node.op.args[7].as_str() {
+                    "break" | "continue" => {}
+                    other => {
+                        return Err(format!(
+                            "node `{}` has invalid flow control action `{}`",
+                            node.name, other
+                        ));
+                    }
+                }
+                for carry_kind in node.op.args[9..].iter().step_by(2) {
+                    if carry_kind == "add_current" {
+                        continue;
+                    }
+                    if let Some(index) = carry_kind.strip_prefix("add_carry") {
+                        index.parse::<usize>().map_err(|_| {
+                            format!(
+                                "node `{}` has invalid carry kind `{}`",
+                                node.name, carry_kind
+                            )
+                        })?;
+                        continue;
+                    }
+                    return Err(format!(
+                        "node `{}` has invalid carry kind `{}`",
+                        node.name, carry_kind
+                    ));
+                }
+                let mut inputs = node.op.args[..3].to_vec();
+                inputs.push(node.op.args[6].clone());
+                for chunk in node.op.args[8..].chunks(2) {
+                    inputs.push(chunk[0].clone());
+                }
+                Ok(InstructionSemantics::effect(inputs))
+            }
+            "loop_while_i64_post_flow_cond_chain" => {
+                if node.op.args.len() < 13 || (node.op.args.len() - 8) % 5 != 0 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.loop_while_i64_post_flow_cond_chain <name> <resource> <initial> <limit> <step> <cmp> <step_kind> <control_kind> <control_rhs> <control_action> (<carry_initial> <cond_kind> <cond_rhs> <then_kind> <else_kind>)+`",
+                        node.name
+                    ));
+                }
+                match node.op.args[3].as_str() {
+                    "lt" | "le" | "gt" | "ge" => {}
+                    other => {
+                        return Err(format!(
+                            "node `{}` has invalid loop compare kind `{}`",
+                            node.name, other
+                        ));
+                    }
+                }
+                match node.op.args[4].as_str() {
+                    "add" | "sub" => {}
+                    other => {
+                        return Err(format!(
+                            "node `{}` has invalid loop step kind `{}`",
+                            node.name, other
+                        ));
+                    }
+                }
+                match node.op.args[5].as_str() {
+                    "current_lt" | "current_gt" => {}
+                    other if other.starts_with("carry") && other.ends_with("_lt") => {
+                        other[5..other.len() - 3].parse::<usize>().map_err(|_| {
+                            format!(
+                                "node `{}` has invalid flow control kind `{}`",
+                                node.name, other
+                            )
+                        })?;
+                    }
+                    other if other.starts_with("carry") && other.ends_with("_gt") => {
+                        other[5..other.len() - 3].parse::<usize>().map_err(|_| {
+                            format!(
+                                "node `{}` has invalid flow control kind `{}`",
+                                node.name, other
+                            )
+                        })?;
+                    }
+                    other => {
+                        return Err(format!(
+                            "node `{}` has invalid flow control kind `{}`",
+                            node.name, other
+                        ));
+                    }
+                }
+                match node.op.args[7].as_str() {
+                    "break" | "continue" => {}
+                    other => {
+                        return Err(format!(
+                            "node `{}` has invalid flow control action `{}`",
+                            node.name, other
+                        ));
+                    }
+                }
+                for chunk in node.op.args[8..].chunks(5) {
+                    let cond_kind = chunk[1].as_str();
+                    if cond_kind != "always" {
+                        match cond_kind {
+                            "current_lt" | "current_gt" => {}
+                            other if other.starts_with("carry") && other.ends_with("_lt") => {
+                                other[5..other.len() - 3].parse::<usize>().map_err(|_| {
+                                    format!(
+                                        "node `{}` has invalid conditional carry kind `{}`",
+                                        node.name, other
+                                    )
+                                })?;
+                            }
+                            other if other.starts_with("carry") && other.ends_with("_gt") => {
+                                other[5..other.len() - 3].parse::<usize>().map_err(|_| {
+                                    format!(
+                                        "node `{}` has invalid conditional carry kind `{}`",
+                                        node.name, other
+                                    )
+                                })?;
+                            }
+                            other => {
+                                return Err(format!(
+                                    "node `{}` has invalid conditional carry kind `{}`",
+                                    node.name, other
+                                ));
+                            }
+                        }
+                    }
+                    for carry_kind in [&chunk[3], &chunk[4]] {
+                        if carry_kind == "keep" || carry_kind == "add_current" {
+                            continue;
+                        }
+                        if let Some(index) = carry_kind.strip_prefix("add_carry") {
+                            index.parse::<usize>().map_err(|_| {
+                                format!(
+                                    "node `{}` has invalid carry kind `{}`",
+                                    node.name, carry_kind
+                                )
+                            })?;
+                            continue;
+                        }
+                        return Err(format!(
+                            "node `{}` has invalid carry kind `{}`",
+                            node.name, carry_kind
+                        ));
+                    }
+                }
+                let mut inputs = node.op.args[..3].to_vec();
+                inputs.push(node.op.args[6].clone());
+                for chunk in node.op.args[8..].chunks(5) {
+                    inputs.push(chunk[0].clone());
+                    if chunk[1] != "always" {
+                        inputs.push(chunk[2].clone());
+                    }
+                }
+                Ok(InstructionSemantics::effect(inputs))
+            }
+            "loop_while_i64_flow_cond_chain" => {
+                if node.op.args.len() < 13 || (node.op.args.len() - 8) % 5 != 0 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.loop_while_i64_flow_cond_chain <name> <resource> <initial> <limit> <step> <cmp> <step_kind> <control_kind> <control_rhs> <control_action> (<carry_initial> <cond_kind> <cond_rhs> <then_kind> <else_kind>)+`",
+                        node.name
+                    ));
+                }
+                match node.op.args[3].as_str() {
+                    "lt" | "le" | "gt" | "ge" => {}
+                    other => {
+                        return Err(format!(
+                            "node `{}` has invalid loop compare kind `{}`",
+                            node.name, other
+                        ));
+                    }
+                }
+                match node.op.args[4].as_str() {
+                    "add" | "sub" => {}
+                    other => {
+                        return Err(format!(
+                            "node `{}` has invalid loop step kind `{}`",
+                            node.name, other
+                        ));
+                    }
+                }
+                match node.op.args[5].as_str() {
+                    "current_lt" | "current_gt" => {}
+                    other if other.starts_with("carry") && other.ends_with("_lt") => {
+                        other[5..other.len() - 3].parse::<usize>().map_err(|_| {
+                            format!(
+                                "node `{}` has invalid flow control kind `{}`",
+                                node.name, other
+                            )
+                        })?;
+                    }
+                    other if other.starts_with("carry") && other.ends_with("_gt") => {
+                        other[5..other.len() - 3].parse::<usize>().map_err(|_| {
+                            format!(
+                                "node `{}` has invalid flow control kind `{}`",
+                                node.name, other
+                            )
+                        })?;
+                    }
+                    other => {
+                        return Err(format!(
+                            "node `{}` has invalid flow control kind `{}`",
+                            node.name, other
+                        ));
+                    }
+                }
+                match node.op.args[7].as_str() {
+                    "break" | "continue" => {}
+                    other => {
+                        return Err(format!(
+                            "node `{}` has invalid flow control action `{}`",
+                            node.name, other
+                        ));
+                    }
+                }
+                for chunk in node.op.args[8..].chunks(5) {
+                    let cond_kind = &chunk[1];
+                    match cond_kind.as_str() {
+                        "always" | "current_lt" | "current_gt" => {}
+                        _ if cond_kind.starts_with("carry") && cond_kind.ends_with("_lt") => {
+                            cond_kind[5..cond_kind.len() - 3]
+                                .parse::<usize>()
+                                .map_err(|_| {
+                                    format!(
+                                        "node `{}` has invalid conditional carry kind `{}`",
+                                        node.name, cond_kind
+                                    )
+                                })?;
+                        }
+                        _ if cond_kind.starts_with("carry") && cond_kind.ends_with("_gt") => {
+                            cond_kind[5..cond_kind.len() - 3]
+                                .parse::<usize>()
+                                .map_err(|_| {
+                                    format!(
+                                        "node `{}` has invalid conditional carry kind `{}`",
+                                        node.name, cond_kind
+                                    )
+                                })?;
+                        }
+                        _ => {
+                            return Err(format!(
+                                "node `{}` has invalid conditional carry kind `{}`",
+                                node.name, cond_kind
+                            ));
+                        }
+                    }
+                    for carry_kind in [&chunk[3], &chunk[4]] {
+                        if carry_kind == "keep" || carry_kind == "add_current" {
+                            continue;
+                        }
+                        if let Some(index) = carry_kind.strip_prefix("add_carry") {
+                            index.parse::<usize>().map_err(|_| {
+                                format!(
+                                    "node `{}` has invalid carry kind `{}`",
+                                    node.name, carry_kind
+                                )
+                            })?;
+                            continue;
+                        }
+                        return Err(format!(
+                            "node `{}` has invalid carry kind `{}`",
+                            node.name, carry_kind
+                        ));
+                    }
+                }
+                let mut inputs = node.op.args[..3].to_vec();
+                inputs.push(node.op.args[6].clone());
+                for chunk in node.op.args[8..].chunks(5) {
+                    inputs.push(chunk[0].clone());
+                    if chunk[1] != "always" {
+                        inputs.push(chunk[2].clone());
+                    }
+                }
+                Ok(InstructionSemantics::effect(inputs))
             }
             "guard_return" => {
                 if node.op.args.len() != 2 {
@@ -1471,27 +1976,224 @@ impl RegisteredMod for CpuMod {
                 );
                 Ok(Value::Unit)
             }
-            "loop_while_i64_accumulate" => {
+            "loop_while_i64_chain" => {
                 let initial = state.expect_value(&node.op.args[0])?.clone();
-                let carry_initial = state.expect_value(&node.op.args[1])?.clone();
-                let limit = state.expect_value(&node.op.args[2])?.clone();
-                let step = state.expect_value(&node.op.args[3])?.clone();
-                let cmp = node.op.args.get(4).map_or("<missing>", String::as_str);
-                let step_kind = node.op.args.get(5).map_or("<missing>", String::as_str);
-                let carry_kind = node.op.args.get(6).map_or("<missing>", String::as_str);
+                let limit = state.expect_value(&node.op.args[1])?.clone();
+                let step = state.expect_value(&node.op.args[2])?.clone();
+                let cmp = node.op.args.get(3).map_or("<missing>", String::as_str);
+                let step_kind = node.op.args.get(4).map_or("<missing>", String::as_str);
+                let carries = node.op.args[5..]
+                    .chunks(2)
+                    .map(|chunk| {
+                        let initial = state.expect_value(&chunk[0])?.clone();
+                        Ok(format!("{}:{}", initial, chunk[1]))
+                    })
+                    .collect::<Result<Vec<_>, String>>()?;
                 state.push_resource_event(
                     resource,
                     format!(
-                        "effect cpu.loop_while_i64_accumulate @{} [{}]: start {}, carry {}, loop while current {} {}, step {} {}, carry {}",
+                        "effect cpu.loop_while_i64_chain @{} [{}]: start {}, loop while current {} {}, step {} {}, carries {}",
                         node.resource,
                         resource.kind.raw,
                         initial,
-                        carry_initial,
                         cmp,
                         limit,
                         step_kind,
                         step,
-                        carry_kind
+                        carries.join(", ")
+                    ),
+                );
+                Ok(Value::Unit)
+            }
+            "loop_while_i64_cond_chain" => {
+                let initial = state.expect_value(&node.op.args[0])?.clone();
+                let limit = state.expect_value(&node.op.args[1])?.clone();
+                let step = state.expect_value(&node.op.args[2])?.clone();
+                let cmp = node.op.args.get(3).map_or("<missing>", String::as_str);
+                let step_kind = node.op.args.get(4).map_or("<missing>", String::as_str);
+                let carries = node.op.args[5..]
+                    .chunks(5)
+                    .map(|chunk| {
+                        let initial = state.expect_value(&chunk[0])?.clone();
+                        let rhs = if chunk[1] == "always" {
+                            "<always>".to_owned()
+                        } else {
+                            state.expect_value(&chunk[2])?.to_string()
+                        };
+                        Ok(format!(
+                            "{}:{} ? {} : {} @ {}",
+                            initial, chunk[1], chunk[3], chunk[4], rhs
+                        ))
+                    })
+                    .collect::<Result<Vec<_>, String>>()?;
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.loop_while_i64_cond_chain @{} [{}]: start {}, loop while current {} {}, step {} {}, carries {}",
+                        node.resource,
+                        resource.kind.raw,
+                        initial,
+                        cmp,
+                        limit,
+                        step_kind,
+                        step,
+                        carries.join(", ")
+                    ),
+                );
+                Ok(Value::Unit)
+            }
+            "loop_while_i64_flow_chain" => {
+                let initial = state.expect_value(&node.op.args[0])?.clone();
+                let limit = state.expect_value(&node.op.args[1])?.clone();
+                let step = state.expect_value(&node.op.args[2])?.clone();
+                let cmp = node.op.args.get(3).map_or("<missing>", String::as_str);
+                let step_kind = node.op.args.get(4).map_or("<missing>", String::as_str);
+                let control_kind = node.op.args.get(5).map_or("<missing>", String::as_str);
+                let control_rhs = state.expect_value(&node.op.args[6])?.to_string();
+                let control_action = node.op.args.get(7).map_or("<missing>", String::as_str);
+                let carries = node.op.args[8..]
+                    .chunks(2)
+                    .map(|chunk| {
+                        let initial = state.expect_value(&chunk[0])?.clone();
+                        Ok(format!("{}:{}", initial, chunk[1]))
+                    })
+                    .collect::<Result<Vec<_>, String>>()?;
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.loop_while_i64_flow_chain @{} [{}]: start {}, loop while current {} {}, step {} {}, if {} {} then {}, carries {}",
+                        node.resource,
+                        resource.kind.raw,
+                        initial,
+                        cmp,
+                        limit,
+                        step_kind,
+                        step,
+                        control_kind,
+                        control_rhs,
+                        control_action,
+                        carries.join(", ")
+                    ),
+                );
+                Ok(Value::Unit)
+            }
+            "loop_while_i64_post_flow_chain" => {
+                let initial = state.expect_value(&node.op.args[0])?.clone();
+                let limit = state.expect_value(&node.op.args[1])?.clone();
+                let step = state.expect_value(&node.op.args[2])?.clone();
+                let cmp = node.op.args.get(3).map_or("<missing>", String::as_str);
+                let step_kind = node.op.args.get(4).map_or("<missing>", String::as_str);
+                let control_kind = node.op.args.get(5).map_or("<missing>", String::as_str);
+                let control_rhs = state.expect_value(&node.op.args[6])?.to_string();
+                let control_action = node.op.args.get(7).map_or("<missing>", String::as_str);
+                let carries = node.op.args[8..]
+                    .chunks(2)
+                    .map(|chunk| {
+                        let initial = state.expect_value(&chunk[0])?.clone();
+                        Ok(format!("{}:{}", initial, chunk[1]))
+                    })
+                    .collect::<Result<Vec<_>, String>>()?;
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.loop_while_i64_post_flow_chain @{} [{}]: start {}, loop while current {} {}, step {} {}, update carries {}, then if {} {} {},",
+                        node.resource,
+                        resource.kind.raw,
+                        initial,
+                        cmp,
+                        limit,
+                        step_kind,
+                        step,
+                        carries.join(", "),
+                        control_kind,
+                        control_rhs,
+                        control_action,
+                    ),
+                );
+                Ok(Value::Unit)
+            }
+            "loop_while_i64_post_flow_cond_chain" => {
+                let initial = state.expect_value(&node.op.args[0])?.clone();
+                let limit = state.expect_value(&node.op.args[1])?.clone();
+                let step = state.expect_value(&node.op.args[2])?.clone();
+                let cmp = node.op.args.get(3).map_or("<missing>", String::as_str);
+                let step_kind = node.op.args.get(4).map_or("<missing>", String::as_str);
+                let control_kind = node.op.args.get(5).map_or("<missing>", String::as_str);
+                let control_rhs = state.expect_value(&node.op.args[6])?.to_string();
+                let control_action = node.op.args.get(7).map_or("<missing>", String::as_str);
+                let carries = node.op.args[8..]
+                    .chunks(5)
+                    .map(|chunk| {
+                        let initial = state.expect_value(&chunk[0])?.clone();
+                        let rhs = if chunk[1] == "always" {
+                            "<always>".to_owned()
+                        } else {
+                            state.expect_value(&chunk[2])?.to_string()
+                        };
+                        Ok(format!(
+                            "{}:{} ? {} : {} @ {}",
+                            initial, chunk[1], chunk[3], chunk[4], rhs
+                        ))
+                    })
+                    .collect::<Result<Vec<_>, String>>()?;
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.loop_while_i64_post_flow_cond_chain @{} [{}]: start {}, loop while current {} {}, step {} {}, update carries {}, then if {} {} {},",
+                        node.resource,
+                        resource.kind.raw,
+                        initial,
+                        cmp,
+                        limit,
+                        step_kind,
+                        step,
+                        carries.join(", "),
+                        control_kind,
+                        control_rhs,
+                        control_action,
+                    ),
+                );
+                Ok(Value::Unit)
+            }
+            "loop_while_i64_flow_cond_chain" => {
+                let initial = state.expect_value(&node.op.args[0])?.clone();
+                let limit = state.expect_value(&node.op.args[1])?.clone();
+                let step = state.expect_value(&node.op.args[2])?.clone();
+                let cmp = node.op.args.get(3).map_or("<missing>", String::as_str);
+                let step_kind = node.op.args.get(4).map_or("<missing>", String::as_str);
+                let control_kind = node.op.args.get(5).map_or("<missing>", String::as_str);
+                let control_rhs = state.expect_value(&node.op.args[6])?.to_string();
+                let control_action = node.op.args.get(7).map_or("<missing>", String::as_str);
+                let carries = node.op.args[8..]
+                    .chunks(5)
+                    .map(|chunk| {
+                        let initial = state.expect_value(&chunk[0])?.clone();
+                        let rhs = if chunk[1] == "always" {
+                            "<always>".to_owned()
+                        } else {
+                            state.expect_value(&chunk[2])?.to_string()
+                        };
+                        Ok(format!(
+                            "{}:{} ? {} : {} @ {}",
+                            initial, chunk[1], chunk[3], chunk[4], rhs
+                        ))
+                    })
+                    .collect::<Result<Vec<_>, String>>()?;
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.loop_while_i64_flow_cond_chain @{} [{}]: start {}, loop while current {} {}, step {} {}, if {} {} then {}, carries {}",
+                        node.resource,
+                        resource.kind.raw,
+                        initial,
+                        cmp,
+                        limit,
+                        step_kind,
+                        step,
+                        control_kind,
+                        control_rhs,
+                        control_action,
+                        carries.join(", ")
                     ),
                 );
                 Ok(Value::Unit)

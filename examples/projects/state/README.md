@@ -14,6 +14,16 @@ Start here:
 * [guarded_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/guarded_while_demo)
 * [counted_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/counted_while_demo)
 * [accumulating_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/accumulating_while_demo)
+* [chained_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/chained_while_demo)
+* [branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/branching_while_demo)
+* [breaking_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/breaking_while_demo)
+* [carried_breaking_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/carried_breaking_while_demo)
+* [flow_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/flow_branching_while_demo)
+* [flow_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/flow_continuing_while_demo)
+* [post_flow_breaking_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_breaking_while_demo)
+* [post_flow_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_while_demo)
+* [post_flow_branching_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_continuing_while_demo)
+* [post_flow_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_continuing_while_demo)
 * [sliding_window_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/sliding_window_state_demo)
 
 Reading rule:
