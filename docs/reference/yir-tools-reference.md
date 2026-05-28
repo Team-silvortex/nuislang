@@ -262,6 +262,12 @@ Current loading-contract direction is:
 * the canonical bootstrap symbol is `nustar.bootstrap.v1`
 * the canonical bootstrap signature is `extern "C" fn(*const NustarHostAbiV1, *const u8, usize, *mut NustarBootstrapResultV1) -> i32`
 * host/runtime bootstrap stays machine-ABI aware: current `.nustar` packages carry `machine_arch / machine_os / object_format / calling_abi`
+* package implementations are intended to be replaceable
+  * a platform-facing package such as an `x86_64-cpu-linux` `nustar` may be swapped
+    as long as registration completeness, standards legality, and loader-contract
+    requirements still validate
+  * this is also why frontend annotation spelling should be treated as a managed
+    convenience surface, not as the strongest semantic truth in the stack
 * `loader-contract` now also defines per-kind implementation-segment requirements, including container kind, implementation section name, required exports, required metadata, and link mode
 * machine ABI compatibility is explicit and inspectable
 * `abi_targets` now also participate in package inspection, loader-contract metadata, project auto-resolution, and CPU-target override validation
@@ -332,6 +338,8 @@ Read that as:
   `nuis.project.exchange.txt`, and `nuis.project.packet.txt`
   alongside the existing project manifest/modules/links/ABI indexes
   the packet index now records packet shape, field-order, and coarse field kind/role metadata
+  it now also records a first encode skeleton through `packet_encode_shape`,
+  `payload_bytes`, `payload_layout`, plus per-field `wire_kind` / `fixed_width`
   `@packet_field` currently means a payload slot specifically
   `@packet_control_field` currently means an explicit control-plane slot
   so control-plane roles must use the latter, while async-carrier / unsupported-shape roles are still rejected

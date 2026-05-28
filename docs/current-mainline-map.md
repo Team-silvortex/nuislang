@@ -24,6 +24,20 @@ local README for the area you are actively touching.
   [stdlib/std/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
 * annotation / intrinsic future edge:
   [reference/annotation-intrinsic-stdlib-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/annotation-intrinsic-stdlib-sketch.md)
+  shortest rule:
+  `official annotations are preferred frontend conventions; registered nustar capability contracts are the stable truth`
+* launcher / container / linker future edge:
+  [reference/nuis-launcher-container-linker-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-launcher-container-linker-sketch.md)
+  shortest rule:
+  `the operating system launches the program; nuis owns the program's real structure`
+* AOT lifecycle future edge:
+  [reference/nuis-aot-lifecycle-loop-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-aot-lifecycle-loop-sketch.md)
+  shortest rule:
+  `host main starts the process; nuis owns the lifecycle loop`
+* `nustar` ABI grain future edge:
+  [reference/nustar-abi-grain-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nustar-abi-grain-sketch.md)
+  shortest rule:
+  `one family package, many registered targets, one concrete built artifact`
 * trait/generic future edge:
   [reference/trait-generic-monomorphization-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/trait-generic-monomorphization-sketch.md)
 
@@ -206,6 +220,13 @@ Use these when you want the shortest explanation of how the current layers stack
   [net_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_session_recipe_demo)
   detailed route:
   [std-net-layering-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/std-net-layering-contract.md)
+* `nustar` replaceability:
+  frontend surface syntax may vary ->
+  registration completeness / standards legality validate ->
+  loader-contract binds stable capability truth
+  detailed route:
+  [reference/yir-tools-reference.md](/Users/Shared/chroot/dev/nuislang/docs/reference/yir-tools-reference.md) /
+  [reference/annotation-intrinsic-stdlib-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/annotation-intrinsic-stdlib-sketch.md)
 * text/data:
   [host_text_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/host_text_runtime_recipe.ns) ->
   [text_format_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/text_format_runtime_recipe.ns) ->

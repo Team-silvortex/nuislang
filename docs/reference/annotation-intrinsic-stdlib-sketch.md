@@ -30,6 +30,10 @@ The intended tradeoff is explicit:
 * more compiler control
 * more stable optimization and tooling behavior
 
+That should not be read as “surface syntax is the only truth”.
+The current repository already leans on `nustar` registration and loader
+contracts as the more stable semantic boundary.
+
 ## Design Rule
 
 Treat annotations as:
@@ -45,6 +49,35 @@ Do not treat annotations as:
 * user-defined code generators
 * procedural macros
 
+## Replaceability Rule
+
+Official annotations should be treated as the repository's preferred frontend
+conventions, not as the only legal long-term surface spelling.
+
+In practice:
+
+* the official frontend may spell a packet contract as `@packet`
+* another frontend could choose a different source spelling
+* both are acceptable if they bind to the same registered capability surface
+  and preserve the same validated downstream contract
+
+The stable truth should live in:
+
+* `nustar` registration metadata
+* registration-time completeness / standards validation
+* loader-contract requirements
+* lowered capability contracts that downstream `YIR` and packaging consume
+
+So the repository should optimize for:
+
+* replaceable surface syntax
+* replaceable `nustar` implementations
+* stable registered capability contracts
+
+This is especially important because platform packages such as an
+`x86_64-cpu-linux`-style `nustar` are expected to be replaceable, as long as
+their registration remains complete and standards-valid.
+
 ## Ownership Model
 
 Annotations should be standard-library-owned in the same sense that other
@@ -57,6 +90,13 @@ That means:
 * invalid annotations are hard errors
 * unknown annotations are hard errors
 * lowering behavior is fixed by compiler intrinsic handling, not user hooks
+
+But that ownership should still be read through the replaceability rule above:
+
+* official annotations are std-owned frontend conventions
+* they are not the sole source of semantic truth
+* the stronger long-lived boundary is the registered capability contract
+  carried through `nustar`
 
 This keeps annotations in the same “managed truth” bucket as:
 
@@ -166,6 +206,11 @@ Current first-step packet semantics should stay deliberately narrow:
 * distinguish coarse packet field roles such as `payload`, `control-plane`, `async-carrier`, and `unsupported-shape`
 * treat `@packet_field` as a payload-slot marker for now
 * treat `@packet_control_field` as an explicit control-plane slot marker for now
+* surface a first encode skeleton through metadata, not generated code
+  * `packet_encode_shape`
+  * `payload_bytes`
+  * `payload_layout`
+  * per-field `wire_kind` / `fixed_width`
 * start with narrow static packet-safety checks: packet structs must be non-empty, must declare at least one `@packet_field`, and currently reject `ref` / optional fields
 * allow control-plane families like `Marker<...>` and `HandleTable<...>` only through `@packet_control_field`
 * continue rejecting async-carrier families like `Task<...>` and `*Result<...>` for now
@@ -216,6 +261,8 @@ It should mean:
 * std defines the stable names and intent
 * compiler owns validation and lowering
 * docs present them as part of the std-facing programming model
+* `nustar` registration remains the stronger replaceable capability boundary
+  underneath that programming model
 
 So the real model is:
 
@@ -224,6 +271,14 @@ So the real model is:
 not:
 
 `ordinary library call + magical reflection later`
+
+and not:
+
+`single mandatory source spelling as the only semantic truth`
+
+The shortest repository rule is:
+
+`surface syntax is replaceable; registered capability contracts are the stable truth`
 
 ## First Milestone
 

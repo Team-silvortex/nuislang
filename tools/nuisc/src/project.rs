@@ -691,6 +691,102 @@ fn classify_packet_field_slot(field: &nuis_semantics::model::AstStructField) -> 
     }
 }
 
+fn packet_fixed_scalar_width(ty: &AstTypeRef) -> Option<usize> {
+    if ty.is_ref || ty.is_optional || !ty.generic_args.is_empty() {
+        return None;
+    }
+    match ty.name.as_str() {
+        "bool" => Some(1),
+        "i32" | "f32" => Some(4),
+        "i64" | "f64" => Some(8),
+        _ => None,
+    }
+}
+
+fn classify_packet_wire_kind(field: &nuis_semantics::model::AstStructField) -> &'static str {
+    match classify_packet_field_slot(field) {
+        "payload" => {
+            if let Some(width) = packet_fixed_scalar_width(&field.ty) {
+                return match (field.ty.name.as_str(), width) {
+                    ("bool", 1) => "bool",
+                    ("i32", 4) => "i32",
+                    ("i64", 8) => "i64",
+                    ("f32", 4) => "f32",
+                    ("f64", 8) => "f64",
+                    _ => "fixed-scalar",
+                };
+            }
+            match classify_packet_field_kind(&field.ty) {
+                "scalar" => "dynamic-scalar",
+                "nominal" => "nominal",
+                "container" => "container",
+                "ref" => "ref",
+                "optional" => "optional",
+                other => other,
+            }
+        }
+        "control" => "control-plane",
+        "invalid" => "invalid",
+        "none" => "none",
+        _ => "none",
+    }
+}
+
+fn packet_payload_layout(
+    definition: &nuis_semantics::model::AstStructDef,
+) -> Option<Vec<(usize, &str, &'static str, usize)>> {
+    let mut offset = 0usize;
+    let mut layout = Vec::new();
+    for field in &definition.fields {
+        if !has_ast_attribute(&field.attributes, "packet_field") {
+            continue;
+        }
+        let width = packet_fixed_scalar_width(&field.ty)?;
+        let wire_kind = classify_packet_wire_kind(field);
+        layout.push((offset, field.name.as_str(), wire_kind, width));
+        offset += width;
+    }
+    Some(layout)
+}
+
+fn describe_packet_payload_layout(
+    definition: &nuis_semantics::model::AstStructDef,
+) -> (String, String, &'static str) {
+    let has_control = definition
+        .fields
+        .iter()
+        .any(|field| has_ast_attribute(&field.attributes, "packet_control_field"));
+    let Some(layout) = packet_payload_layout(definition) else {
+        return (
+            "dynamic".to_owned(),
+            "intrinsic-only".to_owned(),
+            if has_control {
+                "dynamic-payload+control"
+            } else {
+                "dynamic-payload"
+            },
+        );
+    };
+    let payload_bytes = layout
+        .last()
+        .map(|(offset, _, _, width)| offset + width)
+        .unwrap_or(0);
+    let layout_description = layout
+        .into_iter()
+        .map(|(offset, name, wire_kind, width)| format!("{name}:{wire_kind}@{offset}+{width}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    (
+        payload_bytes.to_string(),
+        layout_description,
+        if has_control {
+            "fixed-payload+control"
+        } else {
+            "fixed-payload"
+        },
+    )
+}
+
 fn describe_packet_shape(definition: &nuis_semantics::model::AstStructDef) -> &'static str {
     let mut has_scalar = false;
     let mut has_non_scalar = false;
@@ -741,8 +837,10 @@ pub fn render_project_packet_index(project: &LoadedProject) -> String {
                 .count();
             let field_kinds = describe_packet_field_kind_counts(definition);
             let field_roles = describe_packet_field_role_counts(definition);
+            let (payload_bytes, payload_layout, encode_shape) =
+                describe_packet_payload_layout(definition);
             out.push_str(&format!(
-                "{}\t{}.{}.{}\tfields={}\tpacket_fields={}\tpacket_control_fields={}\tpacket_shape={}\tfield_kinds={}\tfield_roles={}\n",
+                "{}\t{}.{}.{}\tfields={}\tpacket_fields={}\tpacket_control_fields={}\tpacket_shape={}\tfield_kinds={}\tfield_roles={}\tpacket_encode_shape={}\tpayload_bytes={}\tpayload_layout={}\n",
                 relative,
                 project_module.ast.domain,
                 project_module.ast.unit,
@@ -752,18 +850,26 @@ pub fn render_project_packet_index(project: &LoadedProject) -> String {
                 packet_control_fields,
                 describe_packet_shape(definition),
                 field_kinds,
-                field_roles
+                field_roles,
+                encode_shape,
+                payload_bytes,
+                payload_layout
             ));
             for (index, field) in definition.fields.iter().enumerate() {
                 let kind = classify_packet_field_kind(&field.ty);
+                let fixed_width = packet_fixed_scalar_width(&field.ty)
+                    .map(|width| width.to_string())
+                    .unwrap_or_else(|| "dynamic".to_owned());
                 out.push_str(&format!(
-                    "\tindex={}\t{}\t{}\tkind={}\trole={}\tpacket_slot={}\tpacket_field={}\tpacket_control_field={}\n",
+                    "\tindex={}\t{}\t{}\tkind={}\trole={}\tpacket_slot={}\twire_kind={}\tfixed_width={}\tpacket_field={}\tpacket_control_field={}\n",
                     index,
                     field.name,
                     render_ast_type_ref(&field.ty),
                     kind,
                     classify_packet_field_role(kind),
                     classify_packet_field_slot(field),
+                    classify_packet_wire_kind(field),
+                    fixed_width,
                     has_ast_attribute(&field.attributes, "packet_field"),
                     has_ast_attribute(&field.attributes, "packet_control_field")
                 ));
@@ -5826,15 +5932,15 @@ mod tests {
         )]);
         let rendered = render_project_packet_index(&project);
         assert!(rendered.contains(
-            "main.ns\tcpu.Main.Packet\tfields=2\tpacket_fields=1\tpacket_control_fields=0\tpacket_shape=scalar-only\tfield_kinds=scalar=2\tfield_roles=payload=2"
+            "main.ns\tcpu.Main.Packet\tfields=2\tpacket_fields=1\tpacket_control_fields=0\tpacket_shape=scalar-only\tfield_kinds=scalar=2\tfield_roles=payload=2\tpacket_encode_shape=fixed-payload\tpayload_bytes=8\tpayload_layout=lhs:i64@0+8"
         ));
         assert!(
             rendered.contains(
-                "\tindex=0\tlhs\ti64\tkind=scalar\trole=payload\tpacket_slot=payload\tpacket_field=true\tpacket_control_field=false"
+                "\tindex=0\tlhs\ti64\tkind=scalar\trole=payload\tpacket_slot=payload\twire_kind=i64\tfixed_width=8\tpacket_field=true\tpacket_control_field=false"
             )
         );
         assert!(rendered.contains(
-            "\tindex=1\trhs\tbool\tkind=scalar\trole=payload\tpacket_slot=none\tpacket_field=false\tpacket_control_field=false"
+            "\tindex=1\trhs\tbool\tkind=scalar\trole=payload\tpacket_slot=none\twire_kind=none\tfixed_width=1\tpacket_field=false\tpacket_control_field=false"
         ));
     }
 
@@ -5859,11 +5965,13 @@ mod tests {
         assert!(rendered.contains("packet_shape=carrier-mixed"));
         assert!(rendered.contains("field_kinds=container=1, marker=1"));
         assert!(rendered.contains("field_roles=control-plane=1, payload=1"));
+        assert!(rendered.contains("packet_encode_shape=dynamic-payload"));
+        assert!(rendered.contains("payload_bytes=dynamic"));
         assert!(rendered.contains(
-            "\tindex=0\tpayload\tWindow<i64>\tkind=container\trole=payload\tpacket_slot=payload\tpacket_field=true\tpacket_control_field=false"
+            "\tindex=0\tpayload\tWindow<i64>\tkind=container\trole=payload\tpacket_slot=payload\twire_kind=container\tfixed_width=dynamic\tpacket_field=true\tpacket_control_field=false"
         ));
         assert!(rendered.contains(
-            "\tindex=1\ttag\tMarker<Tag>\tkind=marker\trole=control-plane\tpacket_slot=none\tpacket_field=false\tpacket_control_field=false"
+            "\tindex=1\ttag\tMarker<Tag>\tkind=marker\trole=control-plane\tpacket_slot=none\twire_kind=none\tfixed_width=dynamic\tpacket_field=false\tpacket_control_field=false"
         ));
     }
 
@@ -5888,9 +5996,37 @@ mod tests {
         validate_project_modules(&project.modules).unwrap();
         let rendered = render_project_packet_index(&project);
         assert!(rendered.contains("packet_control_fields=1"));
+        assert!(rendered.contains("packet_encode_shape=fixed-payload+control"));
+        assert!(rendered.contains("payload_layout=payload:i64@0+8"));
         assert!(rendered.contains(
-            "\tindex=1\ttag\tMarker<Tag>\tkind=marker\trole=control-plane\tpacket_slot=control\tpacket_field=false\tpacket_control_field=true"
+            "\tindex=1\ttag\tMarker<Tag>\tkind=marker\trole=control-plane\tpacket_slot=control\twire_kind=control-plane\tfixed_width=dynamic\tpacket_field=false\tpacket_control_field=true"
         ));
+    }
+
+    #[test]
+    fn renders_packet_payload_layout_for_multiple_fixed_scalars() {
+        let project = project_with_modules(vec![(
+            "main.ns",
+            r#"
+            mod cpu Main {
+              @packet
+              struct Packet {
+                @packet_field
+                lhs: i32,
+                @packet_field
+                rhs: bool,
+                @packet_field
+                bias: i64,
+              }
+
+              fn main() -> i64 { return 1; }
+            }
+            "#,
+        )]);
+        let rendered = render_project_packet_index(&project);
+        assert!(rendered.contains("packet_encode_shape=fixed-payload"));
+        assert!(rendered.contains("payload_bytes=13"));
+        assert!(rendered.contains("payload_layout=lhs:i32@0+4, rhs:bool@4+1, bias:i64@5+8"));
     }
 
     #[test]
