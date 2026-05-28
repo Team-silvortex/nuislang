@@ -23,6 +23,10 @@ The key thing that is already real today is not “all language features are don
 
 That model is increasingly enforced through `YIR` contracts, project validation, per-domain `nustar` manifests, and verifier checks rather than only ad hoc frontend rules.
 
+Current phase snapshot:
+
+* [docs/versioning/nuis-0.13.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.13.0-snapshot.md)
+
 ## Toolchain
 
 ```text
@@ -108,6 +112,15 @@ High-signal implemented surfaces:
 * explicit `--cpu-abi` and `--target` overrides for CPU builds
 * compile-cache inspection and pruning through `nuis`
 * AOT bundle generation for current CPU-only and macOS window-hosted demo paths
+* source visibility boundaries through minimal `pub/private`
+* `project-status` / `project-doctor` public-surface reporting
+* intrinsic frontend annotations for `@test`, `@export`, `@inline`,
+  `@noinline`, and `@host_symbol`
+* first constrained trait/generic monomorphization slices
+* packet schema/contract metadata through `@packet`,
+  `@packet_field`, and `@packet_control_field`
+* executable `while` subsets for counted/carry/flow-style loops
+* `std net` low-level syscall/socket/flow layering
 * project-level host FFI contract indexing
 * `ns-nova` framework manifests with family/render/selection assembly metadata for `core / ui / future scene` layering
 * `cpu/data/shader/kernel` result-family validation in `YIR`

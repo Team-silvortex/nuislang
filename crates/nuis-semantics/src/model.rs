@@ -36,6 +36,7 @@ pub struct AstModule {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AstExternFunction {
+    pub visibility: AstVisibility,
     pub abi: String,
     pub interface: Option<String>,
     pub name: String,
@@ -46,6 +47,7 @@ pub struct AstExternFunction {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AstExternInterface {
+    pub visibility: AstVisibility,
     pub abi: String,
     pub name: String,
     pub methods: Vec<AstExternFunction>,
@@ -305,6 +307,7 @@ pub struct NirModule {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NirExternFunction {
+    pub visibility: NirVisibility,
     pub abi: String,
     pub interface: Option<String>,
     pub name: String,
@@ -315,6 +318,7 @@ pub struct NirExternFunction {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NirExternInterface {
+    pub visibility: NirVisibility,
     pub abi: String,
     pub name: String,
     pub methods: Vec<NirExternFunction>,

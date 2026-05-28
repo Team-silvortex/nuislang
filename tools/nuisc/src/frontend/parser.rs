@@ -24,12 +24,19 @@ impl Parser {
         while self.peek_word("use") {
             uses.push(self.parse_use_decl()?);
         }
-        while self.peek_word("extern") {
+        while self.peek_item_keyword_after_attributes("extern") {
+            let (visibility, attributes) = self.parse_visibility_and_attribute_list()?;
+            if !attributes.is_empty() {
+                return Err(
+                    "module-level extern declarations currently only support `pub` before `extern`"
+                        .to_owned(),
+                );
+            }
             let abi = self.parse_extern_abi()?;
             if self.peek_word("interface") {
-                extern_interfaces.push(self.parse_extern_interface(abi)?);
+                extern_interfaces.push(self.parse_extern_interface(visibility, abi)?);
             } else {
-                externs.push(self.parse_extern_function_with_abi(abi, None)?);
+                externs.push(self.parse_extern_function_with_abi(visibility, abi, None)?);
             }
         }
         self.expect_word("mod")?;
@@ -45,12 +52,19 @@ impl Parser {
             if self.peek_word("mod") {
                 return Err("nested mod definitions are not allowed".to_owned());
             }
-            if self.peek_word("extern") {
+            if self.peek_item_keyword_after_attributes("extern") {
+                let (visibility, attributes) = self.parse_visibility_and_attribute_list()?;
+                if !attributes.is_empty() {
+                    return Err(
+                        "module-level extern declarations currently only support `pub` before `extern`"
+                            .to_owned(),
+                    );
+                }
                 let abi = self.parse_extern_abi()?;
                 if self.peek_word("interface") {
-                    extern_interfaces.push(self.parse_extern_interface(abi)?);
+                    extern_interfaces.push(self.parse_extern_interface(visibility, abi)?);
                 } else {
-                    externs.push(self.parse_extern_function_with_abi(abi, None)?);
+                    externs.push(self.parse_extern_function_with_abi(visibility, abi, None)?);
                 }
             } else if self.peek_item_keyword_after_attributes("struct") {
                 structs.push(self.parse_struct_def()?);
@@ -206,6 +220,18 @@ impl Parser {
     }
 
     fn parse_trait_method_sig(&mut self) -> Result<AstTraitMethodSig, String> {
+        let (visibility, attributes) = self.parse_visibility_and_attribute_list()?;
+        if !matches!(visibility, AstVisibility::Private) {
+            return Err(
+                "trait methods do not support independent `pub` visibility in the current frontend"
+                    .to_owned(),
+            );
+        }
+        if !attributes.is_empty() {
+            return Err(
+                "trait method annotations are not supported in the current frontend".to_owned(),
+            );
+        }
         self.expect_word("fn")?;
         let name = self.expect_ident()?;
         self.expect_symbol('(')?;
@@ -248,6 +274,18 @@ impl Parser {
     }
 
     fn parse_impl_method(&mut self) -> Result<AstImplMethod, String> {
+        let (visibility, attributes) = self.parse_visibility_and_attribute_list()?;
+        if !matches!(visibility, AstVisibility::Private) {
+            return Err(
+                "impl methods do not support independent `pub` visibility in the current frontend"
+                    .to_owned(),
+            );
+        }
+        if !attributes.is_empty() {
+            return Err(
+                "impl method annotations are not supported in the current frontend".to_owned(),
+            );
+        }
         self.expect_word("fn")?;
         let name = self.expect_ident()?;
         self.expect_symbol('(')?;
@@ -284,20 +322,34 @@ impl Parser {
         })
     }
 
-    fn parse_extern_interface(&mut self, abi: String) -> Result<AstExternInterface, String> {
+    fn parse_extern_interface(
+        &mut self,
+        visibility: AstVisibility,
+        abi: String,
+    ) -> Result<AstExternInterface, String> {
         self.expect_word("interface")?;
         let name = self.expect_ident()?;
         self.expect_symbol('{')?;
         let mut methods = Vec::new();
         while !self.peek_symbol('}') {
-            methods.push(self.parse_extern_function_with_abi(abi.clone(), Some(name.clone()))?);
+            methods.push(self.parse_extern_function_with_abi(
+                AstVisibility::Private,
+                abi.clone(),
+                Some(name.clone()),
+            )?);
         }
         self.expect_symbol('}')?;
-        Ok(AstExternInterface { abi, name, methods })
+        Ok(AstExternInterface {
+            visibility,
+            abi,
+            name,
+            methods,
+        })
     }
 
     fn parse_extern_function_with_abi(
         &mut self,
+        visibility: AstVisibility,
         abi: String,
         interface: Option<String>,
     ) -> Result<AstExternFunction, String> {
@@ -315,6 +367,7 @@ impl Parser {
         let return_type = self.parse_type_ref()?;
         self.expect_symbol(';')?;
         Ok(AstExternFunction {
+            visibility,
             abi,
             interface,
             name,

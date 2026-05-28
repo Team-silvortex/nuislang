@@ -2924,7 +2924,7 @@ mod tests {
         BuildManifestCacheInfo, BuildManifestContext, BuildManifestProjectInfo, CompileArtifacts,
         CpuBuildTarget,
     };
-    use nuis_semantics::model::{AstExternFunction, AstModule, AstTypeRef};
+    use nuis_semantics::model::{AstExternFunction, AstModule, AstTypeRef, AstVisibility};
     use std::{
         fs,
         path::PathBuf,
@@ -3096,6 +3096,7 @@ mod tests {
             unit: "Main".to_owned(),
             externs: vec![
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_argv_count".to_owned(),
@@ -3104,6 +3105,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_cwd_handle".to_owned(),
@@ -3112,6 +3114,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_monotonic_time_ns".to_owned(),
@@ -3151,6 +3154,7 @@ mod tests {
             unit: "Main".to_owned(),
             externs: vec![
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_env_has".to_owned(),
@@ -3162,6 +3166,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_path_basename".to_owned(),
@@ -3173,6 +3178,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_path_filename".to_owned(),
@@ -3184,6 +3190,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_path_basename_matches".to_owned(),
@@ -3201,6 +3208,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_path_filename_matches".to_owned(),
@@ -3218,6 +3226,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_path_parent_matches".to_owned(),
@@ -3235,6 +3244,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_path_stem_matches".to_owned(),
@@ -3252,6 +3262,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_path_parent".to_owned(),
@@ -3263,6 +3274,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_path_has_parent".to_owned(),
@@ -3274,6 +3286,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_path_is_basename_only".to_owned(),
@@ -3285,6 +3298,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_path_depth".to_owned(),
@@ -3296,6 +3310,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_path_is_empty".to_owned(),
@@ -3307,6 +3322,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_path_is_dot".to_owned(),
@@ -3318,6 +3334,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_path_is_dotdot".to_owned(),
@@ -3329,6 +3346,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_path_is_relative".to_owned(),
@@ -3340,6 +3358,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_path_is_root".to_owned(),
@@ -3351,6 +3370,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_path_stem".to_owned(),
@@ -3362,6 +3382,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_path_extension".to_owned(),
@@ -3373,6 +3394,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_path_has_extension".to_owned(),
@@ -3384,6 +3406,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_path_matches_extension".to_owned(),
@@ -3401,6 +3424,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_path_extension_is".to_owned(),
@@ -3418,6 +3442,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_path_starts_with_dot".to_owned(),
@@ -3429,6 +3454,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_path_ends_with_slash".to_owned(),
@@ -3440,6 +3466,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_path_is_hidden".to_owned(),
@@ -3451,6 +3478,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_stat_mode".to_owned(),
@@ -3513,6 +3541,7 @@ mod tests {
             unit: "Main".to_owned(),
             externs: vec![
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_file_open".to_owned(),
@@ -3530,6 +3559,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_file_write".to_owned(),
@@ -3547,6 +3577,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_stdin_read".to_owned(),
@@ -3564,6 +3595,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_tty_width".to_owned(),
@@ -3605,6 +3637,7 @@ mod tests {
             unit: "Main".to_owned(),
             externs: vec![
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_network_connect_probe".to_owned(),
@@ -3626,6 +3659,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_network_accept_probe".to_owned(),
@@ -3647,6 +3681,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_network_open_tcp_listener".to_owned(),
@@ -3668,6 +3703,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_network_bind_udp_datagram".to_owned(),
@@ -3689,6 +3725,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_network_accept_owned".to_owned(),
@@ -3710,6 +3747,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_network_close".to_owned(),
@@ -3721,6 +3759,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_network_send_owned".to_owned(),
@@ -3742,6 +3781,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_network_recv_owned".to_owned(),
@@ -3763,6 +3803,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_network_recv_http_status_owned".to_owned(),
@@ -3784,6 +3825,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_network_send_probe".to_owned(),
@@ -3805,6 +3847,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_network_recv_probe".to_owned(),
@@ -3882,6 +3925,7 @@ mod tests {
             unit: "Main".to_owned(),
             externs: vec![
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_dir_open".to_owned(),
@@ -3893,6 +3937,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_dir_create".to_owned(),
@@ -3904,6 +3949,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_dir_remove".to_owned(),
@@ -3915,6 +3961,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_path_rename".to_owned(),
@@ -3932,6 +3979,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_path_copy".to_owned(),
@@ -3949,6 +3997,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_path_remove".to_owned(),
@@ -3960,6 +4009,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_temp_file_handle".to_owned(),
@@ -3971,6 +4021,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_command_spawn".to_owned(),
@@ -4024,6 +4075,7 @@ mod tests {
             unit: "Main".to_owned(),
             externs: vec![
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_command_wait_exit".to_owned(),
@@ -4035,6 +4087,7 @@ mod tests {
                     host_symbol: None,
                 },
                 AstExternFunction {
+                    visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
                     name: "host_subprocess_join_exit".to_owned(),
@@ -4075,6 +4128,7 @@ mod tests {
             domain: "cpu".to_owned(),
             unit: "Main".to_owned(),
             externs: vec![AstExternFunction {
+                visibility: AstVisibility::Private,
                 abi: "c".to_owned(),
                 interface: None,
                 name: "host_text_concat".to_owned(),
@@ -4118,6 +4172,7 @@ mod tests {
             domain: "cpu".to_owned(),
             unit: "Main".to_owned(),
             externs: vec![AstExternFunction {
+                visibility: AstVisibility::Private,
                 abi: "c".to_owned(),
                 interface: None,
                 name: "usleep".to_owned(),

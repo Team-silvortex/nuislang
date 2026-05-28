@@ -10,7 +10,7 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-use nuis_semantics::model::{AstExpr, AstFunction, AstModule, AstStmt, AstTypeRef};
+use nuis_semantics::model::{AstExpr, AstFunction, AstModule, AstStmt, AstTypeRef, AstVisibility};
 
 fn main() {
     let result = thread::Builder::new()
@@ -853,6 +853,176 @@ fn json_object_array_field(name: &str, values: &[String]) -> String {
     format!("\"{}\":[{}]", name, values.join(","))
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PublicSurfaceModuleRecord {
+    module: String,
+    externs: Vec<String>,
+    extern_interfaces: Vec<String>,
+    functions: Vec<String>,
+    structs: Vec<String>,
+    traits: Vec<String>,
+}
+
+impl PublicSurfaceModuleRecord {
+    fn is_empty(&self) -> bool {
+        self.externs.is_empty()
+            && self.extern_interfaces.is_empty()
+            && self.functions.is_empty()
+            && self.structs.is_empty()
+            && self.traits.is_empty()
+    }
+}
+
+fn public_surface_records(
+    project: &nuisc::project::LoadedProject,
+) -> Vec<PublicSurfaceModuleRecord> {
+    project
+        .modules
+        .iter()
+        .filter_map(|module| {
+            let externs = module
+                .ast
+                .externs
+                .iter()
+                .filter(|function| matches!(function.visibility, AstVisibility::Public))
+                .map(|function| function.name.clone())
+                .collect::<Vec<_>>();
+            let extern_interfaces = module
+                .ast
+                .extern_interfaces
+                .iter()
+                .filter(|interface| matches!(interface.visibility, AstVisibility::Public))
+                .map(|interface| interface.name.clone())
+                .collect::<Vec<_>>();
+            let functions = module
+                .ast
+                .functions
+                .iter()
+                .filter(|function| matches!(function.visibility, AstVisibility::Public))
+                .map(|function| function.name.clone())
+                .collect::<Vec<_>>();
+            let structs = module
+                .ast
+                .structs
+                .iter()
+                .filter(|definition| matches!(definition.visibility, AstVisibility::Public))
+                .map(|definition| {
+                    let public_fields = definition
+                        .fields
+                        .iter()
+                        .filter(|field| matches!(field.visibility, AstVisibility::Public))
+                        .count();
+                    let hidden_fields = definition.fields.len().saturating_sub(public_fields);
+                    if hidden_fields == 0 {
+                        format!("{}(fields={public_fields})", definition.name)
+                    } else {
+                        format!(
+                            "{}(fields={public_fields}, hidden={hidden_fields})",
+                            definition.name
+                        )
+                    }
+                })
+                .collect::<Vec<_>>();
+            let traits = module
+                .ast
+                .traits
+                .iter()
+                .filter(|definition| matches!(definition.visibility, AstVisibility::Public))
+                .map(|definition| definition.name.clone())
+                .collect::<Vec<_>>();
+            let record = PublicSurfaceModuleRecord {
+                module: format!("{}::{}", module.ast.domain, module.ast.unit),
+                externs,
+                extern_interfaces,
+                functions,
+                structs,
+                traits,
+            };
+            if record.is_empty() {
+                None
+            } else {
+                Some(record)
+            }
+        })
+        .collect()
+}
+
+fn describe_public_surface(records: &[PublicSurfaceModuleRecord]) -> String {
+    let extern_count = records
+        .iter()
+        .map(|record| record.externs.len())
+        .sum::<usize>();
+    let extern_interface_count = records
+        .iter()
+        .map(|record| record.extern_interfaces.len())
+        .sum::<usize>();
+    let function_count = records
+        .iter()
+        .map(|record| record.functions.len())
+        .sum::<usize>();
+    let struct_count = records
+        .iter()
+        .map(|record| record.structs.len())
+        .sum::<usize>();
+    let trait_count = records
+        .iter()
+        .map(|record| record.traits.len())
+        .sum::<usize>();
+    let module_count = records.len();
+    if module_count == 0 {
+        return "<none>".to_owned();
+    }
+    format!(
+        "modules={module_count} extern={extern_count} interface={extern_interface_count} fn={function_count} struct={struct_count} trait={trait_count}"
+    )
+}
+
+fn describe_public_surface_modules(records: &[PublicSurfaceModuleRecord]) -> String {
+    if records.is_empty() {
+        return "<none>".to_owned();
+    }
+    records
+        .iter()
+        .map(|record| {
+            let mut segments = Vec::new();
+            if !record.externs.is_empty() {
+                segments.push(format!("extern={}", record.externs.join(", ")));
+            }
+            if !record.extern_interfaces.is_empty() {
+                segments.push(format!("interface={}", record.extern_interfaces.join(", ")));
+            }
+            if !record.functions.is_empty() {
+                segments.push(format!("fn={}", record.functions.join(", ")));
+            }
+            if !record.structs.is_empty() {
+                segments.push(format!("struct={}", record.structs.join(", ")));
+            }
+            if !record.traits.is_empty() {
+                segments.push(format!("trait={}", record.traits.join(", ")));
+            }
+            format!("{} [{}]", record.module, segments.join(" | "))
+        })
+        .collect::<Vec<_>>()
+        .join("; ")
+}
+
+fn public_surface_json(records: &[PublicSurfaceModuleRecord]) -> Vec<String> {
+    records
+        .iter()
+        .map(|record| {
+            format!(
+                "{{{},{},{},{},{},{}}}",
+                json_field("module", &record.module),
+                json_string_array_field("externs", &record.externs),
+                json_string_array_field("extern_interfaces", &record.extern_interfaces),
+                json_string_array_field("functions", &record.functions),
+                json_string_array_field("structs", &record.structs),
+                json_string_array_field("traits", &record.traits),
+            )
+        })
+        .collect()
+}
+
 fn project_plan_json_fields(plan: &nuisc::project::ProjectCompilationPlan) -> Vec<String> {
     vec![
         json_field(
@@ -1201,6 +1371,7 @@ fn handle_project_status(input: std::path::PathBuf, json: bool) -> Result<(), St
     }
     let project = nuisc::project::load_project(&input)?;
     let plan = nuisc::project::build_project_compilation_plan(&project)?;
+    let public_surface = public_surface_records(&project);
     let galaxy_lock_status = galaxy::verify_project_lock(&input);
     let galaxy_manifest_path = project.root.join("galaxy.toml");
     let include_galaxy_flow =
@@ -1216,6 +1387,14 @@ fn handle_project_status(input: std::path::PathBuf, json: bool) -> Result<(), St
     println!("  manifest: {}", project.manifest_path.display());
     println!("  entry: {}", project.manifest.entry);
     println!("  modules: {}", project.modules.len());
+    println!(
+        "  public_surface: {}",
+        describe_public_surface(&public_surface)
+    );
+    print_scheduler_sample_field(
+        "public_surface_modules",
+        &describe_public_surface_modules(&public_surface),
+    );
     println!("  links: {}", project.manifest.links.len());
     println!(
         "  project_plan: {}",
@@ -1352,6 +1531,7 @@ fn handle_project_status(input: std::path::PathBuf, json: bool) -> Result<(), St
 fn handle_project_status_json(input: std::path::PathBuf) -> Result<(), String> {
     let project = nuisc::project::load_project(&input)?;
     let plan = nuisc::project::build_project_compilation_plan(&project)?;
+    let public_surface = public_surface_records(&project);
     let galaxy_lock_status = galaxy::verify_project_lock(&input);
     let galaxy_manifest_path = project.root.join("galaxy.toml");
     let include_galaxy_flow =
@@ -1373,6 +1553,27 @@ fn handle_project_status_json(input: std::path::PathBuf) -> Result<(), String> {
         })
         .collect::<Vec<_>>();
     let domain_json = project_plan_domains_json(&plan)?;
+    let public_surface_json = public_surface_json(&public_surface);
+    let public_extern_count = public_surface
+        .iter()
+        .map(|record| record.externs.len())
+        .sum::<usize>();
+    let public_extern_interface_count = public_surface
+        .iter()
+        .map(|record| record.extern_interfaces.len())
+        .sum::<usize>();
+    let public_function_count = public_surface
+        .iter()
+        .map(|record| record.functions.len())
+        .sum::<usize>();
+    let public_struct_count = public_surface
+        .iter()
+        .map(|record| record.structs.len())
+        .sum::<usize>();
+    let public_trait_count = public_surface
+        .iter()
+        .map(|record| record.traits.len())
+        .sum::<usize>();
     let mut fields = vec![
         json_field("source_kind", "project"),
         json_field("input", &input.display().to_string()),
@@ -1381,6 +1582,12 @@ fn handle_project_status_json(input: std::path::PathBuf) -> Result<(), String> {
         json_field("manifest", &project.manifest_path.display().to_string()),
         json_field("entry", &project.manifest.entry),
         json_usize_field("modules", project.modules.len()),
+        json_usize_field("public_surface_modules", public_surface.len()),
+        json_usize_field("public_externs", public_extern_count),
+        json_usize_field("public_extern_interfaces", public_extern_interface_count),
+        json_usize_field("public_functions", public_function_count),
+        json_usize_field("public_structs", public_struct_count),
+        json_usize_field("public_traits", public_trait_count),
         json_usize_field("links", project.manifest.links.len()),
     ];
     fields.extend(project_plan_json_fields(&plan));
@@ -1456,6 +1663,10 @@ fn handle_project_status_json(input: std::path::PathBuf) -> Result<(), String> {
         }
     }
     fields.push(json_object_array_field("tests", &test_json));
+    fields.push(json_object_array_field(
+        "public_surface_records",
+        &public_surface_json,
+    ));
     println!("{{{},\"domains\":[{}]}}", fields.join(","), domain_json);
     Ok(())
 }
@@ -1466,6 +1677,7 @@ fn handle_project_doctor(input: std::path::PathBuf, json: bool) -> Result<(), St
     }
     let project = nuisc::project::load_project(&input)?;
     let plan = nuisc::project::build_project_compilation_plan(&project)?;
+    let public_surface = public_surface_records(&project);
     let declared_tests = project
         .manifest
         .tests
@@ -1511,6 +1723,14 @@ fn handle_project_doctor(input: std::path::PathBuf, json: bool) -> Result<(), St
     println!("  manifest: {}", project.manifest_path.display());
     println!("  entry: {}", project.manifest.entry);
     println!("  modules: {}", project.modules.len());
+    println!(
+        "  public_surface: {}",
+        describe_public_surface(&public_surface)
+    );
+    print_scheduler_sample_field(
+        "public_surface_modules",
+        &describe_public_surface_modules(&public_surface),
+    );
     println!("  links: {}", project.manifest.links.len());
     println!(
         "  project_plan: {}",
@@ -1809,6 +2029,7 @@ fn handle_project_doctor(input: std::path::PathBuf, json: bool) -> Result<(), St
 fn handle_project_doctor_json(input: std::path::PathBuf) -> Result<(), String> {
     let project = nuisc::project::load_project(&input)?;
     let plan = nuisc::project::build_project_compilation_plan(&project)?;
+    let public_surface = public_surface_records(&project);
     let declared_tests = project
         .manifest
         .tests
@@ -1967,6 +2188,27 @@ fn handle_project_doctor_json(input: std::path::PathBuf) -> Result<(), String> {
         );
     }
     let domain_json = project_plan_domains_json(&plan)?;
+    let public_surface_json = public_surface_json(&public_surface);
+    let public_extern_count = public_surface
+        .iter()
+        .map(|record| record.externs.len())
+        .sum::<usize>();
+    let public_extern_interface_count = public_surface
+        .iter()
+        .map(|record| record.extern_interfaces.len())
+        .sum::<usize>();
+    let public_function_count = public_surface
+        .iter()
+        .map(|record| record.functions.len())
+        .sum::<usize>();
+    let public_struct_count = public_surface
+        .iter()
+        .map(|record| record.structs.len())
+        .sum::<usize>();
+    let public_trait_count = public_surface
+        .iter()
+        .map(|record| record.traits.len())
+        .sum::<usize>();
     let tests_json = declared_tests
         .iter()
         .map(|path| {
@@ -2004,6 +2246,12 @@ fn handle_project_doctor_json(input: std::path::PathBuf) -> Result<(), String> {
         json_field("manifest", &project.manifest_path.display().to_string()),
         json_field("entry", &project.manifest.entry),
         json_usize_field("modules", project.modules.len()),
+        json_usize_field("public_surface_modules", public_surface.len()),
+        json_usize_field("public_externs", public_extern_count),
+        json_usize_field("public_extern_interfaces", public_extern_interface_count),
+        json_usize_field("public_functions", public_function_count),
+        json_usize_field("public_structs", public_struct_count),
+        json_usize_field("public_traits", public_trait_count),
         json_usize_field("links", project.manifest.links.len()),
     ];
     fields.extend(project_plan_json_fields(&plan));
@@ -2082,6 +2330,10 @@ fn handle_project_doctor_json(input: std::path::PathBuf) -> Result<(), String> {
     }
     fields.push(json_string_array_field("next_steps", &next_steps));
     fields.push(json_object_array_field("tests", &tests_json));
+    fields.push(json_object_array_field(
+        "public_surface_records",
+        &public_surface_json,
+    ));
     fields.push(json_object_array_field(
         "galaxy_dependencies",
         &dependency_json,

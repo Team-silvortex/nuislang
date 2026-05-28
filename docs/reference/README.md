@@ -6,6 +6,11 @@ If you want to understand what is true in the repository today, this is usually
 the best documentation layer to read first after the top-level
 [README.md](/Users/Shared/chroot/dev/nuislang/README.md).
 
+If you want a short phase summary before drilling into individual
+contracts, start with:
+
+* [../versioning/nuis-0.13.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.13.0-snapshot.md)
+
 ## Reading Order
 
 Start in this order:

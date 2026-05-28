@@ -26,8 +26,10 @@ pub fn render_ast(module: &AstModule) -> String {
             .as_ref()
             .map(|symbol| format!("@host_symbol(\"{}\") ", escape_debug(symbol)))
             .unwrap_or_default();
+        let visibility_prefix = render_ast_visibility(function.visibility);
         out.push_str(&format!(
-            "  extern \"{}\" {}fn {}({}) -> {}\n",
+            "  {}extern \"{}\" {}fn {}({}) -> {}\n",
+            visibility_prefix,
             function.abi,
             host_prefix,
             function.name,
@@ -131,8 +133,10 @@ pub fn render_nir(module: &NirModule) -> String {
             .as_ref()
             .map(|symbol| format!("@host_symbol(\"{}\") ", escape_debug(symbol)))
             .unwrap_or_default();
+        let visibility_prefix = render_nir_visibility(function.visibility);
         out.push_str(&format!(
-            "  extern \"{}\" {}fn {}({}) -> {}\n",
+            "  {}extern \"{}\" {}fn {}({}) -> {}\n",
+            visibility_prefix,
             function.abi,
             host_prefix,
             function.name,
@@ -360,8 +364,10 @@ fn render_ast_impl(definition: &AstImplDef) -> String {
 fn render_ast_extern_interface(interface: &AstExternInterface) -> String {
     let mut out = String::new();
     out.push_str(&format!(
-        "  extern \"{}\" interface {}\n",
-        interface.abi, interface.name
+        "  {}extern \"{}\" interface {}\n",
+        render_ast_visibility(interface.visibility),
+        interface.abi,
+        interface.name
     ));
     for function in &interface.methods {
         let params = function
@@ -376,7 +382,8 @@ fn render_ast_extern_interface(interface: &AstExternInterface) -> String {
             .map(|symbol| format!("@host_symbol(\"{}\") ", escape_debug(symbol)))
             .unwrap_or_default();
         out.push_str(&format!(
-            "    {}fn {}({}) -> {}\n",
+            "    {}{}fn {}({}) -> {}\n",
+            render_ast_visibility(function.visibility),
             host_prefix,
             function.name,
             params,
@@ -1110,8 +1117,10 @@ fn render_nir_impl(definition: &NirImplDef) -> String {
 fn render_nir_extern_interface(interface: &NirExternInterface) -> String {
     let mut out = String::new();
     out.push_str(&format!(
-        "  extern \"{}\" interface {}\n",
-        interface.abi, interface.name
+        "  {}extern \"{}\" interface {}\n",
+        render_nir_visibility(interface.visibility),
+        interface.abi,
+        interface.name
     ));
     for function in &interface.methods {
         let params = function
@@ -1126,7 +1135,8 @@ fn render_nir_extern_interface(interface: &NirExternInterface) -> String {
             .map(|symbol| format!("@host_symbol(\"{}\") ", escape_debug(symbol)))
             .unwrap_or_default();
         out.push_str(&format!(
-            "    {}fn {}({}) -> {}\n",
+            "    {}{}fn {}({}) -> {}\n",
+            render_nir_visibility(function.visibility),
             host_prefix,
             function.name,
             params,

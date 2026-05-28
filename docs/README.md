@@ -22,6 +22,7 @@ There is also a practical split inside the current tree:
 If you want to understand the repository as it exists today, start here:
 
 * [current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+* [versioning/nuis-0.13.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.13.0-snapshot.md)
 * [reference/README.md](/Users/Shared/chroot/dev/nuislang/docs/reference/README.md)
 * [repo-layout.md](/Users/Shared/chroot/dev/nuislang/docs/repo-layout.md)
 

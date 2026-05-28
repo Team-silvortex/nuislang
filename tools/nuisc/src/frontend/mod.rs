@@ -149,6 +149,66 @@ pub fn lower_project_ast_to_nir(
             );
         }
     }
+    for helper in &local_cpu_helpers {
+        for function in helper
+            .externs
+            .iter()
+            .filter(|function| is_public_visibility(function.visibility))
+        {
+            let symbol_name = extern_function_symbol_name(function)?;
+            let signature = FunctionSignature {
+                abi: function.abi.clone(),
+                interface: None,
+                symbol_name,
+                params: function
+                    .params
+                    .iter()
+                    .map(|param| lower_type_ref(&param.ty))
+                    .collect(),
+                return_type: Some(lower_type_ref(&function.return_type)),
+                is_extern: true,
+                is_async: false,
+            };
+            signatures.insert(
+                format!("{}.{}", helper.unit, function.name),
+                signature.clone(),
+            );
+            signatures.entry(function.name.clone()).or_insert(signature);
+        }
+        for interface in helper
+            .extern_interfaces
+            .iter()
+            .filter(|interface| is_public_visibility(interface.visibility))
+        {
+            for function in interface
+                .methods
+                .iter()
+                .filter(|function| is_public_visibility(function.visibility))
+            {
+                let symbol_name = extern_function_symbol_name(function)?;
+                let signature = FunctionSignature {
+                    abi: function.abi.clone(),
+                    interface: Some(interface.name.clone()),
+                    symbol_name,
+                    params: function
+                        .params
+                        .iter()
+                        .map(|param| lower_type_ref(&param.ty))
+                        .collect(),
+                    return_type: Some(lower_type_ref(&function.return_type)),
+                    is_extern: true,
+                    is_async: false,
+                };
+                signatures.insert(
+                    format!("{}.{}.{}", helper.unit, interface.name, function.name),
+                    signature.clone(),
+                );
+                signatures
+                    .entry(format!("{}.{}", interface.name, function.name))
+                    .or_insert_with(|| signature.clone());
+            }
+        }
+    }
     let module_struct_table = module
         .structs
         .iter()
@@ -395,6 +455,7 @@ pub fn lower_project_ast_to_nir(
             .externs
             .iter()
             .map(|function| NirExternFunction {
+                visibility: lower_visibility(function.visibility),
                 abi: function.abi.clone(),
                 interface: None,
                 name: function.name.clone(),
@@ -407,12 +468,14 @@ pub fn lower_project_ast_to_nir(
             .extern_interfaces
             .iter()
             .map(|interface| NirExternInterface {
+                visibility: lower_visibility(interface.visibility),
                 abi: interface.abi.clone(),
                 name: interface.name.clone(),
                 methods: interface
                     .methods
                     .iter()
                     .map(|function| NirExternFunction {
+                        visibility: lower_visibility(function.visibility),
                         abi: function.abi.clone(),
                         interface: Some(interface.name.clone()),
                         name: function.name.clone(),
@@ -16903,6 +16966,7 @@ fn render_type_name(ty: &NirTypeRef) -> String {
 
 #[cfg(test)]
 mod tests {
+    use super::lower_project_ast_to_nir;
     use super::parse_nuis_ast;
     use super::parse_nuis_module;
     use nuis_semantics::model::{
@@ -16975,6 +17039,50 @@ mod tests {
                 .as_ref()
                 .map(|bound| bound.name.as_str()),
             Some("Addable")
+        );
+    }
+
+    #[test]
+    fn rejects_pub_trait_methods_in_current_frontend() {
+        let error = parse_nuis_ast(
+            r#"
+            mod cpu Main {
+              pub trait Addable {
+                pub fn add(lhs: Self, rhs: Self) -> Self;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(
+            error.contains("trait methods do not support independent `pub` visibility"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn rejects_pub_impl_methods_in_current_frontend() {
+        let error = parse_nuis_ast(
+            r#"
+            mod cpu Main {
+              pub trait Addable {
+                fn add(lhs: Self, rhs: Self) -> Self;
+              }
+
+              impl Addable for i64 {
+                pub fn add(lhs: i64, rhs: i64) -> i64 {
+                  return lhs + rhs;
+                }
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(
+            error.contains("impl methods do not support independent `pub` visibility"),
+            "unexpected error: {error}"
         );
     }
 
@@ -17267,6 +17375,33 @@ mod tests {
     }
 
     #[test]
+    fn parses_pub_extern_items_into_ast() {
+        let ast = parse_nuis_ast(
+            r#"
+            pub extern "c" fn host_clock() -> i64;
+            pub extern "c" interface Clock {
+              fn now() -> i64;
+            }
+            mod cpu Main {
+              fn main() -> i64 {
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(ast.externs.len(), 1);
+        assert_eq!(ast.externs[0].visibility, AstVisibility::Public);
+        assert_eq!(ast.extern_interfaces.len(), 1);
+        assert_eq!(ast.extern_interfaces[0].visibility, AstVisibility::Public);
+        assert_eq!(
+            ast.extern_interfaces[0].methods[0].visibility,
+            AstVisibility::Private
+        );
+    }
+
+    #[test]
     fn lowers_extern_host_symbol_bridge_into_nir_signature() {
         let module = parse_nuis_module(
             r#"
@@ -17301,6 +17436,66 @@ mod tests {
                 args: vec![NirExpr::Int(80), NirExpr::Int(8080)],
             }))]
         );
+    }
+
+    #[test]
+    fn lowers_pub_extern_items_into_nir() {
+        let module = parse_nuis_module(
+            r#"
+            pub extern "c" fn host_clock() -> i64;
+            pub extern "c" interface Clock {
+              fn now() -> i64;
+            }
+            mod cpu Main {
+              fn main() -> i64 {
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(module.externs.len(), 1);
+        assert_eq!(module.externs[0].visibility, NirVisibility::Public);
+        assert_eq!(module.extern_interfaces.len(), 1);
+        assert_eq!(
+            module.extern_interfaces[0].visibility,
+            NirVisibility::Public
+        );
+        assert_eq!(
+            module.extern_interfaces[0].methods[0].visibility,
+            NirVisibility::Private
+        );
+    }
+
+    #[test]
+    fn helper_pub_externs_can_cross_module_but_private_ones_cannot() {
+        let main_ast = parse_nuis_ast(
+            r#"
+            use cpu Helper;
+            mod cpu Main {
+              fn main() -> i64 {
+                return host_clock() + hidden_clock();
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let helper_ast = parse_nuis_ast(
+            r#"
+            pub extern "c" fn host_clock() -> i64;
+            extern "c" fn hidden_clock() -> i64;
+            mod cpu Helper {
+              fn main() -> i64 {
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let error = lower_project_ast_to_nir(&main_ast, &[helper_ast]).unwrap_err();
+        assert!(error.contains("unknown function `hidden_clock`"));
     }
 
     #[test]

@@ -9,6 +9,10 @@ local README for the area you are actively touching.
 
 * repo status and current toolchain spine:
   [README.md](/Users/Shared/chroot/dev/nuislang/README.md)
+* current phase snapshot:
+  [versioning/nuis-0.13.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.13.0-snapshot.md)
+* current phase checklist:
+  [versioning/nuis-0.13.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.13.0-release-checklist.md)
 * implementation-truth docs:
   [reference/README.md](/Users/Shared/chroot/dev/nuislang/docs/reference/README.md)
 * repo structure:
