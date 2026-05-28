@@ -28,10 +28,28 @@ pub struct AstModule {
     pub unit: String,
     pub externs: Vec<AstExternFunction>,
     pub extern_interfaces: Vec<AstExternInterface>,
+    pub consts: Vec<AstConstItem>,
+    pub type_aliases: Vec<AstTypeAlias>,
     pub structs: Vec<AstStructDef>,
     pub traits: Vec<AstTraitDef>,
     pub impls: Vec<AstImplDef>,
     pub functions: Vec<AstFunction>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AstConstItem {
+    pub visibility: AstVisibility,
+    pub name: String,
+    pub ty: AstTypeRef,
+    pub value: AstExpr,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AstTypeAlias {
+    pub visibility: AstVisibility,
+    pub name: String,
+    pub generic_params: Vec<AstGenericParam>,
+    pub target: AstTypeRef,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -299,10 +317,28 @@ pub struct NirModule {
     pub unit: String,
     pub externs: Vec<NirExternFunction>,
     pub extern_interfaces: Vec<NirExternInterface>,
+    pub consts: Vec<NirConstItem>,
+    pub type_aliases: Vec<NirTypeAlias>,
     pub structs: Vec<NirStructDef>,
     pub traits: Vec<NirTraitDef>,
     pub impls: Vec<NirImplDef>,
     pub functions: Vec<NirFunction>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NirConstItem {
+    pub visibility: NirVisibility,
+    pub name: String,
+    pub ty: NirTypeRef,
+    pub value: NirExpr,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NirTypeAlias {
+    pub visibility: NirVisibility,
+    pub name: String,
+    pub generic_params: Vec<NirGenericParam>,
+    pub target: NirTypeRef,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

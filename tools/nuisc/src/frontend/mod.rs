@@ -4,13 +4,14 @@ mod parser;
 use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{
-    AstAttributeValue, AstBinaryOp, AstExpr, AstFunction, AstImplDef, AstModule, AstParam, AstStmt,
-    AstStructDef, AstStructField, AstTypeRef, AstVisibility, NirAnnotation, NirAttributeArg,
-    NirAttributeValue, NirBinaryOp, NirDataFlowState, NirExpr, NirExternFunction,
-    NirExternInterface, NirFunction, NirGenericParam, NirImplDef, NirImplMethod, NirKernelAxis,
-    NirKernelFlowState, NirKernelMapOp, NirKernelZipOp, NirModule, NirNetworkFlowState, NirParam,
-    NirResultFamily, NirResultStage, NirShaderFlowState, NirStmt, NirStructDef, NirStructField,
-    NirTraitDef, NirTraitMethodSig, NirTypeRef, NirUse, NirVisibility, NirWindowMode,
+    AstAttributeValue, AstBinaryOp, AstConstItem, AstExpr, AstFunction, AstImplDef, AstModule,
+    AstParam, AstStmt, AstStructDef, AstStructField, AstTypeAlias, AstTypeRef, AstVisibility,
+    NirAnnotation, NirAttributeArg, NirAttributeValue, NirBinaryOp, NirConstItem, NirDataFlowState,
+    NirExpr, NirExternFunction, NirExternInterface, NirFunction, NirGenericParam, NirImplDef,
+    NirImplMethod, NirKernelAxis, NirKernelFlowState, NirKernelMapOp, NirKernelZipOp, NirModule,
+    NirNetworkFlowState, NirParam, NirResultFamily, NirResultStage, NirShaderFlowState, NirStmt,
+    NirStructDef, NirStructField, NirTraitDef, NirTraitMethodSig, NirTypeAlias, NirTypeRef, NirUse,
+    NirVisibility, NirWindowMode,
 };
 
 pub fn frontend_name() -> &'static str {
@@ -48,6 +49,9 @@ pub fn lower_project_ast_to_nir(
     for definition in &module.structs {
         validate_struct_annotations(definition)?;
     }
+    for constant in &module.consts {
+        validate_const_item(constant)?;
+    }
     for function in &module.functions {
         validate_function_annotations(function)?;
     }
@@ -61,48 +65,60 @@ pub fn lower_project_ast_to_nir(
                 .find(|candidate| candidate.domain == item.domain && candidate.unit == item.unit)
         })
         .collect::<Vec<_>>();
+    let visible_type_aliases = build_visible_type_alias_map(module, &local_cpu_helpers)?;
 
     let struct_defs = module
         .structs
         .iter()
-        .map(|definition| NirStructDef {
-            annotations: lower_ast_attributes(&definition.attributes),
-            visibility: lower_visibility(definition.visibility),
-            name: definition.name.clone(),
-            fields: definition
-                .fields
-                .iter()
-                .map(|field| NirStructField {
-                    annotations: lower_ast_attributes(&field.attributes),
-                    visibility: lower_visibility(field.visibility),
-                    name: field.name.clone(),
-                    ty: lower_type_ref(&field.ty),
-                })
-                .collect(),
+        .map(|definition| {
+            Ok(NirStructDef {
+                annotations: lower_ast_attributes(&definition.attributes),
+                visibility: lower_visibility(definition.visibility),
+                name: definition.name.clone(),
+                fields: definition
+                    .fields
+                    .iter()
+                    .map(|field| {
+                        Ok(NirStructField {
+                            annotations: lower_ast_attributes(&field.attributes),
+                            visibility: lower_visibility(field.visibility),
+                            name: field.name.clone(),
+                            ty: lower_type_ref_with_aliases(&field.ty, &visible_type_aliases)?,
+                        })
+                    })
+                    .collect::<Result<Vec<_>, String>>()?,
+            })
         })
         .chain(local_cpu_helpers.iter().flat_map(|helper| {
             helper
                 .structs
                 .iter()
                 .filter(|definition| is_public_visibility(definition.visibility))
-                .map(|definition| NirStructDef {
-                    annotations: helper_visible_struct_annotations(definition),
-                    visibility: lower_visibility(definition.visibility),
-                    name: definition.name.clone(),
-                    fields: definition
-                        .fields
-                        .iter()
-                        .filter(|field| is_public_visibility(field.visibility))
-                        .map(|field| NirStructField {
-                            annotations: lower_ast_attributes(&field.attributes),
-                            visibility: lower_visibility(field.visibility),
-                            name: field.name.clone(),
-                            ty: lower_type_ref(&field.ty),
-                        })
-                        .collect(),
+                .map(|definition| {
+                    Ok(NirStructDef {
+                        annotations: helper_visible_struct_annotations(definition),
+                        visibility: lower_visibility(definition.visibility),
+                        name: definition.name.clone(),
+                        fields: definition
+                            .fields
+                            .iter()
+                            .filter(|field| is_public_visibility(field.visibility))
+                            .map(|field| {
+                                Ok(NirStructField {
+                                    annotations: lower_ast_attributes(&field.attributes),
+                                    visibility: lower_visibility(field.visibility),
+                                    name: field.name.clone(),
+                                    ty: lower_type_ref_with_aliases(
+                                        &field.ty,
+                                        &visible_type_aliases,
+                                    )?,
+                                })
+                            })
+                            .collect::<Result<Vec<_>, String>>()?,
+                    })
                 })
         }))
-        .collect::<Vec<_>>();
+        .collect::<Result<Vec<_>, String>>()?;
     let struct_table = struct_defs
         .iter()
         .map(|definition| (definition.name.clone(), definition.clone()))
@@ -120,9 +136,12 @@ pub fn lower_project_ast_to_nir(
                 params: function
                     .params
                     .iter()
-                    .map(|param| lower_type_ref(&param.ty))
-                    .collect(),
-                return_type: Some(lower_type_ref(&function.return_type)),
+                    .map(|param| lower_type_ref_with_aliases(&param.ty, &visible_type_aliases))
+                    .collect::<Result<Vec<_>, _>>()?,
+                return_type: Some(lower_type_ref_with_aliases(
+                    &function.return_type,
+                    &visible_type_aliases,
+                )?),
                 is_extern: true,
                 is_async: false,
             },
@@ -140,9 +159,12 @@ pub fn lower_project_ast_to_nir(
                     params: function
                         .params
                         .iter()
-                        .map(|param| lower_type_ref(&param.ty))
-                        .collect(),
-                    return_type: Some(lower_type_ref(&function.return_type)),
+                        .map(|param| lower_type_ref_with_aliases(&param.ty, &visible_type_aliases))
+                        .collect::<Result<Vec<_>, _>>()?,
+                    return_type: Some(lower_type_ref_with_aliases(
+                        &function.return_type,
+                        &visible_type_aliases,
+                    )?),
                     is_extern: true,
                     is_async: false,
                 },
@@ -163,9 +185,12 @@ pub fn lower_project_ast_to_nir(
                 params: function
                     .params
                     .iter()
-                    .map(|param| lower_type_ref(&param.ty))
-                    .collect(),
-                return_type: Some(lower_type_ref(&function.return_type)),
+                    .map(|param| lower_type_ref_with_aliases(&param.ty, &visible_type_aliases))
+                    .collect::<Result<Vec<_>, _>>()?,
+                return_type: Some(lower_type_ref_with_aliases(
+                    &function.return_type,
+                    &visible_type_aliases,
+                )?),
                 is_extern: true,
                 is_async: false,
             };
@@ -193,9 +218,12 @@ pub fn lower_project_ast_to_nir(
                     params: function
                         .params
                         .iter()
-                        .map(|param| lower_type_ref(&param.ty))
-                        .collect(),
-                    return_type: Some(lower_type_ref(&function.return_type)),
+                        .map(|param| lower_type_ref_with_aliases(&param.ty, &visible_type_aliases))
+                        .collect::<Result<Vec<_>, _>>()?,
+                    return_type: Some(lower_type_ref_with_aliases(
+                        &function.return_type,
+                        &visible_type_aliases,
+                    )?),
                     is_extern: true,
                     is_async: false,
                 };
@@ -218,15 +246,16 @@ pub fn lower_project_ast_to_nir(
         .impls
         .iter()
         .map(|definition| {
-            (
+            Ok((
                 (
                     definition.trait_name.clone(),
-                    lower_type_ref(&definition.for_type).render(),
+                    lower_type_ref_with_aliases(&definition.for_type, &visible_type_aliases)?
+                        .render(),
                 ),
                 definition.clone(),
-            )
+            ))
         })
-        .collect::<BTreeMap<_, _>>();
+        .collect::<Result<BTreeMap<_, _>, String>>()?;
     let mut generic_templates = BTreeMap::<String, AstFunction>::new();
     let mut concrete_module_functions = Vec::new();
     for function in &module.functions {
@@ -243,9 +272,13 @@ pub fn lower_project_ast_to_nir(
             params: function
                 .params
                 .iter()
-                .map(|param| lower_type_ref(&param.ty))
-                .collect(),
-            return_type: function.return_type.as_ref().map(lower_type_ref),
+                .map(|param| lower_type_ref_with_aliases(&param.ty, &visible_type_aliases))
+                .collect::<Result<Vec<_>, _>>()?,
+            return_type: function
+                .return_type
+                .as_ref()
+                .map(|ty| lower_type_ref_with_aliases(ty, &visible_type_aliases))
+                .transpose()?,
             is_extern: is_host_bridge,
             is_async: function.is_async,
         };
@@ -272,9 +305,13 @@ pub fn lower_project_ast_to_nir(
                 params: function
                     .params
                     .iter()
-                    .map(|param| lower_type_ref(&param.ty))
-                    .collect(),
-                return_type: function.return_type.as_ref().map(lower_type_ref),
+                    .map(|param| lower_type_ref_with_aliases(&param.ty, &visible_type_aliases))
+                    .collect::<Result<Vec<_>, _>>()?,
+                return_type: function
+                    .return_type
+                    .as_ref()
+                    .map(|ty| lower_type_ref_with_aliases(ty, &visible_type_aliases))
+                    .transpose()?,
                 is_extern: false,
                 is_async: function.is_async,
             };
@@ -286,11 +323,44 @@ pub fn lower_project_ast_to_nir(
         }
     }
 
+    let mut helper_const_maps = BTreeMap::<String, BTreeMap<String, ModuleConstValue>>::new();
+    let mut visible_helper_consts = BTreeMap::<String, ModuleConstValue>::new();
+    for helper in &local_cpu_helpers {
+        let helper_aliases = build_visible_type_alias_map(helper, &[])?;
+        let (_, helper_consts) = lower_module_const_items(
+            helper,
+            &BTreeMap::new(),
+            &helper_aliases,
+            &signatures,
+            &struct_table,
+        )?;
+        for (name, constant) in &helper_consts {
+            if matches!(constant.visibility, NirVisibility::Public) {
+                visible_helper_consts.insert(format!("{}.{}", helper.unit, name), constant.clone());
+                visible_helper_consts
+                    .entry(name.clone())
+                    .or_insert_with(|| constant.clone());
+            }
+        }
+        helper_const_maps.insert(helper.unit.clone(), helper_consts);
+    }
+    let (lowered_consts, module_local_consts) = lower_module_const_items(
+        module,
+        &visible_helper_consts,
+        &visible_type_aliases,
+        &signatures,
+        &struct_table,
+    )?;
+    let mut module_const_values = visible_helper_consts.clone();
+    module_const_values.extend(module_local_consts.clone());
+    let module_const_env = ast_const_type_env(&module_const_values);
+
     let function_return_types = build_function_return_type_table(
         module,
         &concrete_module_functions,
         &generic_templates,
         &local_cpu_helpers,
+        &visible_type_aliases,
     );
     let mut specialized_functions = Vec::new();
     let mut specialized_signatures = Vec::new();
@@ -300,6 +370,7 @@ pub fn lower_project_ast_to_nir(
         .map(|function| {
             rewrite_generic_calls_in_function(
                 function,
+                &module_const_env,
                 &generic_templates,
                 &impl_lookup,
                 &module_struct_table,
@@ -314,7 +385,8 @@ pub fn lower_project_ast_to_nir(
         signatures.insert(name, signature);
     }
     for definition in &module.impls {
-        let lowered_for_type = lower_type_ref(&definition.for_type);
+        let lowered_for_type =
+            lower_type_ref_with_aliases(&definition.for_type, &visible_type_aliases)?;
         for method in &definition.methods {
             let symbol_name =
                 impl_method_symbol_name(&definition.trait_name, &lowered_for_type, &method.name);
@@ -327,9 +399,13 @@ pub fn lower_project_ast_to_nir(
                     params: method
                         .params
                         .iter()
-                        .map(|param| lower_type_ref(&param.ty))
-                        .collect(),
-                    return_type: method.return_type.as_ref().map(lower_type_ref),
+                        .map(|param| lower_type_ref_with_aliases(&param.ty, &visible_type_aliases))
+                        .collect::<Result<Vec<_>, _>>()?,
+                    return_type: method
+                        .return_type
+                        .as_ref()
+                        .map(|ty| lower_type_ref_with_aliases(ty, &visible_type_aliases))
+                        .transpose()?,
                     is_extern: false,
                     is_async: false,
                 },
@@ -349,6 +425,8 @@ pub fn lower_project_ast_to_nir(
                 function,
                 &module.domain,
                 &module.unit,
+                &module_const_values,
+                &visible_type_aliases,
                 &signatures,
                 &struct_table,
             )
@@ -362,6 +440,8 @@ pub fn lower_project_ast_to_nir(
                     function,
                     &module.domain,
                     &module.unit,
+                    &module_const_values,
+                    &visible_type_aliases,
                     &signatures,
                     &struct_table,
                 )
@@ -380,6 +460,8 @@ pub fn lower_project_ast_to_nir(
                 &renamed,
                 &module.domain,
                 &helper.unit,
+                helper_const_maps.get(&helper.unit).unwrap(),
+                &visible_type_aliases,
                 &signatures,
                 &struct_table,
             )?);
@@ -389,27 +471,42 @@ pub fn lower_project_ast_to_nir(
     let lowered_traits = module
         .traits
         .iter()
-        .map(|definition| NirTraitDef {
-            visibility: lower_visibility(definition.visibility),
-            name: definition.name.clone(),
-            methods: definition
-                .methods
-                .iter()
-                .map(|method| NirTraitMethodSig {
-                    name: method.name.clone(),
-                    params: method.params.iter().map(lower_param).collect(),
-                    return_type: method.return_type.as_ref().map(lower_type_ref),
-                })
-                .collect(),
+        .map(|definition| {
+            Ok(NirTraitDef {
+                visibility: lower_visibility(definition.visibility),
+                name: definition.name.clone(),
+                methods: definition
+                    .methods
+                    .iter()
+                    .map(|method| {
+                        Ok(NirTraitMethodSig {
+                            name: method.name.clone(),
+                            params: method
+                                .params
+                                .iter()
+                                .map(|param| lower_param_with_aliases(param, &visible_type_aliases))
+                                .collect::<Result<Vec<_>, _>>()?,
+                            return_type: method
+                                .return_type
+                                .as_ref()
+                                .map(|ty| lower_type_ref_with_aliases(ty, &visible_type_aliases))
+                                .transpose()?,
+                        })
+                    })
+                    .collect::<Result<Vec<_>, String>>()?,
+            })
         })
-        .collect::<Vec<_>>();
+        .collect::<Result<Vec<_>, String>>()?;
     let mut lowered_impls = Vec::new();
     for definition in &module.impls {
         let mut methods = Vec::new();
         for method in &definition.methods {
             let mut bindings = BTreeMap::<String, NirTypeRef>::new();
             for param in &method.params {
-                bindings.insert(param.name.clone(), lower_type_ref(&param.ty));
+                bindings.insert(
+                    param.name.clone(),
+                    lower_type_ref_with_aliases(&param.ty, &visible_type_aliases)?,
+                );
             }
             let body = method
                 .body
@@ -420,7 +517,9 @@ pub fn lower_project_ast_to_nir(
                         &module.domain,
                         false,
                         &mut bindings,
+                        &module_const_values,
                         method.return_type.as_ref(),
+                        &visible_type_aliases,
                         &signatures,
                         &struct_table,
                     )
@@ -428,14 +527,22 @@ pub fn lower_project_ast_to_nir(
                 .collect::<Result<Vec<_>, _>>()?;
             methods.push(NirImplMethod {
                 name: method.name.clone(),
-                params: method.params.iter().map(lower_param).collect(),
-                return_type: method.return_type.as_ref().map(lower_type_ref),
+                params: method
+                    .params
+                    .iter()
+                    .map(|param| lower_param_with_aliases(param, &visible_type_aliases))
+                    .collect::<Result<Vec<_>, _>>()?,
+                return_type: method
+                    .return_type
+                    .as_ref()
+                    .map(|ty| lower_type_ref_with_aliases(ty, &visible_type_aliases))
+                    .transpose()?,
                 body,
             });
         }
         lowered_impls.push(NirImplDef {
             trait_name: definition.trait_name.clone(),
-            for_type: lower_type_ref(&definition.for_type),
+            for_type: lower_type_ref_with_aliases(&definition.for_type, &visible_type_aliases)?,
             methods,
         });
     }
@@ -451,41 +558,91 @@ pub fn lower_project_ast_to_nir(
             .collect(),
         domain: module.domain.clone(),
         unit: module.unit.clone(),
+        type_aliases: module
+            .type_aliases
+            .iter()
+            .map(|alias| {
+                Ok(NirTypeAlias {
+                    visibility: lower_visibility(alias.visibility),
+                    name: alias.name.clone(),
+                    generic_params: alias
+                        .generic_params
+                        .iter()
+                        .map(|param| {
+                            Ok(NirGenericParam {
+                                name: param.name.clone(),
+                                bound: param
+                                    .bound
+                                    .as_ref()
+                                    .map(|ty| {
+                                        lower_type_ref_with_aliases(ty, &visible_type_aliases)
+                                    })
+                                    .transpose()?,
+                            })
+                        })
+                        .collect::<Result<Vec<_>, String>>()?,
+                    target: lower_type_ref_with_aliases(&alias.target, &visible_type_aliases)?,
+                })
+            })
+            .collect::<Result<Vec<_>, String>>()?,
         externs: module
             .externs
             .iter()
-            .map(|function| NirExternFunction {
-                visibility: lower_visibility(function.visibility),
-                abi: function.abi.clone(),
-                interface: None,
-                name: function.name.clone(),
-                host_symbol: function.host_symbol.clone(),
-                params: function.params.iter().map(lower_param).collect(),
-                return_type: lower_type_ref(&function.return_type),
+            .map(|function| {
+                Ok(NirExternFunction {
+                    visibility: lower_visibility(function.visibility),
+                    abi: function.abi.clone(),
+                    interface: None,
+                    name: function.name.clone(),
+                    host_symbol: function.host_symbol.clone(),
+                    params: function
+                        .params
+                        .iter()
+                        .map(|param| lower_param_with_aliases(param, &visible_type_aliases))
+                        .collect::<Result<Vec<_>, _>>()?,
+                    return_type: lower_type_ref_with_aliases(
+                        &function.return_type,
+                        &visible_type_aliases,
+                    )?,
+                })
             })
-            .collect(),
+            .collect::<Result<Vec<_>, String>>()?,
         extern_interfaces: module
             .extern_interfaces
             .iter()
-            .map(|interface| NirExternInterface {
-                visibility: lower_visibility(interface.visibility),
-                abi: interface.abi.clone(),
-                name: interface.name.clone(),
-                methods: interface
-                    .methods
-                    .iter()
-                    .map(|function| NirExternFunction {
-                        visibility: lower_visibility(function.visibility),
-                        abi: function.abi.clone(),
-                        interface: Some(interface.name.clone()),
-                        name: function.name.clone(),
-                        host_symbol: function.host_symbol.clone(),
-                        params: function.params.iter().map(lower_param).collect(),
-                        return_type: lower_type_ref(&function.return_type),
-                    })
-                    .collect(),
+            .map(|interface| {
+                Ok(NirExternInterface {
+                    visibility: lower_visibility(interface.visibility),
+                    abi: interface.abi.clone(),
+                    name: interface.name.clone(),
+                    methods: interface
+                        .methods
+                        .iter()
+                        .map(|function| {
+                            Ok(NirExternFunction {
+                                visibility: lower_visibility(function.visibility),
+                                abi: function.abi.clone(),
+                                interface: Some(interface.name.clone()),
+                                name: function.name.clone(),
+                                host_symbol: function.host_symbol.clone(),
+                                params: function
+                                    .params
+                                    .iter()
+                                    .map(|param| {
+                                        lower_param_with_aliases(param, &visible_type_aliases)
+                                    })
+                                    .collect::<Result<Vec<_>, _>>()?,
+                                return_type: lower_type_ref_with_aliases(
+                                    &function.return_type,
+                                    &visible_type_aliases,
+                                )?,
+                            })
+                        })
+                        .collect::<Result<Vec<_>, String>>()?,
+                })
             })
-            .collect(),
+            .collect::<Result<Vec<_>, String>>()?,
+        consts: lowered_consts,
         structs: struct_defs,
         traits: lowered_traits,
         impls: lowered_impls,
@@ -792,6 +949,37 @@ fn validate_function_annotations(function: &AstFunction) -> Result<(), String> {
     Ok(())
 }
 
+fn validate_const_item(constant: &AstConstItem) -> Result<(), String> {
+    validate_const_safe_expr(&constant.value).map_err(|reason| {
+        format!(
+            "top-level const `{}` currently requires a const-safe expression: {}",
+            constant.name, reason
+        )
+    })
+}
+
+fn validate_const_safe_expr(expr: &AstExpr) -> Result<(), &'static str> {
+    match expr {
+        AstExpr::Bool(_) | AstExpr::Text(_) | AstExpr::Int(_) | AstExpr::Var(_) => Ok(()),
+        AstExpr::Binary { lhs, rhs, .. } => {
+            validate_const_safe_expr(lhs)?;
+            validate_const_safe_expr(rhs)
+        }
+        AstExpr::StructLiteral { fields, .. } => {
+            for (_, value) in fields {
+                validate_const_safe_expr(value)?;
+            }
+            Ok(())
+        }
+        AstExpr::FieldAccess { base, .. } => validate_const_safe_expr(base),
+        AstExpr::Await(_) => Err("`await` is not const-safe"),
+        AstExpr::Instantiate { .. } => Err("`instantiate` is not const-safe"),
+        AstExpr::Call { .. } | AstExpr::MethodCall { .. } => {
+            Err("calls are not const-safe in the current MVP")
+        }
+    }
+}
+
 fn validate_struct_annotations(definition: &AstStructDef) -> Result<(), String> {
     let mut seen_struct_annotations = BTreeSet::new();
     let mut is_packet_struct = false;
@@ -1082,6 +1270,13 @@ fn hidden_private_field_count(definition: &NirStructDef) -> usize {
         .unwrap_or(0)
 }
 
+#[derive(Clone)]
+struct ModuleConstValue {
+    visibility: NirVisibility,
+    ty: NirTypeRef,
+    value: NirExpr,
+}
+
 fn validate_zero_arg_function_annotation(
     function: &AstFunction,
     annotation: &str,
@@ -1245,12 +1440,17 @@ fn lower_function(
     function: &AstFunction,
     current_domain: &str,
     _current_unit: &str,
+    module_consts: &BTreeMap<String, ModuleConstValue>,
+    type_aliases: &BTreeMap<String, AstTypeAlias>,
     signatures: &BTreeMap<String, FunctionSignature>,
     struct_table: &BTreeMap<String, NirStructDef>,
 ) -> Result<NirFunction, String> {
     let mut bindings = BTreeMap::<String, NirTypeRef>::new();
     for param in &function.params {
-        bindings.insert(param.name.clone(), lower_type_ref(&param.ty));
+        bindings.insert(
+            param.name.clone(),
+            lower_type_ref_with_aliases(&param.ty, type_aliases)?,
+        );
     }
 
     Ok(NirFunction {
@@ -1268,13 +1468,27 @@ fn lower_function(
         generic_params: function
             .generic_params
             .iter()
-            .map(|param| NirGenericParam {
-                name: param.name.clone(),
-                bound: param.bound.as_ref().map(lower_type_ref),
+            .map(|param| {
+                Ok(NirGenericParam {
+                    name: param.name.clone(),
+                    bound: param
+                        .bound
+                        .as_ref()
+                        .map(|ty| lower_type_ref_with_aliases(ty, type_aliases))
+                        .transpose()?,
+                })
             })
-            .collect(),
-        params: function.params.iter().map(lower_param).collect(),
-        return_type: function.return_type.as_ref().map(lower_type_ref),
+            .collect::<Result<Vec<_>, String>>()?,
+        params: function
+            .params
+            .iter()
+            .map(|param| lower_param_with_aliases(param, type_aliases))
+            .collect::<Result<Vec<_>, _>>()?,
+        return_type: function
+            .return_type
+            .as_ref()
+            .map(|ty| lower_type_ref_with_aliases(ty, type_aliases))
+            .transpose()?,
         body: function
             .body
             .iter()
@@ -1284,7 +1498,9 @@ fn lower_function(
                     current_domain,
                     function.is_async,
                     &mut bindings,
+                    module_consts,
                     function.return_type.as_ref(),
+                    type_aliases,
                     signatures,
                     struct_table,
                 )
@@ -1293,11 +1509,14 @@ fn lower_function(
     })
 }
 
-fn lower_param(param: &AstParam) -> NirParam {
-    NirParam {
+fn lower_param_with_aliases(
+    param: &AstParam,
+    aliases: &BTreeMap<String, AstTypeAlias>,
+) -> Result<NirParam, String> {
+    Ok(NirParam {
         name: param.name.clone(),
-        ty: lower_type_ref(&param.ty),
-    }
+        ty: lower_type_ref_with_aliases(&param.ty, aliases)?,
+    })
 }
 
 fn lower_type_ref(ty: &AstTypeRef) -> NirTypeRef {
@@ -1309,21 +1528,215 @@ fn lower_type_ref(ty: &AstTypeRef) -> NirTypeRef {
     }
 }
 
+fn lower_type_ref_with_aliases(
+    ty: &AstTypeRef,
+    aliases: &BTreeMap<String, AstTypeAlias>,
+) -> Result<NirTypeRef, String> {
+    Ok(lower_type_ref(&resolve_ast_type_ref_aliases(ty, aliases)?))
+}
+
+fn build_visible_type_alias_map(
+    module: &AstModule,
+    local_helpers: &[&AstModule],
+) -> Result<BTreeMap<String, AstTypeAlias>, String> {
+    let mut aliases = BTreeMap::new();
+    for helper in local_helpers {
+        for alias in &helper.type_aliases {
+            if !is_public_visibility(alias.visibility) {
+                continue;
+            }
+            aliases.insert(format!("{}.{}", helper.unit, alias.name), alias.clone());
+            aliases
+                .entry(alias.name.clone())
+                .or_insert_with(|| alias.clone());
+        }
+    }
+    for alias in &module.type_aliases {
+        aliases.insert(alias.name.clone(), alias.clone());
+    }
+    Ok(aliases)
+}
+
+fn resolve_ast_type_ref_aliases(
+    ty: &AstTypeRef,
+    aliases: &BTreeMap<String, AstTypeAlias>,
+) -> Result<AstTypeRef, String> {
+    let mut visiting = BTreeSet::new();
+    resolve_ast_type_ref_aliases_inner(ty, aliases, &mut visiting)
+}
+
+fn resolve_ast_type_ref_aliases_inner(
+    ty: &AstTypeRef,
+    aliases: &BTreeMap<String, AstTypeAlias>,
+    visiting: &mut BTreeSet<String>,
+) -> Result<AstTypeRef, String> {
+    let resolved_generic_args = ty
+        .generic_args
+        .iter()
+        .map(|arg| resolve_ast_type_ref_aliases_inner(arg, aliases, visiting))
+        .collect::<Result<Vec<_>, _>>()?;
+    let raw = AstTypeRef {
+        name: ty.name.clone(),
+        generic_args: resolved_generic_args,
+        is_optional: ty.is_optional,
+        is_ref: ty.is_ref,
+    };
+    let Some(alias_definition) = aliases.get(&raw.name) else {
+        return Ok(raw);
+    };
+    if alias_definition.generic_params.len() != raw.generic_args.len() {
+        return Err(format!(
+            "type alias `{}` expects {} generic argument(s), found {}",
+            raw.name,
+            alias_definition.generic_params.len(),
+            raw.generic_args.len()
+        ));
+    }
+    let visit_key = lower_type_ref(&raw).render();
+    if !visiting.insert(visit_key.clone()) {
+        return Err(format!("type alias `{}` is cyclic", raw.name));
+    }
+    let substitutions = alias_definition
+        .generic_params
+        .iter()
+        .map(|param| param.name.clone())
+        .zip(raw.generic_args.iter().cloned())
+        .collect::<BTreeMap<_, _>>();
+    let substituted = substitute_ast_type_alias_target(&alias_definition.target, &substitutions)?;
+    let mut expanded = resolve_ast_type_ref_aliases_inner(&substituted, aliases, visiting)?;
+    visiting.remove(&visit_key);
+    if ty.is_optional {
+        expanded.is_optional = true;
+    }
+    if ty.is_ref {
+        expanded.is_ref = true;
+    }
+    Ok(expanded)
+}
+
+fn substitute_ast_type_alias_target(
+    ty: &AstTypeRef,
+    substitutions: &BTreeMap<String, AstTypeRef>,
+) -> Result<AstTypeRef, String> {
+    if ty.generic_args.is_empty() {
+        if let Some(substitution) = substitutions.get(&ty.name) {
+            let mut substituted = substitution.clone();
+            if ty.is_optional {
+                substituted.is_optional = true;
+            }
+            if ty.is_ref {
+                substituted.is_ref = true;
+            }
+            return Ok(substituted);
+        }
+    }
+    Ok(AstTypeRef {
+        name: ty.name.clone(),
+        generic_args: ty
+            .generic_args
+            .iter()
+            .map(|arg| substitute_ast_type_alias_target(arg, substitutions))
+            .collect::<Result<Vec<_>, _>>()?,
+        is_optional: ty.is_optional,
+        is_ref: ty.is_ref,
+    })
+}
+
+fn const_type_bindings(
+    values: &BTreeMap<String, ModuleConstValue>,
+) -> BTreeMap<String, NirTypeRef> {
+    values
+        .iter()
+        .map(|(name, constant)| (name.clone(), constant.ty.clone()))
+        .collect()
+}
+
+fn ast_const_type_env(values: &BTreeMap<String, ModuleConstValue>) -> BTreeMap<String, AstTypeRef> {
+    values
+        .iter()
+        .map(|(name, constant)| (name.clone(), ast_type_from_nir(&constant.ty)))
+        .collect()
+}
+
+fn lower_module_const_items(
+    module: &AstModule,
+    imported_consts: &BTreeMap<String, ModuleConstValue>,
+    type_aliases: &BTreeMap<String, AstTypeAlias>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> Result<(Vec<NirConstItem>, BTreeMap<String, ModuleConstValue>), String> {
+    let mut available_consts = imported_consts.clone();
+    let mut lowered_items = Vec::new();
+    let mut local_consts = BTreeMap::new();
+    for constant in &module.consts {
+        let expected = lower_type_ref_with_aliases(&constant.ty, type_aliases)?;
+        validate_type_ref(&expected)?;
+        let type_bindings = const_type_bindings(&available_consts);
+        let lowered_value = lower_expr_with_async(
+            &constant.value,
+            &module.domain,
+            false,
+            &type_bindings,
+            &available_consts,
+            signatures,
+            struct_table,
+            Some(&expected),
+            false,
+        )?;
+        let inferred =
+            infer_nir_expr_type(&lowered_value, &type_bindings, signatures, struct_table);
+        let final_type = resolve_declared_or_inferred(&constant.name, Some(expected), inferred)?;
+        let lowered = ModuleConstValue {
+            visibility: lower_visibility(constant.visibility),
+            ty: final_type.clone(),
+            value: lowered_value.clone(),
+        };
+        available_consts.insert(constant.name.clone(), lowered.clone());
+        local_consts.insert(constant.name.clone(), lowered.clone());
+        lowered_items.push(NirConstItem {
+            visibility: lowered.visibility,
+            name: constant.name.clone(),
+            ty: final_type,
+            value: lowered_value,
+        });
+    }
+    Ok((lowered_items, local_consts))
+}
+
 fn build_function_return_type_table(
     module: &AstModule,
     concrete_module_functions: &[AstFunction],
     generic_templates: &BTreeMap<String, AstFunction>,
     local_cpu_helpers: &[&AstModule],
+    aliases: &BTreeMap<String, AstTypeAlias>,
 ) -> BTreeMap<String, Option<AstTypeRef>> {
     let mut table = BTreeMap::new();
     for function in &module.externs {
-        table.insert(function.name.clone(), Some(function.return_type.clone()));
+        table.insert(
+            function.name.clone(),
+            Some(
+                resolve_ast_type_ref_aliases(&function.return_type, aliases)
+                    .unwrap_or_else(|_| function.return_type.clone()),
+            ),
+        );
     }
     for function in concrete_module_functions {
-        table.insert(function.name.clone(), function.return_type.clone());
+        table.insert(
+            function.name.clone(),
+            function
+                .return_type
+                .as_ref()
+                .map(|ty| resolve_ast_type_ref_aliases(ty, aliases).unwrap_or_else(|_| ty.clone())),
+        );
     }
     for (name, function) in generic_templates {
-        table.insert(name.clone(), function.return_type.clone());
+        table.insert(
+            name.clone(),
+            function
+                .return_type
+                .as_ref()
+                .map(|ty| resolve_ast_type_ref_aliases(ty, aliases).unwrap_or_else(|_| ty.clone())),
+        );
     }
     for helper in local_cpu_helpers {
         for function in helper
@@ -1331,10 +1744,17 @@ fn build_function_return_type_table(
             .iter()
             .filter(|function| is_public_visibility(function.visibility))
         {
-            table.insert(function.name.clone(), function.return_type.clone());
+            table.insert(
+                function.name.clone(),
+                function.return_type.as_ref().map(|ty| {
+                    resolve_ast_type_ref_aliases(ty, aliases).unwrap_or_else(|_| ty.clone())
+                }),
+            );
             table.insert(
                 format!("{}.{}", helper.unit, function.name),
-                function.return_type.clone(),
+                function.return_type.as_ref().map(|ty| {
+                    resolve_ast_type_ref_aliases(ty, aliases).unwrap_or_else(|_| ty.clone())
+                }),
             );
         }
     }
@@ -1343,6 +1763,7 @@ fn build_function_return_type_table(
 
 fn rewrite_generic_calls_in_function(
     function: &AstFunction,
+    module_const_env: &BTreeMap<String, AstTypeRef>,
     generic_templates: &BTreeMap<String, AstFunction>,
     impl_lookup: &BTreeMap<(String, String), AstImplDef>,
     struct_table: &BTreeMap<String, AstStructDef>,
@@ -1351,7 +1772,7 @@ fn rewrite_generic_calls_in_function(
     specialized_functions: &mut Vec<AstFunction>,
     specialized_signatures: &mut Vec<(String, FunctionSignature)>,
 ) -> Result<AstFunction, String> {
-    let mut env = BTreeMap::<String, AstTypeRef>::new();
+    let mut env = module_const_env.clone();
     for param in &function.params {
         env.insert(param.name.clone(), param.ty.clone());
     }
@@ -2018,6 +2439,7 @@ fn ensure_generic_specialization(
             specialize_function_template(template, &specialized_name, &substitutions)?;
         let rewritten = rewrite_generic_calls_in_function(
             &specialized,
+            &BTreeMap::new(),
             generic_templates,
             impl_lookup,
             struct_table,
@@ -2649,7 +3071,9 @@ fn lower_stmt(
     stmt: &AstStmt,
     current_domain: &str,
     bindings: &mut BTreeMap<String, NirTypeRef>,
+    module_consts: &BTreeMap<String, ModuleConstValue>,
     return_type: Option<&AstTypeRef>,
+    type_aliases: &BTreeMap<String, AstTypeAlias>,
     signatures: &BTreeMap<String, FunctionSignature>,
     struct_table: &BTreeMap<String, NirStructDef>,
 ) -> Result<NirStmt, String> {
@@ -2658,7 +3082,9 @@ fn lower_stmt(
         current_domain,
         false,
         bindings,
+        module_consts,
         return_type,
+        type_aliases,
         signatures,
         struct_table,
     )
@@ -2669,13 +3095,18 @@ fn lower_stmt_with_async(
     current_domain: &str,
     current_function_is_async: bool,
     bindings: &mut BTreeMap<String, NirTypeRef>,
+    module_consts: &BTreeMap<String, ModuleConstValue>,
     return_type: Option<&AstTypeRef>,
+    type_aliases: &BTreeMap<String, AstTypeAlias>,
     signatures: &BTreeMap<String, FunctionSignature>,
     struct_table: &BTreeMap<String, NirStructDef>,
 ) -> Result<NirStmt, String> {
     Ok(match stmt {
         AstStmt::Let { name, ty, value } => {
-            let expected = ty.as_ref().map(lower_type_ref);
+            let expected = ty
+                .as_ref()
+                .map(|ty| lower_type_ref_with_aliases(ty, type_aliases))
+                .transpose()?;
             if let Some(expected_ty) = expected.as_ref() {
                 validate_type_ref(expected_ty)?;
             }
@@ -2684,6 +3115,7 @@ fn lower_stmt_with_async(
                 current_domain,
                 current_function_is_async,
                 bindings,
+                module_consts,
                 signatures,
                 struct_table,
                 expected.as_ref(),
@@ -2699,13 +3131,14 @@ fn lower_stmt_with_async(
             }
         }
         AstStmt::Const { name, ty, value } => {
-            let expected = lower_type_ref(ty);
+            let expected = lower_type_ref_with_aliases(ty, type_aliases)?;
             validate_type_ref(&expected)?;
             let lowered = lower_expr_with_async(
                 value,
                 current_domain,
                 current_function_is_async,
                 bindings,
+                module_consts,
                 signatures,
                 struct_table,
                 Some(&expected),
@@ -2725,6 +3158,7 @@ fn lower_stmt_with_async(
             current_domain,
             current_function_is_async,
             bindings,
+            module_consts,
             signatures,
             struct_table,
             None,
@@ -2739,6 +3173,7 @@ fn lower_stmt_with_async(
                 current_domain,
                 current_function_is_async,
                 bindings,
+                module_consts,
                 signatures,
                 struct_table,
                 None,
@@ -2758,6 +3193,7 @@ fn lower_stmt_with_async(
                     current_domain,
                     current_function_is_async,
                     bindings,
+                    module_consts,
                     signatures,
                     struct_table,
                     Some(&bool_type()),
@@ -2771,7 +3207,9 @@ fn lower_stmt_with_async(
                             current_domain,
                             current_function_is_async,
                             &mut then_bindings,
+                            module_consts,
                             return_type,
+                            type_aliases,
                             signatures,
                             struct_table,
                         )
@@ -2785,7 +3223,9 @@ fn lower_stmt_with_async(
                             current_domain,
                             current_function_is_async,
                             &mut else_bindings,
+                            module_consts,
                             return_type,
+                            type_aliases,
                             signatures,
                             struct_table,
                         )
@@ -2801,6 +3241,7 @@ fn lower_stmt_with_async(
                     current_domain,
                     current_function_is_async,
                     bindings,
+                    module_consts,
                     signatures,
                     struct_table,
                     Some(&bool_type()),
@@ -2814,7 +3255,9 @@ fn lower_stmt_with_async(
                             current_domain,
                             current_function_is_async,
                             &mut loop_bindings,
+                            module_consts,
                             return_type,
+                            type_aliases,
                             signatures,
                             struct_table,
                         )
@@ -2829,13 +3272,16 @@ fn lower_stmt_with_async(
             current_domain,
             current_function_is_async,
             bindings,
+            module_consts,
             signatures,
             struct_table,
             None,
             false,
         )?),
         AstStmt::Return(value) => {
-            let expected = return_type.map(lower_type_ref);
+            let expected = return_type
+                .map(|ty| lower_type_ref_with_aliases(ty, type_aliases))
+                .transpose()?;
             if let Some(expected_ty) = expected.as_ref() {
                 validate_type_ref(expected_ty)?;
             }
@@ -2845,6 +3291,7 @@ fn lower_stmt_with_async(
                     current_domain,
                     current_function_is_async,
                     bindings,
+                    module_consts,
                     signatures,
                     struct_table,
                     expected.as_ref(),
@@ -2869,6 +3316,7 @@ fn lower_expr(
         current_domain,
         false,
         bindings,
+        &BTreeMap::new(),
         signatures,
         struct_table,
         expected,
@@ -2890,6 +3338,30 @@ fn lower_nested_expr_with_async(
         current_domain,
         current_function_is_async,
         bindings,
+        &BTreeMap::new(),
+        signatures,
+        struct_table,
+        expected,
+        false,
+    )
+}
+
+fn lower_nested_expr_with_async_and_consts(
+    expr: &AstExpr,
+    current_domain: &str,
+    current_function_is_async: bool,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    module_consts: &BTreeMap<String, ModuleConstValue>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+    expected: Option<&NirTypeRef>,
+) -> Result<NirExpr, String> {
+    lower_expr_with_async(
+        expr,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
         signatures,
         struct_table,
         expected,
@@ -2902,6 +3374,7 @@ fn lower_expr_with_async(
     current_domain: &str,
     current_function_is_async: bool,
     bindings: &BTreeMap<String, NirTypeRef>,
+    module_consts: &BTreeMap<String, ModuleConstValue>,
     signatures: &BTreeMap<String, FunctionSignature>,
     struct_table: &BTreeMap<String, NirStructDef>,
     expected: Option<&NirTypeRef>,
@@ -2911,7 +3384,15 @@ fn lower_expr_with_async(
         AstExpr::Bool(value) => NirExpr::Bool(*value),
         AstExpr::Text(text) => NirExpr::Text(text.clone()),
         AstExpr::Int(value) => NirExpr::Int(*value),
-        AstExpr::Var(name) => NirExpr::Var(name.clone()),
+        AstExpr::Var(name) => {
+            if let Some(constant) = module_consts.get(name) {
+                constant.value.clone()
+            } else if bindings.contains_key(name) {
+                NirExpr::Var(name.clone())
+            } else {
+                return Err(format!("unknown value `{name}`"));
+            }
+        }
         AstExpr::Await(value) => {
             if !current_function_is_async {
                 return Err("`await` is only allowed inside `async fn`".to_owned());
@@ -2921,6 +3402,7 @@ fn lower_expr_with_async(
                 current_domain,
                 current_function_is_async,
                 bindings,
+                module_consts,
                 signatures,
                 struct_table,
                 expected,
@@ -2945,6 +3427,7 @@ fn lower_expr_with_async(
             current_domain,
             current_function_is_async,
             bindings,
+            module_consts,
             signatures,
             struct_table,
             expected,
@@ -2961,11 +3444,12 @@ fn lower_expr_with_async(
                     let lowered_args = args
                         .iter()
                         .map(|arg| {
-                            lower_nested_expr_with_async(
+                            lower_nested_expr_with_async_and_consts(
                                 arg,
                                 current_domain,
                                 current_function_is_async,
                                 bindings,
+                                module_consts,
                                 signatures,
                                 struct_table,
                                 None,
@@ -3010,11 +3494,12 @@ fn lower_expr_with_async(
                     });
                 }
             }
-            let lowered_receiver = lower_nested_expr_with_async(
+            let lowered_receiver = lower_nested_expr_with_async_and_consts(
                 receiver,
                 current_domain,
                 current_function_is_async,
                 bindings,
+                module_consts,
                 signatures,
                 struct_table,
                 None,
@@ -3028,11 +3513,12 @@ fn lower_expr_with_async(
                     lowered_args.extend(
                         args.iter()
                             .map(|arg| {
-                                lower_nested_expr_with_async(
+                                lower_nested_expr_with_async_and_consts(
                                     arg,
                                     current_domain,
                                     current_function_is_async,
                                     bindings,
+                                    module_consts,
                                     signatures,
                                     struct_table,
                                     None,
@@ -3061,11 +3547,12 @@ fn lower_expr_with_async(
                 args: args
                     .iter()
                     .map(|arg| {
-                        lower_nested_expr_with_async(
+                        lower_nested_expr_with_async_and_consts(
                             arg,
                             current_domain,
                             current_function_is_async,
                             bindings,
+                            module_consts,
                             signatures,
                             struct_table,
                             None,
@@ -3099,11 +3586,12 @@ fn lower_expr_with_async(
                         type_name, name
                     ));
                 }
-                let lowered = lower_nested_expr_with_async(
+                let lowered = lower_nested_expr_with_async_and_consts(
                     value,
                     current_domain,
                     current_function_is_async,
                     bindings,
+                    module_consts,
                     signatures,
                     struct_table,
                     Some(&field.ty),
@@ -3125,11 +3613,12 @@ fn lower_expr_with_async(
             }
         }
         AstExpr::FieldAccess { base, field } => {
-            let lowered_base = lower_nested_expr_with_async(
+            let lowered_base = lower_nested_expr_with_async_and_consts(
                 base,
                 current_domain,
                 current_function_is_async,
                 bindings,
+                module_consts,
                 signatures,
                 struct_table,
                 None,
@@ -3155,6 +3644,7 @@ fn lower_expr_with_async(
             current_domain,
             current_function_is_async,
             bindings,
+            module_consts,
             signatures,
             struct_table,
         )?,
@@ -3178,6 +3668,7 @@ fn lower_binary_expr(
         current_domain,
         false,
         bindings,
+        &BTreeMap::new(),
         signatures,
         struct_table,
     )
@@ -3190,23 +3681,26 @@ fn lower_binary_expr_with_async(
     current_domain: &str,
     current_function_is_async: bool,
     bindings: &BTreeMap<String, NirTypeRef>,
+    module_consts: &BTreeMap<String, ModuleConstValue>,
     signatures: &BTreeMap<String, FunctionSignature>,
     struct_table: &BTreeMap<String, NirStructDef>,
 ) -> Result<NirExpr, String> {
-    let lowered_lhs = lower_nested_expr_with_async(
+    let lowered_lhs = lower_nested_expr_with_async_and_consts(
         lhs,
         current_domain,
         current_function_is_async,
         bindings,
+        module_consts,
         signatures,
         struct_table,
         None,
     )?;
-    let lowered_rhs = lower_nested_expr_with_async(
+    let lowered_rhs = lower_nested_expr_with_async_and_consts(
         rhs,
         current_domain,
         current_function_is_async,
         bindings,
+        module_consts,
         signatures,
         struct_table,
         None,
@@ -3317,6 +3811,7 @@ fn lower_call_expr(
         current_domain,
         false,
         bindings,
+        &BTreeMap::new(),
         signatures,
         struct_table,
         expected,
@@ -3330,6 +3825,7 @@ fn lower_call_expr_with_async(
     current_domain: &str,
     current_function_is_async: bool,
     bindings: &BTreeMap<String, NirTypeRef>,
+    module_consts: &BTreeMap<String, ModuleConstValue>,
     signatures: &BTreeMap<String, FunctionSignature>,
     struct_table: &BTreeMap<String, NirStructDef>,
     expected: Option<&NirTypeRef>,
@@ -3374,11 +3870,12 @@ fn lower_call_expr_with_async(
                 args: spawned_args
                     .iter()
                     .map(|arg| {
-                        let lowered = lower_nested_expr_with_async(
+                        let lowered = lower_nested_expr_with_async_and_consts(
                             arg,
                             current_domain,
                             current_function_is_async,
                             bindings,
+                            module_consts,
                             signatures,
                             struct_table,
                             None,
@@ -3404,11 +3901,12 @@ fn lower_call_expr_with_async(
             let [task] = args else {
                 return Err("join(...) expects exactly one task handle".to_owned());
             };
-            let lowered = lower_nested_expr_with_async(
+            let lowered = lower_nested_expr_with_async_and_consts(
                 task,
                 current_domain,
                 current_function_is_async,
                 bindings,
+                module_consts,
                 signatures,
                 struct_table,
                 None,
@@ -3425,11 +3923,12 @@ fn lower_call_expr_with_async(
             let [task] = args else {
                 return Err("cancel(...) expects exactly one task handle".to_owned());
             };
-            let lowered = lower_nested_expr_with_async(
+            let lowered = lower_nested_expr_with_async_and_consts(
                 task,
                 current_domain,
                 current_function_is_async,
                 bindings,
+                module_consts,
                 signatures,
                 struct_table,
                 None,
@@ -3446,11 +3945,12 @@ fn lower_call_expr_with_async(
             let [task] = args else {
                 return Err("join_result(...) expects exactly one task handle".to_owned());
             };
-            let lowered = lower_nested_expr_with_async(
+            let lowered = lower_nested_expr_with_async_and_consts(
                 task,
                 current_domain,
                 current_function_is_async,
                 bindings,
+                module_consts,
                 signatures,
                 struct_table,
                 None,
@@ -3458,45 +3958,49 @@ fn lower_call_expr_with_async(
             ensure_task_like("join_result", &lowered, bindings, signatures, struct_table)?;
             Ok(NirExpr::CpuJoinResult(Box::new(lowered)))
         }
-        "task_completed" => lower_result_observer_call(
+        "task_completed" => lower_result_observer_call_with_consts(
             "task_completed",
             args,
             current_domain,
             current_function_is_async,
             bindings,
+            module_consts,
             signatures,
             struct_table,
             NirResultFamily::Task,
             |expr| NirExpr::CpuTaskCompleted(Box::new(expr)),
         ),
-        "task_timed_out" => lower_result_observer_call(
+        "task_timed_out" => lower_result_observer_call_with_consts(
             "task_timed_out",
             args,
             current_domain,
             current_function_is_async,
             bindings,
+            module_consts,
             signatures,
             struct_table,
             NirResultFamily::Task,
             |expr| NirExpr::CpuTaskTimedOut(Box::new(expr)),
         ),
-        "task_cancelled" => lower_result_observer_call(
+        "task_cancelled" => lower_result_observer_call_with_consts(
             "task_cancelled",
             args,
             current_domain,
             current_function_is_async,
             bindings,
+            module_consts,
             signatures,
             struct_table,
             NirResultFamily::Task,
             |expr| NirExpr::CpuTaskCancelled(Box::new(expr)),
         ),
-        "task_value" => lower_result_observer_call(
+        "task_value" => lower_result_observer_call_with_consts(
             "task_value",
             args,
             current_domain,
             current_function_is_async,
             bindings,
+            module_consts,
             signatures,
             struct_table,
             NirResultFamily::Task,
@@ -3511,21 +4015,23 @@ fn lower_call_expr_with_async(
             let [task, limit] = args else {
                 return Err("timeout(...) expects exactly two arguments: task and limit".to_owned());
             };
-            let lowered_task = lower_nested_expr_with_async(
+            let lowered_task = lower_nested_expr_with_async_and_consts(
                 task,
                 current_domain,
                 current_function_is_async,
                 bindings,
+                module_consts,
                 signatures,
                 struct_table,
                 None,
             )?;
             ensure_task_like("timeout", &lowered_task, bindings, signatures, struct_table)?;
-            let lowered_limit = lower_nested_expr_with_async(
+            let lowered_limit = lower_nested_expr_with_async_and_consts(
                 limit,
                 current_domain,
                 current_function_is_async,
                 bindings,
+                module_consts,
                 signatures,
                 struct_table,
                 Some(&i64_type()),
@@ -3837,12 +4343,13 @@ fn lower_call_expr_with_async(
             )?;
             Ok(NirExpr::DataInputPipe(Box::new(lowered)))
         }
-        "data_result" => lower_result_wrapper_call(
+        "data_result" => lower_result_wrapper_call_with_consts(
             "data_result",
             args,
             current_domain,
             current_function_is_async,
             bindings,
+            module_consts,
             signatures,
             struct_table,
             NirResultFamily::Data,
@@ -3856,56 +4363,61 @@ fn lower_call_expr_with_async(
             },
             "expects a direct data operation like pipe/window/profile send",
         ),
-        "data_ready" => lower_result_observer_call(
+        "data_ready" => lower_result_observer_call_with_consts(
             "data_ready",
             args,
             current_domain,
             current_function_is_async,
             bindings,
+            module_consts,
             signatures,
             struct_table,
             NirResultFamily::Data,
             |expr| NirExpr::DataReady(Box::new(expr)),
         ),
-        "data_moved" => lower_result_observer_call(
+        "data_moved" => lower_result_observer_call_with_consts(
             "data_moved",
             args,
             current_domain,
             current_function_is_async,
             bindings,
+            module_consts,
             signatures,
             struct_table,
             NirResultFamily::Data,
             |expr| NirExpr::DataMoved(Box::new(expr)),
         ),
-        "data_windowed" => lower_result_observer_call(
+        "data_windowed" => lower_result_observer_call_with_consts(
             "data_windowed",
             args,
             current_domain,
             current_function_is_async,
             bindings,
+            module_consts,
             signatures,
             struct_table,
             NirResultFamily::Data,
             |expr| NirExpr::DataWindowed(Box::new(expr)),
         ),
-        "data_value" => lower_result_observer_call(
+        "data_value" => lower_result_observer_call_with_consts(
             "data_value",
             args,
             current_domain,
             current_function_is_async,
             bindings,
+            module_consts,
             signatures,
             struct_table,
             NirResultFamily::Data,
             |expr| NirExpr::DataValue(Box::new(expr)),
         ),
-        "shader_result" => lower_result_wrapper_call(
+        "shader_result" => lower_result_wrapper_call_with_consts(
             "shader_result",
             args,
             current_domain,
             current_function_is_async,
             bindings,
+            module_consts,
             signatures,
             struct_table,
             NirResultFamily::Shader,
@@ -3919,34 +4431,37 @@ fn lower_call_expr_with_async(
             },
             "expects a direct shader operation like begin_pass/render",
         ),
-        "shader_pass_ready" => lower_result_observer_call(
+        "shader_pass_ready" => lower_result_observer_call_with_consts(
             "shader_pass_ready",
             args,
             current_domain,
             current_function_is_async,
             bindings,
+            module_consts,
             signatures,
             struct_table,
             NirResultFamily::Shader,
             |expr| NirExpr::ShaderPassReady(Box::new(expr)),
         ),
-        "shader_frame_ready" => lower_result_observer_call(
+        "shader_frame_ready" => lower_result_observer_call_with_consts(
             "shader_frame_ready",
             args,
             current_domain,
             current_function_is_async,
             bindings,
+            module_consts,
             signatures,
             struct_table,
             NirResultFamily::Shader,
             |expr| NirExpr::ShaderFrameReady(Box::new(expr)),
         ),
-        "shader_value" => lower_result_observer_call(
+        "shader_value" => lower_result_observer_call_with_consts(
             "shader_value",
             args,
             current_domain,
             current_function_is_async,
             bindings,
+            module_consts,
             signatures,
             struct_table,
             NirResultFamily::Shader,
@@ -14017,12 +14532,13 @@ fn lower_call_expr_with_async(
             };
             Ok(NirExpr::NetworkProfileProtocolHeaderBytesRef { unit: unit.clone() })
         }
-        "network_result" => lower_result_wrapper_call(
+        "network_result" => lower_result_wrapper_call_with_consts(
             "network_result",
             args,
             current_domain,
             current_function_is_async,
             bindings,
+            module_consts,
             signatures,
             struct_table,
             NirResultFamily::Network,
@@ -14036,56 +14552,61 @@ fn lower_call_expr_with_async(
             },
             "expects a direct network profile/config expression",
         ),
-        "network_config_ready" => lower_result_observer_call(
+        "network_config_ready" => lower_result_observer_call_with_consts(
             "network_config_ready",
             args,
             current_domain,
             current_function_is_async,
             bindings,
+            module_consts,
             signatures,
             struct_table,
             NirResultFamily::Network,
             |expr| NirExpr::NetworkConfigReady(Box::new(expr)),
         ),
-        "network_send_ready" => lower_result_observer_call(
+        "network_send_ready" => lower_result_observer_call_with_consts(
             "network_send_ready",
             args,
             current_domain,
             current_function_is_async,
             bindings,
+            module_consts,
             signatures,
             struct_table,
             NirResultFamily::Network,
             |expr| NirExpr::NetworkSendReady(Box::new(expr)),
         ),
-        "network_recv_ready" => lower_result_observer_call(
+        "network_recv_ready" => lower_result_observer_call_with_consts(
             "network_recv_ready",
             args,
             current_domain,
             current_function_is_async,
             bindings,
+            module_consts,
             signatures,
             struct_table,
             NirResultFamily::Network,
             |expr| NirExpr::NetworkRecvReady(Box::new(expr)),
         ),
-        "network_accept_ready" => lower_result_observer_call(
+        "network_accept_ready" => lower_result_observer_call_with_consts(
             "network_accept_ready",
             args,
             current_domain,
             current_function_is_async,
             bindings,
+            module_consts,
             signatures,
             struct_table,
             NirResultFamily::Network,
             |expr| NirExpr::NetworkAcceptReady(Box::new(expr)),
         ),
-        "network_value" => lower_result_observer_call(
+        "network_value" => lower_result_observer_call_with_consts(
             "network_value",
             args,
             current_domain,
             current_function_is_async,
             bindings,
+            module_consts,
             signatures,
             struct_table,
             NirResultFamily::Network,
@@ -14142,12 +14663,13 @@ fn lower_call_expr_with_async(
             };
             Ok(NirExpr::KernelProfileBatchLanesRef { unit: unit.clone() })
         }
-        "kernel_result" => lower_result_wrapper_call(
+        "kernel_result" => lower_result_wrapper_call_with_consts(
             "kernel_result",
             args,
             current_domain,
             current_function_is_async,
             bindings,
+            module_consts,
             signatures,
             struct_table,
             NirResultFamily::Kernel,
@@ -14161,23 +14683,25 @@ fn lower_call_expr_with_async(
             },
             "expects a direct kernel profile/config expression",
         ),
-        "kernel_config_ready" => lower_result_observer_call(
+        "kernel_config_ready" => lower_result_observer_call_with_consts(
             "kernel_config_ready",
             args,
             current_domain,
             current_function_is_async,
             bindings,
+            module_consts,
             signatures,
             struct_table,
             NirResultFamily::Kernel,
             |expr| NirExpr::KernelConfigReady(Box::new(expr)),
         ),
-        "kernel_value" => lower_result_observer_call(
+        "kernel_value" => lower_result_observer_call_with_consts(
             "kernel_value",
             args,
             current_domain,
             current_function_is_async,
             bindings,
+            module_consts,
             signatures,
             struct_table,
             NirResultFamily::Kernel,
@@ -15281,6 +15805,7 @@ fn ensure_spawn_input_safe(
     }
 }
 
+#[allow(dead_code)]
 fn lower_single_nested_expr(
     name: &str,
     args: &[AstExpr],
@@ -15290,20 +15815,44 @@ fn lower_single_nested_expr(
     signatures: &BTreeMap<String, FunctionSignature>,
     struct_table: &BTreeMap<String, NirStructDef>,
 ) -> Result<NirExpr, String> {
+    lower_single_nested_expr_with_consts(
+        name,
+        args,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        &BTreeMap::new(),
+        signatures,
+        struct_table,
+    )
+}
+
+fn lower_single_nested_expr_with_consts(
+    name: &str,
+    args: &[AstExpr],
+    current_domain: &str,
+    current_function_is_async: bool,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    module_consts: &BTreeMap<String, ModuleConstValue>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> Result<NirExpr, String> {
     let [value] = args else {
         return Err(format!("{name}(...) expects exactly one argument"));
     };
-    lower_nested_expr_with_async(
+    lower_nested_expr_with_async_and_consts(
         value,
         current_domain,
         current_function_is_async,
         bindings,
+        module_consts,
         signatures,
         struct_table,
         None,
     )
 }
 
+#[allow(dead_code)]
 fn lower_result_wrapper_call(
     name: &str,
     args: &[AstExpr],
@@ -15317,12 +15866,43 @@ fn lower_result_wrapper_call(
     build: fn(Box<NirExpr>, NirResultStage) -> Result<NirExpr, String>,
     usage_hint: &str,
 ) -> Result<NirExpr, String> {
-    let lowered = lower_single_nested_expr(
+    lower_result_wrapper_call_with_consts(
         name,
         args,
         current_domain,
         current_function_is_async,
         bindings,
+        &BTreeMap::new(),
+        signatures,
+        struct_table,
+        family,
+        infer_stage,
+        build,
+        usage_hint,
+    )
+}
+
+fn lower_result_wrapper_call_with_consts(
+    name: &str,
+    args: &[AstExpr],
+    current_domain: &str,
+    current_function_is_async: bool,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    module_consts: &BTreeMap<String, ModuleConstValue>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+    family: NirResultFamily,
+    infer_stage: fn(&NirExpr) -> Option<NirResultStage>,
+    build: fn(Box<NirExpr>, NirResultStage) -> Result<NirExpr, String>,
+    usage_hint: &str,
+) -> Result<NirExpr, String> {
+    let lowered = lower_single_nested_expr_with_consts(
+        name,
+        args,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
         signatures,
         struct_table,
     )?;
@@ -15350,6 +15930,7 @@ fn validate_result_stage_payload(
     stage.validate_payload(payload)
 }
 
+#[allow(dead_code)]
 fn lower_result_observer_call(
     name: &str,
     args: &[AstExpr],
@@ -15361,12 +15942,39 @@ fn lower_result_observer_call(
     family: NirResultFamily,
     build: fn(NirExpr) -> NirExpr,
 ) -> Result<NirExpr, String> {
-    let lowered = lower_single_nested_expr(
+    lower_result_observer_call_with_consts(
         name,
         args,
         current_domain,
         current_function_is_async,
         bindings,
+        &BTreeMap::new(),
+        signatures,
+        struct_table,
+        family,
+        build,
+    )
+}
+
+fn lower_result_observer_call_with_consts(
+    name: &str,
+    args: &[AstExpr],
+    current_domain: &str,
+    current_function_is_async: bool,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    module_consts: &BTreeMap<String, ModuleConstValue>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+    family: NirResultFamily,
+    build: fn(NirExpr) -> NirExpr,
+) -> Result<NirExpr, String> {
+    let lowered = lower_single_nested_expr_with_consts(
+        name,
+        args,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
         signatures,
         struct_table,
     )?;
@@ -19458,6 +20066,265 @@ mod tests {
             error.contains("struct literal `Config` cannot be constructed outside its defining module because it hides 1 private field"),
             "unexpected error: {error}"
         );
+    }
+
+    #[test]
+    fn parses_pub_const_items_into_ast() {
+        let ast = parse_nuis_ast(
+            r#"
+            mod cpu Main {
+              pub const LIMIT: i64 = 7;
+
+              fn main() -> i64 {
+                return LIMIT;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        assert_eq!(ast.consts.len(), 1);
+        assert!(matches!(ast.consts[0].visibility, AstVisibility::Public));
+        assert_eq!(ast.consts[0].name, "LIMIT");
+    }
+
+    #[test]
+    fn lowers_top_level_const_reads_by_inlining_values() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              const LIMIT: i64 = 7;
+
+              fn main() -> i64 {
+                return LIMIT;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        assert_eq!(module.consts.len(), 1);
+        assert!(matches!(
+            module.functions[0].body.first(),
+            Some(NirStmt::Return(Some(NirExpr::Int(7))))
+        ));
+    }
+
+    #[test]
+    fn helper_pub_consts_can_cross_module_but_private_ones_cannot() {
+        let entry = parse_nuis_ast(
+            r#"
+            use cpu Limits;
+
+            mod cpu Main {
+              fn main() -> i64 {
+                return LIMIT;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let helper = parse_nuis_ast(
+            r#"
+            mod cpu Limits {
+              pub const LIMIT: i64 = 9;
+              const SECRET: i64 = 5;
+            }
+            "#,
+        )
+        .unwrap();
+        let module = super::lower_project_ast_to_nir(&entry, &[helper.clone()]).unwrap();
+        let main_function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            main_function.body.first(),
+            Some(NirStmt::Return(Some(NirExpr::Int(9))))
+        ));
+
+        let hidden_entry = parse_nuis_ast(
+            r#"
+            use cpu Limits;
+
+            mod cpu Main {
+              fn main() -> i64 {
+                return SECRET;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let error = super::lower_project_ast_to_nir(&hidden_entry, &[helper]).unwrap_err();
+        assert!(
+            error.contains("unknown value `SECRET`"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn parses_pub_type_alias_items_into_ast() {
+        let ast = parse_nuis_ast(
+            r#"
+            mod cpu Main {
+              pub type Count = i64;
+
+              fn main() -> Count {
+                return 7;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        assert_eq!(ast.type_aliases.len(), 1);
+        assert!(matches!(
+            ast.type_aliases[0].visibility,
+            AstVisibility::Public
+        ));
+        assert_eq!(ast.type_aliases[0].name, "Count");
+        assert_eq!(ast.type_aliases[0].target.name, "i64");
+    }
+
+    #[test]
+    fn lowers_type_aliases_into_nir_and_resolves_declared_types() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              type Count = i64;
+
+              fn main() -> Count {
+                let value: Count = 7;
+                return value;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        assert_eq!(module.type_aliases.len(), 1);
+        assert_eq!(module.type_aliases[0].target.name, "i64");
+        assert_eq!(
+            module.functions[0]
+                .return_type
+                .as_ref()
+                .map(|ty| ty.render()),
+            Some("i64".to_owned())
+        );
+        assert!(matches!(
+            module.functions[0].body.first(),
+            Some(NirStmt::Let { ty: Some(ty), .. }) if ty.render() == "i64"
+        ));
+    }
+
+    #[test]
+    fn helper_pub_type_aliases_can_cross_module() {
+        let entry = parse_nuis_ast(
+            r#"
+            use cpu Types;
+
+            mod cpu Main {
+              fn main() -> i64 {
+                let value: Count = 7;
+                return value;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let helper = parse_nuis_ast(
+            r#"
+            mod cpu Types {
+              pub type Count = i64;
+            }
+            "#,
+        )
+        .unwrap();
+        let module = super::lower_project_ast_to_nir(&entry, &[helper]).unwrap();
+        let main_function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            main_function.body.first(),
+            Some(NirStmt::Let { ty: Some(ty), .. }) if ty.render() == "i64"
+        ));
+    }
+
+    #[test]
+    fn rejects_cyclic_type_aliases() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              type A = B;
+              type B = A;
+
+              fn main() -> i64 {
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+        assert!(
+            error.contains("type alias `A` is cyclic")
+                || error.contains("type alias `B` is cyclic"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn lowers_generic_type_aliases_into_nir() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              pub type PipeOf<T> = Pipe<T>;
+
+              fn use_pipe(pipe: PipeOf<i64>) -> i64 {
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        assert_eq!(module.type_aliases.len(), 1);
+        assert_eq!(module.type_aliases[0].generic_params.len(), 1);
+        assert_eq!(module.type_aliases[0].target.render(), "Pipe<T>");
+        let use_pipe = module
+            .functions
+            .iter()
+            .find(|function| function.name == "use_pipe")
+            .unwrap();
+        assert_eq!(use_pipe.params[0].ty.render(), "Pipe<i64>");
+    }
+
+    #[test]
+    fn helper_pub_generic_type_aliases_can_cross_module() {
+        let entry = parse_nuis_ast(
+            r#"
+            use cpu Types;
+
+            mod cpu Main {
+              fn use_pipe(pipe: PipeOf<i64>) -> i64 {
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let helper = parse_nuis_ast(
+            r#"
+            mod cpu Types {
+              pub type PipeOf<T> = Pipe<T>;
+            }
+            "#,
+        )
+        .unwrap();
+        let module = super::lower_project_ast_to_nir(&entry, &[helper]).unwrap();
+        let use_pipe = module
+            .functions
+            .iter()
+            .find(|function| function.name == "use_pipe")
+            .unwrap();
+        assert_eq!(use_pipe.params[0].ty.render(), "Pipe<i64>");
     }
 
     #[test]

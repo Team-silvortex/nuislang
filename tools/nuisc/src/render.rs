@@ -40,6 +40,42 @@ pub fn render_ast(module: &AstModule) -> String {
     for interface in &module.extern_interfaces {
         out.push_str(&render_ast_extern_interface(interface));
     }
+    for constant in &module.consts {
+        let visibility_prefix = render_ast_visibility(constant.visibility);
+        out.push_str(&format!(
+            "  {}const {}: {} = {}\n",
+            visibility_prefix,
+            constant.name,
+            render_ast_type(&constant.ty),
+            render_ast_expr(&constant.value)
+        ));
+    }
+    for alias in &module.type_aliases {
+        let visibility_prefix = render_ast_visibility(alias.visibility);
+        let generics = if alias.generic_params.is_empty() {
+            String::new()
+        } else {
+            format!(
+                "<{}>",
+                alias
+                    .generic_params
+                    .iter()
+                    .map(|param| match &param.bound {
+                        Some(bound) => format!("{}: {}", param.name, render_ast_type(bound)),
+                        None => param.name.clone(),
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        };
+        out.push_str(&format!(
+            "  {}type {}{} = {}\n",
+            visibility_prefix,
+            alias.name,
+            generics,
+            render_ast_type(&alias.target)
+        ));
+    }
     for definition in &module.structs {
         out.push_str(&render_ast_struct(definition));
     }
@@ -146,6 +182,42 @@ pub fn render_nir(module: &NirModule) -> String {
     }
     for interface in &module.extern_interfaces {
         out.push_str(&render_nir_extern_interface(interface));
+    }
+    for constant in &module.consts {
+        let visibility_prefix = render_nir_visibility(constant.visibility);
+        out.push_str(&format!(
+            "  {}const {}: {} = {}\n",
+            visibility_prefix,
+            constant.name,
+            render_nir_type(&constant.ty),
+            render_nir_expr(&constant.value)
+        ));
+    }
+    for alias in &module.type_aliases {
+        let visibility_prefix = render_nir_visibility(alias.visibility);
+        let generics = if alias.generic_params.is_empty() {
+            String::new()
+        } else {
+            format!(
+                "<{}>",
+                alias
+                    .generic_params
+                    .iter()
+                    .map(|param| match &param.bound {
+                        Some(bound) => format!("{}: {}", param.name, render_nir_type(bound)),
+                        None => param.name.clone(),
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        };
+        out.push_str(&format!(
+            "  {}type {}{} = {}\n",
+            visibility_prefix,
+            alias.name,
+            generics,
+            render_nir_type(&alias.target)
+        ));
     }
     for definition in &module.structs {
         out.push_str(&render_nir_struct(definition));

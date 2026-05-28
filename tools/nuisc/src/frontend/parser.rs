@@ -1,8 +1,8 @@
 use nuis_semantics::model::{
-    AstAttribute, AstAttributeArg, AstAttributeValue, AstBinaryOp, AstExpr, AstExternFunction,
-    AstExternInterface, AstFunction, AstGenericParam, AstImplDef, AstImplMethod, AstModule,
-    AstParam, AstStmt, AstStructDef, AstStructField, AstTraitDef, AstTraitMethodSig, AstTypeRef,
-    AstVisibility, TestClockDomain, TestClockPolicy,
+    AstAttribute, AstAttributeArg, AstAttributeValue, AstBinaryOp, AstConstItem, AstExpr,
+    AstExternFunction, AstExternInterface, AstFunction, AstGenericParam, AstImplDef, AstImplMethod,
+    AstModule, AstParam, AstStmt, AstStructDef, AstStructField, AstTraitDef, AstTraitMethodSig,
+    AstTypeAlias, AstTypeRef, AstVisibility, TestClockDomain, TestClockPolicy,
 };
 
 use super::lexer::{describe_token, Token};
@@ -47,6 +47,8 @@ impl Parser {
         let mut structs = Vec::new();
         let mut traits = Vec::new();
         let mut impls = Vec::new();
+        let mut consts = Vec::new();
+        let mut type_aliases = Vec::new();
         let mut functions = Vec::new();
         while !self.peek_symbol('}') {
             if self.peek_word("mod") {
@@ -72,6 +74,10 @@ impl Parser {
                 traits.push(self.parse_trait_def()?);
             } else if self.peek_item_keyword_after_attributes("impl") {
                 impls.push(self.parse_impl_def()?);
+            } else if self.peek_item_keyword_after_attributes("const") {
+                consts.push(self.parse_const_item()?);
+            } else if self.peek_item_keyword_after_attributes("type") {
+                type_aliases.push(self.parse_type_alias_item()?);
             } else {
                 functions.push(self.parse_function()?);
             }
@@ -86,6 +92,8 @@ impl Parser {
             unit,
             externs,
             extern_interfaces,
+            consts,
+            type_aliases,
             structs,
             traits,
             impls,
@@ -196,6 +204,54 @@ impl Parser {
             attributes,
             name,
             fields,
+        })
+    }
+
+    fn parse_const_item(&mut self) -> Result<AstConstItem, String> {
+        let (visibility, attributes) = self.parse_visibility_and_attribute_list()?;
+        if !attributes.is_empty() {
+            return Err(
+                "top-level const annotations are not supported in the current frontend".to_owned(),
+            );
+        }
+        self.expect_word("const")?;
+        let name = self.expect_ident()?;
+        self.expect_symbol(':')?;
+        let ty = self.parse_type_ref()?;
+        self.expect_symbol('=')?;
+        let value = self.parse_expr()?;
+        self.expect_symbol(';')?;
+        Ok(AstConstItem {
+            visibility,
+            name,
+            ty,
+            value,
+        })
+    }
+
+    fn parse_type_alias_item(&mut self) -> Result<AstTypeAlias, String> {
+        let (visibility, attributes) = self.parse_visibility_and_attribute_list()?;
+        if !attributes.is_empty() {
+            return Err(
+                "top-level type alias annotations are not supported in the current frontend"
+                    .to_owned(),
+            );
+        }
+        self.expect_word("type")?;
+        let name = self.expect_ident()?;
+        let generic_params = if self.peek_symbol('<') {
+            self.parse_generic_param_decl_list()?
+        } else {
+            Vec::new()
+        };
+        self.expect_symbol('=')?;
+        let target = self.parse_type_ref()?;
+        self.expect_symbol(';')?;
+        Ok(AstTypeAlias {
+            visibility,
+            name,
+            generic_params,
+            target,
         })
     }
 

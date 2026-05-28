@@ -858,6 +858,8 @@ struct PublicSurfaceModuleRecord {
     module: String,
     externs: Vec<String>,
     extern_interfaces: Vec<String>,
+    consts: Vec<String>,
+    type_aliases: Vec<String>,
     functions: Vec<String>,
     structs: Vec<String>,
     traits: Vec<String>,
@@ -867,6 +869,8 @@ impl PublicSurfaceModuleRecord {
     fn is_empty(&self) -> bool {
         self.externs.is_empty()
             && self.extern_interfaces.is_empty()
+            && self.consts.is_empty()
+            && self.type_aliases.is_empty()
             && self.functions.is_empty()
             && self.structs.is_empty()
             && self.traits.is_empty()
@@ -893,6 +897,20 @@ fn public_surface_records(
                 .iter()
                 .filter(|interface| matches!(interface.visibility, AstVisibility::Public))
                 .map(|interface| interface.name.clone())
+                .collect::<Vec<_>>();
+            let consts = module
+                .ast
+                .consts
+                .iter()
+                .filter(|constant| matches!(constant.visibility, AstVisibility::Public))
+                .map(|constant| constant.name.clone())
+                .collect::<Vec<_>>();
+            let type_aliases = module
+                .ast
+                .type_aliases
+                .iter()
+                .filter(|alias| matches!(alias.visibility, AstVisibility::Public))
+                .map(|alias| alias.name.clone())
                 .collect::<Vec<_>>();
             let functions = module
                 .ast
@@ -934,6 +952,8 @@ fn public_surface_records(
                 module: format!("{}::{}", module.ast.domain, module.ast.unit),
                 externs,
                 extern_interfaces,
+                consts,
+                type_aliases,
                 functions,
                 structs,
                 traits,
@@ -956,9 +976,17 @@ fn describe_public_surface(records: &[PublicSurfaceModuleRecord]) -> String {
         .iter()
         .map(|record| record.extern_interfaces.len())
         .sum::<usize>();
+    let const_count = records
+        .iter()
+        .map(|record| record.consts.len())
+        .sum::<usize>();
     let function_count = records
         .iter()
         .map(|record| record.functions.len())
+        .sum::<usize>();
+    let alias_count = records
+        .iter()
+        .map(|record| record.type_aliases.len())
         .sum::<usize>();
     let struct_count = records
         .iter()
@@ -973,7 +1001,7 @@ fn describe_public_surface(records: &[PublicSurfaceModuleRecord]) -> String {
         return "<none>".to_owned();
     }
     format!(
-        "modules={module_count} extern={extern_count} interface={extern_interface_count} fn={function_count} struct={struct_count} trait={trait_count}"
+        "modules={module_count} extern={extern_count} interface={extern_interface_count} const={const_count} type={alias_count} fn={function_count} struct={struct_count} trait={trait_count}"
     )
 }
 
@@ -990,6 +1018,12 @@ fn describe_public_surface_modules(records: &[PublicSurfaceModuleRecord]) -> Str
             }
             if !record.extern_interfaces.is_empty() {
                 segments.push(format!("interface={}", record.extern_interfaces.join(", ")));
+            }
+            if !record.consts.is_empty() {
+                segments.push(format!("const={}", record.consts.join(", ")));
+            }
+            if !record.type_aliases.is_empty() {
+                segments.push(format!("type={}", record.type_aliases.join(", ")));
             }
             if !record.functions.is_empty() {
                 segments.push(format!("fn={}", record.functions.join(", ")));
@@ -1011,10 +1045,12 @@ fn public_surface_json(records: &[PublicSurfaceModuleRecord]) -> Vec<String> {
         .iter()
         .map(|record| {
             format!(
-                "{{{},{},{},{},{},{}}}",
+                "{{{},{},{},{},{},{},{},{}}}",
                 json_field("module", &record.module),
                 json_string_array_field("externs", &record.externs),
                 json_string_array_field("extern_interfaces", &record.extern_interfaces),
+                json_string_array_field("consts", &record.consts),
+                json_string_array_field("type_aliases", &record.type_aliases),
                 json_string_array_field("functions", &record.functions),
                 json_string_array_field("structs", &record.structs),
                 json_string_array_field("traits", &record.traits),
@@ -1562,9 +1598,17 @@ fn handle_project_status_json(input: std::path::PathBuf) -> Result<(), String> {
         .iter()
         .map(|record| record.extern_interfaces.len())
         .sum::<usize>();
+    let public_const_count = public_surface
+        .iter()
+        .map(|record| record.consts.len())
+        .sum::<usize>();
     let public_function_count = public_surface
         .iter()
         .map(|record| record.functions.len())
+        .sum::<usize>();
+    let public_type_alias_count = public_surface
+        .iter()
+        .map(|record| record.type_aliases.len())
         .sum::<usize>();
     let public_struct_count = public_surface
         .iter()
@@ -1585,6 +1629,8 @@ fn handle_project_status_json(input: std::path::PathBuf) -> Result<(), String> {
         json_usize_field("public_surface_modules", public_surface.len()),
         json_usize_field("public_externs", public_extern_count),
         json_usize_field("public_extern_interfaces", public_extern_interface_count),
+        json_usize_field("public_consts", public_const_count),
+        json_usize_field("public_type_aliases", public_type_alias_count),
         json_usize_field("public_functions", public_function_count),
         json_usize_field("public_structs", public_struct_count),
         json_usize_field("public_traits", public_trait_count),
@@ -2197,9 +2243,17 @@ fn handle_project_doctor_json(input: std::path::PathBuf) -> Result<(), String> {
         .iter()
         .map(|record| record.extern_interfaces.len())
         .sum::<usize>();
+    let public_const_count = public_surface
+        .iter()
+        .map(|record| record.consts.len())
+        .sum::<usize>();
     let public_function_count = public_surface
         .iter()
         .map(|record| record.functions.len())
+        .sum::<usize>();
+    let public_type_alias_count = public_surface
+        .iter()
+        .map(|record| record.type_aliases.len())
         .sum::<usize>();
     let public_struct_count = public_surface
         .iter()
@@ -2249,6 +2303,8 @@ fn handle_project_doctor_json(input: std::path::PathBuf) -> Result<(), String> {
         json_usize_field("public_surface_modules", public_surface.len()),
         json_usize_field("public_externs", public_extern_count),
         json_usize_field("public_extern_interfaces", public_extern_interface_count),
+        json_usize_field("public_consts", public_const_count),
+        json_usize_field("public_type_aliases", public_type_alias_count),
         json_usize_field("public_functions", public_function_count),
         json_usize_field("public_structs", public_struct_count),
         json_usize_field("public_traits", public_trait_count),

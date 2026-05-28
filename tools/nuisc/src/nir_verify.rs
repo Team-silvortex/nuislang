@@ -1182,6 +1182,8 @@ mod tests {
             unit: "Main".to_owned(),
             externs: vec![],
             extern_interfaces: vec![],
+            consts: vec![],
+            type_aliases: vec![],
             structs: vec![],
             traits: vec![],
             impls: vec![],

@@ -1,4 +1,7 @@
 mod cpu Main {
+  type IntTask = Task<i64>;
+  type IntTaskResult = TaskResult<i64>;
+
   struct TaskRuntimeProjectCompletedSummary {
     completed: i64,
     value: i64
@@ -15,14 +18,14 @@ mod cpu Main {
     return seed + 1;
   }
 
-  fn encode_timed_out(result: TaskResult<i64>) -> i64 {
+  fn encode_timed_out(result: IntTaskResult) -> i64 {
     if task_timed_out(result) {
       return 1;
     }
     return 0;
   }
 
-  fn encode_cancelled(result: TaskResult<i64>) -> i64 {
+  fn encode_cancelled(result: IntTaskResult) -> i64 {
     if task_cancelled(result) {
       return 1;
     }
@@ -30,8 +33,8 @@ mod cpu Main {
   }
 
   fn capture_completed_task(seed: i64) -> TaskRuntimeProjectCompletedSummary {
-    let task: Task<i64> = spawn(ping(seed));
-    let result: TaskResult<i64> = join_result(task);
+    let task: IntTask = spawn(ping(seed));
+    let result: IntTaskResult = join_result(task);
     if task_completed(result) {
       return TaskRuntimeProjectCompletedSummary {
         completed: 1,
@@ -45,14 +48,14 @@ mod cpu Main {
   }
 
   fn capture_task_lifecycle(seed: i64, limit: i64) -> TaskRuntimeProjectLifecycleSummary {
-    let completed_task: Task<i64> = spawn(ping(seed));
-    let completed_result: TaskResult<i64> = join_result(completed_task);
+    let completed_task: IntTask = spawn(ping(seed));
+    let completed_result: IntTaskResult = join_result(completed_task);
 
-    let timed_task: Task<i64> = timeout(spawn(ping(seed)), limit);
-    let timed_result: TaskResult<i64> = join_result(timed_task);
+    let timed_task: IntTask = timeout(spawn(ping(seed)), limit);
+    let timed_result: IntTaskResult = join_result(timed_task);
 
-    let cancelled_task: Task<i64> = cancel(spawn(ping(seed)));
-    let cancelled_result: TaskResult<i64> = join_result(cancelled_task);
+    let cancelled_task: IntTask = cancel(spawn(ping(seed)));
+    let cancelled_result: IntTaskResult = join_result(cancelled_task);
     let timed_out: i64 = encode_timed_out(timed_result);
     let cancelled: i64 = encode_cancelled(cancelled_result);
 
