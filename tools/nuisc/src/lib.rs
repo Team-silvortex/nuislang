@@ -659,6 +659,9 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             if let Some(plan_index) = report.project_plan_index {
                 println!("  project_plan_index: {}", plan_index);
             }
+            if let Some(packet_index) = report.project_packet_index {
+                println!("  project_packet_index: {}", packet_index);
+            }
             println!("  artifacts_checked: {}", report.artifacts_checked);
             println!(
                 "  project_metadata_checked: {}",
@@ -1161,6 +1164,9 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                             links_index_path: project_metadata
                                 .as_ref()
                                 .map(|item| item.links_index_path.clone()),
+                            packet_index_path: project_metadata
+                                .as_ref()
+                                .map(|item| item.packet_index_path.clone()),
                             host_ffi_index_path: project_metadata
                                 .as_ref()
                                 .map(|item| item.host_ffi_index_path.clone()),
@@ -1259,6 +1265,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 println!("project_exchange: {}", metadata.exchange_index_path);
                 println!("project_modules: {}", metadata.modules_index_path);
                 println!("project_links: {}", metadata.links_index_path);
+                println!("project_packet: {}", metadata.packet_index_path);
                 println!("project_host_ffi: {}", metadata.host_ffi_index_path);
                 println!("project_abi: {}", metadata.abi_index_path);
             }

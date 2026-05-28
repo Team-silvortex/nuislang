@@ -73,10 +73,12 @@ Two syntax families are reasonable.
 ```ns
 @inline
 @export(name = "main")
-@host_symbol("network.open_tcp")
 fn main() -> i64 {
   return 0;
 }
+
+extern "c" @host_symbol("network.open_tcp")
+fn open_tcp(local_port: i64, remote_port: i64) -> i64;
 ```
 
 This reads clearly and matches user expectations.
@@ -86,7 +88,6 @@ This reads clearly and matches user expectations.
 ```ns
 annotate(inline);
 annotate(export(name = "main"));
-annotate(host_symbol("network.open_tcp"));
 fn main() -> i64 {
   return 0;
 }
@@ -129,6 +130,12 @@ requires one.
 
 These should connect directly to existing lowering and packaging surfaces.
 
+Current host-boundary guidance:
+
+* prefer `extern "c" @host_symbol("...") fn ...;` as the stable std-owned host boundary
+* allow `@host_symbol("...") fn ... { return 0; }` only as an MVP bridge-stub form
+* keep both forms compiler-owned and white-listed
+
 ### Test / Tooling
 
 * `@test`
@@ -149,6 +156,20 @@ They are compiler-recognized, std-owned intrinsic helpers.
 * `@network_entry`
 
 The exact first set can stay small, but the model should allow this style.
+
+Current first-step packet semantics should stay deliberately narrow:
+
+* allow `@packet` on `struct`
+* allow `@packet_field` on fields inside a packet struct
+* surface packet-shape metadata through project/build indexes first
+* include stable field order and coarse field-kind classification in that metadata
+* distinguish coarse packet field roles such as `payload`, `control-plane`, `async-carrier`, and `unsupported-shape`
+* treat `@packet_field` as a payload-slot marker for now
+* treat `@packet_control_field` as an explicit control-plane slot marker for now
+* start with narrow static packet-safety checks: packet structs must be non-empty, must declare at least one `@packet_field`, and currently reject `ref` / optional fields
+* allow control-plane families like `Marker<...>` and `HandleTable<...>` only through `@packet_control_field`
+* continue rejecting async-carrier families like `Task<...>` and `*Result<...>` for now
+* do not jump straight to full encode/decode generation
 
 ## What Not To Do In V1
 

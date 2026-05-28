@@ -20,9 +20,15 @@ pub fn render_ast(module: &AstModule) -> String {
             .map(|param| format!("{}: {}", param.name, render_ast_type(&param.ty)))
             .collect::<Vec<_>>()
             .join(", ");
+        let host_prefix = function
+            .host_symbol
+            .as_ref()
+            .map(|symbol| format!("@host_symbol(\"{}\") ", escape_debug(symbol)))
+            .unwrap_or_default();
         out.push_str(&format!(
-            "  extern \"{}\" fn {}({}) -> {}\n",
+            "  extern \"{}\" {}fn {}({}) -> {}\n",
             function.abi,
+            host_prefix,
             function.name,
             params,
             render_ast_type(&function.return_type)
@@ -119,9 +125,15 @@ pub fn render_nir(module: &NirModule) -> String {
             .map(|param| format!("{}: {}", param.name, render_nir_type(&param.ty)))
             .collect::<Vec<_>>()
             .join(", ");
+        let host_prefix = function
+            .host_symbol
+            .as_ref()
+            .map(|symbol| format!("@host_symbol(\"{}\") ", escape_debug(symbol)))
+            .unwrap_or_default();
         out.push_str(&format!(
-            "  extern \"{}\" fn {}({}) -> {}\n",
+            "  extern \"{}\" {}fn {}({}) -> {}\n",
             function.abi,
+            host_prefix,
             function.name,
             params,
             render_nir_type(&function.return_type)
@@ -300,10 +312,16 @@ fn render_ast_expr(value: &AstExpr) -> String {
 
 fn render_ast_struct(definition: &AstStructDef) -> String {
     let mut out = String::new();
-    out.push_str(&format!("  struct {}\n", definition.name));
+    let attribute_prefix = render_ast_attributes(&definition.attributes);
+    out.push_str(&format!(
+        "  {}struct {}\n",
+        attribute_prefix, definition.name
+    ));
     for field in &definition.fields {
+        let field_prefix = render_ast_attributes(&field.attributes);
         out.push_str(&format!(
-            "    field {}: {}\n",
+            "    {}field {}: {}\n",
+            field_prefix,
             field.name,
             render_ast_type(&field.ty)
         ));
@@ -344,8 +362,14 @@ fn render_ast_extern_interface(interface: &AstExternInterface) -> String {
             .map(|param| format!("{}: {}", param.name, render_ast_type(&param.ty)))
             .collect::<Vec<_>>()
             .join(", ");
+        let host_prefix = function
+            .host_symbol
+            .as_ref()
+            .map(|symbol| format!("@host_symbol(\"{}\") ", escape_debug(symbol)))
+            .unwrap_or_default();
         out.push_str(&format!(
-            "    fn {}({}) -> {}\n",
+            "    {}fn {}({}) -> {}\n",
+            host_prefix,
             function.name,
             params,
             render_ast_type(&function.return_type)
@@ -1031,10 +1055,16 @@ fn render_nir_expr(value: &NirExpr) -> String {
 
 fn render_nir_struct(definition: &NirStructDef) -> String {
     let mut out = String::new();
-    out.push_str(&format!("  struct {}\n", definition.name));
+    let annotation_prefix = render_nir_annotations(&definition.annotations);
+    out.push_str(&format!(
+        "  {}struct {}\n",
+        annotation_prefix, definition.name
+    ));
     for field in &definition.fields {
+        let field_prefix = render_nir_annotations(&field.annotations);
         out.push_str(&format!(
-            "    field {}: {}\n",
+            "    {}field {}: {}\n",
+            field_prefix,
             field.name,
             render_nir_type(&field.ty)
         ));
@@ -1075,8 +1105,14 @@ fn render_nir_extern_interface(interface: &NirExternInterface) -> String {
             .map(|param| format!("{}: {}", param.name, render_nir_type(&param.ty)))
             .collect::<Vec<_>>()
             .join(", ");
+        let host_prefix = function
+            .host_symbol
+            .as_ref()
+            .map(|symbol| format!("@host_symbol(\"{}\") ", escape_debug(symbol)))
+            .unwrap_or_default();
         out.push_str(&format!(
-            "    fn {}({}) -> {}\n",
+            "    {}fn {}({}) -> {}\n",
+            host_prefix,
             function.name,
             params,
             render_nir_type(&function.return_type)

@@ -5,12 +5,12 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{
     AstAttributeValue, AstBinaryOp, AstExpr, AstFunction, AstImplDef, AstModule, AstParam, AstStmt,
-    AstStructDef, AstTypeRef, NirAnnotation, NirAttributeArg, NirAttributeValue, NirBinaryOp,
-    NirDataFlowState, NirExpr, NirExternFunction, NirExternInterface, NirFunction, NirGenericParam,
-    NirImplDef, NirImplMethod, NirKernelAxis, NirKernelFlowState, NirKernelMapOp, NirKernelZipOp,
-    NirModule, NirNetworkFlowState, NirParam, NirResultFamily, NirResultStage, NirShaderFlowState,
-    NirStmt, NirStructDef, NirStructField, NirTraitDef, NirTraitMethodSig, NirTypeRef, NirUse,
-    NirWindowMode,
+    AstStructDef, AstStructField, AstTypeRef, NirAnnotation, NirAttributeArg, NirAttributeValue,
+    NirBinaryOp, NirDataFlowState, NirExpr, NirExternFunction, NirExternInterface, NirFunction,
+    NirGenericParam, NirImplDef, NirImplMethod, NirKernelAxis, NirKernelFlowState, NirKernelMapOp,
+    NirKernelZipOp, NirModule, NirNetworkFlowState, NirParam, NirResultFamily, NirResultStage,
+    NirShaderFlowState, NirStmt, NirStructDef, NirStructField, NirTraitDef, NirTraitMethodSig,
+    NirTypeRef, NirUse, NirWindowMode,
 };
 
 pub fn frontend_name() -> &'static str {
@@ -32,6 +32,11 @@ pub fn lower_project_ast_to_nir(
     local_modules: &[AstModule],
 ) -> Result<NirModule, String> {
     validate_export_annotations(module)?;
+    validate_extern_host_symbols(module)?;
+    validate_host_symbol_bridge_annotations(module)?;
+    for definition in &module.structs {
+        validate_struct_annotations(definition)?;
+    }
     for function in &module.functions {
         validate_function_annotations(function)?;
     }
@@ -50,11 +55,13 @@ pub fn lower_project_ast_to_nir(
         .structs
         .iter()
         .map(|definition| NirStructDef {
+            annotations: lower_ast_attributes(&definition.attributes),
             name: definition.name.clone(),
             fields: definition
                 .fields
                 .iter()
                 .map(|field| NirStructField {
+                    annotations: lower_ast_attributes(&field.attributes),
                     name: field.name.clone(),
                     ty: lower_type_ref(&field.ty),
                 })
@@ -62,11 +69,13 @@ pub fn lower_project_ast_to_nir(
         })
         .chain(local_cpu_helpers.iter().flat_map(|helper| {
             helper.structs.iter().map(|definition| NirStructDef {
+                annotations: lower_ast_attributes(&definition.attributes),
                 name: definition.name.clone(),
                 fields: definition
                     .fields
                     .iter()
                     .map(|field| NirStructField {
+                        annotations: lower_ast_attributes(&field.attributes),
                         name: field.name.clone(),
                         ty: lower_type_ref(&field.ty),
                     })
@@ -81,12 +90,13 @@ pub fn lower_project_ast_to_nir(
 
     let mut signatures = BTreeMap::<String, FunctionSignature>::new();
     for function in &module.externs {
+        let symbol_name = extern_function_symbol_name(function)?;
         signatures.insert(
             function.name.clone(),
             FunctionSignature {
                 abi: function.abi.clone(),
                 interface: None,
-                symbol_name: function.name.clone(),
+                symbol_name,
                 params: function
                     .params
                     .iter()
@@ -100,12 +110,13 @@ pub fn lower_project_ast_to_nir(
     }
     for interface in &module.extern_interfaces {
         for function in &interface.methods {
+            let symbol_name = extern_function_symbol_name(function)?;
             signatures.insert(
                 format!("{}.{}", interface.name, function.name),
                 FunctionSignature {
                     abi: function.abi.clone(),
                     interface: Some(interface.name.clone()),
-                    symbol_name: format!("{}__{}", interface.name, function.name),
+                    symbol_name,
                     params: function
                         .params
                         .iter()
@@ -139,20 +150,29 @@ pub fn lower_project_ast_to_nir(
     let mut generic_templates = BTreeMap::<String, AstFunction>::new();
     let mut concrete_module_functions = Vec::new();
     for function in &module.functions {
+        let host_symbol = function_host_symbol_name(function)?;
+        let is_host_bridge = host_symbol.is_some();
         let signature = FunctionSignature {
-            abi: "nuis".to_owned(),
+            abi: if is_host_bridge {
+                "c".to_owned()
+            } else {
+                "nuis".to_owned()
+            },
             interface: None,
-            symbol_name: function.name.clone(),
+            symbol_name: host_symbol.unwrap_or_else(|| function.name.clone()),
             params: function
                 .params
                 .iter()
                 .map(|param| lower_type_ref(&param.ty))
                 .collect(),
             return_type: function.return_type.as_ref().map(lower_type_ref),
-            is_extern: false,
+            is_extern: is_host_bridge,
             is_async: function.is_async,
         };
         signatures.insert(function.name.clone(), signature);
+        if is_host_bridge {
+            continue;
+        }
         if function.generic_params.is_empty() {
             concrete_module_functions.push(function.clone());
         } else {
@@ -332,6 +352,7 @@ pub fn lower_project_ast_to_nir(
                 abi: function.abi.clone(),
                 interface: None,
                 name: function.name.clone(),
+                host_symbol: function.host_symbol.clone(),
                 params: function.params.iter().map(lower_param).collect(),
                 return_type: lower_type_ref(&function.return_type),
             })
@@ -349,6 +370,7 @@ pub fn lower_project_ast_to_nir(
                         abi: function.abi.clone(),
                         interface: Some(interface.name.clone()),
                         name: function.name.clone(),
+                        host_symbol: function.host_symbol.clone(),
                         params: function.params.iter().map(lower_param).collect(),
                         return_type: lower_type_ref(&function.return_type),
                     })
@@ -424,6 +446,199 @@ fn function_export_name(function: &AstFunction) -> Result<Option<String>, String
     }
 }
 
+fn function_host_symbol_name(function: &AstFunction) -> Result<Option<String>, String> {
+    let Some(attribute) = function
+        .attributes
+        .iter()
+        .find(|attribute| attribute.name == "host_symbol")
+    else {
+        return Ok(None);
+    };
+    let Some(arg) = attribute.args.first() else {
+        return Ok(None);
+    };
+    match &arg.value {
+        AstAttributeValue::String(value) => resolve_std_host_symbol(value).map(|value| Some(value.to_owned())).ok_or_else(|| {
+            format!(
+                "function `{}` annotation `@host_symbol(\"{}\")` is not a recognized std-owned host symbol",
+                function.name, value
+            )
+        }),
+        _ => Err(format!(
+            "function `{}` annotation `@host_symbol` expects a string literal",
+            function.name
+        )),
+    }
+}
+
+fn extern_function_symbol_name(
+    function: &nuis_semantics::model::AstExternFunction,
+) -> Result<String, String> {
+    match &function.host_symbol {
+        Some(symbol) => resolve_std_host_symbol(symbol)
+            .map(str::to_owned)
+            .ok_or_else(|| {
+                format!(
+                    "extern function `{}` host symbol `{}` is not a recognized std-owned host symbol",
+                    function.name, symbol
+                )
+            }),
+        None => Ok(match &function.interface {
+            Some(interface) => format!("{interface}__{}", function.name),
+            None => function.name.clone(),
+        }),
+    }
+}
+
+fn resolve_std_host_symbol(symbol: &str) -> Option<&'static str> {
+    match symbol {
+        "network.connect" => Some("host_network_connect_probe"),
+        "network.open_tcp" => Some("host_network_open_tcp_stream"),
+        "network.open_tcp_listener" => Some("host_network_open_tcp_listener"),
+        "network.open_udp" => Some("host_network_open_udp_datagram"),
+        "network.bind_udp" => Some("host_network_bind_udp_datagram"),
+        "network.accept" => Some("host_network_accept_probe"),
+        "network.accept_owned" => Some("host_network_accept_owned"),
+        "network.close" => Some("host_network_close"),
+        "network.close_owned" => Some("host_network_close_owned"),
+        "network.send_owned" => Some("host_network_send_owned"),
+        "network.recv_owned" => Some("host_network_recv_owned"),
+        "network.recv_http_status_owned" => Some("host_network_recv_http_status_owned"),
+        "network.send" => Some("host_network_send_probe"),
+        "network.recv" => Some("host_network_recv_probe"),
+        _ => None,
+    }
+}
+
+fn validate_host_symbol_bridge_annotations(module: &AstModule) -> Result<(), String> {
+    for function in &module.functions {
+        let Some(attribute) = function
+            .attributes
+            .iter()
+            .find(|attribute| attribute.name == "host_symbol")
+        else {
+            continue;
+        };
+        let Some(arg) = attribute.args.first() else {
+            continue;
+        };
+        let AstAttributeValue::String(logical_symbol) = &arg.value else {
+            continue;
+        };
+        if resolve_std_host_symbol(logical_symbol).is_none() {
+            return Err(format!(
+                "function `{}` annotation `@host_symbol(\"{}\")` is not a recognized std-owned host symbol",
+                function.name, logical_symbol
+            ));
+        }
+        if module.domain != "cpu" {
+            return Err(format!(
+                "function `{}::{}` can only use `@host_symbol(\"{}\")` inside `mod cpu` in the current MVP; prefer `extern \"c\" @host_symbol(...) fn ...;` for the stable host-boundary form",
+                module.unit, function.name, logical_symbol
+            ));
+        }
+        if function.is_async {
+            return Err(format!(
+                "function `{}` uses `@host_symbol(\"{}\")`, but async host bridge stubs are not supported in the current MVP; prefer `extern \"c\" @host_symbol(...) fn ...;` for stable host-boundary declarations",
+                function.name, logical_symbol
+            ));
+        }
+        if !function.generic_params.is_empty() {
+            return Err(format!(
+                "function `{}` uses `@host_symbol(\"{}\")`, but generic host bridge stubs are not supported in the current MVP; prefer `extern \"c\" @host_symbol(...) fn ...;` for stable host-boundary declarations",
+                function.name, logical_symbol
+            ));
+        }
+        if !function
+            .params
+            .iter()
+            .all(|param| is_i64_type_ref(&param.ty))
+        {
+            return Err(format!(
+                "function `{}` uses `@host_symbol(\"{}\")`, but host bridge stubs currently require all parameters to be `i64`; prefer the `extern \"c\" @host_symbol(...) fn ...;` form for the stable host-boundary path",
+                function.name, logical_symbol
+            ));
+        }
+        let Some(return_type) = &function.return_type else {
+            return Err(format!(
+                "function `{}` uses `@host_symbol(\"{}\")`, but host bridge stubs currently require `-> i64`; prefer the `extern \"c\" @host_symbol(...) fn ...;` form for the stable host-boundary path",
+                function.name, logical_symbol
+            ));
+        };
+        if !is_i64_type_ref(return_type) {
+            return Err(format!(
+                "function `{}` uses `@host_symbol(\"{}\")`, but host bridge stubs currently require `-> i64`; prefer the `extern \"c\" @host_symbol(...) fn ...;` form for the stable host-boundary path",
+                function.name, logical_symbol
+            ));
+        }
+        if !matches!(
+            function.body.as_slice(),
+            [AstStmt::Return(Some(AstExpr::Int(0)))]
+        ) {
+            return Err(format!(
+                "function `{}` uses `@host_symbol(\"{}\")`, but host bridge stubs currently require a trivial `return 0;` body; prefer `extern \"c\" @host_symbol(...) fn ...;` for the stable host-boundary form",
+                function.name, logical_symbol
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_extern_host_symbols(module: &AstModule) -> Result<(), String> {
+    for function in &module.externs {
+        validate_extern_host_symbol(module, function)?;
+    }
+    for interface in &module.extern_interfaces {
+        for function in &interface.methods {
+            validate_extern_host_symbol(module, function)?;
+        }
+    }
+    Ok(())
+}
+
+fn validate_extern_host_symbol(
+    module: &AstModule,
+    function: &nuis_semantics::model::AstExternFunction,
+) -> Result<(), String> {
+    let Some(logical_symbol) = &function.host_symbol else {
+        return Ok(());
+    };
+    if resolve_std_host_symbol(logical_symbol).is_none() {
+        return Err(format!(
+            "extern function `{}` annotation `@host_symbol(\"{}\")` is not a recognized std-owned host symbol",
+            function.name, logical_symbol
+        ));
+    }
+    if module.domain != "cpu" {
+        return Err(format!(
+            "extern function `{}::{}` can only use `@host_symbol(\"{}\")` inside `mod cpu` in the current MVP",
+            module.unit, function.name, logical_symbol
+        ));
+    }
+    if function.abi != "c" {
+        return Err(format!(
+            "extern function `{}` uses `@host_symbol(\"{}\")`, but std-owned host symbol externs currently require `extern \"c\"`",
+            function.name, logical_symbol
+        ));
+    }
+    if !function
+        .params
+        .iter()
+        .all(|param| is_i64_type_ref(&param.ty))
+        || !is_i64_type_ref(&function.return_type)
+    {
+        return Err(format!(
+            "extern function `{}` uses `@host_symbol(\"{}\")`, but std-owned host symbol externs currently require only `i64` parameters and `-> i64`",
+            function.name, logical_symbol
+        ));
+    }
+    Ok(())
+}
+
+fn is_i64_type_ref(ty: &AstTypeRef) -> bool {
+    ty.name == "i64" && ty.generic_args.is_empty() && !ty.is_optional && !ty.is_ref
+}
+
 fn validate_function_annotations(function: &AstFunction) -> Result<(), String> {
     let mut seen = BTreeSet::new();
     let mut has_inline = false;
@@ -466,6 +681,264 @@ fn validate_function_annotations(function: &AstFunction) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+fn validate_struct_annotations(definition: &AstStructDef) -> Result<(), String> {
+    let mut seen_struct_annotations = BTreeSet::new();
+    let mut is_packet_struct = false;
+    for attribute in &definition.attributes {
+        match attribute.name.as_str() {
+            "packet" => {
+                validate_zero_arg_struct_annotation(definition, "packet", &attribute.args)?;
+                is_packet_struct = true;
+            }
+            other => {
+                return Err(format!(
+                    "struct `{}` uses unknown annotation `@{other}`",
+                    definition.name
+                ));
+            }
+        }
+        if !seen_struct_annotations.insert(attribute.name.as_str()) {
+            return Err(format!(
+                "struct `{}` repeats annotation `@{}`",
+                definition.name, attribute.name
+            ));
+        }
+    }
+
+    for field in &definition.fields {
+        let mut seen_field_annotations = BTreeSet::new();
+        for attribute in &field.attributes {
+            match attribute.name.as_str() {
+                "packet_field" => {
+                    validate_zero_arg_struct_field_annotation(
+                        definition,
+                        field,
+                        "packet_field",
+                        &attribute.args,
+                    )?;
+                    if !is_packet_struct {
+                        return Err(format!(
+                            "struct `{}` field `{}` annotation `@packet_field` requires parent struct `{}` to also declare `@packet`",
+                            definition.name, field.name, definition.name
+                        ));
+                    }
+                }
+                "packet_control_field" => {
+                    validate_zero_arg_struct_field_annotation(
+                        definition,
+                        field,
+                        "packet_control_field",
+                        &attribute.args,
+                    )?;
+                    if !is_packet_struct {
+                        return Err(format!(
+                            "struct `{}` field `{}` annotation `@packet_control_field` requires parent struct `{}` to also declare `@packet`",
+                            definition.name, field.name, definition.name
+                        ));
+                    }
+                }
+                other => {
+                    return Err(format!(
+                        "struct `{}` field `{}` uses unknown annotation `@{other}`",
+                        definition.name, field.name
+                    ));
+                }
+            }
+            if !seen_field_annotations.insert(attribute.name.as_str()) {
+                return Err(format!(
+                    "struct `{}` field `{}` repeats annotation `@{}`",
+                    definition.name, field.name, attribute.name
+                ));
+            }
+        }
+    }
+
+    if is_packet_struct {
+        validate_packet_struct_contract(definition)?;
+    }
+
+    Ok(())
+}
+
+fn validate_packet_struct_contract(definition: &AstStructDef) -> Result<(), String> {
+    if definition.fields.is_empty() {
+        return Err(format!(
+            "struct `{}` annotation `@packet` requires at least one field",
+            definition.name
+        ));
+    }
+
+    let packet_field_count = definition
+        .fields
+        .iter()
+        .filter(|field| {
+            field
+                .attributes
+                .iter()
+                .any(|attribute| attribute.name == "packet_field")
+        })
+        .count();
+    if packet_field_count == 0 {
+        return Err(format!(
+            "struct `{}` annotation `@packet` requires at least one `@packet_field`",
+            definition.name
+        ));
+    }
+
+    for field in &definition.fields {
+        let is_packet_field = field
+            .attributes
+            .iter()
+            .any(|attribute| attribute.name == "packet_field");
+        let is_packet_control_field = field
+            .attributes
+            .iter()
+            .any(|attribute| attribute.name == "packet_control_field");
+        let field_role = packet_field_contract_role(&field.ty);
+        if is_packet_field && is_packet_control_field {
+            return Err(format!(
+                "struct `{}` field `{}` cannot use both `@packet_field` and `@packet_control_field`",
+                definition.name, field.name
+            ));
+        }
+        if is_packet_field && field_role != "payload" {
+            return Err(format!(
+                "struct `{}` field `{}` annotation `@packet_field` currently only supports payload-role fields (role={})",
+                definition.name, field.name, field_role
+            ));
+        }
+        if is_packet_control_field && field_role != "control-plane" {
+            return Err(format!(
+                "struct `{}` field `{}` annotation `@packet_control_field` currently only supports control-plane-role fields (role={})",
+                definition.name, field.name, field_role
+            ));
+        }
+        if field.ty.is_ref {
+            return Err(format!(
+                "struct `{}` field `{}` is not packet-safe yet: `@packet` currently rejects `ref` fields (role={})",
+                definition.name,
+                field.name,
+                field_role
+            ));
+        }
+        if field.ty.is_optional {
+            return Err(format!(
+                "struct `{}` field `{}` is not packet-safe yet: `@packet` currently rejects optional fields (role={})",
+                definition.name,
+                field.name,
+                field_role
+            ));
+        }
+        match field.ty.name.as_str() {
+            "Task" => {
+                return Err(format!(
+                    "struct `{}` field `{}` is not packet-safe yet: `@packet` currently rejects `Task<...>` fields (role={})",
+                    definition.name,
+                    field.name,
+                    field_role
+                ));
+            }
+            "TaskResult" | "DataResult" | "ShaderResult" | "KernelResult" | "NetworkResult" => {
+                return Err(format!(
+                    "struct `{}` field `{}` is not packet-safe yet: `@packet` currently rejects result-carrier fields like `{}` (role={})",
+                    definition.name,
+                    field.name,
+                    field.ty.name,
+                    field_role
+                ));
+            }
+            "Marker" => {
+                if is_packet_control_field {
+                    continue;
+                }
+                return Err(format!(
+                    "struct `{}` field `{}` is not packet-safe yet: `@packet` currently rejects `Marker<...>` fields (role={})",
+                    definition.name,
+                    field.name,
+                    field_role
+                ));
+            }
+            "HandleTable" => {
+                if is_packet_control_field {
+                    continue;
+                }
+                return Err(format!(
+                    "struct `{}` field `{}` is not packet-safe yet: `@packet` currently rejects `HandleTable<...>` fields (role={})",
+                    definition.name,
+                    field.name,
+                    field_role
+                ));
+            }
+            _ => {}
+        }
+    }
+
+    Ok(())
+}
+
+fn packet_field_contract_role(ty: &AstTypeRef) -> &'static str {
+    match ty.name.as_str() {
+        "Marker" | "HandleTable" => "control-plane",
+        "TaskResult" | "DataResult" | "ShaderResult" | "KernelResult" | "NetworkResult"
+        | "Task" => "async-carrier",
+        _ if ty.is_ref || ty.is_optional => "unsupported-shape",
+        _ => "payload",
+    }
+}
+
+fn validate_zero_arg_struct_annotation(
+    definition: &AstStructDef,
+    annotation: &str,
+    args: &[nuis_semantics::model::AstAttributeArg],
+) -> Result<(), String> {
+    if args.is_empty() {
+        return Ok(());
+    }
+    Err(format!(
+        "struct `{}` annotation `@{annotation}` does not take arguments",
+        definition.name
+    ))
+}
+
+fn validate_zero_arg_struct_field_annotation(
+    definition: &AstStructDef,
+    field: &AstStructField,
+    annotation: &str,
+    args: &[nuis_semantics::model::AstAttributeArg],
+) -> Result<(), String> {
+    if args.is_empty() {
+        return Ok(());
+    }
+    Err(format!(
+        "struct `{}` field `{}` annotation `@{annotation}` does not take arguments",
+        definition.name, field.name
+    ))
+}
+
+fn lower_ast_attributes(attributes: &[nuis_semantics::model::AstAttribute]) -> Vec<NirAnnotation> {
+    attributes
+        .iter()
+        .map(|attribute| NirAnnotation {
+            name: attribute.name.clone(),
+            args: attribute
+                .args
+                .iter()
+                .map(|arg| NirAttributeArg {
+                    name: arg.name.clone(),
+                    value: match &arg.value {
+                        AstAttributeValue::Bool(value) => NirAttributeValue::Bool(*value),
+                        AstAttributeValue::Int(value) => NirAttributeValue::Int(*value),
+                        AstAttributeValue::String(value) => {
+                            NirAttributeValue::String(value.clone())
+                        }
+                        AstAttributeValue::Ident(value) => NirAttributeValue::Ident(value.clone()),
+                    },
+                })
+                .collect(),
+        })
+        .collect()
 }
 
 fn validate_zero_arg_function_annotation(
@@ -639,30 +1112,7 @@ fn lower_function(
 
     Ok(NirFunction {
         name: function.name.clone(),
-        annotations: function
-            .attributes
-            .iter()
-            .map(|attribute| NirAnnotation {
-                name: attribute.name.clone(),
-                args: attribute
-                    .args
-                    .iter()
-                    .map(|arg| NirAttributeArg {
-                        name: arg.name.clone(),
-                        value: match &arg.value {
-                            AstAttributeValue::Bool(value) => NirAttributeValue::Bool(*value),
-                            AstAttributeValue::Int(value) => NirAttributeValue::Int(*value),
-                            AstAttributeValue::String(value) => {
-                                NirAttributeValue::String(value.clone())
-                            }
-                            AstAttributeValue::Ident(value) => {
-                                NirAttributeValue::Ident(value.clone())
-                            }
-                        },
-                    })
-                    .collect(),
-            })
-            .collect(),
+        annotations: lower_ast_attributes(&function.attributes),
         test_name: function.test_name.clone(),
         test_ignored: function.test_ignored,
         test_should_fail: function.test_should_fail,
@@ -16457,8 +16907,6 @@ mod tests {
             r#"
             mod cpu Main {
               @inline
-              @export(name = "main")
-              @host_symbol("network.open_tcp")
               fn main() -> i64 {
                 return 0;
               }
@@ -16472,11 +16920,31 @@ mod tests {
             .iter()
             .find(|function| function.name == "main")
             .unwrap();
-        assert_eq!(function.attributes.len(), 3);
+        assert_eq!(function.attributes.len(), 1);
         assert_eq!(function.attributes[0].name, "inline");
-        assert_eq!(function.attributes[1].name, "export");
-        assert_eq!(function.attributes[1].args.len(), 1);
-        assert_eq!(function.attributes[2].name, "host_symbol");
+    }
+
+    #[test]
+    fn parses_struct_and_field_annotations_into_ast() {
+        let ast = parse_nuis_ast(
+            r#"
+            mod cpu Main {
+              @packet
+              struct Packet {
+                @packet_field
+                id: i64,
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(ast.structs.len(), 1);
+        assert_eq!(ast.structs[0].attributes.len(), 1);
+        assert_eq!(ast.structs[0].attributes[0].name, "packet");
+        assert_eq!(ast.structs[0].fields.len(), 1);
+        assert_eq!(ast.structs[0].fields[0].attributes.len(), 1);
+        assert_eq!(ast.structs[0].fields[0].attributes[0].name, "packet_field");
     }
 
     #[test]
@@ -16654,7 +17122,6 @@ mod tests {
             mod cpu Main {
               @inline
               @export(name = "main")
-              @host_symbol("network.open_tcp")
               fn main() -> i64 {
                 return 0;
               }
@@ -16668,10 +17135,132 @@ mod tests {
             .iter()
             .find(|function| function.name == "main")
             .unwrap();
-        assert_eq!(function.annotations.len(), 3);
+        assert_eq!(function.annotations.len(), 2);
         assert_eq!(function.annotations[0].name, "inline");
         assert_eq!(function.annotations[1].name, "export");
-        assert_eq!(function.annotations[2].name, "host_symbol");
+    }
+
+    #[test]
+    fn lowers_struct_and_field_annotations_into_nir() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              @packet
+              struct Packet {
+                @packet_field
+                id: i64,
+              }
+
+              fn main() -> i64 {
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(module.structs.len(), 1);
+        assert_eq!(module.structs[0].annotations.len(), 1);
+        assert_eq!(module.structs[0].annotations[0].name, "packet");
+        assert_eq!(module.structs[0].fields[0].annotations.len(), 1);
+        assert_eq!(
+            module.structs[0].fields[0].annotations[0].name,
+            "packet_field"
+        );
+    }
+
+    #[test]
+    fn parses_extern_host_symbol_bridge_into_ast() {
+        let ast = parse_nuis_ast(
+            r#"
+            mod cpu Main {
+              extern "c" @host_symbol("network.open_tcp") fn open_tcp(local_port: i64, remote_port: i64) -> i64;
+            }
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(ast.externs.len(), 1);
+        assert_eq!(ast.externs[0].name, "open_tcp");
+        assert_eq!(
+            ast.externs[0].host_symbol.as_deref(),
+            Some("network.open_tcp")
+        );
+    }
+
+    #[test]
+    fn lowers_extern_host_symbol_bridge_into_nir_signature() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              extern "c" @host_symbol("network.open_tcp") fn open_tcp(local_port: i64, remote_port: i64) -> i64;
+
+              fn main() -> i64 {
+                return open_tcp(80, 8080);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(module.externs.len(), 1);
+        assert_eq!(module.externs[0].name, "open_tcp");
+        assert_eq!(
+            module.externs[0].host_symbol.as_deref(),
+            Some("network.open_tcp")
+        );
+        let main = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert_eq!(
+            main.body,
+            vec![NirStmt::Return(Some(NirExpr::CpuExternCall {
+                abi: "c".to_owned(),
+                interface: None,
+                callee: "host_network_open_tcp_stream".to_owned(),
+                args: vec![NirExpr::Int(80), NirExpr::Int(8080)],
+            }))]
+        );
+    }
+
+    #[test]
+    fn lowers_host_symbol_bridge_stub_calls_into_cpu_extern_calls() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              @host_symbol("network.open_tcp")
+              fn open_tcp(local_port: i64, remote_port: i64) -> i64 {
+                return 0;
+              }
+
+              fn main() -> i64 {
+                return open_tcp(80, 8080);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        assert!(module
+            .functions
+            .iter()
+            .all(|function| function.name != "open_tcp"));
+        let main = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert_eq!(
+            main.body,
+            vec![NirStmt::Return(Some(NirExpr::CpuExternCall {
+                abi: "c".to_owned(),
+                interface: None,
+                callee: "host_network_open_tcp_stream".to_owned(),
+                args: vec![NirExpr::Int(80), NirExpr::Int(8080)],
+            }))]
+        );
     }
 
     #[test]
@@ -16689,6 +17278,304 @@ mod tests {
         .unwrap_err();
 
         assert!(error.contains("unknown annotation `@mystery`"));
+    }
+
+    #[test]
+    fn rejects_unknown_struct_annotation() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              @mystery
+              struct Packet {
+                id: i64,
+              }
+
+              fn main() -> i64 {
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("struct `Packet` uses unknown annotation `@mystery`"));
+    }
+
+    #[test]
+    fn rejects_packet_field_outside_packet_struct() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              struct Packet {
+                @packet_field
+                id: i64,
+              }
+
+              fn main() -> i64 {
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains(
+            "annotation `@packet_field` requires parent struct `Packet` to also declare `@packet`"
+        ));
+    }
+
+    #[test]
+    fn rejects_empty_packet_struct() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              @packet
+              struct Packet {}
+
+              fn main() -> i64 {
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("annotation `@packet` requires at least one field"));
+    }
+
+    #[test]
+    fn rejects_packet_struct_without_packet_fields() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              @packet
+              struct Packet {
+                id: i64,
+              }
+
+              fn main() -> i64 {
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("annotation `@packet` requires at least one `@packet_field`"));
+    }
+
+    #[test]
+    fn rejects_ref_fields_inside_packet_struct() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              @packet
+              struct Packet {
+                @packet_field
+                payload: ref i64,
+              }
+
+              fn main() -> i64 {
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains(
+            "annotation `@packet_field` currently only supports payload-role fields (role=unsupported-shape)"
+        ));
+    }
+
+    #[test]
+    fn rejects_optional_fields_inside_packet_struct() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              @packet
+              struct Packet {
+                @packet_field
+                payload: i64?,
+              }
+
+              fn main() -> i64 {
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains(
+            "annotation `@packet_field` currently only supports payload-role fields (role=unsupported-shape)"
+        ));
+    }
+
+    #[test]
+    fn rejects_marker_fields_inside_packet_struct() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              @packet
+              struct Packet {
+                @packet_field
+                payload: Marker<Tag>,
+              }
+
+              fn main() -> i64 {
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("annotation `@packet_field` currently only supports payload-role fields (role=control-plane)"));
+    }
+
+    #[test]
+    fn accepts_packet_control_field_for_marker_field() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              @packet
+              struct Packet {
+                @packet_field
+                payload: i64,
+                @packet_control_field
+                tag: Marker<Tag>,
+              }
+
+              fn main() -> i64 {
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(module.structs.len(), 1);
+        assert_eq!(module.structs[0].fields.len(), 2);
+        assert_eq!(
+            module.structs[0].fields[1].annotations[0].name,
+            "packet_control_field"
+        );
+    }
+
+    #[test]
+    fn rejects_result_fields_inside_packet_struct() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              @packet
+              struct Packet {
+                @packet_field
+                payload: DataResult<i64>,
+              }
+
+              fn main() -> i64 {
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("annotation `@packet_field` currently only supports payload-role fields (role=async-carrier)"));
+    }
+
+    #[test]
+    fn rejects_task_fields_inside_packet_struct() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              @packet
+              struct Packet {
+                @packet_field
+                payload: Task<i64>,
+              }
+
+              fn main() -> i64 {
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("annotation `@packet_field` currently only supports payload-role fields (role=async-carrier)"));
+    }
+
+    #[test]
+    fn rejects_handle_table_fields_inside_packet_struct() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              @packet
+              struct Packet {
+                @packet_field
+                payload: HandleTable<Bindings>,
+              }
+
+              fn main() -> i64 {
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("annotation `@packet_field` currently only supports payload-role fields (role=control-plane)"));
+    }
+
+    #[test]
+    fn rejects_packet_control_field_on_payload_role_field() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              @packet
+              struct Packet {
+                @packet_field
+                payload: i64,
+                @packet_control_field
+                extra: bool,
+              }
+
+              fn main() -> i64 {
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains(
+            "annotation `@packet_control_field` currently only supports control-plane-role fields (role=payload)"
+        ));
+    }
+
+    #[test]
+    fn rejects_field_with_both_packet_slots() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              @packet
+              struct Packet {
+                @packet_field
+                @packet_control_field
+                payload: Marker<Tag>,
+              }
+
+              fn main() -> i64 {
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("cannot use both `@packet_field` and `@packet_control_field`"));
     }
 
     #[test]
@@ -16779,6 +17666,37 @@ mod tests {
         .unwrap_err();
 
         assert!(error.contains("annotation `@host_symbol` expects `@host_symbol(\"...\")`"));
+    }
+
+    #[test]
+    fn rejects_unknown_std_host_symbol_annotation() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              @host_symbol("network.future_magic")
+              fn open_magic(value: i64) -> i64 {
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("is not a recognized std-owned host symbol"));
+    }
+
+    #[test]
+    fn rejects_non_c_extern_host_symbol_bridge() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              extern "nurs" @host_symbol("network.open_tcp") fn open_tcp(local_port: i64, remote_port: i64) -> i64;
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("require `extern \"c\"`"));
     }
 
     #[test]

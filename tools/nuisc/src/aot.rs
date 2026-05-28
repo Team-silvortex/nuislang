@@ -32,6 +32,7 @@ pub struct BuildManifestProjectInfo {
     pub exchange_index_path: Option<String>,
     pub modules_index_path: Option<String>,
     pub links_index_path: Option<String>,
+    pub packet_index_path: Option<String>,
     pub host_ffi_index_path: Option<String>,
     pub abi_index_path: Option<String>,
 }
@@ -486,6 +487,12 @@ pub fn write_build_manifest(
                 escape_toml_string(value)
             ));
         }
+        if let Some(value) = &project.packet_index_path {
+            out.push_str(&format!(
+                "packet_index = \"{}\"\n",
+                escape_toml_string(value)
+            ));
+        }
         if let Some(value) = &project.host_ffi_index_path {
             out.push_str(&format!(
                 "host_ffi_index = \"{}\"\n",
@@ -617,6 +624,7 @@ pub struct BuildManifestVerifyReport {
     pub compile_cache_key: Option<String>,
     pub compile_cache_root: Option<String>,
     pub project_plan_index: Option<String>,
+    pub project_packet_index: Option<String>,
     pub artifacts_checked: usize,
     pub project_metadata_checked: usize,
 }
@@ -649,6 +657,7 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
     let compile_cache_key = parse_optional_toml_string(&source, "compile_cache_key");
     let compile_cache_root = parse_optional_toml_string(&source, "compile_cache_root");
     let project_plan_index = parse_optional_toml_string(&source, "plan_index");
+    let project_packet_index = parse_optional_toml_string(&source, "packet_index");
     let project_plan_summary = parse_optional_toml_string(&source, "plan_summary");
 
     let artifacts = parse_artifact_hash_blocks(&source, path)?;
@@ -700,6 +709,16 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
         }
         project_metadata_checked += 1;
     }
+    if let Some(packet_index) = &project_packet_index {
+        fs::read_to_string(packet_index).map_err(|error| {
+            format!(
+                "failed to read project packet index `{}` referenced by `{}`: {error}",
+                packet_index,
+                path.display()
+            )
+        })?;
+        project_metadata_checked += 1;
+    }
 
     Ok(BuildManifestVerifyReport {
         schema,
@@ -717,6 +736,7 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
         compile_cache_key,
         compile_cache_root,
         project_plan_index,
+        project_packet_index,
         artifacts_checked: artifacts.len(),
         project_metadata_checked,
     })
@@ -3040,6 +3060,7 @@ mod tests {
                     exchange_index_path: None,
                     modules_index_path: None,
                     links_index_path: None,
+                    packet_index_path: None,
                     host_ffi_index_path: None,
                     abi_index_path: None,
                 }),
@@ -3080,6 +3101,7 @@ mod tests {
                     name: "host_argv_count".to_owned(),
                     params: Vec::new(),
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3087,6 +3109,7 @@ mod tests {
                     name: "host_cwd_handle".to_owned(),
                     params: Vec::new(),
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3094,6 +3117,7 @@ mod tests {
                     name: "host_monotonic_time_ns".to_owned(),
                     params: Vec::new(),
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
             ],
             extern_interfaces: Vec::new(),
@@ -3135,6 +3159,7 @@ mod tests {
                         ty: i64_ty(),
                     }],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3145,6 +3170,7 @@ mod tests {
                         ty: i64_ty(),
                     }],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3155,6 +3181,7 @@ mod tests {
                         ty: i64_ty(),
                     }],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3171,6 +3198,7 @@ mod tests {
                         },
                     ],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3187,6 +3215,7 @@ mod tests {
                         },
                     ],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3203,6 +3232,7 @@ mod tests {
                         },
                     ],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3219,6 +3249,7 @@ mod tests {
                         },
                     ],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3229,6 +3260,7 @@ mod tests {
                         ty: i64_ty(),
                     }],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3239,6 +3271,7 @@ mod tests {
                         ty: i64_ty(),
                     }],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3249,6 +3282,7 @@ mod tests {
                         ty: i64_ty(),
                     }],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3259,6 +3293,7 @@ mod tests {
                         ty: i64_ty(),
                     }],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3269,6 +3304,7 @@ mod tests {
                         ty: i64_ty(),
                     }],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3279,6 +3315,7 @@ mod tests {
                         ty: i64_ty(),
                     }],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3289,6 +3326,7 @@ mod tests {
                         ty: i64_ty(),
                     }],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3299,6 +3337,7 @@ mod tests {
                         ty: i64_ty(),
                     }],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3309,6 +3348,7 @@ mod tests {
                         ty: i64_ty(),
                     }],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3319,6 +3359,7 @@ mod tests {
                         ty: i64_ty(),
                     }],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3329,6 +3370,7 @@ mod tests {
                         ty: i64_ty(),
                     }],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3339,6 +3381,7 @@ mod tests {
                         ty: i64_ty(),
                     }],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3355,6 +3398,7 @@ mod tests {
                         },
                     ],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3371,6 +3415,7 @@ mod tests {
                         },
                     ],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3381,6 +3426,7 @@ mod tests {
                         ty: i64_ty(),
                     }],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3391,6 +3437,7 @@ mod tests {
                         ty: i64_ty(),
                     }],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3401,6 +3448,7 @@ mod tests {
                         ty: i64_ty(),
                     }],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3411,6 +3459,7 @@ mod tests {
                         ty: i64_ty(),
                     }],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
             ],
             extern_interfaces: Vec::new(),
@@ -3478,6 +3527,7 @@ mod tests {
                         },
                     ],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3494,6 +3544,7 @@ mod tests {
                         },
                     ],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3510,6 +3561,7 @@ mod tests {
                         },
                     ],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3520,6 +3572,7 @@ mod tests {
                         ty: i64_ty(),
                     }],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
             ],
             extern_interfaces: Vec::new(),
@@ -3570,6 +3623,7 @@ mod tests {
                         },
                     ],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3590,6 +3644,7 @@ mod tests {
                         },
                     ],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3610,6 +3665,7 @@ mod tests {
                         },
                     ],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3630,6 +3686,7 @@ mod tests {
                         },
                     ],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3650,6 +3707,7 @@ mod tests {
                         },
                     ],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3660,6 +3718,7 @@ mod tests {
                         ty: i64_ty(),
                     }],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3680,6 +3739,7 @@ mod tests {
                         },
                     ],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3700,6 +3760,7 @@ mod tests {
                         },
                     ],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3720,6 +3781,7 @@ mod tests {
                         },
                     ],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3740,6 +3802,7 @@ mod tests {
                         },
                     ],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3760,6 +3823,7 @@ mod tests {
                         },
                     ],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
             ],
             extern_interfaces: Vec::new(),
@@ -3826,6 +3890,7 @@ mod tests {
                         ty: i64_ty(),
                     }],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3836,6 +3901,7 @@ mod tests {
                         ty: i64_ty(),
                     }],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3846,6 +3912,7 @@ mod tests {
                         ty: i64_ty(),
                     }],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3862,6 +3929,7 @@ mod tests {
                         },
                     ],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3878,6 +3946,7 @@ mod tests {
                         },
                     ],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3888,6 +3957,7 @@ mod tests {
                         ty: i64_ty(),
                     }],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3898,6 +3968,7 @@ mod tests {
                         ty: i64_ty(),
                     }],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3914,6 +3985,7 @@ mod tests {
                         },
                     ],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
             ],
             extern_interfaces: Vec::new(),
@@ -3960,6 +4032,7 @@ mod tests {
                         ty: i64_ty(),
                     }],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
                 AstExternFunction {
                     abi: "c".to_owned(),
@@ -3970,6 +4043,7 @@ mod tests {
                         ty: i64_ty(),
                     }],
                     return_type: i64_ty(),
+                    host_symbol: None,
                 },
             ],
             extern_interfaces: Vec::new(),
@@ -4015,6 +4089,7 @@ mod tests {
                     },
                 ],
                 return_type: i64_ty(),
+                host_symbol: None,
             }],
             extern_interfaces: Vec::new(),
             structs: Vec::new(),
@@ -4051,6 +4126,7 @@ mod tests {
                     ty: ty("i64"),
                 }],
                 return_type: ty("i32"),
+                host_symbol: None,
             }],
             extern_interfaces: Vec::new(),
             structs: Vec::new(),

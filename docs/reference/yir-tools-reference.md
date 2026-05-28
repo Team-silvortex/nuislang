@@ -218,6 +218,10 @@ Current `nustar` loading policy is:
   * `host_symbol=network.close:host_network_close`
   * `host_symbol=network.send:host_network_send_probe`
   * `host_symbol=network.recv:host_network_recv_probe`
+* source-level annotation guidance now prefers
+  `extern "c" @host_symbol("network.*") fn ...;`
+  for std-owned host-boundary declarations; the function-body bridge-stub form
+  remains available as an MVP compatibility path
 * the current narrow project-first bridge sample is
   [network_host_control_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_control_runtime_demo),
   whose `dump-yir` output currently shows:
@@ -325,10 +329,17 @@ Read that as:
   artifact generation
   current project builds now also emit `nuis.project.plan.txt`
   current project builds now also emit `nuis.project.organization.txt`
-  and `nuis.project.exchange.txt` alongside the existing project
-  manifest/modules/links/ABI indexes
+  `nuis.project.exchange.txt`, and `nuis.project.packet.txt`
+  alongside the existing project manifest/modules/links/ABI indexes
+  the packet index now records packet shape, field-order, and coarse field kind/role metadata
+  `@packet_field` currently means a payload slot specifically
+  `@packet_control_field` currently means an explicit control-plane slot
+  so control-plane roles must use the latter, while async-carrier / unsupported-shape roles are still rejected
+  current packet validation is intentionally narrow: `@packet` structs must be non-empty, must include at least one `@packet_field`, and currently reject `ref` / optional fields
+  control-plane families like `Marker<...>` / `HandleTable<...>` are now allowed only through `@packet_control_field`
+  async-carrier families like `Task<...>` / `*Result<...>` are still rejected
   `verify-build-manifest` now also checks the referenced `plan_index`
-  when the build manifest includes one
+  and `packet_index` when the build manifest includes them
 
 For framework/package-aware projects, the current companion `galaxy` flow is:
 

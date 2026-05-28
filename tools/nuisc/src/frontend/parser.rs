@@ -52,11 +52,11 @@ impl Parser {
                 } else {
                     externs.push(self.parse_extern_function_with_abi(abi, None)?);
                 }
-            } else if self.peek_word("struct") {
+            } else if self.peek_item_keyword_after_attributes("struct") {
                 structs.push(self.parse_struct_def()?);
-            } else if self.peek_word("trait") {
+            } else if self.peek_item_keyword_after_attributes("trait") {
                 traits.push(self.parse_trait_def()?);
-            } else if self.peek_word("impl") {
+            } else if self.peek_item_keyword_after_attributes("impl") {
                 impls.push(self.parse_impl_def()?);
             } else {
                 functions.push(self.parse_function()?);
@@ -87,16 +87,49 @@ impl Parser {
         Ok(nuis_semantics::model::AstUse { domain, unit })
     }
 
+    fn peek_item_keyword_after_attributes(&self, keyword: &str) -> bool {
+        let mut index = self.cursor;
+        while matches!(self.tokens.get(index), Some(Token::Symbol('@'))) {
+            index += 1;
+            if !matches!(self.tokens.get(index), Some(Token::Word(_))) {
+                return false;
+            }
+            index += 1;
+            if !matches!(self.tokens.get(index), Some(Token::Symbol('('))) {
+                continue;
+            }
+            let mut depth = 0usize;
+            while let Some(token) = self.tokens.get(index) {
+                match token {
+                    Token::Symbol('(') => depth += 1,
+                    Token::Symbol(')') => {
+                        depth -= 1;
+                        if depth == 0 {
+                            index += 1;
+                            break;
+                        }
+                    }
+                    _ => {}
+                }
+                index += 1;
+            }
+        }
+        matches!(self.tokens.get(index), Some(Token::Word(word)) if word == keyword)
+    }
+
     fn parse_struct_def(&mut self) -> Result<AstStructDef, String> {
+        let attributes = self.parse_attribute_list()?;
         self.expect_word("struct")?;
         let name = self.expect_ident()?;
         self.expect_symbol('{')?;
         let mut fields = Vec::new();
         while !self.peek_symbol('}') {
+            let field_attributes = self.parse_attribute_list()?;
             let field_name = self.expect_ident()?;
             self.expect_symbol(':')?;
             let ty = self.parse_type_ref()?;
             fields.push(AstStructField {
+                attributes: field_attributes,
                 name: field_name,
                 ty,
             });
@@ -107,7 +140,11 @@ impl Parser {
             }
         }
         self.expect_symbol('}')?;
-        Ok(AstStructDef { name, fields })
+        Ok(AstStructDef {
+            attributes,
+            name,
+            fields,
+        })
     }
 
     fn parse_trait_def(&mut self) -> Result<AstTraitDef, String> {
@@ -218,6 +255,7 @@ impl Parser {
         abi: String,
         interface: Option<String>,
     ) -> Result<AstExternFunction, String> {
+        let host_symbol = self.parse_extern_host_symbol()?;
         self.expect_word("fn")?;
         let name = self.expect_ident()?;
         self.expect_symbol('(')?;
@@ -234,9 +272,48 @@ impl Parser {
             abi,
             interface,
             name,
+            host_symbol,
             params,
             return_type,
         })
+    }
+
+    fn parse_extern_host_symbol(&mut self) -> Result<Option<String>, String> {
+        let attributes = self.parse_attribute_list()?;
+        if attributes.is_empty() {
+            return Ok(None);
+        }
+        if attributes.len() != 1 || attributes[0].name != "host_symbol" {
+            return Err(
+                "extern declarations currently only support `@host_symbol(\"...\")` annotations"
+                    .to_owned(),
+            );
+        }
+        let attribute = &attributes[0];
+        if attribute.args.len() != 1 {
+            return Err(
+                "extern declaration annotation `@host_symbol` expects exactly one string argument"
+                    .to_owned(),
+            );
+        }
+        let arg = &attribute.args[0];
+        if arg.name.is_some() {
+            return Err(
+                "extern declaration annotation `@host_symbol` expects `@host_symbol(\"...\")`"
+                    .to_owned(),
+            );
+        }
+        match &arg.value {
+            AstAttributeValue::String(value) if !value.is_empty() => Ok(Some(value.clone())),
+            AstAttributeValue::String(_) => Err(
+                "extern declaration annotation `@host_symbol(\"...\")` requires a non-empty host symbol"
+                    .to_owned(),
+            ),
+            _ => Err(
+                "extern declaration annotation `@host_symbol` expects a string literal"
+                    .to_owned(),
+            ),
+        }
     }
 
     fn parse_function(&mut self) -> Result<AstFunction, String> {

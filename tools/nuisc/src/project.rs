@@ -66,6 +66,7 @@ pub struct ProjectBuildMetadata {
     pub exchange_index_path: String,
     pub modules_index_path: String,
     pub links_index_path: String,
+    pub packet_index_path: String,
     pub host_ffi_index_path: String,
     pub abi_index_path: String,
 }
@@ -342,6 +343,11 @@ pub fn build_project_compilation_plan(
         },
         ProjectOutputIntent {
             category: "project-metadata".to_owned(),
+            kind: "project-packet-index".to_owned(),
+            path_hint: "nuis.project.packet.txt".to_owned(),
+        },
+        ProjectOutputIntent {
+            category: "project-metadata".to_owned(),
             kind: "project-host-ffi-index".to_owned(),
             path_hint: "nuis.project.host_ffi.txt".to_owned(),
         },
@@ -492,6 +498,7 @@ pub fn write_project_metadata(
     let exchange_index_path = output_dir.join("nuis.project.exchange.txt");
     let modules_index_path = output_dir.join("nuis.project.modules.txt");
     let links_index_path = output_dir.join("nuis.project.links.txt");
+    let packet_index_path = output_dir.join("nuis.project.packet.txt");
     let host_ffi_index_path = output_dir.join("nuis.project.host_ffi.txt");
     let abi_index_path = output_dir.join("nuis.project.abi.txt");
     fs::copy(&project.manifest_path, &manifest_copy_path).map_err(|error| {
@@ -560,6 +567,13 @@ pub fn write_project_metadata(
             links_index_path.display()
         )
     })?;
+    let packet_index = render_project_packet_index(project);
+    fs::write(&packet_index_path, packet_index).map_err(|error| {
+        format!(
+            "failed to write project packet index `{}`: {error}",
+            packet_index_path.display()
+        )
+    })?;
     let host_ffi_index = render_project_host_ffi_index(project);
     fs::write(&host_ffi_index_path, host_ffi_index).map_err(|error| {
         format!(
@@ -581,9 +595,182 @@ pub fn write_project_metadata(
         exchange_index_path: exchange_index_path.display().to_string(),
         modules_index_path: modules_index_path.display().to_string(),
         links_index_path: links_index_path.display().to_string(),
+        packet_index_path: packet_index_path.display().to_string(),
         host_ffi_index_path: host_ffi_index_path.display().to_string(),
         abi_index_path: abi_index_path.display().to_string(),
     })
+}
+
+fn has_ast_attribute(attributes: &[nuis_semantics::model::AstAttribute], expected: &str) -> bool {
+    attributes
+        .iter()
+        .any(|attribute| attribute.name == expected)
+}
+
+fn classify_packet_field_kind(ty: &AstTypeRef) -> &'static str {
+    if ty.is_ref {
+        return "ref";
+    }
+    if ty.is_optional {
+        return "optional";
+    }
+    if matches!(
+        ty.name.as_str(),
+        "bool" | "i32" | "i64" | "f32" | "f64" | "String" | "Unit"
+    ) && ty.generic_args.is_empty()
+    {
+        return "scalar";
+    }
+    if matches!(
+        ty.name.as_str(),
+        "Window" | "WindowMut" | "Pipe" | "Instance" | "Task"
+    ) {
+        return "container";
+    }
+    if matches!(
+        ty.name.as_str(),
+        "TaskResult" | "DataResult" | "ShaderResult" | "KernelResult" | "NetworkResult"
+    ) && ty.generic_args.len() == 1
+    {
+        return "result";
+    }
+    if ty.name == "Marker" {
+        return "marker";
+    }
+    if ty.name == "HandleTable" {
+        return "handle-table";
+    }
+    "nominal"
+}
+
+fn classify_packet_field_role(kind: &str) -> &'static str {
+    match kind {
+        "scalar" | "nominal" | "container" => "payload",
+        "marker" | "handle-table" => "control-plane",
+        "result" => "async-carrier",
+        "ref" | "optional" => "unsupported-shape",
+        _ => "payload",
+    }
+}
+
+fn describe_packet_field_kind_counts(definition: &nuis_semantics::model::AstStructDef) -> String {
+    let mut counts = BTreeMap::<&'static str, usize>::new();
+    for field in &definition.fields {
+        *counts
+            .entry(classify_packet_field_kind(&field.ty))
+            .or_insert(0) += 1;
+    }
+    counts
+        .into_iter()
+        .map(|(kind, count)| format!("{kind}={count}"))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn describe_packet_field_role_counts(definition: &nuis_semantics::model::AstStructDef) -> String {
+    let mut counts = BTreeMap::<&'static str, usize>::new();
+    for field in &definition.fields {
+        let kind = classify_packet_field_kind(&field.ty);
+        *counts.entry(classify_packet_field_role(kind)).or_insert(0) += 1;
+    }
+    counts
+        .into_iter()
+        .map(|(role, count)| format!("{role}={count}"))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn classify_packet_field_slot(field: &nuis_semantics::model::AstStructField) -> &'static str {
+    let has_payload = has_ast_attribute(&field.attributes, "packet_field");
+    let has_control = has_ast_attribute(&field.attributes, "packet_control_field");
+    match (has_payload, has_control) {
+        (true, false) => "payload",
+        (false, true) => "control",
+        (true, true) => "invalid",
+        (false, false) => "none",
+    }
+}
+
+fn describe_packet_shape(definition: &nuis_semantics::model::AstStructDef) -> &'static str {
+    let mut has_scalar = false;
+    let mut has_non_scalar = false;
+    let mut has_carrier = false;
+    for field in &definition.fields {
+        match classify_packet_field_kind(&field.ty) {
+            "scalar" => has_scalar = true,
+            "container" | "result" => {
+                has_non_scalar = true;
+                has_carrier = true;
+            }
+            _ => has_non_scalar = true,
+        }
+    }
+    if has_carrier {
+        "carrier-mixed"
+    } else if has_scalar && !has_non_scalar {
+        "scalar-only"
+    } else if !has_scalar && has_non_scalar {
+        "structured-only"
+    } else {
+        "mixed"
+    }
+}
+
+pub fn render_project_packet_index(project: &LoadedProject) -> String {
+    let mut out = String::new();
+    for project_module in &project.modules {
+        let relative = project_module
+            .path
+            .strip_prefix(&project.root)
+            .unwrap_or(project_module.path.as_path())
+            .display()
+            .to_string();
+        for definition in &project_module.ast.structs {
+            if !has_ast_attribute(&definition.attributes, "packet") {
+                continue;
+            }
+            let packet_fields = definition
+                .fields
+                .iter()
+                .filter(|field| has_ast_attribute(&field.attributes, "packet_field"))
+                .count();
+            let packet_control_fields = definition
+                .fields
+                .iter()
+                .filter(|field| has_ast_attribute(&field.attributes, "packet_control_field"))
+                .count();
+            let field_kinds = describe_packet_field_kind_counts(definition);
+            let field_roles = describe_packet_field_role_counts(definition);
+            out.push_str(&format!(
+                "{}\t{}.{}.{}\tfields={}\tpacket_fields={}\tpacket_control_fields={}\tpacket_shape={}\tfield_kinds={}\tfield_roles={}\n",
+                relative,
+                project_module.ast.domain,
+                project_module.ast.unit,
+                definition.name,
+                definition.fields.len(),
+                packet_fields,
+                packet_control_fields,
+                describe_packet_shape(definition),
+                field_kinds,
+                field_roles
+            ));
+            for (index, field) in definition.fields.iter().enumerate() {
+                let kind = classify_packet_field_kind(&field.ty);
+                out.push_str(&format!(
+                    "\tindex={}\t{}\t{}\tkind={}\trole={}\tpacket_slot={}\tpacket_field={}\tpacket_control_field={}\n",
+                    index,
+                    field.name,
+                    render_ast_type_ref(&field.ty),
+                    kind,
+                    classify_packet_field_role(kind),
+                    classify_packet_field_slot(field),
+                    has_ast_attribute(&field.attributes, "packet_field"),
+                    has_ast_attribute(&field.attributes, "packet_control_field")
+                ));
+            }
+        }
+    }
+    out
 }
 
 pub fn organize_project(project: &LoadedProject) -> ProjectOrganization {
@@ -4769,6 +4956,127 @@ fn validate_project_modules(modules: &[ProjectModule]) -> Result<(), String> {
                 key.0, key.1
             ));
         }
+        validate_project_packet_contracts(module)?;
+    }
+    Ok(())
+}
+
+fn validate_project_packet_contracts(module: &ProjectModule) -> Result<(), String> {
+    for definition in &module.ast.structs {
+        let is_packet = definition
+            .attributes
+            .iter()
+            .any(|attribute| attribute.name == "packet");
+        if !is_packet {
+            continue;
+        }
+        if definition.fields.is_empty() {
+            return Err(format!(
+                "project mod `mod {} {}` packet struct `{}` requires at least one field",
+                module.ast.domain, module.ast.unit, definition.name
+            ));
+        }
+        let packet_field_count = definition
+            .fields
+            .iter()
+            .filter(|field| {
+                field
+                    .attributes
+                    .iter()
+                    .any(|attribute| attribute.name == "packet_field")
+            })
+            .count();
+        if packet_field_count == 0 {
+            return Err(format!(
+                "project mod `mod {} {}` packet struct `{}` requires at least one `@packet_field`",
+                module.ast.domain, module.ast.unit, definition.name
+            ));
+        }
+        for field in &definition.fields {
+            let field_kind = classify_packet_field_kind(&field.ty);
+            let field_role = classify_packet_field_role(field_kind);
+            let is_packet_field = field
+                .attributes
+                .iter()
+                .any(|attribute| attribute.name == "packet_field");
+            let is_packet_control_field = field
+                .attributes
+                .iter()
+                .any(|attribute| attribute.name == "packet_control_field");
+            if is_packet_field && field_role != "payload" {
+                return Err(format!(
+                    "project mod `mod {} {}` packet struct `{}.{}` annotation `@packet_field` currently only supports payload-role fields (kind={}, role={})",
+                    module.ast.domain,
+                    module.ast.unit,
+                    definition.name,
+                    field.name,
+                    field_kind,
+                    field_role
+                ));
+            }
+            if is_packet_control_field && field_role != "control-plane" {
+                return Err(format!(
+                    "project mod `mod {} {}` packet struct `{}.{}` annotation `@packet_control_field` currently only supports control-plane-role fields (kind={}, role={})",
+                    module.ast.domain,
+                    module.ast.unit,
+                    definition.name,
+                    field.name,
+                    field_kind,
+                    field_role
+                ));
+            }
+            if is_packet_field && is_packet_control_field {
+                return Err(format!(
+                    "project mod `mod {} {}` packet struct `{}.{}` cannot use both `@packet_field` and `@packet_control_field`",
+                    module.ast.domain, module.ast.unit, definition.name, field.name
+                ));
+            }
+            if field.ty.is_ref {
+                return Err(format!(
+                    "project mod `mod {} {}` packet struct `{}.{}` is not packet-safe yet: `ref` fields are currently rejected (kind={}, role={})",
+                    module.ast.domain, module.ast.unit, definition.name, field.name, field_kind, field_role
+                ));
+            }
+            if field.ty.is_optional {
+                return Err(format!(
+                    "project mod `mod {} {}` packet struct `{}.{}` is not packet-safe yet: optional fields are currently rejected (kind={}, role={})",
+                    module.ast.domain, module.ast.unit, definition.name, field.name, field_kind, field_role
+                ));
+            }
+            match field.ty.name.as_str() {
+                "Task" => {
+                    return Err(format!(
+                        "project mod `mod {} {}` packet struct `{}.{}` is not packet-safe yet: `Task<...>` fields are currently rejected (kind={}, role={})",
+                        module.ast.domain, module.ast.unit, definition.name, field.name, field_kind, field_role
+                    ));
+                }
+                "TaskResult" | "DataResult" | "ShaderResult" | "KernelResult" | "NetworkResult" => {
+                    return Err(format!(
+                        "project mod `mod {} {}` packet struct `{}.{}` is not packet-safe yet: result-carrier fields like `{}` are currently rejected (kind={}, role={})",
+                        module.ast.domain, module.ast.unit, definition.name, field.name, field.ty.name, field_kind, field_role
+                    ));
+                }
+                "Marker" => {
+                    if is_packet_control_field {
+                        continue;
+                    }
+                    return Err(format!(
+                        "project mod `mod {} {}` packet struct `{}.{}` is not packet-safe yet: `Marker<...>` fields are currently rejected (kind={}, role={})",
+                        module.ast.domain, module.ast.unit, definition.name, field.name, field_kind, field_role
+                    ));
+                }
+                "HandleTable" => {
+                    if is_packet_control_field {
+                        continue;
+                    }
+                    return Err(format!(
+                        "project mod `mod {} {}` packet struct `{}.{}` is not packet-safe yet: `HandleTable<...>` fields are currently rejected (kind={}, role={})",
+                        module.ast.domain, module.ast.unit, definition.name, field.name, field_kind, field_role
+                    ));
+                }
+                _ => {}
+            }
+        }
     }
     Ok(())
 }
@@ -5456,9 +5764,15 @@ mod tests {
             .any(|item| item.category == "project-metadata"
                 && item.kind == "project-plan-index"
                 && item.path_hint == "nuis.project.plan.txt"));
+        assert!(plan
+            .output_intents
+            .iter()
+            .any(|item| item.category == "project-metadata"
+                && item.kind == "project-packet-index"
+                && item.path_hint == "nuis.project.packet.txt"));
         assert_eq!(
             describe_project_output_intent_categories(&plan),
-            "core-artifacts=1, project-metadata=7, verification-inputs=1"
+            "core-artifacts=1, project-metadata=8, verification-inputs=1"
         );
         assert_eq!(
             describe_project_compilation_plan(&plan),
@@ -5491,6 +5805,157 @@ mod tests {
         assert!(rendered.contains("effective_input ./demo.ns"));
         assert!(rendered
             .contains("summary entry=main.ns domains=cpu exchanges=0 abi_mode=auto-recommended"));
+    }
+
+    #[test]
+    fn renders_project_packet_index_from_packet_annotated_structs() {
+        let project = project_with_modules(vec![(
+            "main.ns",
+            r#"
+            mod cpu Main {
+              @packet
+              struct Packet {
+                @packet_field
+                lhs: i64,
+                rhs: bool,
+              }
+
+              fn main() -> i64 { return 1; }
+            }
+            "#,
+        )]);
+        let rendered = render_project_packet_index(&project);
+        assert!(rendered.contains(
+            "main.ns\tcpu.Main.Packet\tfields=2\tpacket_fields=1\tpacket_control_fields=0\tpacket_shape=scalar-only\tfield_kinds=scalar=2\tfield_roles=payload=2"
+        ));
+        assert!(
+            rendered.contains(
+                "\tindex=0\tlhs\ti64\tkind=scalar\trole=payload\tpacket_slot=payload\tpacket_field=true\tpacket_control_field=false"
+            )
+        );
+        assert!(rendered.contains(
+            "\tindex=1\trhs\tbool\tkind=scalar\trole=payload\tpacket_slot=none\tpacket_field=false\tpacket_control_field=false"
+        ));
+    }
+
+    #[test]
+    fn renders_packet_shape_metadata_for_container_bearing_packets() {
+        let project = project_with_modules(vec![(
+            "main.ns",
+            r#"
+            mod cpu Main {
+              @packet
+              struct Packet {
+                @packet_field
+                payload: Window<i64>,
+                tag: Marker<Tag>,
+              }
+
+              fn main() -> i64 { return 1; }
+            }
+            "#,
+        )]);
+        let rendered = render_project_packet_index(&project);
+        assert!(rendered.contains("packet_shape=carrier-mixed"));
+        assert!(rendered.contains("field_kinds=container=1, marker=1"));
+        assert!(rendered.contains("field_roles=control-plane=1, payload=1"));
+        assert!(rendered.contains(
+            "\tindex=0\tpayload\tWindow<i64>\tkind=container\trole=payload\tpacket_slot=payload\tpacket_field=true\tpacket_control_field=false"
+        ));
+        assert!(rendered.contains(
+            "\tindex=1\ttag\tMarker<Tag>\tkind=marker\trole=control-plane\tpacket_slot=none\tpacket_field=false\tpacket_control_field=false"
+        ));
+    }
+
+    #[test]
+    fn accepts_project_packet_struct_with_explicit_control_field() {
+        let project = project_with_modules(vec![(
+            "main.ns",
+            r#"
+            mod cpu Main {
+              @packet
+              struct Packet {
+                @packet_field
+                payload: i64,
+                @packet_control_field
+                tag: Marker<Tag>,
+              }
+
+              fn main() -> i64 { return 1; }
+            }
+            "#,
+        )]);
+        validate_project_modules(&project.modules).unwrap();
+        let rendered = render_project_packet_index(&project);
+        assert!(rendered.contains("packet_control_fields=1"));
+        assert!(rendered.contains(
+            "\tindex=1\ttag\tMarker<Tag>\tkind=marker\trole=control-plane\tpacket_slot=control\tpacket_field=false\tpacket_control_field=true"
+        ));
+    }
+
+    #[test]
+    fn rejects_project_packet_struct_with_marker_field() {
+        let project = project_with_modules(vec![(
+            "main.ns",
+            r#"
+            mod cpu Main {
+              @packet
+              struct Packet {
+                @packet_field
+                payload: Marker<Tag>,
+              }
+
+              fn main() -> i64 { return 1; }
+            }
+            "#,
+        )]);
+        let error = validate_project_modules(&project.modules).unwrap_err();
+        assert!(error.contains(
+            "annotation `@packet_field` currently only supports payload-role fields (kind=marker, role=control-plane)"
+        ));
+    }
+
+    #[test]
+    fn rejects_project_packet_control_field_on_payload_role_field() {
+        let project = project_with_modules(vec![(
+            "main.ns",
+            r#"
+            mod cpu Main {
+              @packet
+              struct Packet {
+                @packet_field
+                payload: i64,
+                @packet_control_field
+                extra: bool,
+              }
+
+              fn main() -> i64 { return 1; }
+            }
+            "#,
+        )]);
+        let error = validate_project_modules(&project.modules).unwrap_err();
+        assert!(error.contains(
+            "annotation `@packet_control_field` currently only supports control-plane-role fields (kind=scalar, role=payload)"
+        ));
+    }
+
+    #[test]
+    fn rejects_project_packet_struct_without_packet_fields() {
+        let project = project_with_modules(vec![(
+            "main.ns",
+            r#"
+            mod cpu Main {
+              @packet
+              struct Packet {
+                payload: i64,
+              }
+
+              fn main() -> i64 { return 1; }
+            }
+            "#,
+        )]);
+        let error = validate_project_modules(&project.modules).unwrap_err();
+        assert!(error.contains("requires at least one `@packet_field`"));
     }
 
     #[test]

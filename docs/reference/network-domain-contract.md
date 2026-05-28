@@ -201,6 +201,21 @@ That means the repository now has a stable syscall-facing interpretation path,
 even though the `network` family does not yet claim a full socket runtime or a
 dedicated `network`-native host-call instruction surface.
 
+At the source level, the preferred annotation-facing spelling is now:
+
+```text
+extern "c" @host_symbol("network.*") fn ...;
+```
+
+The older bridge-stub spelling:
+
+```text
+@host_symbol("network.*") fn ... { return 0; }
+```
+
+still exists as an MVP compatibility path, but should be read as a transitional
+front door rather than the long-term recommended host-boundary form.
+
 At the current binary/AOT layer, that bridge has now moved one step closer to
 real runtime behavior:
 

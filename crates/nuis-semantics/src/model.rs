@@ -27,6 +27,7 @@ pub struct AstExternFunction {
     pub abi: String,
     pub interface: Option<String>,
     pub name: String,
+    pub host_symbol: Option<String>,
     pub params: Vec<AstParam>,
     pub return_type: AstTypeRef,
 }
@@ -40,12 +41,14 @@ pub struct AstExternInterface {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AstStructField {
+    pub attributes: Vec<AstAttribute>,
     pub name: String,
     pub ty: AstTypeRef,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AstStructDef {
+    pub attributes: Vec<AstAttribute>,
     pub name: String,
     pub fields: Vec<AstStructField>,
 }
@@ -289,6 +292,7 @@ pub struct NirExternFunction {
     pub abi: String,
     pub interface: Option<String>,
     pub name: String,
+    pub host_symbol: Option<String>,
     pub params: Vec<NirParam>,
     pub return_type: NirTypeRef,
 }
@@ -302,12 +306,14 @@ pub struct NirExternInterface {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NirStructField {
+    pub annotations: Vec<NirAnnotation>,
     pub name: String,
     pub ty: NirTypeRef,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NirStructDef {
+    pub annotations: Vec<NirAnnotation>,
     pub name: String,
     pub fields: Vec<NirStructField>,
 }
