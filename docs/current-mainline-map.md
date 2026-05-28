@@ -38,6 +38,10 @@ local README for the area you are actively touching.
   [reference/nustar-abi-grain-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nustar-abi-grain-sketch.md)
   shortest rule:
   `one family package, many registered targets, one concrete built artifact`
+* packaging / lifecycle responsibility edge:
+  [reference/nuis-packaging-lifecycle-responsibility-map.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nuis-packaging-lifecycle-responsibility-map.md)
+  shortest rule:
+  `host launches, linker assembles, container carries, lifecycle runs`
 * trait/generic future edge:
   [reference/trait-generic-monomorphization-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/trait-generic-monomorphization-sketch.md)
 

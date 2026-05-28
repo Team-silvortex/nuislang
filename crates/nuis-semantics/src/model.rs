@@ -3,6 +3,18 @@ pub struct NirIntent {
     pub op: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AstVisibility {
+    Private,
+    Public,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NirVisibility {
+    Private,
+    Public,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AstUse {
     pub domain: String,
@@ -41,6 +53,7 @@ pub struct AstExternInterface {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AstStructField {
+    pub visibility: AstVisibility,
     pub attributes: Vec<AstAttribute>,
     pub name: String,
     pub ty: AstTypeRef,
@@ -48,6 +61,7 @@ pub struct AstStructField {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AstStructDef {
+    pub visibility: AstVisibility,
     pub attributes: Vec<AstAttribute>,
     pub name: String,
     pub fields: Vec<AstStructField>,
@@ -88,6 +102,7 @@ pub struct AstTraitMethodSig {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AstTraitDef {
+    pub visibility: AstVisibility,
     pub name: String,
     pub methods: Vec<AstTraitMethodSig>,
 }
@@ -177,6 +192,7 @@ impl TestClockPolicy {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AstFunction {
+    pub visibility: AstVisibility,
     pub name: String,
     pub attributes: Vec<AstAttribute>,
     pub test_name: Option<String>,
@@ -306,6 +322,7 @@ pub struct NirExternInterface {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NirStructField {
+    pub visibility: NirVisibility,
     pub annotations: Vec<NirAnnotation>,
     pub name: String,
     pub ty: NirTypeRef,
@@ -313,6 +330,7 @@ pub struct NirStructField {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NirStructDef {
+    pub visibility: NirVisibility,
     pub annotations: Vec<NirAnnotation>,
     pub name: String,
     pub fields: Vec<NirStructField>,
@@ -359,6 +377,7 @@ pub struct NirTraitMethodSig {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NirTraitDef {
+    pub visibility: NirVisibility,
     pub name: String,
     pub methods: Vec<NirTraitMethodSig>,
 }
@@ -772,6 +791,7 @@ pub struct NirParam {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NirFunction {
+    pub visibility: NirVisibility,
     pub name: String,
     pub annotations: Vec<NirAnnotation>,
     pub test_name: Option<String>,

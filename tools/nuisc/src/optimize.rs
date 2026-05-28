@@ -1346,6 +1346,7 @@ mod tests {
     use super::simplify_nir_module;
     use nuis_semantics::model::{
         NirAnnotation, NirBinaryOp, NirExpr, NirFunction, NirModule, NirParam, NirStmt, NirTypeRef,
+        NirVisibility,
     };
 
     fn i64_type() -> NirTypeRef {
@@ -1370,6 +1371,7 @@ mod tests {
             functions: vec![NirFunction {
                 name: "main".to_owned(),
                 annotations: vec![],
+                visibility: NirVisibility::Private,
                 test_name: None,
                 test_ignored: false,
                 test_should_fail: false,
@@ -1657,6 +1659,7 @@ mod tests {
                 NirFunction {
                     name: "add_one".to_owned(),
                     annotations: vec![annotation("inline")],
+                    visibility: NirVisibility::Private,
                     test_name: None,
                     test_ignored: false,
                     test_should_fail: false,
@@ -1680,6 +1683,7 @@ mod tests {
                 NirFunction {
                     name: "main".to_owned(),
                     annotations: vec![],
+                    visibility: NirVisibility::Private,
                     test_name: None,
                     test_ignored: false,
                     test_should_fail: false,
@@ -1721,6 +1725,7 @@ mod tests {
                 NirFunction {
                     name: "add_one".to_owned(),
                     annotations: vec![annotation("inline"), annotation("noinline")],
+                    visibility: NirVisibility::Private,
                     test_name: None,
                     test_ignored: false,
                     test_should_fail: false,
@@ -1744,6 +1749,7 @@ mod tests {
                 NirFunction {
                     name: "main".to_owned(),
                     annotations: vec![],
+                    visibility: NirVisibility::Private,
                     test_name: None,
                     test_ignored: false,
                     test_should_fail: false,

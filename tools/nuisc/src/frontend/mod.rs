@@ -5,16 +5,27 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{
     AstAttributeValue, AstBinaryOp, AstExpr, AstFunction, AstImplDef, AstModule, AstParam, AstStmt,
-    AstStructDef, AstStructField, AstTypeRef, NirAnnotation, NirAttributeArg, NirAttributeValue,
-    NirBinaryOp, NirDataFlowState, NirExpr, NirExternFunction, NirExternInterface, NirFunction,
-    NirGenericParam, NirImplDef, NirImplMethod, NirKernelAxis, NirKernelFlowState, NirKernelMapOp,
-    NirKernelZipOp, NirModule, NirNetworkFlowState, NirParam, NirResultFamily, NirResultStage,
-    NirShaderFlowState, NirStmt, NirStructDef, NirStructField, NirTraitDef, NirTraitMethodSig,
-    NirTypeRef, NirUse, NirWindowMode,
+    AstStructDef, AstStructField, AstTypeRef, AstVisibility, NirAnnotation, NirAttributeArg,
+    NirAttributeValue, NirBinaryOp, NirDataFlowState, NirExpr, NirExternFunction,
+    NirExternInterface, NirFunction, NirGenericParam, NirImplDef, NirImplMethod, NirKernelAxis,
+    NirKernelFlowState, NirKernelMapOp, NirKernelZipOp, NirModule, NirNetworkFlowState, NirParam,
+    NirResultFamily, NirResultStage, NirShaderFlowState, NirStmt, NirStructDef, NirStructField,
+    NirTraitDef, NirTraitMethodSig, NirTypeRef, NirUse, NirVisibility, NirWindowMode,
 };
 
 pub fn frontend_name() -> &'static str {
     "nuisc-parser-minimal"
+}
+
+fn lower_visibility(visibility: AstVisibility) -> NirVisibility {
+    match visibility {
+        AstVisibility::Private => NirVisibility::Private,
+        AstVisibility::Public => NirVisibility::Public,
+    }
+}
+
+fn is_public_visibility(visibility: AstVisibility) -> bool {
+    matches!(visibility, AstVisibility::Public)
 }
 
 pub fn parse_nuis_ast(input: &str) -> Result<AstModule, String> {
@@ -56,31 +67,40 @@ pub fn lower_project_ast_to_nir(
         .iter()
         .map(|definition| NirStructDef {
             annotations: lower_ast_attributes(&definition.attributes),
+            visibility: lower_visibility(definition.visibility),
             name: definition.name.clone(),
             fields: definition
                 .fields
                 .iter()
                 .map(|field| NirStructField {
                     annotations: lower_ast_attributes(&field.attributes),
+                    visibility: lower_visibility(field.visibility),
                     name: field.name.clone(),
                     ty: lower_type_ref(&field.ty),
                 })
                 .collect(),
         })
         .chain(local_cpu_helpers.iter().flat_map(|helper| {
-            helper.structs.iter().map(|definition| NirStructDef {
-                annotations: lower_ast_attributes(&definition.attributes),
-                name: definition.name.clone(),
-                fields: definition
-                    .fields
-                    .iter()
-                    .map(|field| NirStructField {
-                        annotations: lower_ast_attributes(&field.attributes),
-                        name: field.name.clone(),
-                        ty: lower_type_ref(&field.ty),
-                    })
-                    .collect(),
-            })
+            helper
+                .structs
+                .iter()
+                .filter(|definition| is_public_visibility(definition.visibility))
+                .map(|definition| NirStructDef {
+                    annotations: helper_visible_struct_annotations(definition),
+                    visibility: lower_visibility(definition.visibility),
+                    name: definition.name.clone(),
+                    fields: definition
+                        .fields
+                        .iter()
+                        .filter(|field| is_public_visibility(field.visibility))
+                        .map(|field| NirStructField {
+                            annotations: lower_ast_attributes(&field.attributes),
+                            visibility: lower_visibility(field.visibility),
+                            name: field.name.clone(),
+                            ty: lower_type_ref(&field.ty),
+                        })
+                        .collect(),
+                })
         }))
         .collect::<Vec<_>>();
     let struct_table = struct_defs
@@ -180,7 +200,11 @@ pub fn lower_project_ast_to_nir(
         }
     }
     for helper in &local_cpu_helpers {
-        for function in &helper.functions {
+        for function in helper
+            .functions
+            .iter()
+            .filter(|function| is_public_visibility(function.visibility))
+        {
             let signature = FunctionSignature {
                 abi: "nuis".to_owned(),
                 interface: None,
@@ -260,21 +284,42 @@ pub fn lower_project_ast_to_nir(
 
     let mut lowered_functions = rewritten_module_functions
         .iter()
-        .map(|function| lower_function(function, &module.domain, &signatures, &struct_table))
+        .map(|function| {
+            lower_function(
+                function,
+                &module.domain,
+                &module.unit,
+                &signatures,
+                &struct_table,
+            )
+        })
         .collect::<Result<Vec<_>, _>>()?;
     lowered_functions.extend(
         specialized_functions
             .iter()
-            .map(|function| lower_function(function, &module.domain, &signatures, &struct_table))
+            .map(|function| {
+                lower_function(
+                    function,
+                    &module.domain,
+                    &module.unit,
+                    &signatures,
+                    &struct_table,
+                )
+            })
             .collect::<Result<Vec<_>, _>>()?,
     );
     for helper in &local_cpu_helpers {
-        for function in &helper.functions {
+        for function in helper
+            .functions
+            .iter()
+            .filter(|function| is_public_visibility(function.visibility))
+        {
             let mut renamed = function.clone();
             renamed.name = format!("{}.{}", helper.unit, function.name);
             lowered_functions.push(lower_function(
                 &renamed,
                 &module.domain,
+                &helper.unit,
                 &signatures,
                 &struct_table,
             )?);
@@ -285,6 +330,7 @@ pub fn lower_project_ast_to_nir(
         .traits
         .iter()
         .map(|definition| NirTraitDef {
+            visibility: lower_visibility(definition.visibility),
             name: definition.name.clone(),
             methods: definition
                 .methods
@@ -941,6 +987,38 @@ fn lower_ast_attributes(attributes: &[nuis_semantics::model::AstAttribute]) -> V
         .collect()
 }
 
+fn helper_visible_struct_annotations(definition: &AstStructDef) -> Vec<NirAnnotation> {
+    let mut annotations = lower_ast_attributes(&definition.attributes);
+    let hidden_private_fields = definition
+        .fields
+        .iter()
+        .filter(|field| !is_public_visibility(field.visibility))
+        .count();
+    if hidden_private_fields > 0 {
+        annotations.push(NirAnnotation {
+            name: "visibility_hidden_fields".to_owned(),
+            args: vec![NirAttributeArg {
+                name: None,
+                value: NirAttributeValue::Int(hidden_private_fields as i64),
+            }],
+        });
+    }
+    annotations
+}
+
+fn hidden_private_field_count(definition: &NirStructDef) -> usize {
+    definition
+        .annotations
+        .iter()
+        .find(|annotation| annotation.name == "visibility_hidden_fields")
+        .and_then(|annotation| annotation.args.first())
+        .and_then(|arg| match arg.value {
+            NirAttributeValue::Int(value) if value > 0 => Some(value as usize),
+            _ => None,
+        })
+        .unwrap_or(0)
+}
+
 fn validate_zero_arg_function_annotation(
     function: &AstFunction,
     annotation: &str,
@@ -1076,6 +1154,7 @@ fn build_impl_method_function(
 ) -> AstFunction {
     AstFunction {
         name: symbol_name.to_owned(),
+        visibility: AstVisibility::Private,
         attributes: vec![],
         test_name: None,
         test_ignored: false,
@@ -1102,6 +1181,7 @@ fn build_impl_method_function(
 fn lower_function(
     function: &AstFunction,
     current_domain: &str,
+    _current_unit: &str,
     signatures: &BTreeMap<String, FunctionSignature>,
     struct_table: &BTreeMap<String, NirStructDef>,
 ) -> Result<NirFunction, String> {
@@ -1113,6 +1193,7 @@ fn lower_function(
     Ok(NirFunction {
         name: function.name.clone(),
         annotations: lower_ast_attributes(&function.attributes),
+        visibility: lower_visibility(function.visibility),
         test_name: function.test_name.clone(),
         test_ignored: function.test_ignored,
         test_should_fail: function.test_should_fail,
@@ -1182,7 +1263,11 @@ fn build_function_return_type_table(
         table.insert(name.clone(), function.return_type.clone());
     }
     for helper in local_cpu_helpers {
-        for function in &helper.functions {
+        for function in helper
+            .functions
+            .iter()
+            .filter(|function| is_public_visibility(function.visibility))
+        {
             table.insert(function.name.clone(), function.return_type.clone());
             table.insert(
                 format!("{}.{}", helper.unit, function.name),
@@ -2028,6 +2113,7 @@ fn specialize_function_template(
 ) -> Result<AstFunction, String> {
     Ok(AstFunction {
         name: specialized_name.to_owned(),
+        visibility: template.visibility,
         attributes: template.attributes.clone(),
         test_name: None,
         test_ignored: false,
@@ -2929,6 +3015,13 @@ fn lower_expr_with_async(
             let definition = struct_table
                 .get(type_name)
                 .ok_or_else(|| format!("unknown struct type `{}`", type_name))?;
+            let hidden_private_fields = hidden_private_field_count(definition);
+            if hidden_private_fields > 0 {
+                return Err(format!(
+                    "struct literal `{}` cannot be constructed outside its defining module because it hides {} private field(s)",
+                    type_name, hidden_private_fields
+                ));
+            }
             let mut seen = BTreeSet::new();
             let mut lowered_fields = Vec::new();
             for (name, value) in fields {
@@ -15057,24 +15150,7 @@ fn lower_call_expr_with_async(
                     args: lowered_args,
                 });
             }
-            let lowered_args = args
-                .iter()
-                .map(|arg| {
-                    lower_nested_expr_with_async(
-                        arg,
-                        current_domain,
-                        current_function_is_async,
-                        bindings,
-                        signatures,
-                        struct_table,
-                        None,
-                    )
-                })
-                .collect::<Result<Vec<_>, _>>()?;
-            Ok(NirExpr::Call {
-                callee: callee.to_owned(),
-                args: lowered_args,
-            })
+            Err(format!("unknown function `{callee}`"))
         }
     }
 }
@@ -16830,8 +16906,8 @@ mod tests {
     use super::parse_nuis_ast;
     use super::parse_nuis_module;
     use nuis_semantics::model::{
-        NirDataFlowState, NirExpr, NirKernelFlowState, NirShaderFlowState, NirStmt,
-        TestClockDomain, TestClockPolicy,
+        AstVisibility, NirDataFlowState, NirExpr, NirKernelFlowState, NirShaderFlowState, NirStmt,
+        NirVisibility, TestClockDomain, TestClockPolicy,
     };
 
     #[test]
@@ -16860,7 +16936,7 @@ mod tests {
         let ast = parse_nuis_ast(
             r#"
             mod cpu Main {
-              trait Addable {
+              pub trait Addable {
                 fn add(lhs: Self, rhs: Self) -> Self;
               }
 
@@ -16880,6 +16956,7 @@ mod tests {
 
         assert_eq!(ast.traits.len(), 1);
         assert_eq!(ast.traits[0].name, "Addable");
+        assert_eq!(ast.traits[0].visibility, AstVisibility::Public);
         assert_eq!(ast.traits[0].methods.len(), 1);
         assert_eq!(ast.impls.len(), 1);
         assert_eq!(ast.impls[0].trait_name, "Addable");
@@ -17085,7 +17162,7 @@ mod tests {
         let module = parse_nuis_module(
             r#"
             mod cpu Main {
-              trait Addable {
+              pub trait Addable {
                 fn add(lhs: Self, rhs: Self) -> Self;
               }
 
@@ -17105,6 +17182,7 @@ mod tests {
 
         assert_eq!(module.traits.len(), 1);
         assert_eq!(module.traits[0].name, "Addable");
+        assert_eq!(module.traits[0].visibility, NirVisibility::Public);
         assert_eq!(module.traits[0].methods.len(), 1);
         assert_eq!(module.impls.len(), 1);
         assert_eq!(module.impls[0].trait_name, "Addable");
@@ -19033,7 +19111,7 @@ mod tests {
 
             mod cpu Main {
               fn main() -> i64 {
-                return TaskHelpers.task_policy_completed(7);
+                return task_policy_completed(7);
               }
             }
             "#,
@@ -19042,11 +19120,11 @@ mod tests {
         let helper = parse_nuis_ast(
             r#"
             mod cpu TaskHelpers {
-              fn encode_completed(value: i64) -> i64 {
+              pub fn encode_completed(value: i64) -> i64 {
                 return value + 1;
               }
 
-              fn task_policy_completed(value: i64) -> i64 {
+              pub fn task_policy_completed(value: i64) -> i64 {
                 return encode_completed(value);
               }
             }
@@ -19076,6 +19154,115 @@ mod tests {
             Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
                 if callee == "TaskHelpers.task_policy_completed"
         ));
+    }
+
+    #[test]
+    fn rejects_private_local_cpu_helper_calls_across_modules() {
+        let entry = parse_nuis_ast(
+            r#"
+            use cpu TaskHelpers;
+
+            mod cpu Main {
+              fn main() -> i64 {
+                return task_policy_completed(7);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let helper = parse_nuis_ast(
+            r#"
+            mod cpu TaskHelpers {
+              fn task_policy_completed(value: i64) -> i64 {
+                return value + 1;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let error = super::lower_project_ast_to_nir(&entry, &[helper]).unwrap_err();
+        assert!(
+            error.contains("unknown function `task_policy_completed`"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn rejects_private_helper_field_access_across_modules() {
+        let entry = parse_nuis_ast(
+            r#"
+            use cpu Shapes;
+
+            mod cpu Main {
+              fn main() -> i64 {
+                let cfg: Config = Shapes.make();
+                return cfg.secret;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let helper = parse_nuis_ast(
+            r#"
+            mod cpu Shapes {
+              pub struct Config {
+                pub visible: i64,
+                secret: i64
+              }
+
+              pub fn make() -> Config {
+                return Config {
+                  visible: 1,
+                  secret: 2
+                };
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let error = super::lower_project_ast_to_nir(&entry, &[helper]).unwrap_err();
+        assert!(
+            error.contains("type `Config` has no field `secret`"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn rejects_struct_literals_for_imported_structs_with_hidden_private_fields() {
+        let entry = parse_nuis_ast(
+            r#"
+            use cpu Shapes;
+
+            mod cpu Main {
+              fn main() -> i64 {
+                let cfg: Config = Config {
+                  visible: 1
+                };
+                return cfg.visible;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let helper = parse_nuis_ast(
+            r#"
+            mod cpu Shapes {
+              pub struct Config {
+                pub visible: i64,
+                secret: i64
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let error = super::lower_project_ast_to_nir(&entry, &[helper]).unwrap_err();
+        assert!(
+            error.contains("struct literal `Config` cannot be constructed outside its defining module because it hides 1 private field"),
+            "unexpected error: {error}"
+        );
     }
 
     #[test]

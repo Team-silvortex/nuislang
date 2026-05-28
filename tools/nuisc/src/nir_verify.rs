@@ -1173,7 +1173,7 @@ fn render_data_expr_name(expr: &NirExpr) -> String {
 #[cfg(test)]
 mod tests {
     use super::verify_nir_module;
-    use nuis_semantics::model::{NirExpr, NirFunction, NirModule, NirStmt};
+    use nuis_semantics::model::{NirExpr, NirFunction, NirModule, NirStmt, NirVisibility};
 
     fn module_with_body(body: Vec<NirStmt>) -> NirModule {
         NirModule {
@@ -1188,6 +1188,7 @@ mod tests {
             functions: vec![NirFunction {
                 name: "main".to_owned(),
                 annotations: vec![],
+                visibility: NirVisibility::Private,
                 test_name: None,
                 test_ignored: false,
                 test_should_fail: false,

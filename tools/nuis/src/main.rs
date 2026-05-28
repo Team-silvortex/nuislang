@@ -681,6 +681,7 @@ fn build_test_main_function(test_function: &AstFunction) -> AstFunction {
     };
     AstFunction {
         name: "main".to_owned(),
+        visibility: nuis_semantics::model::AstVisibility::Private,
         attributes: vec![],
         test_name: None,
         test_ignored: false,

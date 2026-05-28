@@ -1,9 +1,10 @@
 use nuis_semantics::model::{
     AstAttribute, AstAttributeArg, AstAttributeValue, AstBinaryOp, AstExpr, AstExternInterface,
     AstFunction, AstGenericParam, AstImplDef, AstImplMethod, AstModule, AstStmt, AstStructDef,
-    AstTraitDef, AstTraitMethodSig, NirAnnotation, NirAttributeArg, NirAttributeValue, NirBinaryOp,
-    NirExpr, NirExternInterface, NirFunction, NirGenericParam, NirImplDef, NirImplMethod,
-    NirModule, NirStmt, NirStructDef, NirTraitDef, NirTraitMethodSig,
+    AstTraitDef, AstTraitMethodSig, AstVisibility, NirAnnotation, NirAttributeArg,
+    NirAttributeValue, NirBinaryOp, NirExpr, NirExternInterface, NirFunction, NirGenericParam,
+    NirImplDef, NirImplMethod, NirModule, NirStmt, NirStructDef, NirTraitDef, NirTraitMethodSig,
+    NirVisibility,
 };
 use yir_core::YirModule;
 
@@ -313,15 +314,18 @@ fn render_ast_expr(value: &AstExpr) -> String {
 fn render_ast_struct(definition: &AstStructDef) -> String {
     let mut out = String::new();
     let attribute_prefix = render_ast_attributes(&definition.attributes);
+    let visibility_prefix = render_ast_visibility(definition.visibility);
     out.push_str(&format!(
-        "  {}struct {}\n",
-        attribute_prefix, definition.name
+        "  {}{}struct {}\n",
+        attribute_prefix, visibility_prefix, definition.name
     ));
     for field in &definition.fields {
         let field_prefix = render_ast_attributes(&field.attributes);
+        let field_visibility = render_ast_visibility(field.visibility);
         out.push_str(&format!(
-            "    {}field {}: {}\n",
+            "    {}{}field {}: {}\n",
             field_prefix,
+            field_visibility,
             field.name,
             render_ast_type(&field.ty)
         ));
@@ -330,7 +334,11 @@ fn render_ast_struct(definition: &AstStructDef) -> String {
 }
 
 fn render_ast_trait(definition: &AstTraitDef) -> String {
-    let mut out = format!("  trait {}\n", definition.name);
+    let mut out = format!(
+        "  {}trait {}\n",
+        render_ast_visibility(definition.visibility),
+        definition.name
+    );
     for method in &definition.methods {
         out.push_str(&render_ast_trait_method_sig(method));
     }
@@ -1056,15 +1064,18 @@ fn render_nir_expr(value: &NirExpr) -> String {
 fn render_nir_struct(definition: &NirStructDef) -> String {
     let mut out = String::new();
     let annotation_prefix = render_nir_annotations(&definition.annotations);
+    let visibility_prefix = render_nir_visibility(definition.visibility);
     out.push_str(&format!(
-        "  {}struct {}\n",
-        annotation_prefix, definition.name
+        "  {}{}struct {}\n",
+        annotation_prefix, visibility_prefix, definition.name
     ));
     for field in &definition.fields {
         let field_prefix = render_nir_annotations(&field.annotations);
+        let field_visibility = render_nir_visibility(field.visibility);
         out.push_str(&format!(
-            "    {}field {}: {}\n",
+            "    {}{}field {}: {}\n",
             field_prefix,
+            field_visibility,
             field.name,
             render_nir_type(&field.ty)
         ));
@@ -1073,7 +1084,11 @@ fn render_nir_struct(definition: &NirStructDef) -> String {
 }
 
 fn render_nir_trait(definition: &NirTraitDef) -> String {
-    let mut out = format!("  trait {}\n", definition.name);
+    let mut out = format!(
+        "  {}trait {}\n",
+        render_nir_visibility(definition.visibility),
+        definition.name
+    );
     for method in &definition.methods {
         out.push_str(&render_nir_trait_method_sig(method));
     }
@@ -1261,9 +1276,11 @@ fn render_ast_function_header(function: &AstFunction) -> String {
         .unwrap_or_default();
     let async_prefix = if function.is_async { "async " } else { "" };
     let attribute_prefix = render_ast_attributes(&function.attributes);
+    let visibility_prefix = render_ast_visibility(function.visibility);
     format!(
-        "  {}{}{}fn {}{}({}){}\n",
+        "  {}{}{}{}fn {}{}({}){}\n",
         attribute_prefix,
+        visibility_prefix,
         test_prefix,
         async_prefix,
         function.name,
@@ -1313,9 +1330,11 @@ fn render_nir_function_header(function: &NirFunction) -> String {
         .unwrap_or_default();
     let async_prefix = if function.is_async { "async " } else { "" };
     let annotation_prefix = render_nir_annotations(&function.annotations);
+    let visibility_prefix = render_nir_visibility(function.visibility);
     format!(
-        "  {}{}{}fn {}{}({}){}\n",
+        "  {}{}{}{}fn {}{}({}){}\n",
         annotation_prefix,
+        visibility_prefix,
         test_prefix,
         async_prefix,
         function.name,
@@ -1323,6 +1342,20 @@ fn render_nir_function_header(function: &NirFunction) -> String {
         params,
         return_suffix
     )
+}
+
+fn render_ast_visibility(visibility: AstVisibility) -> &'static str {
+    match visibility {
+        AstVisibility::Private => "",
+        AstVisibility::Public => "pub ",
+    }
+}
+
+fn render_nir_visibility(visibility: NirVisibility) -> &'static str {
+    match visibility {
+        NirVisibility::Private => "",
+        NirVisibility::Public => "pub ",
+    }
 }
 
 fn render_ast_attributes(attributes: &[AstAttribute]) -> String {

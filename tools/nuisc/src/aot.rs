@@ -4160,6 +4160,7 @@ mod tests {
             impls: Vec::new(),
             functions: vec![nuis_semantics::model::AstFunction {
                 name: "main".to_owned(),
+                visibility: nuis_semantics::model::AstVisibility::Private,
                 attributes: vec![nuis_semantics::model::AstAttribute {
                     name: "export".to_owned(),
                     args: vec![nuis_semantics::model::AstAttributeArg {

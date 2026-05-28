@@ -2,7 +2,7 @@ use nuis_semantics::model::{
     AstAttribute, AstAttributeArg, AstAttributeValue, AstBinaryOp, AstExpr, AstExternFunction,
     AstExternInterface, AstFunction, AstGenericParam, AstImplDef, AstImplMethod, AstModule,
     AstParam, AstStmt, AstStructDef, AstStructField, AstTraitDef, AstTraitMethodSig, AstTypeRef,
-    TestClockDomain, TestClockPolicy,
+    AstVisibility, TestClockDomain, TestClockPolicy,
 };
 
 use super::lexer::{describe_token, Token};
@@ -89,7 +89,19 @@ impl Parser {
 
     fn peek_item_keyword_after_attributes(&self, keyword: &str) -> bool {
         let mut index = self.cursor;
-        while matches!(self.tokens.get(index), Some(Token::Symbol('@'))) {
+        let mut saw_pub = false;
+        loop {
+            if matches!(self.tokens.get(index), Some(Token::Word(word)) if word == "pub") {
+                if saw_pub {
+                    return false;
+                }
+                saw_pub = true;
+                index += 1;
+                continue;
+            }
+            if !matches!(self.tokens.get(index), Some(Token::Symbol('@'))) {
+                break;
+            }
             index += 1;
             if !matches!(self.tokens.get(index), Some(Token::Word(_))) {
                 return false;
@@ -117,18 +129,43 @@ impl Parser {
         matches!(self.tokens.get(index), Some(Token::Word(word)) if word == keyword)
     }
 
+    fn parse_visibility_and_attribute_list(
+        &mut self,
+    ) -> Result<(AstVisibility, Vec<AstAttribute>), String> {
+        let mut visibility = AstVisibility::Private;
+        let mut attributes = Vec::new();
+        loop {
+            if self.peek_word("pub") {
+                if visibility == AstVisibility::Public {
+                    return Err("duplicate `pub` visibility modifier".to_owned());
+                }
+                self.expect_word("pub")?;
+                visibility = AstVisibility::Public;
+                continue;
+            }
+            if self.peek_symbol('@') {
+                attributes.push(self.parse_attribute()?);
+                continue;
+            }
+            break;
+        }
+        Ok((visibility, attributes))
+    }
+
     fn parse_struct_def(&mut self) -> Result<AstStructDef, String> {
-        let attributes = self.parse_attribute_list()?;
+        let (visibility, attributes) = self.parse_visibility_and_attribute_list()?;
         self.expect_word("struct")?;
         let name = self.expect_ident()?;
         self.expect_symbol('{')?;
         let mut fields = Vec::new();
         while !self.peek_symbol('}') {
-            let field_attributes = self.parse_attribute_list()?;
+            let (field_visibility, field_attributes) =
+                self.parse_visibility_and_attribute_list()?;
             let field_name = self.expect_ident()?;
             self.expect_symbol(':')?;
             let ty = self.parse_type_ref()?;
             fields.push(AstStructField {
+                visibility: field_visibility,
                 attributes: field_attributes,
                 name: field_name,
                 ty,
@@ -141,6 +178,7 @@ impl Parser {
         }
         self.expect_symbol('}')?;
         Ok(AstStructDef {
+            visibility,
             attributes,
             name,
             fields,
@@ -148,6 +186,10 @@ impl Parser {
     }
 
     fn parse_trait_def(&mut self) -> Result<AstTraitDef, String> {
+        let (visibility, attributes) = self.parse_visibility_and_attribute_list()?;
+        if !attributes.is_empty() {
+            return Err("trait annotations are not supported in the current frontend".to_owned());
+        }
         self.expect_word("trait")?;
         let name = self.expect_ident()?;
         self.expect_symbol('{')?;
@@ -156,7 +198,11 @@ impl Parser {
             methods.push(self.parse_trait_method_sig()?);
         }
         self.expect_symbol('}')?;
-        Ok(AstTraitDef { name, methods })
+        Ok(AstTraitDef {
+            visibility,
+            name,
+            methods,
+        })
     }
 
     fn parse_trait_method_sig(&mut self) -> Result<AstTraitMethodSig, String> {
@@ -317,7 +363,7 @@ impl Parser {
     }
 
     fn parse_function(&mut self) -> Result<AstFunction, String> {
-        let mut attributes = self.parse_attribute_list()?;
+        let (visibility, mut attributes) = self.parse_visibility_and_attribute_list()?;
         let (
             declared_test_name,
             test_ignored,
@@ -422,6 +468,7 @@ impl Parser {
         self.expect_symbol('}')?;
 
         Ok(AstFunction {
+            visibility,
             name,
             attributes,
             test_name,
