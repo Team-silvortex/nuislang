@@ -1,0 +1,22 @@
+mod cpu Main {
+  fn main() -> i64 {
+    let value: i64 = 0;
+    let acc: i64 = 0;
+    let weighted: i64 = 0;
+    while value < 5 {
+      let value: i64 = value + 1;
+      if value > 1 {
+        let acc: i64 = acc + value;
+      } else {
+        let acc: i64 = acc + 0;
+      }
+      if acc == 5 {
+        let weighted: i64 = weighted + acc;
+      } else {
+        let weighted: i64 = weighted + 0;
+      }
+    }
+    print(weighted);
+    return weighted;
+  }
+}

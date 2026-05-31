@@ -1,8 +1,9 @@
 use nuis_semantics::model::{
     AstAttribute, AstAttributeArg, AstAttributeValue, AstBinaryOp, AstConstItem, AstExpr,
     AstExternFunction, AstExternInterface, AstFunction, AstGenericParam, AstImplDef, AstImplMethod,
-    AstModule, AstParam, AstStmt, AstStructDef, AstStructField, AstTraitDef, AstTraitMethodSig,
-    AstTypeAlias, AstTypeRef, AstVisibility, TestClockDomain, TestClockPolicy,
+    AstMatchArm, AstMatchPattern, AstModule, AstParam, AstStmt, AstStructDef, AstStructField,
+    AstTraitDef, AstTraitMethodSig, AstTypeAlias, AstTypeRef, AstVisibility, TestClockDomain,
+    TestClockPolicy,
 };
 
 use super::lexer::{describe_token, Token};
@@ -10,11 +11,16 @@ use super::lexer::{describe_token, Token};
 pub struct Parser {
     tokens: Vec<Token>,
     cursor: usize,
+    allow_struct_literals: bool,
 }
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
-        Self { tokens, cursor: 0 }
+        Self {
+            tokens,
+            cursor: 0,
+            allow_struct_literals: true,
+        }
     }
 
     pub fn parse_module(&mut self) -> Result<AstModule, String> {
@@ -1087,6 +1093,9 @@ impl Parser {
         if self.peek_word("if") {
             return self.parse_if_stmt();
         }
+        if self.peek_word("match") {
+            return self.parse_match_stmt();
+        }
         if self.peek_word("while") {
             return self.parse_while_stmt();
         }
@@ -1233,6 +1242,47 @@ impl Parser {
         let condition = self.parse_expr()?;
         let body = self.parse_block()?;
         Ok(AstStmt::While { condition, body })
+    }
+
+    fn parse_match_stmt(&mut self) -> Result<AstStmt, String> {
+        self.expect_word("match")?;
+        let value = self.parse_match_scrutinee_expr()?;
+        self.expect_symbol('{')?;
+        let mut arms = Vec::new();
+        while !self.peek_symbol('}') {
+            let pattern = self.parse_match_pattern()?;
+            self.expect_symbol('=')?;
+            self.expect_symbol('>')?;
+            let body = self.parse_block()?;
+            arms.push(AstMatchArm { pattern, body });
+            if self.peek_symbol(',') {
+                self.expect_symbol(',')?;
+            }
+        }
+        self.expect_symbol('}')?;
+        Ok(AstStmt::Match { value, arms })
+    }
+
+    fn parse_match_scrutinee_expr(&mut self) -> Result<AstExpr, String> {
+        let old = self.allow_struct_literals;
+        self.allow_struct_literals = false;
+        let parsed = self.parse_expr();
+        self.allow_struct_literals = old;
+        parsed
+    }
+
+    fn parse_match_pattern(&mut self) -> Result<AstMatchPattern, String> {
+        match self.next() {
+            Some(Token::Word(word)) if word == "_" => Ok(AstMatchPattern::Wildcard),
+            Some(Token::Word(word)) if word == "true" => Ok(AstMatchPattern::Bool(true)),
+            Some(Token::Word(word)) if word == "false" => Ok(AstMatchPattern::Bool(false)),
+            Some(Token::Integer(value)) => Ok(AstMatchPattern::Int(value)),
+            Some(other) => Err(format!(
+                "expected `true`, `false`, integer literal, or `_` in match arm pattern, found {}",
+                describe_token(&other)
+            )),
+            None => Err("unexpected end of input in match arm pattern".to_owned()),
+        }
     }
 
     fn parse_break_stmt(&mut self) -> Result<AstStmt, String> {
@@ -1387,7 +1437,18 @@ impl Parser {
     fn parse_postfix(&mut self) -> Result<AstExpr, String> {
         let mut expr = self.parse_primary()?;
         loop {
-            if self.peek_symbol('.') {
+            if self.peek_symbol('(') {
+                self.expect_symbol('(')?;
+                let args = self.parse_argument_list(')')?;
+                self.expect_symbol(')')?;
+                expr = match expr {
+                    AstExpr::Var(callee) => AstExpr::Call { callee, args },
+                    other => AstExpr::Invoke {
+                        callee: Box::new(other),
+                        args,
+                    },
+                };
+            } else if self.peek_symbol('.') {
                 self.expect_symbol('.')?;
                 let member = self.expect_ident()?;
                 if self.peek_symbol('(') {
@@ -1414,6 +1475,26 @@ impl Parser {
 
     fn parse_primary(&mut self) -> Result<AstExpr, String> {
         match self.next() {
+            Some(Token::Symbol('|')) => {
+                let params = if self.peek_symbol('|') {
+                    Vec::new()
+                } else {
+                    self.parse_lambda_param_list()?
+                };
+                self.expect_symbol('|')?;
+                let return_type = if self.peek_arrow() {
+                    self.expect_arrow()?;
+                    Some(self.parse_type_ref()?)
+                } else {
+                    None
+                };
+                let body = self.parse_block()?;
+                Ok(AstExpr::Lambda {
+                    params,
+                    return_type,
+                    body,
+                })
+            }
             Some(Token::Word(word)) if word == "instantiate" => {
                 let domain = self.expect_ident()?;
                 let unit = self.expect_ident()?;
@@ -1429,7 +1510,7 @@ impl Parser {
                     let args = self.parse_argument_list(')')?;
                     self.expect_symbol(')')?;
                     Ok(AstExpr::Call { callee: name, args })
-                } else if self.peek_symbol('{') {
+                } else if self.allow_struct_literals && self.peek_symbol('{') {
                     self.expect_symbol('{')?;
                     let fields = self.parse_struct_field_list()?;
                     self.expect_symbol('}')?;
@@ -1468,6 +1549,22 @@ impl Parser {
             }
         }
         Ok(args)
+    }
+
+    fn parse_lambda_param_list(&mut self) -> Result<Vec<AstParam>, String> {
+        let mut params = Vec::new();
+        loop {
+            let name = self.expect_ident()?;
+            self.expect_symbol(':')?;
+            let ty = self.parse_type_ref()?;
+            params.push(AstParam { name, ty });
+            if self.peek_symbol(',') {
+                self.expect_symbol(',')?;
+            } else {
+                break;
+            }
+        }
+        Ok(params)
     }
 
     fn parse_block(&mut self) -> Result<Vec<AstStmt>, String> {

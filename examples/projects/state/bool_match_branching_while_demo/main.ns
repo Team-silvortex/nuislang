@@ -1,0 +1,19 @@
+mod cpu Main {
+  fn main() -> i64 {
+    let value: i64 = 0;
+    let acc: i64 = 0;
+    while value < 5 {
+      let value: i64 = value + 1;
+      match value > 2 {
+        true => {
+          let acc: i64 = acc + value;
+        },
+        _ => {
+          let acc: i64 = acc + 0;
+        }
+      }
+    }
+    print(acc);
+    return acc;
+  }
+}

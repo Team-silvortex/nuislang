@@ -15,7 +15,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, String> {
         match ch {
             c if c.is_whitespace() => {}
             '{' | '}' | '(' | ')' | ';' | ',' | '=' | '!' | '+' | '*' | '/' | ':' | '.' | '<'
-            | '>' | '?' | '@' => tokens.push(Token::Symbol(ch)),
+            | '>' | '?' | '@' | '|' => tokens.push(Token::Symbol(ch)),
             '-' => {
                 if chars.peek().copied() == Some('>') {
                     chars.next();

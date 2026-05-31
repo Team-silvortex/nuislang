@@ -1,7 +1,7 @@
 use nuis_semantics::model::{
     AstAttribute, AstAttributeArg, AstAttributeValue, AstBinaryOp, AstExpr, AstExternInterface,
-    AstFunction, AstGenericParam, AstImplDef, AstImplMethod, AstModule, AstStmt, AstStructDef,
-    AstTraitDef, AstTraitMethodSig, AstVisibility, NirAnnotation, NirAttributeArg,
+    AstFunction, AstGenericParam, AstImplDef, AstImplMethod, AstMatchPattern, AstModule, AstStmt,
+    AstStructDef, AstTraitDef, AstTraitMethodSig, AstVisibility, NirAnnotation, NirAttributeArg,
     NirAttributeValue, NirBinaryOp, NirExpr, NirExternInterface, NirFunction, NirGenericParam,
     NirImplDef, NirImplMethod, NirModule, NirStmt, NirStructDef, NirTraitDef, NirTraitMethodSig,
     NirVisibility,
@@ -126,6 +126,19 @@ pub fn render_ast(module: &AstModule) -> String {
                     }
                     for stmt in else_body {
                         out.push_str(&format!("      else {}\n", render_ast_stmt_inline(stmt)));
+                    }
+                }
+                AstStmt::Match { value, arms } => {
+                    out.push_str(&format!("    match {}\n", render_ast_expr(value)));
+                    for arm in arms {
+                        let pattern = render_ast_match_pattern(&arm.pattern);
+                        for stmt in &arm.body {
+                            out.push_str(&format!(
+                                "      arm {} {}\n",
+                                pattern,
+                                render_ast_stmt_inline(stmt)
+                            ));
+                        }
                     }
                 }
                 AstStmt::While { condition, body } => {
@@ -345,11 +358,40 @@ fn render_ast_expr(value: &AstExpr) -> String {
         AstExpr::Text(text) => format!("\"{}\"", escape_debug(text)),
         AstExpr::Int(value) => value.to_string(),
         AstExpr::Var(name) => name.clone(),
+        AstExpr::Lambda {
+            params,
+            return_type,
+            body,
+        } => {
+            let params = params
+                .iter()
+                .map(|param| format!("{}: {}", param.name, render_ast_type(&param.ty)))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let return_suffix = return_type
+                .as_ref()
+                .map(|ty| format!(" -> {}", render_ast_type(ty)))
+                .unwrap_or_default();
+            let body = body
+                .iter()
+                .map(render_ast_stmt_inline)
+                .collect::<Vec<_>>()
+                .join("; ");
+            format!("|{params}|{return_suffix} {{ {body} }}")
+        }
         AstExpr::Await(value) => format!("await {}", render_ast_expr(value)),
         AstExpr::Instantiate { domain, unit } => format!("instantiate {} {}", domain, unit),
         AstExpr::Call { callee, args } => format!(
             "{}({})",
             callee,
+            args.iter()
+                .map(render_ast_expr)
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        AstExpr::Invoke { callee, args } => format!(
+            "({})({})",
+            render_ast_expr(callee),
             args.iter()
                 .map(render_ast_expr)
                 .collect::<Vec<_>>()
@@ -1613,6 +1655,7 @@ fn render_ast_stmt_inline(stmt: &AstStmt) -> String {
         AstStmt::Await(value) => format!("await {}", render_ast_expr(value)),
         AstStmt::Expr(expr) => render_ast_expr(expr),
         AstStmt::If { .. } => "if ...".to_owned(),
+        AstStmt::Match { .. } => "match ...".to_owned(),
         AstStmt::While { .. } => "while ...".to_owned(),
         AstStmt::Break => "break".to_owned(),
         AstStmt::Continue => "continue".to_owned(),
@@ -1620,6 +1663,14 @@ fn render_ast_stmt_inline(stmt: &AstStmt) -> String {
             Some(value) => format!("return {}", render_ast_expr(value)),
             None => "return".to_owned(),
         },
+    }
+}
+
+fn render_ast_match_pattern(pattern: &AstMatchPattern) -> String {
+    match pattern {
+        AstMatchPattern::Wildcard => "_".to_owned(),
+        AstMatchPattern::Bool(value) => value.to_string(),
+        AstMatchPattern::Int(value) => value.to_string(),
     }
 }
 

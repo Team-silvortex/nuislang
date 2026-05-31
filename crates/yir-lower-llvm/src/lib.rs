@@ -406,22 +406,33 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 *last_cpu_value = Some(widened);
             }
             ("cpu", "eq") => {
-                let (Some(lhs), Some(rhs)) = (
+                if let (Some(lhs), Some(rhs)) = (
                     get_i64(&registers, &node.op.args[0]),
                     get_i64(&registers, &node.op.args[1]),
-                ) else {
+                ) {
+                    let cmp = fresh_reg(&mut next_reg);
+                    body.push(format!("  {cmp} = icmp eq i64 {lhs}, {rhs}"));
+                    let reg = fresh_reg(&mut next_reg);
+                    body.push(format!("  {reg} = zext i1 {cmp} to i64"));
+                    registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                    *last_cpu_value = Some(reg);
+                } else if let (Some(lhs), Some(rhs)) = (
+                    get_bool(&registers, &node.op.args[0]),
+                    get_bool(&registers, &node.op.args[1]),
+                ) {
+                    let cmp = fresh_reg(&mut next_reg);
+                    body.push(format!("  {cmp} = icmp eq i1 {lhs}, {rhs}"));
+                    let reg = fresh_reg(&mut next_reg);
+                    body.push(format!("  {reg} = zext i1 {cmp} to i64"));
+                    registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                    *last_cpu_value = Some(reg);
+                } else {
                     body.push(format!(
                         "  ; deferred lowering for cpu.eq `{}` because one or more inputs are outside the current CPU LLVM slice",
                         node.name
                     ));
                     continue;
-                };
-                let cmp = fresh_reg(&mut next_reg);
-                body.push(format!("  {cmp} = icmp eq i64 {lhs}, {rhs}"));
-                let reg = fresh_reg(&mut next_reg);
-                body.push(format!("  {reg} = zext i1 {cmp} to i64"));
-                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                *last_cpu_value = Some(reg);
+                }
             }
             ("cpu", "eq_i32") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -478,22 +489,33 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 *last_cpu_value = Some(widened);
             }
             ("cpu", "ne") => {
-                let (Some(lhs), Some(rhs)) = (
+                if let (Some(lhs), Some(rhs)) = (
                     get_i64(&registers, &node.op.args[0]),
                     get_i64(&registers, &node.op.args[1]),
-                ) else {
+                ) {
+                    let cmp = fresh_reg(&mut next_reg);
+                    body.push(format!("  {cmp} = icmp ne i64 {lhs}, {rhs}"));
+                    let reg = fresh_reg(&mut next_reg);
+                    body.push(format!("  {reg} = zext i1 {cmp} to i64"));
+                    registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                    *last_cpu_value = Some(reg);
+                } else if let (Some(lhs), Some(rhs)) = (
+                    get_bool(&registers, &node.op.args[0]),
+                    get_bool(&registers, &node.op.args[1]),
+                ) {
+                    let cmp = fresh_reg(&mut next_reg);
+                    body.push(format!("  {cmp} = icmp ne i1 {lhs}, {rhs}"));
+                    let reg = fresh_reg(&mut next_reg);
+                    body.push(format!("  {reg} = zext i1 {cmp} to i64"));
+                    registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                    *last_cpu_value = Some(reg);
+                } else {
                     body.push(format!(
                         "  ; deferred lowering for cpu.ne `{}` because one or more inputs are outside the current CPU LLVM slice",
                         node.name
                     ));
                     continue;
-                };
-                let cmp = fresh_reg(&mut next_reg);
-                body.push(format!("  {cmp} = icmp ne i64 {lhs}, {rhs}"));
-                let reg = fresh_reg(&mut next_reg);
-                body.push(format!("  {reg} = zext i1 {cmp} to i64"));
-                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                *last_cpu_value = Some(reg);
+                }
             }
             ("cpu", "lt") => {
                 let (Some(lhs), Some(rhs)) = (

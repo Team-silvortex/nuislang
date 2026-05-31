@@ -230,6 +230,19 @@ pub struct AstFunction {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AstMatchPattern {
+    Wildcard,
+    Bool(bool),
+    Int(i64),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AstMatchArm {
+    pub pattern: AstMatchPattern,
+    pub body: Vec<AstStmt>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AstStmt {
     Let {
         name: String,
@@ -248,6 +261,10 @@ pub enum AstStmt {
         then_body: Vec<AstStmt>,
         else_body: Vec<AstStmt>,
     },
+    Match {
+        value: AstExpr,
+        arms: Vec<AstMatchArm>,
+    },
     While {
         condition: AstExpr,
         body: Vec<AstStmt>,
@@ -264,6 +281,11 @@ pub enum AstExpr {
     Text(String),
     Int(i64),
     Var(String),
+    Lambda {
+        params: Vec<AstParam>,
+        return_type: Option<AstTypeRef>,
+        body: Vec<AstStmt>,
+    },
     Await(Box<AstExpr>),
     Instantiate {
         domain: String,
@@ -271,6 +293,10 @@ pub enum AstExpr {
     },
     Call {
         callee: String,
+        args: Vec<AstExpr>,
+    },
+    Invoke {
+        callee: Box<AstExpr>,
         args: Vec<AstExpr>,
     },
     MethodCall {

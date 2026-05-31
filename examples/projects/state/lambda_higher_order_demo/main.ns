@@ -1,0 +1,11 @@
+mod cpu Main {
+  fn apply(x: i64, f: Fn1<i64, i64>) -> i64 {
+    return f(x);
+  }
+
+  fn main() -> i64 {
+    return apply(6, |x: i64| -> i64 {
+      return x + 1;
+    });
+  }
+}

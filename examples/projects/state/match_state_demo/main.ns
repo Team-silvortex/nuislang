@@ -1,0 +1,16 @@
+mod cpu Main {
+  fn main() -> i64 {
+    let state: i64 = 1;
+    match state {
+      0 => {
+        return 0;
+      },
+      1 => {
+        return 7;
+      },
+      _ => {
+        return 9;
+      }
+    }
+  }
+}

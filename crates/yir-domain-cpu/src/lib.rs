@@ -1703,9 +1703,19 @@ impl RegisteredMod for CpuMod {
                 }
                 Ok(Value::Int(lhs % rhs))
             }
-            "eq" => Ok(Value::Int(
-                (state.expect_int(&node.op.args[0])? == state.expect_int(&node.op.args[1])?) as i64,
-            )),
+            "eq" => {
+                if let (Ok(lhs), Ok(rhs)) = (
+                    state.expect_int(&node.op.args[0]),
+                    state.expect_int(&node.op.args[1]),
+                ) {
+                    Ok(Value::Int((lhs == rhs) as i64))
+                } else {
+                    Ok(Value::Int(
+                        (state.expect_bool(&node.op.args[0])?
+                            == state.expect_bool(&node.op.args[1])?) as i64,
+                    ))
+                }
+            }
             "eq_i32" => Ok(Value::Bool(
                 state.expect_i32(&node.op.args[0])? == state.expect_i32(&node.op.args[1])?,
             )),
@@ -1715,9 +1725,19 @@ impl RegisteredMod for CpuMod {
             "eq_f64" => Ok(Value::Bool(
                 state.expect_f64(&node.op.args[0])? == state.expect_f64(&node.op.args[1])?,
             )),
-            "ne" => Ok(Value::Int(
-                (state.expect_int(&node.op.args[0])? != state.expect_int(&node.op.args[1])?) as i64,
-            )),
+            "ne" => {
+                if let (Ok(lhs), Ok(rhs)) = (
+                    state.expect_int(&node.op.args[0]),
+                    state.expect_int(&node.op.args[1]),
+                ) {
+                    Ok(Value::Int((lhs != rhs) as i64))
+                } else {
+                    Ok(Value::Int(
+                        (state.expect_bool(&node.op.args[0])?
+                            != state.expect_bool(&node.op.args[1])?) as i64,
+                    ))
+                }
+            }
             "lt" => Ok(Value::Int(
                 (state.expect_int(&node.op.args[0])? < state.expect_int(&node.op.args[1])?) as i64,
             )),

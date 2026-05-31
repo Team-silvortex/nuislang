@@ -1,0 +1,3 @@
+name = "bool_match_branching_while_demo"
+version = "0.1.0"
+entry = "main.ns"

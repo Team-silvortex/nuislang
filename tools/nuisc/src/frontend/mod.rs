@@ -4,11 +4,12 @@ mod parser;
 use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{
-    AstAttributeValue, AstBinaryOp, AstConstItem, AstExpr, AstFunction, AstImplDef, AstModule,
-    AstParam, AstStmt, AstStructDef, AstStructField, AstTypeAlias, AstTypeRef, AstVisibility,
-    NirAnnotation, NirAttributeArg, NirAttributeValue, NirBinaryOp, NirConstItem, NirDataFlowState,
-    NirExpr, NirExternFunction, NirExternInterface, NirFunction, NirGenericParam, NirImplDef,
-    NirImplMethod, NirKernelAxis, NirKernelFlowState, NirKernelMapOp, NirKernelZipOp, NirModule,
+    nir_expr_effect_class, AstAttributeValue, AstBinaryOp, AstConstItem, AstExpr, AstFunction,
+    AstImplDef, AstMatchArm, AstMatchPattern, AstModule, AstParam, AstStmt, AstStructDef,
+    AstStructField, AstTypeAlias, AstTypeRef, AstVisibility, NirAnnotation, NirAttributeArg,
+    NirAttributeValue, NirBinaryOp, NirConstItem, NirDataFlowState, NirExpr, NirExprEffectClass,
+    NirExternFunction, NirExternInterface, NirFunction, NirGenericParam, NirImplDef, NirImplMethod,
+    NirKernelAxis, NirKernelFlowState, NirKernelMapOp, NirKernelZipOp, NirModule,
     NirNetworkFlowState, NirParam, NirResultFamily, NirResultStage, NirShaderFlowState, NirStmt,
     NirStructDef, NirStructField, NirTraitDef, NirTraitMethodSig, NirTypeAlias, NirTypeRef, NirUse,
     NirVisibility, NirWindowMode,
@@ -43,6 +44,20 @@ pub fn lower_project_ast_to_nir(
     module: &AstModule,
     local_modules: &[AstModule],
 ) -> Result<NirModule, String> {
+    let expanded_module = expand_module_lambdas(module)?;
+    let local_cpu_helpers = expanded_module
+        .uses
+        .iter()
+        .filter(|item| item.domain == expanded_module.domain)
+        .filter_map(|item| {
+            local_modules
+                .iter()
+                .find(|candidate| candidate.domain == item.domain && candidate.unit == item.unit)
+        })
+        .collect::<Vec<_>>();
+    let visible_type_aliases = build_visible_type_alias_map(&expanded_module, &local_cpu_helpers)?;
+    let expanded_module = expand_higher_order_functions(&expanded_module, &visible_type_aliases)?;
+    let module = &expanded_module;
     validate_export_annotations(module)?;
     validate_extern_host_symbols(module)?;
     validate_host_symbol_bridge_annotations(module)?;
@@ -55,17 +70,6 @@ pub fn lower_project_ast_to_nir(
     for function in &module.functions {
         validate_function_annotations(function)?;
     }
-    let local_cpu_helpers = module
-        .uses
-        .iter()
-        .filter(|item| item.domain == module.domain)
-        .filter_map(|item| {
-            local_modules
-                .iter()
-                .find(|candidate| candidate.domain == item.domain && candidate.unit == item.unit)
-        })
-        .collect::<Vec<_>>();
-    let visible_type_aliases = build_visible_type_alias_map(module, &local_cpu_helpers)?;
 
     let struct_defs = module
         .structs
@@ -652,6 +656,1541 @@ pub fn lower_project_ast_to_nir(
     Ok(nir)
 }
 
+fn expand_module_lambdas(module: &AstModule) -> Result<AstModule, String> {
+    let module_const_names = module
+        .consts
+        .iter()
+        .map(|constant| constant.name.clone())
+        .collect::<BTreeSet<_>>();
+    let mut expanded = module.clone();
+    expanded.functions.clear();
+    for function in &module.functions {
+        let (rewritten, synthesized) = expand_function_lambdas(function, &module_const_names)?;
+        expanded.functions.extend(synthesized);
+        expanded.functions.push(rewritten);
+    }
+    Ok(expanded)
+}
+
+fn expand_function_lambdas(
+    function: &AstFunction,
+    module_const_names: &BTreeSet<String>,
+) -> Result<(AstFunction, Vec<AstFunction>), String> {
+    let mut counter = 0usize;
+    let mut synthesized = Vec::new();
+    let visible_locals = function
+        .params
+        .iter()
+        .map(|param| param.name.clone())
+        .collect::<BTreeSet<_>>();
+    let body = expand_lambda_block(
+        &function.body,
+        &BTreeMap::new(),
+        &visible_locals,
+        module_const_names,
+        &function.name,
+        &mut counter,
+        &mut synthesized,
+    )?;
+    let mut rewritten = function.clone();
+    rewritten.body = body;
+    Ok((rewritten, synthesized))
+}
+
+fn synthesize_lambda_function(
+    params: &[AstParam],
+    return_type: &Option<AstTypeRef>,
+    body: &[AstStmt],
+    lambda_aliases: &BTreeMap<String, String>,
+    outer_locals: &BTreeSet<String>,
+    module_const_names: &BTreeSet<String>,
+    owning_function_name: &str,
+    counter: &mut usize,
+    synthesized: &mut Vec<AstFunction>,
+) -> Result<String, String> {
+    let Some(lambda_return_type) = return_type.clone() else {
+        return Err("inline lambda currently requires an explicit return type".to_owned());
+    };
+    let mut lambda_locals = params
+        .iter()
+        .map(|param| param.name.clone())
+        .collect::<BTreeSet<_>>();
+    validate_lambda_block_no_capture(body, &mut lambda_locals, outer_locals)?;
+    let synthesized_name = format!("__lambda_{}_{}", owning_function_name, *counter);
+    *counter += 1;
+    let lambda_body = expand_lambda_block(
+        body,
+        lambda_aliases,
+        &params
+            .iter()
+            .map(|param| param.name.clone())
+            .collect::<BTreeSet<_>>(),
+        module_const_names,
+        owning_function_name,
+        counter,
+        synthesized,
+    )?;
+    synthesized.push(AstFunction {
+        visibility: AstVisibility::Private,
+        name: synthesized_name.clone(),
+        attributes: Vec::new(),
+        test_name: None,
+        test_ignored: false,
+        test_should_fail: false,
+        test_reason: None,
+        test_timeout_ms: None,
+        test_clock_domain: None,
+        test_clock_policy: None,
+        is_async: false,
+        generic_params: Vec::new(),
+        params: params.to_vec(),
+        return_type: Some(lambda_return_type),
+        body: lambda_body,
+    });
+    Ok(synthesized_name)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn expand_lambda_block(
+    body: &[AstStmt],
+    lambda_aliases: &BTreeMap<String, String>,
+    visible_locals: &BTreeSet<String>,
+    module_const_names: &BTreeSet<String>,
+    owning_function_name: &str,
+    counter: &mut usize,
+    synthesized: &mut Vec<AstFunction>,
+) -> Result<Vec<AstStmt>, String> {
+    let mut aliases = lambda_aliases.clone();
+    let mut locals = visible_locals.clone();
+    let mut rewritten = Vec::new();
+    for stmt in body {
+        match stmt {
+            AstStmt::Let {
+                name,
+                ty,
+                value:
+                    AstExpr::Lambda {
+                        params,
+                        return_type,
+                        body,
+                    },
+            } => {
+                if ty.is_some() {
+                    return Err(format!(
+                        "lambda binding `{name}` currently does not support an explicit type annotation"
+                    ));
+                }
+                let synthesized_name = synthesize_lambda_function(
+                    params,
+                    return_type,
+                    body,
+                    &aliases,
+                    &locals,
+                    module_const_names,
+                    owning_function_name,
+                    counter,
+                    synthesized,
+                )
+                .map_err(|error| {
+                    if error == "inline lambda currently requires an explicit return type" {
+                        format!("lambda binding `{name}` currently requires an explicit return type")
+                    } else {
+                        error
+                    }
+                })?;
+                aliases.insert(name.clone(), synthesized_name);
+                locals.insert(name.clone());
+            }
+            AstStmt::Let { name, ty, value } => {
+                let rewritten_value = rewrite_lambda_expr(
+                    value,
+                    &aliases,
+                    &locals,
+                    module_const_names,
+                    owning_function_name,
+                    counter,
+                    synthesized,
+                )?;
+                rewritten.push(AstStmt::Let {
+                    name: name.clone(),
+                    ty: ty.clone(),
+                    value: rewritten_value,
+                });
+                aliases.remove(name);
+                locals.insert(name.clone());
+            }
+            AstStmt::Const { name, ty, value } => {
+                let rewritten_value = rewrite_lambda_expr(
+                    value,
+                    &aliases,
+                    &locals,
+                    module_const_names,
+                    owning_function_name,
+                    counter,
+                    synthesized,
+                )?;
+                rewritten.push(AstStmt::Const {
+                    name: name.clone(),
+                    ty: ty.clone(),
+                    value: rewritten_value,
+                });
+                aliases.remove(name);
+                locals.insert(name.clone());
+            }
+            AstStmt::Print(value) => rewritten.push(AstStmt::Print(rewrite_lambda_expr(
+                value,
+                &aliases,
+                &locals,
+                module_const_names,
+                owning_function_name,
+                counter,
+                synthesized,
+            )?)),
+            AstStmt::Await(value) => rewritten.push(AstStmt::Await(rewrite_lambda_expr(
+                value,
+                &aliases,
+                &locals,
+                module_const_names,
+                owning_function_name,
+                counter,
+                synthesized,
+            )?)),
+            AstStmt::If {
+                condition,
+                then_body,
+                else_body,
+            } => rewritten.push(AstStmt::If {
+                condition: rewrite_lambda_expr(
+                    condition,
+                    &aliases,
+                    &locals,
+                    module_const_names,
+                    owning_function_name,
+                    counter,
+                    synthesized,
+                )?,
+                then_body: expand_lambda_block(
+                    then_body,
+                    &aliases,
+                    &locals,
+                    module_const_names,
+                    owning_function_name,
+                    counter,
+                    synthesized,
+                )?,
+                else_body: expand_lambda_block(
+                    else_body,
+                    &aliases,
+                    &locals,
+                    module_const_names,
+                    owning_function_name,
+                    counter,
+                    synthesized,
+                )?,
+            }),
+            AstStmt::Match { value, arms } => rewritten.push(AstStmt::Match {
+                value: rewrite_lambda_expr(
+                    value,
+                    &aliases,
+                    &locals,
+                    module_const_names,
+                    owning_function_name,
+                    counter,
+                    synthesized,
+                )?,
+                arms: arms
+                    .iter()
+                    .map(|arm| {
+                        Ok(AstMatchArm {
+                            pattern: arm.pattern.clone(),
+                            body: expand_lambda_block(
+                                &arm.body,
+                                &aliases,
+                                &locals,
+                                module_const_names,
+                                owning_function_name,
+                                counter,
+                                synthesized,
+                            )?,
+                        })
+                    })
+                    .collect::<Result<Vec<_>, String>>()?,
+            }),
+            AstStmt::While { condition, body } => rewritten.push(AstStmt::While {
+                condition: rewrite_lambda_expr(
+                    condition,
+                    &aliases,
+                    &locals,
+                    module_const_names,
+                    owning_function_name,
+                    counter,
+                    synthesized,
+                )?,
+                body: expand_lambda_block(
+                    body,
+                    &aliases,
+                    &locals,
+                    module_const_names,
+                    owning_function_name,
+                    counter,
+                    synthesized,
+                )?,
+            }),
+            AstStmt::Expr(expr) => rewritten.push(AstStmt::Expr(rewrite_lambda_expr(
+                expr,
+                &aliases,
+                &locals,
+                module_const_names,
+                owning_function_name,
+                counter,
+                synthesized,
+            )?)),
+            AstStmt::Return(value) => rewritten.push(AstStmt::Return(match value {
+                Some(value) => Some(rewrite_lambda_expr(
+                    value,
+                    &aliases,
+                    &locals,
+                    module_const_names,
+                    owning_function_name,
+                    counter,
+                    synthesized,
+                )?),
+                None => None,
+            })),
+            AstStmt::Break => rewritten.push(AstStmt::Break),
+            AstStmt::Continue => rewritten.push(AstStmt::Continue),
+        }
+    }
+    Ok(rewritten)
+}
+
+fn validate_lambda_block_no_capture(
+    body: &[AstStmt],
+    visible_locals: &mut BTreeSet<String>,
+    outer_locals: &BTreeSet<String>,
+) -> Result<(), String> {
+    for stmt in body {
+        match stmt {
+            AstStmt::Let { name, value, .. } => {
+                validate_lambda_expr_no_capture(value, visible_locals, outer_locals)?;
+                visible_locals.insert(name.clone());
+            }
+            AstStmt::Const { name, value, .. } => {
+                validate_lambda_expr_no_capture(value, visible_locals, outer_locals)?;
+                visible_locals.insert(name.clone());
+            }
+            AstStmt::Print(value) | AstStmt::Await(value) | AstStmt::Expr(value) => {
+                validate_lambda_expr_no_capture(value, visible_locals, outer_locals)?;
+            }
+            AstStmt::If {
+                condition,
+                then_body,
+                else_body,
+            } => {
+                validate_lambda_expr_no_capture(condition, visible_locals, outer_locals)?;
+                let mut then_locals = visible_locals.clone();
+                let mut else_locals = visible_locals.clone();
+                validate_lambda_block_no_capture(then_body, &mut then_locals, outer_locals)?;
+                validate_lambda_block_no_capture(else_body, &mut else_locals, outer_locals)?;
+            }
+            AstStmt::Match { value, arms } => {
+                validate_lambda_expr_no_capture(value, visible_locals, outer_locals)?;
+                for arm in arms {
+                    let mut arm_locals = visible_locals.clone();
+                    validate_lambda_block_no_capture(&arm.body, &mut arm_locals, outer_locals)?;
+                }
+            }
+            AstStmt::While { condition, body } => {
+                validate_lambda_expr_no_capture(condition, visible_locals, outer_locals)?;
+                let mut loop_locals = visible_locals.clone();
+                validate_lambda_block_no_capture(body, &mut loop_locals, outer_locals)?;
+            }
+            AstStmt::Return(Some(value)) => {
+                validate_lambda_expr_no_capture(value, visible_locals, outer_locals)?;
+            }
+            AstStmt::Return(None) | AstStmt::Break | AstStmt::Continue => {}
+        }
+    }
+    Ok(())
+}
+
+fn validate_lambda_expr_no_capture(
+    expr: &AstExpr,
+    visible_locals: &BTreeSet<String>,
+    outer_locals: &BTreeSet<String>,
+) -> Result<(), String> {
+    match expr {
+        AstExpr::Var(name) if outer_locals.contains(name) && !visible_locals.contains(name) => {
+            Err(format!(
+                "lambda currently does not support capturing outer local `{name}`"
+            ))
+        }
+        AstExpr::Lambda { .. } => Err(
+            "nested or inline lambdas are not supported in the current MVP; bind lambdas with `let name = |...| -> ... { ... };` only"
+                .to_owned(),
+        ),
+        AstExpr::Await(value) => {
+            validate_lambda_expr_no_capture(value, visible_locals, outer_locals)
+        }
+        AstExpr::Invoke { callee, args } => {
+            validate_lambda_expr_no_capture(callee, visible_locals, outer_locals)?;
+            for arg in args {
+                validate_lambda_expr_no_capture(arg, visible_locals, outer_locals)?;
+            }
+            Ok(())
+        }
+        AstExpr::Call { args, .. } => {
+            for arg in args {
+                validate_lambda_expr_no_capture(arg, visible_locals, outer_locals)?;
+            }
+            Ok(())
+        }
+        AstExpr::MethodCall { receiver, args, .. } => {
+            validate_lambda_expr_no_capture(receiver, visible_locals, outer_locals)?;
+            for arg in args {
+                validate_lambda_expr_no_capture(arg, visible_locals, outer_locals)?;
+            }
+            Ok(())
+        }
+        AstExpr::StructLiteral { fields, .. } => {
+            for (_, value) in fields {
+                validate_lambda_expr_no_capture(value, visible_locals, outer_locals)?;
+            }
+            Ok(())
+        }
+        AstExpr::FieldAccess { base, .. } => {
+            validate_lambda_expr_no_capture(base, visible_locals, outer_locals)
+        }
+        AstExpr::Binary { lhs, rhs, .. } => {
+            validate_lambda_expr_no_capture(lhs, visible_locals, outer_locals)?;
+            validate_lambda_expr_no_capture(rhs, visible_locals, outer_locals)
+        }
+        AstExpr::Bool(_)
+        | AstExpr::Text(_)
+        | AstExpr::Int(_)
+        | AstExpr::Var(_)
+        | AstExpr::Instantiate { .. } => Ok(()),
+    }
+}
+
+fn rewrite_lambda_expr(
+    expr: &AstExpr,
+    lambda_aliases: &BTreeMap<String, String>,
+    visible_locals: &BTreeSet<String>,
+    module_const_names: &BTreeSet<String>,
+    owning_function_name: &str,
+    counter: &mut usize,
+    synthesized: &mut Vec<AstFunction>,
+) -> Result<AstExpr, String> {
+    Ok(match expr {
+        AstExpr::Var(name) if lambda_aliases.contains_key(name) && !module_const_names.contains(name) => {
+            AstExpr::Var(lambda_aliases.get(name).cloned().unwrap_or_else(|| name.clone()))
+        }
+        AstExpr::Lambda { .. } => {
+            let AstExpr::Lambda {
+                params,
+                return_type,
+                body,
+            } = expr
+            else {
+                unreachable!();
+            };
+            let synthesized_name = synthesize_lambda_function(
+                params,
+                return_type,
+                body,
+                lambda_aliases,
+                visible_locals,
+                module_const_names,
+                owning_function_name,
+                counter,
+                synthesized,
+            )?;
+            AstExpr::Var(synthesized_name)
+        }
+        AstExpr::Await(value) => AstExpr::Await(Box::new(rewrite_lambda_expr(
+            value,
+            lambda_aliases,
+            visible_locals,
+            module_const_names,
+            owning_function_name,
+            counter,
+            synthesized,
+        )?)),
+        AstExpr::Invoke { callee, args } => {
+            let rewritten_args = args
+                .iter()
+                .map(|arg| {
+                    rewrite_lambda_expr(
+                        arg,
+                        lambda_aliases,
+                        visible_locals,
+                        module_const_names,
+                        owning_function_name,
+                        counter,
+                        synthesized,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            match callee.as_ref() {
+                AstExpr::Lambda {
+                    params,
+                    return_type,
+                    body,
+                } => {
+                    let synthesized_name = synthesize_lambda_function(
+                        params,
+                        return_type,
+                        body,
+                        lambda_aliases,
+                        visible_locals,
+                        module_const_names,
+                        owning_function_name,
+                        counter,
+                        synthesized,
+                    )?;
+                    AstExpr::Call {
+                        callee: synthesized_name,
+                        args: rewritten_args,
+                    }
+                }
+                AstExpr::Var(name) => AstExpr::Call {
+                    callee: lambda_aliases
+                        .get(name)
+                        .cloned()
+                        .unwrap_or_else(|| name.clone()),
+                    args: rewritten_args,
+                },
+                _ => {
+                    return Err(
+                        "only immediate no-capture lambda invocation and named function invocation are supported in the current MVP"
+                            .to_owned(),
+                    )
+                }
+            }
+        }
+        AstExpr::Call { callee, args } => AstExpr::Call {
+            callee: lambda_aliases
+                .get(callee)
+                .cloned()
+                .unwrap_or_else(|| callee.clone()),
+            args: args
+                .iter()
+                .map(|arg| {
+                    rewrite_lambda_expr(
+                        arg,
+                        lambda_aliases,
+                        visible_locals,
+                        module_const_names,
+                        owning_function_name,
+                        counter,
+                        synthesized,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+        },
+        AstExpr::MethodCall {
+            receiver,
+            method,
+            args,
+        } => AstExpr::MethodCall {
+            receiver: Box::new(rewrite_lambda_expr(
+                receiver,
+                lambda_aliases,
+                visible_locals,
+                module_const_names,
+                owning_function_name,
+                counter,
+                synthesized,
+            )?),
+            method: method.clone(),
+            args: args
+                .iter()
+                .map(|arg| {
+                    rewrite_lambda_expr(
+                        arg,
+                        lambda_aliases,
+                        visible_locals,
+                        module_const_names,
+                        owning_function_name,
+                        counter,
+                        synthesized,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+        },
+        AstExpr::StructLiteral { type_name, fields } => AstExpr::StructLiteral {
+            type_name: type_name.clone(),
+            fields: fields
+                .iter()
+                .map(|(name, value)| {
+                    Ok((
+                        name.clone(),
+                        rewrite_lambda_expr(
+                            value,
+                            lambda_aliases,
+                            visible_locals,
+                            module_const_names,
+                            owning_function_name,
+                            counter,
+                            synthesized,
+                        )?,
+                    ))
+                })
+                .collect::<Result<Vec<_>, String>>()?,
+        },
+        AstExpr::FieldAccess { base, field } => AstExpr::FieldAccess {
+            base: Box::new(rewrite_lambda_expr(
+                base,
+                lambda_aliases,
+                visible_locals,
+                module_const_names,
+                owning_function_name,
+                counter,
+                synthesized,
+            )?),
+            field: field.clone(),
+        },
+        AstExpr::Binary { op, lhs, rhs } => AstExpr::Binary {
+            op: *op,
+            lhs: Box::new(rewrite_lambda_expr(
+                lhs,
+                lambda_aliases,
+                visible_locals,
+                module_const_names,
+                owning_function_name,
+                counter,
+                synthesized,
+            )?),
+            rhs: Box::new(rewrite_lambda_expr(
+                rhs,
+                lambda_aliases,
+                visible_locals,
+                module_const_names,
+                owning_function_name,
+                counter,
+                synthesized,
+            )?),
+        },
+        AstExpr::Bool(_)
+        | AstExpr::Text(_)
+        | AstExpr::Int(_)
+        | AstExpr::Var(_)
+        | AstExpr::Instantiate { .. } => expr.clone(),
+    })
+}
+
+fn is_fn1_type(ty: &AstTypeRef) -> bool {
+    ty.name == "Fn1" && ty.generic_args.len() == 2 && !ty.is_optional && !ty.is_ref
+}
+
+fn sanitize_symbol_fragment(name: &str) -> String {
+    name.chars()
+        .map(|ch| match ch {
+            'a'..='z' | 'A'..='Z' | '0'..='9' => ch,
+            _ => '_',
+        })
+        .collect()
+}
+
+fn function_type_matches_fn1(
+    callable: &AstFunction,
+    expected: &AstTypeRef,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+) -> Result<bool, String> {
+    if !is_fn1_type(expected) {
+        return Ok(false);
+    }
+    if callable.params.len() != 1 {
+        return Ok(false);
+    }
+    let Some(callable_return_type) = &callable.return_type else {
+        return Ok(false);
+    };
+    let expected_arg =
+        lower_type_ref_with_aliases(&expected.generic_args[0], visible_type_aliases)?;
+    let expected_return =
+        lower_type_ref_with_aliases(&expected.generic_args[1], visible_type_aliases)?;
+    let callable_arg =
+        lower_type_ref_with_aliases(&callable.params[0].ty, visible_type_aliases)?;
+    let callable_return =
+        lower_type_ref_with_aliases(callable_return_type, visible_type_aliases)?;
+    Ok(callable_arg == expected_arg && callable_return == expected_return)
+}
+
+fn expand_higher_order_functions(
+    module: &AstModule,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+) -> Result<AstModule, String> {
+    let templates = module
+        .functions
+        .iter()
+        .filter(|function| function.params.iter().any(|param| is_fn1_type(&param.ty)))
+        .map(|function| (function.name.clone(), function.clone()))
+        .collect::<BTreeMap<_, _>>();
+    if templates.is_empty() {
+        return Ok(module.clone());
+    }
+
+    let function_table = module
+        .functions
+        .iter()
+        .map(|function| (function.name.clone(), function.clone()))
+        .collect::<BTreeMap<_, _>>();
+
+    let mut expanded = module.clone();
+    expanded.functions.clear();
+    let mut specialized_cache = BTreeSet::new();
+    let mut specialized_functions = Vec::new();
+
+    for function in &module.functions {
+        if templates.contains_key(&function.name) {
+            continue;
+        }
+        expanded.functions.push(rewrite_higher_order_calls_in_function(
+            function,
+            &templates,
+            &function_table,
+            visible_type_aliases,
+            &mut specialized_cache,
+            &mut specialized_functions,
+        )?);
+    }
+    expanded.functions.extend(specialized_functions);
+    Ok(expanded)
+}
+
+fn rewrite_higher_order_calls_in_function(
+    function: &AstFunction,
+    templates: &BTreeMap<String, AstFunction>,
+    function_table: &BTreeMap<String, AstFunction>,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+    specialized_cache: &mut BTreeSet<String>,
+    specialized_functions: &mut Vec<AstFunction>,
+) -> Result<AstFunction, String> {
+    let body = rewrite_higher_order_calls_in_block(
+        &function.body,
+        templates,
+        function_table,
+        visible_type_aliases,
+        specialized_cache,
+        specialized_functions,
+    )?;
+    let mut rewritten = function.clone();
+    rewritten.body = body;
+    Ok(rewritten)
+}
+
+fn rewrite_higher_order_calls_in_block(
+    body: &[AstStmt],
+    templates: &BTreeMap<String, AstFunction>,
+    function_table: &BTreeMap<String, AstFunction>,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+    specialized_cache: &mut BTreeSet<String>,
+    specialized_functions: &mut Vec<AstFunction>,
+) -> Result<Vec<AstStmt>, String> {
+    body.iter()
+        .map(|stmt| {
+            rewrite_higher_order_calls_in_stmt(
+                stmt,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )
+        })
+        .collect()
+}
+
+fn rewrite_higher_order_calls_in_stmt(
+    stmt: &AstStmt,
+    templates: &BTreeMap<String, AstFunction>,
+    function_table: &BTreeMap<String, AstFunction>,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+    specialized_cache: &mut BTreeSet<String>,
+    specialized_functions: &mut Vec<AstFunction>,
+) -> Result<AstStmt, String> {
+    Ok(match stmt {
+        AstStmt::Let { name, ty, value } => AstStmt::Let {
+            name: name.clone(),
+            ty: ty.clone(),
+            value: rewrite_higher_order_calls_in_expr(
+                value,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?,
+        },
+        AstStmt::Const { name, ty, value } => AstStmt::Const {
+            name: name.clone(),
+            ty: ty.clone(),
+            value: rewrite_higher_order_calls_in_expr(
+                value,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?,
+        },
+        AstStmt::Print(value) => AstStmt::Print(rewrite_higher_order_calls_in_expr(
+            value,
+            templates,
+            function_table,
+            visible_type_aliases,
+            specialized_cache,
+            specialized_functions,
+        )?),
+        AstStmt::Await(value) => AstStmt::Await(rewrite_higher_order_calls_in_expr(
+            value,
+            templates,
+            function_table,
+            visible_type_aliases,
+            specialized_cache,
+            specialized_functions,
+        )?),
+        AstStmt::If {
+            condition,
+            then_body,
+            else_body,
+        } => AstStmt::If {
+            condition: rewrite_higher_order_calls_in_expr(
+                condition,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?,
+            then_body: rewrite_higher_order_calls_in_block(
+                then_body,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?,
+            else_body: rewrite_higher_order_calls_in_block(
+                else_body,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?,
+        },
+        AstStmt::Match { value, arms } => AstStmt::Match {
+            value: rewrite_higher_order_calls_in_expr(
+                value,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?,
+            arms: arms
+                .iter()
+                .map(|arm| {
+                    Ok(AstMatchArm {
+                        pattern: arm.pattern.clone(),
+                        body: rewrite_higher_order_calls_in_block(
+                            &arm.body,
+                            templates,
+                            function_table,
+                            visible_type_aliases,
+                            specialized_cache,
+                            specialized_functions,
+                        )?,
+                    })
+                })
+                .collect::<Result<Vec<_>, String>>()?,
+        },
+        AstStmt::While { condition, body } => AstStmt::While {
+            condition: rewrite_higher_order_calls_in_expr(
+                condition,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?,
+            body: rewrite_higher_order_calls_in_block(
+                body,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?,
+        },
+        AstStmt::Expr(expr) => AstStmt::Expr(rewrite_higher_order_calls_in_expr(
+            expr,
+            templates,
+            function_table,
+            visible_type_aliases,
+            specialized_cache,
+            specialized_functions,
+        )?),
+        AstStmt::Return(Some(value)) => AstStmt::Return(Some(rewrite_higher_order_calls_in_expr(
+            value,
+            templates,
+            function_table,
+            visible_type_aliases,
+            specialized_cache,
+            specialized_functions,
+        )?)),
+        AstStmt::Return(None) => AstStmt::Return(None),
+        AstStmt::Break => AstStmt::Break,
+        AstStmt::Continue => AstStmt::Continue,
+    })
+}
+
+fn rewrite_higher_order_calls_in_expr(
+    expr: &AstExpr,
+    templates: &BTreeMap<String, AstFunction>,
+    function_table: &BTreeMap<String, AstFunction>,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+    specialized_cache: &mut BTreeSet<String>,
+    specialized_functions: &mut Vec<AstFunction>,
+) -> Result<AstExpr, String> {
+    Ok(match expr {
+        AstExpr::Call { callee, args } if templates.contains_key(callee) => {
+            specialize_higher_order_call(
+                callee,
+                args,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?
+        }
+        AstExpr::Await(value) => AstExpr::Await(Box::new(rewrite_higher_order_calls_in_expr(
+            value,
+            templates,
+            function_table,
+            visible_type_aliases,
+            specialized_cache,
+            specialized_functions,
+        )?)),
+        AstExpr::Call { callee, args } => AstExpr::Call {
+            callee: callee.clone(),
+            args: args
+                .iter()
+                .map(|arg| {
+                    rewrite_higher_order_calls_in_expr(
+                        arg,
+                        templates,
+                        function_table,
+                        visible_type_aliases,
+                        specialized_cache,
+                        specialized_functions,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+        },
+        AstExpr::Invoke { callee, args } => AstExpr::Invoke {
+            callee: Box::new(rewrite_higher_order_calls_in_expr(
+                callee,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?),
+            args: args
+                .iter()
+                .map(|arg| {
+                    rewrite_higher_order_calls_in_expr(
+                        arg,
+                        templates,
+                        function_table,
+                        visible_type_aliases,
+                        specialized_cache,
+                        specialized_functions,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+        },
+        AstExpr::MethodCall {
+            receiver,
+            method,
+            args,
+        } => AstExpr::MethodCall {
+            receiver: Box::new(rewrite_higher_order_calls_in_expr(
+                receiver,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?),
+            method: method.clone(),
+            args: args
+                .iter()
+                .map(|arg| {
+                    rewrite_higher_order_calls_in_expr(
+                        arg,
+                        templates,
+                        function_table,
+                        visible_type_aliases,
+                        specialized_cache,
+                        specialized_functions,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+        },
+        AstExpr::StructLiteral { type_name, fields } => AstExpr::StructLiteral {
+            type_name: type_name.clone(),
+            fields: fields
+                .iter()
+                .map(|(name, value)| {
+                    Ok((
+                        name.clone(),
+                        rewrite_higher_order_calls_in_expr(
+                            value,
+                            templates,
+                            function_table,
+                            visible_type_aliases,
+                            specialized_cache,
+                            specialized_functions,
+                        )?,
+                    ))
+                })
+                .collect::<Result<Vec<_>, String>>()?,
+        },
+        AstExpr::FieldAccess { base, field } => AstExpr::FieldAccess {
+            base: Box::new(rewrite_higher_order_calls_in_expr(
+                base,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?),
+            field: field.clone(),
+        },
+        AstExpr::Binary { op, lhs, rhs } => AstExpr::Binary {
+            op: *op,
+            lhs: Box::new(rewrite_higher_order_calls_in_expr(
+                lhs,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?),
+            rhs: Box::new(rewrite_higher_order_calls_in_expr(
+                rhs,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?),
+        },
+        _ => expr.clone(),
+    })
+}
+
+fn specialize_higher_order_call(
+    callee: &str,
+    args: &[AstExpr],
+    templates: &BTreeMap<String, AstFunction>,
+    function_table: &BTreeMap<String, AstFunction>,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+    specialized_cache: &mut BTreeSet<String>,
+    specialized_functions: &mut Vec<AstFunction>,
+) -> Result<AstExpr, String> {
+    let template = templates
+        .get(callee)
+        .ok_or_else(|| format!("unknown higher-order template `{callee}`"))?;
+    if template.params.len() != args.len() {
+        return Err(format!(
+            "function `{}` expects {} args, found {}",
+            callee,
+            template.params.len(),
+            args.len()
+        ));
+    }
+
+    let mut callable_bindings = BTreeMap::<String, String>::new();
+    let mut ordinary_args = Vec::new();
+    let mut callable_fragments = Vec::new();
+
+    for (param, arg) in template.params.iter().zip(args) {
+        let rewritten_arg = rewrite_higher_order_calls_in_expr(
+            arg,
+            templates,
+            function_table,
+            visible_type_aliases,
+            specialized_cache,
+            specialized_functions,
+        )?;
+        if is_fn1_type(&param.ty) {
+            let AstExpr::Var(callable_name) = &rewritten_arg else {
+                return Err(format!(
+                    "higher-order parameter `{}` currently expects a no-capture lambda or named function symbol",
+                    param.name
+                ));
+            };
+            let callable = function_table.get(callable_name).ok_or_else(|| {
+                format!(
+                    "higher-order parameter `{}` references unknown callable `{}`",
+                    param.name, callable_name
+                )
+            })?;
+            if !function_type_matches_fn1(callable, &param.ty, visible_type_aliases)? {
+                return Err(format!(
+                    "callable `{}` does not match higher-order parameter `{}` of type `{}`",
+                    callable_name,
+                    param.name,
+                    param.ty.name
+                ));
+            }
+            callable_bindings.insert(param.name.clone(), callable_name.clone());
+            callable_fragments.push(sanitize_symbol_fragment(callable_name));
+        } else {
+            ordinary_args.push(rewritten_arg);
+        }
+    }
+
+    let specialized_name = format!(
+        "__hof_{}_{}",
+        callee,
+        callable_fragments.join("__")
+    );
+    if specialized_cache.insert(specialized_name.clone()) {
+        let specialized = specialize_higher_order_template(
+            template,
+            &specialized_name,
+            &callable_bindings,
+            templates,
+            function_table,
+            visible_type_aliases,
+            specialized_cache,
+            specialized_functions,
+        )?;
+        specialized_functions.push(specialized.clone());
+    }
+
+    Ok(AstExpr::Call {
+        callee: specialized_name,
+        args: ordinary_args,
+    })
+}
+
+fn specialize_higher_order_template(
+    template: &AstFunction,
+    specialized_name: &str,
+    callable_bindings: &BTreeMap<String, String>,
+    templates: &BTreeMap<String, AstFunction>,
+    function_table: &BTreeMap<String, AstFunction>,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+    specialized_cache: &mut BTreeSet<String>,
+    specialized_functions: &mut Vec<AstFunction>,
+) -> Result<AstFunction, String> {
+    let body = rewrite_higher_order_template_block(
+        &template.body,
+        callable_bindings,
+        templates,
+        function_table,
+        visible_type_aliases,
+        specialized_cache,
+        specialized_functions,
+    )?;
+    Ok(AstFunction {
+        name: specialized_name.to_owned(),
+        visibility: AstVisibility::Private,
+        attributes: Vec::new(),
+        test_name: None,
+        test_ignored: false,
+        test_should_fail: false,
+        test_reason: None,
+        test_timeout_ms: None,
+        test_clock_domain: None,
+        test_clock_policy: None,
+        is_async: template.is_async,
+        generic_params: Vec::new(),
+        params: template
+            .params
+            .iter()
+            .filter(|param| !is_fn1_type(&param.ty))
+            .cloned()
+            .collect(),
+        return_type: template.return_type.clone(),
+        body,
+    })
+}
+
+fn rewrite_higher_order_template_block(
+    body: &[AstStmt],
+    callable_bindings: &BTreeMap<String, String>,
+    templates: &BTreeMap<String, AstFunction>,
+    function_table: &BTreeMap<String, AstFunction>,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+    specialized_cache: &mut BTreeSet<String>,
+    specialized_functions: &mut Vec<AstFunction>,
+) -> Result<Vec<AstStmt>, String> {
+    body.iter()
+        .map(|stmt| {
+            rewrite_higher_order_template_stmt(
+                stmt,
+                callable_bindings,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )
+        })
+        .collect()
+}
+
+fn rewrite_higher_order_template_stmt(
+    stmt: &AstStmt,
+    callable_bindings: &BTreeMap<String, String>,
+    templates: &BTreeMap<String, AstFunction>,
+    function_table: &BTreeMap<String, AstFunction>,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+    specialized_cache: &mut BTreeSet<String>,
+    specialized_functions: &mut Vec<AstFunction>,
+) -> Result<AstStmt, String> {
+    Ok(match stmt {
+        AstStmt::Let { name, ty, value } => AstStmt::Let {
+            name: name.clone(),
+            ty: ty.clone(),
+            value: rewrite_higher_order_template_expr(
+                value,
+                callable_bindings,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?,
+        },
+        AstStmt::Const { name, ty, value } => AstStmt::Const {
+            name: name.clone(),
+            ty: ty.clone(),
+            value: rewrite_higher_order_template_expr(
+                value,
+                callable_bindings,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?,
+        },
+        AstStmt::Print(value) => AstStmt::Print(rewrite_higher_order_template_expr(
+            value,
+            callable_bindings,
+            templates,
+            function_table,
+            visible_type_aliases,
+            specialized_cache,
+            specialized_functions,
+        )?),
+        AstStmt::Await(value) => AstStmt::Await(rewrite_higher_order_template_expr(
+            value,
+            callable_bindings,
+            templates,
+            function_table,
+            visible_type_aliases,
+            specialized_cache,
+            specialized_functions,
+        )?),
+        AstStmt::If {
+            condition,
+            then_body,
+            else_body,
+        } => AstStmt::If {
+            condition: rewrite_higher_order_template_expr(
+                condition,
+                callable_bindings,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?,
+            then_body: rewrite_higher_order_template_block(
+                then_body,
+                callable_bindings,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?,
+            else_body: rewrite_higher_order_template_block(
+                else_body,
+                callable_bindings,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?,
+        },
+        AstStmt::Match { value, arms } => AstStmt::Match {
+            value: rewrite_higher_order_template_expr(
+                value,
+                callable_bindings,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?,
+            arms: arms
+                .iter()
+                .map(|arm| {
+                    Ok(AstMatchArm {
+                        pattern: arm.pattern.clone(),
+                        body: rewrite_higher_order_template_block(
+                            &arm.body,
+                            callable_bindings,
+                            templates,
+                            function_table,
+                            visible_type_aliases,
+                            specialized_cache,
+                            specialized_functions,
+                        )?,
+                    })
+                })
+                .collect::<Result<Vec<_>, String>>()?,
+        },
+        AstStmt::While { condition, body } => AstStmt::While {
+            condition: rewrite_higher_order_template_expr(
+                condition,
+                callable_bindings,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?,
+            body: rewrite_higher_order_template_block(
+                body,
+                callable_bindings,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?,
+        },
+        AstStmt::Expr(expr) => AstStmt::Expr(rewrite_higher_order_template_expr(
+            expr,
+            callable_bindings,
+            templates,
+            function_table,
+            visible_type_aliases,
+            specialized_cache,
+            specialized_functions,
+        )?),
+        AstStmt::Return(Some(value)) => AstStmt::Return(Some(rewrite_higher_order_template_expr(
+            value,
+            callable_bindings,
+            templates,
+            function_table,
+            visible_type_aliases,
+            specialized_cache,
+            specialized_functions,
+        )?)),
+        AstStmt::Return(None) => AstStmt::Return(None),
+        AstStmt::Break => AstStmt::Break,
+        AstStmt::Continue => AstStmt::Continue,
+    })
+}
+
+fn rewrite_higher_order_template_expr(
+    expr: &AstExpr,
+    callable_bindings: &BTreeMap<String, String>,
+    templates: &BTreeMap<String, AstFunction>,
+    function_table: &BTreeMap<String, AstFunction>,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+    specialized_cache: &mut BTreeSet<String>,
+    specialized_functions: &mut Vec<AstFunction>,
+) -> Result<AstExpr, String> {
+    Ok(match expr {
+        AstExpr::Var(name) if callable_bindings.contains_key(name) => {
+            return Err(format!(
+                "higher-order function parameter `{name}` can currently only be used in direct call position"
+            ))
+        }
+        AstExpr::Call { callee, args } if callable_bindings.contains_key(callee) => AstExpr::Call {
+            callee: callable_bindings
+                .get(callee)
+                .cloned()
+                .unwrap_or_else(|| callee.clone()),
+            args: args
+                .iter()
+                .map(|arg| {
+                    rewrite_higher_order_template_expr(
+                        arg,
+                        callable_bindings,
+                        templates,
+                        function_table,
+                        visible_type_aliases,
+                        specialized_cache,
+                        specialized_functions,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+        },
+        AstExpr::Call { callee, args } if templates.contains_key(callee) => specialize_higher_order_call(
+            callee,
+            args,
+            templates,
+            function_table,
+            visible_type_aliases,
+            specialized_cache,
+            specialized_functions,
+        )?,
+        AstExpr::Await(value) => AstExpr::Await(Box::new(rewrite_higher_order_template_expr(
+            value,
+            callable_bindings,
+            templates,
+            function_table,
+            visible_type_aliases,
+            specialized_cache,
+            specialized_functions,
+        )?)),
+        AstExpr::Call { callee, args } => AstExpr::Call {
+            callee: callee.clone(),
+            args: args
+                .iter()
+                .map(|arg| {
+                    rewrite_higher_order_template_expr(
+                        arg,
+                        callable_bindings,
+                        templates,
+                        function_table,
+                        visible_type_aliases,
+                        specialized_cache,
+                        specialized_functions,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+        },
+        AstExpr::Invoke { callee, args } => AstExpr::Invoke {
+            callee: Box::new(rewrite_higher_order_template_expr(
+                callee,
+                callable_bindings,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?),
+            args: args
+                .iter()
+                .map(|arg| {
+                    rewrite_higher_order_template_expr(
+                        arg,
+                        callable_bindings,
+                        templates,
+                        function_table,
+                        visible_type_aliases,
+                        specialized_cache,
+                        specialized_functions,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+        },
+        AstExpr::MethodCall {
+            receiver,
+            method,
+            args,
+        } => AstExpr::MethodCall {
+            receiver: Box::new(rewrite_higher_order_template_expr(
+                receiver,
+                callable_bindings,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?),
+            method: method.clone(),
+            args: args
+                .iter()
+                .map(|arg| {
+                    rewrite_higher_order_template_expr(
+                        arg,
+                        callable_bindings,
+                        templates,
+                        function_table,
+                        visible_type_aliases,
+                        specialized_cache,
+                        specialized_functions,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+        },
+        AstExpr::StructLiteral { type_name, fields } => AstExpr::StructLiteral {
+            type_name: type_name.clone(),
+            fields: fields
+                .iter()
+                .map(|(name, value)| {
+                    Ok((
+                        name.clone(),
+                        rewrite_higher_order_template_expr(
+                            value,
+                            callable_bindings,
+                            templates,
+                            function_table,
+                            visible_type_aliases,
+                            specialized_cache,
+                            specialized_functions,
+                        )?,
+                    ))
+                })
+                .collect::<Result<Vec<_>, String>>()?,
+        },
+        AstExpr::FieldAccess { base, field } => AstExpr::FieldAccess {
+            base: Box::new(rewrite_higher_order_template_expr(
+                base,
+                callable_bindings,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?),
+            field: field.clone(),
+        },
+        AstExpr::Binary { op, lhs, rhs } => AstExpr::Binary {
+            op: *op,
+            lhs: Box::new(rewrite_higher_order_template_expr(
+                lhs,
+                callable_bindings,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?),
+            rhs: Box::new(rewrite_higher_order_template_expr(
+                rhs,
+                callable_bindings,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?),
+        },
+        _ => expr.clone(),
+    })
+}
+
 pub fn parse_nuis_module(input: &str) -> Result<NirModule, String> {
     let ast = parse_nuis_ast(input)?;
     lower_ast_to_nir(&ast)
@@ -961,6 +2500,7 @@ fn validate_const_item(constant: &AstConstItem) -> Result<(), String> {
 fn validate_const_safe_expr(expr: &AstExpr) -> Result<(), &'static str> {
     match expr {
         AstExpr::Bool(_) | AstExpr::Text(_) | AstExpr::Int(_) | AstExpr::Var(_) => Ok(()),
+        AstExpr::Lambda { .. } => Err("lambda expressions are not const-safe"),
         AstExpr::Binary { lhs, rhs, .. } => {
             validate_const_safe_expr(lhs)?;
             validate_const_safe_expr(rhs)
@@ -974,7 +2514,7 @@ fn validate_const_safe_expr(expr: &AstExpr) -> Result<(), &'static str> {
         AstExpr::FieldAccess { base, .. } => validate_const_safe_expr(base),
         AstExpr::Await(_) => Err("`await` is not const-safe"),
         AstExpr::Instantiate { .. } => Err("`instantiate` is not const-safe"),
-        AstExpr::Call { .. } | AstExpr::MethodCall { .. } => {
+        AstExpr::Call { .. } | AstExpr::Invoke { .. } | AstExpr::MethodCall { .. } => {
             Err("calls are not const-safe in the current MVP")
         }
     }
@@ -2165,6 +3705,32 @@ fn rewrite_generic_calls_in_stmt(
                 )?,
             }
         }
+        AstStmt::Match { value, arms } => AstStmt::Match {
+            value: rewrite_generic_calls_in_expr(
+                value,
+                None,
+                env,
+                generic_templates,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                specialization_cache,
+                specialized_functions,
+                specialized_signatures,
+            )?,
+            arms: rewrite_generic_calls_in_match_arms(
+                arms,
+                current_return_type,
+                env,
+                generic_templates,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                specialization_cache,
+                specialized_functions,
+                specialized_signatures,
+            )?,
+        },
         AstStmt::While { condition, body } => {
             let rewritten_condition = rewrite_generic_calls_in_expr(
                 condition,
@@ -2225,6 +3791,41 @@ fn rewrite_generic_calls_in_stmt(
         AstStmt::Break => AstStmt::Break,
         AstStmt::Continue => AstStmt::Continue,
     })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn rewrite_generic_calls_in_match_arms(
+    arms: &[AstMatchArm],
+    current_return_type: Option<&AstTypeRef>,
+    env: &BTreeMap<String, AstTypeRef>,
+    generic_templates: &BTreeMap<String, AstFunction>,
+    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
+    struct_table: &BTreeMap<String, AstStructDef>,
+    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
+    specialization_cache: &mut BTreeSet<String>,
+    specialized_functions: &mut Vec<AstFunction>,
+    specialized_signatures: &mut Vec<(String, FunctionSignature)>,
+) -> Result<Vec<AstMatchArm>, String> {
+    let mut rewritten = Vec::with_capacity(arms.len());
+    for arm in arms {
+        let mut arm_env = env.clone();
+        rewritten.push(AstMatchArm {
+            pattern: arm.pattern.clone(),
+            body: rewrite_generic_calls_in_block(
+                &arm.body,
+                current_return_type,
+                &mut arm_env,
+                generic_templates,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                specialization_cache,
+                specialized_functions,
+                specialized_signatures,
+            )?,
+        });
+    }
+    Ok(rewritten)
 }
 
 fn rewrite_generic_calls_in_expr(
@@ -2657,6 +4258,18 @@ fn specialize_stmt_types(
                     then_body: specialize_stmt_types(then_body, substitutions)?,
                     else_body: specialize_stmt_types(else_body, substitutions)?,
                 },
+                AstStmt::Match { value, arms } => AstStmt::Match {
+                    value: value.clone(),
+                    arms: arms
+                        .iter()
+                        .map(|arm| {
+                            Ok(AstMatchArm {
+                                pattern: arm.pattern.clone(),
+                                body: specialize_stmt_types(&arm.body, substitutions)?,
+                            })
+                        })
+                        .collect::<Result<Vec<_>, String>>()?,
+                },
                 AstStmt::While { condition, body } => AstStmt::While {
                     condition: condition.clone(),
                     body: specialize_stmt_types(body, substitutions)?,
@@ -2760,6 +4373,8 @@ fn infer_ast_expr_type_inner(
         AstExpr::Text(_) => Some(ast_named_type("Text")),
         AstExpr::Int(_) => Some(ast_named_type("i64")),
         AstExpr::Var(name) => env.get(name).cloned(),
+        AstExpr::Lambda { .. } => None,
+        AstExpr::Invoke { .. } => None,
         AstExpr::Await(value) => infer_ast_expr_type_inner(
             value,
             env,
@@ -3238,6 +4853,18 @@ fn lower_stmt_with_async(
                     .collect::<Result<Vec<_>, _>>()?,
             }
         }
+        AstStmt::Match { value, arms } => lower_match_stmt_with_async(
+            value,
+            arms,
+            current_domain,
+            current_function_is_async,
+            bindings,
+            module_consts,
+            return_type,
+            type_aliases,
+            signatures,
+            struct_table,
+        )?,
         AstStmt::While { condition, body } => {
             let mut loop_bindings = bindings.clone();
             NirStmt::While {
@@ -3306,6 +4933,156 @@ fn lower_stmt_with_async(
             })
         }
     })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_match_stmt_with_async(
+    value: &AstExpr,
+    arms: &[AstMatchArm],
+    current_domain: &str,
+    current_function_is_async: bool,
+    bindings: &mut BTreeMap<String, NirTypeRef>,
+    module_consts: &BTreeMap<String, ModuleConstValue>,
+    return_type: Option<&AstTypeRef>,
+    type_aliases: &BTreeMap<String, AstTypeAlias>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> Result<NirStmt, String> {
+    if arms.is_empty() {
+        return Err("`match` requires at least one arm".to_owned());
+    }
+    let lowered_value = lower_expr_with_async(
+        value,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+        None,
+        false,
+    )?;
+    match nir_expr_effect_class(&lowered_value) {
+        NirExprEffectClass::Pure | NirExprEffectClass::LocalReadOnly => {}
+        _ => {
+            return Err(
+                "minimal `match` currently requires a pure or local-read-only scrutinee".to_owned(),
+            )
+        }
+    }
+    let Some(value_ty) = infer_nir_expr_type(&lowered_value, bindings, signatures, struct_table)
+    else {
+        return Err("could not infer scrutinee type for `match`".to_owned());
+    };
+    let value_kind = value_ty.scalar_kind().ok_or_else(|| {
+        "minimal `match` currently only supports `bool` and `i64` scrutinees".to_owned()
+    })?;
+    let wildcard_index = arms
+        .iter()
+        .position(|arm| matches!(arm.pattern, AstMatchPattern::Wildcard))
+        .ok_or_else(|| "minimal `match` currently requires a final `_` arm".to_owned())?;
+    if wildcard_index != arms.len() - 1 {
+        return Err("minimal `match` currently requires `_` to be the final arm".to_owned());
+    }
+
+    let mut wildcard_bindings = bindings.clone();
+    let mut else_body = arms[wildcard_index]
+        .body
+        .iter()
+        .map(|stmt| {
+            lower_stmt_with_async(
+                stmt,
+                current_domain,
+                current_function_is_async,
+                &mut wildcard_bindings,
+                module_consts,
+                return_type,
+                type_aliases,
+                signatures,
+                struct_table,
+            )
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    for arm in arms[..wildcard_index].iter().rev() {
+        let condition = match (&arm.pattern, value_kind) {
+            (AstMatchPattern::Bool(true), nuis_semantics::model::NirScalarKind::Bool) => {
+                lowered_value.clone()
+            }
+            (AstMatchPattern::Bool(false), nuis_semantics::model::NirScalarKind::Bool) => {
+                let mut then_bindings = bindings.clone();
+                let else_body_for_false = arm
+                    .body
+                    .iter()
+                    .map(|stmt| {
+                        lower_stmt_with_async(
+                            stmt,
+                            current_domain,
+                            current_function_is_async,
+                            &mut then_bindings,
+                            module_consts,
+                            return_type,
+                            type_aliases,
+                            signatures,
+                            struct_table,
+                        )
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                else_body = vec![NirStmt::If {
+                    condition: lowered_value.clone(),
+                    then_body: else_body,
+                    else_body: else_body_for_false,
+                }];
+                continue;
+            }
+            (AstMatchPattern::Int(value), nuis_semantics::model::NirScalarKind::I64) => {
+                NirExpr::Binary {
+                    op: NirBinaryOp::Eq,
+                    lhs: Box::new(lowered_value.clone()),
+                    rhs: Box::new(NirExpr::Int(*value)),
+                }
+            }
+            (AstMatchPattern::Bool(_), _) => {
+                return Err(
+                    "`match` arm pattern `true`/`false` requires a `bool` scrutinee".to_owned(),
+                )
+            }
+            (AstMatchPattern::Int(_), _) => {
+                return Err(
+                    "minimal `match` integer patterns require an `i64` scrutinee".to_owned(),
+                )
+            }
+            (AstMatchPattern::Wildcard, _) => unreachable!("wildcard handled separately"),
+        };
+        let mut then_bindings = bindings.clone();
+        let then_body = arm
+            .body
+            .iter()
+            .map(|stmt| {
+                lower_stmt_with_async(
+                    stmt,
+                    current_domain,
+                    current_function_is_async,
+                    &mut then_bindings,
+                    module_consts,
+                    return_type,
+                    type_aliases,
+                    signatures,
+                    struct_table,
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        else_body = vec![NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+        }];
+    }
+
+    else_body
+        .into_iter()
+        .next()
+        .ok_or_else(|| "internal error: lowered empty `match` body".to_owned())
 }
 
 fn lower_expr(
@@ -3389,11 +5166,27 @@ fn lower_expr_with_async(
         AstExpr::Bool(value) => NirExpr::Bool(*value),
         AstExpr::Text(text) => NirExpr::Text(text.clone()),
         AstExpr::Int(value) => NirExpr::Int(*value),
+        AstExpr::Lambda { .. } => {
+            return Err(
+                "internal frontend error: lambda expression should have been expanded before NIR lowering"
+                    .to_owned(),
+            )
+        }
+        AstExpr::Invoke { .. } => {
+            return Err(
+                "internal frontend error: invoke expression should have been rewritten before NIR lowering"
+                    .to_owned(),
+            )
+        }
         AstExpr::Var(name) => {
             if let Some(constant) = module_consts.get(name) {
                 constant.value.clone()
             } else if bindings.contains_key(name) {
                 NirExpr::Var(name.clone())
+            } else if signatures.contains_key(name) {
+                return Err(format!(
+                    "function symbol `{name}` cannot currently be used as a first-class value; pass it only to `Fn1<...>` higher-order parameters or invoke it directly"
+                ));
             } else {
                 return Err(format!("unknown value `{name}`"));
             }
@@ -3769,12 +5562,28 @@ fn binary_result_type(
             }
             Ok(lhs.clone())
         }
-        AstBinaryOp::Eq
-        | AstBinaryOp::Ne
-        | AstBinaryOp::Lt
-        | AstBinaryOp::Le
-        | AstBinaryOp::Gt
-        | AstBinaryOp::Ge => {
+        AstBinaryOp::Eq | AstBinaryOp::Ne => {
+            if !compatible_types(lhs, rhs) {
+                return Err(format!(
+                    "binary `{}` expects matching operand types, found `{}` and `{}`",
+                    render_binary_op(op),
+                    lhs.render(),
+                    rhs.render()
+                ));
+            }
+            if !((lhs.is_integer_scalar() && rhs.is_integer_scalar())
+                || (lhs.is_bool_scalar() && rhs.is_bool_scalar()))
+            {
+                return Err(format!(
+                    "binary `{}` currently expects integer or bool scalar operands, found `{}` and `{}`",
+                    render_binary_op(op),
+                    lhs.render(),
+                    rhs.render()
+                ));
+            }
+            Ok(bool_type())
+        }
+        AstBinaryOp::Lt | AstBinaryOp::Le | AstBinaryOp::Gt | AstBinaryOp::Ge => {
             if !compatible_types(lhs, rhs) {
                 return Err(format!(
                     "binary `{}` expects matching operand types, found `{}` and `{}`",
@@ -16355,13 +18164,37 @@ fn infer_nir_expr_type(
             let base_ty = infer_nir_expr_type(base, bindings, signatures, struct_table)?;
             struct_field_type(&base_ty, field, struct_table)
         }
-        NirExpr::Binary { lhs, rhs, .. } => {
+        NirExpr::Binary { op, lhs, rhs } => {
             let lhs_ty = infer_nir_expr_type(lhs, bindings, signatures, struct_table)?;
             let rhs_ty = infer_nir_expr_type(rhs, bindings, signatures, struct_table)?;
-            if compatible_types(&lhs_ty, &rhs_ty) && lhs_ty.is_numeric_scalar() {
-                Some(lhs_ty)
-            } else {
-                None
+            match op {
+                NirBinaryOp::Add | NirBinaryOp::Sub | NirBinaryOp::Mul | NirBinaryOp::Div => {
+                    if compatible_types(&lhs_ty, &rhs_ty) && lhs_ty.is_numeric_scalar() {
+                        Some(lhs_ty)
+                    } else {
+                        None
+                    }
+                }
+                NirBinaryOp::Eq | NirBinaryOp::Ne => {
+                    if compatible_types(&lhs_ty, &rhs_ty)
+                        && ((lhs_ty.is_integer_scalar() && rhs_ty.is_integer_scalar())
+                            || (lhs_ty.is_bool_scalar() && rhs_ty.is_bool_scalar()))
+                    {
+                        Some(bool_type())
+                    } else {
+                        None
+                    }
+                }
+                NirBinaryOp::Lt | NirBinaryOp::Le | NirBinaryOp::Gt | NirBinaryOp::Ge => {
+                    if compatible_types(&lhs_ty, &rhs_ty)
+                        && lhs_ty.is_integer_scalar()
+                        && rhs_ty.is_integer_scalar()
+                    {
+                        Some(bool_type())
+                    } else {
+                        None
+                    }
+                }
             }
         }
     }
@@ -17594,8 +19427,9 @@ mod tests {
     use super::parse_nuis_ast;
     use super::parse_nuis_module;
     use nuis_semantics::model::{
-        AstVisibility, NirDataFlowState, NirExpr, NirKernelFlowState, NirShaderFlowState, NirStmt,
-        NirVisibility, TestClockDomain, TestClockPolicy,
+        AstExpr, AstStmt, AstVisibility, NirBinaryOp, NirDataFlowState, NirExpr,
+        NirKernelFlowState, NirShaderFlowState, NirStmt, NirVisibility, TestClockDomain,
+        TestClockPolicy,
     };
 
     #[test]
@@ -24349,5 +26183,566 @@ mod tests {
             },
             other => panic!("expected if statement, found {other:?}"),
         }
+    }
+
+    #[test]
+    fn lowers_integer_match_into_nested_ifs() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let value: i64 = 1;
+                match value {
+                  0 => { return 0; },
+                  1 => { return 7; },
+                  _ => { return 9; }
+                }
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        match &function.body[1] {
+            NirStmt::If {
+                condition,
+                then_body,
+                else_body,
+            } => {
+                match condition {
+                    NirExpr::Binary { op, rhs, .. } => {
+                        assert_eq!(*op, NirBinaryOp::Eq);
+                        assert!(matches!(rhs.as_ref(), NirExpr::Int(0)));
+                    }
+                    other => panic!("expected equality condition, found {other:?}"),
+                }
+                assert!(matches!(
+                    then_body.as_slice(),
+                    [NirStmt::Return(Some(NirExpr::Int(0)))]
+                ));
+                match else_body.as_slice() {
+                    [NirStmt::If {
+                        condition,
+                        then_body,
+                        else_body,
+                    }] => {
+                        match condition {
+                            NirExpr::Binary { op, rhs, .. } => {
+                                assert_eq!(*op, NirBinaryOp::Eq);
+                                assert!(matches!(rhs.as_ref(), NirExpr::Int(1)));
+                            }
+                            other => panic!("expected nested equality condition, found {other:?}"),
+                        }
+                        assert!(matches!(
+                            then_body.as_slice(),
+                            [NirStmt::Return(Some(NirExpr::Int(7)))]
+                        ));
+                        assert!(matches!(
+                            else_body.as_slice(),
+                            [NirStmt::Return(Some(NirExpr::Int(9)))]
+                        ));
+                    }
+                    other => panic!("expected nested if in match fallback, found {other:?}"),
+                }
+            }
+            other => panic!("expected lowered match as if statement, found {other:?}"),
+        }
+    }
+
+    #[test]
+    fn rejects_match_without_final_wildcard_arm() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let value: i64 = 1;
+                match value {
+                  0 => { return 0; },
+                  1 => { return 1; }
+                }
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("requires a final `_` arm"));
+    }
+
+    #[test]
+    fn rejects_match_on_non_scalar_scrutinee() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                match "hello" {
+                  0 => { return 1; },
+                  _ => { return 0; }
+                }
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("integer patterns require an `i64` scrutinee"));
+    }
+
+    #[test]
+    fn lowers_match_inside_while_body_into_nested_if() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let state: i64 = 1;
+                while state > 0 {
+                  match state {
+                    1 => { return 7; },
+                    _ => { return 9; }
+                  }
+                }
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        match &function.body[1] {
+            NirStmt::While { body, .. } => match body.as_slice() {
+                [NirStmt::If {
+                    condition,
+                    then_body,
+                    else_body,
+                }] => {
+                    match condition {
+                        NirExpr::Binary { op, rhs, .. } => {
+                            assert_eq!(*op, NirBinaryOp::Eq);
+                            assert!(matches!(rhs.as_ref(), NirExpr::Int(1)));
+                        }
+                        other => {
+                            panic!("expected equality condition in lowered match, found {other:?}")
+                        }
+                    }
+                    assert!(matches!(
+                        then_body.as_slice(),
+                        [NirStmt::Return(Some(NirExpr::Int(7)))]
+                    ));
+                    assert!(matches!(
+                        else_body.as_slice(),
+                        [NirStmt::Return(Some(NirExpr::Int(9)))]
+                    ));
+                }
+                other => panic!("expected lowered match if in while body, found {other:?}"),
+            },
+            other => panic!("expected while statement, found {other:?}"),
+        }
+    }
+
+    #[test]
+    fn lowers_expression_scrutinee_match_inside_while_into_nested_if() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let state: i64 = 2;
+                while state > 0 {
+                  match state + 1 {
+                    3 => { return 7; },
+                    _ => { return 9; }
+                  }
+                }
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        match &function.body[1] {
+            NirStmt::While { body, .. } => match body.as_slice() {
+                [NirStmt::If {
+                    condition,
+                    then_body,
+                    else_body,
+                }] => {
+                    match condition {
+                        NirExpr::Binary { op, lhs, rhs } => {
+                            assert_eq!(*op, NirBinaryOp::Eq);
+                            assert!(matches!(rhs.as_ref(), NirExpr::Int(3)));
+                            assert!(matches!(
+                                lhs.as_ref(),
+                                NirExpr::Binary {
+                                    op: NirBinaryOp::Add,
+                                    ..
+                                }
+                            ));
+                        }
+                        other => panic!(
+                            "expected equality against expression scrutinee in lowered match, found {other:?}"
+                        ),
+                    }
+                    assert!(matches!(
+                        then_body.as_slice(),
+                        [NirStmt::Return(Some(NirExpr::Int(7)))]
+                    ));
+                    assert!(matches!(
+                        else_body.as_slice(),
+                        [NirStmt::Return(Some(NirExpr::Int(9)))]
+                    ));
+                }
+                other => panic!("expected lowered match if in while body, found {other:?}"),
+            },
+            other => panic!("expected while statement, found {other:?}"),
+        }
+    }
+
+    #[test]
+    fn lowers_bool_match_inside_while_into_nested_if() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let state: i64 = 2;
+                while state > 0 {
+                  match state > 1 {
+                    true => { return 7; },
+                    _ => { return 9; }
+                  }
+                }
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        match &function.body[1] {
+            NirStmt::While { body, .. } => match body.as_slice() {
+                [NirStmt::If {
+                    condition,
+                    then_body,
+                    else_body,
+                }] => {
+                    match condition {
+                        NirExpr::Binary { op: NirBinaryOp::Gt, .. } => {}
+                        other => panic!(
+                            "expected direct bool expression scrutinee in lowered match, found {other:?}"
+                        ),
+                    }
+                    assert!(matches!(
+                        then_body.as_slice(),
+                        [NirStmt::Return(Some(NirExpr::Int(7)))]
+                    ));
+                    assert!(matches!(
+                        else_body.as_slice(),
+                        [NirStmt::Return(Some(NirExpr::Int(9)))]
+                    ));
+                }
+                other => panic!("expected lowered bool match if in while body, found {other:?}"),
+            },
+            other => panic!("expected while statement, found {other:?}"),
+        }
+    }
+
+    #[test]
+    fn lowers_multi_arm_match_inside_while_into_nested_if_chain() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let state: i64 = 2;
+                while state > 0 {
+                  match state {
+                    1 => { return 7; },
+                    2 => { return 8; },
+                    _ => { return 9; }
+                  }
+                }
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        match &function.body[1] {
+            NirStmt::While { body, .. } => match body.as_slice() {
+                [NirStmt::If {
+                    condition,
+                    then_body,
+                    else_body,
+                }] => {
+                    match condition {
+                        NirExpr::Binary { op, rhs, .. } => {
+                            assert_eq!(*op, NirBinaryOp::Eq);
+                            assert!(matches!(rhs.as_ref(), NirExpr::Int(1)));
+                        }
+                        other => panic!(
+                            "expected first equality arm in lowered multi-arm match, found {other:?}"
+                        ),
+                    }
+                    assert!(matches!(
+                        then_body.as_slice(),
+                        [NirStmt::Return(Some(NirExpr::Int(7)))]
+                    ));
+                    match else_body.as_slice() {
+                        [NirStmt::If {
+                            condition,
+                            then_body,
+                            else_body,
+                        }] => {
+                            match condition {
+                                NirExpr::Binary { op, rhs, .. } => {
+                                    assert_eq!(*op, NirBinaryOp::Eq);
+                                    assert!(matches!(rhs.as_ref(), NirExpr::Int(2)));
+                                }
+                                other => panic!(
+                                    "expected second equality arm in lowered multi-arm match, found {other:?}"
+                                ),
+                            }
+                            assert!(matches!(
+                                then_body.as_slice(),
+                                [NirStmt::Return(Some(NirExpr::Int(8)))]
+                            ));
+                            assert!(matches!(
+                                else_body.as_slice(),
+                                [NirStmt::Return(Some(NirExpr::Int(9)))]
+                            ));
+                        }
+                        other => panic!(
+                            "expected nested if for second arm in lowered multi-arm match, found {other:?}"
+                        ),
+                    }
+                }
+                other => {
+                    panic!("expected lowered multi-arm match if in while body, found {other:?}")
+                }
+            },
+            other => panic!("expected while statement, found {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_lambda_expr_in_ast() {
+        let ast = parse_nuis_ast(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let inc = |x: i64| -> i64 { return x + 1; };
+                return inc(6);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = ast
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        match &function.body[0] {
+            AstStmt::Let {
+                value:
+                    AstExpr::Lambda {
+                        params,
+                        return_type,
+                        body,
+                    },
+                ..
+            } => {
+                assert_eq!(params.len(), 1);
+                assert_eq!(params[0].name, "x");
+                assert_eq!(params[0].ty.name, "i64");
+                assert_eq!(return_type.as_ref().unwrap().name, "i64");
+                assert!(matches!(
+                    body.as_slice(),
+                    [AstStmt::Return(Some(AstExpr::Binary { .. }))]
+                ));
+            }
+            other => panic!("expected lambda in let binding, found {other:?}"),
+        }
+    }
+
+    #[test]
+    fn lowers_no_capture_lambda_binding_into_private_synth_function() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let inc = |x: i64| -> i64 { return x + 1; };
+                return inc(6);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(module.functions.len(), 2);
+        let lambda = module
+            .functions
+            .iter()
+            .find(|function| function.name.starts_with("__lambda_main_"))
+            .expect("expected synthesized lambda function");
+        assert!(matches!(lambda.visibility, NirVisibility::Private));
+        assert_eq!(lambda.params.len(), 1);
+        assert_eq!(lambda.params[0].name, "x");
+
+        let main = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            main.body.as_slice(),
+            [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+                if callee == &lambda.name && matches!(args.as_slice(), [NirExpr::Int(6)])
+        ));
+    }
+
+    #[test]
+    fn lowers_immediate_no_capture_lambda_invocation_into_private_synth_function() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                return (|x: i64| -> i64 { return x + 1; })(6);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(module.functions.len(), 2);
+        let lambda = module
+            .functions
+            .iter()
+            .find(|function| function.name.starts_with("__lambda_main_"))
+            .expect("expected synthesized lambda function");
+        let main = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            main.body.as_slice(),
+            [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+                if callee == &lambda.name && matches!(args.as_slice(), [NirExpr::Int(6)])
+        ));
+    }
+
+    #[test]
+    fn rejects_lambda_capture_of_outer_local() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let seed: i64 = 6;
+                let inc = |x: i64| -> i64 { return x + seed; };
+                return inc(1);
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(
+            error.contains("lambda currently does not support capturing outer local `seed`"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn rejects_calling_non_lambda_expression_value_in_invoke_form() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                return (1 + 2)(3);
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(
+            error.contains(
+                "only immediate no-capture lambda invocation and named function invocation are supported in the current MVP"
+            ),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn lowers_no_capture_lambda_passed_to_named_fn1_function() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn apply(x: i64, f: Fn1<i64, i64>) -> i64 {
+                return f(x);
+              }
+
+              fn main() -> i64 {
+                return apply(6, |x: i64| -> i64 { return x + 1; });
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let lambda = module
+            .functions
+            .iter()
+            .find(|function| function.name.starts_with("__lambda_main_"))
+            .expect("expected synthesized lambda function");
+        let specialized = module
+            .functions
+            .iter()
+            .find(|function| function.name.starts_with("__hof_apply_"))
+            .expect("expected synthesized higher-order specialization");
+        assert_eq!(specialized.params.len(), 1);
+        assert_eq!(specialized.params[0].name, "x");
+        assert!(matches!(
+            specialized.body.as_slice(),
+            [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+                if callee == &lambda.name && matches!(args.as_slice(), [NirExpr::Var(name)] if name == "x")
+        ));
+
+        let main = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            main.body.as_slice(),
+            [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+                if callee == &specialized.name && matches!(args.as_slice(), [NirExpr::Int(6)])
+        ));
     }
 }
