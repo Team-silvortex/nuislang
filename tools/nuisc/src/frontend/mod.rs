@@ -3035,7 +3035,12 @@ fn infer_ast_expr_type_inner(
                 .map(|field| field.ty.clone())
         }
         AstExpr::Binary { op, lhs, rhs } => match op {
-            AstBinaryOp::Eq | AstBinaryOp::Lt | AstBinaryOp::Gt => Some(ast_named_type("bool")),
+            AstBinaryOp::Eq
+            | AstBinaryOp::Ne
+            | AstBinaryOp::Lt
+            | AstBinaryOp::Le
+            | AstBinaryOp::Gt
+            | AstBinaryOp::Ge => Some(ast_named_type("bool")),
             AstBinaryOp::Add | AstBinaryOp::Sub | AstBinaryOp::Mul | AstBinaryOp::Div => {
                 let lhs_ty = infer_ast_expr_type_inner(
                     lhs,
@@ -3728,8 +3733,11 @@ fn lower_binary_expr_with_async(
             AstBinaryOp::Mul => NirBinaryOp::Mul,
             AstBinaryOp::Div => NirBinaryOp::Div,
             AstBinaryOp::Eq => NirBinaryOp::Eq,
+            AstBinaryOp::Ne => NirBinaryOp::Ne,
             AstBinaryOp::Lt => NirBinaryOp::Lt,
+            AstBinaryOp::Le => NirBinaryOp::Le,
             AstBinaryOp::Gt => NirBinaryOp::Gt,
+            AstBinaryOp::Ge => NirBinaryOp::Ge,
         },
         lhs: Box::new(lowered_lhs),
         rhs: Box::new(lowered_rhs),
@@ -3761,7 +3769,12 @@ fn binary_result_type(
             }
             Ok(lhs.clone())
         }
-        AstBinaryOp::Eq | AstBinaryOp::Lt | AstBinaryOp::Gt => {
+        AstBinaryOp::Eq
+        | AstBinaryOp::Ne
+        | AstBinaryOp::Lt
+        | AstBinaryOp::Le
+        | AstBinaryOp::Gt
+        | AstBinaryOp::Ge => {
             if !compatible_types(lhs, rhs) {
                 return Err(format!(
                     "binary `{}` expects matching operand types, found `{}` and `{}`",
@@ -3790,8 +3803,11 @@ fn render_binary_op(op: AstBinaryOp) -> &'static str {
         AstBinaryOp::Mul => "*",
         AstBinaryOp::Div => "/",
         AstBinaryOp::Eq => "==",
+        AstBinaryOp::Ne => "!=",
         AstBinaryOp::Lt => "<",
+        AstBinaryOp::Le => "<=",
         AstBinaryOp::Gt => ">",
+        AstBinaryOp::Ge => ">=",
     }
 }
 

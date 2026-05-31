@@ -300,8 +300,11 @@ pub enum AstBinaryOp {
     Mul,
     Div,
     Eq,
+    Ne,
     Lt,
+    Le,
     Gt,
+    Ge,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1473,8 +1476,11 @@ pub enum NirBinaryOp {
     Mul,
     Div,
     Eq,
+    Ne,
     Lt,
+    Le,
     Gt,
+    Ge,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -1467,6 +1467,8 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 body.push(format!("  {current} = load i64, ptr {loop_slot}"));
                 let cmp = fresh_reg(&mut next_reg);
                 let pred = match cmp_kind {
+                    "eq" => "eq",
+                    "ne" => "ne",
                     "lt" => "slt",
                     "le" => "sle",
                     "gt" => "sgt",
@@ -1587,6 +1589,8 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 body.push(format!("  {current} = load i64, ptr {current_slot}"));
                 let cmp = fresh_reg(&mut next_reg);
                 let pred = match cmp_kind {
+                    "eq" => "eq",
+                    "ne" => "ne",
                     "lt" => "slt",
                     "le" => "sle",
                     "gt" => "sgt",
@@ -1807,6 +1811,8 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 body.push(format!("  {current} = load i64, ptr {current_slot}"));
                 let cmp = fresh_reg(&mut next_reg);
                 let pred = match cmp_kind {
+                    "eq" => "eq",
+                    "ne" => "ne",
                     "lt" => "slt",
                     "le" => "sle",
                     "gt" => "sgt",
@@ -1905,7 +1911,15 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                     let next_carry = if cond_kind == "always" {
                         then_value
                     } else {
-                        let lhs = if cond_kind == "current_lt" || cond_kind == "current_gt" {
+                        let lhs = if matches!(
+                            cond_kind.as_str(),
+                            "current_eq"
+                                | "current_ne"
+                                | "current_lt"
+                                | "current_le"
+                                | "current_gt"
+                                | "current_ge"
+                        ) {
                             next_current.clone()
                         } else if let Some(rest) = cond_kind.strip_prefix("carry") {
                             let (index_text, suffix) = rest.split_once('_').ok_or_else(|| {
@@ -1920,7 +1934,13 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                                     node.name
                                 )
                             })?;
-                            if suffix != "lt" && suffix != "gt" {
+                            if suffix != "eq"
+                                && suffix != "ne"
+                                && suffix != "lt"
+                                && suffix != "le"
+                                && suffix != "gt"
+                                && suffix != "ge"
+                            {
                                 return Err(format!(
                                     "cpu.loop_while_i64_cond_chain `{}` has unsupported conditional carry kind `{cond_kind}` during LLVM lowering",
                                     node.name
@@ -1944,10 +1964,18 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                                 node.name
                             )
                         })?;
-                        let cond_pred = if cond_kind.ends_with("_lt") || cond_kind == "current_lt" {
+                        let cond_pred = if cond_kind.ends_with("_eq") || cond_kind == "current_eq" {
+                            "eq"
+                        } else if cond_kind.ends_with("_ne") || cond_kind == "current_ne" {
+                            "ne"
+                        } else if cond_kind.ends_with("_lt") || cond_kind == "current_lt" {
                             "slt"
-                        } else {
+                        } else if cond_kind.ends_with("_le") || cond_kind == "current_le" {
+                            "sle"
+                        } else if cond_kind.ends_with("_gt") || cond_kind == "current_gt" {
                             "sgt"
+                        } else {
+                            "sge"
                         };
                         let cond_reg = fresh_reg(&mut next_reg);
                         body.push(format!("  {cond_reg} = icmp {cond_pred} i64 {lhs}, {rhs}"));
@@ -2097,6 +2125,8 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 body.push(format!("  {current} = load i64, ptr {current_slot}"));
                 let cmp = fresh_reg(&mut next_reg);
                 let pred = match cmp_kind {
+                    "eq" => "eq",
+                    "ne" => "ne",
                     "lt" => "slt",
                     "le" => "sle",
                     "gt" => "sgt",
@@ -2138,8 +2168,46 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                     current_carries.push(carry_before);
                 }
                 let (control_lhs, control_pred) = match control_kind {
+                    "current_eq" => (next_current.clone(), "eq"),
+                    "current_ne" => (next_current.clone(), "ne"),
                     "current_lt" => (next_current.clone(), "slt"),
+                    "current_le" => (next_current.clone(), "sle"),
                     "current_gt" => (next_current.clone(), "sgt"),
+                    "current_ge" => (next_current.clone(), "sge"),
+                    other if other.starts_with("carry") && other.ends_with("_eq") => {
+                        let source_index = other[5..other.len() - 3].parse::<usize>().map_err(
+                            |_| {
+                                format!(
+                                    "cpu.loop_while_i64_flow_chain `{}` has unsupported control kind `{other}` during LLVM lowering",
+                                    node.name
+                                )
+                            },
+                        )?;
+                        let lhs = current_carries.get(source_index).cloned().ok_or_else(|| {
+                            format!(
+                                "cpu.loop_while_i64_flow_chain `{}` references unavailable control source `{other}` during LLVM lowering",
+                                node.name
+                            )
+                        })?;
+                        (lhs, "eq")
+                    }
+                    other if other.starts_with("carry") && other.ends_with("_ne") => {
+                        let source_index = other[5..other.len() - 3].parse::<usize>().map_err(
+                            |_| {
+                                format!(
+                                    "cpu.loop_while_i64_flow_chain `{}` has unsupported control kind `{other}` during LLVM lowering",
+                                    node.name
+                                )
+                            },
+                        )?;
+                        let lhs = current_carries.get(source_index).cloned().ok_or_else(|| {
+                            format!(
+                                "cpu.loop_while_i64_flow_chain `{}` references unavailable control source `{other}` during LLVM lowering",
+                                node.name
+                            )
+                        })?;
+                        (lhs, "ne")
+                    }
                     other if other.starts_with("carry") && other.ends_with("_lt") => {
                         let source_index = other[5..other.len() - 3].parse::<usize>().map_err(
                             |_| {
@@ -2157,6 +2225,23 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                         })?;
                         (lhs, "slt")
                     }
+                    other if other.starts_with("carry") && other.ends_with("_le") => {
+                        let source_index = other[5..other.len() - 3].parse::<usize>().map_err(
+                            |_| {
+                                format!(
+                                    "cpu.loop_while_i64_flow_chain `{}` has unsupported control kind `{other}` during LLVM lowering",
+                                    node.name
+                                )
+                            },
+                        )?;
+                        let lhs = current_carries.get(source_index).cloned().ok_or_else(|| {
+                            format!(
+                                "cpu.loop_while_i64_flow_chain `{}` references unavailable control source `{other}` during LLVM lowering",
+                                node.name
+                            )
+                        })?;
+                        (lhs, "sle")
+                    }
                     other if other.starts_with("carry") && other.ends_with("_gt") => {
                         let source_index = other[5..other.len() - 3].parse::<usize>().map_err(
                             |_| {
@@ -2173,6 +2258,23 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                             )
                         })?;
                         (lhs, "sgt")
+                    }
+                    other if other.starts_with("carry") && other.ends_with("_ge") => {
+                        let source_index = other[5..other.len() - 3].parse::<usize>().map_err(
+                            |_| {
+                                format!(
+                                    "cpu.loop_while_i64_flow_chain `{}` has unsupported control kind `{other}` during LLVM lowering",
+                                    node.name
+                                )
+                            },
+                        )?;
+                        let lhs = current_carries.get(source_index).cloned().ok_or_else(|| {
+                            format!(
+                                "cpu.loop_while_i64_flow_chain `{}` references unavailable control source `{other}` during LLVM lowering",
+                                node.name
+                            )
+                        })?;
+                        (lhs, "sge")
                     }
                     other => {
                         return Err(format!(
@@ -2371,6 +2473,8 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 body.push(format!("  {current} = load i64, ptr {current_slot}"));
                 let cmp = fresh_reg(&mut next_reg);
                 let pred = match cmp_kind {
+                    "eq" => "eq",
+                    "ne" => "ne",
                     "lt" => "slt",
                     "le" => "sle",
                     "gt" => "sgt",
@@ -2442,8 +2546,46 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                     next_carries.push(reg);
                 }
                 let (control_lhs, control_pred) = match control_kind {
+                    "current_eq" => (next_current.clone(), "eq"),
+                    "current_ne" => (next_current.clone(), "ne"),
                     "current_lt" => (next_current.clone(), "slt"),
+                    "current_le" => (next_current.clone(), "sle"),
                     "current_gt" => (next_current.clone(), "sgt"),
+                    "current_ge" => (next_current.clone(), "sge"),
+                    other if other.starts_with("carry") && other.ends_with("_eq") => {
+                        let source_index = other[5..other.len() - 3].parse::<usize>().map_err(
+                            |_| {
+                                format!(
+                                    "cpu.loop_while_i64_post_flow_chain `{}` has unsupported control kind `{other}` during LLVM lowering",
+                                    node.name
+                                )
+                            },
+                        )?;
+                        let lhs = next_carries.get(source_index).cloned().ok_or_else(|| {
+                            format!(
+                                "cpu.loop_while_i64_post_flow_chain `{}` references unavailable control source `{other}` during LLVM lowering",
+                                node.name
+                            )
+                        })?;
+                        (lhs, "eq")
+                    }
+                    other if other.starts_with("carry") && other.ends_with("_ne") => {
+                        let source_index = other[5..other.len() - 3].parse::<usize>().map_err(
+                            |_| {
+                                format!(
+                                    "cpu.loop_while_i64_post_flow_chain `{}` has unsupported control kind `{other}` during LLVM lowering",
+                                    node.name
+                                )
+                            },
+                        )?;
+                        let lhs = next_carries.get(source_index).cloned().ok_or_else(|| {
+                            format!(
+                                "cpu.loop_while_i64_post_flow_chain `{}` references unavailable control source `{other}` during LLVM lowering",
+                                node.name
+                            )
+                        })?;
+                        (lhs, "ne")
+                    }
                     other if other.starts_with("carry") && other.ends_with("_lt") => {
                         let source_index = other[5..other.len() - 3].parse::<usize>().map_err(
                             |_| {
@@ -2461,6 +2603,23 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                         })?;
                         (lhs, "slt")
                     }
+                    other if other.starts_with("carry") && other.ends_with("_le") => {
+                        let source_index = other[5..other.len() - 3].parse::<usize>().map_err(
+                            |_| {
+                                format!(
+                                    "cpu.loop_while_i64_post_flow_chain `{}` has unsupported control kind `{other}` during LLVM lowering",
+                                    node.name
+                                )
+                            },
+                        )?;
+                        let lhs = next_carries.get(source_index).cloned().ok_or_else(|| {
+                            format!(
+                                "cpu.loop_while_i64_post_flow_chain `{}` references unavailable control source `{other}` during LLVM lowering",
+                                node.name
+                            )
+                        })?;
+                        (lhs, "sle")
+                    }
                     other if other.starts_with("carry") && other.ends_with("_gt") => {
                         let source_index = other[5..other.len() - 3].parse::<usize>().map_err(
                             |_| {
@@ -2477,6 +2636,23 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                             )
                         })?;
                         (lhs, "sgt")
+                    }
+                    other if other.starts_with("carry") && other.ends_with("_ge") => {
+                        let source_index = other[5..other.len() - 3].parse::<usize>().map_err(
+                            |_| {
+                                format!(
+                                    "cpu.loop_while_i64_post_flow_chain `{}` has unsupported control kind `{other}` during LLVM lowering",
+                                    node.name
+                                )
+                            },
+                        )?;
+                        let lhs = next_carries.get(source_index).cloned().ok_or_else(|| {
+                            format!(
+                                "cpu.loop_while_i64_post_flow_chain `{}` references unavailable control source `{other}` during LLVM lowering",
+                                node.name
+                            )
+                        })?;
+                        (lhs, "sge")
                     }
                     other => {
                         return Err(format!(
@@ -2684,6 +2860,8 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 body.push(format!("  {current} = load i64, ptr {current_slot}"));
                 let cmp = fresh_reg(&mut next_reg);
                 let pred = match cmp_kind {
+                    "eq" => "eq",
+                    "ne" => "ne",
                     "lt" => "slt",
                     "le" => "sle",
                     "gt" => "sgt",
@@ -2782,7 +2960,15 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                     let next_carry = if cond_kind == "always" {
                         then_value
                     } else {
-                        let lhs = if cond_kind == "current_lt" || cond_kind == "current_gt" {
+                        let lhs = if matches!(
+                            cond_kind.as_str(),
+                            "current_eq"
+                                | "current_ne"
+                                | "current_lt"
+                                | "current_le"
+                                | "current_gt"
+                                | "current_ge"
+                        ) {
                             next_current.clone()
                         } else if let Some(rest) = cond_kind.strip_prefix("carry") {
                             let (index_text, suffix) = rest.split_once('_').ok_or_else(|| {
@@ -2797,7 +2983,13 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                                     node.name
                                 )
                             })?;
-                            if suffix != "lt" && suffix != "gt" {
+                            if suffix != "eq"
+                                && suffix != "ne"
+                                && suffix != "lt"
+                                && suffix != "le"
+                                && suffix != "gt"
+                                && suffix != "ge"
+                            {
                                 return Err(format!(
                                     "cpu.loop_while_i64_post_flow_cond_chain `{}` has unsupported conditional carry kind `{cond_kind}` during LLVM lowering",
                                     node.name
@@ -2821,10 +3013,18 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                                 node.name
                             )
                         })?;
-                        let cond_pred = if cond_kind.ends_with("_lt") || cond_kind == "current_lt" {
+                        let cond_pred = if cond_kind.ends_with("_eq") || cond_kind == "current_eq" {
+                            "eq"
+                        } else if cond_kind.ends_with("_ne") || cond_kind == "current_ne" {
+                            "ne"
+                        } else if cond_kind.ends_with("_lt") || cond_kind == "current_lt" {
                             "slt"
-                        } else {
+                        } else if cond_kind.ends_with("_le") || cond_kind == "current_le" {
+                            "sle"
+                        } else if cond_kind.ends_with("_gt") || cond_kind == "current_gt" {
                             "sgt"
+                        } else {
+                            "sge"
                         };
                         let cond_reg = fresh_reg(&mut next_reg);
                         body.push(format!("  {cond_reg} = icmp {cond_pred} i64 {lhs}, {rhs}"));
@@ -2837,8 +3037,46 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                     next_carries.push(next_carry);
                 }
                 let (control_lhs, control_pred) = match control_kind {
+                    "current_eq" => (next_current.clone(), "eq"),
+                    "current_ne" => (next_current.clone(), "ne"),
                     "current_lt" => (next_current.clone(), "slt"),
+                    "current_le" => (next_current.clone(), "sle"),
                     "current_gt" => (next_current.clone(), "sgt"),
+                    "current_ge" => (next_current.clone(), "sge"),
+                    other if other.starts_with("carry") && other.ends_with("_eq") => {
+                        let source_index = other[5..other.len() - 3].parse::<usize>().map_err(
+                            |_| {
+                                format!(
+                                    "cpu.loop_while_i64_post_flow_cond_chain `{}` has unsupported control kind `{other}` during LLVM lowering",
+                                    node.name
+                                )
+                            },
+                        )?;
+                        let lhs = next_carries.get(source_index).cloned().ok_or_else(|| {
+                            format!(
+                                "cpu.loop_while_i64_post_flow_cond_chain `{}` references unavailable control source `{other}` during LLVM lowering",
+                                node.name
+                            )
+                        })?;
+                        (lhs, "eq")
+                    }
+                    other if other.starts_with("carry") && other.ends_with("_ne") => {
+                        let source_index = other[5..other.len() - 3].parse::<usize>().map_err(
+                            |_| {
+                                format!(
+                                    "cpu.loop_while_i64_post_flow_cond_chain `{}` has unsupported control kind `{other}` during LLVM lowering",
+                                    node.name
+                                )
+                            },
+                        )?;
+                        let lhs = next_carries.get(source_index).cloned().ok_or_else(|| {
+                            format!(
+                                "cpu.loop_while_i64_post_flow_cond_chain `{}` references unavailable control source `{other}` during LLVM lowering",
+                                node.name
+                            )
+                        })?;
+                        (lhs, "ne")
+                    }
                     other if other.starts_with("carry") && other.ends_with("_lt") => {
                         let source_index = other[5..other.len() - 3].parse::<usize>().map_err(
                             |_| {
@@ -2856,6 +3094,23 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                         })?;
                         (lhs, "slt")
                     }
+                    other if other.starts_with("carry") && other.ends_with("_le") => {
+                        let source_index = other[5..other.len() - 3].parse::<usize>().map_err(
+                            |_| {
+                                format!(
+                                    "cpu.loop_while_i64_post_flow_cond_chain `{}` has unsupported control kind `{other}` during LLVM lowering",
+                                    node.name
+                                )
+                            },
+                        )?;
+                        let lhs = next_carries.get(source_index).cloned().ok_or_else(|| {
+                            format!(
+                                "cpu.loop_while_i64_post_flow_cond_chain `{}` references unavailable control source `{other}` during LLVM lowering",
+                                node.name
+                            )
+                        })?;
+                        (lhs, "sle")
+                    }
                     other if other.starts_with("carry") && other.ends_with("_gt") => {
                         let source_index = other[5..other.len() - 3].parse::<usize>().map_err(
                             |_| {
@@ -2872,6 +3127,23 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                             )
                         })?;
                         (lhs, "sgt")
+                    }
+                    other if other.starts_with("carry") && other.ends_with("_ge") => {
+                        let source_index = other[5..other.len() - 3].parse::<usize>().map_err(
+                            |_| {
+                                format!(
+                                    "cpu.loop_while_i64_post_flow_cond_chain `{}` has unsupported control kind `{other}` during LLVM lowering",
+                                    node.name
+                                )
+                            },
+                        )?;
+                        let lhs = next_carries.get(source_index).cloned().ok_or_else(|| {
+                            format!(
+                                "cpu.loop_while_i64_post_flow_cond_chain `{}` references unavailable control source `{other}` during LLVM lowering",
+                                node.name
+                            )
+                        })?;
+                        (lhs, "sge")
                     }
                     other => {
                         return Err(format!(
@@ -3113,8 +3385,46 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                     current_carries.push(carry_before);
                 }
                 let (control_lhs, control_pred) = match control_kind {
+                    "current_eq" => (next_current.clone(), "eq"),
+                    "current_ne" => (next_current.clone(), "ne"),
                     "current_lt" => (next_current.clone(), "slt"),
+                    "current_le" => (next_current.clone(), "sle"),
                     "current_gt" => (next_current.clone(), "sgt"),
+                    "current_ge" => (next_current.clone(), "sge"),
+                    other if other.starts_with("carry") && other.ends_with("_eq") => {
+                        let source_index = other[5..other.len() - 3].parse::<usize>().map_err(
+                            |_| {
+                                format!(
+                                    "cpu.loop_while_i64_flow_cond_chain `{}` has unsupported control kind `{other}` during LLVM lowering",
+                                    node.name
+                                )
+                            },
+                        )?;
+                        let lhs = current_carries.get(source_index).cloned().ok_or_else(|| {
+                            format!(
+                                "cpu.loop_while_i64_flow_cond_chain `{}` references unavailable control source `{other}` during LLVM lowering",
+                                node.name
+                            )
+                        })?;
+                        (lhs, "eq")
+                    }
+                    other if other.starts_with("carry") && other.ends_with("_ne") => {
+                        let source_index = other[5..other.len() - 3].parse::<usize>().map_err(
+                            |_| {
+                                format!(
+                                    "cpu.loop_while_i64_flow_cond_chain `{}` has unsupported control kind `{other}` during LLVM lowering",
+                                    node.name
+                                )
+                            },
+                        )?;
+                        let lhs = current_carries.get(source_index).cloned().ok_or_else(|| {
+                            format!(
+                                "cpu.loop_while_i64_flow_cond_chain `{}` references unavailable control source `{other}` during LLVM lowering",
+                                node.name
+                            )
+                        })?;
+                        (lhs, "ne")
+                    }
                     other if other.starts_with("carry") && other.ends_with("_lt") => {
                         let source_index = other[5..other.len() - 3].parse::<usize>().map_err(
                             |_| {
@@ -3132,6 +3442,23 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                         })?;
                         (lhs, "slt")
                     }
+                    other if other.starts_with("carry") && other.ends_with("_le") => {
+                        let source_index = other[5..other.len() - 3].parse::<usize>().map_err(
+                            |_| {
+                                format!(
+                                    "cpu.loop_while_i64_flow_cond_chain `{}` has unsupported control kind `{other}` during LLVM lowering",
+                                    node.name
+                                )
+                            },
+                        )?;
+                        let lhs = current_carries.get(source_index).cloned().ok_or_else(|| {
+                            format!(
+                                "cpu.loop_while_i64_flow_cond_chain `{}` references unavailable control source `{other}` during LLVM lowering",
+                                node.name
+                            )
+                        })?;
+                        (lhs, "sle")
+                    }
                     other if other.starts_with("carry") && other.ends_with("_gt") => {
                         let source_index = other[5..other.len() - 3].parse::<usize>().map_err(
                             |_| {
@@ -3148,6 +3475,23 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                             )
                         })?;
                         (lhs, "sgt")
+                    }
+                    other if other.starts_with("carry") && other.ends_with("_ge") => {
+                        let source_index = other[5..other.len() - 3].parse::<usize>().map_err(
+                            |_| {
+                                format!(
+                                    "cpu.loop_while_i64_flow_cond_chain `{}` has unsupported control kind `{other}` during LLVM lowering",
+                                    node.name
+                                )
+                            },
+                        )?;
+                        let lhs = current_carries.get(source_index).cloned().ok_or_else(|| {
+                            format!(
+                                "cpu.loop_while_i64_flow_cond_chain `{}` references unavailable control source `{other}` during LLVM lowering",
+                                node.name
+                            )
+                        })?;
+                        (lhs, "sge")
                     }
                     other => {
                         return Err(format!(
@@ -3234,7 +3578,15 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                     let next_carry = if cond_kind == "always" {
                         then_value
                     } else {
-                        let lhs = if cond_kind == "current_lt" || cond_kind == "current_gt" {
+                        let lhs = if matches!(
+                            cond_kind.as_str(),
+                            "current_eq"
+                                | "current_ne"
+                                | "current_lt"
+                                | "current_le"
+                                | "current_gt"
+                                | "current_ge"
+                        ) {
                             next_current.clone()
                         } else if let Some(rest) = cond_kind.strip_prefix("carry") {
                             let (index_text, suffix) = rest.split_once('_').ok_or_else(|| {
@@ -3249,7 +3601,13 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                                     node.name
                                 )
                             })?;
-                            if suffix != "lt" && suffix != "gt" {
+                            if suffix != "eq"
+                                && suffix != "ne"
+                                && suffix != "lt"
+                                && suffix != "le"
+                                && suffix != "gt"
+                                && suffix != "ge"
+                            {
                                 return Err(format!(
                                     "cpu.loop_while_i64_flow_cond_chain `{}` has unsupported conditional carry kind `{cond_kind}` during LLVM lowering",
                                     node.name
@@ -3273,10 +3631,18 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                                 node.name
                             )
                         })?;
-                        let cond_pred = if cond_kind.ends_with("_lt") || cond_kind == "current_lt" {
+                        let cond_pred = if cond_kind.ends_with("_eq") || cond_kind == "current_eq" {
+                            "eq"
+                        } else if cond_kind.ends_with("_ne") || cond_kind == "current_ne" {
+                            "ne"
+                        } else if cond_kind.ends_with("_lt") || cond_kind == "current_lt" {
                             "slt"
-                        } else {
+                        } else if cond_kind.ends_with("_le") || cond_kind == "current_le" {
+                            "sle"
+                        } else if cond_kind.ends_with("_gt") || cond_kind == "current_gt" {
                             "sgt"
+                        } else {
+                            "sge"
                         };
                         let cond_reg = fresh_reg(&mut next_reg);
                         body.push(format!("  {cond_reg} = icmp {cond_pred} i64 {lhs}, {rhs}"));

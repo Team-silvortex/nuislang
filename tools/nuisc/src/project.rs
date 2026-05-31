@@ -5,8 +5,8 @@ use std::{
 };
 
 use nuis_semantics::model::{
-    AstExpr, AstExternFunction, AstModule, AstStmt, AstTypeRef, NirDataFlowState, NirExpr,
-    NirModule, NirResultStage, NirStmt, NirTypeRef,
+    AstExpr, AstExternFunction, AstModule, AstStmt, AstTypeAlias, AstTypeRef, NirDataFlowState,
+    NirExpr, NirModule, NirResultStage, NirStmt, NirTypeRef,
 };
 use yir_core::{
     EdgeKind, Node, Operation, OperationDomainFamily, Resource, ResourceKind, SemanticOp, YirModule,
@@ -3005,7 +3005,12 @@ fn validate_data_profile_token_types(
     let (from_domain, _) = split_domain_unit(from_endpoint)?;
     let (to_domain, _) = split_domain_unit(to_endpoint)?;
 
-    let handle_table_ty = find_profile_call_declared_type(&profile_fn.body, "data_handle_table", None)
+    let handle_table_ty = find_profile_call_declared_type(
+        &profile_fn.body,
+        &profile_module.ast.type_aliases,
+        "data_handle_table",
+        None,
+    )
         .ok_or_else(|| {
             format!(
                 "project data unit `data.{}` requires typed `HandleTable<Schema>` on its data_handle_table binding",
@@ -3019,13 +3024,18 @@ fn validate_data_profile_token_types(
             continue;
         }
         let tag = slot.trim_start_matches("marker:");
-        let marker_ty = find_profile_call_declared_type(&profile_fn.body, "data_marker", Some(tag))
-            .ok_or_else(|| {
-                format!(
-                    "project data unit `data.{}` requires typed `Marker<Tag>` binding for marker `{}`",
-                    unit, tag
-                )
-            })?;
+        let marker_ty = find_profile_call_declared_type(
+            &profile_fn.body,
+            &profile_module.ast.type_aliases,
+            "data_marker",
+            Some(tag),
+        )
+        .ok_or_else(|| {
+            format!(
+                "project data unit `data.{}` requires typed `Marker<Tag>` binding for marker `{}`",
+                unit, tag
+            )
+        })?;
         require_profile_semantic_type(&marker_ty, "Marker", true, &unit, tag)?;
     }
 
@@ -3039,18 +3049,24 @@ fn validate_data_profile_token_types(
         "uplink_payload_shape",
         "downlink_payload_shape",
     ] {
-        let marker_ty = find_profile_call_declared_type(&profile_fn.body, "data_marker", Some(tag))
-            .ok_or_else(|| {
-                format!(
-                    "project data unit `data.{}` requires typed `Marker<Tag>` binding for marker `{}`",
-                    unit, tag
-                )
+        let marker_ty = find_profile_call_declared_type(
+            &profile_fn.body,
+            &profile_module.ast.type_aliases,
+            "data_marker",
+            Some(tag),
+        )
+        .ok_or_else(|| {
+            format!(
+                "project data unit `data.{}` requires typed `Marker<Tag>` binding for marker `{}`",
+                unit, tag
+            )
         })?;
         require_profile_semantic_type(&marker_ty, "Marker", true, &unit, tag)?;
     }
     if contract.uplink == NirResultStage::Data(NirDataFlowState::Windowed) {
         let marker_ty = find_profile_call_declared_type(
             &profile_fn.body,
+            &profile_module.ast.type_aliases,
             "data_marker",
             Some("uplink_window_policy"),
         )
@@ -3071,6 +3087,7 @@ fn validate_data_profile_token_types(
     if contract.downlink == NirResultStage::Data(NirDataFlowState::Windowed) {
         let marker_ty = find_profile_call_declared_type(
             &profile_fn.body,
+            &profile_module.ast.type_aliases,
             "data_marker",
             Some("downlink_window_policy"),
         )
@@ -3091,13 +3108,18 @@ fn validate_data_profile_token_types(
 
     if let Some(uplink_ty) = bridge.uplink_payload.as_ref() {
         let marker_ty =
-            find_profile_call_declared_type(&profile_fn.body, "data_marker", Some("uplink_payload_class"))
-                .ok_or_else(|| {
-                    format!(
-                        "project data unit `data.{}` requires typed `Marker<Tag>` binding for marker `uplink_payload_class`",
-                        unit
-                    )
-                })?;
+            find_profile_call_declared_type(
+                &profile_fn.body,
+                &profile_module.ast.type_aliases,
+                "data_marker",
+                Some("uplink_payload_class"),
+            )
+            .ok_or_else(|| {
+                format!(
+                    "project data unit `data.{}` requires typed `Marker<Tag>` binding for marker `uplink_payload_class`",
+                    unit
+                )
+            })?;
         require_marker_semantic_payload_name(
             &marker_ty,
             &payload_class_marker_name(uplink_ty),
@@ -3106,13 +3128,18 @@ fn validate_data_profile_token_types(
         )?;
 
         let marker_ty =
-            find_profile_call_declared_type(&profile_fn.body, "data_marker", Some("uplink_payload_shape"))
-                .ok_or_else(|| {
-                    format!(
-                        "project data unit `data.{}` requires typed `Marker<Tag>` binding for marker `uplink_payload_shape`",
-                        unit
-                    )
-                })?;
+            find_profile_call_declared_type(
+                &profile_fn.body,
+                &profile_module.ast.type_aliases,
+                "data_marker",
+                Some("uplink_payload_shape"),
+            )
+            .ok_or_else(|| {
+                format!(
+                    "project data unit `data.{}` requires typed `Marker<Tag>` binding for marker `uplink_payload_shape`",
+                    unit
+                )
+            })?;
         require_marker_semantic_payload_name(
             &marker_ty,
             &payload_shape_marker_name(uplink_ty),
@@ -3123,13 +3150,18 @@ fn validate_data_profile_token_types(
 
     if let Some(downlink_ty) = bridge.downlink_payload.as_ref() {
         let marker_ty =
-            find_profile_call_declared_type(&profile_fn.body, "data_marker", Some("downlink_payload_class"))
-                .ok_or_else(|| {
-                    format!(
-                        "project data unit `data.{}` requires typed `Marker<Tag>` binding for marker `downlink_payload_class`",
-                        unit
-                    )
-                })?;
+            find_profile_call_declared_type(
+                &profile_fn.body,
+                &profile_module.ast.type_aliases,
+                "data_marker",
+                Some("downlink_payload_class"),
+            )
+            .ok_or_else(|| {
+                format!(
+                    "project data unit `data.{}` requires typed `Marker<Tag>` binding for marker `downlink_payload_class`",
+                    unit
+                )
+            })?;
         require_marker_semantic_payload_name(
             &marker_ty,
             &payload_class_marker_name(downlink_ty),
@@ -3138,13 +3170,18 @@ fn validate_data_profile_token_types(
         )?;
 
         let marker_ty =
-            find_profile_call_declared_type(&profile_fn.body, "data_marker", Some("downlink_payload_shape"))
-                .ok_or_else(|| {
-                    format!(
-                        "project data unit `data.{}` requires typed `Marker<Tag>` binding for marker `downlink_payload_shape`",
-                        unit
-                    )
-                })?;
+            find_profile_call_declared_type(
+                &profile_fn.body,
+                &profile_module.ast.type_aliases,
+                "data_marker",
+                Some("downlink_payload_shape"),
+            )
+            .ok_or_else(|| {
+                format!(
+                    "project data unit `data.{}` requires typed `Marker<Tag>` binding for marker `downlink_payload_shape`",
+                    unit
+                )
+            })?;
         require_marker_semantic_payload_name(
             &marker_ty,
             &payload_shape_marker_name(downlink_ty),
@@ -3158,6 +3195,7 @@ fn validate_data_profile_token_types(
 
 fn find_profile_call_declared_type(
     body: &[AstStmt],
+    aliases: &[AstTypeAlias],
     callee: &str,
     marker_tag: Option<&str>,
 ) -> Option<AstTypeRef> {
@@ -3189,12 +3227,81 @@ fn find_profile_call_declared_type(
                         continue;
                     }
                 }
-                return Some(ty.clone());
+                return Some(
+                    resolve_project_type_aliases(ty, aliases).unwrap_or_else(|| ty.clone()),
+                );
             }
             _ => {}
         }
     }
     None
+}
+
+fn resolve_project_type_aliases(ty: &AstTypeRef, aliases: &[AstTypeAlias]) -> Option<AstTypeRef> {
+    let alias_map = aliases
+        .iter()
+        .map(|alias| (alias.name.clone(), alias))
+        .collect::<BTreeMap<_, _>>();
+    resolve_project_type_aliases_inner(ty, &alias_map, &mut BTreeSet::new())
+}
+
+fn resolve_project_type_aliases_inner(
+    ty: &AstTypeRef,
+    aliases: &BTreeMap<String, &AstTypeAlias>,
+    visiting: &mut BTreeSet<String>,
+) -> Option<AstTypeRef> {
+    let key = render_ast_type_name(ty);
+    if !visiting.insert(key.clone()) {
+        return None;
+    }
+
+    let result = if let Some(alias) = aliases.get(&ty.name) {
+        if alias.generic_params.len() != ty.generic_args.len() {
+            None
+        } else {
+            let bindings = alias
+                .generic_params
+                .iter()
+                .zip(ty.generic_args.iter())
+                .map(|(param, arg)| (param.name.clone(), arg.clone()))
+                .collect::<BTreeMap<_, _>>();
+            let substituted = substitute_project_type_alias_target(&alias.target, &bindings);
+            resolve_project_type_aliases_inner(&substituted, aliases, visiting)
+        }
+    } else {
+        let mut resolved = ty.clone();
+        let mut args = Vec::with_capacity(ty.generic_args.len());
+        for arg in &ty.generic_args {
+            args.push(resolve_project_type_aliases_inner(arg, aliases, visiting)?);
+        }
+        resolved.generic_args = args;
+        Some(resolved)
+    };
+
+    visiting.remove(&key);
+    result
+}
+
+fn substitute_project_type_alias_target(
+    ty: &AstTypeRef,
+    bindings: &BTreeMap<String, AstTypeRef>,
+) -> AstTypeRef {
+    if let Some(bound) = bindings.get(&ty.name) {
+        let mut substituted = bound.clone();
+        substituted.is_optional = substituted.is_optional || ty.is_optional;
+        substituted.is_ref = substituted.is_ref || ty.is_ref;
+        return substituted;
+    }
+    AstTypeRef {
+        name: ty.name.clone(),
+        generic_args: ty
+            .generic_args
+            .iter()
+            .map(|arg| substitute_project_type_alias_target(arg, bindings))
+            .collect(),
+        is_optional: ty.is_optional,
+        is_ref: ty.is_ref,
+    }
 }
 
 fn require_profile_semantic_type(
@@ -3689,10 +3796,13 @@ fn infer_data_handle_table_schema(
     else {
         return Ok(None);
     };
-    Ok(
-        find_profile_call_declared_type(&profile_fn.body, "data_handle_table", None)
-            .and_then(|ty| ty.generic_args.first().map(render_ast_type_name)),
+    Ok(find_profile_call_declared_type(
+        &profile_fn.body,
+        &project_module.ast.type_aliases,
+        "data_handle_table",
+        None,
     )
+    .and_then(|ty| ty.generic_args.first().map(render_ast_type_name)))
 }
 
 fn infer_kernel_slot_contract_summary(
@@ -6183,6 +6293,95 @@ mod tests {
                     let downlink_payload_shape: Marker<PayloadShapeWindowFrame> = data_marker("downlink_payload_shape");
                     let uplink_window_policy: Marker<UplinkWindowPolicy> = data_marker("uplink_window_policy");
                     let downlink_window_policy: Marker<DownlinkWindowPolicy> = data_marker("downlink_window_policy");
+                  }
+                }
+                "#,
+            ),
+        ]);
+
+        validate_data_profile_token_types(
+            &project,
+            "cpu.Main",
+            "shader.SurfaceShader",
+            "data.FabricPlane",
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn validates_data_profile_token_types_through_local_type_aliases() {
+        let project = project_with_modules(vec![
+            (
+                "main.ns",
+                r#"
+                mod cpu Main {
+                  fn main() {
+                    let packet: SurfaceShaderPacket =
+                      shader_profile_packet("SurfaceShader", 1, 2, 3);
+                    let gpu_packet: Window<SurfaceShaderPacket> =
+                      data_profile_send_uplink("FabricPlane", packet);
+                    let frame: Frame = shader_profile_render("SurfaceShader", gpu_packet);
+                    let host_frame: Window<Frame> =
+                      data_profile_send_downlink("FabricPlane", frame);
+                    print(host_frame);
+                  }
+                }
+                "#,
+            ),
+            (
+                "surface_shader.ns",
+                r#"
+                mod shader SurfaceShader {
+                  fn profile() {
+                    const vertex_count: i64 = 4;
+                    const instance_count: i64 = 1;
+                    const packet_color_slot: i64 = 0;
+                    const packet_speed_slot: i64 = 1;
+                    const packet_radius_slot: i64 = 2;
+                    const packet_tag: i64 = 17;
+                    const material_mode: i64 = 2;
+                    const pass_kind: i64 = 1;
+                    const packet_field_count: i64 = 3;
+                    let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
+                    let profile_view: Viewport = shader_viewport(160, 120);
+                    let profile_pipe: Pipeline = shader_pipeline("lit_sphere", "triangle_strip");
+                    let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", "stub");
+                  }
+                }
+                "#,
+            ),
+            (
+                "fabric_plane.ns",
+                r#"
+                mod data FabricPlane {
+                  type FabricBindingsTable = HandleTable<FabricBindings>;
+                  type CpuToShaderMarker = Marker<CpuToShader>;
+                  type ShaderToCpuMarker = Marker<ShaderToCpu>;
+                  type UplinkPipeMarker = Marker<UplinkPipe>;
+                  type DownlinkPipeMarker = Marker<DownlinkPipe>;
+                  type UplinkPipeClassMarker = Marker<UplinkPipeClass>;
+                  type DownlinkPipeClassMarker = Marker<DownlinkPipeClass>;
+                  type PayloadClassMarker = Marker<PayloadClassWindow>;
+                  type UplinkPayloadShapeMarker = Marker<PayloadShapeWindowSurfaceShaderPacket>;
+                  type DownlinkPayloadShapeMarker = Marker<PayloadShapeWindowFrame>;
+                  type UplinkWindowPolicyMarker = Marker<UplinkWindowPolicy>;
+                  type DownlinkWindowPolicyMarker = Marker<DownlinkWindowPolicy>;
+
+                  fn profile() {
+                    let profile_handles: FabricBindingsTable =
+                      data_handle_table("host=cpu0", "render=shader0");
+                    let cpu_to_shader: CpuToShaderMarker = data_marker("cpu_to_shader");
+                    let shader_to_cpu: ShaderToCpuMarker = data_marker("shader_to_cpu");
+                    let uplink_pipe: UplinkPipeMarker = data_marker("uplink_pipe");
+                    let downlink_pipe: DownlinkPipeMarker = data_marker("downlink_pipe");
+                    let uplink_pipe_class: UplinkPipeClassMarker = data_marker("uplink_pipe_class");
+                    let downlink_pipe_class: DownlinkPipeClassMarker = data_marker("downlink_pipe_class");
+                    let uplink_payload_class: PayloadClassMarker = data_marker("uplink_payload_class");
+                    let downlink_payload_class: PayloadClassMarker = data_marker("downlink_payload_class");
+                    let uplink_payload_shape: UplinkPayloadShapeMarker = data_marker("uplink_payload_shape");
+                    let downlink_payload_shape: DownlinkPayloadShapeMarker = data_marker("downlink_payload_shape");
+                    let uplink_window_policy: UplinkWindowPolicyMarker = data_marker("uplink_window_policy");
+                    let downlink_window_policy: DownlinkWindowPolicyMarker = data_marker("downlink_window_policy");
                   }
                 }
                 "#,

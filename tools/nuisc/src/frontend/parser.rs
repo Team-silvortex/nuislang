@@ -1263,6 +1263,15 @@ impl Parser {
                     lhs: Box::new(expr),
                     rhs: Box::new(rhs),
                 };
+            } else if self.peek_symbol_pair('!', '=') {
+                self.expect_symbol('!')?;
+                self.expect_symbol('=')?;
+                let rhs = self.parse_comparison()?;
+                expr = AstExpr::Binary {
+                    op: AstBinaryOp::Ne,
+                    lhs: Box::new(expr),
+                    rhs: Box::new(rhs),
+                };
             } else {
                 break;
             }
@@ -1273,7 +1282,25 @@ impl Parser {
     fn parse_comparison(&mut self) -> Result<AstExpr, String> {
         let mut expr = self.parse_additive()?;
         loop {
-            if self.peek_symbol('<') {
+            if self.peek_symbol_pair('<', '=') {
+                self.expect_symbol('<')?;
+                self.expect_symbol('=')?;
+                let rhs = self.parse_additive()?;
+                expr = AstExpr::Binary {
+                    op: AstBinaryOp::Le,
+                    lhs: Box::new(expr),
+                    rhs: Box::new(rhs),
+                };
+            } else if self.peek_symbol_pair('>', '=') {
+                self.expect_symbol('>')?;
+                self.expect_symbol('=')?;
+                let rhs = self.parse_additive()?;
+                expr = AstExpr::Binary {
+                    op: AstBinaryOp::Ge,
+                    lhs: Box::new(expr),
+                    rhs: Box::new(rhs),
+                };
+            } else if self.peek_symbol('<') {
                 self.expect_symbol('<')?;
                 let rhs = self.parse_additive()?;
                 expr = AstExpr::Binary {
@@ -1532,6 +1559,11 @@ impl Parser {
     fn peek_double_symbol(&self, expected: char) -> bool {
         matches!(self.tokens.get(self.cursor), Some(Token::Symbol(actual)) if *actual == expected)
             && matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol(actual)) if *actual == expected)
+    }
+
+    fn peek_symbol_pair(&self, first: char, second: char) -> bool {
+        matches!(self.tokens.get(self.cursor), Some(Token::Symbol(actual)) if *actual == first)
+            && matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol(actual)) if *actual == second)
     }
 
     fn peek_arrow(&self) -> bool {

@@ -1,4 +1,7 @@
 mod cpu Main {
+  type ScalarWindow = Window<i64>;
+  type ScalarWindowMut = WindowMut<i64>;
+
   struct PanelSeeds {
     color: i64,
     speed: i64,
@@ -10,11 +13,11 @@ mod cpu Main {
 
   fn pack_panel_seeds(color: i64, speed: i64, radius: i64, tick: i64) -> PanelSeeds {
     let backing: ref Buffer = alloc_buffer(3, 0);
-    let copy: WindowMut<i64> = data_copy_window(backing, 0, 3);
-    let copy_color: WindowMut<i64> = data_write_window(copy, 0, color);
-    let copy_speed: WindowMut<i64> = data_write_window(copy_color, 1, speed);
-    let copy_radius: WindowMut<i64> = data_write_window(copy_speed, 2, radius);
-    let frozen: Window<i64> = data_freeze_window(copy_radius);
+    let copy: ScalarWindowMut = data_copy_window(backing, 0, 3);
+    let copy_color: ScalarWindowMut = data_write_window(copy, 0, color);
+    let copy_speed: ScalarWindowMut = data_write_window(copy_color, 1, speed);
+    let copy_radius: ScalarWindowMut = data_write_window(copy_speed, 2, radius);
+    let frozen: ScalarWindow = data_freeze_window(copy_radius);
 
     let packed_color: i64 = data_read_window(frozen, 0);
     let packed_speed: i64 = data_read_window(frozen, 1);

@@ -2,6 +2,10 @@ use data FabricPlane;
 use shader SurfaceShader;
 
 mod cpu Main {
+  type FabricBindings = HandleTable<FabricPlaneBindings>;
+  type ShaderPacketWindow = Window<SurfaceShaderPacket>;
+  type HostFrameWindow = Window<Frame>;
+
   fn main() {
     cpu_bind_core(0);
     cpu_window(320, 200, "shader_profile_render_demo");
@@ -24,12 +28,11 @@ mod cpu Main {
       shader_profile_packet("SurfaceShader", panel_color, panel_speed, panel_radius);
 
     data_profile_bind_core("FabricPlane");
-    let fabric_handles: HandleTable<FabricPlaneBindings> =
-      data_profile_handle_table("FabricPlane");
-    let gpu_packet: Window<SurfaceShaderPacket> =
+    let fabric_handles: FabricBindings = data_profile_handle_table("FabricPlane");
+    let gpu_packet: ShaderPacketWindow =
       data_profile_send_uplink("FabricPlane", render_controls);
     let frame: Frame = shader_profile_render("SurfaceShader", gpu_packet);
-    let host_frame: Window<Frame> = data_profile_send_downlink("FabricPlane", frame);
+    let host_frame: HostFrameWindow = data_profile_send_downlink("FabricPlane", frame);
 
     cpu_present_frame(host_frame);
   }

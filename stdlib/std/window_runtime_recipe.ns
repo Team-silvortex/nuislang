@@ -1,4 +1,7 @@
 mod cpu Main {
+  type ScalarWindow = Window<i64>;
+  type ScalarWindowMut = WindowMut<i64>;
+
   struct WindowRuntimeRecipeSummary {
     first: i64,
     second: i64,
@@ -8,11 +11,11 @@ mod cpu Main {
 
   fn capture_window_runtime_recipe(first: i64, second: i64, third: i64) -> WindowRuntimeRecipeSummary {
     let backing: ref Buffer = alloc_buffer(3, 0);
-    let copy: WindowMut<i64> = data_copy_window(backing, 0, 3);
-    let copy_first: WindowMut<i64> = data_write_window(copy, 0, first);
-    let copy_second: WindowMut<i64> = data_write_window(copy_first, 1, second);
-    let copy_third: WindowMut<i64> = data_write_window(copy_second, 2, third);
-    let frozen: Window<i64> = data_freeze_window(copy_third);
+    let copy: ScalarWindowMut = data_copy_window(backing, 0, 3);
+    let copy_first: ScalarWindowMut = data_write_window(copy, 0, first);
+    let copy_second: ScalarWindowMut = data_write_window(copy_first, 1, second);
+    let copy_third: ScalarWindowMut = data_write_window(copy_second, 2, third);
+    let frozen: ScalarWindow = data_freeze_window(copy_third);
     let value_first: i64 = data_read_window(frozen, 0);
     let value_second: i64 = data_read_window(frozen, 1);
     let value_third: i64 = data_read_window(frozen, 2);

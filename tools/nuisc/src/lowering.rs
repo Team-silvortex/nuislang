@@ -4138,8 +4138,11 @@ fn lower_expr(
                 NirBinaryOp::Mul => "mul",
                 NirBinaryOp::Div => "div",
                 NirBinaryOp::Eq => "eq",
+                NirBinaryOp::Ne => "ne",
                 NirBinaryOp::Lt => "lt",
+                NirBinaryOp::Le => "le",
                 NirBinaryOp::Gt => "gt",
+                NirBinaryOp::Ge => "ge",
             };
             let name = next_name(state, instruction);
             state.yir.nodes.push(Node {
@@ -4304,8 +4307,12 @@ enum PreparedLoopBody {
 
 #[derive(Clone, Copy)]
 enum PreparedLoopCompare {
+    Eq,
+    Ne,
     Lt,
+    Le,
     Gt,
+    Ge,
 }
 
 #[derive(Clone, Copy)]
@@ -4400,6 +4407,58 @@ struct PreparedLoopFlowControl {
     action: PreparedLoopFlowAction,
 }
 
+fn loop_compare_from_binary_op(op: NirBinaryOp) -> Option<PreparedLoopCompare> {
+    match op {
+        NirBinaryOp::Eq => Some(PreparedLoopCompare::Eq),
+        NirBinaryOp::Ne => Some(PreparedLoopCompare::Ne),
+        NirBinaryOp::Lt => Some(PreparedLoopCompare::Lt),
+        NirBinaryOp::Le => Some(PreparedLoopCompare::Le),
+        NirBinaryOp::Gt => Some(PreparedLoopCompare::Gt),
+        NirBinaryOp::Ge => Some(PreparedLoopCompare::Ge),
+        _ => None,
+    }
+}
+
+fn render_loop_compare(compare: PreparedLoopCompare) -> &'static str {
+    match compare {
+        PreparedLoopCompare::Eq => "eq",
+        PreparedLoopCompare::Ne => "ne",
+        PreparedLoopCompare::Lt => "lt",
+        PreparedLoopCompare::Le => "le",
+        PreparedLoopCompare::Gt => "gt",
+        PreparedLoopCompare::Ge => "ge",
+    }
+}
+
+fn render_loop_cond_kind(lhs: &PreparedCarryCondSource, compare: PreparedLoopCompare) -> String {
+    match (lhs, compare) {
+        (PreparedCarryCondSource::Current, PreparedLoopCompare::Eq) => "current_eq".to_owned(),
+        (PreparedCarryCondSource::Current, PreparedLoopCompare::Ne) => "current_ne".to_owned(),
+        (PreparedCarryCondSource::Current, PreparedLoopCompare::Lt) => "current_lt".to_owned(),
+        (PreparedCarryCondSource::Current, PreparedLoopCompare::Le) => "current_le".to_owned(),
+        (PreparedCarryCondSource::Current, PreparedLoopCompare::Gt) => "current_gt".to_owned(),
+        (PreparedCarryCondSource::Current, PreparedLoopCompare::Ge) => "current_ge".to_owned(),
+        (PreparedCarryCondSource::Carry(index), PreparedLoopCompare::Eq) => {
+            format!("carry{index}_eq")
+        }
+        (PreparedCarryCondSource::Carry(index), PreparedLoopCompare::Ne) => {
+            format!("carry{index}_ne")
+        }
+        (PreparedCarryCondSource::Carry(index), PreparedLoopCompare::Lt) => {
+            format!("carry{index}_lt")
+        }
+        (PreparedCarryCondSource::Carry(index), PreparedLoopCompare::Le) => {
+            format!("carry{index}_le")
+        }
+        (PreparedCarryCondSource::Carry(index), PreparedLoopCompare::Gt) => {
+            format!("carry{index}_gt")
+        }
+        (PreparedCarryCondSource::Carry(index), PreparedLoopCompare::Ge) => {
+            format!("carry{index}_ge")
+        }
+    }
+}
+
 fn find_prepared_carry_index(carries: &[PreparedCarryUpdate], name: &str) -> Option<usize> {
     carries.iter().position(|carry| carry.binding_name == name)
 }
@@ -4461,6 +4520,20 @@ fn parse_loop_carry_condition(
 ) -> Option<PreparedLoopCarryCondition> {
     let (lhs, compare, rhs) = match expr {
         NirExpr::Binary {
+            op: NirBinaryOp::Eq,
+            lhs,
+            rhs,
+        } if is_terminal_branch_pure_expr(rhs, pure_helpers) => {
+            (lhs.as_ref(), PreparedLoopCompare::Eq, rhs.as_ref().clone())
+        }
+        NirExpr::Binary {
+            op: NirBinaryOp::Ne,
+            lhs,
+            rhs,
+        } if is_terminal_branch_pure_expr(rhs, pure_helpers) => {
+            (lhs.as_ref(), PreparedLoopCompare::Ne, rhs.as_ref().clone())
+        }
+        NirExpr::Binary {
             op: NirBinaryOp::Lt,
             lhs,
             rhs,
@@ -4468,11 +4541,25 @@ fn parse_loop_carry_condition(
             (lhs.as_ref(), PreparedLoopCompare::Lt, rhs.as_ref().clone())
         }
         NirExpr::Binary {
+            op: NirBinaryOp::Le,
+            lhs,
+            rhs,
+        } if is_terminal_branch_pure_expr(rhs, pure_helpers) => {
+            (lhs.as_ref(), PreparedLoopCompare::Le, rhs.as_ref().clone())
+        }
+        NirExpr::Binary {
             op: NirBinaryOp::Gt,
             lhs,
             rhs,
         } if is_terminal_branch_pure_expr(rhs, pure_helpers) => {
             (lhs.as_ref(), PreparedLoopCompare::Gt, rhs.as_ref().clone())
+        }
+        NirExpr::Binary {
+            op: NirBinaryOp::Ge,
+            lhs,
+            rhs,
+        } if is_terminal_branch_pure_expr(rhs, pure_helpers) => {
+            (lhs.as_ref(), PreparedLoopCompare::Ge, rhs.as_ref().clone())
         }
         _ => return None,
     };
@@ -4494,6 +4581,20 @@ fn parse_loop_flow_condition(
 ) -> Option<PreparedLoopCarryCondition> {
     let (lhs, compare, rhs) = match expr {
         NirExpr::Binary {
+            op: NirBinaryOp::Eq,
+            lhs,
+            rhs,
+        } if is_terminal_branch_pure_expr(rhs, pure_helpers) => {
+            (lhs.as_ref(), PreparedLoopCompare::Eq, rhs.as_ref().clone())
+        }
+        NirExpr::Binary {
+            op: NirBinaryOp::Ne,
+            lhs,
+            rhs,
+        } if is_terminal_branch_pure_expr(rhs, pure_helpers) => {
+            (lhs.as_ref(), PreparedLoopCompare::Ne, rhs.as_ref().clone())
+        }
+        NirExpr::Binary {
             op: NirBinaryOp::Lt,
             lhs,
             rhs,
@@ -4501,11 +4602,25 @@ fn parse_loop_flow_condition(
             (lhs.as_ref(), PreparedLoopCompare::Lt, rhs.as_ref().clone())
         }
         NirExpr::Binary {
+            op: NirBinaryOp::Le,
+            lhs,
+            rhs,
+        } if is_terminal_branch_pure_expr(rhs, pure_helpers) => {
+            (lhs.as_ref(), PreparedLoopCompare::Le, rhs.as_ref().clone())
+        }
+        NirExpr::Binary {
             op: NirBinaryOp::Gt,
             lhs,
             rhs,
         } if is_terminal_branch_pure_expr(rhs, pure_helpers) => {
             (lhs.as_ref(), PreparedLoopCompare::Gt, rhs.as_ref().clone())
+        }
+        NirExpr::Binary {
+            op: NirBinaryOp::Ge,
+            lhs,
+            rhs,
+        } if is_terminal_branch_pure_expr(rhs, pure_helpers) => {
+            (lhs.as_ref(), PreparedLoopCompare::Ge, rhs.as_ref().clone())
         }
         _ => return None,
     };
@@ -4846,26 +4961,13 @@ fn prepare_counted_while(
     pure_helpers: &BTreeSet<String>,
 ) -> Option<PreparedCountedWhile> {
     let (binding_name, limit, compare) = match condition {
-        NirExpr::Binary {
-            op: NirBinaryOp::Lt,
-            lhs,
-            rhs,
-        } => match lhs.as_ref() {
-            NirExpr::Var(name) if is_terminal_branch_pure_expr(rhs, pure_helpers) => {
-                (name.clone(), (**rhs).clone(), PreparedLoopCompare::Lt)
+        NirExpr::Binary { op, lhs, rhs } if is_terminal_branch_pure_expr(rhs, pure_helpers) => {
+            let compare = loop_compare_from_binary_op(*op)?;
+            match lhs.as_ref() {
+                NirExpr::Var(name) => (name.clone(), (**rhs).clone(), compare),
+                _ => return None,
             }
-            _ => return None,
-        },
-        NirExpr::Binary {
-            op: NirBinaryOp::Gt,
-            lhs,
-            rhs,
-        } => match lhs.as_ref() {
-            NirExpr::Var(name) if is_terminal_branch_pure_expr(rhs, pure_helpers) => {
-                (name.clone(), (**rhs).clone(), PreparedLoopCompare::Gt)
-            }
-            _ => return None,
-        },
+        }
         _ => return None,
     };
 
@@ -4927,26 +5029,13 @@ fn prepare_chained_while(
     pure_helpers: &BTreeSet<String>,
 ) -> Option<PreparedChainedWhile> {
     let (binding_name, limit, compare) = match condition {
-        NirExpr::Binary {
-            op: NirBinaryOp::Lt,
-            lhs,
-            rhs,
-        } => match lhs.as_ref() {
-            NirExpr::Var(name) if is_terminal_branch_pure_expr(rhs, pure_helpers) => {
-                (name.clone(), (**rhs).clone(), PreparedLoopCompare::Lt)
+        NirExpr::Binary { op, lhs, rhs } if is_terminal_branch_pure_expr(rhs, pure_helpers) => {
+            let compare = loop_compare_from_binary_op(*op)?;
+            match lhs.as_ref() {
+                NirExpr::Var(name) => (name.clone(), (**rhs).clone(), compare),
+                _ => return None,
             }
-            _ => return None,
-        },
-        NirExpr::Binary {
-            op: NirBinaryOp::Gt,
-            lhs,
-            rhs,
-        } => match lhs.as_ref() {
-            NirExpr::Var(name) if is_terminal_branch_pure_expr(rhs, pure_helpers) => {
-                (name.clone(), (**rhs).clone(), PreparedLoopCompare::Gt)
-            }
-            _ => return None,
-        },
+        }
         _ => return None,
     };
 
@@ -5012,26 +5101,13 @@ fn prepare_flow_while(
     pure_helpers: &BTreeSet<String>,
 ) -> Option<PreparedFlowWhile> {
     let (binding_name, limit, compare) = match condition {
-        NirExpr::Binary {
-            op: NirBinaryOp::Lt,
-            lhs,
-            rhs,
-        } => match lhs.as_ref() {
-            NirExpr::Var(name) if is_terminal_branch_pure_expr(rhs, pure_helpers) => {
-                (name.clone(), (**rhs).clone(), PreparedLoopCompare::Lt)
+        NirExpr::Binary { op, lhs, rhs } if is_terminal_branch_pure_expr(rhs, pure_helpers) => {
+            let compare = loop_compare_from_binary_op(*op)?;
+            match lhs.as_ref() {
+                NirExpr::Var(name) => (name.clone(), (**rhs).clone(), compare),
+                _ => return None,
             }
-            _ => return None,
-        },
-        NirExpr::Binary {
-            op: NirBinaryOp::Gt,
-            lhs,
-            rhs,
-        } => match lhs.as_ref() {
-            NirExpr::Var(name) if is_terminal_branch_pure_expr(rhs, pure_helpers) => {
-                (name.clone(), (**rhs).clone(), PreparedLoopCompare::Gt)
-            }
-            _ => return None,
-        },
+        }
         _ => return None,
     };
 
@@ -5108,26 +5184,13 @@ fn prepare_post_flow_while(
     pure_helpers: &BTreeSet<String>,
 ) -> Option<PreparedPostFlowWhile> {
     let (binding_name, limit, compare) = match condition {
-        NirExpr::Binary {
-            op: NirBinaryOp::Lt,
-            lhs,
-            rhs,
-        } => match lhs.as_ref() {
-            NirExpr::Var(name) if is_terminal_branch_pure_expr(rhs, pure_helpers) => {
-                (name.clone(), (**rhs).clone(), PreparedLoopCompare::Lt)
+        NirExpr::Binary { op, lhs, rhs } if is_terminal_branch_pure_expr(rhs, pure_helpers) => {
+            let compare = loop_compare_from_binary_op(*op)?;
+            match lhs.as_ref() {
+                NirExpr::Var(name) => (name.clone(), (**rhs).clone(), compare),
+                _ => return None,
             }
-            _ => return None,
-        },
-        NirExpr::Binary {
-            op: NirBinaryOp::Gt,
-            lhs,
-            rhs,
-        } => match lhs.as_ref() {
-            NirExpr::Var(name) if is_terminal_branch_pure_expr(rhs, pure_helpers) => {
-                (name.clone(), (**rhs).clone(), PreparedLoopCompare::Gt)
-            }
-            _ => return None,
-        },
+        }
         _ => return None,
     };
 
@@ -5573,10 +5636,7 @@ fn lower_counted_while(
     let limit_name = lower_expr(&prepared.limit, state, bindings)?;
     let step_name = lower_expr(&prepared.step, state, bindings)?;
     let name = next_name(state, "loop_while_i64");
-    let compare = match prepared.compare {
-        PreparedLoopCompare::Lt => "lt",
-        PreparedLoopCompare::Gt => "gt",
-    };
+    let compare = render_loop_compare(prepared.compare);
     let step_kind = match prepared.step_kind {
         PreparedLoopStepKind::Add => "add",
         PreparedLoopStepKind::Sub => "sub",
@@ -5653,10 +5713,7 @@ fn lower_chained_while(
             "loop_while_i64_chain"
         },
     );
-    let compare = match prepared.compare {
-        PreparedLoopCompare::Lt => "lt",
-        PreparedLoopCompare::Gt => "gt",
-    };
+    let compare = render_loop_compare(prepared.compare);
     let step_kind = match prepared.step_kind {
         PreparedLoopStepKind::Add => "add",
         PreparedLoopStepKind::Sub => "sub",
@@ -5702,20 +5759,7 @@ fn lower_chained_while(
                 then_source,
                 else_source,
             } => {
-                let condition_tag = match (&condition.lhs, condition.compare) {
-                    (PreparedCarryCondSource::Current, PreparedLoopCompare::Lt) => {
-                        "current_lt".to_owned()
-                    }
-                    (PreparedCarryCondSource::Current, PreparedLoopCompare::Gt) => {
-                        "current_gt".to_owned()
-                    }
-                    (PreparedCarryCondSource::Carry(source_index), PreparedLoopCompare::Lt) => {
-                        format!("carry{source_index}_lt")
-                    }
-                    (PreparedCarryCondSource::Carry(source_index), PreparedLoopCompare::Gt) => {
-                        format!("carry{source_index}_gt")
-                    }
-                };
+                let condition_tag = render_loop_cond_kind(&condition.lhs, condition.compare);
                 let rhs_name = lower_expr(&condition.rhs, state, bindings)?;
                 args.push(condition_tag);
                 args.push(rhs_name.clone());
@@ -5853,27 +5897,15 @@ fn lower_flow_while(
             "loop_while_i64_flow_chain"
         },
     );
-    let compare = match prepared.compare {
-        PreparedLoopCompare::Lt => "lt",
-        PreparedLoopCompare::Gt => "gt",
-    };
+    let compare = render_loop_compare(prepared.compare);
     let step_kind = match prepared.step_kind {
         PreparedLoopStepKind::Add => "add",
         PreparedLoopStepKind::Sub => "sub",
     };
-    let control_kind = match (
+    let control_kind = render_loop_cond_kind(
         &prepared.control.condition.lhs,
         prepared.control.condition.compare,
-    ) {
-        (PreparedCarryCondSource::Current, PreparedLoopCompare::Lt) => "current_lt".to_owned(),
-        (PreparedCarryCondSource::Current, PreparedLoopCompare::Gt) => "current_gt".to_owned(),
-        (PreparedCarryCondSource::Carry(index), PreparedLoopCompare::Lt) => {
-            format!("carry{index}_lt")
-        }
-        (PreparedCarryCondSource::Carry(index), PreparedLoopCompare::Gt) => {
-            format!("carry{index}_gt")
-        }
-    };
+    );
     let control_action = match prepared.control.action {
         PreparedLoopFlowAction::Break => "break",
         PreparedLoopFlowAction::Continue => "continue",
@@ -5921,20 +5953,7 @@ fn lower_flow_while(
                 then_source,
                 else_source,
             } => {
-                let condition_tag = match (&condition.lhs, condition.compare) {
-                    (PreparedCarryCondSource::Current, PreparedLoopCompare::Lt) => {
-                        "current_lt".to_owned()
-                    }
-                    (PreparedCarryCondSource::Current, PreparedLoopCompare::Gt) => {
-                        "current_gt".to_owned()
-                    }
-                    (PreparedCarryCondSource::Carry(source_index), PreparedLoopCompare::Lt) => {
-                        format!("carry{source_index}_lt")
-                    }
-                    (PreparedCarryCondSource::Carry(source_index), PreparedLoopCompare::Gt) => {
-                        format!("carry{source_index}_gt")
-                    }
-                };
+                let condition_tag = render_loop_cond_kind(&condition.lhs, condition.compare);
                 let rhs_name = lower_expr(&condition.rhs, state, bindings)?;
                 args.push(condition_tag);
                 args.push(rhs_name.clone());
@@ -6054,27 +6073,15 @@ fn lower_post_flow_while(
         .carries
         .iter()
         .any(|carry| matches!(carry.kind, PreparedCarryUpdateKind::Conditional { .. }));
-    let compare = match prepared.compare {
-        PreparedLoopCompare::Lt => "lt",
-        PreparedLoopCompare::Gt => "gt",
-    };
+    let compare = render_loop_compare(prepared.compare);
     let step_kind = match prepared.step_kind {
         PreparedLoopStepKind::Add => "add",
         PreparedLoopStepKind::Sub => "sub",
     };
-    let control_kind = match (
+    let control_kind = render_loop_cond_kind(
         &prepared.control.condition.lhs,
         prepared.control.condition.compare,
-    ) {
-        (PreparedCarryCondSource::Current, PreparedLoopCompare::Lt) => "current_lt".to_owned(),
-        (PreparedCarryCondSource::Current, PreparedLoopCompare::Gt) => "current_gt".to_owned(),
-        (PreparedCarryCondSource::Carry(index), PreparedLoopCompare::Lt) => {
-            format!("carry{index}_lt")
-        }
-        (PreparedCarryCondSource::Carry(index), PreparedLoopCompare::Gt) => {
-            format!("carry{index}_gt")
-        }
-    };
+    );
     let control_action = match prepared.control.action {
         PreparedLoopFlowAction::Break => "break",
         PreparedLoopFlowAction::Continue => "continue",
@@ -6124,20 +6131,7 @@ fn lower_post_flow_while(
                 then_source,
                 else_source,
             } => {
-                let condition_tag = match (&condition.lhs, condition.compare) {
-                    (PreparedCarryCondSource::Current, PreparedLoopCompare::Lt) => {
-                        "current_lt".to_owned()
-                    }
-                    (PreparedCarryCondSource::Current, PreparedLoopCompare::Gt) => {
-                        "current_gt".to_owned()
-                    }
-                    (PreparedCarryCondSource::Carry(source_index), PreparedLoopCompare::Lt) => {
-                        format!("carry{source_index}_lt")
-                    }
-                    (PreparedCarryCondSource::Carry(source_index), PreparedLoopCompare::Gt) => {
-                        format!("carry{source_index}_gt")
-                    }
-                };
+                let condition_tag = render_loop_cond_kind(&condition.lhs, condition.compare);
                 let rhs_name = lower_expr(&condition.rhs, state, bindings)?;
                 args.push(condition_tag);
                 args.push(rhs_name.clone());
@@ -8583,6 +8577,62 @@ mod tests {
     }
 
     #[test]
+    fn lowers_equality_counted_while_into_loop_while_i64() {
+        let mut module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let value: i64 = 0;
+                while value == 0 {
+                  let value: i64 = value + 1;
+                }
+                return value;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        crate::optimize::simplify_nir_module(&mut module);
+
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+        let loop_node = yir
+            .nodes
+            .iter()
+            .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64")
+            .expect("expected loop_while_i64 node");
+        assert_eq!(loop_node.op.args[3], "eq");
+        assert_eq!(loop_node.op.args[4], "add");
+    }
+
+    #[test]
+    fn lowers_inequality_counted_while_into_loop_while_i64() {
+        let mut module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let value: i64 = 0;
+                while value != 1 {
+                  let value: i64 = value + 1;
+                }
+                return value;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        crate::optimize::simplify_nir_module(&mut module);
+
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+        let loop_node = yir
+            .nodes
+            .iter()
+            .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64")
+            .expect("expected loop_while_i64 node");
+        assert_eq!(loop_node.op.args[3], "ne");
+        assert_eq!(loop_node.op.args[4], "add");
+    }
+
+    #[test]
     fn lowers_accumulating_counted_while_into_loop_while_i64_chain() {
         let mut module = parse_nuis_module(
             r#"
@@ -8906,6 +8956,117 @@ mod tests {
             })
             .expect("expected loop_while_i64_post_flow_chain node");
         assert_eq!(loop_node.op.args[5], "carry0_gt");
+        assert_eq!(loop_node.op.args[7], "break");
+        assert_eq!(loop_node.op.args[9], "add_current");
+    }
+
+    #[test]
+    fn lowers_post_flow_breaking_while_with_le_ge_into_loop_while_i64_post_flow_chain() {
+        let mut module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let value: i64 = 0;
+                let acc: i64 = 0;
+                while value <= 3 {
+                  let value: i64 = value + 1;
+                  let acc: i64 = acc + value;
+                  if acc >= 6 {
+                    break;
+                  }
+                }
+                return acc;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        crate::optimize::simplify_nir_module(&mut module);
+
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+        let loop_node = yir
+            .nodes
+            .iter()
+            .find(|node| {
+                node.op.module == "cpu" && node.op.instruction == "loop_while_i64_post_flow_chain"
+            })
+            .expect("expected loop_while_i64_post_flow_chain node");
+        assert_eq!(loop_node.op.args[3], "le");
+        assert_eq!(loop_node.op.args[5], "carry0_ge");
+        assert_eq!(loop_node.op.args[7], "break");
+        assert_eq!(loop_node.op.args[9], "add_current");
+    }
+
+    #[test]
+    fn lowers_post_flow_breaking_while_with_eq_into_loop_while_i64_post_flow_chain() {
+        let mut module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let value: i64 = 0;
+                let acc: i64 = 0;
+                while value < 4 {
+                  let value: i64 = value + 1;
+                  let acc: i64 = acc + value;
+                  if acc == 6 {
+                    break;
+                  }
+                }
+                return acc;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        crate::optimize::simplify_nir_module(&mut module);
+
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+        let loop_node = yir
+            .nodes
+            .iter()
+            .find(|node| {
+                node.op.module == "cpu" && node.op.instruction == "loop_while_i64_post_flow_chain"
+            })
+            .expect("expected loop_while_i64_post_flow_chain node");
+        assert_eq!(loop_node.op.args[3], "lt");
+        assert_eq!(loop_node.op.args[5], "carry0_eq");
+        assert_eq!(loop_node.op.args[7], "break");
+        assert_eq!(loop_node.op.args[9], "add_current");
+    }
+
+    #[test]
+    fn lowers_post_flow_breaking_while_with_ne_into_loop_while_i64_post_flow_chain() {
+        let mut module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let value: i64 = 0;
+                let acc: i64 = 0;
+                while value < 4 {
+                  let value: i64 = value + 1;
+                  let acc: i64 = acc + value;
+                  if acc != 6 {
+                    break;
+                  }
+                }
+                return acc;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        crate::optimize::simplify_nir_module(&mut module);
+
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+        let loop_node = yir
+            .nodes
+            .iter()
+            .find(|node| {
+                node.op.module == "cpu" && node.op.instruction == "loop_while_i64_post_flow_chain"
+            })
+            .expect("expected loop_while_i64_post_flow_chain node");
+        assert_eq!(loop_node.op.args[3], "lt");
+        assert_eq!(loop_node.op.args[5], "carry0_ne");
         assert_eq!(loop_node.op.args[7], "break");
         assert_eq!(loop_node.op.args[9], "add_current");
     }

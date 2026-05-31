@@ -540,7 +540,7 @@ impl RegisteredMod for CpuMod {
                     ));
                 }
                 match node.op.args[3].as_str() {
-                    "lt" | "le" | "gt" | "ge" => {}
+                    "eq" | "ne" | "lt" | "le" | "gt" | "ge" => {}
                     other => {
                         return Err(format!(
                             "node `{}` has invalid loop compare kind `{}`",
@@ -567,7 +567,7 @@ impl RegisteredMod for CpuMod {
                     ));
                 }
                 match node.op.args[3].as_str() {
-                    "lt" | "le" | "gt" | "ge" => {}
+                    "eq" | "ne" | "lt" | "le" | "gt" | "ge" => {}
                     other => {
                         return Err(format!(
                             "node `{}` has invalid loop compare kind `{}`",
@@ -620,7 +620,7 @@ impl RegisteredMod for CpuMod {
                     ));
                 }
                 match node.op.args[3].as_str() {
-                    "lt" | "le" | "gt" | "ge" => {}
+                    "eq" | "ne" | "lt" | "le" | "gt" | "ge" => {}
                     other => {
                         return Err(format!(
                             "node `{}` has invalid loop compare kind `{}`",
@@ -640,7 +640,28 @@ impl RegisteredMod for CpuMod {
                 for chunk in node.op.args[5..].chunks(5) {
                     let cond_kind = &chunk[1];
                     match cond_kind.as_str() {
-                        "always" | "current_lt" | "current_gt" => {}
+                        "always" | "current_eq" | "current_ne" | "current_lt" | "current_le"
+                        | "current_gt" | "current_ge" => {}
+                        _ if cond_kind.starts_with("carry") && cond_kind.ends_with("_eq") => {
+                            cond_kind[5..cond_kind.len() - 3]
+                                .parse::<usize>()
+                                .map_err(|_| {
+                                    format!(
+                                        "node `{}` has invalid conditional carry kind `{}`",
+                                        node.name, cond_kind
+                                    )
+                                })?;
+                        }
+                        _ if cond_kind.starts_with("carry") && cond_kind.ends_with("_ne") => {
+                            cond_kind[5..cond_kind.len() - 3]
+                                .parse::<usize>()
+                                .map_err(|_| {
+                                    format!(
+                                        "node `{}` has invalid conditional carry kind `{}`",
+                                        node.name, cond_kind
+                                    )
+                                })?;
+                        }
                         _ if cond_kind.starts_with("carry") && cond_kind.ends_with("_lt") => {
                             cond_kind[5..cond_kind.len() - 3]
                                 .parse::<usize>()
@@ -652,6 +673,26 @@ impl RegisteredMod for CpuMod {
                                 })?;
                         }
                         _ if cond_kind.starts_with("carry") && cond_kind.ends_with("_gt") => {
+                            cond_kind[5..cond_kind.len() - 3]
+                                .parse::<usize>()
+                                .map_err(|_| {
+                                    format!(
+                                        "node `{}` has invalid conditional carry kind `{}`",
+                                        node.name, cond_kind
+                                    )
+                                })?;
+                        }
+                        _ if cond_kind.starts_with("carry") && cond_kind.ends_with("_le") => {
+                            cond_kind[5..cond_kind.len() - 3]
+                                .parse::<usize>()
+                                .map_err(|_| {
+                                    format!(
+                                        "node `{}` has invalid conditional carry kind `{}`",
+                                        node.name, cond_kind
+                                    )
+                                })?;
+                        }
+                        _ if cond_kind.starts_with("carry") && cond_kind.ends_with("_ge") => {
                             cond_kind[5..cond_kind.len() - 3]
                                 .parse::<usize>()
                                 .map_err(|_| {
@@ -704,7 +745,7 @@ impl RegisteredMod for CpuMod {
                     ));
                 }
                 match node.op.args[3].as_str() {
-                    "lt" | "le" | "gt" | "ge" => {}
+                    "eq" | "lt" | "le" | "gt" | "ge" => {}
                     other => {
                         return Err(format!(
                             "node `{}` has invalid loop compare kind `{}`",
@@ -722,7 +763,24 @@ impl RegisteredMod for CpuMod {
                     }
                 }
                 match node.op.args[5].as_str() {
-                    "current_lt" | "current_gt" => {}
+                    "current_eq" | "current_ne" | "current_lt" | "current_le" | "current_gt"
+                    | "current_ge" => {}
+                    other if other.starts_with("carry") && other.ends_with("_eq") => {
+                        other[5..other.len() - 3].parse::<usize>().map_err(|_| {
+                            format!(
+                                "node `{}` has invalid flow control kind `{}`",
+                                node.name, other
+                            )
+                        })?;
+                    }
+                    other if other.starts_with("carry") && other.ends_with("_ne") => {
+                        other[5..other.len() - 3].parse::<usize>().map_err(|_| {
+                            format!(
+                                "node `{}` has invalid flow control kind `{}`",
+                                node.name, other
+                            )
+                        })?;
+                    }
                     other if other.starts_with("carry") && other.ends_with("_lt") => {
                         other[5..other.len() - 3].parse::<usize>().map_err(|_| {
                             format!(
@@ -731,7 +789,23 @@ impl RegisteredMod for CpuMod {
                             )
                         })?;
                     }
+                    other if other.starts_with("carry") && other.ends_with("_le") => {
+                        other[5..other.len() - 3].parse::<usize>().map_err(|_| {
+                            format!(
+                                "node `{}` has invalid flow control kind `{}`",
+                                node.name, other
+                            )
+                        })?;
+                    }
                     other if other.starts_with("carry") && other.ends_with("_gt") => {
+                        other[5..other.len() - 3].parse::<usize>().map_err(|_| {
+                            format!(
+                                "node `{}` has invalid flow control kind `{}`",
+                                node.name, other
+                            )
+                        })?;
+                    }
+                    other if other.starts_with("carry") && other.ends_with("_ge") => {
                         other[5..other.len() - 3].parse::<usize>().map_err(|_| {
                             format!(
                                 "node `{}` has invalid flow control kind `{}`",
@@ -788,7 +862,7 @@ impl RegisteredMod for CpuMod {
                     ));
                 }
                 match node.op.args[3].as_str() {
-                    "lt" | "le" | "gt" | "ge" => {}
+                    "eq" | "lt" | "le" | "gt" | "ge" => {}
                     other => {
                         return Err(format!(
                             "node `{}` has invalid loop compare kind `{}`",
@@ -806,7 +880,24 @@ impl RegisteredMod for CpuMod {
                     }
                 }
                 match node.op.args[5].as_str() {
-                    "current_lt" | "current_gt" => {}
+                    "current_eq" | "current_ne" | "current_lt" | "current_le" | "current_gt"
+                    | "current_ge" => {}
+                    other if other.starts_with("carry") && other.ends_with("_eq") => {
+                        other[5..other.len() - 3].parse::<usize>().map_err(|_| {
+                            format!(
+                                "node `{}` has invalid flow control kind `{}`",
+                                node.name, other
+                            )
+                        })?;
+                    }
+                    other if other.starts_with("carry") && other.ends_with("_ne") => {
+                        other[5..other.len() - 3].parse::<usize>().map_err(|_| {
+                            format!(
+                                "node `{}` has invalid flow control kind `{}`",
+                                node.name, other
+                            )
+                        })?;
+                    }
                     other if other.starts_with("carry") && other.ends_with("_lt") => {
                         other[5..other.len() - 3].parse::<usize>().map_err(|_| {
                             format!(
@@ -815,7 +906,23 @@ impl RegisteredMod for CpuMod {
                             )
                         })?;
                     }
+                    other if other.starts_with("carry") && other.ends_with("_le") => {
+                        other[5..other.len() - 3].parse::<usize>().map_err(|_| {
+                            format!(
+                                "node `{}` has invalid flow control kind `{}`",
+                                node.name, other
+                            )
+                        })?;
+                    }
                     other if other.starts_with("carry") && other.ends_with("_gt") => {
+                        other[5..other.len() - 3].parse::<usize>().map_err(|_| {
+                            format!(
+                                "node `{}` has invalid flow control kind `{}`",
+                                node.name, other
+                            )
+                        })?;
+                    }
+                    other if other.starts_with("carry") && other.ends_with("_ge") => {
                         other[5..other.len() - 3].parse::<usize>().map_err(|_| {
                             format!(
                                 "node `{}` has invalid flow control kind `{}`",
@@ -872,7 +979,7 @@ impl RegisteredMod for CpuMod {
                     ));
                 }
                 match node.op.args[3].as_str() {
-                    "lt" | "le" | "gt" | "ge" => {}
+                    "eq" | "lt" | "le" | "gt" | "ge" => {}
                     other => {
                         return Err(format!(
                             "node `{}` has invalid loop compare kind `{}`",
@@ -890,7 +997,24 @@ impl RegisteredMod for CpuMod {
                     }
                 }
                 match node.op.args[5].as_str() {
-                    "current_lt" | "current_gt" => {}
+                    "current_eq" | "current_ne" | "current_lt" | "current_le" | "current_gt"
+                    | "current_ge" => {}
+                    other if other.starts_with("carry") && other.ends_with("_eq") => {
+                        other[5..other.len() - 3].parse::<usize>().map_err(|_| {
+                            format!(
+                                "node `{}` has invalid flow control kind `{}`",
+                                node.name, other
+                            )
+                        })?;
+                    }
+                    other if other.starts_with("carry") && other.ends_with("_ne") => {
+                        other[5..other.len() - 3].parse::<usize>().map_err(|_| {
+                            format!(
+                                "node `{}` has invalid flow control kind `{}`",
+                                node.name, other
+                            )
+                        })?;
+                    }
                     other if other.starts_with("carry") && other.ends_with("_lt") => {
                         other[5..other.len() - 3].parse::<usize>().map_err(|_| {
                             format!(
@@ -899,7 +1023,23 @@ impl RegisteredMod for CpuMod {
                             )
                         })?;
                     }
+                    other if other.starts_with("carry") && other.ends_with("_le") => {
+                        other[5..other.len() - 3].parse::<usize>().map_err(|_| {
+                            format!(
+                                "node `{}` has invalid flow control kind `{}`",
+                                node.name, other
+                            )
+                        })?;
+                    }
                     other if other.starts_with("carry") && other.ends_with("_gt") => {
+                        other[5..other.len() - 3].parse::<usize>().map_err(|_| {
+                            format!(
+                                "node `{}` has invalid flow control kind `{}`",
+                                node.name, other
+                            )
+                        })?;
+                    }
+                    other if other.starts_with("carry") && other.ends_with("_ge") => {
                         other[5..other.len() - 3].parse::<usize>().map_err(|_| {
                             format!(
                                 "node `{}` has invalid flow control kind `{}`",
@@ -927,7 +1067,24 @@ impl RegisteredMod for CpuMod {
                     let cond_kind = chunk[1].as_str();
                     if cond_kind != "always" {
                         match cond_kind {
-                            "current_lt" | "current_gt" => {}
+                            "current_eq" | "current_ne" | "current_lt" | "current_le"
+                            | "current_gt" | "current_ge" => {}
+                            other if other.starts_with("carry") && other.ends_with("_eq") => {
+                                other[5..other.len() - 3].parse::<usize>().map_err(|_| {
+                                    format!(
+                                        "node `{}` has invalid conditional carry kind `{}`",
+                                        node.name, other
+                                    )
+                                })?;
+                            }
+                            other if other.starts_with("carry") && other.ends_with("_ne") => {
+                                other[5..other.len() - 3].parse::<usize>().map_err(|_| {
+                                    format!(
+                                        "node `{}` has invalid conditional carry kind `{}`",
+                                        node.name, other
+                                    )
+                                })?;
+                            }
                             other if other.starts_with("carry") && other.ends_with("_lt") => {
                                 other[5..other.len() - 3].parse::<usize>().map_err(|_| {
                                     format!(
@@ -936,7 +1093,23 @@ impl RegisteredMod for CpuMod {
                                     )
                                 })?;
                             }
+                            other if other.starts_with("carry") && other.ends_with("_le") => {
+                                other[5..other.len() - 3].parse::<usize>().map_err(|_| {
+                                    format!(
+                                        "node `{}` has invalid conditional carry kind `{}`",
+                                        node.name, other
+                                    )
+                                })?;
+                            }
                             other if other.starts_with("carry") && other.ends_with("_gt") => {
+                                other[5..other.len() - 3].parse::<usize>().map_err(|_| {
+                                    format!(
+                                        "node `{}` has invalid conditional carry kind `{}`",
+                                        node.name, other
+                                    )
+                                })?;
+                            }
+                            other if other.starts_with("carry") && other.ends_with("_ge") => {
                                 other[5..other.len() - 3].parse::<usize>().map_err(|_| {
                                     format!(
                                         "node `{}` has invalid conditional carry kind `{}`",
@@ -989,7 +1162,7 @@ impl RegisteredMod for CpuMod {
                     ));
                 }
                 match node.op.args[3].as_str() {
-                    "lt" | "le" | "gt" | "ge" => {}
+                    "eq" | "lt" | "le" | "gt" | "ge" => {}
                     other => {
                         return Err(format!(
                             "node `{}` has invalid loop compare kind `{}`",
@@ -1007,7 +1180,24 @@ impl RegisteredMod for CpuMod {
                     }
                 }
                 match node.op.args[5].as_str() {
-                    "current_lt" | "current_gt" => {}
+                    "current_eq" | "current_ne" | "current_lt" | "current_le" | "current_gt"
+                    | "current_ge" => {}
+                    other if other.starts_with("carry") && other.ends_with("_eq") => {
+                        other[5..other.len() - 3].parse::<usize>().map_err(|_| {
+                            format!(
+                                "node `{}` has invalid flow control kind `{}`",
+                                node.name, other
+                            )
+                        })?;
+                    }
+                    other if other.starts_with("carry") && other.ends_with("_ne") => {
+                        other[5..other.len() - 3].parse::<usize>().map_err(|_| {
+                            format!(
+                                "node `{}` has invalid flow control kind `{}`",
+                                node.name, other
+                            )
+                        })?;
+                    }
                     other if other.starts_with("carry") && other.ends_with("_lt") => {
                         other[5..other.len() - 3].parse::<usize>().map_err(|_| {
                             format!(
@@ -1016,7 +1206,23 @@ impl RegisteredMod for CpuMod {
                             )
                         })?;
                     }
+                    other if other.starts_with("carry") && other.ends_with("_le") => {
+                        other[5..other.len() - 3].parse::<usize>().map_err(|_| {
+                            format!(
+                                "node `{}` has invalid flow control kind `{}`",
+                                node.name, other
+                            )
+                        })?;
+                    }
                     other if other.starts_with("carry") && other.ends_with("_gt") => {
+                        other[5..other.len() - 3].parse::<usize>().map_err(|_| {
+                            format!(
+                                "node `{}` has invalid flow control kind `{}`",
+                                node.name, other
+                            )
+                        })?;
+                    }
+                    other if other.starts_with("carry") && other.ends_with("_ge") => {
                         other[5..other.len() - 3].parse::<usize>().map_err(|_| {
                             format!(
                                 "node `{}` has invalid flow control kind `{}`",
@@ -1043,8 +1249,39 @@ impl RegisteredMod for CpuMod {
                 for chunk in node.op.args[8..].chunks(5) {
                     let cond_kind = &chunk[1];
                     match cond_kind.as_str() {
-                        "always" | "current_lt" | "current_gt" => {}
+                        "always" | "current_eq" | "current_ne" | "current_lt" | "current_le"
+                        | "current_gt" | "current_ge" => {}
+                        _ if cond_kind.starts_with("carry") && cond_kind.ends_with("_eq") => {
+                            cond_kind[5..cond_kind.len() - 3]
+                                .parse::<usize>()
+                                .map_err(|_| {
+                                    format!(
+                                        "node `{}` has invalid conditional carry kind `{}`",
+                                        node.name, cond_kind
+                                    )
+                                })?;
+                        }
+                        _ if cond_kind.starts_with("carry") && cond_kind.ends_with("_ne") => {
+                            cond_kind[5..cond_kind.len() - 3]
+                                .parse::<usize>()
+                                .map_err(|_| {
+                                    format!(
+                                        "node `{}` has invalid conditional carry kind `{}`",
+                                        node.name, cond_kind
+                                    )
+                                })?;
+                        }
                         _ if cond_kind.starts_with("carry") && cond_kind.ends_with("_lt") => {
+                            cond_kind[5..cond_kind.len() - 3]
+                                .parse::<usize>()
+                                .map_err(|_| {
+                                    format!(
+                                        "node `{}` has invalid conditional carry kind `{}`",
+                                        node.name, cond_kind
+                                    )
+                                })?;
+                        }
+                        _ if cond_kind.starts_with("carry") && cond_kind.ends_with("_le") => {
                             cond_kind[5..cond_kind.len() - 3]
                                 .parse::<usize>()
                                 .map_err(|_| {

@@ -2,6 +2,12 @@ use data FabricPlane;
 use shader SurfaceShader;
 
 mod cpu Main {
+  type FabricBindings = HandleTable<FabricPlaneBindings>;
+  type PassStatus = ShaderResult<Pass>;
+  type FrameStatus = ShaderResult<Frame>;
+  type ShaderPacketWindow = Window<SurfaceShaderPacket>;
+  type HostFrameWindow = Window<Frame>;
+
   fn main() {
     cpu_bind_core(0);
     cpu_window(320, 200, "shader_result_family_profile_demo");
@@ -37,28 +43,27 @@ mod cpu Main {
       shader_profile_packet("SurfaceShader", panel_color, panel_speed, panel_radius);
 
     data_profile_bind_core("FabricPlane");
-    let fabric_handles: HandleTable<FabricPlaneBindings> =
-      data_profile_handle_table("FabricPlane");
+    let fabric_handles: FabricBindings = data_profile_handle_table("FabricPlane");
 
-    let pass_result: ShaderResult<Pass> =
+    let pass_result: PassStatus =
       shader_result(shader_profile_begin_pass("SurfaceShader"));
     let pass_ready: bool = shader_pass_ready(pass_result);
 
-    let gpu_packet_draw: Window<SurfaceShaderPacket> =
+    let gpu_packet_draw: ShaderPacketWindow =
       data_profile_send_uplink("FabricPlane", render_controls);
-    let draw_result: ShaderResult<Frame> = shader_result(
+    let draw_result: FrameStatus = shader_result(
       shader_profile_draw_instanced("SurfaceShader", shader_value(pass_result), gpu_packet_draw)
     );
     let draw_ready: bool = shader_frame_ready(draw_result);
-    let host_draw_preview: Window<Frame> =
+    let host_draw_preview: HostFrameWindow =
       data_profile_send_downlink("FabricPlane", shader_value(draw_result));
 
-    let gpu_packet_render: Window<SurfaceShaderPacket> =
+    let gpu_packet_render: ShaderPacketWindow =
       data_profile_send_uplink("FabricPlane", render_controls);
-    let frame_result: ShaderResult<Frame> =
+    let frame_result: FrameStatus =
       shader_result(shader_profile_render("SurfaceShader", gpu_packet_render));
     let frame_ready: bool = shader_frame_ready(frame_result);
-    let host_frame: Window<Frame> =
+    let host_frame: HostFrameWindow =
       data_profile_send_downlink("FabricPlane", shader_value(frame_result));
 
     print(

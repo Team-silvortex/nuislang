@@ -1225,8 +1225,11 @@ fn render_ast_binary_op(op: AstBinaryOp) -> &'static str {
         AstBinaryOp::Mul => "*",
         AstBinaryOp::Div => "/",
         AstBinaryOp::Eq => "==",
+        AstBinaryOp::Ne => "!=",
         AstBinaryOp::Lt => "<",
+        AstBinaryOp::Le => "<=",
         AstBinaryOp::Gt => ">",
+        AstBinaryOp::Ge => ">=",
     }
 }
 
@@ -1237,8 +1240,11 @@ fn render_nir_binary_op(op: NirBinaryOp) -> &'static str {
         NirBinaryOp::Mul => "*",
         NirBinaryOp::Div => "/",
         NirBinaryOp::Eq => "==",
+        NirBinaryOp::Ne => "!=",
         NirBinaryOp::Lt => "<",
+        NirBinaryOp::Le => "<=",
         NirBinaryOp::Gt => ">",
+        NirBinaryOp::Ge => ">=",
     }
 }
 
