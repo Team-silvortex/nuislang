@@ -1,0 +1,8 @@
+mod cpu Main {
+  const LIMIT = 7;
+
+  fn main() -> i64 {
+    print(LIMIT);
+    return LIMIT;
+  }
+}

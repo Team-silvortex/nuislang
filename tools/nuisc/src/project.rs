@@ -3211,7 +3211,7 @@ fn find_profile_call_declared_type(
                 ..
             }
             | AstStmt::Const {
-                ty,
+                ty: Some(ty),
                 value:
                     AstExpr::Call {
                         callee: stmt_callee,

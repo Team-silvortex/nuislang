@@ -1,0 +1,19 @@
+mod cpu Main {
+  fn main() -> i64 {
+    if true {
+      const LIMIT = 7;
+      print(LIMIT);
+      return LIMIT;
+    } else {
+      match 1 {
+        1 => {
+          const LIMIT = 8;
+          return LIMIT;
+        }
+        _ => {
+          return 9;
+        }
+      }
+    }
+  }
+}

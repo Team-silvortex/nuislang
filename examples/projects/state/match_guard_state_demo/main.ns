@@ -1,0 +1,16 @@
+mod cpu Main {
+  fn main() -> i64 {
+    let ready: bool = true;
+    while 1 == 1 {
+      match 2 {
+        2 if ready => {
+          return 7;
+        }
+        _ => {
+          return 9;
+        }
+      }
+    }
+    return 0;
+  }
+}

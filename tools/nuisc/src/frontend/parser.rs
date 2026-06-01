@@ -222,8 +222,12 @@ impl Parser {
         }
         self.expect_word("const")?;
         let name = self.expect_ident()?;
-        self.expect_symbol(':')?;
-        let ty = self.parse_type_ref()?;
+        let ty = if self.peek_symbol(':') {
+            self.expect_symbol(':')?;
+            Some(self.parse_type_ref()?)
+        } else {
+            None
+        };
         self.expect_symbol('=')?;
         let value = self.parse_expr()?;
         self.expect_symbol(';')?;
@@ -573,14 +577,7 @@ impl Parser {
         } else {
             None
         };
-        self.expect_symbol('{')?;
-
-        let mut body = Vec::new();
-        while !self.peek_symbol('}') {
-            body.push(self.parse_stmt()?);
-        }
-
-        self.expect_symbol('}')?;
+        let body = self.parse_block()?;
 
         Ok(AstFunction {
             visibility,
@@ -1171,8 +1168,12 @@ impl Parser {
     fn parse_const_stmt(&mut self) -> Result<AstStmt, String> {
         self.expect_word("const")?;
         let name = self.expect_ident()?;
-        self.expect_symbol(':')?;
-        let ty = self.parse_type_ref()?;
+        let ty = if self.peek_symbol(':') {
+            self.expect_symbol(':')?;
+            Some(self.parse_type_ref()?)
+        } else {
+            None
+        };
         self.expect_symbol('=')?;
         let value = self.parse_expr()?;
         self.expect_symbol(';')?;
@@ -1251,10 +1252,20 @@ impl Parser {
         let mut arms = Vec::new();
         while !self.peek_symbol('}') {
             let pattern = self.parse_match_pattern()?;
+            let guard = if self.peek_word("if") {
+                self.expect_word("if")?;
+                Some(self.parse_condition_expr()?)
+            } else {
+                None
+            };
             self.expect_symbol('=')?;
             self.expect_symbol('>')?;
             let body = self.parse_block()?;
-            arms.push(AstMatchArm { pattern, body });
+            arms.push(AstMatchArm {
+                pattern,
+                guard,
+                body,
+            });
             if self.peek_symbol(',') {
                 self.expect_symbol(',')?;
             }
@@ -1280,13 +1291,64 @@ impl Parser {
     }
 
     fn parse_match_pattern(&mut self) -> Result<AstMatchPattern, String> {
+        let mut patterns = vec![self.parse_single_match_pattern()?];
+        while self.peek_symbol('|') && !self.peek_symbol_pair('|', '|') {
+            self.expect_symbol('|')?;
+            patterns.push(self.parse_single_match_pattern()?);
+        }
+        if patterns.len() == 1 {
+            return Ok(patterns.pop().expect("pattern exists"));
+        }
+        if patterns
+            .iter()
+            .any(|pattern| matches!(pattern, AstMatchPattern::Wildcard))
+        {
+            return Err(
+                "minimal `match` does not allow `_` inside multi-pattern arms; use a final standalone `_ => ...` arm"
+                    .to_owned(),
+            );
+        }
+        Ok(AstMatchPattern::Or(patterns))
+    }
+
+    fn parse_single_match_pattern(&mut self) -> Result<AstMatchPattern, String> {
         match self.next() {
             Some(Token::Word(word)) if word == "_" => Ok(AstMatchPattern::Wildcard),
             Some(Token::Word(word)) if word == "true" => Ok(AstMatchPattern::Bool(true)),
             Some(Token::Word(word)) if word == "false" => Ok(AstMatchPattern::Bool(false)),
-            Some(Token::Integer(value)) => Ok(AstMatchPattern::Int(value)),
+            Some(Token::Integer(value)) => {
+                if self.peek_symbol('.') && matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol('.')))
+                {
+                    self.expect_symbol('.')?;
+                    self.expect_symbol('.')?;
+                    self.expect_symbol('=')?;
+                    let end = match self.next() {
+                        Some(Token::Integer(value)) => value,
+                        Some(other) => {
+                            return Err(format!(
+                                "expected integer literal after `..=` in match range pattern, found {}",
+                                describe_token(&other)
+                            ))
+                        }
+                        None => {
+                            return Err(
+                                "unexpected end of input after `..=` in match range pattern"
+                                    .to_owned(),
+                            )
+                        }
+                    };
+                    if value > end {
+                        return Err(format!(
+                            "inclusive match range `{value}..={end}` must have start <= end"
+                        ));
+                    }
+                    Ok(AstMatchPattern::IntRangeInclusive(value, end))
+                } else {
+                    Ok(AstMatchPattern::Int(value))
+                }
+            }
             Some(other) => Err(format!(
-                "expected `true`, `false`, integer literal, or `_` in match arm pattern, found {}",
+                "expected `true`, `false`, integer literal, integer range, or `_` in match arm pattern, found {}",
                 describe_token(&other)
             )),
             None => Err("unexpected end of input in match arm pattern".to_owned()),
@@ -1615,12 +1677,46 @@ impl Parser {
 
     fn parse_block(&mut self) -> Result<Vec<AstStmt>, String> {
         self.expect_symbol('{')?;
-        let mut body = Vec::new();
-        while !self.peek_symbol('}') {
-            body.push(self.parse_stmt()?);
-        }
+        let body = self.parse_block_body()?;
         self.expect_symbol('}')?;
         Ok(body)
+    }
+
+    fn parse_block_body(&mut self) -> Result<Vec<AstStmt>, String> {
+        let mut body = Vec::new();
+        while !self.peek_symbol('}') {
+            if self.can_start_tail_expr_stmt() {
+                let checkpoint = self.cursor;
+                let parsed_expr = self.parse_expr();
+                match parsed_expr {
+                    Ok(expr) if self.peek_symbol('}') => {
+                        body.push(AstStmt::Return(Some(expr)));
+                        break;
+                    }
+                    Ok(_) | Err(_) => {
+                        self.cursor = checkpoint;
+                    }
+                }
+            }
+            body.push(self.parse_stmt()?);
+        }
+        Ok(body)
+    }
+
+    fn can_start_tail_expr_stmt(&self) -> bool {
+        !self.peek_symbol('}')
+            && !self.peek_word("let")
+            && !self.peek_word("const")
+            && !self.peek_word("link")
+            && !self.peek_word("if")
+            && !self.peek_word("match")
+            && !self.peek_word("while")
+            && !self.peek_word("loop")
+            && !self.peek_word("break")
+            && !self.peek_word("continue")
+            && !self.peek_word("return")
+            && !self.peek_word("await")
+            && !self.peek_word("mod")
     }
 
     fn parse_struct_field_list(&mut self) -> Result<Vec<(String, AstExpr)>, String> {

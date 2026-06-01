@@ -42,11 +42,17 @@ pub fn render_ast(module: &AstModule) -> String {
     }
     for constant in &module.consts {
         let visibility_prefix = render_ast_visibility(constant.visibility);
+        let rendered_type = constant
+            .ty
+            .as_ref()
+            .map(render_ast_type)
+            .map(|ty| format!(": {ty}"))
+            .unwrap_or_default();
         out.push_str(&format!(
-            "  {}const {}: {} = {}\n",
+            "  {}const {}{} = {}\n",
             visibility_prefix,
             constant.name,
-            render_ast_type(&constant.ty),
+            rendered_type,
             render_ast_expr(&constant.value)
         ));
     }
@@ -102,10 +108,14 @@ pub fn render_ast(module: &AstModule) -> String {
                     ));
                 }
                 AstStmt::Const { name, ty, value } => {
+                    let type_suffix = ty
+                        .as_ref()
+                        .map(|ty| format!(": {}", render_ast_type(ty)))
+                        .unwrap_or_default();
                     out.push_str(&format!(
-                        "    const {}: {} = {}\n",
+                        "    const {}{} = {}\n",
                         name,
-                        render_ast_type(ty),
+                        type_suffix,
                         render_ast_expr(value)
                     ));
                 }
@@ -132,10 +142,15 @@ pub fn render_ast(module: &AstModule) -> String {
                     out.push_str(&format!("    match {}\n", render_ast_expr(value)));
                     for arm in arms {
                         let pattern = render_ast_match_pattern(&arm.pattern);
+                        let guarded_pattern = arm
+                            .guard
+                            .as_ref()
+                            .map(|guard| format!("{pattern} if {}", render_ast_expr(guard)))
+                            .unwrap_or(pattern);
                         for stmt in &arm.body {
                             out.push_str(&format!(
                                 "      arm {} {}\n",
-                                pattern,
+                                guarded_pattern,
                                 render_ast_stmt_inline(stmt)
                             ));
                         }
@@ -1648,12 +1663,11 @@ fn render_ast_stmt_inline(stmt: &AstStmt) -> String {
             format!("let {}{} = {}", name, suffix, render_ast_expr(value))
         }
         AstStmt::Const { name, ty, value } => {
-            format!(
-                "const {}: {} = {}",
-                name,
-                render_ast_type(ty),
-                render_ast_expr(value)
-            )
+            let suffix = ty
+                .as_ref()
+                .map(|ty| format!(": {}", render_ast_type(ty)))
+                .unwrap_or_default();
+            format!("const {}{} = {}", name, suffix, render_ast_expr(value))
         }
         AstStmt::Print(value) => format!("print {}", render_ast_expr(value)),
         AstStmt::Await(value) => format!("await {}", render_ast_expr(value)),
@@ -1675,6 +1689,12 @@ fn render_ast_match_pattern(pattern: &AstMatchPattern) -> String {
         AstMatchPattern::Wildcard => "_".to_owned(),
         AstMatchPattern::Bool(value) => value.to_string(),
         AstMatchPattern::Int(value) => value.to_string(),
+        AstMatchPattern::IntRangeInclusive(start, end) => format!("{start}..={end}"),
+        AstMatchPattern::Or(patterns) => patterns
+            .iter()
+            .map(render_ast_match_pattern)
+            .collect::<Vec<_>>()
+            .join(" | "),
     }
 }
 

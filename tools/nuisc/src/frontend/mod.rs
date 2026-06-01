@@ -779,6 +779,7 @@ fn rewrite_effectful_match_scrutinees_in_block(
                         .iter()
                         .map(|arm| AstMatchArm {
                             pattern: arm.pattern.clone(),
+                            guard: arm.guard.clone(),
                             body: rewrite_effectful_match_scrutinees_in_block(&arm.body, counter),
                         })
                         .collect(),
@@ -790,6 +791,7 @@ fn rewrite_effectful_match_scrutinees_in_block(
                     .iter()
                     .map(|arm| AstMatchArm {
                         pattern: arm.pattern.clone(),
+                        guard: arm.guard.clone(),
                         body: rewrite_effectful_match_scrutinees_in_block(&arm.body, counter),
                     })
                     .collect(),
@@ -1053,6 +1055,21 @@ fn expand_lambda_block(
                     .map(|arm| {
                         Ok(AstMatchArm {
                             pattern: arm.pattern.clone(),
+                            guard: arm
+                                .guard
+                                .clone()
+                                .map(|guard| {
+                                    rewrite_lambda_expr(
+                                        &guard,
+                                        &aliases,
+                                        &locals,
+                                        module_const_names,
+                                        owning_function_name,
+                                        counter,
+                                        synthesized,
+                                    )
+                                })
+                                .transpose()?,
                             body: expand_lambda_block(
                                 &arm.body,
                                 &aliases,
@@ -1701,6 +1718,20 @@ fn rewrite_higher_order_calls_in_stmt(
                 .map(|arm| {
                     Ok(AstMatchArm {
                         pattern: arm.pattern.clone(),
+                        guard: arm
+                            .guard
+                            .as_ref()
+                            .map(|guard| {
+                                rewrite_higher_order_calls_in_expr(
+                                    guard,
+                                    templates,
+                                    function_table,
+                                    visible_type_aliases,
+                                    specialized_cache,
+                                    specialized_functions,
+                                )
+                            })
+                            .transpose()?,
                         body: rewrite_higher_order_calls_in_block(
                             &arm.body,
                             templates,
@@ -2163,6 +2194,21 @@ fn rewrite_higher_order_template_stmt(
                 .map(|arm| {
                     Ok(AstMatchArm {
                         pattern: arm.pattern.clone(),
+                        guard: arm
+                            .guard
+                            .as_ref()
+                            .map(|guard| {
+                                rewrite_higher_order_template_expr(
+                                    guard,
+                                    callable_bindings,
+                                    templates,
+                                    function_table,
+                                    visible_type_aliases,
+                                    specialized_cache,
+                                    specialized_functions,
+                                )
+                            })
+                            .transpose()?,
                         body: rewrite_higher_order_template_block(
                             &arm.body,
                             callable_bindings,
@@ -3420,8 +3466,14 @@ fn lower_module_const_items(
     let mut lowered_items = Vec::new();
     let mut local_consts = BTreeMap::new();
     for constant in &module.consts {
-        let expected = lower_type_ref_with_aliases(&constant.ty, type_aliases)?;
-        validate_type_ref(&expected)?;
+        let expected = constant
+            .ty
+            .as_ref()
+            .map(|ty| lower_type_ref_with_aliases(ty, type_aliases))
+            .transpose()?;
+        if let Some(expected) = &expected {
+            validate_type_ref(expected)?;
+        }
         let type_bindings = const_type_bindings(&available_consts);
         let lowered_value = lower_expr_with_async(
             &constant.value,
@@ -3431,12 +3483,12 @@ fn lower_module_const_items(
             &available_consts,
             signatures,
             struct_table,
-            Some(&expected),
+            expected.as_ref(),
             false,
         )?;
         let inferred =
             infer_nir_expr_type(&lowered_value, &type_bindings, signatures, struct_table);
-        let final_type = resolve_declared_or_inferred(&constant.name, Some(expected), inferred)?;
+        let final_type = resolve_declared_or_inferred(&constant.name, expected, inferred)?;
         let lowered = ModuleConstValue {
             visibility: lower_visibility(constant.visibility),
             ty: final_type.clone(),
@@ -3588,7 +3640,9 @@ fn collect_inferred_return_types_from_block(
                 }
             }
             AstStmt::Const { name, ty, .. } => {
-                env.insert(name.clone(), ty.clone());
+                if let Some(ty) = ty.clone() {
+                    env.insert(name.clone(), ty);
+                }
             }
             AstStmt::If {
                 then_body,
@@ -3994,7 +4048,7 @@ fn rewrite_generic_calls_in_stmt(
         AstStmt::Const { name, ty, value } => {
             let rewritten_value = rewrite_generic_calls_in_expr(
                 value,
-                Some(ty),
+                ty.as_ref(),
                 env,
                 generic_templates,
                 impl_lookup,
@@ -4004,10 +4058,21 @@ fn rewrite_generic_calls_in_stmt(
                 specialized_functions,
                 specialized_signatures,
             )?;
-            env.insert(name.clone(), ty.clone());
+            let inferred = ty.clone().or_else(|| {
+                infer_ast_expr_type(
+                    &rewritten_value,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                )
+            });
+            if let Some(inferred_ty) = &inferred {
+                env.insert(name.clone(), inferred_ty.clone());
+            }
             AstStmt::Const {
                 name: name.clone(),
-                ty: ty.clone(),
+                ty: inferred.or_else(|| ty.clone()),
                 value: rewritten_value,
             }
         }
@@ -4188,6 +4253,24 @@ fn rewrite_generic_calls_in_match_arms(
         let mut arm_env = env.clone();
         rewritten.push(AstMatchArm {
             pattern: arm.pattern.clone(),
+            guard: arm
+                .guard
+                .as_ref()
+                .map(|guard| {
+                    rewrite_generic_calls_in_expr(
+                        guard,
+                        Some(&ast_named_type("bool")),
+                        &mut arm_env,
+                        generic_templates,
+                        impl_lookup,
+                        struct_table,
+                        function_return_types,
+                        specialization_cache,
+                        specialized_functions,
+                        specialized_signatures,
+                    )
+                })
+                .transpose()?,
             body: rewrite_generic_calls_in_block(
                 &arm.body,
                 current_return_type,
@@ -4623,7 +4706,10 @@ fn specialize_stmt_types(
                 },
                 AstStmt::Const { name, ty, value } => AstStmt::Const {
                     name: name.clone(),
-                    ty: specialize_ast_type_ref(ty, substitutions)?,
+                    ty: ty
+                        .as_ref()
+                        .map(|ty| specialize_ast_type_ref(ty, substitutions))
+                        .transpose()?,
                     value: value.clone(),
                 },
                 AstStmt::If {
@@ -4642,6 +4728,7 @@ fn specialize_stmt_types(
                         .map(|arm| {
                             Ok(AstMatchArm {
                                 pattern: arm.pattern.clone(),
+                                guard: arm.guard.clone(),
                                 body: specialize_stmt_types(&arm.body, substitutions)?,
                             })
                         })
@@ -5154,8 +5241,13 @@ fn lower_stmt_with_async(
             }
         }
         AstStmt::Const { name, ty, value } => {
-            let expected = lower_type_ref_with_aliases(ty, type_aliases)?;
-            validate_type_ref(&expected)?;
+            let expected = ty
+                .as_ref()
+                .map(|ty| lower_type_ref_with_aliases(ty, type_aliases))
+                .transpose()?;
+            if let Some(expected_ty) = expected.as_ref() {
+                validate_type_ref(expected_ty)?;
+            }
             let lowered = lower_expr_with_async(
                 value,
                 current_domain,
@@ -5164,11 +5256,11 @@ fn lower_stmt_with_async(
                 module_consts,
                 signatures,
                 struct_table,
-                Some(&expected),
+                expected.as_ref(),
                 false,
             )?;
             let inferred = infer_nir_expr_type(&lowered, bindings, signatures, struct_table);
-            let final_type = resolve_declared_or_inferred(name, Some(expected), inferred)?;
+            let final_type = resolve_declared_or_inferred(name, expected, inferred)?;
             bindings.insert(name.clone(), final_type.clone());
             NirStmt::Const {
                 name: name.clone(),
@@ -5382,10 +5474,12 @@ fn lower_match_stmt_with_async(
     })?;
     let wildcard_index = arms
         .iter()
-        .position(|arm| matches!(arm.pattern, AstMatchPattern::Wildcard))
-        .ok_or_else(|| "minimal `match` currently requires a final `_` arm".to_owned())?;
+        .position(|arm| matches!(arm.pattern, AstMatchPattern::Wildcard) && arm.guard.is_none())
+        .ok_or_else(|| "minimal `match` currently requires a final unguarded `_` arm".to_owned())?;
     if wildcard_index != arms.len() - 1 {
-        return Err("minimal `match` currently requires `_` to be the final arm".to_owned());
+        return Err(
+            "minimal `match` currently requires an unguarded `_` to be the final arm".to_owned(),
+        );
     }
 
     let mut wildcard_bindings = bindings.clone();
@@ -5408,55 +5502,35 @@ fn lower_match_stmt_with_async(
         .collect::<Result<Vec<_>, _>>()?;
 
     for arm in arms[..wildcard_index].iter().rev() {
-        let condition = match (&arm.pattern, value_kind) {
-            (AstMatchPattern::Bool(true), nuis_semantics::model::NirScalarKind::Bool) => {
-                lowered_value.clone()
-            }
-            (AstMatchPattern::Bool(false), nuis_semantics::model::NirScalarKind::Bool) => {
-                let mut then_bindings = bindings.clone();
-                let else_body_for_false = arm
-                    .body
-                    .iter()
-                    .map(|stmt| {
-                        lower_stmt_with_async(
-                            stmt,
-                            current_domain,
-                            current_function_is_async,
-                            &mut then_bindings,
-                            module_consts,
-                            return_type,
-                            type_aliases,
-                            signatures,
-                            struct_table,
-                        )
-                    })
-                    .collect::<Result<Vec<_>, _>>()?;
-                else_body = vec![NirStmt::If {
-                    condition: lowered_value.clone(),
-                    then_body: else_body,
-                    else_body: else_body_for_false,
-                }];
-                continue;
-            }
-            (AstMatchPattern::Int(value), nuis_semantics::model::NirScalarKind::I64) => {
-                NirExpr::Binary {
-                    op: NirBinaryOp::Eq,
-                    lhs: Box::new(lowered_value.clone()),
-                    rhs: Box::new(NirExpr::Int(*value)),
+        let mut condition =
+            lower_match_pattern_condition(&arm.pattern, &lowered_value, value_kind)?;
+        if let Some(guard) = &arm.guard {
+            let lowered_guard = lower_expr_with_async(
+                guard,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                module_consts,
+                signatures,
+                struct_table,
+                Some(&bool_type()),
+                false,
+            )?;
+            match nir_expr_effect_class(&lowered_guard) {
+                NirExprEffectClass::Pure | NirExprEffectClass::LocalReadOnly => {}
+                _ => {
+                    return Err(
+                        "minimal `match` currently requires a pure or local-read-only guard"
+                            .to_owned(),
+                    )
                 }
             }
-            (AstMatchPattern::Bool(_), _) => {
-                return Err(
-                    "`match` arm pattern `true`/`false` requires a `bool` scrutinee".to_owned(),
-                )
-            }
-            (AstMatchPattern::Int(_), _) => {
-                return Err(
-                    "minimal `match` integer patterns require an `i64` scrutinee".to_owned(),
-                )
-            }
-            (AstMatchPattern::Wildcard, _) => unreachable!("wildcard handled separately"),
-        };
+            condition = NirExpr::Binary {
+                op: NirBinaryOp::And,
+                lhs: Box::new(condition),
+                rhs: Box::new(lowered_guard),
+            };
+        }
         let mut then_bindings = bindings.clone();
         let then_body = arm
             .body
@@ -5486,6 +5560,74 @@ fn lower_match_stmt_with_async(
         .into_iter()
         .next()
         .ok_or_else(|| "internal error: lowered empty `match` body".to_owned())
+}
+
+fn lower_match_pattern_condition(
+    pattern: &AstMatchPattern,
+    lowered_value: &NirExpr,
+    value_kind: nuis_semantics::model::NirScalarKind,
+) -> Result<NirExpr, String> {
+    match (pattern, value_kind) {
+        (AstMatchPattern::Wildcard, _) => {
+            unreachable!("wildcard pattern should be handled before lowering")
+        }
+        (AstMatchPattern::Bool(true), nuis_semantics::model::NirScalarKind::Bool) => {
+            Ok(lowered_value.clone())
+        }
+        (AstMatchPattern::Bool(false), nuis_semantics::model::NirScalarKind::Bool) => {
+            Ok(NirExpr::Binary {
+                op: NirBinaryOp::Eq,
+                lhs: Box::new(lowered_value.clone()),
+                rhs: Box::new(NirExpr::Bool(false)),
+            })
+        }
+        (AstMatchPattern::Int(value), nuis_semantics::model::NirScalarKind::I64) => {
+            Ok(NirExpr::Binary {
+                op: NirBinaryOp::Eq,
+                lhs: Box::new(lowered_value.clone()),
+                rhs: Box::new(NirExpr::Int(*value)),
+            })
+        }
+        (
+            AstMatchPattern::IntRangeInclusive(start, end),
+            nuis_semantics::model::NirScalarKind::I64,
+        ) => Ok(NirExpr::Binary {
+            op: NirBinaryOp::And,
+            lhs: Box::new(NirExpr::Binary {
+                op: NirBinaryOp::Ge,
+                lhs: Box::new(lowered_value.clone()),
+                rhs: Box::new(NirExpr::Int(*start)),
+            }),
+            rhs: Box::new(NirExpr::Binary {
+                op: NirBinaryOp::Le,
+                lhs: Box::new(lowered_value.clone()),
+                rhs: Box::new(NirExpr::Int(*end)),
+            }),
+        }),
+        (AstMatchPattern::Or(patterns), kind) => {
+            let mut conditions = patterns
+                .iter()
+                .map(|pattern| lower_match_pattern_condition(pattern, lowered_value, kind))
+                .collect::<Result<Vec<_>, _>>()?;
+            let first = conditions
+                .drain(..1)
+                .next()
+                .ok_or_else(|| "multi-pattern match arm cannot be empty".to_owned())?;
+            Ok(conditions
+                .into_iter()
+                .fold(first, |lhs, rhs| NirExpr::Binary {
+                    op: NirBinaryOp::Or,
+                    lhs: Box::new(lhs),
+                    rhs: Box::new(rhs),
+                }))
+        }
+        (AstMatchPattern::Bool(_), _) => {
+            Err("`match` arm pattern `true`/`false` requires a `bool` scrutinee".to_owned())
+        }
+        (AstMatchPattern::Int(_), _) | (AstMatchPattern::IntRangeInclusive(_, _), _) => {
+            Err("minimal `match` integer patterns require an `i64` scrutinee".to_owned())
+        }
+    }
 }
 
 fn lower_expr(
@@ -19865,6 +20007,7 @@ fn render_type_name(ty: &NirTypeRef) -> String {
 #[cfg(test)]
 mod tests {
     use super::lower_project_ast_to_nir;
+    use super::lower_type_ref;
     use super::parse_nuis_ast;
     use super::parse_nuis_module;
     use nuis_semantics::model::{
@@ -22376,6 +22519,28 @@ mod tests {
         assert_eq!(ast.consts.len(), 1);
         assert!(matches!(ast.consts[0].visibility, AstVisibility::Public));
         assert_eq!(ast.consts[0].name, "LIMIT");
+        assert_eq!(
+            ast.consts[0]
+                .ty
+                .as_ref()
+                .map(|ty| lower_type_ref(ty).render())
+                .as_deref(),
+            Some("i64")
+        );
+    }
+
+    #[test]
+    fn parses_top_level_const_items_without_explicit_type() {
+        let ast = parse_nuis_ast(
+            r#"
+            mod cpu Main {
+              const LIMIT = 7;
+            }
+            "#,
+        )
+        .unwrap();
+        assert_eq!(ast.consts.len(), 1);
+        assert!(ast.consts[0].ty.is_none());
     }
 
     #[test]
@@ -22397,6 +22562,485 @@ mod tests {
             module.functions[0].body.first(),
             Some(NirStmt::Return(Some(NirExpr::Int(7))))
         ));
+    }
+
+    #[test]
+    fn infers_top_level_const_item_types_from_values() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              const LIMIT = 7;
+
+              fn main() -> i64 {
+                return LIMIT;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        assert_eq!(module.consts.len(), 1);
+        assert_eq!(module.consts[0].ty.render(), "i64");
+        assert!(matches!(
+            module.functions[0].body.first(),
+            Some(NirStmt::Return(Some(NirExpr::Int(7))))
+        ));
+    }
+
+    #[test]
+    fn parses_local_const_without_explicit_type() {
+        let ast = parse_nuis_ast(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                const LIMIT = 7;
+                return LIMIT;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        match &ast.functions[0].body[0] {
+            AstStmt::Const { ty, .. } => assert!(ty.is_none()),
+            other => panic!("expected local const statement, found {other:?}"),
+        }
+    }
+
+    #[test]
+    fn infers_local_const_item_types_inside_branches() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                if true {
+                  const LIMIT = 7;
+                  return LIMIT;
+                } else {
+                  match 1 {
+                    1 => {
+                      const LIMIT = 8;
+                      return LIMIT;
+                    }
+                    _ => {
+                      return 9;
+                    }
+                  }
+                }
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        match &module.functions[0].body[0] {
+            NirStmt::If {
+                then_body,
+                else_body,
+                ..
+            } => {
+                match &then_body[0] {
+                    NirStmt::Const { ty, .. } => assert_eq!(ty.render(), "i64"),
+                    other => panic!("expected inferred const in then branch, found {other:?}"),
+                }
+                match &else_body[0] {
+                    NirStmt::If { then_body, .. } => match &then_body[0] {
+                        NirStmt::Const { ty, .. } => assert_eq!(ty.render(), "i64"),
+                        other => {
+                            panic!("expected inferred const in match arm branch, found {other:?}")
+                        }
+                    },
+                    other => panic!("expected lowered match branch if, found {other:?}"),
+                }
+            }
+            other => panic!("expected if statement, found {other:?}"),
+        }
+    }
+
+    #[test]
+    fn lowers_implicit_tail_expr_returns_in_functions() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                7
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        assert!(matches!(
+            module.functions[0].body.as_slice(),
+            [NirStmt::Return(Some(NirExpr::Int(7)))]
+        ));
+    }
+
+    #[test]
+    fn infers_missing_function_return_types_from_implicit_tail_expr_branches() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn branchy(flag: bool) {
+                if flag {
+                  7
+                } else {
+                  match 1 {
+                    1 => { 8 }
+                    _ => { 9 }
+                  }
+                }
+              }
+
+              fn main() {
+                branchy(true)
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        let branchy = module
+            .functions
+            .iter()
+            .find(|function| function.name == "branchy")
+            .unwrap();
+        assert_eq!(
+            branchy
+                .return_type
+                .as_ref()
+                .map(|ty| ty.render())
+                .as_deref(),
+            Some("i64")
+        );
+        let main = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert_eq!(
+            main.return_type.as_ref().map(|ty| ty.render()).as_deref(),
+            Some("i64")
+        );
+    }
+
+    #[test]
+    fn lowers_multi_pattern_match_arms_inside_while() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                while 1 == 1 {
+                  match 2 {
+                    1 | 2 => {
+                      return 7;
+                    }
+                    _ => {
+                      return 9;
+                    }
+                  }
+                }
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        match &module.functions[0].body[0] {
+            NirStmt::While { body, .. } => match &body[0] {
+                NirStmt::If {
+                    condition,
+                    then_body,
+                    else_body,
+                } => {
+                    match condition {
+                        NirExpr::Binary {
+                            op: NirBinaryOp::Or,
+                            lhs,
+                            rhs,
+                        } => {
+                            for side in [lhs.as_ref(), rhs.as_ref()] {
+                                match side {
+                                    NirExpr::Binary { op, rhs, .. } => {
+                                        assert_eq!(*op, NirBinaryOp::Eq);
+                                        assert!(matches!(rhs.as_ref(), NirExpr::Int(1) | NirExpr::Int(2)));
+                                    }
+                                    other => panic!(
+                                        "expected equality term in multi-pattern condition, found {other:?}"
+                                    ),
+                                }
+                            }
+                        }
+                        other => panic!(
+                            "expected `or` condition for multi-pattern match arm, found {other:?}"
+                        ),
+                    }
+                    assert!(matches!(
+                        then_body.as_slice(),
+                        [NirStmt::Return(Some(NirExpr::Int(7)))]
+                    ));
+                    assert!(matches!(
+                        else_body.as_slice(),
+                        [NirStmt::Return(Some(NirExpr::Int(9)))]
+                    ));
+                }
+                other => panic!("expected lowered match if in while body, found {other:?}"),
+            },
+            other => panic!("expected while statement, found {other:?}"),
+        }
+    }
+
+    #[test]
+    fn lowers_inclusive_range_match_arms_inside_while() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                while 1 == 1 {
+                  match 2 {
+                    1..=3 => {
+                      return 7;
+                    }
+                    _ => {
+                      return 9;
+                    }
+                  }
+                }
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        match &module.functions[0].body[0] {
+            NirStmt::While { body, .. } => match &body[0] {
+                NirStmt::If {
+                    condition,
+                    then_body,
+                    else_body,
+                } => {
+                    match condition {
+                        NirExpr::Binary {
+                            op: NirBinaryOp::And,
+                            lhs,
+                            rhs,
+                        } => {
+                            match lhs.as_ref() {
+                                NirExpr::Binary { op, rhs, .. } => {
+                                    assert_eq!(*op, NirBinaryOp::Ge);
+                                    assert!(matches!(rhs.as_ref(), NirExpr::Int(1)));
+                                }
+                                other => panic!(
+                                    "expected lower-bound comparison in range match, found {other:?}"
+                                ),
+                            }
+                            match rhs.as_ref() {
+                                NirExpr::Binary { op, rhs, .. } => {
+                                    assert_eq!(*op, NirBinaryOp::Le);
+                                    assert!(matches!(rhs.as_ref(), NirExpr::Int(3)));
+                                }
+                                other => panic!(
+                                    "expected upper-bound comparison in range match, found {other:?}"
+                                ),
+                            }
+                        }
+                        other => {
+                            panic!("expected `and` condition for range match arm, found {other:?}")
+                        }
+                    }
+                    assert!(matches!(
+                        then_body.as_slice(),
+                        [NirStmt::Return(Some(NirExpr::Int(7)))]
+                    ));
+                    assert!(matches!(
+                        else_body.as_slice(),
+                        [NirStmt::Return(Some(NirExpr::Int(9)))]
+                    ));
+                }
+                other => panic!("expected lowered match if in while body, found {other:?}"),
+            },
+            other => panic!("expected while statement, found {other:?}"),
+        }
+    }
+
+    #[test]
+    fn lowers_match_guard_arms_inside_while() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let ready: bool = true;
+                while 1 == 1 {
+                  match 2 {
+                    2 if ready => {
+                      return 7;
+                    }
+                    _ => {
+                      return 9;
+                    }
+                  }
+                }
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        match &module.functions[0].body[1] {
+            NirStmt::While { body, .. } => match &body[0] {
+                NirStmt::If {
+                    condition,
+                    then_body,
+                    else_body,
+                } => {
+                    match condition {
+                        NirExpr::Binary {
+                            op: NirBinaryOp::And,
+                            lhs,
+                            rhs,
+                        } => {
+                            match lhs.as_ref() {
+                                NirExpr::Binary { op, rhs, .. } => {
+                                    assert_eq!(*op, NirBinaryOp::Eq);
+                                    assert!(matches!(rhs.as_ref(), NirExpr::Int(2)));
+                                }
+                                other => panic!(
+                                    "expected equality term in guarded match condition, found {other:?}"
+                                ),
+                            }
+                            assert!(matches!(
+                                rhs.as_ref(),
+                                NirExpr::Bool(true) | NirExpr::Var(_)
+                            ));
+                        }
+                        other => panic!(
+                            "expected `and` condition for guarded match arm, found {other:?}"
+                        ),
+                    }
+                    assert!(matches!(
+                        then_body.as_slice(),
+                        [NirStmt::Return(Some(NirExpr::Int(7)))]
+                    ));
+                    assert!(matches!(
+                        else_body.as_slice(),
+                        [NirStmt::Return(Some(NirExpr::Int(9)))]
+                    ));
+                }
+                other => panic!("expected lowered match if in while body, found {other:?}"),
+            },
+            other => panic!("expected while statement after let binding, found {other:?}"),
+        }
+    }
+
+    #[test]
+    fn lowers_multiple_guarded_match_arms_inside_while() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let ready: bool = true;
+                let armed: bool = false;
+                while 1 == 1 {
+                  match 2 {
+                    1 if armed => {
+                      return 5;
+                    }
+                    2 if ready => {
+                      return 7;
+                    }
+                    _ => {
+                      return 9;
+                    }
+                  }
+                }
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        match &module.functions[0].body[2] {
+            NirStmt::While { body, .. } => match &body[0] {
+                NirStmt::If {
+                    condition,
+                    then_body,
+                    else_body,
+                } => {
+                    match condition {
+                        NirExpr::Binary {
+                            op: NirBinaryOp::And,
+                            lhs,
+                            rhs,
+                        } => {
+                            match lhs.as_ref() {
+                                NirExpr::Binary { op, rhs, .. } => {
+                                    assert_eq!(*op, NirBinaryOp::Eq);
+                                    assert!(matches!(rhs.as_ref(), NirExpr::Int(1)));
+                                }
+                                other => panic!(
+                                    "expected equality term in first guarded match condition, found {other:?}"
+                                ),
+                            }
+                            assert!(matches!(
+                                rhs.as_ref(),
+                                NirExpr::Bool(false) | NirExpr::Var(_)
+                            ));
+                        }
+                        other => panic!(
+                            "expected `and` condition for first guarded match arm, found {other:?}"
+                        ),
+                    }
+                    assert!(matches!(
+                        then_body.as_slice(),
+                        [NirStmt::Return(Some(NirExpr::Int(5)))]
+                    ));
+                    match else_body.as_slice() {
+                        [NirStmt::If {
+                            condition,
+                            then_body,
+                            else_body,
+                        }] => {
+                            match condition {
+                                NirExpr::Binary {
+                                    op: NirBinaryOp::And,
+                                    lhs,
+                                    rhs,
+                                } => {
+                                    match lhs.as_ref() {
+                                        NirExpr::Binary { op, rhs, .. } => {
+                                            assert_eq!(*op, NirBinaryOp::Eq);
+                                            assert!(matches!(rhs.as_ref(), NirExpr::Int(2)));
+                                        }
+                                        other => panic!(
+                                            "expected equality term in second guarded match condition, found {other:?}"
+                                        ),
+                                    }
+                                    assert!(matches!(
+                                        rhs.as_ref(),
+                                        NirExpr::Bool(true) | NirExpr::Var(_)
+                                    ));
+                                }
+                                other => panic!(
+                                    "expected `and` condition for second guarded match arm, found {other:?}"
+                                ),
+                            }
+                            assert!(matches!(
+                                then_body.as_slice(),
+                                [NirStmt::Return(Some(NirExpr::Int(7)))]
+                            ));
+                            assert!(matches!(
+                                else_body.as_slice(),
+                                [NirStmt::Return(Some(NirExpr::Int(9)))]
+                            ));
+                        }
+                        other => panic!(
+                            "expected nested if chain for multiple guarded match arms, found {other:?}"
+                        ),
+                    }
+                }
+                other => panic!("expected lowered match if in while body, found {other:?}"),
+            },
+            other => panic!("expected while statement after let bindings, found {other:?}"),
+        }
     }
 
     #[test]
@@ -26712,7 +27356,7 @@ mod tests {
         )
         .unwrap_err();
 
-        assert!(error.contains("requires a final `_` arm"));
+        assert!(error.contains("requires a final unguarded `_` arm"));
     }
 
     #[test]

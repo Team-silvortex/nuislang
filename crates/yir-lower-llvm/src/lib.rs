@@ -5,7 +5,7 @@ use yir_verify::verify_module;
 
 #[derive(Clone)]
 enum LlvmValueRef {
-    Bool(String),
+    Bool { i1: String, i64: String },
     I32(String),
     I64(String),
     F32(String),
@@ -67,13 +67,17 @@ fn lower_cpu_literal_node(node: &Node, state: &mut LlvmLoweringState) -> bool {
                     return true;
                 }
             };
-            state
-                .registers
-                .insert(node.name.clone(), LlvmValueRef::Bool(value.to_owned()));
             let widened = fresh_reg(&mut state.next_reg);
             state
                 .body
                 .push(format!("  {widened} = zext i1 {value} to i64"));
+            state.registers.insert(
+                node.name.clone(),
+                LlvmValueRef::Bool {
+                    i1: value.to_owned(),
+                    i64: widened.clone(),
+                },
+            );
             state.last_cpu_value = Some(widened);
             true
         }
@@ -447,9 +451,15 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 };
                 let cmp = fresh_reg(&mut next_reg);
                 body.push(format!("  {cmp} = icmp eq i32 {lhs}, {rhs}"));
-                registers.insert(node.name.clone(), LlvmValueRef::Bool(cmp.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = zext i1 {cmp} to i64"));
+                registers.insert(
+                    node.name.clone(),
+                    LlvmValueRef::Bool {
+                        i1: cmp.clone(),
+                        i64: widened.clone(),
+                    },
+                );
                 *last_cpu_value = Some(widened);
             }
             ("cpu", "eq_f32") => {
@@ -465,9 +475,15 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 };
                 let cmp = fresh_reg(&mut next_reg);
                 body.push(format!("  {cmp} = fcmp oeq float {lhs}, {rhs}"));
-                registers.insert(node.name.clone(), LlvmValueRef::Bool(cmp.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = zext i1 {cmp} to i64"));
+                registers.insert(
+                    node.name.clone(),
+                    LlvmValueRef::Bool {
+                        i1: cmp.clone(),
+                        i64: widened.clone(),
+                    },
+                );
                 *last_cpu_value = Some(widened);
             }
             ("cpu", "eq_f64") => {
@@ -483,9 +499,15 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 };
                 let cmp = fresh_reg(&mut next_reg);
                 body.push(format!("  {cmp} = fcmp oeq double {lhs}, {rhs}"));
-                registers.insert(node.name.clone(), LlvmValueRef::Bool(cmp.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = zext i1 {cmp} to i64"));
+                registers.insert(
+                    node.name.clone(),
+                    LlvmValueRef::Bool {
+                        i1: cmp.clone(),
+                        i64: widened.clone(),
+                    },
+                );
                 *last_cpu_value = Some(widened);
             }
             ("cpu", "ne") => {
@@ -548,9 +570,15 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 };
                 let cmp = fresh_reg(&mut next_reg);
                 body.push(format!("  {cmp} = icmp slt i32 {lhs}, {rhs}"));
-                registers.insert(node.name.clone(), LlvmValueRef::Bool(cmp.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = zext i1 {cmp} to i64"));
+                registers.insert(
+                    node.name.clone(),
+                    LlvmValueRef::Bool {
+                        i1: cmp.clone(),
+                        i64: widened.clone(),
+                    },
+                );
                 *last_cpu_value = Some(widened);
             }
             ("cpu", "lt_f32") => {
@@ -566,9 +594,15 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 };
                 let cmp = fresh_reg(&mut next_reg);
                 body.push(format!("  {cmp} = fcmp olt float {lhs}, {rhs}"));
-                registers.insert(node.name.clone(), LlvmValueRef::Bool(cmp.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = zext i1 {cmp} to i64"));
+                registers.insert(
+                    node.name.clone(),
+                    LlvmValueRef::Bool {
+                        i1: cmp.clone(),
+                        i64: widened.clone(),
+                    },
+                );
                 *last_cpu_value = Some(widened);
             }
             ("cpu", "lt_f64") => {
@@ -584,9 +618,15 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 };
                 let cmp = fresh_reg(&mut next_reg);
                 body.push(format!("  {cmp} = fcmp olt double {lhs}, {rhs}"));
-                registers.insert(node.name.clone(), LlvmValueRef::Bool(cmp.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = zext i1 {cmp} to i64"));
+                registers.insert(
+                    node.name.clone(),
+                    LlvmValueRef::Bool {
+                        i1: cmp.clone(),
+                        i64: widened.clone(),
+                    },
+                );
                 *last_cpu_value = Some(widened);
             }
             ("cpu", "gt") => {
@@ -620,9 +660,15 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 };
                 let cmp = fresh_reg(&mut next_reg);
                 body.push(format!("  {cmp} = icmp sgt i32 {lhs}, {rhs}"));
-                registers.insert(node.name.clone(), LlvmValueRef::Bool(cmp.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = zext i1 {cmp} to i64"));
+                registers.insert(
+                    node.name.clone(),
+                    LlvmValueRef::Bool {
+                        i1: cmp.clone(),
+                        i64: widened.clone(),
+                    },
+                );
                 *last_cpu_value = Some(widened);
             }
             ("cpu", "gt_f32") => {
@@ -638,9 +684,15 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 };
                 let cmp = fresh_reg(&mut next_reg);
                 body.push(format!("  {cmp} = fcmp ogt float {lhs}, {rhs}"));
-                registers.insert(node.name.clone(), LlvmValueRef::Bool(cmp.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = zext i1 {cmp} to i64"));
+                registers.insert(
+                    node.name.clone(),
+                    LlvmValueRef::Bool {
+                        i1: cmp.clone(),
+                        i64: widened.clone(),
+                    },
+                );
                 *last_cpu_value = Some(widened);
             }
             ("cpu", "gt_f64") => {
@@ -656,9 +708,15 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 };
                 let cmp = fresh_reg(&mut next_reg);
                 body.push(format!("  {cmp} = fcmp ogt double {lhs}, {rhs}"));
-                registers.insert(node.name.clone(), LlvmValueRef::Bool(cmp.clone()));
                 let widened = fresh_reg(&mut next_reg);
                 body.push(format!("  {widened} = zext i1 {cmp} to i64"));
+                registers.insert(
+                    node.name.clone(),
+                    LlvmValueRef::Bool {
+                        i1: cmp.clone(),
+                        i64: widened.clone(),
+                    },
+                );
                 *last_cpu_value = Some(widened);
             }
             ("cpu", "le") => {
@@ -4103,6 +4161,7 @@ fn render_dynamic_extern_decls(module: &YirModule) -> Vec<String> {
 fn get_i64<'a>(registers: &'a BTreeMap<String, LlvmValueRef>, name: &str) -> Option<&'a str> {
     match registers.get(name) {
         Some(LlvmValueRef::I64(value)) => Some(value.as_str()),
+        Some(LlvmValueRef::Bool { i64, .. }) => Some(i64.as_str()),
         Some(LlvmValueRef::TextHandle { handle, .. }) => Some(handle.as_str()),
         _ => None,
     }
@@ -4117,7 +4176,7 @@ fn get_i32<'a>(registers: &'a BTreeMap<String, LlvmValueRef>, name: &str) -> Opt
 
 fn get_bool<'a>(registers: &'a BTreeMap<String, LlvmValueRef>, name: &str) -> Option<&'a str> {
     match registers.get(name) {
-        Some(LlvmValueRef::Bool(value)) => Some(value.as_str()),
+        Some(LlvmValueRef::Bool { i1, .. }) => Some(i1.as_str()),
         _ => None,
     }
 }
@@ -4159,11 +4218,7 @@ fn coerce_to_i64(
             body.push(format!("  {reg} = sext i32 {value} to i64"));
             Some(reg)
         }
-        LlvmValueRef::Bool(value) => {
-            let reg = fresh_reg(next_reg);
-            body.push(format!("  {reg} = zext i1 {value} to i64"));
-            Some(reg)
-        }
+        LlvmValueRef::Bool { i64, .. } => Some(i64.clone()),
         LlvmValueRef::F32(value) => {
             let reg = fresh_reg(next_reg);
             body.push(format!("  {reg} = fptosi float {value} to i64"));

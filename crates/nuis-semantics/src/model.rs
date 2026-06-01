@@ -40,7 +40,7 @@ pub struct AstModule {
 pub struct AstConstItem {
     pub visibility: AstVisibility,
     pub name: String,
-    pub ty: AstTypeRef,
+    pub ty: Option<AstTypeRef>,
     pub value: AstExpr,
 }
 
@@ -234,11 +234,14 @@ pub enum AstMatchPattern {
     Wildcard,
     Bool(bool),
     Int(i64),
+    IntRangeInclusive(i64, i64),
+    Or(Vec<AstMatchPattern>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AstMatchArm {
     pub pattern: AstMatchPattern,
+    pub guard: Option<AstExpr>,
     pub body: Vec<AstStmt>,
 }
 
@@ -251,7 +254,7 @@ pub enum AstStmt {
     },
     Const {
         name: String,
-        ty: AstTypeRef,
+        ty: Option<AstTypeRef>,
         value: AstExpr,
     },
     Print(AstExpr),
