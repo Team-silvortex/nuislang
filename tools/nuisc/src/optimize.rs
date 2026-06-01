@@ -1331,6 +1331,8 @@ fn collect_used_vars_expr(expr: &NirExpr, out: &mut BTreeSet<String>) {
 
 fn fold_int_binary(op: NirBinaryOp, lhs: i64, rhs: i64) -> Option<i64> {
     match op {
+        NirBinaryOp::And => Some(((lhs != 0) && (rhs != 0)) as i64),
+        NirBinaryOp::Or => Some(((lhs != 0) || (rhs != 0)) as i64),
         NirBinaryOp::Add => Some(lhs + rhs),
         NirBinaryOp::Sub => Some(lhs - rhs),
         NirBinaryOp::Mul => Some(lhs * rhs),

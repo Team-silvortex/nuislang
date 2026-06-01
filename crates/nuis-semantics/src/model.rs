@@ -321,6 +321,8 @@ pub enum AstExpr {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AstBinaryOp {
+    And,
+    Or,
     Add,
     Sub,
     Mul,
@@ -1497,6 +1499,8 @@ pub enum NirExpr {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NirBinaryOp {
+    And,
+    Or,
     Add,
     Sub,
     Mul,

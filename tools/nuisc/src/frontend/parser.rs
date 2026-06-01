@@ -1298,7 +1298,45 @@ impl Parser {
     }
 
     fn parse_expr(&mut self) -> Result<AstExpr, String> {
-        self.parse_equality()
+        self.parse_or()
+    }
+
+    fn parse_or(&mut self) -> Result<AstExpr, String> {
+        let mut expr = self.parse_and()?;
+        loop {
+            if self.peek_symbol_pair('|', '|') {
+                self.expect_symbol('|')?;
+                self.expect_symbol('|')?;
+                let rhs = self.parse_and()?;
+                expr = AstExpr::Binary {
+                    op: AstBinaryOp::Or,
+                    lhs: Box::new(expr),
+                    rhs: Box::new(rhs),
+                };
+            } else {
+                break;
+            }
+        }
+        Ok(expr)
+    }
+
+    fn parse_and(&mut self) -> Result<AstExpr, String> {
+        let mut expr = self.parse_equality()?;
+        loop {
+            if self.peek_symbol_pair('&', '&') {
+                self.expect_symbol('&')?;
+                self.expect_symbol('&')?;
+                let rhs = self.parse_equality()?;
+                expr = AstExpr::Binary {
+                    op: AstBinaryOp::And,
+                    lhs: Box::new(expr),
+                    rhs: Box::new(rhs),
+                };
+            } else {
+                break;
+            }
+        }
+        Ok(expr)
     }
 
     fn parse_equality(&mut self) -> Result<AstExpr, String> {

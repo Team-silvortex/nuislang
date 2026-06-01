@@ -57,6 +57,7 @@ pub fn lower_project_ast_to_nir(
         .collect::<Vec<_>>();
     let visible_type_aliases = build_visible_type_alias_map(&expanded_module, &local_cpu_helpers)?;
     let expanded_module = expand_higher_order_functions(&expanded_module, &visible_type_aliases)?;
+    let expanded_module = expand_effectful_match_scrutinees(&expanded_module);
     let module = &expanded_module;
     validate_export_annotations(module)?;
     validate_extern_host_symbols(module)?;
@@ -656,6 +657,100 @@ pub fn lower_project_ast_to_nir(
     Ok(nir)
 }
 
+fn ast_expr_requires_match_hoist(expr: &AstExpr) -> bool {
+    match expr {
+        AstExpr::Call { .. }
+        | AstExpr::Invoke { .. }
+        | AstExpr::MethodCall { .. }
+        | AstExpr::Await(_)
+        | AstExpr::Instantiate { .. } => true,
+        AstExpr::FieldAccess { base, .. } => ast_expr_requires_match_hoist(base),
+        AstExpr::Binary { lhs, rhs, .. } => {
+            ast_expr_requires_match_hoist(lhs) || ast_expr_requires_match_hoist(rhs)
+        }
+        AstExpr::StructLiteral { fields, .. } => fields
+            .iter()
+            .any(|(_, value)| ast_expr_requires_match_hoist(value)),
+        AstExpr::Bool(_)
+        | AstExpr::Text(_)
+        | AstExpr::Int(_)
+        | AstExpr::Var(_)
+        | AstExpr::Lambda { .. } => false,
+    }
+}
+
+fn expand_effectful_match_scrutinees(module: &AstModule) -> AstModule {
+    let mut expanded = module.clone();
+    expanded.functions = module
+        .functions
+        .iter()
+        .map(rewrite_effectful_match_scrutinees_in_function)
+        .collect();
+    expanded
+}
+
+fn rewrite_effectful_match_scrutinees_in_function(function: &AstFunction) -> AstFunction {
+    let mut counter = 0usize;
+    let mut rewritten = function.clone();
+    rewritten.body = rewrite_effectful_match_scrutinees_in_block(&function.body, &mut counter);
+    rewritten
+}
+
+fn rewrite_effectful_match_scrutinees_in_block(
+    body: &[AstStmt],
+    counter: &mut usize,
+) -> Vec<AstStmt> {
+    let mut rewritten = Vec::new();
+    for stmt in body {
+        match stmt {
+            AstStmt::If {
+                condition,
+                then_body,
+                else_body,
+            } => rewritten.push(AstStmt::If {
+                condition: condition.clone(),
+                then_body: rewrite_effectful_match_scrutinees_in_block(then_body, counter),
+                else_body: rewrite_effectful_match_scrutinees_in_block(else_body, counter),
+            }),
+            AstStmt::Match { value, arms } if ast_expr_requires_match_hoist(value) => {
+                let temp_name = format!("__match_scrutinee_{counter}");
+                *counter += 1;
+                rewritten.push(AstStmt::Let {
+                    name: temp_name.clone(),
+                    ty: None,
+                    value: value.clone(),
+                });
+                rewritten.push(AstStmt::Match {
+                    value: AstExpr::Var(temp_name),
+                    arms: arms
+                        .iter()
+                        .map(|arm| AstMatchArm {
+                            pattern: arm.pattern.clone(),
+                            body: rewrite_effectful_match_scrutinees_in_block(&arm.body, counter),
+                        })
+                        .collect(),
+                });
+            }
+            AstStmt::Match { value, arms } => rewritten.push(AstStmt::Match {
+                value: value.clone(),
+                arms: arms
+                    .iter()
+                    .map(|arm| AstMatchArm {
+                        pattern: arm.pattern.clone(),
+                        body: rewrite_effectful_match_scrutinees_in_block(&arm.body, counter),
+                    })
+                    .collect(),
+            }),
+            AstStmt::While { condition, body } => rewritten.push(AstStmt::While {
+                condition: condition.clone(),
+                body: rewrite_effectful_match_scrutinees_in_block(body, counter),
+            }),
+            other => rewritten.push(other.clone()),
+        }
+    }
+    rewritten
+}
+
 fn expand_module_lambdas(module: &AstModule) -> Result<AstModule, String> {
     let module_const_names = module
         .consts
@@ -793,7 +888,9 @@ fn expand_lambda_block(
                 )
                 .map_err(|error| {
                     if error == "inline lambda currently requires an explicit return type" {
-                        format!("lambda binding `{name}` currently requires an explicit return type")
+                        format!(
+                            "lambda binding `{name}` currently requires an explicit return type"
+                        )
                     } else {
                         error
                     }
@@ -1083,8 +1180,15 @@ fn rewrite_lambda_expr(
     synthesized: &mut Vec<AstFunction>,
 ) -> Result<AstExpr, String> {
     Ok(match expr {
-        AstExpr::Var(name) if lambda_aliases.contains_key(name) && !module_const_names.contains(name) => {
-            AstExpr::Var(lambda_aliases.get(name).cloned().unwrap_or_else(|| name.clone()))
+        AstExpr::Var(name)
+            if lambda_aliases.contains_key(name) && !module_const_names.contains(name) =>
+        {
+            AstExpr::Var(
+                lambda_aliases
+                    .get(name)
+                    .cloned()
+                    .unwrap_or_else(|| name.clone()),
+            )
         }
         AstExpr::Lambda { .. } => {
             let AstExpr::Lambda {
@@ -1280,8 +1384,27 @@ fn rewrite_lambda_expr(
     })
 }
 
-fn is_fn1_type(ty: &AstTypeRef) -> bool {
-    ty.name == "Fn1" && ty.generic_args.len() == 2 && !ty.is_optional && !ty.is_ref
+fn callable_type_arity(ty: &AstTypeRef) -> Option<usize> {
+    if ty.is_optional || ty.is_ref {
+        return None;
+    }
+    match ty.name.as_str() {
+        "Fn1" if ty.generic_args.len() == 2 => Some(1),
+        "Fn2" if ty.generic_args.len() == 3 => Some(2),
+        _ => None,
+    }
+}
+
+fn is_callable_type(ty: &AstTypeRef) -> bool {
+    callable_type_arity(ty).is_some()
+}
+
+fn is_callable_type_with_aliases(
+    ty: &AstTypeRef,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+) -> Result<bool, String> {
+    let resolved = resolve_ast_type_ref_aliases(ty, visible_type_aliases)?;
+    Ok(is_callable_type(&resolved))
 }
 
 fn sanitize_symbol_fragment(name: &str) -> String {
@@ -1293,29 +1416,52 @@ fn sanitize_symbol_fragment(name: &str) -> String {
         .collect()
 }
 
-fn function_type_matches_fn1(
+fn function_type_matches_callable(
     callable: &AstFunction,
     expected: &AstTypeRef,
+    generic_names: &BTreeSet<String>,
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
 ) -> Result<bool, String> {
-    if !is_fn1_type(expected) {
+    let expected = resolve_ast_type_ref_aliases(expected, visible_type_aliases)?;
+    let Some(arity) = callable_type_arity(&expected) else {
         return Ok(false);
-    }
-    if callable.params.len() != 1 {
+    };
+    if callable.params.len() != arity {
         return Ok(false);
     }
     let Some(callable_return_type) = &callable.return_type else {
         return Ok(false);
     };
-    let expected_arg =
-        lower_type_ref_with_aliases(&expected.generic_args[0], visible_type_aliases)?;
-    let expected_return =
-        lower_type_ref_with_aliases(&expected.generic_args[1], visible_type_aliases)?;
-    let callable_arg =
-        lower_type_ref_with_aliases(&callable.params[0].ty, visible_type_aliases)?;
-    let callable_return =
-        lower_type_ref_with_aliases(callable_return_type, visible_type_aliases)?;
-    Ok(callable_arg == expected_arg && callable_return == expected_return)
+    let expected_parts = expected.generic_args[..arity]
+        .iter()
+        .chain(std::iter::once(&expected.generic_args[arity]))
+        .map(|arg| {
+            lower_type_ref_with_aliases(arg, visible_type_aliases).map(|ty| ast_type_from_nir(&ty))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let callable_parts = callable
+        .params
+        .iter()
+        .map(|param| {
+            lower_type_ref_with_aliases(&param.ty, visible_type_aliases)
+                .map(|ty| ast_type_from_nir(&ty))
+        })
+        .chain(std::iter::once(
+            lower_type_ref_with_aliases(callable_return_type, visible_type_aliases)
+                .map(|ty| ast_type_from_nir(&ty)),
+        ))
+        .collect::<Result<Vec<_>, _>>()?;
+    let mut substitutions = BTreeMap::<String, AstTypeRef>::new();
+    for (expected_part, callable_part) in expected_parts.iter().zip(callable_parts.iter()) {
+        unify_generic_type_pattern(
+            expected_part,
+            callable_part,
+            generic_names,
+            &mut substitutions,
+            &callable.name,
+        )?;
+    }
+    Ok(true)
 }
 
 fn expand_higher_order_functions(
@@ -1325,7 +1471,11 @@ fn expand_higher_order_functions(
     let templates = module
         .functions
         .iter()
-        .filter(|function| function.params.iter().any(|param| is_fn1_type(&param.ty)))
+        .filter(|function| {
+            function.params.iter().any(|param| {
+                is_callable_type_with_aliases(&param.ty, visible_type_aliases).unwrap_or(false)
+            })
+        })
         .map(|function| (function.name.clone(), function.clone()))
         .collect::<BTreeMap<_, _>>();
     if templates.is_empty() {
@@ -1347,14 +1497,16 @@ fn expand_higher_order_functions(
         if templates.contains_key(&function.name) {
             continue;
         }
-        expanded.functions.push(rewrite_higher_order_calls_in_function(
-            function,
-            &templates,
-            &function_table,
-            visible_type_aliases,
-            &mut specialized_cache,
-            &mut specialized_functions,
-        )?);
+        expanded
+            .functions
+            .push(rewrite_higher_order_calls_in_function(
+                function,
+                &templates,
+                &function_table,
+                visible_type_aliases,
+                &mut specialized_cache,
+                &mut specialized_functions,
+            )?);
     }
     expanded.functions.extend(specialized_functions);
     Ok(expanded)
@@ -1720,6 +1872,11 @@ fn specialize_higher_order_call(
     let mut callable_bindings = BTreeMap::<String, String>::new();
     let mut ordinary_args = Vec::new();
     let mut callable_fragments = Vec::new();
+    let generic_names = template
+        .generic_params
+        .iter()
+        .map(|param| param.name.clone())
+        .collect::<BTreeSet<_>>();
 
     for (param, arg) in template.params.iter().zip(args) {
         let rewritten_arg = rewrite_higher_order_calls_in_expr(
@@ -1730,7 +1887,7 @@ fn specialize_higher_order_call(
             specialized_cache,
             specialized_functions,
         )?;
-        if is_fn1_type(&param.ty) {
+        if is_callable_type_with_aliases(&param.ty, visible_type_aliases)? {
             let AstExpr::Var(callable_name) = &rewritten_arg else {
                 return Err(format!(
                     "higher-order parameter `{}` currently expects a no-capture lambda or named function symbol",
@@ -1743,12 +1900,15 @@ fn specialize_higher_order_call(
                     param.name, callable_name
                 )
             })?;
-            if !function_type_matches_fn1(callable, &param.ty, visible_type_aliases)? {
+            if !function_type_matches_callable(
+                callable,
+                &param.ty,
+                &generic_names,
+                visible_type_aliases,
+            )? {
                 return Err(format!(
                     "callable `{}` does not match higher-order parameter `{}` of type `{}`",
-                    callable_name,
-                    param.name,
-                    param.ty.name
+                    callable_name, param.name, param.ty.name
                 ));
             }
             callable_bindings.insert(param.name.clone(), callable_name.clone());
@@ -1758,11 +1918,7 @@ fn specialize_higher_order_call(
         }
     }
 
-    let specialized_name = format!(
-        "__hof_{}_{}",
-        callee,
-        callable_fragments.join("__")
-    );
+    let specialized_name = format!("__hof_{}_{}", callee, callable_fragments.join("__"));
     if specialized_cache.insert(specialized_name.clone()) {
         let specialized = specialize_higher_order_template(
             template,
@@ -1814,11 +1970,13 @@ fn specialize_higher_order_template(
         test_clock_domain: None,
         test_clock_policy: None,
         is_async: template.is_async,
-        generic_params: Vec::new(),
+        generic_params: template.generic_params.clone(),
         params: template
             .params
             .iter()
-            .filter(|param| !is_fn1_type(&param.ty))
+            .filter(|param| {
+                !is_callable_type_with_aliases(&param.ty, visible_type_aliases).unwrap_or(false)
+            })
             .cloned()
             .collect(),
         return_type: template.return_type.clone(),
@@ -4656,6 +4814,32 @@ fn infer_ast_expr_type_inner(
             | AstBinaryOp::Le
             | AstBinaryOp::Gt
             | AstBinaryOp::Ge => Some(ast_named_type("bool")),
+            AstBinaryOp::And | AstBinaryOp::Or => {
+                let lhs_ty = infer_ast_expr_type_inner(
+                    lhs,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                let rhs_ty = infer_ast_expr_type_inner(
+                    rhs,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                if lower_type_ref(&lhs_ty).render() == lower_type_ref(&rhs_ty).render()
+                    && lhs_ty.name == "bool"
+                    && rhs_ty.name == "bool"
+                {
+                    Some(ast_named_type("bool"))
+                } else {
+                    None
+                }
+            }
             AstBinaryOp::Add | AstBinaryOp::Sub | AstBinaryOp::Mul | AstBinaryOp::Div => {
                 let lhs_ty = infer_ast_expr_type_inner(
                     lhs,
@@ -5185,7 +5369,7 @@ fn lower_expr_with_async(
                 NirExpr::Var(name.clone())
             } else if signatures.contains_key(name) {
                 return Err(format!(
-                    "function symbol `{name}` cannot currently be used as a first-class value; pass it only to `Fn1<...>` higher-order parameters or invoke it directly"
+                    "function symbol `{name}` cannot currently be used as a first-class value; pass it only to `Fn1<...>`/`Fn2<...>` higher-order parameters or invoke it directly"
                 ));
             } else {
                 return Err(format!("unknown value `{name}`"));
@@ -5510,7 +5694,12 @@ fn lower_binary_expr_with_async(
     let result_ty = binary_result_type(*op, &lhs_ty, &rhs_ty)?;
     if matches!(
         op,
-        AstBinaryOp::Add | AstBinaryOp::Sub | AstBinaryOp::Mul | AstBinaryOp::Div
+        AstBinaryOp::Add
+            | AstBinaryOp::Sub
+            | AstBinaryOp::Mul
+            | AstBinaryOp::Div
+            | AstBinaryOp::And
+            | AstBinaryOp::Or
     ) && (!compatible_types(&lhs_ty, &result_ty) || !compatible_types(&rhs_ty, &result_ty))
     {
         return Err(format!(
@@ -5521,6 +5710,8 @@ fn lower_binary_expr_with_async(
     }
     Ok(NirExpr::Binary {
         op: match op {
+            AstBinaryOp::And => NirBinaryOp::And,
+            AstBinaryOp::Or => NirBinaryOp::Or,
             AstBinaryOp::Add => NirBinaryOp::Add,
             AstBinaryOp::Sub => NirBinaryOp::Sub,
             AstBinaryOp::Mul => NirBinaryOp::Mul,
@@ -5543,6 +5734,25 @@ fn binary_result_type(
     rhs: &NirTypeRef,
 ) -> Result<NirTypeRef, String> {
     match op {
+        AstBinaryOp::And | AstBinaryOp::Or => {
+            if !compatible_types(lhs, rhs) {
+                return Err(format!(
+                    "binary `{}` expects matching operand types, found `{}` and `{}`",
+                    render_binary_op(op),
+                    lhs.render(),
+                    rhs.render()
+                ));
+            }
+            if !lhs.is_bool_scalar() || !rhs.is_bool_scalar() {
+                return Err(format!(
+                    "binary `{}` currently expects bool scalar operands, found `{}` and `{}`",
+                    render_binary_op(op),
+                    lhs.render(),
+                    rhs.render()
+                ));
+            }
+            Ok(bool_type())
+        }
         AstBinaryOp::Add | AstBinaryOp::Sub | AstBinaryOp::Mul | AstBinaryOp::Div => {
             if !compatible_types(lhs, rhs) {
                 return Err(format!(
@@ -5607,6 +5817,8 @@ fn binary_result_type(
 
 fn render_binary_op(op: AstBinaryOp) -> &'static str {
     match op {
+        AstBinaryOp::And => "&&",
+        AstBinaryOp::Or => "||",
         AstBinaryOp::Add => "+",
         AstBinaryOp::Sub => "-",
         AstBinaryOp::Mul => "*",
@@ -18168,6 +18380,16 @@ fn infer_nir_expr_type(
             let lhs_ty = infer_nir_expr_type(lhs, bindings, signatures, struct_table)?;
             let rhs_ty = infer_nir_expr_type(rhs, bindings, signatures, struct_table)?;
             match op {
+                NirBinaryOp::And | NirBinaryOp::Or => {
+                    if compatible_types(&lhs_ty, &rhs_ty)
+                        && lhs_ty.is_bool_scalar()
+                        && rhs_ty.is_bool_scalar()
+                    {
+                        Some(bool_type())
+                    } else {
+                        None
+                    }
+                }
                 NirBinaryOp::Add | NirBinaryOp::Sub | NirBinaryOp::Mul | NirBinaryOp::Div => {
                     if compatible_types(&lhs_ty, &rhs_ty) && lhs_ty.is_numeric_scalar() {
                         Some(lhs_ty)
@@ -26744,5 +26966,367 @@ mod tests {
             [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
                 if callee == &specialized.name && matches!(args.as_slice(), [NirExpr::Int(6)])
         ));
+    }
+
+    #[test]
+    fn lowers_named_function_passed_to_named_fn1_function() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn plus_one(x: i64) -> i64 {
+                return x + 1;
+              }
+
+              fn apply(x: i64, f: Fn1<i64, i64>) -> i64 {
+                return f(x);
+              }
+
+              fn main() -> i64 {
+                return apply(6, plus_one);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let plus_one = module
+            .functions
+            .iter()
+            .find(|function| function.name == "plus_one")
+            .expect("expected source function");
+        let specialized = module
+            .functions
+            .iter()
+            .find(|function| function.name.starts_with("__hof_apply_"))
+            .expect("expected synthesized higher-order specialization");
+        assert_eq!(specialized.params.len(), 1);
+        assert_eq!(specialized.params[0].name, "x");
+        assert!(matches!(
+            specialized.body.as_slice(),
+            [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+                if callee == &plus_one.name && matches!(args.as_slice(), [NirExpr::Var(name)] if name == "x")
+        ));
+
+        let main = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            main.body.as_slice(),
+            [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+                if callee == &specialized.name && matches!(args.as_slice(), [NirExpr::Int(6)])
+        ));
+    }
+
+    #[test]
+    fn lowers_no_capture_lambda_passed_to_named_fn2_function() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn apply2(x: i64, y: i64, f: Fn2<i64, i64, i64>) -> i64 {
+                return f(x, y);
+              }
+
+              fn main() -> i64 {
+                return apply2(6, 1, |x: i64, y: i64| -> i64 { return x + y; });
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let lambda = module
+            .functions
+            .iter()
+            .find(|function| function.name.starts_with("__lambda_main_"))
+            .expect("expected synthesized lambda function");
+        let specialized = module
+            .functions
+            .iter()
+            .find(|function| function.name.starts_with("__hof_apply2_"))
+            .expect("expected synthesized higher-order specialization");
+        assert_eq!(specialized.params.len(), 2);
+        assert_eq!(specialized.params[0].name, "x");
+        assert_eq!(specialized.params[1].name, "y");
+        assert!(matches!(
+            specialized.body.as_slice(),
+            [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+                if callee == &lambda.name
+                    && matches!(args.as_slice(), [NirExpr::Var(x), NirExpr::Var(y)] if x == "x" && y == "y")
+        ));
+
+        let main = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            main.body.as_slice(),
+            [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+                if callee == &specialized.name
+                    && matches!(args.as_slice(), [NirExpr::Int(6), NirExpr::Int(1)])
+        ));
+    }
+
+    #[test]
+    fn lowers_named_function_passed_to_named_fn2_function() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn plus(x: i64, y: i64) -> i64 {
+                return x + y;
+              }
+
+              fn apply2(x: i64, y: i64, f: Fn2<i64, i64, i64>) -> i64 {
+                return f(x, y);
+              }
+
+              fn main() -> i64 {
+                return apply2(6, 1, plus);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let plus = module
+            .functions
+            .iter()
+            .find(|function| function.name == "plus")
+            .expect("expected source function");
+        let specialized = module
+            .functions
+            .iter()
+            .find(|function| function.name.starts_with("__hof_apply2_"))
+            .expect("expected synthesized higher-order specialization");
+        assert_eq!(specialized.params.len(), 2);
+        assert_eq!(specialized.params[0].name, "x");
+        assert_eq!(specialized.params[1].name, "y");
+        assert!(matches!(
+            specialized.body.as_slice(),
+            [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+                if callee == &plus.name
+                    && matches!(args.as_slice(), [NirExpr::Var(x), NirExpr::Var(y)] if x == "x" && y == "y")
+        ));
+
+        let main = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            main.body.as_slice(),
+            [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+                if callee == &specialized.name
+                    && matches!(args.as_slice(), [NirExpr::Int(6), NirExpr::Int(1)])
+        ));
+    }
+
+    #[test]
+    fn combines_higher_order_specialization_with_trait_generic_monomorphization() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              trait Addable {
+                fn add(lhs: Self, rhs: Self) -> Self;
+              }
+
+              impl Addable for i64 {
+                fn add(lhs: i64, rhs: i64) -> i64 {
+                  return lhs + rhs;
+                }
+              }
+
+              fn sum_two<T: Addable>(lhs: T, rhs: T) -> T {
+                return lhs.add(rhs);
+              }
+
+              fn apply_and_sum(x: i64, y: i64, f: Fn1<i64, i64>) -> i64 {
+                return sum_two(f(x), y);
+              }
+
+              fn main() -> i64 {
+                return apply_and_sum(6, 1, |x: i64| -> i64 { return x; });
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let lambda = module
+            .functions
+            .iter()
+            .find(|function| function.name.starts_with("__lambda_main_"))
+            .expect("expected synthesized lambda function");
+        let higher_order = module
+            .functions
+            .iter()
+            .find(|function| function.name.starts_with("__hof_apply_and_sum_"))
+            .expect("expected synthesized higher-order specialization");
+        assert!(matches!(
+            higher_order.body.as_slice(),
+            [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+                if callee == "sum_two__i64"
+                    && matches!(args.as_slice(), [NirExpr::Call { callee: inner, .. }, NirExpr::Var(y)] if inner == &lambda.name && y == "y")
+        ));
+
+        let main = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            main.body.last(),
+            Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
+                if callee == &higher_order.name
+        ));
+    }
+
+    #[test]
+    fn lowers_generic_fn1_higher_order_lambda_family() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              trait Addable {
+                fn add(lhs: Self, rhs: Self) -> Self;
+              }
+
+              impl Addable for i64 {
+                fn add(lhs: i64, rhs: i64) -> i64 {
+                  return lhs + rhs;
+                }
+              }
+
+              fn apply<T: Addable>(x: T, f: Fn1<T, T>) -> T {
+                return f(x);
+              }
+
+              fn main() -> i64 {
+                return apply(6, |x: i64| -> i64 { return x + 1; });
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let higher_order_concrete = module
+            .functions
+            .iter()
+            .find(|function| {
+                function.name.starts_with("__hof_apply_") && function.name.ends_with("__i64")
+            })
+            .expect("expected monomorphized higher-order helper");
+        assert!(higher_order_concrete.generic_params.is_empty());
+        assert!(matches!(
+            higher_order_concrete.body.as_slice(),
+            [NirStmt::Return(Some(NirExpr::Call { callee, .. }))]
+                if callee == "impl.Addable.for.i64.add"
+                    || callee.starts_with("__lambda_main_")
+        ));
+
+        let main = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            main.body.last(),
+            Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
+                if callee == &higher_order_concrete.name
+        ));
+    }
+
+    #[test]
+    fn lowers_generic_fn1_alias_higher_order_lambda_family() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              type Mapper<T> = Fn1<T, T>;
+
+              trait Addable {
+                fn add(lhs: Self, rhs: Self) -> Self;
+              }
+
+              impl Addable for i64 {
+                fn add(lhs: i64, rhs: i64) -> i64 {
+                  return lhs + rhs;
+                }
+              }
+
+              fn apply<T: Addable>(x: T, f: Mapper<T>) -> T {
+                return f(x);
+              }
+
+              fn main() -> i64 {
+                return apply(6, |x: i64| -> i64 { return x + 1; });
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let higher_order_concrete = module
+            .functions
+            .iter()
+            .find(|function| {
+                function.name.starts_with("__hof_apply_") && function.name.ends_with("__i64")
+            })
+            .expect("expected monomorphized higher-order helper");
+        assert!(higher_order_concrete.generic_params.is_empty());
+
+        let main = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            main.body.last(),
+            Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
+                if callee == &higher_order_concrete.name
+        ));
+    }
+
+    #[test]
+    fn lowers_higher_order_call_scrutinee_match_inside_while_via_hoisted_let() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn apply(x: i64, f: Fn1<i64, i64>) -> i64 {
+                return f(x);
+              }
+
+              fn main() -> i64 {
+                let state: i64 = 2;
+                while state > 0 {
+                  match apply(state, |x: i64| -> i64 { return x + 1; }) {
+                    3 => { return 7; },
+                    _ => { return 9; }
+                  }
+                }
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        match &function.body[1] {
+            NirStmt::While { body, .. } => {
+                assert!(matches!(
+                    body.as_slice(),
+                    [
+                        NirStmt::Let { name, value: NirExpr::Call { .. }, .. },
+                        NirStmt::If { .. }
+                    ] if name.starts_with("__match_scrutinee_")
+                ));
+            }
+            other => panic!("expected while statement, found {other:?}"),
+        }
     }
 }

@@ -1,0 +1,3 @@
+name = "lambda_generic_fn1_demo"
+version = "0.1.0"
+entry = "main.ns"

@@ -4133,6 +4133,8 @@ fn lower_expr(
             let lhs_name = lower_expr(lhs, state, bindings)?;
             let rhs_name = lower_expr(rhs, state, bindings)?;
             let instruction = match op {
+                NirBinaryOp::And => "and",
+                NirBinaryOp::Or => "or",
                 NirBinaryOp::Add => "add",
                 NirBinaryOp::Sub => "sub",
                 NirBinaryOp::Mul => "mul",
@@ -4403,8 +4405,23 @@ enum PreparedLoopFlowAction {
 }
 
 struct PreparedLoopFlowControl {
-    condition: PreparedLoopCarryCondition,
+    condition: PreparedLoopFlowCondition,
     action: PreparedLoopFlowAction,
+}
+
+enum PreparedLoopFlowCondition {
+    Simple(PreparedLoopCarryCondition),
+    Compound {
+        op: PreparedLoopLogicOp,
+        lhs: PreparedLoopCarryCondition,
+        rhs: PreparedLoopCarryCondition,
+    },
+}
+
+#[derive(Clone, Copy)]
+enum PreparedLoopLogicOp {
+    And,
+    Or,
 }
 
 fn loop_compare_from_binary_op(op: NirBinaryOp) -> Option<PreparedLoopCompare> {
@@ -4456,6 +4473,13 @@ fn render_loop_cond_kind(lhs: &PreparedCarryCondSource, compare: PreparedLoopCom
         (PreparedCarryCondSource::Carry(index), PreparedLoopCompare::Ge) => {
             format!("carry{index}_ge")
         }
+    }
+}
+
+fn render_loop_logic_op(op: PreparedLoopLogicOp) -> &'static str {
+    match op {
+        PreparedLoopLogicOp::And => "and",
+        PreparedLoopLogicOp::Or => "or",
     }
 }
 
@@ -4573,7 +4597,7 @@ fn parse_loop_carry_condition(
     Some(PreparedLoopCarryCondition { lhs, compare, rhs })
 }
 
-fn parse_loop_flow_condition(
+fn parse_loop_flow_condition_atom(
     expr: &NirExpr,
     binding_name: &str,
     carry_binding_names: &[String],
@@ -4634,6 +4658,60 @@ fn parse_loop_flow_condition(
         _ => return None,
     };
     Some(PreparedLoopCarryCondition { lhs, compare, rhs })
+}
+
+fn parse_loop_flow_condition(
+    expr: &NirExpr,
+    binding_name: &str,
+    carry_binding_names: &[String],
+    pure_helpers: &BTreeSet<String>,
+) -> Option<PreparedLoopFlowCondition> {
+    match expr {
+        NirExpr::Binary {
+            op: NirBinaryOp::And,
+            lhs,
+            rhs,
+        } => Some(PreparedLoopFlowCondition::Compound {
+            op: PreparedLoopLogicOp::And,
+            lhs: parse_loop_flow_condition_atom(
+                lhs,
+                binding_name,
+                carry_binding_names,
+                pure_helpers,
+            )?,
+            rhs: parse_loop_flow_condition_atom(
+                rhs,
+                binding_name,
+                carry_binding_names,
+                pure_helpers,
+            )?,
+        }),
+        NirExpr::Binary {
+            op: NirBinaryOp::Or,
+            lhs,
+            rhs,
+        } => Some(PreparedLoopFlowCondition::Compound {
+            op: PreparedLoopLogicOp::Or,
+            lhs: parse_loop_flow_condition_atom(
+                lhs,
+                binding_name,
+                carry_binding_names,
+                pure_helpers,
+            )?,
+            rhs: parse_loop_flow_condition_atom(
+                rhs,
+                binding_name,
+                carry_binding_names,
+                pure_helpers,
+            )?,
+        }),
+        _ => Some(PreparedLoopFlowCondition::Simple(parse_loop_flow_condition_atom(
+            expr,
+            binding_name,
+            carry_binding_names,
+            pure_helpers,
+        )?)),
+    }
 }
 
 fn parse_loop_flow_control(
@@ -4720,39 +4798,115 @@ fn parse_loop_carry_update(
     }
 }
 
-fn extract_loop_carry_binding_name(
+fn is_loop_match_scrutinee_temp_binding(name: &str) -> bool {
+    name.starts_with("__match_scrutinee_")
+}
+
+fn extract_loop_match_scrutinee_temp_binding(
     stmt: &NirStmt,
     pure_helpers: &BTreeSet<String>,
-) -> Option<String> {
+) -> Option<(String, NirExpr)> {
+    let (name, expr) = extract_pure_branch_binding(stmt, pure_helpers)?;
+    if is_loop_match_scrutinee_temp_binding(&name) {
+        Some((name, expr))
+    } else {
+        None
+    }
+}
+
+fn substitute_stmt_binding(stmt: &NirStmt, binding_name: &str, binding_value: &NirExpr) -> NirStmt {
     match stmt {
-        binding @ (NirStmt::Let { .. } | NirStmt::Const { .. }) => {
-            extract_pure_branch_binding(binding, pure_helpers).map(|(name, _)| name)
+        NirStmt::Let { name, ty, value } => NirStmt::Let {
+            name: name.clone(),
+            ty: ty.clone(),
+            value: substitute_branch_binding(value, binding_name, binding_value),
+        },
+        NirStmt::Const { name, ty, value } => NirStmt::Const {
+            name: name.clone(),
+            ty: ty.clone(),
+            value: substitute_branch_binding(value, binding_name, binding_value),
+        },
+        NirStmt::Expr(expr) => {
+            NirStmt::Expr(substitute_branch_binding(expr, binding_name, binding_value))
         }
+        NirStmt::Return(Some(expr)) => NirStmt::Return(Some(substitute_branch_binding(
+            expr,
+            binding_name,
+            binding_value,
+        ))),
         NirStmt::If {
+            condition,
             then_body,
             else_body,
-            ..
-        } => {
-            let [then_binding @ (NirStmt::Let { .. } | NirStmt::Const { .. })] =
-                then_body.as_slice()
-            else {
-                return None;
-            };
-            let [else_binding @ (NirStmt::Let { .. } | NirStmt::Const { .. })] =
-                else_body.as_slice()
-            else {
-                return None;
-            };
-            let (then_name, _) = extract_pure_branch_binding(then_binding, pure_helpers)?;
-            let (else_name, _) = extract_pure_branch_binding(else_binding, pure_helpers)?;
-            if then_name == else_name {
-                Some(then_name)
-            } else {
-                None
-            }
-        }
-        _ => None,
+        } => NirStmt::If {
+            condition: substitute_branch_binding(condition, binding_name, binding_value),
+            then_body: then_body
+                .iter()
+                .map(|inner| substitute_stmt_binding(inner, binding_name, binding_value))
+                .collect(),
+            else_body: else_body
+                .iter()
+                .map(|inner| substitute_stmt_binding(inner, binding_name, binding_value))
+                .collect(),
+        },
+        NirStmt::While { condition, body } => NirStmt::While {
+            condition: substitute_branch_binding(condition, binding_name, binding_value),
+            body: body
+                .iter()
+                .map(|inner| substitute_stmt_binding(inner, binding_name, binding_value))
+                .collect(),
+        },
+        _ => stmt.clone(),
     }
+}
+
+fn substitute_stmt_bindings(stmt: &NirStmt, bindings: &[(String, NirExpr)]) -> NirStmt {
+    bindings
+        .iter()
+        .fold(stmt.clone(), |current, (binding_name, binding_value)| {
+            substitute_stmt_binding(&current, binding_name, binding_value)
+        })
+}
+
+fn prepare_loop_carry_sequence(
+    stmts: &[NirStmt],
+    binding_name: &str,
+    pure_helpers: &BTreeSet<String>,
+) -> Option<Vec<PreparedCarryUpdate>> {
+    let mut carries = Vec::<PreparedCarryUpdate>::new();
+    let mut temp_bindings = Vec::<(String, NirExpr)>::new();
+    for stmt in stmts {
+        let substituted = substitute_stmt_bindings(stmt, &temp_bindings);
+        if let Some(prepared) =
+            parse_loop_carry_update(&substituted, binding_name, &carries, pure_helpers)
+        {
+            carries.push(prepared);
+            continue;
+        }
+        let (temp_name, temp_expr) = extract_pure_branch_binding(&substituted, pure_helpers)?;
+        if !is_loop_match_scrutinee_temp_binding(&temp_name) {
+            return None;
+        }
+        temp_bindings.push((temp_name, temp_expr));
+    }
+    Some(carries)
+}
+
+fn split_temp_prefixed_loop_flow_control<'a>(
+    stmts: &'a [NirStmt],
+    pure_helpers: &BTreeSet<String>,
+) -> Option<(Vec<(String, NirExpr)>, &'a NirStmt, &'a [NirStmt])> {
+    let mut temp_bindings = Vec::<(String, NirExpr)>::new();
+    for (index, stmt) in stmts.iter().enumerate() {
+        if let Some((temp_name, temp_expr)) =
+            extract_loop_match_scrutinee_temp_binding(stmt, pure_helpers)
+        {
+            temp_bindings.push((temp_name, temp_expr));
+            continue;
+        }
+        return Some((temp_bindings, stmt, &stmts[index + 1..]));
+    }
+    None
 }
 
 fn lower_if_pair(
@@ -5118,11 +5272,9 @@ fn prepare_chained_while(
         _ => return None,
     };
 
-    let mut carries: Vec<PreparedCarryUpdate> = Vec::new();
-    for carry_binding in carry_bindings {
-        let prepared =
-            parse_loop_carry_update(carry_binding, &binding_name, &carries, pure_helpers)?;
-        carries.push(prepared);
+    let carries = prepare_loop_carry_sequence(carry_bindings, &binding_name, pure_helpers)?;
+    if carries.is_empty() {
+        return None;
     }
 
     Some(PreparedChainedWhile {
@@ -5151,11 +5303,12 @@ fn prepare_flow_while(
         _ => return None,
     };
 
-    let [step_binding @ (NirStmt::Let { .. } | NirStmt::Const { .. }), control_stmt, carry_bindings @ ..] =
-        body
-    else {
+    let [step_binding @ (NirStmt::Let { .. } | NirStmt::Const { .. }), rest @ ..] = body else {
         return None;
     };
+    if rest.is_empty() {
+        return None;
+    }
     let (step_name, step_expr) = extract_pure_branch_binding(step_binding, pure_helpers)?;
     if step_name != binding_name {
         return None;
@@ -5187,26 +5340,20 @@ fn prepare_flow_while(
         },
         _ => return None,
     };
-    let carry_binding_names = carry_bindings
+    let (control_temp_bindings, raw_control_stmt, carry_bindings) =
+        split_temp_prefixed_loop_flow_control(rest, pure_helpers)?;
+    let prepared_carries = prepare_loop_carry_sequence(carry_bindings, &binding_name, pure_helpers)?;
+    let carry_binding_names = prepared_carries
         .iter()
-        .map(|stmt| extract_loop_carry_binding_name(stmt, pure_helpers))
-        .collect::<Option<Vec<_>>>()?;
+        .map(|carry| carry.binding_name.clone())
+        .collect::<Vec<_>>();
+    let substituted_control_stmt = substitute_stmt_bindings(raw_control_stmt, &control_temp_bindings);
     let control = parse_loop_flow_control(
-        control_stmt,
+        &substituted_control_stmt,
         &binding_name,
         &carry_binding_names,
         pure_helpers,
     )?;
-    let mut prepared_carries: Vec<PreparedCarryUpdate> = Vec::new();
-    for carry_binding in carry_bindings {
-        let prepared = parse_loop_carry_update(
-            carry_binding,
-            &binding_name,
-            &prepared_carries,
-            pure_helpers,
-        )?;
-        prepared_carries.push(prepared);
-    }
     Some(PreparedFlowWhile {
         binding_name,
         limit,
@@ -5274,20 +5421,25 @@ fn prepare_post_flow_while(
         _ => return None,
     };
 
-    let mut prepared_carries: Vec<PreparedCarryUpdate> = Vec::new();
-    let mut carry_binding_names = Vec::new();
-    for carry_binding in middle {
-        let prepared = parse_loop_carry_update(
-            carry_binding,
-            &binding_name,
-            &prepared_carries,
-            pure_helpers,
-        )?;
-        carry_binding_names.push(prepared.binding_name.clone());
-        prepared_carries.push(prepared);
-    }
+    let trailing_temp_count = middle
+        .iter()
+        .rev()
+        .take_while(|stmt| extract_loop_match_scrutinee_temp_binding(stmt, pure_helpers).is_some())
+        .count();
+    let split_index = middle.len().saturating_sub(trailing_temp_count);
+    let (carry_bindings, control_temp_stmts) = middle.split_at(split_index);
+    let prepared_carries = prepare_loop_carry_sequence(carry_bindings, &binding_name, pure_helpers)?;
+    let carry_binding_names = prepared_carries
+        .iter()
+        .map(|carry| carry.binding_name.clone())
+        .collect::<Vec<_>>();
+    let control_temp_bindings = control_temp_stmts
+        .iter()
+        .map(|stmt| extract_loop_match_scrutinee_temp_binding(stmt, pure_helpers))
+        .collect::<Option<Vec<_>>>()?;
+    let substituted_control_stmt = substitute_stmt_bindings(control_stmt, &control_temp_bindings);
     let control = parse_loop_flow_control(
-        control_stmt,
+        &substituted_control_stmt,
         &binding_name,
         &carry_binding_names,
         pure_helpers,
@@ -5961,7 +6113,43 @@ fn lower_flow_while(
     }
     let limit_name = lower_expr(&prepared.limit, state, bindings)?;
     let step_name = lower_expr(&prepared.step, state, bindings)?;
-    let control_rhs_name = lower_expr(&prepared.control.condition.rhs, state, bindings)?;
+    let (control_args, control_dep_inputs, control_effect_inputs) = match &prepared.control.condition
+    {
+        PreparedLoopFlowCondition::Simple(condition) => {
+            let control_rhs_name = lower_expr(&condition.rhs, state, bindings)?;
+            (
+                vec![
+                    render_loop_cond_kind(&condition.lhs, condition.compare),
+                    control_rhs_name.clone(),
+                    match prepared.control.action {
+                        PreparedLoopFlowAction::Break => "break".to_owned(),
+                        PreparedLoopFlowAction::Continue => "continue".to_owned(),
+                    },
+                ],
+                vec![control_rhs_name.clone()],
+                vec![control_rhs_name],
+            )
+        }
+        PreparedLoopFlowCondition::Compound { op, lhs, rhs } => {
+            let lhs_rhs_name = lower_expr(&lhs.rhs, state, bindings)?;
+            let rhs_rhs_name = lower_expr(&rhs.rhs, state, bindings)?;
+            (
+                vec![
+                    render_loop_logic_op(*op).to_owned(),
+                    render_loop_cond_kind(&lhs.lhs, lhs.compare),
+                    lhs_rhs_name.clone(),
+                    render_loop_cond_kind(&rhs.lhs, rhs.compare),
+                    rhs_rhs_name.clone(),
+                    match prepared.control.action {
+                        PreparedLoopFlowAction::Break => "break".to_owned(),
+                        PreparedLoopFlowAction::Continue => "continue".to_owned(),
+                    },
+                ],
+                vec![lhs_rhs_name.clone(), rhs_rhs_name.clone()],
+                vec![lhs_rhs_name, rhs_rhs_name],
+            )
+        }
+    };
     let has_conditional = prepared
         .carries
         .iter()
@@ -5979,24 +6167,14 @@ fn lower_flow_while(
         PreparedLoopStepKind::Add => "add",
         PreparedLoopStepKind::Sub => "sub",
     };
-    let control_kind = render_loop_cond_kind(
-        &prepared.control.condition.lhs,
-        prepared.control.condition.compare,
-    );
-    let control_action = match prepared.control.action {
-        PreparedLoopFlowAction::Break => "break",
-        PreparedLoopFlowAction::Continue => "continue",
-    };
     let mut args = vec![
         initial_name.clone(),
         limit_name.clone(),
         step_name.clone(),
         compare.to_owned(),
         step_kind.to_owned(),
-        control_kind,
-        control_rhs_name.clone(),
-        control_action.to_owned(),
     ];
+    args.extend(control_args);
     let mut extra_dep_inputs: Vec<String> = Vec::new();
     let mut extra_effect_inputs: Vec<String> = Vec::new();
     for (index, carry_initial_name) in carry_initial_names.iter().enumerate() {
@@ -6063,8 +6241,11 @@ fn lower_flow_while(
             args,
         },
     });
-    for dep in [&initial_name, &limit_name, &step_name, &control_rhs_name] {
+    for dep in [&initial_name, &limit_name, &step_name] {
         push_dep_edges(state, dep, &name);
+    }
+    for control_dep_input in &control_dep_inputs {
+        push_dep_edges(state, control_dep_input, &name);
     }
     for carry_initial_name in &carry_initial_names {
         push_dep_edges(state, carry_initial_name, &name);
@@ -6072,10 +6253,17 @@ fn lower_flow_while(
     for extra_dep_input in &extra_dep_inputs {
         push_dep_edges(state, extra_dep_input, &name);
     }
-    for effect in [&initial_name, &limit_name, &step_name, &control_rhs_name] {
+    for effect in [&initial_name, &limit_name, &step_name] {
         state.yir.edges.push(Edge {
             kind: EdgeKind::Effect,
             from: effect.clone(),
+            to: name.clone(),
+        });
+    }
+    for control_effect_input in &control_effect_inputs {
+        state.yir.edges.push(Edge {
+            kind: EdgeKind::Effect,
+            from: control_effect_input.clone(),
             to: name.clone(),
         });
     }
@@ -6145,7 +6333,43 @@ fn lower_post_flow_while(
     }
     let limit_name = lower_expr(&prepared.limit, state, bindings)?;
     let step_name = lower_expr(&prepared.step, state, bindings)?;
-    let control_rhs_name = lower_expr(&prepared.control.condition.rhs, state, bindings)?;
+    let (control_args, control_dep_inputs, control_effect_inputs) = match &prepared.control.condition
+    {
+        PreparedLoopFlowCondition::Simple(condition) => {
+            let control_rhs_name = lower_expr(&condition.rhs, state, bindings)?;
+            (
+                vec![
+                    render_loop_cond_kind(&condition.lhs, condition.compare),
+                    control_rhs_name.clone(),
+                    match prepared.control.action {
+                        PreparedLoopFlowAction::Break => "break".to_owned(),
+                        PreparedLoopFlowAction::Continue => "continue".to_owned(),
+                    },
+                ],
+                vec![control_rhs_name.clone()],
+                vec![control_rhs_name],
+            )
+        }
+        PreparedLoopFlowCondition::Compound { op, lhs, rhs } => {
+            let lhs_rhs_name = lower_expr(&lhs.rhs, state, bindings)?;
+            let rhs_rhs_name = lower_expr(&rhs.rhs, state, bindings)?;
+            (
+                vec![
+                    render_loop_logic_op(*op).to_owned(),
+                    render_loop_cond_kind(&lhs.lhs, lhs.compare),
+                    lhs_rhs_name.clone(),
+                    render_loop_cond_kind(&rhs.lhs, rhs.compare),
+                    rhs_rhs_name.clone(),
+                    match prepared.control.action {
+                        PreparedLoopFlowAction::Break => "break".to_owned(),
+                        PreparedLoopFlowAction::Continue => "continue".to_owned(),
+                    },
+                ],
+                vec![lhs_rhs_name.clone(), rhs_rhs_name.clone()],
+                vec![lhs_rhs_name, rhs_rhs_name],
+            )
+        }
+    };
     let has_conditional = prepared
         .carries
         .iter()
@@ -6155,24 +6379,14 @@ fn lower_post_flow_while(
         PreparedLoopStepKind::Add => "add",
         PreparedLoopStepKind::Sub => "sub",
     };
-    let control_kind = render_loop_cond_kind(
-        &prepared.control.condition.lhs,
-        prepared.control.condition.compare,
-    );
-    let control_action = match prepared.control.action {
-        PreparedLoopFlowAction::Break => "break",
-        PreparedLoopFlowAction::Continue => "continue",
-    };
     let mut args = vec![
         initial_name.clone(),
         limit_name.clone(),
         step_name.clone(),
         compare.to_owned(),
         step_kind.to_owned(),
-        control_kind,
-        control_rhs_name.clone(),
-        control_action.to_owned(),
     ];
+    args.extend(control_args);
     let mut extra_dep_inputs: Vec<String> = Vec::new();
     let mut extra_effect_inputs: Vec<String> = Vec::new();
     for (index, carry_initial_name) in carry_initial_names.iter().enumerate() {
@@ -6249,8 +6463,11 @@ fn lower_post_flow_while(
             args,
         },
     });
-    for dep in [&initial_name, &limit_name, &step_name, &control_rhs_name] {
+    for dep in [&initial_name, &limit_name, &step_name] {
         push_dep_edges(state, dep, &name);
+    }
+    for control_dep_input in &control_dep_inputs {
+        push_dep_edges(state, control_dep_input, &name);
     }
     for carry_initial_name in &carry_initial_names {
         push_dep_edges(state, carry_initial_name, &name);
@@ -6273,11 +6490,13 @@ fn lower_post_flow_while(
         from: step_name.clone(),
         to: name.clone(),
     });
-    state.yir.edges.push(Edge {
-        kind: EdgeKind::Effect,
-        from: control_rhs_name.clone(),
-        to: name.clone(),
-    });
+    for control_effect_input in &control_effect_inputs {
+        state.yir.edges.push(Edge {
+            kind: EdgeKind::Effect,
+            from: control_effect_input.clone(),
+            to: name.clone(),
+        });
+    }
     for carry_initial_name in &carry_initial_names {
         state.yir.edges.push(Edge {
             kind: EdgeKind::Effect,
@@ -8921,6 +9140,51 @@ mod tests {
     }
 
     #[test]
+    fn lowers_inline_helper_bool_match_branching_while_into_loop_while_i64_cond_chain() {
+        let mut module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              @inline
+              fn hot(value: i64) -> bool {
+                return value > 2;
+              }
+
+              fn main() -> i64 {
+                let value: i64 = 0;
+                let acc: i64 = 0;
+                while value < 5 {
+                  let value: i64 = value + 1;
+                  match hot(value) {
+                    true => {
+                      let acc: i64 = acc + value;
+                    },
+                    _ => {
+                      let acc: i64 = acc + 0;
+                    }
+                  }
+                }
+                return acc;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        crate::optimize::simplify_nir_module(&mut module);
+
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+        let loop_node = yir
+            .nodes
+            .iter()
+            .find(|node| {
+                node.op.module == "cpu" && node.op.instruction == "loop_while_i64_cond_chain"
+            })
+            .expect("expected loop_while_i64_cond_chain node");
+        assert_eq!(loop_node.op.args[6], "current_gt");
+        assert_eq!(loop_node.op.args[8], "add_current");
+        assert_eq!(loop_node.op.args[9], "keep");
+    }
+
+    #[test]
     fn lowers_flow_breaking_while_into_loop_while_i64_flow_chain() {
         let mut module = parse_nuis_module(
             r#"
@@ -9152,6 +9416,106 @@ mod tests {
         assert_eq!(loop_node.op.args[9], "current_eq");
         assert_eq!(loop_node.op.args[11], "add_current");
         assert_eq!(loop_node.op.args[12], "keep");
+    }
+
+    #[test]
+    fn lowers_match_prefixed_flow_control_then_branching_carry_into_loop_while_i64_flow_cond_chain(
+    ) {
+        let mut module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              @inline
+              fn hot(value: i64) -> bool {
+                return value < 3;
+              }
+
+              fn main() -> i64 {
+                let value: i64 = 0;
+                let acc: i64 = 0;
+                while value < 6 {
+                  let value: i64 = value + 1;
+                  match hot(value) {
+                    true => { continue; },
+                    _ => { }
+                  }
+                  if value > 4 {
+                    let acc: i64 = acc + value;
+                  } else {
+                    let acc: i64 = acc + 0;
+                  }
+                }
+                return acc;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        crate::optimize::simplify_nir_module(&mut module);
+
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+        let loop_node = yir
+            .nodes
+            .iter()
+            .find(|node| {
+                node.op.module == "cpu" && node.op.instruction == "loop_while_i64_flow_cond_chain"
+            })
+            .expect("expected loop_while_i64_flow_cond_chain node");
+        assert_eq!(loop_node.op.args[5], "current_lt");
+        assert_eq!(loop_node.op.args[7], "continue");
+        assert_eq!(loop_node.op.args[9], "current_gt");
+        assert_eq!(loop_node.op.args[11], "add_current");
+        assert_eq!(loop_node.op.args[12], "keep");
+    }
+
+    #[test]
+    fn lowers_bool_or_helper_match_flow_control_then_branching_carry_into_loop_while_i64_flow_cond_chain(
+    ) {
+        let mut module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              @inline
+              fn hot(value: i64) -> bool {
+                return value == 1 || value == 2;
+              }
+
+              fn main() -> i64 {
+                let value: i64 = 0;
+                let acc: i64 = 0;
+                while value < 6 {
+                  let value: i64 = value + 1;
+                  match hot(value) {
+                    true => { continue; },
+                    _ => {}
+                  }
+                  if value > 4 {
+                    let acc: i64 = acc + value;
+                  } else {
+                    let acc: i64 = acc + 0;
+                  }
+                }
+                return acc;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        crate::optimize::simplify_nir_module(&mut module);
+
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+        let loop_node = yir
+            .nodes
+            .iter()
+            .find(|node| {
+                node.op.module == "cpu" && node.op.instruction == "loop_while_i64_flow_cond_chain"
+            })
+            .expect("expected loop_while_i64_flow_cond_chain node");
+        assert_eq!(loop_node.op.args[5], "or");
+        assert_eq!(loop_node.op.args[6], "current_eq");
+        assert_eq!(loop_node.op.args[8], "current_eq");
+        assert_eq!(loop_node.op.args[10], "continue");
+        assert_eq!(loop_node.op.args[12], "current_gt");
+        assert_eq!(loop_node.op.args[14], "add_current");
+        assert_eq!(loop_node.op.args[15], "keep");
     }
 
     #[test]
@@ -9445,6 +9809,56 @@ mod tests {
                   }
                   if acc < 6 {
                     continue;
+                  }
+                }
+                return acc;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+        crate::optimize::simplify_nir_module(&mut module);
+
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+        let loop_node = yir
+            .nodes
+            .iter()
+            .find(|node| {
+                node.op.module == "cpu"
+                    && node.op.instruction == "loop_while_i64_post_flow_cond_chain"
+            })
+            .expect("expected loop_while_i64_post_flow_cond_chain node");
+        assert_eq!(loop_node.op.args[5], "carry0_lt");
+        assert_eq!(loop_node.op.args[7], "continue");
+        assert_eq!(loop_node.op.args[9], "current_gt");
+        assert_eq!(loop_node.op.args[11], "add_current");
+        assert_eq!(loop_node.op.args[12], "keep");
+    }
+
+    #[test]
+    fn lowers_match_prefixed_post_flow_control_after_branching_carry_into_loop_while_i64_post_flow_cond_chain(
+    ) {
+        let mut module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              @inline
+              fn hot(acc: i64) -> bool {
+                return acc < 6;
+              }
+
+              fn main() -> i64 {
+                let value: i64 = 0;
+                let acc: i64 = 0;
+                while value < 6 {
+                  let value: i64 = value + 1;
+                  if value > 2 {
+                    let acc: i64 = acc + value;
+                  } else {
+                    let acc: i64 = acc + 0;
+                  }
+                  match hot(acc) {
+                    true => { continue; },
+                    _ => { }
                   }
                 }
                 return acc;

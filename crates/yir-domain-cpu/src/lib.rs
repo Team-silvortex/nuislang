@@ -1155,12 +1155,34 @@ impl RegisteredMod for CpuMod {
                 Ok(InstructionSemantics::effect(inputs))
             }
             "loop_while_i64_flow_cond_chain" => {
-                if node.op.args.len() < 13 || (node.op.args.len() - 8) % 5 != 0 {
-                    return Err(format!(
-                        "node `{}` expects `cpu.loop_while_i64_flow_cond_chain <name> <resource> <initial> <limit> <step> <cmp> <step_kind> <control_kind> <control_rhs> <control_action> (<carry_initial> <cond_kind> <cond_rhs> <then_kind> <else_kind>)+`",
-                        node.name
-                    ));
-                }
+                let validate_flow_control_kind =
+                    |kind: &str, node_name: &str| -> Result<(), String> {
+                        match kind {
+                            "current_eq" | "current_ne" | "current_lt" | "current_le"
+                            | "current_gt" | "current_ge" => Ok(()),
+                            other
+                                if other.starts_with("carry")
+                                    && ["_eq", "_ne", "_lt", "_le", "_gt", "_ge"]
+                                        .iter()
+                                        .any(|suffix| other.ends_with(suffix)) =>
+                            {
+                                let suffix_len = 3;
+                                other[5..other.len() - suffix_len]
+                                    .parse::<usize>()
+                                    .map_err(|_| {
+                                        format!(
+                                            "node `{}` has invalid flow control kind `{}`",
+                                            node_name, other
+                                        )
+                                    })?;
+                                Ok(())
+                            }
+                            other => Err(format!(
+                                "node `{}` has invalid flow control kind `{}`",
+                                node_name, other
+                            )),
+                        }
+                    };
                 match node.op.args[3].as_str() {
                     "eq" | "lt" | "le" | "gt" | "ge" => {}
                     other => {
@@ -1179,65 +1201,37 @@ impl RegisteredMod for CpuMod {
                         ));
                     }
                 }
-                match node.op.args[5].as_str() {
-                    "current_eq" | "current_ne" | "current_lt" | "current_le" | "current_gt"
-                    | "current_ge" => {}
-                    other if other.starts_with("carry") && other.ends_with("_eq") => {
-                        other[5..other.len() - 3].parse::<usize>().map_err(|_| {
-                            format!(
-                                "node `{}` has invalid flow control kind `{}`",
-                                node.name, other
-                            )
-                        })?;
-                    }
-                    other if other.starts_with("carry") && other.ends_with("_ne") => {
-                        other[5..other.len() - 3].parse::<usize>().map_err(|_| {
-                            format!(
-                                "node `{}` has invalid flow control kind `{}`",
-                                node.name, other
-                            )
-                        })?;
-                    }
-                    other if other.starts_with("carry") && other.ends_with("_lt") => {
-                        other[5..other.len() - 3].parse::<usize>().map_err(|_| {
-                            format!(
-                                "node `{}` has invalid flow control kind `{}`",
-                                node.name, other
-                            )
-                        })?;
-                    }
-                    other if other.starts_with("carry") && other.ends_with("_le") => {
-                        other[5..other.len() - 3].parse::<usize>().map_err(|_| {
-                            format!(
-                                "node `{}` has invalid flow control kind `{}`",
-                                node.name, other
-                            )
-                        })?;
-                    }
-                    other if other.starts_with("carry") && other.ends_with("_gt") => {
-                        other[5..other.len() - 3].parse::<usize>().map_err(|_| {
-                            format!(
-                                "node `{}` has invalid flow control kind `{}`",
-                                node.name, other
-                            )
-                        })?;
-                    }
-                    other if other.starts_with("carry") && other.ends_with("_ge") => {
-                        other[5..other.len() - 3].parse::<usize>().map_err(|_| {
-                            format!(
-                                "node `{}` has invalid flow control kind `{}`",
-                                node.name, other
-                            )
-                        })?;
-                    }
-                    other => {
-                        return Err(format!(
-                            "node `{}` has invalid flow control kind `{}`",
-                            node.name, other
-                        ));
-                    }
-                }
-                match node.op.args[7].as_str() {
+                let (control_rhs_inputs, control_action_index, carry_start_index) =
+                    match node.op.args.get(5).map(String::as_str) {
+                        Some("and") | Some("or") => {
+                            if node.op.args.len() < 16 || (node.op.args.len() - 11) % 5 != 0 {
+                                return Err(format!(
+                                    "node `{}` expects `cpu.loop_while_i64_flow_cond_chain <name> <resource> <initial> <limit> <step> <cmp> <step_kind> (<control_kind> <control_rhs> <control_action> | <and|or> <control_kind> <control_rhs> <control_kind> <control_rhs> <control_action>) (<carry_initial> <cond_kind> <cond_rhs> <then_kind> <else_kind>)+`",
+                                    node.name
+                                ));
+                            }
+                            validate_flow_control_kind(&node.op.args[6], &node.name)?;
+                            validate_flow_control_kind(&node.op.args[8], &node.name)?;
+                            (vec![node.op.args[7].clone(), node.op.args[9].clone()], 10, 11)
+                        }
+                        Some(kind) => {
+                            if node.op.args.len() < 13 || (node.op.args.len() - 8) % 5 != 0 {
+                                return Err(format!(
+                                    "node `{}` expects `cpu.loop_while_i64_flow_cond_chain <name> <resource> <initial> <limit> <step> <cmp> <step_kind> (<control_kind> <control_rhs> <control_action> | <and|or> <control_kind> <control_rhs> <control_kind> <control_rhs> <control_action>) (<carry_initial> <cond_kind> <cond_rhs> <then_kind> <else_kind>)+`",
+                                    node.name
+                                ));
+                            }
+                            validate_flow_control_kind(kind, &node.name)?;
+                            (vec![node.op.args[6].clone()], 7, 8)
+                        }
+                        None => {
+                            return Err(format!(
+                                "node `{}` is missing flow control arguments",
+                                node.name
+                            ));
+                        }
+                    };
+                match node.op.args[control_action_index].as_str() {
                     "break" | "continue" => {}
                     other => {
                         return Err(format!(
@@ -1246,7 +1240,7 @@ impl RegisteredMod for CpuMod {
                         ));
                     }
                 }
-                for chunk in node.op.args[8..].chunks(5) {
+                for chunk in node.op.args[carry_start_index..].chunks(5) {
                     let cond_kind = &chunk[1];
                     match cond_kind.as_str() {
                         "always" | "current_eq" | "current_ne" | "current_lt" | "current_le"
@@ -1328,8 +1322,8 @@ impl RegisteredMod for CpuMod {
                     }
                 }
                 let mut inputs = node.op.args[..3].to_vec();
-                inputs.push(node.op.args[6].clone());
-                for chunk in node.op.args[8..].chunks(5) {
+                inputs.extend(control_rhs_inputs);
+                for chunk in node.op.args[carry_start_index..].chunks(5) {
                     inputs.push(chunk[0].clone());
                     if chunk[1] != "always" {
                         inputs.push(chunk[2].clone());

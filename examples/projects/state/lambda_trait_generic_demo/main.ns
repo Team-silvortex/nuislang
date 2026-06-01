@@ -1,0 +1,25 @@
+mod cpu Main {
+  trait Addable {
+    fn add(lhs: Self, rhs: Self) -> Self;
+  }
+
+  impl Addable for i64 {
+    fn add(lhs: i64, rhs: i64) -> i64 {
+      return lhs + rhs;
+    }
+  }
+
+  fn sum_two<T: Addable>(lhs: T, rhs: T) -> T {
+    return lhs.add(rhs);
+  }
+
+  fn apply_and_sum(x: i64, y: i64, f: Fn1<i64, i64>) -> i64 {
+    return sum_two(f(x), y);
+  }
+
+  fn main() -> i64 {
+    return apply_and_sum(6, 1, |x: i64| -> i64 {
+      return x;
+    });
+  }
+}

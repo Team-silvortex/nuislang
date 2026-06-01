@@ -1,0 +1,3 @@
+name = "lambda_trait_generic_demo"
+version = "0.1.0"
+entry = "main.ns"
