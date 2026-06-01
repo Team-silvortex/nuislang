@@ -1222,7 +1222,7 @@ impl Parser {
 
     fn parse_if_stmt(&mut self) -> Result<AstStmt, String> {
         self.expect_word("if")?;
-        let condition = self.parse_expr()?;
+        let condition = self.parse_condition_expr()?;
         let then_body = self.parse_block()?;
         let else_body = if self.peek_word("else") {
             self.expect_word("else")?;
@@ -1239,7 +1239,7 @@ impl Parser {
 
     fn parse_while_stmt(&mut self) -> Result<AstStmt, String> {
         self.expect_word("while")?;
-        let condition = self.parse_expr()?;
+        let condition = self.parse_condition_expr()?;
         let body = self.parse_block()?;
         Ok(AstStmt::While { condition, body })
     }
@@ -1264,6 +1264,14 @@ impl Parser {
     }
 
     fn parse_match_scrutinee_expr(&mut self) -> Result<AstExpr, String> {
+        let old = self.allow_struct_literals;
+        self.allow_struct_literals = false;
+        let parsed = self.parse_expr();
+        self.allow_struct_literals = old;
+        parsed
+    }
+
+    fn parse_condition_expr(&mut self) -> Result<AstExpr, String> {
         let old = self.allow_struct_literals;
         self.allow_struct_literals = false;
         let parsed = self.parse_expr();

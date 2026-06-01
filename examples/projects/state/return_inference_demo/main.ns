@@ -1,0 +1,11 @@
+mod cpu Main {
+  fn plus_one(x: i64) {
+    return x + 1;
+  }
+
+  fn main() {
+    let value = plus_one(6);
+    print(value);
+    return value;
+  }
+}

@@ -3579,7 +3579,11 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                     control_cmp_regs[0].clone()
                 } else {
                     let combined = fresh_reg(&mut next_reg);
-                    let logic_op = if node.op.args[5] == "and" { "and" } else { "or" };
+                    let logic_op = if node.op.args[5] == "and" {
+                        "and"
+                    } else {
+                        "or"
+                    };
                     body.push(format!(
                         "  {combined} = {logic_op} i1 {}, {}",
                         control_cmp_regs[0], control_cmp_regs[1]

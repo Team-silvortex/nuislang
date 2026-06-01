@@ -367,6 +367,7 @@ pub fn lower_project_ast_to_nir(
         &local_cpu_helpers,
         &visible_type_aliases,
     );
+    let mut inferred_function_return_types = function_return_types.clone();
     let mut specialized_functions = Vec::new();
     let mut specialized_signatures = Vec::new();
     let mut specialization_cache = BTreeSet::new();
@@ -379,13 +380,42 @@ pub fn lower_project_ast_to_nir(
                 &generic_templates,
                 &impl_lookup,
                 &module_struct_table,
-                &function_return_types,
+                &inferred_function_return_types,
                 &mut specialization_cache,
                 &mut specialized_functions,
                 &mut specialized_signatures,
             )
         })
         .collect::<Result<Vec<_>, _>>()?;
+
+    let mut changed = true;
+    while changed {
+        changed = false;
+        for function in &mut rewritten_module_functions {
+            if function.return_type.is_none() {
+                if let Some(inferred_return_type) = infer_missing_function_return_type(
+                    function,
+                    &module_const_env,
+                    &impl_lookup,
+                    &module_struct_table,
+                    &inferred_function_return_types,
+                )? {
+                    function.return_type = Some(inferred_return_type.clone());
+                    inferred_function_return_types
+                        .insert(function.name.clone(), Some(inferred_return_type));
+                    changed = true;
+                }
+            }
+            if let Some(return_type) = &function.return_type {
+                if let Some(signature) = signatures.get_mut(&function.name) {
+                    signature.return_type = Some(lower_type_ref_with_aliases(
+                        return_type,
+                        &visible_type_aliases,
+                    )?);
+                }
+            }
+        }
+    }
     for (name, signature) in specialized_signatures {
         signatures.insert(name, signature);
     }
@@ -437,6 +467,29 @@ pub fn lower_project_ast_to_nir(
             )
         })
         .collect::<Result<Vec<_>, _>>()?;
+    for function in &mut specialized_functions {
+        if function.return_type.is_none() {
+            if let Some(inferred_return_type) = infer_missing_function_return_type(
+                function,
+                &module_const_env,
+                &impl_lookup,
+                &module_struct_table,
+                &inferred_function_return_types,
+            )? {
+                function.return_type = Some(inferred_return_type.clone());
+                inferred_function_return_types
+                    .insert(function.name.clone(), Some(inferred_return_type));
+            }
+        }
+        if let Some(return_type) = &function.return_type {
+            if let Some(signature) = signatures.get_mut(&function.name) {
+                signature.return_type = Some(lower_type_ref_with_aliases(
+                    return_type,
+                    &visible_type_aliases,
+                )?);
+            }
+        }
+    }
     lowered_functions.extend(
         specialized_functions
             .iter()
@@ -3457,6 +3510,172 @@ fn build_function_return_type_table(
         }
     }
     table
+}
+
+fn infer_missing_function_return_type(
+    function: &AstFunction,
+    module_const_env: &BTreeMap<String, AstTypeRef>,
+    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
+    struct_table: &BTreeMap<String, AstStructDef>,
+    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
+) -> Result<Option<AstTypeRef>, String> {
+    if function.return_type.is_some() {
+        return Ok(function.return_type.clone());
+    }
+    let mut env = module_const_env.clone();
+    for param in &function.params {
+        env.insert(param.name.clone(), param.ty.clone());
+    }
+    let mut returns = Vec::<AstTypeRef>::new();
+    let guaranteed_return = collect_inferred_return_types_from_block(
+        &function.body,
+        &function.name,
+        &mut env,
+        impl_lookup,
+        struct_table,
+        function_return_types,
+        &mut returns,
+    )?;
+    if returns.is_empty() {
+        return Ok(None);
+    }
+    if !guaranteed_return {
+        return Err(format!(
+            "function `{}` currently needs an explicit return type or total terminal return branches to infer its return type",
+            function.name
+        ));
+    }
+    let resolved = returns
+        .iter()
+        .map(lower_type_ref)
+        .map(|ty| ty.render())
+        .collect::<Vec<_>>();
+    let mut deduped = resolved.clone();
+    deduped.dedup();
+    if deduped.len() > 1 {
+        return Err(format!(
+            "function `{}` has inconsistent inferred return types: {}",
+            function.name,
+            deduped.join(", ")
+        ));
+    }
+    Ok(returns.into_iter().next())
+}
+
+fn collect_inferred_return_types_from_block(
+    body: &[AstStmt],
+    function_name: &str,
+    env: &mut BTreeMap<String, AstTypeRef>,
+    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
+    struct_table: &BTreeMap<String, AstStructDef>,
+    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
+    returns: &mut Vec<AstTypeRef>,
+) -> Result<bool, String> {
+    for stmt in body {
+        match stmt {
+            AstStmt::Let { name, ty, value } => {
+                let inferred = ty.clone().or_else(|| {
+                    infer_ast_expr_type(
+                        value,
+                        env,
+                        impl_lookup,
+                        struct_table,
+                        function_return_types,
+                    )
+                });
+                if let Some(inferred_ty) = inferred {
+                    env.insert(name.clone(), inferred_ty);
+                }
+            }
+            AstStmt::Const { name, ty, .. } => {
+                env.insert(name.clone(), ty.clone());
+            }
+            AstStmt::If {
+                then_body,
+                else_body,
+                ..
+            } => {
+                let mut then_env = env.clone();
+                let then_returns = collect_inferred_return_types_from_block(
+                    then_body,
+                    function_name,
+                    &mut then_env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    returns,
+                )?;
+                let mut else_env = env.clone();
+                let else_returns = collect_inferred_return_types_from_block(
+                    else_body,
+                    function_name,
+                    &mut else_env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    returns,
+                )?;
+                if then_returns && else_returns {
+                    return Ok(true);
+                }
+            }
+            AstStmt::Match { arms, .. } => {
+                let mut all_arms_return = !arms.is_empty();
+                for arm in arms {
+                    let mut arm_env = env.clone();
+                    let arm_returns = collect_inferred_return_types_from_block(
+                        &arm.body,
+                        function_name,
+                        &mut arm_env,
+                        impl_lookup,
+                        struct_table,
+                        function_return_types,
+                        returns,
+                    )?;
+                    all_arms_return &= arm_returns;
+                }
+                if all_arms_return {
+                    return Ok(true);
+                }
+            }
+            AstStmt::While { body, .. } => {
+                let mut loop_env = env.clone();
+                collect_inferred_return_types_from_block(
+                    body,
+                    function_name,
+                    &mut loop_env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    returns,
+                )?;
+            }
+            AstStmt::Return(Some(value)) => {
+                let inferred = infer_ast_expr_type(
+                    value,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                )
+                .ok_or_else(|| {
+                    format!(
+                        "function `{}` currently needs an explicit return type or more explicit return expressions to infer `return ...`",
+                        function_name
+                    )
+                })?;
+                returns.push(inferred);
+                return Ok(true);
+            }
+            AstStmt::Return(None) => return Ok(true),
+            AstStmt::Print(_)
+            | AstStmt::Await(_)
+            | AstStmt::Expr(_)
+            | AstStmt::Break
+            | AstStmt::Continue => {}
+        }
+    }
+    Ok(false)
 }
 
 fn rewrite_generic_calls_in_function(
@@ -26768,6 +26987,120 @@ mod tests {
             },
             other => panic!("expected while statement, found {other:?}"),
         }
+    }
+
+    #[test]
+    fn infers_missing_function_return_types_from_explicit_returns() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn plus_one(x: i64) {
+                return x + 1;
+              }
+
+              fn main() {
+                let value = plus_one(6);
+                return value;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let plus_one = module
+            .functions
+            .iter()
+            .find(|function| function.name == "plus_one")
+            .unwrap();
+        assert_eq!(
+            plus_one
+                .return_type
+                .as_ref()
+                .map(|ty| ty.render())
+                .as_deref(),
+            Some("i64")
+        );
+
+        let main = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert_eq!(
+            main.return_type.as_ref().map(|ty| ty.render()).as_deref(),
+            Some("i64")
+        );
+        match &main.body[0] {
+            NirStmt::Let { ty: Some(ty), .. } => assert_eq!(ty.render(), "i64"),
+            other => panic!("expected inferred typed let binding, found {other:?}"),
+        }
+    }
+
+    #[test]
+    fn infers_missing_function_return_types_from_total_if_and_match_branches() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn branchy(flag: bool) {
+                let state = 1;
+                if flag {
+                  match state {
+                    1 => { return 7; }
+                    _ => { return 8; }
+                  }
+                } else {
+                  return 9;
+                }
+              }
+
+              fn main() {
+                return branchy(true);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let branchy = module
+            .functions
+            .iter()
+            .find(|function| function.name == "branchy")
+            .unwrap();
+        assert_eq!(
+            branchy
+                .return_type
+                .as_ref()
+                .map(|ty| ty.render())
+                .as_deref(),
+            Some("i64")
+        );
+
+        let main = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert_eq!(
+            main.return_type.as_ref().map(|ty| ty.render()).as_deref(),
+            Some("i64")
+        );
+    }
+
+    #[test]
+    fn rejects_partial_branch_return_inference_without_explicit_return_type() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn branchy(flag: bool) {
+                if flag {
+                  return 7;
+                }
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+        assert!(error.contains("explicit return type or total terminal return branches"));
     }
 
     #[test]

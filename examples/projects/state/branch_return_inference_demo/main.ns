@@ -1,0 +1,23 @@
+mod cpu Main {
+  fn branchy(flag: bool) {
+    let state = 1;
+    if flag {
+      match state {
+        1 => {
+          return 7;
+        }
+        _ => {
+          return 8;
+        }
+      }
+    } else {
+      return 9;
+    }
+  }
+
+  fn main() {
+    let value = branchy(true);
+    print(value);
+    return value;
+  }
+}

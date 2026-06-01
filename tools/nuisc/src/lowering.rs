@@ -4705,12 +4705,9 @@ fn parse_loop_flow_condition(
                 pure_helpers,
             )?,
         }),
-        _ => Some(PreparedLoopFlowCondition::Simple(parse_loop_flow_condition_atom(
-            expr,
-            binding_name,
-            carry_binding_names,
-            pure_helpers,
-        )?)),
+        _ => Some(PreparedLoopFlowCondition::Simple(
+            parse_loop_flow_condition_atom(expr, binding_name, carry_binding_names, pure_helpers)?,
+        )),
     }
 }
 
@@ -5342,12 +5339,14 @@ fn prepare_flow_while(
     };
     let (control_temp_bindings, raw_control_stmt, carry_bindings) =
         split_temp_prefixed_loop_flow_control(rest, pure_helpers)?;
-    let prepared_carries = prepare_loop_carry_sequence(carry_bindings, &binding_name, pure_helpers)?;
+    let prepared_carries =
+        prepare_loop_carry_sequence(carry_bindings, &binding_name, pure_helpers)?;
     let carry_binding_names = prepared_carries
         .iter()
         .map(|carry| carry.binding_name.clone())
         .collect::<Vec<_>>();
-    let substituted_control_stmt = substitute_stmt_bindings(raw_control_stmt, &control_temp_bindings);
+    let substituted_control_stmt =
+        substitute_stmt_bindings(raw_control_stmt, &control_temp_bindings);
     let control = parse_loop_flow_control(
         &substituted_control_stmt,
         &binding_name,
@@ -5428,7 +5427,8 @@ fn prepare_post_flow_while(
         .count();
     let split_index = middle.len().saturating_sub(trailing_temp_count);
     let (carry_bindings, control_temp_stmts) = middle.split_at(split_index);
-    let prepared_carries = prepare_loop_carry_sequence(carry_bindings, &binding_name, pure_helpers)?;
+    let prepared_carries =
+        prepare_loop_carry_sequence(carry_bindings, &binding_name, pure_helpers)?;
     let carry_binding_names = prepared_carries
         .iter()
         .map(|carry| carry.binding_name.clone())
@@ -6113,43 +6113,43 @@ fn lower_flow_while(
     }
     let limit_name = lower_expr(&prepared.limit, state, bindings)?;
     let step_name = lower_expr(&prepared.step, state, bindings)?;
-    let (control_args, control_dep_inputs, control_effect_inputs) = match &prepared.control.condition
-    {
-        PreparedLoopFlowCondition::Simple(condition) => {
-            let control_rhs_name = lower_expr(&condition.rhs, state, bindings)?;
-            (
-                vec![
-                    render_loop_cond_kind(&condition.lhs, condition.compare),
-                    control_rhs_name.clone(),
-                    match prepared.control.action {
-                        PreparedLoopFlowAction::Break => "break".to_owned(),
-                        PreparedLoopFlowAction::Continue => "continue".to_owned(),
-                    },
-                ],
-                vec![control_rhs_name.clone()],
-                vec![control_rhs_name],
-            )
-        }
-        PreparedLoopFlowCondition::Compound { op, lhs, rhs } => {
-            let lhs_rhs_name = lower_expr(&lhs.rhs, state, bindings)?;
-            let rhs_rhs_name = lower_expr(&rhs.rhs, state, bindings)?;
-            (
-                vec![
-                    render_loop_logic_op(*op).to_owned(),
-                    render_loop_cond_kind(&lhs.lhs, lhs.compare),
-                    lhs_rhs_name.clone(),
-                    render_loop_cond_kind(&rhs.lhs, rhs.compare),
-                    rhs_rhs_name.clone(),
-                    match prepared.control.action {
-                        PreparedLoopFlowAction::Break => "break".to_owned(),
-                        PreparedLoopFlowAction::Continue => "continue".to_owned(),
-                    },
-                ],
-                vec![lhs_rhs_name.clone(), rhs_rhs_name.clone()],
-                vec![lhs_rhs_name, rhs_rhs_name],
-            )
-        }
-    };
+    let (control_args, control_dep_inputs, control_effect_inputs) =
+        match &prepared.control.condition {
+            PreparedLoopFlowCondition::Simple(condition) => {
+                let control_rhs_name = lower_expr(&condition.rhs, state, bindings)?;
+                (
+                    vec![
+                        render_loop_cond_kind(&condition.lhs, condition.compare),
+                        control_rhs_name.clone(),
+                        match prepared.control.action {
+                            PreparedLoopFlowAction::Break => "break".to_owned(),
+                            PreparedLoopFlowAction::Continue => "continue".to_owned(),
+                        },
+                    ],
+                    vec![control_rhs_name.clone()],
+                    vec![control_rhs_name],
+                )
+            }
+            PreparedLoopFlowCondition::Compound { op, lhs, rhs } => {
+                let lhs_rhs_name = lower_expr(&lhs.rhs, state, bindings)?;
+                let rhs_rhs_name = lower_expr(&rhs.rhs, state, bindings)?;
+                (
+                    vec![
+                        render_loop_logic_op(*op).to_owned(),
+                        render_loop_cond_kind(&lhs.lhs, lhs.compare),
+                        lhs_rhs_name.clone(),
+                        render_loop_cond_kind(&rhs.lhs, rhs.compare),
+                        rhs_rhs_name.clone(),
+                        match prepared.control.action {
+                            PreparedLoopFlowAction::Break => "break".to_owned(),
+                            PreparedLoopFlowAction::Continue => "continue".to_owned(),
+                        },
+                    ],
+                    vec![lhs_rhs_name.clone(), rhs_rhs_name.clone()],
+                    vec![lhs_rhs_name, rhs_rhs_name],
+                )
+            }
+        };
     let has_conditional = prepared
         .carries
         .iter()
@@ -6333,43 +6333,43 @@ fn lower_post_flow_while(
     }
     let limit_name = lower_expr(&prepared.limit, state, bindings)?;
     let step_name = lower_expr(&prepared.step, state, bindings)?;
-    let (control_args, control_dep_inputs, control_effect_inputs) = match &prepared.control.condition
-    {
-        PreparedLoopFlowCondition::Simple(condition) => {
-            let control_rhs_name = lower_expr(&condition.rhs, state, bindings)?;
-            (
-                vec![
-                    render_loop_cond_kind(&condition.lhs, condition.compare),
-                    control_rhs_name.clone(),
-                    match prepared.control.action {
-                        PreparedLoopFlowAction::Break => "break".to_owned(),
-                        PreparedLoopFlowAction::Continue => "continue".to_owned(),
-                    },
-                ],
-                vec![control_rhs_name.clone()],
-                vec![control_rhs_name],
-            )
-        }
-        PreparedLoopFlowCondition::Compound { op, lhs, rhs } => {
-            let lhs_rhs_name = lower_expr(&lhs.rhs, state, bindings)?;
-            let rhs_rhs_name = lower_expr(&rhs.rhs, state, bindings)?;
-            (
-                vec![
-                    render_loop_logic_op(*op).to_owned(),
-                    render_loop_cond_kind(&lhs.lhs, lhs.compare),
-                    lhs_rhs_name.clone(),
-                    render_loop_cond_kind(&rhs.lhs, rhs.compare),
-                    rhs_rhs_name.clone(),
-                    match prepared.control.action {
-                        PreparedLoopFlowAction::Break => "break".to_owned(),
-                        PreparedLoopFlowAction::Continue => "continue".to_owned(),
-                    },
-                ],
-                vec![lhs_rhs_name.clone(), rhs_rhs_name.clone()],
-                vec![lhs_rhs_name, rhs_rhs_name],
-            )
-        }
-    };
+    let (control_args, control_dep_inputs, control_effect_inputs) =
+        match &prepared.control.condition {
+            PreparedLoopFlowCondition::Simple(condition) => {
+                let control_rhs_name = lower_expr(&condition.rhs, state, bindings)?;
+                (
+                    vec![
+                        render_loop_cond_kind(&condition.lhs, condition.compare),
+                        control_rhs_name.clone(),
+                        match prepared.control.action {
+                            PreparedLoopFlowAction::Break => "break".to_owned(),
+                            PreparedLoopFlowAction::Continue => "continue".to_owned(),
+                        },
+                    ],
+                    vec![control_rhs_name.clone()],
+                    vec![control_rhs_name],
+                )
+            }
+            PreparedLoopFlowCondition::Compound { op, lhs, rhs } => {
+                let lhs_rhs_name = lower_expr(&lhs.rhs, state, bindings)?;
+                let rhs_rhs_name = lower_expr(&rhs.rhs, state, bindings)?;
+                (
+                    vec![
+                        render_loop_logic_op(*op).to_owned(),
+                        render_loop_cond_kind(&lhs.lhs, lhs.compare),
+                        lhs_rhs_name.clone(),
+                        render_loop_cond_kind(&rhs.lhs, rhs.compare),
+                        rhs_rhs_name.clone(),
+                        match prepared.control.action {
+                            PreparedLoopFlowAction::Break => "break".to_owned(),
+                            PreparedLoopFlowAction::Continue => "continue".to_owned(),
+                        },
+                    ],
+                    vec![lhs_rhs_name.clone(), rhs_rhs_name.clone()],
+                    vec![lhs_rhs_name, rhs_rhs_name],
+                )
+            }
+        };
     let has_conditional = prepared
         .carries
         .iter()
@@ -9419,8 +9419,8 @@ mod tests {
     }
 
     #[test]
-    fn lowers_match_prefixed_flow_control_then_branching_carry_into_loop_while_i64_flow_cond_chain(
-    ) {
+    fn lowers_match_prefixed_flow_control_then_branching_carry_into_loop_while_i64_flow_cond_chain()
+    {
         let mut module = parse_nuis_module(
             r#"
             mod cpu Main {

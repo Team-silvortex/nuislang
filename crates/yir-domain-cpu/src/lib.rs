@@ -1201,36 +1201,44 @@ impl RegisteredMod for CpuMod {
                         ));
                     }
                 }
-                let (control_rhs_inputs, control_action_index, carry_start_index) =
-                    match node.op.args.get(5).map(String::as_str) {
-                        Some("and") | Some("or") => {
-                            if node.op.args.len() < 16 || (node.op.args.len() - 11) % 5 != 0 {
-                                return Err(format!(
-                                    "node `{}` expects `cpu.loop_while_i64_flow_cond_chain <name> <resource> <initial> <limit> <step> <cmp> <step_kind> (<control_kind> <control_rhs> <control_action> | <and|or> <control_kind> <control_rhs> <control_kind> <control_rhs> <control_action>) (<carry_initial> <cond_kind> <cond_rhs> <then_kind> <else_kind>)+`",
-                                    node.name
-                                ));
-                            }
-                            validate_flow_control_kind(&node.op.args[6], &node.name)?;
-                            validate_flow_control_kind(&node.op.args[8], &node.name)?;
-                            (vec![node.op.args[7].clone(), node.op.args[9].clone()], 10, 11)
-                        }
-                        Some(kind) => {
-                            if node.op.args.len() < 13 || (node.op.args.len() - 8) % 5 != 0 {
-                                return Err(format!(
-                                    "node `{}` expects `cpu.loop_while_i64_flow_cond_chain <name> <resource> <initial> <limit> <step> <cmp> <step_kind> (<control_kind> <control_rhs> <control_action> | <and|or> <control_kind> <control_rhs> <control_kind> <control_rhs> <control_action>) (<carry_initial> <cond_kind> <cond_rhs> <then_kind> <else_kind>)+`",
-                                    node.name
-                                ));
-                            }
-                            validate_flow_control_kind(kind, &node.name)?;
-                            (vec![node.op.args[6].clone()], 7, 8)
-                        }
-                        None => {
+                let (control_rhs_inputs, control_action_index, carry_start_index) = match node
+                    .op
+                    .args
+                    .get(5)
+                    .map(String::as_str)
+                {
+                    Some("and") | Some("or") => {
+                        if node.op.args.len() < 16 || (node.op.args.len() - 11) % 5 != 0 {
                             return Err(format!(
-                                "node `{}` is missing flow control arguments",
-                                node.name
-                            ));
+                                    "node `{}` expects `cpu.loop_while_i64_flow_cond_chain <name> <resource> <initial> <limit> <step> <cmp> <step_kind> (<control_kind> <control_rhs> <control_action> | <and|or> <control_kind> <control_rhs> <control_kind> <control_rhs> <control_action>) (<carry_initial> <cond_kind> <cond_rhs> <then_kind> <else_kind>)+`",
+                                    node.name
+                                ));
                         }
-                    };
+                        validate_flow_control_kind(&node.op.args[6], &node.name)?;
+                        validate_flow_control_kind(&node.op.args[8], &node.name)?;
+                        (
+                            vec![node.op.args[7].clone(), node.op.args[9].clone()],
+                            10,
+                            11,
+                        )
+                    }
+                    Some(kind) => {
+                        if node.op.args.len() < 13 || (node.op.args.len() - 8) % 5 != 0 {
+                            return Err(format!(
+                                    "node `{}` expects `cpu.loop_while_i64_flow_cond_chain <name> <resource> <initial> <limit> <step> <cmp> <step_kind> (<control_kind> <control_rhs> <control_action> | <and|or> <control_kind> <control_rhs> <control_kind> <control_rhs> <control_action>) (<carry_initial> <cond_kind> <cond_rhs> <then_kind> <else_kind>)+`",
+                                    node.name
+                                ));
+                        }
+                        validate_flow_control_kind(kind, &node.name)?;
+                        (vec![node.op.args[6].clone()], 7, 8)
+                    }
+                    None => {
+                        return Err(format!(
+                            "node `{}` is missing flow control arguments",
+                            node.name
+                        ));
+                    }
+                };
                 match node.op.args[control_action_index].as_str() {
                     "break" | "continue" => {}
                     other => {

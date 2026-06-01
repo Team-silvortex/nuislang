@@ -17,6 +17,7 @@ Start here:
 * [config_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/config_runtime_demo)
 * [bool_match_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/bool_match_state_demo)
 * [bool_match_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/bool_match_branching_while_demo)
+* [branch_return_inference_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/branch_return_inference_demo)
 * [config_cache_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/config_cache_demo)
 * [guarded_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/guarded_while_demo)
 * [lambda_alias_fn1_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/lambda_alias_fn1_demo)
@@ -48,6 +49,7 @@ Start here:
 * [post_flow_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_while_demo)
 * [post_flow_branching_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_continuing_while_demo)
 * [post_flow_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_continuing_while_demo)
+* [return_inference_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/return_inference_demo)
 * [sliding_window_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/sliding_window_state_demo)
 
 Reading rule:
