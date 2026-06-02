@@ -1,0 +1,5 @@
+[project]
+name = "tail_recursive_branching_multi_carry_demo"
+version = "0.1.0"
+entry = "main.ns"
+

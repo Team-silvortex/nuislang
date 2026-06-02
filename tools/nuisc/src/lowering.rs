@@ -288,6 +288,12 @@ fn rewrite_self_tail_recursive_loop_body(
     function: &NirFunction,
     recursive_step: SelfTailRecursiveStep,
 ) -> Option<Vec<NirStmt>> {
+    let non_current_param_names = function
+        .params
+        .iter()
+        .skip(1)
+        .map(|param| param.name.clone())
+        .collect::<Vec<_>>();
     match recursive_step {
         SelfTailRecursiveStep::Linear(recursive_args) => {
             if recursive_args.len() != function.params.len() {
@@ -309,6 +315,8 @@ fn rewrite_self_tail_recursive_loop_body(
                             canonicalize_tail_recursive_loop_arg(
                                 arg,
                                 &function.params[0].name,
+                                &non_current_param_names,
+                                Some(&param.name),
                                 &next_current_expr,
                             )
                         };
@@ -333,6 +341,11 @@ fn rewrite_self_tail_recursive_loop_body(
             if then_args[0] != else_args[0] {
                 return None;
             }
+            let branch_condition = canonicalize_tail_recursive_condition_expr(
+                &condition,
+                &function.params[0].name,
+                &non_current_param_names,
+            );
             let next_current_expr = then_args[0].clone();
             let mut body = vec![NirStmt::Let {
                 name: function.params[0].name.clone(),
@@ -343,15 +356,19 @@ fn rewrite_self_tail_recursive_loop_body(
                 let then_value = canonicalize_tail_recursive_loop_arg(
                     &then_args[index],
                     &function.params[0].name,
+                    &non_current_param_names,
+                    Some(&param.name),
                     &next_current_expr,
                 );
                 let else_value = canonicalize_tail_recursive_loop_arg(
                     &else_args[index],
                     &function.params[0].name,
+                    &non_current_param_names,
+                    Some(&param.name),
                     &next_current_expr,
                 );
                 body.push(NirStmt::If {
-                    condition: condition.clone(),
+                    condition: branch_condition.clone(),
                     then_body: vec![NirStmt::Let {
                         name: param.name.clone(),
                         ty: Some(param.ty.clone()),
@@ -429,6 +446,8 @@ fn is_self_tail_recursive_loop_shape(
 fn canonicalize_tail_recursive_loop_arg(
     expr: &NirExpr,
     current_name: &str,
+    non_current_param_names: &[String],
+    target_carry_name: Option<&str>,
     next_current_expr: &NirExpr,
 ) -> NirExpr {
     if expr == next_current_expr {
@@ -438,12 +457,24 @@ fn canonicalize_tail_recursive_loop_arg(
         NirExpr::Var(name) if name == current_name => {
             NirExpr::Var(TAIL_RECURSIVE_PREV_CURRENT_BINDING.to_owned())
         }
-        NirExpr::Var(_) | NirExpr::Bool(_) | NirExpr::Text(_) | NirExpr::Int(_) | NirExpr::Null => {
-            expr.clone()
+        NirExpr::Var(name) => {
+            if target_carry_name.is_some() && Some(name.as_str()) == target_carry_name {
+                expr.clone()
+            } else {
+                non_current_param_names
+                    .iter()
+                    .position(|param_name| param_name == name)
+                    .map(tail_recursive_prev_carry_binding)
+                    .map(NirExpr::Var)
+                    .unwrap_or_else(|| expr.clone())
+            }
         }
+        NirExpr::Bool(_) | NirExpr::Text(_) | NirExpr::Int(_) | NirExpr::Null => expr.clone(),
         NirExpr::Await(inner) => NirExpr::Await(Box::new(canonicalize_tail_recursive_loop_arg(
             inner,
             current_name,
+            non_current_param_names,
+            target_carry_name,
             next_current_expr,
         ))),
         NirExpr::Call { callee, args } => NirExpr::Call {
@@ -451,7 +482,13 @@ fn canonicalize_tail_recursive_loop_arg(
             args: args
                 .iter()
                 .map(|arg| {
-                    canonicalize_tail_recursive_loop_arg(arg, current_name, next_current_expr)
+                    canonicalize_tail_recursive_loop_arg(
+                        arg,
+                        current_name,
+                        non_current_param_names,
+                        target_carry_name,
+                        next_current_expr,
+                    )
                 })
                 .collect(),
         },
@@ -463,13 +500,21 @@ fn canonicalize_tail_recursive_loop_arg(
             receiver: Box::new(canonicalize_tail_recursive_loop_arg(
                 receiver,
                 current_name,
+                non_current_param_names,
+                target_carry_name,
                 next_current_expr,
             )),
             method: method.clone(),
             args: args
                 .iter()
                 .map(|arg| {
-                    canonicalize_tail_recursive_loop_arg(arg, current_name, next_current_expr)
+                    canonicalize_tail_recursive_loop_arg(
+                        arg,
+                        current_name,
+                        non_current_param_names,
+                        target_carry_name,
+                        next_current_expr,
+                    )
                 })
                 .collect(),
         },
@@ -483,6 +528,8 @@ fn canonicalize_tail_recursive_loop_arg(
                         canonicalize_tail_recursive_loop_arg(
                             value,
                             current_name,
+                            non_current_param_names,
+                            target_carry_name,
                             next_current_expr,
                         ),
                     )
@@ -493,6 +540,8 @@ fn canonicalize_tail_recursive_loop_arg(
             base: Box::new(canonicalize_tail_recursive_loop_arg(
                 base,
                 current_name,
+                non_current_param_names,
+                target_carry_name,
                 next_current_expr,
             )),
             field: field.clone(),
@@ -502,12 +551,115 @@ fn canonicalize_tail_recursive_loop_arg(
             lhs: Box::new(canonicalize_tail_recursive_loop_arg(
                 lhs,
                 current_name,
+                non_current_param_names,
+                target_carry_name,
                 next_current_expr,
             )),
             rhs: Box::new(canonicalize_tail_recursive_loop_arg(
                 rhs,
                 current_name,
+                non_current_param_names,
+                target_carry_name,
                 next_current_expr,
+            )),
+        },
+        _ => expr.clone(),
+    }
+}
+
+fn canonicalize_tail_recursive_condition_expr(
+    expr: &NirExpr,
+    current_name: &str,
+    non_current_param_names: &[String],
+) -> NirExpr {
+    match expr {
+        NirExpr::Var(name) if name == current_name => {
+            NirExpr::Var(TAIL_RECURSIVE_PREV_CURRENT_BINDING.to_owned())
+        }
+        NirExpr::Var(name) => non_current_param_names
+            .iter()
+            .position(|param_name| param_name == name)
+            .map(tail_recursive_prev_carry_binding)
+            .map(NirExpr::Var)
+            .unwrap_or_else(|| expr.clone()),
+        NirExpr::Bool(_) | NirExpr::Text(_) | NirExpr::Int(_) | NirExpr::Null => expr.clone(),
+        NirExpr::Await(inner) => {
+            NirExpr::Await(Box::new(canonicalize_tail_recursive_condition_expr(
+                inner,
+                current_name,
+                non_current_param_names,
+            )))
+        }
+        NirExpr::Call { callee, args } => NirExpr::Call {
+            callee: callee.clone(),
+            args: args
+                .iter()
+                .map(|arg| {
+                    canonicalize_tail_recursive_condition_expr(
+                        arg,
+                        current_name,
+                        non_current_param_names,
+                    )
+                })
+                .collect(),
+        },
+        NirExpr::MethodCall {
+            receiver,
+            method,
+            args,
+        } => NirExpr::MethodCall {
+            receiver: Box::new(canonicalize_tail_recursive_condition_expr(
+                receiver,
+                current_name,
+                non_current_param_names,
+            )),
+            method: method.clone(),
+            args: args
+                .iter()
+                .map(|arg| {
+                    canonicalize_tail_recursive_condition_expr(
+                        arg,
+                        current_name,
+                        non_current_param_names,
+                    )
+                })
+                .collect(),
+        },
+        NirExpr::StructLiteral { type_name, fields } => NirExpr::StructLiteral {
+            type_name: type_name.clone(),
+            fields: fields
+                .iter()
+                .map(|(field, value)| {
+                    (
+                        field.clone(),
+                        canonicalize_tail_recursive_condition_expr(
+                            value,
+                            current_name,
+                            non_current_param_names,
+                        ),
+                    )
+                })
+                .collect(),
+        },
+        NirExpr::FieldAccess { base, field } => NirExpr::FieldAccess {
+            base: Box::new(canonicalize_tail_recursive_condition_expr(
+                base,
+                current_name,
+                non_current_param_names,
+            )),
+            field: field.clone(),
+        },
+        NirExpr::Binary { op, lhs, rhs } => NirExpr::Binary {
+            op: *op,
+            lhs: Box::new(canonicalize_tail_recursive_condition_expr(
+                lhs,
+                current_name,
+                non_current_param_names,
+            )),
+            rhs: Box::new(canonicalize_tail_recursive_condition_expr(
+                rhs,
+                current_name,
+                non_current_param_names,
             )),
         },
         _ => expr.clone(),
@@ -4733,11 +4885,13 @@ struct PreparedCarryUpdate {
 }
 
 const TAIL_RECURSIVE_PREV_CURRENT_BINDING: &str = "__tailrec_prev_current";
+const TAIL_RECURSIVE_PREV_CARRY_BINDING_PREFIX: &str = "__tailrec_prev_carry_";
 
 #[derive(Clone, Copy)]
 enum PreparedCarrySource {
     Current,
     PreviousCurrent,
+    PreviousCarry(usize),
     Carry(usize),
 }
 
@@ -4768,6 +4922,8 @@ struct PreparedLoopCarryCondition {
 #[derive(Clone, Copy)]
 enum PreparedCarryCondSource {
     Current,
+    PreviousCurrent,
+    PreviousCarry(usize),
     Carry(usize),
 }
 
@@ -4837,6 +4993,42 @@ fn render_loop_cond_kind(lhs: &PreparedCarryCondSource, compare: PreparedLoopCom
         (PreparedCarryCondSource::Current, PreparedLoopCompare::Le) => "current_le".to_owned(),
         (PreparedCarryCondSource::Current, PreparedLoopCompare::Gt) => "current_gt".to_owned(),
         (PreparedCarryCondSource::Current, PreparedLoopCompare::Ge) => "current_ge".to_owned(),
+        (PreparedCarryCondSource::PreviousCurrent, PreparedLoopCompare::Eq) => {
+            "prev_current_eq".to_owned()
+        }
+        (PreparedCarryCondSource::PreviousCurrent, PreparedLoopCompare::Ne) => {
+            "prev_current_ne".to_owned()
+        }
+        (PreparedCarryCondSource::PreviousCurrent, PreparedLoopCompare::Lt) => {
+            "prev_current_lt".to_owned()
+        }
+        (PreparedCarryCondSource::PreviousCurrent, PreparedLoopCompare::Le) => {
+            "prev_current_le".to_owned()
+        }
+        (PreparedCarryCondSource::PreviousCurrent, PreparedLoopCompare::Gt) => {
+            "prev_current_gt".to_owned()
+        }
+        (PreparedCarryCondSource::PreviousCurrent, PreparedLoopCompare::Ge) => {
+            "prev_current_ge".to_owned()
+        }
+        (PreparedCarryCondSource::PreviousCarry(index), PreparedLoopCompare::Eq) => {
+            format!("prev_carry{index}_eq")
+        }
+        (PreparedCarryCondSource::PreviousCarry(index), PreparedLoopCompare::Ne) => {
+            format!("prev_carry{index}_ne")
+        }
+        (PreparedCarryCondSource::PreviousCarry(index), PreparedLoopCompare::Lt) => {
+            format!("prev_carry{index}_lt")
+        }
+        (PreparedCarryCondSource::PreviousCarry(index), PreparedLoopCompare::Le) => {
+            format!("prev_carry{index}_le")
+        }
+        (PreparedCarryCondSource::PreviousCarry(index), PreparedLoopCompare::Gt) => {
+            format!("prev_carry{index}_gt")
+        }
+        (PreparedCarryCondSource::PreviousCarry(index), PreparedLoopCompare::Ge) => {
+            format!("prev_carry{index}_ge")
+        }
         (PreparedCarryCondSource::Carry(index), PreparedLoopCompare::Eq) => {
             format!("carry{index}_eq")
         }
@@ -4875,6 +5067,9 @@ fn render_loop_carry_kind(op: PreparedCarryLinearOp, source: PreparedCarrySource
         (PreparedCarryLinearOp::Add, PreparedCarrySource::PreviousCurrent) => {
             "add_prev_current".to_owned()
         }
+        (PreparedCarryLinearOp::Add, PreparedCarrySource::PreviousCarry(index)) => {
+            format!("add_prev_carry{index}")
+        }
         (PreparedCarryLinearOp::Add, PreparedCarrySource::Carry(index)) => {
             format!("add_carry{index}")
         }
@@ -4882,10 +5077,17 @@ fn render_loop_carry_kind(op: PreparedCarryLinearOp, source: PreparedCarrySource
         (PreparedCarryLinearOp::Mul, PreparedCarrySource::PreviousCurrent) => {
             "mul_prev_current".to_owned()
         }
+        (PreparedCarryLinearOp::Mul, PreparedCarrySource::PreviousCarry(index)) => {
+            format!("mul_prev_carry{index}")
+        }
         (PreparedCarryLinearOp::Mul, PreparedCarrySource::Carry(index)) => {
             format!("mul_carry{index}")
         }
     }
+}
+
+fn tail_recursive_prev_carry_binding(index: usize) -> String {
+    format!("{TAIL_RECURSIVE_PREV_CARRY_BINDING_PREFIX}{index}")
 }
 
 fn parse_loop_carry_linear(
@@ -4908,6 +5110,14 @@ fn parse_loop_carry_linear(
                         PreparedCarryLinearOp::Add,
                         PreparedCarrySource::PreviousCurrent,
                     ))
+                } else if let Some(index) =
+                    rhs_name.strip_prefix(TAIL_RECURSIVE_PREV_CARRY_BINDING_PREFIX)
+                {
+                    index
+                        .parse::<usize>()
+                        .ok()
+                        .map(PreparedCarrySource::PreviousCarry)
+                        .map(|source| (PreparedCarryLinearOp::Add, source))
                 } else {
                     find_prepared_carry_index(carries, rhs_name)
                         .map(PreparedCarrySource::Carry)
@@ -4929,6 +5139,14 @@ fn parse_loop_carry_linear(
                         PreparedCarryLinearOp::Mul,
                         PreparedCarrySource::PreviousCurrent,
                     ))
+                } else if let Some(index) =
+                    rhs_name.strip_prefix(TAIL_RECURSIVE_PREV_CARRY_BINDING_PREFIX)
+                {
+                    index
+                        .parse::<usize>()
+                        .ok()
+                        .map(PreparedCarrySource::PreviousCarry)
+                        .map(|source| (PreparedCarryLinearOp::Mul, source))
                 } else {
                     find_prepared_carry_index(carries, rhs_name)
                         .map(PreparedCarrySource::Carry)
@@ -5018,6 +5236,16 @@ fn parse_loop_carry_condition(
     };
     let lhs = match lhs {
         NirExpr::Var(name) if name == binding_name => PreparedCarryCondSource::Current,
+        NirExpr::Var(name) if name == TAIL_RECURSIVE_PREV_CURRENT_BINDING => {
+            PreparedCarryCondSource::PreviousCurrent
+        }
+        NirExpr::Var(name) if name.starts_with(TAIL_RECURSIVE_PREV_CARRY_BINDING_PREFIX) => {
+            PreparedCarryCondSource::PreviousCarry(
+                name[TAIL_RECURSIVE_PREV_CARRY_BINDING_PREFIX.len()..]
+                    .parse::<usize>()
+                    .ok()?,
+            )
+        }
         NirExpr::Var(name) => {
             PreparedCarryCondSource::Carry(find_prepared_carry_index(carries, name)?)
         }
@@ -5079,6 +5307,16 @@ fn parse_loop_flow_condition_atom(
     };
     let lhs = match lhs {
         NirExpr::Var(name) if name == binding_name => PreparedCarryCondSource::Current,
+        NirExpr::Var(name) if name == TAIL_RECURSIVE_PREV_CURRENT_BINDING => {
+            PreparedCarryCondSource::PreviousCurrent
+        }
+        NirExpr::Var(name) if name.starts_with(TAIL_RECURSIVE_PREV_CARRY_BINDING_PREFIX) => {
+            PreparedCarryCondSource::PreviousCarry(
+                name[TAIL_RECURSIVE_PREV_CARRY_BINDING_PREFIX.len()..]
+                    .parse::<usize>()
+                    .ok()?,
+            )
+        }
         NirExpr::Var(name) => PreparedCarryCondSource::Carry(
             carry_binding_names
                 .iter()
@@ -9412,7 +9650,7 @@ mod tests {
             .expect("expected loop_while_i64_cond_chain node");
         assert_eq!(loop_node.op.args[3], "ne");
         assert_eq!(loop_node.op.args[4], "sub");
-        assert_eq!(loop_node.op.args[6], "current_gt");
+        assert_eq!(loop_node.op.args[6], "prev_current_gt");
         assert_eq!(loop_node.op.args[8], "add_current");
         assert_eq!(loop_node.op.args[9], "keep");
     }
@@ -9446,6 +9684,124 @@ mod tests {
         assert_eq!(loop_node.op.args[3], "gt");
         assert_eq!(loop_node.op.args[4], "sub");
         assert_eq!(loop_node.op.args[6], "mul_prev_current");
+    }
+
+    #[test]
+    fn lowers_multi_carry_prev_current_self_tail_recursive_function_into_loop_while_i64_chain() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn accumulate(current: i64, sum: i64, prod: i64) -> i64 {
+                if current <= 1 {
+                  return sum + prod;
+                }
+                return accumulate(current - 1, sum + current, prod * current);
+              }
+
+              fn main() -> i64 {
+                return accumulate(4, 0, 1);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+        let loop_node = yir
+            .nodes
+            .iter()
+            .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_chain")
+            .expect("expected loop_while_i64_chain node");
+        assert_eq!(loop_node.op.args[3], "gt");
+        assert_eq!(loop_node.op.args[4], "sub");
+        assert_eq!(loop_node.op.args[6], "add_prev_current");
+        assert_eq!(loop_node.op.args[8], "mul_prev_current");
+    }
+
+    #[test]
+    fn lowers_branching_multi_carry_prev_current_self_tail_recursive_function_into_loop_while_i64_cond_chain(
+    ) {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn accumulate(current: i64, sum: i64, prod: i64) -> i64 {
+                if current <= 1 {
+                  return sum + prod;
+                }
+                if current > 2 {
+                  return accumulate(current - 1, sum + current, prod * current);
+                } else {
+                  return accumulate(current - 1, sum + 0, prod + current);
+                }
+              }
+
+              fn main() -> i64 {
+                return accumulate(4, 0, 1);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+        let loop_node = yir
+            .nodes
+            .iter()
+            .find(|node| {
+                node.op.module == "cpu" && node.op.instruction == "loop_while_i64_cond_chain"
+            })
+            .expect("expected loop_while_i64_cond_chain node");
+        assert_eq!(loop_node.op.args[3], "gt");
+        assert_eq!(loop_node.op.args[4], "sub");
+        assert_eq!(loop_node.op.args[6], "prev_current_gt");
+        assert_eq!(loop_node.op.args[8], "add_prev_current");
+        assert_eq!(loop_node.op.args[9], "keep");
+        assert_eq!(loop_node.op.args[11], "prev_current_gt");
+        assert_eq!(loop_node.op.args[13], "mul_prev_current");
+        assert_eq!(loop_node.op.args[14], "add_prev_current");
+    }
+
+    #[test]
+    fn lowers_carry_condition_branching_multi_carry_prev_current_self_tail_recursive_function_into_loop_while_i64_cond_chain(
+    ) {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn accumulate(current: i64, sum: i64, prod: i64) -> i64 {
+                if current <= 1 {
+                  return sum + prod;
+                }
+                if sum > 3 {
+                  return accumulate(current - 1, sum + 0, prod + current);
+                } else {
+                  return accumulate(current - 1, sum + current, prod * current);
+                }
+              }
+
+              fn main() -> i64 {
+                return accumulate(4, 0, 1);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+        let loop_node = yir
+            .nodes
+            .iter()
+            .find(|node| {
+                node.op.module == "cpu" && node.op.instruction == "loop_while_i64_cond_chain"
+            })
+            .expect("expected loop_while_i64_cond_chain node");
+        assert_eq!(loop_node.op.args[3], "gt");
+        assert_eq!(loop_node.op.args[4], "sub");
+        assert_eq!(loop_node.op.args[6], "prev_carry0_gt");
+        assert_eq!(loop_node.op.args[8], "keep");
+        assert_eq!(loop_node.op.args[9], "add_prev_current");
+        assert_eq!(loop_node.op.args[11], "prev_carry0_gt");
+        assert_eq!(loop_node.op.args[13], "add_prev_current");
+        assert_eq!(loop_node.op.args[14], "mul_prev_current");
     }
 
     #[test]

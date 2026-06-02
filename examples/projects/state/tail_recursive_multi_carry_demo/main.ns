@@ -1,0 +1,12 @@
+mod cpu Main {
+  fn accumulate(current: i64, sum: i64, prod: i64) -> i64 {
+    if current <= 1 {
+      return sum + prod;
+    }
+    return accumulate(current - 1, sum + current, prod * current);
+  }
+
+  fn main() -> i64 {
+    return accumulate(4, 0, 1);
+  }
+}

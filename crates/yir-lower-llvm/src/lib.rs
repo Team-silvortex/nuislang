@@ -1721,6 +1721,38 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                         (next_current.clone(), "mul")
                     } else if carry_kind == "mul_prev_current" {
                         (current.clone(), "mul")
+                    } else if let Some(rest) = carry_kind.strip_prefix("add_prev_carry") {
+                        let source_index = rest.parse::<usize>().map_err(|_| {
+                            format!(
+                                "cpu.loop_while_i64_chain `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                node.name
+                            )
+                        })?;
+                        (
+                            current_carries.get(source_index).cloned().ok_or_else(|| {
+                                format!(
+                                    "cpu.loop_while_i64_chain `{}` references unavailable carry source `{carry_kind}` during LLVM lowering",
+                                    node.name
+                                )
+                            })?,
+                            "add",
+                        )
+                    } else if let Some(rest) = carry_kind.strip_prefix("mul_prev_carry") {
+                        let source_index = rest.parse::<usize>().map_err(|_| {
+                            format!(
+                                "cpu.loop_while_i64_chain `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                node.name
+                            )
+                        })?;
+                        (
+                            current_carries.get(source_index).cloned().ok_or_else(|| {
+                                format!(
+                                    "cpu.loop_while_i64_chain `{}` references unavailable carry source `{carry_kind}` during LLVM lowering",
+                                    node.name
+                                )
+                            })?,
+                            "mul",
+                        )
                     } else if let Some(rest) = carry_kind.strip_prefix("add_carry") {
                         let source_index = rest.parse::<usize>().map_err(|_| {
                             format!(
@@ -1977,6 +2009,34 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                     if kind == "mul_prev_current" {
                         return Ok((current.clone(), "mul"));
                     }
+                    if let Some(rest) = kind.strip_prefix("add_prev_carry") {
+                        let source_index = rest.parse::<usize>().map_err(|_| {
+                                format!(
+                                    "cpu.loop_while_i64_cond_chain `{}` has unsupported carry kind `{kind}` during LLVM lowering",
+                                    node.name
+                                )
+                            })?;
+                        return current_carries.get(source_index).cloned().map(|value| (value, "add")).ok_or_else(|| {
+                                format!(
+                                    "cpu.loop_while_i64_cond_chain `{}` references unavailable carry source `{kind}` during LLVM lowering",
+                                    node.name
+                                )
+                            });
+                    }
+                    if let Some(rest) = kind.strip_prefix("mul_prev_carry") {
+                        let source_index = rest.parse::<usize>().map_err(|_| {
+                                format!(
+                                    "cpu.loop_while_i64_cond_chain `{}` has unsupported carry kind `{kind}` during LLVM lowering",
+                                    node.name
+                                )
+                            })?;
+                        return current_carries.get(source_index).cloned().map(|value| (value, "mul")).ok_or_else(|| {
+                                format!(
+                                    "cpu.loop_while_i64_cond_chain `{}` references unavailable carry source `{kind}` during LLVM lowering",
+                                    node.name
+                                )
+                            });
+                    }
                     if let Some(rest) = kind.strip_prefix("add_carry") {
                         let source_index = rest.parse::<usize>().map_err(|_| {
                                 format!(
@@ -2049,6 +2109,47 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                                 | "current_ge"
                         ) {
                             next_current.clone()
+                        } else if matches!(
+                            cond_kind.as_str(),
+                            "prev_current_eq"
+                                | "prev_current_ne"
+                                | "prev_current_lt"
+                                | "prev_current_le"
+                                | "prev_current_gt"
+                                | "prev_current_ge"
+                        ) {
+                            current.clone()
+                        } else if let Some(rest) = cond_kind.strip_prefix("prev_carry") {
+                            let (index_text, suffix) = rest.split_once('_').ok_or_else(|| {
+                                format!(
+                                    "cpu.loop_while_i64_cond_chain `{}` has unsupported conditional carry kind `{cond_kind}` during LLVM lowering",
+                                    node.name
+                                )
+                            })?;
+                            let source_index = index_text.parse::<usize>().map_err(|_| {
+                                format!(
+                                    "cpu.loop_while_i64_cond_chain `{}` has unsupported conditional carry kind `{cond_kind}` during LLVM lowering",
+                                    node.name
+                                )
+                            })?;
+                            if suffix != "eq"
+                                && suffix != "ne"
+                                && suffix != "lt"
+                                && suffix != "le"
+                                && suffix != "gt"
+                                && suffix != "ge"
+                            {
+                                return Err(format!(
+                                    "cpu.loop_while_i64_cond_chain `{}` has unsupported conditional carry kind `{cond_kind}` during LLVM lowering",
+                                    node.name
+                                ));
+                            }
+                            current_carries.get(source_index).cloned().ok_or_else(|| {
+                                format!(
+                                    "cpu.loop_while_i64_cond_chain `{}` references unavailable conditional carry source `{cond_kind}` during LLVM lowering",
+                                    node.name
+                                )
+                            })?
                         } else if let Some(rest) = cond_kind.strip_prefix("carry") {
                             let (index_text, suffix) = rest.split_once('_').ok_or_else(|| {
                                 format!(

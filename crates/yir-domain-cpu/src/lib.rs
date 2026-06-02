@@ -592,6 +592,24 @@ impl RegisteredMod for CpuMod {
                     {
                         continue;
                     }
+                    if let Some(index) = carry_kind.strip_prefix("add_prev_carry") {
+                        index.parse::<usize>().map_err(|_| {
+                            format!(
+                                "node `{}` has invalid carry kind `{}`",
+                                node.name, carry_kind
+                            )
+                        })?;
+                        continue;
+                    }
+                    if let Some(index) = carry_kind.strip_prefix("mul_prev_carry") {
+                        index.parse::<usize>().map_err(|_| {
+                            format!(
+                                "node `{}` has invalid carry kind `{}`",
+                                node.name, carry_kind
+                            )
+                        })?;
+                        continue;
+                    }
                     if let Some(index) = carry_kind.strip_prefix("add_carry") {
                         index.parse::<usize>().map_err(|_| {
                             format!(
@@ -654,7 +672,69 @@ impl RegisteredMod for CpuMod {
                     let cond_kind = &chunk[1];
                     match cond_kind.as_str() {
                         "always" | "current_eq" | "current_ne" | "current_lt" | "current_le"
-                        | "current_gt" | "current_ge" => {}
+                        | "current_gt" | "current_ge" | "prev_current_eq" | "prev_current_ne"
+                        | "prev_current_lt" | "prev_current_le" | "prev_current_gt"
+                        | "prev_current_ge" => {}
+                        _ if cond_kind.starts_with("prev_carry") && cond_kind.ends_with("_eq") => {
+                            cond_kind[10..cond_kind.len() - 3]
+                                .parse::<usize>()
+                                .map_err(|_| {
+                                    format!(
+                                        "node `{}` has invalid conditional carry kind `{}`",
+                                        node.name, cond_kind
+                                    )
+                                })?;
+                        }
+                        _ if cond_kind.starts_with("prev_carry") && cond_kind.ends_with("_ne") => {
+                            cond_kind[10..cond_kind.len() - 3]
+                                .parse::<usize>()
+                                .map_err(|_| {
+                                    format!(
+                                        "node `{}` has invalid conditional carry kind `{}`",
+                                        node.name, cond_kind
+                                    )
+                                })?;
+                        }
+                        _ if cond_kind.starts_with("prev_carry") && cond_kind.ends_with("_lt") => {
+                            cond_kind[10..cond_kind.len() - 3]
+                                .parse::<usize>()
+                                .map_err(|_| {
+                                    format!(
+                                        "node `{}` has invalid conditional carry kind `{}`",
+                                        node.name, cond_kind
+                                    )
+                                })?;
+                        }
+                        _ if cond_kind.starts_with("prev_carry") && cond_kind.ends_with("_gt") => {
+                            cond_kind[10..cond_kind.len() - 3]
+                                .parse::<usize>()
+                                .map_err(|_| {
+                                    format!(
+                                        "node `{}` has invalid conditional carry kind `{}`",
+                                        node.name, cond_kind
+                                    )
+                                })?;
+                        }
+                        _ if cond_kind.starts_with("prev_carry") && cond_kind.ends_with("_le") => {
+                            cond_kind[10..cond_kind.len() - 3]
+                                .parse::<usize>()
+                                .map_err(|_| {
+                                    format!(
+                                        "node `{}` has invalid conditional carry kind `{}`",
+                                        node.name, cond_kind
+                                    )
+                                })?;
+                        }
+                        _ if cond_kind.starts_with("prev_carry") && cond_kind.ends_with("_ge") => {
+                            cond_kind[10..cond_kind.len() - 3]
+                                .parse::<usize>()
+                                .map_err(|_| {
+                                    format!(
+                                        "node `{}` has invalid conditional carry kind `{}`",
+                                        node.name, cond_kind
+                                    )
+                                })?;
+                        }
                         _ if cond_kind.starts_with("carry") && cond_kind.ends_with("_eq") => {
                             cond_kind[5..cond_kind.len() - 3]
                                 .parse::<usize>()
@@ -729,6 +809,24 @@ impl RegisteredMod for CpuMod {
                             || carry_kind == "mul_current"
                             || carry_kind == "mul_prev_current"
                         {
+                            continue;
+                        }
+                        if let Some(index) = carry_kind.strip_prefix("add_prev_carry") {
+                            index.parse::<usize>().map_err(|_| {
+                                format!(
+                                    "node `{}` has invalid carry kind `{}`",
+                                    node.name, carry_kind
+                                )
+                            })?;
+                            continue;
+                        }
+                        if let Some(index) = carry_kind.strip_prefix("mul_prev_carry") {
+                            index.parse::<usize>().map_err(|_| {
+                                format!(
+                                    "node `{}` has invalid carry kind `{}`",
+                                    node.name, carry_kind
+                                )
+                            })?;
                             continue;
                         }
                         if let Some(index) = carry_kind.strip_prefix("add_carry") {
