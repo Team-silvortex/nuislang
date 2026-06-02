@@ -1713,8 +1713,14 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 }
                 let mut next_carries = Vec::new();
                 for (index, carry_kind) in carry_kinds.iter().enumerate() {
-                    let source = if carry_kind == "add_current" {
-                        next_current.clone()
+                    let (source, op) = if carry_kind == "add_current" {
+                        (next_current.clone(), "add")
+                    } else if carry_kind == "add_prev_current" {
+                        (current.clone(), "add")
+                    } else if carry_kind == "mul_current" {
+                        (next_current.clone(), "mul")
+                    } else if carry_kind == "mul_prev_current" {
+                        (current.clone(), "mul")
                     } else if let Some(rest) = carry_kind.strip_prefix("add_carry") {
                         let source_index = rest.parse::<usize>().map_err(|_| {
                             format!(
@@ -1722,12 +1728,31 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                                 node.name
                             )
                         })?;
-                        next_carries.get(source_index).cloned().ok_or_else(|| {
+                        (
+                            next_carries.get(source_index).cloned().ok_or_else(|| {
+                                format!(
+                                    "cpu.loop_while_i64_chain `{}` references unavailable carry source `{carry_kind}` during LLVM lowering",
+                                    node.name
+                                )
+                            })?,
+                            "add",
+                        )
+                    } else if let Some(rest) = carry_kind.strip_prefix("mul_carry") {
+                        let source_index = rest.parse::<usize>().map_err(|_| {
                             format!(
-                                "cpu.loop_while_i64_chain `{}` references unavailable carry source `{carry_kind}` during LLVM lowering",
+                                "cpu.loop_while_i64_chain `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
                                 node.name
                             )
-                        })?
+                        })?;
+                        (
+                            next_carries.get(source_index).cloned().ok_or_else(|| {
+                                format!(
+                                    "cpu.loop_while_i64_chain `{}` references unavailable carry source `{carry_kind}` during LLVM lowering",
+                                    node.name
+                                )
+                            })?,
+                            "mul",
+                        )
                     } else {
                         return Err(format!(
                             "cpu.loop_while_i64_chain `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
@@ -1736,7 +1761,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                     };
                     let reg = fresh_reg(&mut next_reg);
                     body.push(format!(
-                        "  {reg} = add i64 {}, {}",
+                        "  {reg} = {op} i64 {}, {}",
                         current_carries[index], source
                     ));
                     next_carries.push(reg);
@@ -1936,12 +1961,21 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                 let resolve_source = |kind: &str,
                                       next_current: &String,
                                       next_carries: &Vec<String>|
-                 -> Result<String, String> {
+                 -> Result<(String, &'static str), String> {
                     if kind == "keep" {
-                        return Ok(String::new());
+                        return Ok((String::new(), "keep"));
                     }
                     if kind == "add_current" {
-                        return Ok(next_current.clone());
+                        return Ok((next_current.clone(), "add"));
+                    }
+                    if kind == "add_prev_current" {
+                        return Ok((current.clone(), "add"));
+                    }
+                    if kind == "mul_current" {
+                        return Ok((next_current.clone(), "mul"));
+                    }
+                    if kind == "mul_prev_current" {
+                        return Ok((current.clone(), "mul"));
                     }
                     if let Some(rest) = kind.strip_prefix("add_carry") {
                         let source_index = rest.parse::<usize>().map_err(|_| {
@@ -1950,7 +1984,21 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                                     node.name
                                 )
                             })?;
-                        return next_carries.get(source_index).cloned().ok_or_else(|| {
+                        return next_carries.get(source_index).cloned().map(|value| (value, "add")).ok_or_else(|| {
+                                format!(
+                                    "cpu.loop_while_i64_cond_chain `{}` references unavailable carry source `{kind}` during LLVM lowering",
+                                    node.name
+                                )
+                            });
+                    }
+                    if let Some(rest) = kind.strip_prefix("mul_carry") {
+                        let source_index = rest.parse::<usize>().map_err(|_| {
+                                format!(
+                                    "cpu.loop_while_i64_cond_chain `{}` has unsupported carry kind `{kind}` during LLVM lowering",
+                                    node.name
+                                )
+                            })?;
+                        return next_carries.get(source_index).cloned().map(|value| (value, "mul")).ok_or_else(|| {
                                 format!(
                                     "cpu.loop_while_i64_cond_chain `{}` references unavailable carry source `{kind}` during LLVM lowering",
                                     node.name
@@ -1969,10 +2017,10 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                     let then_value = if then_kind == "keep" {
                         current_carries[index].clone()
                     } else {
-                        let source = resolve_source(then_kind, &next_current, &next_carries)?;
+                        let (source, op) = resolve_source(then_kind, &next_current, &next_carries)?;
                         let reg = fresh_reg(&mut next_reg);
                         body.push(format!(
-                            "  {reg} = add i64 {}, {}",
+                            "  {reg} = {op} i64 {}, {}",
                             current_carries[index], source
                         ));
                         reg
@@ -1980,10 +2028,10 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
                     let else_value = if else_kind == "keep" {
                         current_carries[index].clone()
                     } else {
-                        let source = resolve_source(else_kind, &next_current, &next_carries)?;
+                        let (source, op) = resolve_source(else_kind, &next_current, &next_carries)?;
                         let reg = fresh_reg(&mut next_reg);
                         body.push(format!(
-                            "  {reg} = add i64 {}, {}",
+                            "  {reg} = {op} i64 {}, {}",
                             current_carries[index], source
                         ));
                         reg

@@ -1,0 +1,15 @@
+mod cpu Main {
+  type Frozen<T> = Window<T>;
+  type Wrapped<T> = DataResult<Frozen<T>>;
+
+  fn keep_wrapped<T>(wrapped: Wrapped<T>) -> Wrapped<T> {
+    return wrapped;
+  }
+
+  fn main() -> i64 {
+    let wrapped: Wrapped<i64> =
+      keep_wrapped(data_result(data_freeze_window(data_copy_window(7, 0, 1))));
+    let frozen: Frozen<i64> = data_value(wrapped);
+    return data_read_window(frozen, 0);
+  }
+}

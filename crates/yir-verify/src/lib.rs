@@ -422,6 +422,16 @@ fn verify_data_fabric_protocol(
                     }
                     DataValueKind::WindowMutable
                 }
+                SemanticOp::DataValue => {
+                    infer_data_value_kind(&value_kinds, &nodes, &node.op.args[0])
+                }
+                SemanticOp::DataObserve => {
+                    if node.op.args.get(1).is_some_and(|state| state == "windowed") {
+                        infer_data_value_kind(&value_kinds, &nodes, &node.op.args[0])
+                    } else {
+                        DataValueKind::Other
+                    }
+                }
                 SemanticOp::DataFreezeWindow => {
                     let source = infer_data_value_kind(&value_kinds, &nodes, &node.op.args[0]);
                     if !matches!(
@@ -1922,6 +1932,16 @@ fn infer_data_value_kind(
                 SemanticOp::DataHandleTable => DataValueKind::HandleTable,
                 SemanticOp::DataBindCore => DataValueKind::CoreBinding,
                 SemanticOp::DataOutputPipe => DataValueKind::PipeOutput,
+                SemanticOp::DataValue => {
+                    infer_data_value_kind(value_kinds, nodes, &node.op.args[0])
+                }
+                SemanticOp::DataObserve => {
+                    if node.op.args.get(1).is_some_and(|state| state == "windowed") {
+                        infer_data_value_kind(value_kinds, nodes, &node.op.args[0])
+                    } else {
+                        DataValueKind::Other
+                    }
+                }
                 SemanticOp::DataInputPipe | SemanticOp::DataMove | SemanticOp::DataReadWindow => {
                     DataValueKind::Other
                 }

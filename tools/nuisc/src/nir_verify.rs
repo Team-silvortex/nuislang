@@ -15,6 +15,16 @@ enum NirDataKind {
     PipeInput,
 }
 
+impl NirDataKind {
+    fn merge_with_type_hint(self, hint: Option<NirDataKind>) -> NirDataKind {
+        if self == NirDataKind::Other {
+            hint.unwrap_or(self)
+        } else {
+            self
+        }
+    }
+}
+
 pub fn verify_nir_module(module: &NirModule) -> Result<(), String> {
     verify_declared_types(module)?;
     for function in &module.functions {
@@ -104,14 +114,31 @@ fn verify_stmt(
     data_bindings: &mut BTreeMap<String, NirDataKind>,
 ) -> Result<(), String> {
     match stmt {
-        NirStmt::Let { name, value, .. } | NirStmt::Const { name, value, .. } => {
+        NirStmt::Let { name, ty, value } => {
             ensure_binding_can_be_rebound(name, borrows, borrow_bindings)?;
             borrows.remove(name);
             borrow_bindings.remove(name);
             data_bindings.remove(name);
             verify_expr(value, moved, borrows, borrow_bindings, data_bindings)?;
             note_binding_effects(value, name, moved, borrows, borrow_bindings);
-            data_bindings.insert(name.clone(), infer_data_kind(value, data_bindings));
+            data_bindings.insert(
+                name.clone(),
+                infer_data_kind(value, data_bindings)
+                    .merge_with_type_hint(ty.as_ref().map(infer_data_kind_from_type)),
+            );
+        }
+        NirStmt::Const { name, ty, value } => {
+            ensure_binding_can_be_rebound(name, borrows, borrow_bindings)?;
+            borrows.remove(name);
+            borrow_bindings.remove(name);
+            data_bindings.remove(name);
+            verify_expr(value, moved, borrows, borrow_bindings, data_bindings)?;
+            note_binding_effects(value, name, moved, borrows, borrow_bindings);
+            data_bindings.insert(
+                name.clone(),
+                infer_data_kind(value, data_bindings)
+                    .merge_with_type_hint(Some(infer_data_kind_from_type(ty))),
+            );
         }
         NirStmt::Print(value) | NirStmt::Await(value) | NirStmt::Expr(value) => {
             verify_expr(value, moved, borrows, borrow_bindings, data_bindings)?;
@@ -1129,6 +1156,8 @@ fn expr_resource_key(expr: &NirExpr) -> Option<String> {
 fn infer_data_kind(expr: &NirExpr, data_bindings: &BTreeMap<String, NirDataKind>) -> NirDataKind {
     match expr {
         NirExpr::Await(inner) => infer_data_kind(inner, data_bindings),
+        NirExpr::DataResult { value, .. } => infer_data_kind(value, data_bindings),
+        NirExpr::DataValue(inner) => infer_data_kind(inner, data_bindings),
         NirExpr::Var(name) => data_bindings
             .get(name)
             .copied()
@@ -1147,6 +1176,32 @@ fn infer_data_kind(expr: &NirExpr, data_bindings: &BTreeMap<String, NirDataKind>
         | NirExpr::DataProfileSendDownlink { .. } => NirDataKind::WindowImmutable,
         _ => NirDataKind::Other,
     }
+}
+
+fn infer_data_kind_from_type(ty: &NirTypeRef) -> NirDataKind {
+    if let Some(mode) = ty.window_mode() {
+        return match mode {
+            nuis_semantics::model::NirWindowMode::Mutable => NirDataKind::WindowMutable,
+            nuis_semantics::model::NirWindowMode::Immutable => NirDataKind::WindowImmutable,
+        };
+    }
+    if ty.name == "Pipe" && ty.generic_args.len() == 1 {
+        return NirDataKind::PipeOutput;
+    }
+    if ty.is_marker_type() {
+        return NirDataKind::Marker;
+    }
+    if ty.is_handle_table_type() {
+        return NirDataKind::HandleTable;
+    }
+    if matches!(
+        ty.result_family(),
+        Some(nuis_semantics::model::NirResultFamily::Data)
+    ) && ty.generic_args.len() == 1
+    {
+        return infer_data_kind_from_type(&ty.generic_args[0]);
+    }
+    NirDataKind::Other
 }
 
 fn render_data_expr_name(expr: &NirExpr) -> String {
@@ -1173,7 +1228,9 @@ fn render_data_expr_name(expr: &NirExpr) -> String {
 #[cfg(test)]
 mod tests {
     use super::verify_nir_module;
-    use nuis_semantics::model::{NirExpr, NirFunction, NirModule, NirStmt, NirVisibility};
+    use nuis_semantics::model::{
+        NirDataFlowState, NirExpr, NirFunction, NirModule, NirStmt, NirVisibility,
+    };
 
     fn module_with_body(body: Vec<NirStmt>) -> NirModule {
         NirModule {
@@ -1683,6 +1740,23 @@ mod tests {
                 offset: Box::new(NirExpr::Int(0)),
                 len: Box::new(NirExpr::Int(1)),
             }),
+            index: Box::new(NirExpr::Int(0)),
+        })]);
+
+        verify_nir_module(&module).unwrap();
+    }
+
+    #[test]
+    fn data_read_window_accepts_data_value_of_window_result() {
+        let module = module_with_body(vec![NirStmt::Expr(NirExpr::DataReadWindow {
+            window: Box::new(NirExpr::DataValue(Box::new(NirExpr::DataResult {
+                value: Box::new(NirExpr::DataImmutableWindow {
+                    input: Box::new(NirExpr::Int(7)),
+                    offset: Box::new(NirExpr::Int(0)),
+                    len: Box::new(NirExpr::Int(1)),
+                }),
+                state: NirDataFlowState::Windowed,
+            }))),
             index: Box::new(NirExpr::Int(0)),
         })]);
 

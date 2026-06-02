@@ -1,0 +1,12 @@
+mod cpu Main {
+  fn fact(current: i64, acc: i64) -> i64 {
+    if current <= 1 {
+      return acc;
+    }
+    return fact(current - 1, acc * current);
+  }
+
+  fn main() -> i64 {
+    return fact(4, 1);
+  }
+}

@@ -1,0 +1,12 @@
+mod cpu Main {
+  fn sum_next(current: i64, acc: i64) -> i64 {
+    if current == 0 {
+      return acc;
+    }
+    return sum_next(current - 1, acc + (current - 1));
+  }
+
+  fn main() -> i64 {
+    return sum_next(4, 1);
+  }
+}

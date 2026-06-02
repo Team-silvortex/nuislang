@@ -1,0 +1,16 @@
+mod cpu Main {
+  fn sum_selected(current: i64, acc: i64) -> i64 {
+    if current == 0 {
+      return acc;
+    }
+    if current > 2 {
+      return sum_selected(current - 1, acc + (current - 1));
+    } else {
+      return sum_selected(current - 1, acc + 0);
+    }
+  }
+
+  fn main() -> i64 {
+    return sum_selected(4, 0);
+  }
+}

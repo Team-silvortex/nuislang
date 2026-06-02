@@ -377,6 +377,7 @@ pub fn lower_project_ast_to_nir(
             rewrite_generic_calls_in_function(
                 function,
                 &module_const_env,
+                &visible_type_aliases,
                 &generic_templates,
                 &impl_lookup,
                 &module_struct_table,
@@ -3735,6 +3736,7 @@ fn collect_inferred_return_types_from_block(
 fn rewrite_generic_calls_in_function(
     function: &AstFunction,
     module_const_env: &BTreeMap<String, AstTypeRef>,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
     generic_templates: &BTreeMap<String, AstFunction>,
     impl_lookup: &BTreeMap<(String, String), AstImplDef>,
     struct_table: &BTreeMap<String, AstStructDef>,
@@ -3751,6 +3753,7 @@ fn rewrite_generic_calls_in_function(
         &function.body,
         function.return_type.as_ref(),
         &mut env,
+        visible_type_aliases,
         generic_templates,
         impl_lookup,
         struct_table,
@@ -3768,6 +3771,7 @@ fn rewrite_generic_calls_in_block(
     body: &[AstStmt],
     current_return_type: Option<&AstTypeRef>,
     env: &mut BTreeMap<String, AstTypeRef>,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
     generic_templates: &BTreeMap<String, AstFunction>,
     impl_lookup: &BTreeMap<(String, String), AstImplDef>,
     struct_table: &BTreeMap<String, AstStructDef>,
@@ -3782,6 +3786,7 @@ fn rewrite_generic_calls_in_block(
             stmt,
             current_return_type,
             env,
+            visible_type_aliases,
             generic_templates,
             impl_lookup,
             struct_table,
@@ -3798,6 +3803,7 @@ fn rewrite_generic_stmt_with_hoists(
     stmt: &AstStmt,
     current_return_type: Option<&AstTypeRef>,
     env: &mut BTreeMap<String, AstTypeRef>,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
     generic_templates: &BTreeMap<String, AstFunction>,
     impl_lookup: &BTreeMap<(String, String), AstImplDef>,
     struct_table: &BTreeMap<String, AstStructDef>,
@@ -3813,6 +3819,7 @@ fn rewrite_generic_stmt_with_hoists(
                     stmt,
                     current_return_type,
                     env,
+                    visible_type_aliases,
                     generic_templates,
                     impl_lookup,
                     struct_table,
@@ -3827,6 +3834,7 @@ fn rewrite_generic_stmt_with_hoists(
                     stmt,
                     current_return_type,
                     env,
+                    visible_type_aliases,
                     generic_templates,
                     impl_lookup,
                     struct_table,
@@ -3841,6 +3849,7 @@ fn rewrite_generic_stmt_with_hoists(
                 args,
                 name,
                 env,
+                visible_type_aliases,
                 generic_templates,
                 impl_lookup,
                 struct_table,
@@ -3857,6 +3866,7 @@ fn rewrite_generic_stmt_with_hoists(
                 },
                 ty.as_ref(),
                 env,
+                visible_type_aliases,
                 generic_templates,
                 impl_lookup,
                 struct_table,
@@ -3891,6 +3901,7 @@ fn rewrite_generic_stmt_with_hoists(
                 args,
                 "__nuis_generic_return_arg",
                 env,
+                visible_type_aliases,
                 generic_templates,
                 impl_lookup,
                 struct_table,
@@ -3907,6 +3918,7 @@ fn rewrite_generic_stmt_with_hoists(
                 },
                 current_return_type,
                 env,
+                visible_type_aliases,
                 generic_templates,
                 impl_lookup,
                 struct_table,
@@ -3922,6 +3934,7 @@ fn rewrite_generic_stmt_with_hoists(
             stmt,
             current_return_type,
             env,
+            visible_type_aliases,
             generic_templates,
             impl_lookup,
             struct_table,
@@ -3938,6 +3951,7 @@ fn hoist_direct_result_wrapper_args(
     args: &[AstExpr],
     temp_prefix: &str,
     env: &mut BTreeMap<String, AstTypeRef>,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
     generic_templates: &BTreeMap<String, AstFunction>,
     impl_lookup: &BTreeMap<(String, String), AstImplDef>,
     struct_table: &BTreeMap<String, AstStructDef>,
@@ -3954,6 +3968,7 @@ fn hoist_direct_result_wrapper_args(
             arg,
             None,
             env,
+            visible_type_aliases,
             generic_templates,
             impl_lookup,
             struct_table,
@@ -4005,6 +4020,7 @@ fn rewrite_generic_calls_in_stmt(
     stmt: &AstStmt,
     current_return_type: Option<&AstTypeRef>,
     env: &mut BTreeMap<String, AstTypeRef>,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
     generic_templates: &BTreeMap<String, AstFunction>,
     impl_lookup: &BTreeMap<(String, String), AstImplDef>,
     struct_table: &BTreeMap<String, AstStructDef>,
@@ -4019,6 +4035,7 @@ fn rewrite_generic_calls_in_stmt(
                 value,
                 ty.as_ref(),
                 env,
+                visible_type_aliases,
                 generic_templates,
                 impl_lookup,
                 struct_table,
@@ -4050,6 +4067,7 @@ fn rewrite_generic_calls_in_stmt(
                 value,
                 ty.as_ref(),
                 env,
+                visible_type_aliases,
                 generic_templates,
                 impl_lookup,
                 struct_table,
@@ -4080,6 +4098,7 @@ fn rewrite_generic_calls_in_stmt(
             value,
             None,
             env,
+            visible_type_aliases,
             generic_templates,
             impl_lookup,
             struct_table,
@@ -4092,6 +4111,7 @@ fn rewrite_generic_calls_in_stmt(
             value,
             None,
             env,
+            visible_type_aliases,
             generic_templates,
             impl_lookup,
             struct_table,
@@ -4109,6 +4129,7 @@ fn rewrite_generic_calls_in_stmt(
                 condition,
                 None,
                 env,
+                visible_type_aliases,
                 generic_templates,
                 impl_lookup,
                 struct_table,
@@ -4125,6 +4146,7 @@ fn rewrite_generic_calls_in_stmt(
                     then_body,
                     current_return_type,
                     &mut then_env,
+                    visible_type_aliases,
                     generic_templates,
                     impl_lookup,
                     struct_table,
@@ -4137,6 +4159,7 @@ fn rewrite_generic_calls_in_stmt(
                     else_body,
                     current_return_type,
                     &mut else_env,
+                    visible_type_aliases,
                     generic_templates,
                     impl_lookup,
                     struct_table,
@@ -4152,6 +4175,7 @@ fn rewrite_generic_calls_in_stmt(
                 value,
                 None,
                 env,
+                visible_type_aliases,
                 generic_templates,
                 impl_lookup,
                 struct_table,
@@ -4164,6 +4188,7 @@ fn rewrite_generic_calls_in_stmt(
                 arms,
                 current_return_type,
                 env,
+                visible_type_aliases,
                 generic_templates,
                 impl_lookup,
                 struct_table,
@@ -4178,6 +4203,7 @@ fn rewrite_generic_calls_in_stmt(
                 condition,
                 None,
                 env,
+                visible_type_aliases,
                 generic_templates,
                 impl_lookup,
                 struct_table,
@@ -4193,6 +4219,7 @@ fn rewrite_generic_calls_in_stmt(
                     body,
                     current_return_type,
                     &mut loop_env,
+                    visible_type_aliases,
                     generic_templates,
                     impl_lookup,
                     struct_table,
@@ -4207,6 +4234,7 @@ fn rewrite_generic_calls_in_stmt(
             expr,
             None,
             env,
+            visible_type_aliases,
             generic_templates,
             impl_lookup,
             struct_table,
@@ -4220,6 +4248,7 @@ fn rewrite_generic_calls_in_stmt(
                 value,
                 current_return_type,
                 env,
+                visible_type_aliases,
                 generic_templates,
                 impl_lookup,
                 struct_table,
@@ -4240,6 +4269,7 @@ fn rewrite_generic_calls_in_match_arms(
     arms: &[AstMatchArm],
     current_return_type: Option<&AstTypeRef>,
     env: &BTreeMap<String, AstTypeRef>,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
     generic_templates: &BTreeMap<String, AstFunction>,
     impl_lookup: &BTreeMap<(String, String), AstImplDef>,
     struct_table: &BTreeMap<String, AstStructDef>,
@@ -4261,6 +4291,7 @@ fn rewrite_generic_calls_in_match_arms(
                         guard,
                         Some(&ast_named_type("bool")),
                         &mut arm_env,
+                        visible_type_aliases,
                         generic_templates,
                         impl_lookup,
                         struct_table,
@@ -4275,6 +4306,7 @@ fn rewrite_generic_calls_in_match_arms(
                 &arm.body,
                 current_return_type,
                 &mut arm_env,
+                visible_type_aliases,
                 generic_templates,
                 impl_lookup,
                 struct_table,
@@ -4292,6 +4324,7 @@ fn rewrite_generic_calls_in_expr(
     expr: &AstExpr,
     expected: Option<&AstTypeRef>,
     env: &BTreeMap<String, AstTypeRef>,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
     generic_templates: &BTreeMap<String, AstFunction>,
     impl_lookup: &BTreeMap<(String, String), AstImplDef>,
     struct_table: &BTreeMap<String, AstStructDef>,
@@ -4305,6 +4338,7 @@ fn rewrite_generic_calls_in_expr(
             value,
             expected,
             env,
+            visible_type_aliases,
             generic_templates,
             impl_lookup,
             struct_table,
@@ -4321,6 +4355,7 @@ fn rewrite_generic_calls_in_expr(
                         arg,
                         None,
                         env,
+                        visible_type_aliases,
                         generic_templates,
                         impl_lookup,
                         struct_table,
@@ -4337,6 +4372,7 @@ fn rewrite_generic_calls_in_expr(
                     &rewritten_args,
                     expected,
                     env,
+                    visible_type_aliases,
                     generic_templates,
                     impl_lookup,
                     struct_table,
@@ -4365,6 +4401,7 @@ fn rewrite_generic_calls_in_expr(
                 receiver,
                 None,
                 env,
+                visible_type_aliases,
                 generic_templates,
                 impl_lookup,
                 struct_table,
@@ -4381,6 +4418,7 @@ fn rewrite_generic_calls_in_expr(
                         arg,
                         None,
                         env,
+                        visible_type_aliases,
                         generic_templates,
                         impl_lookup,
                         struct_table,
@@ -4403,6 +4441,7 @@ fn rewrite_generic_calls_in_expr(
                             value,
                             None,
                             env,
+                            visible_type_aliases,
                             generic_templates,
                             impl_lookup,
                             struct_table,
@@ -4420,6 +4459,7 @@ fn rewrite_generic_calls_in_expr(
                 base,
                 None,
                 env,
+                visible_type_aliases,
                 generic_templates,
                 impl_lookup,
                 struct_table,
@@ -4436,6 +4476,7 @@ fn rewrite_generic_calls_in_expr(
                 lhs,
                 None,
                 env,
+                visible_type_aliases,
                 generic_templates,
                 impl_lookup,
                 struct_table,
@@ -4448,6 +4489,7 @@ fn rewrite_generic_calls_in_expr(
                 rhs,
                 None,
                 env,
+                visible_type_aliases,
                 generic_templates,
                 impl_lookup,
                 struct_table,
@@ -4466,6 +4508,7 @@ fn ensure_generic_specialization(
     args: &[AstExpr],
     expected: Option<&AstTypeRef>,
     env: &BTreeMap<String, AstTypeRef>,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
     generic_templates: &BTreeMap<String, AstFunction>,
     impl_lookup: &BTreeMap<(String, String), AstImplDef>,
     struct_table: &BTreeMap<String, AstStructDef>,
@@ -4479,6 +4522,7 @@ fn ensure_generic_specialization(
         args,
         expected,
         env,
+        visible_type_aliases,
         impl_lookup,
         struct_table,
         function_return_types,
@@ -4501,6 +4545,7 @@ fn ensure_generic_specialization(
         let rewritten = rewrite_generic_calls_in_function(
             &specialized,
             &BTreeMap::new(),
+            visible_type_aliases,
             generic_templates,
             impl_lookup,
             struct_table,
@@ -4518,9 +4563,13 @@ fn ensure_generic_specialization(
                 params: rewritten
                     .params
                     .iter()
-                    .map(|param| lower_type_ref(&param.ty))
-                    .collect(),
-                return_type: rewritten.return_type.as_ref().map(lower_type_ref),
+                    .map(|param| lower_type_ref_with_aliases(&param.ty, visible_type_aliases))
+                    .collect::<Result<Vec<_>, _>>()?,
+                return_type: rewritten
+                    .return_type
+                    .as_ref()
+                    .map(|ty| lower_type_ref_with_aliases(ty, visible_type_aliases))
+                    .transpose()?,
                 is_extern: false,
                 is_async: rewritten.is_async,
             },
@@ -4535,6 +4584,7 @@ fn infer_generic_substitutions(
     args: &[AstExpr],
     expected: Option<&AstTypeRef>,
     env: &BTreeMap<String, AstTypeRef>,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
     impl_lookup: &BTreeMap<(String, String), AstImplDef>,
     struct_table: &BTreeMap<String, AstStructDef>,
     function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
@@ -4562,18 +4612,23 @@ fn infer_generic_substitutions(
                 param.name, template.name
             ));
         };
+        let resolved_param_ty = resolve_ast_type_ref_aliases(&param.ty, visible_type_aliases)?;
+        let resolved_arg_ty = resolve_ast_type_ref_aliases(&arg_ty, visible_type_aliases)?;
         unify_generic_type_pattern(
-            &param.ty,
-            &arg_ty,
+            &resolved_param_ty,
+            &resolved_arg_ty,
             &generic_names,
             &mut substitutions,
             &template.name,
         )?;
     }
     if let (Some(return_pattern), Some(expected_ty)) = (template.return_type.as_ref(), expected) {
+        let resolved_return_pattern =
+            resolve_ast_type_ref_aliases(return_pattern, visible_type_aliases)?;
+        let resolved_expected_ty = resolve_ast_type_ref_aliases(expected_ty, visible_type_aliases)?;
         unify_generic_type_pattern(
-            return_pattern,
-            expected_ty,
+            &resolved_return_pattern,
+            &resolved_expected_ty,
             &generic_names,
             &mut substitutions,
             &template.name,
@@ -21473,6 +21528,61 @@ mod tests {
     }
 
     #[test]
+    fn monomorphizes_generic_function_from_nested_alias_shaped_argument() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              type Frozen<T> = Window<T>;
+              type Wrapped<T> = DataResult<Frozen<T>>;
+
+              fn keep_wrapped<T>(wrapped: Wrapped<T>) -> Wrapped<T> {
+                return wrapped;
+              }
+
+              fn main() -> i64 {
+                let wrapped: Wrapped<i64> =
+                  keep_wrapped(data_result(data_freeze_window(data_copy_window(7, 0, 1))));
+                return data_read_window(data_value(wrapped), 0);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let main = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            main.body.iter().find(|stmt| matches!(
+                stmt,
+                NirStmt::Let {
+                    name,
+                    value: NirExpr::Call { callee, .. },
+                    ..
+                } if name == "wrapped" && callee == "keep_wrapped__i64"
+            )),
+            Some(_)
+        ));
+
+        let specialized = module
+            .functions
+            .iter()
+            .find(|function| function.name == "keep_wrapped__i64")
+            .unwrap();
+        assert!(specialized.generic_params.is_empty());
+        assert_eq!(
+            specialized.params.first().map(|param| param.ty.render()),
+            Some("DataResult<Window<i64>>".to_owned())
+        );
+        assert!(matches!(
+            specialized.return_type.as_ref().map(|ty| ty.render()),
+            Some(rendered) if rendered == "DataResult<Window<i64>>"
+        ));
+    }
+
+    #[test]
     fn lowers_test_function_modifiers_into_nir() {
         let module = parse_nuis_module(
             r#"
@@ -28600,6 +28710,57 @@ mod tests {
                 function.name.starts_with("__hof_apply_") && function.name.ends_with("__i64")
             })
             .expect("expected monomorphized higher-order helper");
+        assert!(higher_order_concrete.generic_params.is_empty());
+
+        let main = module
+            .functions
+            .iter()
+            .find(|function| function.name == "main")
+            .unwrap();
+        assert!(matches!(
+            main.body.last(),
+            Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
+                if callee == &higher_order_concrete.name
+        ));
+    }
+
+    #[test]
+    fn lowers_nested_generic_fn1_alias_higher_order_lambda_family() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              type Mapper<T> = Fn1<T, T>;
+              type NestedMapper<T> = Mapper<T>;
+
+              trait Addable {
+                fn add(lhs: Self, rhs: Self) -> Self;
+              }
+
+              impl Addable for i64 {
+                fn add(lhs: i64, rhs: i64) -> i64 {
+                  return lhs + rhs;
+                }
+              }
+
+              fn apply<T: Addable>(x: T, f: NestedMapper<T>) -> T {
+                return f(x);
+              }
+
+              fn main() -> i64 {
+                return apply(6, |x: i64| -> i64 { return x + 1; });
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let higher_order_concrete = module
+            .functions
+            .iter()
+            .find(|function| {
+                function.name.starts_with("__hof_apply_") && function.name.ends_with("__i64")
+            })
+            .expect("expected monomorphized nested higher-order helper");
         assert!(higher_order_concrete.generic_params.is_empty());
 
         let main = module

@@ -585,10 +585,23 @@ impl RegisteredMod for CpuMod {
                     }
                 }
                 for carry_kind in node.op.args[6..].iter().step_by(2) {
-                    if carry_kind == "add_current" {
+                    if carry_kind == "add_current"
+                        || carry_kind == "add_prev_current"
+                        || carry_kind == "mul_current"
+                        || carry_kind == "mul_prev_current"
+                    {
                         continue;
                     }
                     if let Some(index) = carry_kind.strip_prefix("add_carry") {
+                        index.parse::<usize>().map_err(|_| {
+                            format!(
+                                "node `{}` has invalid carry kind `{}`",
+                                node.name, carry_kind
+                            )
+                        })?;
+                        continue;
+                    }
+                    if let Some(index) = carry_kind.strip_prefix("mul_carry") {
                         index.parse::<usize>().map_err(|_| {
                             format!(
                                 "node `{}` has invalid carry kind `{}`",
@@ -710,10 +723,24 @@ impl RegisteredMod for CpuMod {
                         }
                     }
                     for carry_kind in [&chunk[3], &chunk[4]] {
-                        if carry_kind == "keep" || carry_kind == "add_current" {
+                        if carry_kind == "keep"
+                            || carry_kind == "add_current"
+                            || carry_kind == "add_prev_current"
+                            || carry_kind == "mul_current"
+                            || carry_kind == "mul_prev_current"
+                        {
                             continue;
                         }
                         if let Some(index) = carry_kind.strip_prefix("add_carry") {
+                            index.parse::<usize>().map_err(|_| {
+                                format!(
+                                    "node `{}` has invalid carry kind `{}`",
+                                    node.name, carry_kind
+                                )
+                            })?;
+                            continue;
+                        }
+                        if let Some(index) = carry_kind.strip_prefix("mul_carry") {
                             index.parse::<usize>().map_err(|_| {
                                 format!(
                                     "node `{}` has invalid carry kind `{}`",
