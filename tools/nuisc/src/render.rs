@@ -1695,6 +1695,15 @@ fn render_ast_match_pattern(pattern: &AstMatchPattern) -> String {
             .map(render_ast_match_pattern)
             .collect::<Vec<_>>()
             .join(" | "),
+        AstMatchPattern::StructFields { type_name, fields } => format!(
+            "{} {{ {} }}",
+            type_name,
+            fields
+                .iter()
+                .map(|(field, pattern)| format!("{field}: {}", render_ast_match_pattern(pattern)))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
     }
 }
 

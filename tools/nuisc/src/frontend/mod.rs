@@ -5469,9 +5469,6 @@ fn lower_match_stmt_with_async(
     else {
         return Err("could not infer scrutinee type for `match`".to_owned());
     };
-    let value_kind = value_ty.scalar_kind().ok_or_else(|| {
-        "minimal `match` currently only supports `bool` and `i64` scrutinees".to_owned()
-    })?;
     let wildcard_index = arms
         .iter()
         .position(|arm| matches!(arm.pattern, AstMatchPattern::Wildcard) && arm.guard.is_none())
@@ -5503,7 +5500,7 @@ fn lower_match_stmt_with_async(
 
     for arm in arms[..wildcard_index].iter().rev() {
         let mut condition =
-            lower_match_pattern_condition(&arm.pattern, &lowered_value, value_kind)?;
+            lower_match_pattern_condition(&arm.pattern, &lowered_value, &value_ty, struct_table)?;
         if let Some(guard) = &arm.guard {
             let lowered_guard = lower_expr_with_async(
                 guard,
@@ -5565,23 +5562,24 @@ fn lower_match_stmt_with_async(
 fn lower_match_pattern_condition(
     pattern: &AstMatchPattern,
     lowered_value: &NirExpr,
-    value_kind: nuis_semantics::model::NirScalarKind,
+    value_ty: &NirTypeRef,
+    struct_table: &BTreeMap<String, NirStructDef>,
 ) -> Result<NirExpr, String> {
-    match (pattern, value_kind) {
+    match (pattern, value_ty.scalar_kind()) {
         (AstMatchPattern::Wildcard, _) => {
             unreachable!("wildcard pattern should be handled before lowering")
         }
-        (AstMatchPattern::Bool(true), nuis_semantics::model::NirScalarKind::Bool) => {
+        (AstMatchPattern::Bool(true), Some(nuis_semantics::model::NirScalarKind::Bool)) => {
             Ok(lowered_value.clone())
         }
-        (AstMatchPattern::Bool(false), nuis_semantics::model::NirScalarKind::Bool) => {
+        (AstMatchPattern::Bool(false), Some(nuis_semantics::model::NirScalarKind::Bool)) => {
             Ok(NirExpr::Binary {
                 op: NirBinaryOp::Eq,
                 lhs: Box::new(lowered_value.clone()),
                 rhs: Box::new(NirExpr::Bool(false)),
             })
         }
-        (AstMatchPattern::Int(value), nuis_semantics::model::NirScalarKind::I64) => {
+        (AstMatchPattern::Int(value), Some(nuis_semantics::model::NirScalarKind::I64)) => {
             Ok(NirExpr::Binary {
                 op: NirBinaryOp::Eq,
                 lhs: Box::new(lowered_value.clone()),
@@ -5590,7 +5588,7 @@ fn lower_match_pattern_condition(
         }
         (
             AstMatchPattern::IntRangeInclusive(start, end),
-            nuis_semantics::model::NirScalarKind::I64,
+            Some(nuis_semantics::model::NirScalarKind::I64),
         ) => Ok(NirExpr::Binary {
             op: NirBinaryOp::And,
             lhs: Box::new(NirExpr::Binary {
@@ -5604,10 +5602,12 @@ fn lower_match_pattern_condition(
                 rhs: Box::new(NirExpr::Int(*end)),
             }),
         }),
-        (AstMatchPattern::Or(patterns), kind) => {
+        (AstMatchPattern::Or(patterns), _) => {
             let mut conditions = patterns
                 .iter()
-                .map(|pattern| lower_match_pattern_condition(pattern, lowered_value, kind))
+                .map(|pattern| {
+                    lower_match_pattern_condition(pattern, lowered_value, value_ty, struct_table)
+                })
                 .collect::<Result<Vec<_>, _>>()?;
             let first = conditions
                 .drain(..1)
@@ -5621,10 +5621,58 @@ fn lower_match_pattern_condition(
                     rhs: Box::new(rhs),
                 }))
         }
+        (AstMatchPattern::StructFields { type_name, fields }, _) => {
+            if value_ty.name != *type_name {
+                return Err(format!(
+                    "struct match pattern `{}` requires scrutinee of type `{}`, found `{}`",
+                    type_name,
+                    type_name,
+                    value_ty.render()
+                ));
+            }
+            let definition = struct_table.get(type_name).ok_or_else(|| {
+                format!("struct match pattern references unknown struct `{type_name}`")
+            })?;
+            let mut conditions = Vec::new();
+            for (field_name, field_pattern) in fields {
+                if matches!(field_pattern, AstMatchPattern::Wildcard) {
+                    return Err(format!(
+                        "struct match pattern field `{field_name}: _` is not needed; omit the field instead"
+                    ));
+                }
+                let field_def = definition.field(field_name).ok_or_else(|| {
+                    format!(
+                        "struct match pattern `{}` references unknown field `{}`",
+                        type_name, field_name
+                    )
+                })?;
+                let field_expr = NirExpr::FieldAccess {
+                    base: Box::new(lowered_value.clone()),
+                    field: field_name.clone(),
+                };
+                conditions.push(lower_match_pattern_condition(
+                    field_pattern,
+                    &field_expr,
+                    &field_def.ty,
+                    struct_table,
+                )?);
+            }
+            let first = conditions
+                .drain(..1)
+                .next()
+                .ok_or_else(|| "struct match pattern cannot be empty".to_owned())?;
+            Ok(conditions
+                .into_iter()
+                .fold(first, |lhs, rhs| NirExpr::Binary {
+                    op: NirBinaryOp::And,
+                    lhs: Box::new(lhs),
+                    rhs: Box::new(rhs),
+                }))
+        }
         (AstMatchPattern::Bool(_), _) => {
             Err("`match` arm pattern `true`/`false` requires a `bool` scrutinee".to_owned())
         }
-        (AstMatchPattern::Int(_), _) | (AstMatchPattern::IntRangeInclusive(_, _), _) => {
+        (AstMatchPattern::Int(_) | AstMatchPattern::IntRangeInclusive(_, _), _) => {
             Err("minimal `match` integer patterns require an `i64` scrutinee".to_owned())
         }
     }
@@ -23040,6 +23088,308 @@ mod tests {
                 other => panic!("expected lowered match if in while body, found {other:?}"),
             },
             other => panic!("expected while statement after let bindings, found {other:?}"),
+        }
+    }
+
+    #[test]
+    fn lowers_or_pattern_guard_match_arms_inside_while() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let ready: bool = true;
+                while 1 == 1 {
+                  match 2 {
+                    1 | 2 if ready => {
+                      return 7;
+                    }
+                    _ => {
+                      return 9;
+                    }
+                  }
+                }
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        match &module.functions[0].body[1] {
+            NirStmt::While { body, .. } => match &body[0] {
+                NirStmt::If {
+                    condition,
+                    then_body,
+                    else_body,
+                } => {
+                    match condition {
+                        NirExpr::Binary {
+                            op: NirBinaryOp::And,
+                            lhs,
+                            rhs,
+                        } => {
+                            match lhs.as_ref() {
+                                NirExpr::Binary {
+                                    op: NirBinaryOp::Or,
+                                    ..
+                                } => {}
+                                other => panic!(
+                                    "expected `or` term in guarded multi-pattern match condition, found {other:?}"
+                                ),
+                            }
+                            assert!(matches!(
+                                rhs.as_ref(),
+                                NirExpr::Bool(true) | NirExpr::Var(_)
+                            ));
+                        }
+                        other => panic!(
+                            "expected `and` condition for guarded multi-pattern match arm, found {other:?}"
+                        ),
+                    }
+                    assert!(matches!(
+                        then_body.as_slice(),
+                        [NirStmt::Return(Some(NirExpr::Int(7)))]
+                    ));
+                    assert!(matches!(
+                        else_body.as_slice(),
+                        [NirStmt::Return(Some(NirExpr::Int(9)))]
+                    ));
+                }
+                other => panic!("expected lowered guarded match if in while body, found {other:?}"),
+            },
+            other => panic!("expected while statement after let binding, found {other:?}"),
+        }
+    }
+
+    #[test]
+    fn lowers_range_guard_match_arms_inside_while() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              fn main() -> i64 {
+                let ready: bool = true;
+                while 1 == 1 {
+                  match 2 {
+                    1..=3 if ready => {
+                      return 7;
+                    }
+                    _ => {
+                      return 9;
+                    }
+                  }
+                }
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        match &module.functions[0].body[1] {
+            NirStmt::While { body, .. } => match &body[0] {
+                NirStmt::If {
+                    condition,
+                    then_body,
+                    else_body,
+                } => {
+                    match condition {
+                        NirExpr::Binary {
+                            op: NirBinaryOp::And,
+                            lhs,
+                            rhs,
+                        } => {
+                            match lhs.as_ref() {
+                                NirExpr::Binary {
+                                    op: NirBinaryOp::And,
+                                    ..
+                                } => {}
+                                other => panic!(
+                                    "expected range conjunction term in guarded range match condition, found {other:?}"
+                                ),
+                            }
+                            assert!(matches!(
+                                rhs.as_ref(),
+                                NirExpr::Bool(true) | NirExpr::Var(_)
+                            ));
+                        }
+                        other => panic!(
+                            "expected `and` condition for guarded range match arm, found {other:?}"
+                        ),
+                    }
+                    assert!(matches!(
+                        then_body.as_slice(),
+                        [NirStmt::Return(Some(NirExpr::Int(7)))]
+                    ));
+                    assert!(matches!(
+                        else_body.as_slice(),
+                        [NirStmt::Return(Some(NirExpr::Int(9)))]
+                    ));
+                }
+                other => panic!("expected lowered guarded match if in while body, found {other:?}"),
+            },
+            other => panic!("expected while statement after let binding, found {other:?}"),
+        }
+    }
+
+    #[test]
+    fn lowers_struct_field_match_arms_inside_while() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              struct Packet {
+                kind: i64,
+                ready: bool,
+              }
+
+              fn main() -> i64 {
+                let armed: bool = true;
+                let packet: Packet = Packet { kind: 2, ready: true };
+                while 1 == 1 {
+                  match packet {
+                    Packet { kind: 1 | 2, ready: true } if armed => {
+                      return 7;
+                    }
+                    _ => {
+                      return 9;
+                    }
+                  }
+                }
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        match &module.functions[0].body[2] {
+            NirStmt::While { body, .. } => match &body[0] {
+                NirStmt::If {
+                    condition,
+                    then_body,
+                    else_body,
+                } => {
+                    match condition {
+                        NirExpr::Binary {
+                            op: NirBinaryOp::And,
+                            lhs,
+                            rhs,
+                        } => {
+                            match lhs.as_ref() {
+                                NirExpr::Binary {
+                                    op: NirBinaryOp::And,
+                                    ..
+                                } => {}
+                                other => panic!(
+                                    "expected field conjunction term in struct match condition, found {other:?}"
+                                ),
+                            }
+                            assert!(matches!(
+                                rhs.as_ref(),
+                                NirExpr::Bool(true) | NirExpr::Var(_)
+                            ));
+                        }
+                        other => panic!(
+                            "expected `and` condition for guarded struct match arm, found {other:?}"
+                        ),
+                    }
+                    assert!(matches!(
+                        then_body.as_slice(),
+                        [NirStmt::Return(Some(NirExpr::Int(7)))]
+                    ));
+                    assert!(matches!(
+                        else_body.as_slice(),
+                        [NirStmt::Return(Some(NirExpr::Int(9)))]
+                    ));
+                }
+                other => panic!("expected lowered struct match if in while body, found {other:?}"),
+            },
+            other => panic!("expected while statement after bindings, found {other:?}"),
+        }
+    }
+
+    #[test]
+    fn lowers_nested_struct_match_arms_inside_while() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              struct Header {
+                kind: i64,
+                ready: bool,
+              }
+
+              struct Packet {
+                header: Header,
+                code: i64,
+              }
+
+              fn main() -> i64 {
+                let armed: bool = true;
+                let packet: Packet = Packet {
+                  header: Header { kind: 2, ready: true },
+                  code: 5,
+                };
+                while 1 == 1 {
+                  match packet {
+                    Packet { header: Header { kind: 1 | 2, ready: true }, code: 5 } if armed => {
+                      return 7;
+                    }
+                    _ => {
+                      return 9;
+                    }
+                  }
+                }
+                return 0;
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        match &module.functions[0].body[2] {
+            NirStmt::While { body, .. } => match &body[0] {
+                NirStmt::If {
+                    condition,
+                    then_body,
+                    else_body,
+                } => {
+                    match condition {
+                        NirExpr::Binary {
+                            op: NirBinaryOp::And,
+                            lhs,
+                            rhs,
+                        } => {
+                            match lhs.as_ref() {
+                                NirExpr::Binary {
+                                    op: NirBinaryOp::And,
+                                    ..
+                                } => {}
+                                other => panic!(
+                                    "expected nested field conjunction term in struct match condition, found {other:?}"
+                                ),
+                            }
+                            assert!(matches!(
+                                rhs.as_ref(),
+                                NirExpr::Bool(true) | NirExpr::Var(_)
+                            ));
+                        }
+                        other => panic!(
+                            "expected `and` condition for guarded nested struct match arm, found {other:?}"
+                        ),
+                    }
+                    assert!(matches!(
+                        then_body.as_slice(),
+                        [NirStmt::Return(Some(NirExpr::Int(7)))]
+                    ));
+                    assert!(matches!(
+                        else_body.as_slice(),
+                        [NirStmt::Return(Some(NirExpr::Int(9)))]
+                    ));
+                }
+                other => {
+                    panic!("expected lowered nested struct match if in while body, found {other:?}")
+                }
+            },
+            other => panic!("expected while statement after bindings, found {other:?}"),
         }
     }
 

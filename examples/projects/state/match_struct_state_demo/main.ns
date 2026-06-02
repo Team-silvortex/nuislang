@@ -1,0 +1,22 @@
+mod cpu Main {
+  struct Packet {
+    kind: i64,
+    ready: bool,
+  }
+
+  fn main() -> i64 {
+    let armed: bool = true;
+    let packet: Packet = Packet { kind: 2, ready: true };
+    while 1 == 1 {
+      match packet {
+        Packet { kind: 1 | 2, ready: true } if armed => {
+          return 7;
+        }
+        _ => {
+          return 9;
+        }
+      }
+    }
+    return 0;
+  }
+}

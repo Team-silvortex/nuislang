@@ -236,6 +236,10 @@ pub enum AstMatchPattern {
     Int(i64),
     IntRangeInclusive(i64, i64),
     Or(Vec<AstMatchPattern>),
+    StructFields {
+        type_name: String,
+        fields: Vec<(String, AstMatchPattern)>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

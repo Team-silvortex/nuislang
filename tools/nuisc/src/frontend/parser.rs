@@ -1316,6 +1316,48 @@ impl Parser {
             Some(Token::Word(word)) if word == "_" => Ok(AstMatchPattern::Wildcard),
             Some(Token::Word(word)) if word == "true" => Ok(AstMatchPattern::Bool(true)),
             Some(Token::Word(word)) if word == "false" => Ok(AstMatchPattern::Bool(false)),
+            Some(Token::Word(word)) if self.peek_symbol('{') => {
+                self.expect_symbol('{')?;
+                let mut fields = Vec::new();
+                while !self.peek_symbol('}') {
+                    let field_name = match self.next() {
+                        Some(Token::Word(name)) => name,
+                        Some(Token::Symbol('}')) => {
+                            self.cursor = self.cursor.saturating_sub(1);
+                            break;
+                        }
+                        Some(other) => {
+                            return Err(format!(
+                                "expected field name in struct match pattern, found {}",
+                                describe_token(&other)
+                            ))
+                        }
+                        None => {
+                            return Err(
+                                "unexpected end of input in struct match pattern field list"
+                                    .to_owned(),
+                            )
+                        }
+                    };
+                    self.expect_symbol(':')?;
+                    let pattern = self.parse_match_pattern()?;
+                    fields.push((field_name, pattern));
+                    if self.peek_symbol(',') {
+                        self.expect_symbol(',')?;
+                    }
+                }
+                self.expect_symbol('}')?;
+                if fields.is_empty() {
+                    return Err(
+                        "minimal `match` struct patterns require at least one field"
+                            .to_owned(),
+                    );
+                }
+                Ok(AstMatchPattern::StructFields {
+                    type_name: word,
+                    fields,
+                })
+            }
             Some(Token::Integer(value)) => {
                 if self.peek_symbol('.') && matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol('.')))
                 {
@@ -1348,7 +1390,7 @@ impl Parser {
                 }
             }
             Some(other) => Err(format!(
-                "expected `true`, `false`, integer literal, integer range, or `_` in match arm pattern, found {}",
+                "expected `true`, `false`, integer literal, integer range, struct field pattern, or `_` in match arm pattern, found {}",
                 describe_token(&other)
             )),
             None => Err("unexpected end of input in match arm pattern".to_owned()),
@@ -1731,6 +1773,9 @@ impl Parser {
             fields.push((name, value));
             if self.peek_symbol(',') {
                 self.expect_symbol(',')?;
+                if self.peek_symbol('}') {
+                    break;
+                }
             } else {
                 break;
             }

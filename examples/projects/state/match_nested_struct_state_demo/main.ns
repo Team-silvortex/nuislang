@@ -1,0 +1,30 @@
+mod cpu Main {
+  struct Header {
+    kind: i64,
+    ready: bool,
+  }
+
+  struct Packet {
+    header: Header,
+    code: i64,
+  }
+
+  fn main() -> i64 {
+    let armed: bool = true;
+    let packet: Packet = Packet {
+      header: Header { kind: 2, ready: true },
+      code: 5,
+    };
+    while 1 == 1 {
+      match packet {
+        Packet { header: Header { kind: 1 | 2, ready: true }, code: 5 } if armed => {
+          return 7;
+        }
+        _ => {
+          return 9;
+        }
+      }
+    }
+    return 0;
+  }
+}
