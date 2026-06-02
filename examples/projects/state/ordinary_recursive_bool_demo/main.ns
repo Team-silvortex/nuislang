@@ -1,0 +1,16 @@
+mod cpu Main {
+  fn settle(flag: bool) -> bool {
+    if flag == true {
+      return false;
+    }
+    return settle(true);
+  }
+
+  fn main() -> i64 {
+    let result: bool = settle(false);
+    if result == false {
+      return 7;
+    }
+    return 9;
+  }
+}

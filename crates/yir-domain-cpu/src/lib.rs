@@ -191,6 +191,41 @@ impl RegisteredMod for CpuMod {
 
                 Ok(InstructionSemantics::pure(node.op.args.clone()))
             }
+            "param_bool" | "param_i32" | "param_i64" => {
+                if node.op.args.len() != 1 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.{} <name> <resource> <index>`",
+                        node.name, node.op.instruction
+                    ));
+                }
+                node.op.args[0].parse::<usize>().map_err(|_| {
+                    format!(
+                        "node `{}` has invalid parameter index `{}`",
+                        node.name, node.op.args[0]
+                    )
+                })?;
+                Ok(InstructionSemantics::pure(Vec::new()))
+            }
+            "call_bool" | "call_i32" | "call_i64" => {
+                if node.op.args.is_empty() {
+                    return Err(format!(
+                        "node `{}` expects `cpu.{} <name> <resource> <callee> [arg...]`",
+                        node.name, node.op.instruction
+                    ));
+                }
+                Ok(InstructionSemantics::pure(
+                    node.op.args.iter().skip(1).cloned().collect(),
+                ))
+            }
+            "return_bool" | "return_i32" | "return_i64" => {
+                if node.op.args.len() != 1 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.{} <name> <resource> <value>`",
+                        node.name, node.op.instruction
+                    ));
+                }
+                Ok(InstructionSemantics::effect(node.op.args.clone()))
+            }
             "async_call" => {
                 if node.op.args.is_empty() {
                     return Err(format!(
@@ -1589,6 +1624,64 @@ impl RegisteredMod for CpuMod {
             }
             "null" => Ok(Value::Pointer(None)),
             "borrow" | "move_ptr" => Ok(Value::Pointer(state.expect_pointer(&node.op.args[0])?)),
+            "param_bool" => Ok(Value::Bool(false)),
+            "param_i32" => Ok(Value::I32(0)),
+            "param_i64" => Ok(Value::Int(0)),
+            "call_bool" | "call_i32" | "call_i64" => {
+                let callee = &node.op.args[0];
+                let args = node.op.args[1..]
+                    .iter()
+                    .map(|arg| state.expect_value(arg).map(|value| value.to_string()))
+                    .collect::<Result<Vec<_>, _>>()?;
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.call_i64 @{} [{}] {}({})",
+                        node.resource,
+                        resource.kind.raw,
+                        callee,
+                        args.join(", ")
+                    ),
+                );
+                match node.op.instruction.as_str() {
+                    "call_bool" => Ok(Value::Bool(false)),
+                    "call_i32" => Ok(Value::I32(0)),
+                    _ => Ok(Value::Int(0)),
+                }
+            }
+            "return_bool" => {
+                let value = state.expect_bool(&node.op.args[0])?;
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.return_bool @{} [{}] {}",
+                        node.resource, resource.kind.raw, value
+                    ),
+                );
+                Ok(Value::Bool(value))
+            }
+            "return_i32" => {
+                let value = state.expect_i32(&node.op.args[0])?;
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.return_i32 @{} [{}] {}",
+                        node.resource, resource.kind.raw, value
+                    ),
+                );
+                Ok(Value::I32(value))
+            }
+            "return_i64" => {
+                let value = state.expect_int(&node.op.args[0])?;
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.return_i64 @{} [{}] {}",
+                        node.resource, resource.kind.raw, value
+                    ),
+                );
+                Ok(Value::Int(value))
+            }
             "async_call" => {
                 let callee = &node.op.args[0];
                 let args = node.op.args[1..]

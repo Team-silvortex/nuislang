@@ -758,8 +758,12 @@ impl Operation {
             | "load_at" | "store_value" | "store_next" | "store_at" | "is_null" | "free" => {
                 CpuLlvmLoweringClass::Memory
             }
-            "input_i64" | "extern_call_i64" => CpuLlvmLoweringClass::Runtime,
+            "input_i64" | "extern_call_i64" | "param_bool" | "param_i32" | "param_i64"
+            | "call_bool" | "call_i32" | "call_i64" => CpuLlvmLoweringClass::Runtime,
             "print"
+            | "return_bool"
+            | "return_i32"
+            | "return_i64"
             | "loop_while_i64"
             | "loop_while_i64_chain"
             | "loop_while_i64_cond_chain"
