@@ -1929,6 +1929,11 @@ impl RegisteredMod for CpuMod {
                     state.expect_int(&node.op.args[1]),
                 ) {
                     Ok(Value::Int((lhs == rhs) as i64))
+                } else if let (Ok(lhs), Ok(rhs)) = (
+                    state.expect_i32(&node.op.args[0]),
+                    state.expect_i32(&node.op.args[1]),
+                ) {
+                    Ok(Value::Int((lhs == rhs) as i64))
                 } else {
                     Ok(Value::Int(
                         (state.expect_bool(&node.op.args[0])?
@@ -1951,6 +1956,11 @@ impl RegisteredMod for CpuMod {
                     state.expect_int(&node.op.args[1]),
                 ) {
                     Ok(Value::Int((lhs != rhs) as i64))
+                } else if let (Ok(lhs), Ok(rhs)) = (
+                    state.expect_i32(&node.op.args[0]),
+                    state.expect_i32(&node.op.args[1]),
+                ) {
+                    Ok(Value::Int((lhs != rhs) as i64))
                 } else {
                     Ok(Value::Int(
                         (state.expect_bool(&node.op.args[0])?
@@ -1958,9 +1968,19 @@ impl RegisteredMod for CpuMod {
                     ))
                 }
             }
-            "lt" => Ok(Value::Int(
-                (state.expect_int(&node.op.args[0])? < state.expect_int(&node.op.args[1])?) as i64,
-            )),
+            "lt" => {
+                if let (Ok(lhs), Ok(rhs)) = (
+                    state.expect_int(&node.op.args[0]),
+                    state.expect_int(&node.op.args[1]),
+                ) {
+                    Ok(Value::Int((lhs < rhs) as i64))
+                } else {
+                    Ok(Value::Int(
+                        (state.expect_i32(&node.op.args[0])?
+                            < state.expect_i32(&node.op.args[1])?) as i64,
+                    ))
+                }
+            }
             "lt_i32" => Ok(Value::Bool(
                 state.expect_i32(&node.op.args[0])? < state.expect_i32(&node.op.args[1])?,
             )),
@@ -1970,9 +1990,19 @@ impl RegisteredMod for CpuMod {
             "lt_f64" => Ok(Value::Bool(
                 state.expect_f64(&node.op.args[0])? < state.expect_f64(&node.op.args[1])?,
             )),
-            "gt" => Ok(Value::Int(
-                (state.expect_int(&node.op.args[0])? > state.expect_int(&node.op.args[1])?) as i64,
-            )),
+            "gt" => {
+                if let (Ok(lhs), Ok(rhs)) = (
+                    state.expect_int(&node.op.args[0]),
+                    state.expect_int(&node.op.args[1]),
+                ) {
+                    Ok(Value::Int((lhs > rhs) as i64))
+                } else {
+                    Ok(Value::Int(
+                        (state.expect_i32(&node.op.args[0])?
+                            > state.expect_i32(&node.op.args[1])?) as i64,
+                    ))
+                }
+            }
             "gt_i32" => Ok(Value::Bool(
                 state.expect_i32(&node.op.args[0])? > state.expect_i32(&node.op.args[1])?,
             )),
@@ -1982,12 +2012,32 @@ impl RegisteredMod for CpuMod {
             "gt_f64" => Ok(Value::Bool(
                 state.expect_f64(&node.op.args[0])? > state.expect_f64(&node.op.args[1])?,
             )),
-            "le" => Ok(Value::Int(
-                (state.expect_int(&node.op.args[0])? <= state.expect_int(&node.op.args[1])?) as i64,
-            )),
-            "ge" => Ok(Value::Int(
-                (state.expect_int(&node.op.args[0])? >= state.expect_int(&node.op.args[1])?) as i64,
-            )),
+            "le" => {
+                if let (Ok(lhs), Ok(rhs)) = (
+                    state.expect_int(&node.op.args[0]),
+                    state.expect_int(&node.op.args[1]),
+                ) {
+                    Ok(Value::Int((lhs <= rhs) as i64))
+                } else {
+                    Ok(Value::Int(
+                        (state.expect_i32(&node.op.args[0])?
+                            <= state.expect_i32(&node.op.args[1])?) as i64,
+                    ))
+                }
+            }
+            "ge" => {
+                if let (Ok(lhs), Ok(rhs)) = (
+                    state.expect_int(&node.op.args[0]),
+                    state.expect_int(&node.op.args[1]),
+                ) {
+                    Ok(Value::Int((lhs >= rhs) as i64))
+                } else {
+                    Ok(Value::Int(
+                        (state.expect_i32(&node.op.args[0])?
+                            >= state.expect_i32(&node.op.args[1])?) as i64,
+                    ))
+                }
+            }
             "and" => Ok(Value::Int(
                 state.expect_int(&node.op.args[0])? & state.expect_int(&node.op.args[1])?,
             )),

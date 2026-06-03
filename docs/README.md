@@ -37,6 +37,7 @@ Then branch by the kind of truth you want:
   - [stdlib/std/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
 * cleanup policy / archiving candidates
   - [repo-cleanup-candidates.md](/Users/Shared/chroot/dev/nuislang/docs/repo-cleanup-candidates.md)
+  - [repo-file-line-policy.md](/Users/Shared/chroot/dev/nuislang/docs/repo-file-line-policy.md)
 
 ## Grammar And Frontend Notes
 

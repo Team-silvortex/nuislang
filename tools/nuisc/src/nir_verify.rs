@@ -756,6 +756,7 @@ fn verify_expr(
         | NirExpr::Borrow(inner)
         | NirExpr::BorrowEnd(inner)
         | NirExpr::Move(inner)
+        | NirExpr::CastI64ToI32(inner)
         | NirExpr::LoadValue(inner)
         | NirExpr::LoadNext(inner)
         | NirExpr::BufferLen(inner)
@@ -851,6 +852,7 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
             }
         }
         NirExpr::Instantiate { .. } => {}
+        NirExpr::CastI64ToI32(inner) => verify_expr_uses(inner, moved)?,
         NirExpr::DataBindCore(_)
         | NirExpr::DataMarker(_)
         | NirExpr::DataHandleTable(_)

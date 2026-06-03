@@ -527,6 +527,7 @@ fn render_nir_expr(value: &NirExpr) -> String {
         NirExpr::Bool(value) => value.to_string(),
         NirExpr::Text(text) => format!("\"{}\"", escape_debug(text)),
         NirExpr::Int(value) => value.to_string(),
+        NirExpr::CastI64ToI32(value) => format!("i32_from_i64({})", render_nir_expr(value)),
         NirExpr::Var(name) => name.clone(),
         NirExpr::Await(value) => format!("await {}", render_nir_expr(value)),
         NirExpr::Instantiate { domain, unit } => format!("instantiate {} {}", domain, unit),

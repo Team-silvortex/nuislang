@@ -858,6 +858,15 @@ fn canonicalize_tail_recursive_loop_arg(
             }
         }
         NirExpr::Bool(_) | NirExpr::Text(_) | NirExpr::Int(_) | NirExpr::Null => expr.clone(),
+        NirExpr::CastI64ToI32(inner) => {
+            NirExpr::CastI64ToI32(Box::new(canonicalize_tail_recursive_loop_arg(
+                inner,
+                current_name,
+                non_current_param_names,
+                target_carry_name,
+                next_current_expr,
+            )))
+        }
         NirExpr::Await(inner) => NirExpr::Await(Box::new(canonicalize_tail_recursive_loop_arg(
             inner,
             current_name,
@@ -971,6 +980,13 @@ fn canonicalize_tail_recursive_condition_expr(
             .map(NirExpr::Var)
             .unwrap_or_else(|| expr.clone()),
         NirExpr::Bool(_) | NirExpr::Text(_) | NirExpr::Int(_) | NirExpr::Null => expr.clone(),
+        NirExpr::CastI64ToI32(inner) => {
+            NirExpr::CastI64ToI32(Box::new(canonicalize_tail_recursive_condition_expr(
+                inner,
+                current_name,
+                non_current_param_names,
+            )))
+        }
         NirExpr::Await(inner) => {
             NirExpr::Await(Box::new(canonicalize_tail_recursive_condition_expr(
                 inner,
@@ -1710,6 +1726,21 @@ fn lower_expr(
                     args: vec![value.to_string()],
                 },
             });
+            Ok(name)
+        }
+        NirExpr::CastI64ToI32(value) => {
+            let input = lower_expr(value, state, bindings)?;
+            let name = next_name(state, "cast_i32");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "cpu0".to_owned(),
+                op: Operation {
+                    module: "cpu".to_owned(),
+                    instruction: "cast_i64_to_i32".to_owned(),
+                    args: vec![input.clone()],
+                },
+            });
+            push_dep_edges(state, &input, &name);
             Ok(name)
         }
         NirExpr::Var(name) => bindings
@@ -6554,7 +6585,8 @@ fn is_terminal_branch_pure_expr(expr: &NirExpr, pure_helpers: &BTreeSet<String>)
         | NirExpr::NetworkSendReady(inner)
         | NirExpr::NetworkRecvReady(inner)
         | NirExpr::NetworkAcceptReady(inner)
-        | NirExpr::NetworkValue(inner) => is_terminal_branch_pure_expr(inner, pure_helpers),
+        | NirExpr::NetworkValue(inner)
+        | NirExpr::CastI64ToI32(inner) => is_terminal_branch_pure_expr(inner, pure_helpers),
         NirExpr::MethodCall { .. } => false,
         NirExpr::Await(_) | NirExpr::Instantiate { .. } => false,
         NirExpr::StructLiteral { fields, .. } => fields
@@ -6652,6 +6684,7 @@ fn is_pure_helper_expr(
         }
         NirExpr::MethodCall { .. } => false,
         NirExpr::Await(_) | NirExpr::Instantiate { .. } => false,
+        NirExpr::CastI64ToI32(inner) => is_pure_helper_expr(inner, function_map, memo, visiting),
         NirExpr::StructLiteral { fields, .. } => fields
             .iter()
             .all(|(_, value)| is_pure_helper_expr(value, function_map, memo, visiting)),
@@ -6674,6 +6707,11 @@ fn substitute_branch_binding(
     match expr {
         NirExpr::Var(name) if name == binding_name => binding_value.clone(),
         NirExpr::Await(inner) => NirExpr::Await(Box::new(substitute_branch_binding(
+            inner,
+            binding_name,
+            binding_value,
+        ))),
+        NirExpr::CastI64ToI32(inner) => NirExpr::CastI64ToI32(Box::new(substitute_branch_binding(
             inner,
             binding_name,
             binding_value,

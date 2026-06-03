@@ -1,0 +1,16 @@
+mod cpu Main {
+  fn countdown(current: i32) -> i32 {
+    if current <= i32_from_i64(1) {
+      return current;
+    }
+    return countdown(current - i32_from_i64(1));
+  }
+
+  fn main() -> i64 {
+    let result: i32 = countdown(i32_from_i64(7));
+    if result == i32_from_i64(1) {
+      return 7;
+    }
+    return 9;
+  }
+}

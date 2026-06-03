@@ -1478,6 +1478,7 @@ pub enum NirExpr {
         callee: String,
         args: Vec<NirExpr>,
     },
+    CastI64ToI32(Box<NirExpr>),
     Free(Box<NirExpr>),
     IsNull(Box<NirExpr>),
     Call {
@@ -1808,6 +1809,7 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::Bool(_)
         | NirExpr::Text(_)
         | NirExpr::Int(_)
+        | NirExpr::CastI64ToI32(_)
         | NirExpr::Var(_)
         | NirExpr::Await(_)
         | NirExpr::Instantiate { .. }
@@ -2031,6 +2033,7 @@ pub fn nir_expr_effect_class(expr: &NirExpr) -> NirExprEffectClass {
         | NirExpr::Text(_)
         | NirExpr::Int(_)
         | NirExpr::Var(_)
+        | NirExpr::CastI64ToI32(_)
         | NirExpr::StructLiteral { .. }
         | NirExpr::FieldAccess { .. }
         | NirExpr::Binary { .. }

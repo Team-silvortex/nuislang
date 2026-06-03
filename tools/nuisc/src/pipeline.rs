@@ -333,6 +333,7 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         | NirExpr::Await(inner)
         | NirExpr::BorrowEnd(inner)
         | NirExpr::Move(inner)
+        | NirExpr::CastI64ToI32(inner)
         | NirExpr::LoadValue(inner)
         | NirExpr::LoadNext(inner)
         | NirExpr::BufferLen(inner)
