@@ -2,15 +2,20 @@ mod control_accessors;
 mod control_states;
 mod controls;
 mod execution_accessors;
+mod execution_packets;
 mod execution_states;
 mod graph_accessors;
+mod graph_packets;
 mod graph_states;
 mod meta_accessors;
 mod meta_packets;
 mod meta_states;
+mod packet_helpers;
 mod render_accessors;
+mod render_packets;
 mod render_states;
 mod resource_accessors;
+mod resource_packets;
 mod resource_states;
 mod view_accessors;
 mod view_states;
@@ -107,6 +112,18 @@ pub(super) fn lower_nova_builtin_call(
     )? {
         return Ok(Some(meta_accessor_builtin));
     }
+    if let Some(render_packet_builtin) = render_packets::lower_nova_render_packet_builtin_call(
+        callee,
+        args,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+    )? {
+        return Ok(Some(render_packet_builtin));
+    }
     views::lower_nova_view_builtin_call(
         callee,
         args,
@@ -179,6 +196,21 @@ pub(super) fn lower_nova_builtin_call(
     )?
     .map_or_else(
         || {
+            graph_packets::lower_nova_graph_packet_builtin_call(
+                callee,
+                args,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                module_consts,
+                signatures,
+                struct_table,
+            )
+        },
+        |expr| Ok(Some(expr)),
+    )?
+    .map_or_else(
+        || {
             graph_states::lower_nova_graph_state_builtin_call(
                 callee,
                 args,
@@ -209,6 +241,21 @@ pub(super) fn lower_nova_builtin_call(
     )?
     .map_or_else(
         || {
+            resource_packets::lower_nova_resource_packet_builtin_call(
+                callee,
+                args,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                module_consts,
+                signatures,
+                struct_table,
+            )
+        },
+        |expr| Ok(Some(expr)),
+    )?
+    .map_or_else(
+        || {
             resource_states::lower_nova_resource_state_builtin_call(
                 callee,
                 args,
@@ -225,6 +272,21 @@ pub(super) fn lower_nova_builtin_call(
     .map_or_else(
         || {
             resource_accessors::lower_nova_resource_accessor_builtin_call(
+                callee,
+                args,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                module_consts,
+                signatures,
+                struct_table,
+            )
+        },
+        |expr| Ok(Some(expr)),
+    )?
+    .map_or_else(
+        || {
+            execution_packets::lower_nova_execution_packet_builtin_call(
                 callee,
                 args,
                 current_domain,
