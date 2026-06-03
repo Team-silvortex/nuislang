@@ -1,0 +1,151 @@
+use std::path::Path;
+
+use super::{NuisProjectManifest, ProjectAbiRequirement, ProjectGalaxyDependency, ProjectLink};
+
+pub(super) fn parse_project_manifest(
+    source: &str,
+    path: &Path,
+) -> Result<NuisProjectManifest, String> {
+    let name = parse_required_string(source, "name", path)?;
+    let entry = parse_required_string(source, "entry", path)?;
+    let modules = parse_optional_string_array(source, "modules").unwrap_or_default();
+    let tests = parse_optional_string_array(source, "tests").unwrap_or_default();
+    let links = parse_optional_link_array(source, "links").unwrap_or_default();
+    let abi_requirements = parse_optional_abi_array(source, "abi").unwrap_or_default();
+    let galaxy_dependencies =
+        parse_optional_galaxy_dependency_array(source, "galaxy").unwrap_or_default();
+    Ok(NuisProjectManifest {
+        name,
+        entry,
+        modules,
+        tests,
+        links,
+        abi_requirements,
+        galaxy_dependencies,
+    })
+}
+
+fn parse_required_string(source: &str, key: &str, path: &Path) -> Result<String, String> {
+    parse_optional_string(source, key).ok_or_else(|| {
+        format!(
+            "project manifest `{}` is missing required field `{key}`",
+            path.display()
+        )
+    })
+}
+
+fn parse_optional_string(source: &str, key: &str) -> Option<String> {
+    let prefix = format!("{key} = ");
+    for raw_line in source.lines() {
+        let line = raw_line.trim();
+        if let Some(rest) = line.strip_prefix(&prefix) {
+            return parse_quoted(rest);
+        }
+    }
+    None
+}
+
+fn parse_optional_string_array(source: &str, key: &str) -> Option<Vec<String>> {
+    let prefix = format!("{key} = ");
+    let mut lines = source.lines();
+    while let Some(raw_line) = lines.next() {
+        let line = raw_line.trim();
+        if let Some(rest) = line.strip_prefix(&prefix) {
+            let mut collected = rest.trim().to_owned();
+            if !collected.contains(']') {
+                for next_line in lines.by_ref() {
+                    collected.push(' ');
+                    collected.push_str(next_line.trim());
+                    if next_line.contains(']') {
+                        break;
+                    }
+                }
+            }
+            let body = collected.trim();
+            let body = body.strip_prefix('[')?.strip_suffix(']')?;
+            let mut values = Vec::new();
+            for item in body.split(',') {
+                let item = item.trim();
+                if item.is_empty() {
+                    continue;
+                }
+                values.push(
+                    parse_quoted(item)
+                        .ok_or_else(|| format!("invalid string array value `{item}`"))
+                        .ok()?,
+                );
+            }
+            return Some(values);
+        }
+    }
+    None
+}
+
+fn parse_optional_link_array(source: &str, key: &str) -> Option<Vec<ProjectLink>> {
+    let values = parse_optional_string_array(source, key)?;
+    let mut links = Vec::new();
+    for value in values {
+        let parts = value.split("->").map(str::trim).collect::<Vec<_>>();
+        if parts.len() < 2 {
+            return None;
+        }
+        let from = parts[0].to_owned();
+        let rhs = parts[1];
+        let (to, via) = if let Some((to, via)) = rhs.split_once(" via ") {
+            (to.trim().to_owned(), Some(via.trim().to_owned()))
+        } else {
+            (rhs.to_owned(), None)
+        };
+        links.push(ProjectLink { from, to, via });
+    }
+    Some(links)
+}
+
+fn parse_optional_abi_array(source: &str, key: &str) -> Option<Vec<ProjectAbiRequirement>> {
+    let values = parse_optional_string_array(source, key)?;
+    let mut items = Vec::new();
+    for value in values {
+        let Some((domain, abi)) = value.split_once('=') else {
+            return None;
+        };
+        let domain = domain.trim().to_owned();
+        let abi = abi.trim().to_owned();
+        if domain.is_empty() || abi.is_empty() {
+            return None;
+        }
+        items.push(ProjectAbiRequirement { domain, abi });
+    }
+    Some(items)
+}
+
+fn parse_optional_galaxy_dependency_array(
+    source: &str,
+    key: &str,
+) -> Option<Vec<ProjectGalaxyDependency>> {
+    let values = parse_optional_string_array(source, key)?;
+    let mut items = Vec::new();
+    for value in values {
+        let Some((name, version)) = value.split_once('=') else {
+            return None;
+        };
+        let name = name.trim().to_owned();
+        let version = version.trim().to_owned();
+        if name.is_empty() || version.is_empty() {
+            return None;
+        }
+        items.push(ProjectGalaxyDependency { name, version });
+    }
+    Some(items)
+}
+
+fn parse_quoted(raw: &str) -> Option<String> {
+    let raw = raw.trim();
+    let inner = raw.strip_prefix('"')?.strip_suffix('"')?;
+    Some(inner.to_owned())
+}
+
+pub(super) fn sanitize_ident(raw: &str) -> String {
+    raw.chars()
+        .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '_' })
+        .collect()
+}
