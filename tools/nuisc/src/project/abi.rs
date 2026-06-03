@@ -1,11 +1,12 @@
 use std::collections::BTreeSet;
 use std::path::Path;
 
-use super::{
-    collect_project_domains, data_support_surface_contract, kernel_support_surface_contract,
-    network_support_surface_contract, shader_support_surface_contract, split_domain_unit,
-    LoadedProject, ProjectAbiRequirement, ProjectAbiResolution,
+use super::support_contracts::{
+    data_support_surface_contract, kernel_support_surface_contract,
+    network_support_surface_contract, shader_support_surface_contract,
 };
+use super::validation_core::collect_project_domains;
+use super::{split_domain_unit, LoadedProject, ProjectAbiRequirement, ProjectAbiResolution};
 
 pub fn resolve_project_abi(project: &LoadedProject) -> Result<ProjectAbiResolution, String> {
     if !project.manifest.abi_requirements.is_empty() {

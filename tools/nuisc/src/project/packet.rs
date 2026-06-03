@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use nuis_semantics::model::{AstAttribute, AstStructDef, AstStructField, AstTypeRef};
 
-use super::{render_ast_type_ref, LoadedProject, ProjectModule};
+use super::{rendering::render_ast_type_ref, LoadedProject, ProjectModule};
 
 fn has_ast_attribute(attributes: &[AstAttribute], expected: &str) -> bool {
     attributes

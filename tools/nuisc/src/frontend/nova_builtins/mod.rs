@@ -2,6 +2,9 @@ mod control_states;
 mod controls;
 mod execution_states;
 mod graph_states;
+mod meta_accessors;
+mod meta_packets;
+mod meta_states;
 mod render_states;
 mod resource_states;
 mod view_states;
@@ -47,6 +50,42 @@ pub(super) fn lower_nova_builtin_call(
         struct_table,
     )? {
         return Ok(Some(control_state_builtin));
+    }
+    if let Some(meta_packet_builtin) = meta_packets::lower_nova_meta_packet_builtin_call(
+        callee,
+        args,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+    )? {
+        return Ok(Some(meta_packet_builtin));
+    }
+    if let Some(meta_state_builtin) = meta_states::lower_nova_meta_state_builtin_call(
+        callee,
+        args,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+    )? {
+        return Ok(Some(meta_state_builtin));
+    }
+    if let Some(meta_accessor_builtin) = meta_accessors::lower_nova_meta_accessor_builtin_call(
+        callee,
+        args,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+    )? {
+        return Ok(Some(meta_accessor_builtin));
     }
     views::lower_nova_view_builtin_call(
         callee,
