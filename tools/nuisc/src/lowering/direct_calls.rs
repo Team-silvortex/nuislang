@@ -7,15 +7,46 @@ enum DirectCallScalarKind {
     I64,
 }
 
-pub(super) fn collect_self_recursive_functions(module: &NirModule) -> BTreeSet<String> {
-    module
+pub(super) fn collect_recursive_direct_call_functions(module: &NirModule) -> BTreeSet<String> {
+    let eligible = module
         .functions
         .iter()
         .filter(|function| !function.is_async)
         .filter(|function| direct_call_signature_kind(function).is_some())
-        .filter(|function| function_contains_self_call(function, &function.body))
-        .map(|function| function.name.clone())
-        .collect()
+        .collect::<Vec<_>>();
+    let eligible_names = eligible
+        .iter()
+        .map(|function| function.name.as_str())
+        .collect::<BTreeSet<_>>();
+    let call_graph = eligible
+        .iter()
+        .map(|function| {
+            (
+                function.name.clone(),
+                function_called_functions(function, &function.body, &eligible_names),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+
+    let mut recursive = BTreeSet::new();
+    for function in &eligible {
+        if participates_in_recursive_component(&function.name, &call_graph) {
+            recursive.insert(function.name.clone());
+        }
+    }
+    let mut closure = recursive.clone();
+    let mut frontier = recursive.into_iter().collect::<Vec<_>>();
+    while let Some(current) = frontier.pop() {
+        let Some(neighbors) = call_graph.get(&current) else {
+            continue;
+        };
+        for neighbor in neighbors {
+            if closure.insert(neighbor.clone()) {
+                frontier.push(neighbor.clone());
+            }
+        }
+    }
+    closure
 }
 
 fn direct_call_scalar_kind(ty: &nuis_semantics::model::NirTypeRef) -> Option<DirectCallScalarKind> {
@@ -41,57 +72,86 @@ fn direct_call_signature_kind(function: &NirFunction) -> Option<DirectCallScalar
     Some(return_kind)
 }
 
-fn function_contains_self_call(function: &NirFunction, body: &[NirStmt]) -> bool {
-    body.iter()
-        .any(|stmt| stmt_contains_self_call(function, stmt))
+fn function_called_functions(
+    _function: &NirFunction,
+    body: &[NirStmt],
+    eligible_names: &BTreeSet<&str>,
+) -> BTreeSet<String> {
+    let mut called = BTreeSet::new();
+    for stmt in body {
+        stmt_collect_called_functions(_function, stmt, eligible_names, &mut called);
+    }
+    called
 }
 
-fn stmt_contains_self_call(function: &NirFunction, stmt: &NirStmt) -> bool {
+fn stmt_collect_called_functions(
+    _function: &NirFunction,
+    stmt: &NirStmt,
+    eligible_names: &BTreeSet<&str>,
+    called: &mut BTreeSet<String>,
+) {
     match stmt {
         NirStmt::Let { value, .. }
         | NirStmt::Const { value, .. }
         | NirStmt::Print(value)
         | NirStmt::Expr(value)
-        | NirStmt::Await(value) => expr_contains_self_call(function, value),
+        | NirStmt::Await(value) => expr_collect_called_functions(value, eligible_names, called),
         NirStmt::If {
             condition,
             then_body,
             else_body,
         } => {
-            expr_contains_self_call(function, condition)
-                || function_contains_self_call(function, then_body)
-                || function_contains_self_call(function, else_body)
+            expr_collect_called_functions(condition, eligible_names, called);
+            for stmt in then_body {
+                stmt_collect_called_functions(_function, stmt, eligible_names, called);
+            }
+            for stmt in else_body {
+                stmt_collect_called_functions(_function, stmt, eligible_names, called);
+            }
         }
         NirStmt::While { condition, body } => {
-            expr_contains_self_call(function, condition)
-                || function_contains_self_call(function, body)
+            expr_collect_called_functions(condition, eligible_names, called);
+            for stmt in body {
+                stmt_collect_called_functions(_function, stmt, eligible_names, called);
+            }
         }
-        NirStmt::Return(Some(value)) => expr_contains_self_call(function, value),
-        NirStmt::Return(None) | NirStmt::Break | NirStmt::Continue => false,
+        NirStmt::Return(Some(value)) => {
+            expr_collect_called_functions(value, eligible_names, called);
+        }
+        NirStmt::Return(None) | NirStmt::Break | NirStmt::Continue => {}
     }
 }
 
-fn expr_contains_self_call(function: &NirFunction, expr: &NirExpr) -> bool {
+fn expr_collect_called_functions(
+    expr: &NirExpr,
+    eligible_names: &BTreeSet<&str>,
+    called: &mut BTreeSet<String>,
+) {
     match expr {
         NirExpr::Call { callee, args } => {
-            callee == &function.name
-                || args
-                    .iter()
-                    .any(|arg| expr_contains_self_call(function, arg))
+            if eligible_names.contains(callee.as_str()) {
+                called.insert(callee.clone());
+            }
+            for arg in args {
+                expr_collect_called_functions(arg, eligible_names, called);
+            }
         }
         NirExpr::MethodCall { receiver, args, .. } => {
-            expr_contains_self_call(function, receiver)
-                || args
-                    .iter()
-                    .any(|arg| expr_contains_self_call(function, arg))
+            expr_collect_called_functions(receiver, eligible_names, called);
+            for arg in args {
+                expr_collect_called_functions(arg, eligible_names, called);
+            }
         }
-        NirExpr::FieldAccess { base, .. } => expr_contains_self_call(function, base),
+        NirExpr::FieldAccess { base, .. } => {
+            expr_collect_called_functions(base, eligible_names, called);
+        }
         NirExpr::Binary { lhs, rhs, .. } => {
-            expr_contains_self_call(function, lhs) || expr_contains_self_call(function, rhs)
+            expr_collect_called_functions(lhs, eligible_names, called);
+            expr_collect_called_functions(rhs, eligible_names, called);
         }
         NirExpr::StructLiteral { fields, .. } => fields
             .iter()
-            .any(|(_, value)| expr_contains_self_call(function, value)),
+            .for_each(|(_, value)| expr_collect_called_functions(value, eligible_names, called)),
         NirExpr::Await(value)
         | NirExpr::DataOutputPipe(value)
         | NirExpr::DataInputPipe(value)
@@ -107,8 +167,8 @@ fn expr_contains_self_call(function: &NirFunction, expr: &NirExpr) -> bool {
         | NirExpr::CpuTaskTimedOut(value)
         | NirExpr::CpuTaskCancelled(value)
         | NirExpr::CpuTaskValue(value)
-        | NirExpr::CpuPresentFrame(value) => expr_contains_self_call(function, value),
-        NirExpr::Free(value)
+        | NirExpr::CpuPresentFrame(value)
+        | NirExpr::Free(value)
         | NirExpr::IsNull(value)
         | NirExpr::KernelConfigReady(value)
         | NirExpr::KernelValue(value)
@@ -131,16 +191,18 @@ fn expr_contains_self_call(function: &NirFunction, expr: &NirExpr) -> bool {
         | NirExpr::NetworkSendReady(value)
         | NirExpr::NetworkRecvReady(value)
         | NirExpr::NetworkAcceptReady(value)
-        | NirExpr::NetworkValue(value) => expr_contains_self_call(function, value),
-        NirExpr::DataResult { value, .. } => expr_contains_self_call(function, value),
-        NirExpr::KernelResult { value, .. } => expr_contains_self_call(function, value),
-        NirExpr::ShaderResult { value, .. } => expr_contains_self_call(function, value),
-        NirExpr::NetworkResult { value, .. } => expr_contains_self_call(function, value),
+        | NirExpr::NetworkValue(value)
+        | NirExpr::DataResult { value, .. }
+        | NirExpr::KernelResult { value, .. }
+        | NirExpr::ShaderResult { value, .. }
+        | NirExpr::NetworkResult { value, .. } => {
+            expr_collect_called_functions(value, eligible_names, called);
+        }
         NirExpr::DataCopyWindow { input, offset, len }
         | NirExpr::DataImmutableWindow { input, offset, len } => {
-            expr_contains_self_call(function, input)
-                || expr_contains_self_call(function, offset)
-                || expr_contains_self_call(function, len)
+            expr_collect_called_functions(input, eligible_names, called);
+            expr_collect_called_functions(offset, eligible_names, called);
+            expr_collect_called_functions(len, eligible_names, called);
         }
         NirExpr::KernelReshape { input, .. }
         | NirExpr::KernelBroadcast { input, .. }
@@ -153,45 +215,48 @@ fn expr_contains_self_call(function: &NirFunction, expr: &NirExpr) -> bool {
         | NirExpr::KernelTopk { input, .. }
         | NirExpr::KernelTopkAxis { input, .. }
         | NirExpr::ShaderProfileRender { packet: input, .. } => {
-            expr_contains_self_call(function, input)
+            expr_collect_called_functions(input, eligible_names, called);
         }
         NirExpr::DataReadWindow { window, index } => {
-            expr_contains_self_call(function, window) || expr_contains_self_call(function, index)
+            expr_collect_called_functions(window, eligible_names, called);
+            expr_collect_called_functions(index, eligible_names, called);
         }
         NirExpr::DataWriteWindow {
             window,
             index,
             value,
         } => {
-            expr_contains_self_call(function, window)
-                || expr_contains_self_call(function, index)
-                || expr_contains_self_call(function, value)
+            expr_collect_called_functions(window, eligible_names, called);
+            expr_collect_called_functions(index, eligible_names, called);
+            expr_collect_called_functions(value, eligible_names, called);
         }
         NirExpr::KernelElementAt { input, row, col } => {
-            expr_contains_self_call(function, input)
-                || expr_contains_self_call(function, row)
-                || expr_contains_self_call(function, col)
+            expr_collect_called_functions(input, eligible_names, called);
+            expr_collect_called_functions(row, eligible_names, called);
+            expr_collect_called_functions(col, eligible_names, called);
         }
         NirExpr::KernelMap { input, scalar, .. } | NirExpr::KernelMapAxis { input, scalar, .. } => {
-            expr_contains_self_call(function, input)
-                || scalar
-                    .as_deref()
-                    .is_some_and(|value| expr_contains_self_call(function, value))
+            expr_collect_called_functions(input, eligible_names, called);
+            if let Some(value) = scalar.as_deref() {
+                expr_collect_called_functions(value, eligible_names, called);
+            }
         }
         NirExpr::KernelZip { lhs, rhs, .. } | NirExpr::KernelMatmul { lhs, rhs } => {
-            expr_contains_self_call(function, lhs) || expr_contains_self_call(function, rhs)
+            expr_collect_called_functions(lhs, eligible_names, called);
+            expr_collect_called_functions(rhs, eligible_names, called);
         }
         NirExpr::KernelAddBias { input, bias } => {
-            expr_contains_self_call(function, input) || expr_contains_self_call(function, bias)
+            expr_collect_called_functions(input, eligible_names, called);
+            expr_collect_called_functions(bias, eligible_names, called);
         }
         NirExpr::ShaderBeginPass {
             target,
             pipeline,
             viewport,
         } => {
-            expr_contains_self_call(function, target)
-                || expr_contains_self_call(function, pipeline)
-                || expr_contains_self_call(function, viewport)
+            expr_collect_called_functions(target, eligible_names, called);
+            expr_collect_called_functions(pipeline, eligible_names, called);
+            expr_collect_called_functions(viewport, eligible_names, called);
         }
         NirExpr::ShaderDrawInstanced {
             pass,
@@ -199,24 +264,29 @@ fn expr_contains_self_call(function: &NirFunction, expr: &NirExpr) -> bool {
             vertex_count,
             instance_count,
         } => {
-            expr_contains_self_call(function, pass)
-                || expr_contains_self_call(function, packet)
-                || expr_contains_self_call(function, vertex_count)
-                || expr_contains_self_call(function, instance_count)
+            expr_collect_called_functions(pass, eligible_names, called);
+            expr_collect_called_functions(packet, eligible_names, called);
+            expr_collect_called_functions(vertex_count, eligible_names, called);
+            expr_collect_called_functions(instance_count, eligible_names, called);
         }
         NirExpr::DataProfileSendUplink { input, .. }
         | NirExpr::DataProfileSendDownlink { input, .. } => {
-            expr_contains_self_call(function, input)
+            expr_collect_called_functions(input, eligible_names, called);
         }
-        NirExpr::CpuSpawn { args, .. } => args
-            .iter()
-            .any(|arg| expr_contains_self_call(function, arg)),
+        NirExpr::CpuSpawn { args, .. } => {
+            for arg in args {
+                expr_collect_called_functions(arg, eligible_names, called);
+            }
+        }
         NirExpr::CpuTimeout { task, limit } => {
-            expr_contains_self_call(function, task) || expr_contains_self_call(function, limit)
+            expr_collect_called_functions(task, eligible_names, called);
+            expr_collect_called_functions(limit, eligible_names, called);
         }
-        NirExpr::CpuExternCall { args, .. } => args
-            .iter()
-            .any(|arg| expr_contains_self_call(function, arg)),
+        NirExpr::CpuExternCall { args, .. } => {
+            for arg in args {
+                expr_collect_called_functions(arg, eligible_names, called);
+            }
+        }
         NirExpr::DataHandleTable(_)
         | NirExpr::KernelTensor { .. }
         | NirExpr::ShaderTarget { .. }
@@ -262,9 +332,43 @@ fn expr_contains_self_call(function: &NirFunction, expr: &NirExpr) -> bool {
         | NirExpr::CpuBindCore(_)
         | NirExpr::CpuWindow { .. }
         | NirExpr::CpuInputI64 { .. }
-        | NirExpr::CpuTickI64 { .. } => false,
-        _ => false,
+        | NirExpr::CpuTickI64 { .. } => {}
+        _ => {}
     }
+}
+
+fn participates_in_recursive_component(
+    start: &str,
+    call_graph: &BTreeMap<String, BTreeSet<String>>,
+) -> bool {
+    let Some(neighbors) = call_graph.get(start) else {
+        return false;
+    };
+    if neighbors.contains(start) {
+        return true;
+    }
+    neighbors
+        .iter()
+        .any(|neighbor| path_reaches(neighbor, start, call_graph, &mut BTreeSet::new()))
+}
+
+fn path_reaches(
+    current: &str,
+    target: &str,
+    call_graph: &BTreeMap<String, BTreeSet<String>>,
+    visited: &mut BTreeSet<String>,
+) -> bool {
+    if current == target {
+        return true;
+    }
+    if !visited.insert(current.to_owned()) {
+        return false;
+    }
+    call_graph
+        .get(current)
+        .into_iter()
+        .flatten()
+        .any(|next| path_reaches(next, target, call_graph, visited))
 }
 
 pub(super) fn lower_direct_call_helper_function(

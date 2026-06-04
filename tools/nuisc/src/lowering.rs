@@ -81,9 +81,7 @@ use core_exprs::lower_core_expr;
 use cpu_exprs::lower_cpu_expr;
 use data_cpu_exprs::lower_data_cpu_expr;
 use data_profile_refs::lower_data_profile_ref_expr;
-use direct_calls::{
-    collect_self_recursive_functions, lower_direct_call_helper_function, push_direct_call_node,
-};
+use direct_calls::{lower_direct_call_helper_function, push_direct_call_node};
 use edge_helpers::{
     ensure_fabric_resource, ensure_kernel_resource, ensure_network_resource,
     ensure_shader_resource, push_dep_edges, push_lifetime_edge, push_xfer_edge,

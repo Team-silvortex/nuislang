@@ -1,0 +1,2 @@
+name = "ordinary_mutual_recursive_demo"
+entry = "main.ns"

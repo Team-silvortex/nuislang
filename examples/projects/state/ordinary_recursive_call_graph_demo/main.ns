@@ -1,0 +1,23 @@
+mod cpu Main {
+  fn step(value: i64) -> i64 {
+    return value - 1;
+  }
+
+  fn odd(value: i64) -> i64 {
+    if value == 0 {
+      return 0;
+    }
+    return even(step(value));
+  }
+
+  fn even(value: i64) -> i64 {
+    if value == 0 {
+      return 1;
+    }
+    return odd(step(value));
+  }
+
+  fn main() -> i64 {
+    return even(4);
+  }
+}

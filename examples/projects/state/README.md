@@ -19,6 +19,8 @@ Start here:
 * [ordinary_recursive_factorial_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_factorial_demo)
 * [ordinary_recursive_bool_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_bool_demo)
 * [ordinary_recursive_i32_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_i32_demo)
+* [ordinary_recursive_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_call_graph_demo)
+* [ordinary_mutual_recursive_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_mutual_recursive_demo)
 * [home_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/home_runtime_demo)
 * [location_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/location_runtime_demo)
 * [match_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_branching_while_demo)

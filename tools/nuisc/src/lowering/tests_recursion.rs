@@ -361,3 +361,92 @@ fn lowers_ordinary_self_recursive_function_into_helper_lane_and_call_bool() {
         .any(|node| node.op.module == "cpu" && node.op.instruction == "return_bool"));
     assert!(yir.node_lanes.values().any(|lane| lane == "fn:settle"));
 }
+
+#[test]
+fn lowers_mutually_recursive_functions_into_helper_lanes_and_call_i64() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn odd(value: i64) -> i64 {
+            if value == 0 {
+              return 0;
+            }
+            return even(value - 1);
+          }
+
+          fn even(value: i64) -> i64 {
+            if value == 0 {
+              return 1;
+            }
+            return odd(value - 1);
+          }
+
+          fn main() -> i64 {
+            return even(4);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let call_i64_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "call_i64")
+        .count();
+    assert!(
+        call_i64_count >= 2,
+        "expected mutual recursion calls, found {call_i64_count}"
+    );
+    assert!(yir.node_lanes.values().any(|lane| lane == "fn:odd"));
+    assert!(yir.node_lanes.values().any(|lane| lane == "fn:even"));
+}
+
+#[test]
+fn lowers_recursive_component_reachable_scalar_helpers_into_helper_lanes() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn step(value: i64) -> i64 {
+            return value - 1;
+          }
+
+          fn odd(value: i64) -> i64 {
+            if value == 0 {
+              return 0;
+            }
+            return even(step(value));
+          }
+
+          fn even(value: i64) -> i64 {
+            if value == 0 {
+              return 1;
+            }
+            return odd(step(value));
+          }
+
+          fn main() -> i64 {
+            return even(4);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    assert!(yir.node_lanes.values().any(|lane| lane == "fn:step"));
+    let step_calls = yir
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "call_i64"
+                && node.op.args.first().is_some_and(|name| name == "step")
+        })
+        .count();
+    assert!(
+        step_calls >= 2,
+        "expected calls into helper-lowered `step`, found {step_calls}"
+    );
+}

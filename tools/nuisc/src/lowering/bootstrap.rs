@@ -1,4 +1,5 @@
 use super::*;
+use crate::lowering::direct_calls::collect_recursive_direct_call_functions;
 
 pub(super) trait BootstrapLoweringProvider {
     fn lowering_entry(&self) -> &'static str;
@@ -54,7 +55,7 @@ pub(super) fn lower_nir_to_yir_builtin_cpu(module: &NirModule) -> Result<YirModu
 
     let rewritten_module = rewrite_self_tail_recursive_functions(module);
     let module = &rewritten_module;
-    let direct_call_functions = collect_self_recursive_functions(module);
+    let direct_call_functions = collect_recursive_direct_call_functions(module);
 
     let main = module
         .functions

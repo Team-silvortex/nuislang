@@ -1,0 +1,19 @@
+mod cpu Main {
+  fn odd(value: i64) -> i64 {
+    if value == 0 {
+      return 0;
+    }
+    return even(value - 1);
+  }
+
+  fn even(value: i64) -> i64 {
+    if value == 0 {
+      return 1;
+    }
+    return odd(value - 1);
+  }
+
+  fn main() -> i64 {
+    return even(4) + odd(5);
+  }
+}
