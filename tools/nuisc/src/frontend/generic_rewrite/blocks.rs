@@ -304,6 +304,27 @@ fn rewrite_generic_calls_in_stmt(
                 value: rewritten_value,
             }
         }
+        AstStmt::DestructureLet {
+            type_ref,
+            fields,
+            value,
+        } => AstStmt::DestructureLet {
+            type_ref: type_ref.clone(),
+            fields: fields.clone(),
+            value: rewrite_generic_calls_in_expr(
+                value,
+                Some(type_ref),
+                env,
+                visible_type_aliases,
+                generic_templates,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                specialization_cache,
+                specialized_functions,
+                specialized_signatures,
+            )?,
+        },
         AstStmt::Const { name, ty, value } => {
             let rewritten_value = rewrite_generic_calls_in_expr(
                 value,

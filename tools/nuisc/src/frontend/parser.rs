@@ -222,12 +222,7 @@ impl Parser {
         }
         self.expect_word("const")?;
         let name = self.expect_ident()?;
-        let ty = if self.peek_symbol(':') {
-            self.expect_symbol(':')?;
-            Some(self.parse_type_ref()?)
-        } else {
-            None
-        };
+        let ty = self.parse_optional_type_annotation()?;
         self.expect_symbol('=')?;
         let value = self.parse_expr()?;
         self.expect_symbol(';')?;
@@ -307,12 +302,7 @@ impl Parser {
             self.parse_param_list()?
         };
         self.expect_symbol(')')?;
-        let return_type = if self.peek_arrow() {
-            self.expect_arrow()?;
-            Some(self.parse_type_ref()?)
-        } else {
-            None
-        };
+        let return_type = self.parse_optional_return_type()?;
         self.expect_symbol(';')?;
         Ok(AstTraitMethodSig {
             name,
@@ -361,12 +351,7 @@ impl Parser {
             self.parse_param_list()?
         };
         self.expect_symbol(')')?;
-        let return_type = if self.peek_arrow() {
-            self.expect_arrow()?;
-            Some(self.parse_type_ref()?)
-        } else {
-            None
-        };
+        let return_type = self.parse_optional_return_type()?;
         let body = self.parse_block()?;
         Ok(AstImplMethod {
             name,
@@ -571,12 +556,7 @@ impl Parser {
             self.parse_param_list()?
         };
         self.expect_symbol(')')?;
-        let return_type = if self.peek_arrow() {
-            self.expect_arrow()?;
-            Some(self.parse_type_ref()?)
-        } else {
-            None
-        };
+        let return_type = self.parse_optional_return_type()?;
         let body = self.parse_block()?;
 
         Ok(AstFunction {
@@ -1077,6 +1057,11 @@ impl Parser {
         })
     }
 
+    #[rustfmt::skip]
+    fn parse_optional_type_annotation(&mut self) -> Result<Option<AstTypeRef>, String> { if self.peek_symbol(':') { self.expect_symbol(':')?; Ok(Some(self.parse_type_ref()?)) } else { Ok(None) } }
+    #[rustfmt::skip]
+    fn parse_optional_return_type(&mut self) -> Result<Option<AstTypeRef>, String> { if self.peek_arrow() { self.expect_arrow()?; Ok(Some(self.parse_type_ref()?)) } else { Ok(None) } }
+
     fn parse_stmt(&mut self) -> Result<AstStmt, String> {
         if self.peek_word("let") {
             return self.parse_let_stmt();
@@ -1152,13 +1137,41 @@ impl Parser {
 
     fn parse_let_stmt(&mut self) -> Result<AstStmt, String> {
         self.expect_word("let")?;
+        #[rustfmt::skip]
+        fn duplicate_destructure_field_error(field: &str) -> String { format!("duplicate field `{field}` in destructuring let pattern") }
+        #[rustfmt::skip]
+        let starts_destructure = matches!(self.tokens.get(self.cursor), Some(Token::Word(_)))
+            && (matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol('{'))) || matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol('<'))));
+        if starts_destructure {
+            let type_ref = self.parse_type_ref()?;
+            self.expect_symbol('{')?;
+            let mut fields = Vec::new();
+            while !self.peek_symbol('}') {
+                let field = self.expect_ident()?;
+                if fields.iter().any(|existing| existing == &field) {
+                    return Err(duplicate_destructure_field_error(&field));
+                }
+                fields.push(field);
+                if !self.peek_symbol(',') {
+                    break;
+                }
+                self.expect_symbol(',')?;
+            }
+            self.expect_symbol('}')?;
+            if fields.is_empty() {
+                return Err("destructuring let pattern requires at least one field".to_owned());
+            }
+            self.expect_symbol('=')?;
+            let value = self.parse_expr()?;
+            self.expect_symbol(';')?;
+            return Ok(AstStmt::DestructureLet {
+                type_ref,
+                fields,
+                value,
+            });
+        }
         let name = self.expect_ident()?;
-        let ty = if self.peek_symbol(':') {
-            self.expect_symbol(':')?;
-            Some(self.parse_type_ref()?)
-        } else {
-            None
-        };
+        let ty = self.parse_optional_type_annotation()?;
         self.expect_symbol('=')?;
         let value = self.parse_expr()?;
         self.expect_symbol(';')?;
@@ -1168,12 +1181,7 @@ impl Parser {
     fn parse_const_stmt(&mut self) -> Result<AstStmt, String> {
         self.expect_word("const")?;
         let name = self.expect_ident()?;
-        let ty = if self.peek_symbol(':') {
-            self.expect_symbol(':')?;
-            Some(self.parse_type_ref()?)
-        } else {
-            None
-        };
+        let ty = self.parse_optional_type_annotation()?;
         self.expect_symbol('=')?;
         let value = self.parse_expr()?;
         self.expect_symbol(';')?;
@@ -1183,12 +1191,7 @@ impl Parser {
     fn parse_link_stmt(&mut self) -> Result<AstStmt, String> {
         self.expect_word("link")?;
         let name = self.expect_ident()?;
-        let ty = if self.peek_symbol(':') {
-            self.expect_symbol(':')?;
-            Some(self.parse_type_ref()?)
-        } else {
-            None
-        };
+        let ty = self.parse_optional_type_annotation()?;
         self.expect_symbol('=')?;
         let value = if self.peek_word("output") {
             self.expect_word("output")?;
@@ -1316,7 +1319,12 @@ impl Parser {
             Some(Token::Word(word)) if word == "_" => Ok(AstMatchPattern::Wildcard),
             Some(Token::Word(word)) if word == "true" => Ok(AstMatchPattern::Bool(true)),
             Some(Token::Word(word)) if word == "false" => Ok(AstMatchPattern::Bool(false)),
-            Some(Token::Word(word)) if self.peek_symbol('{') => {
+            Some(Token::Word(_word)) if self.peek_symbol('{') || self.peek_symbol('<') => {
+                self.cursor = self.cursor.saturating_sub(1);
+                let type_ref = self.parse_type_ref()?;
+                if !self.peek_symbol('{') {
+                    return Err("expected `{` after struct match pattern type".to_owned());
+                }
                 self.expect_symbol('{')?;
                 let mut fields = Vec::new();
                 while !self.peek_symbol('}') {
@@ -1333,10 +1341,7 @@ impl Parser {
                             ))
                         }
                         None => {
-                            return Err(
-                                "unexpected end of input in struct match pattern field list"
-                                    .to_owned(),
-                            )
+                            return Err("unexpected end of input in struct match pattern field list".to_owned())
                         }
                     };
                     self.expect_symbol(':')?;
@@ -1348,18 +1353,16 @@ impl Parser {
                 }
                 self.expect_symbol('}')?;
                 if fields.is_empty() {
-                    return Err(
-                        "minimal `match` struct patterns require at least one field"
-                            .to_owned(),
-                    );
+                    return Err("minimal `match` struct patterns require at least one field".to_owned());
                 }
                 Ok(AstMatchPattern::StructFields {
-                    type_name: word,
+                    type_ref,
                     fields,
                 })
             }
             Some(Token::Integer(value)) => {
-                if self.peek_symbol('.') && matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol('.')))
+                if self.peek_symbol('.')
+                    && matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol('.')))
                 {
                     self.expect_symbol('.')?;
                     self.expect_symbol('.')?;
@@ -1632,12 +1635,7 @@ impl Parser {
                     self.parse_lambda_param_list()?
                 };
                 self.expect_symbol('|')?;
-                let return_type = if self.peek_arrow() {
-                    self.expect_arrow()?;
-                    Some(self.parse_type_ref()?)
-                } else {
-                    None
-                };
+                let return_type = self.parse_optional_return_type()?;
                 let body = self.parse_block()?;
                 Ok(AstExpr::Lambda {
                     params,

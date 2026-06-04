@@ -171,6 +171,30 @@ fn expand_lambda_block(
                 aliases.remove(name);
                 locals.insert(name.clone());
             }
+            AstStmt::DestructureLet {
+                type_ref,
+                fields,
+                value,
+            } => {
+                let rewritten_value = rewrite_lambda_expr(
+                    value,
+                    &aliases,
+                    &locals,
+                    module_const_names,
+                    owning_function_name,
+                    counter,
+                    synthesized,
+                )?;
+                rewritten.push(AstStmt::DestructureLet {
+                    type_ref: type_ref.clone(),
+                    fields: fields.clone(),
+                    value: rewritten_value,
+                });
+                for field in fields {
+                    aliases.remove(field);
+                    locals.insert(field.clone());
+                }
+            }
             AstStmt::Const { name, ty, value } => {
                 let rewritten_value = rewrite_lambda_expr(
                     value,

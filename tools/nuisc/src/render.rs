@@ -1,3 +1,8 @@
+mod render_stmt_helpers;
+
+use self::render_stmt_helpers::{
+    render_ast_destructure_let, render_ast_stmt_inline, render_ast_type_suffix,
+};
 use nuis_semantics::model::{
     AstAttribute, AstAttributeArg, AstAttributeValue, AstBinaryOp, AstExpr, AstExternInterface,
     AstFunction, AstGenericParam, AstImplDef, AstImplMethod, AstMatchPattern, AstModule, AstStmt,
@@ -96,10 +101,7 @@ pub fn render_ast(module: &AstModule) -> String {
         for stmt in &function.body {
             match stmt {
                 AstStmt::Let { name, ty, value } => {
-                    let type_suffix = ty
-                        .as_ref()
-                        .map(|ty| format!(": {}", render_ast_type(ty)))
-                        .unwrap_or_default();
+                    let type_suffix = render_ast_type_suffix(ty.as_ref());
                     out.push_str(&format!(
                         "    let {}{} = {}\n",
                         name,
@@ -107,11 +109,16 @@ pub fn render_ast(module: &AstModule) -> String {
                         render_ast_expr(value)
                     ));
                 }
+                AstStmt::DestructureLet {
+                    type_ref,
+                    fields,
+                    value,
+                } => out.push_str(&format!(
+                    "    {}\n",
+                    render_ast_destructure_let(type_ref, fields, value)
+                )),
                 AstStmt::Const { name, ty, value } => {
-                    let type_suffix = ty
-                        .as_ref()
-                        .map(|ty| format!(": {}", render_ast_type(ty)))
-                        .unwrap_or_default();
+                    let type_suffix = render_ast_type_suffix(ty.as_ref());
                     out.push_str(&format!(
                         "    const {}{} = {}\n",
                         name,
@@ -1654,37 +1661,6 @@ fn render_nir_impl_method(method: &NirImplMethod) -> String {
     format!("    fn {}({}){} ...\n", method.name, params, return_suffix)
 }
 
-fn render_ast_stmt_inline(stmt: &AstStmt) -> String {
-    match stmt {
-        AstStmt::Let { name, ty, value } => {
-            let suffix = ty
-                .as_ref()
-                .map(|ty| format!(": {}", render_ast_type(ty)))
-                .unwrap_or_default();
-            format!("let {}{} = {}", name, suffix, render_ast_expr(value))
-        }
-        AstStmt::Const { name, ty, value } => {
-            let suffix = ty
-                .as_ref()
-                .map(|ty| format!(": {}", render_ast_type(ty)))
-                .unwrap_or_default();
-            format!("const {}{} = {}", name, suffix, render_ast_expr(value))
-        }
-        AstStmt::Print(value) => format!("print {}", render_ast_expr(value)),
-        AstStmt::Await(value) => format!("await {}", render_ast_expr(value)),
-        AstStmt::Expr(expr) => render_ast_expr(expr),
-        AstStmt::If { .. } => "if ...".to_owned(),
-        AstStmt::Match { .. } => "match ...".to_owned(),
-        AstStmt::While { .. } => "while ...".to_owned(),
-        AstStmt::Break => "break".to_owned(),
-        AstStmt::Continue => "continue".to_owned(),
-        AstStmt::Return(value) => match value {
-            Some(value) => format!("return {}", render_ast_expr(value)),
-            None => "return".to_owned(),
-        },
-    }
-}
-
 fn render_ast_match_pattern(pattern: &AstMatchPattern) -> String {
     match pattern {
         AstMatchPattern::Wildcard => "_".to_owned(),
@@ -1696,9 +1672,9 @@ fn render_ast_match_pattern(pattern: &AstMatchPattern) -> String {
             .map(render_ast_match_pattern)
             .collect::<Vec<_>>()
             .join(" | "),
-        AstMatchPattern::StructFields { type_name, fields } => format!(
+        AstMatchPattern::StructFields { type_ref, fields } => format!(
             "{} {{ {} }}",
-            type_name,
+            render_ast_type(type_ref),
             fields
                 .iter()
                 .map(|(field, pattern)| format!("{field}: {}", render_ast_match_pattern(pattern)))

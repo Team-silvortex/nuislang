@@ -188,6 +188,15 @@ pub(crate) fn specialize_stmt_types(
                         .transpose()?,
                     value: value.clone(),
                 },
+                AstStmt::DestructureLet {
+                    type_ref,
+                    fields,
+                    value,
+                } => AstStmt::DestructureLet {
+                    type_ref: specialize_ast_type_ref(type_ref, substitutions)?,
+                    fields: fields.clone(),
+                    value: value.clone(),
+                },
                 AstStmt::Const { name, ty, value } => AstStmt::Const {
                     name: name.clone(),
                     ty: ty

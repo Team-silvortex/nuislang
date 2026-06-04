@@ -4,11 +4,12 @@ use nuis_semantics::model::{
     AstFunction, AstImplDef, AstModule, AstTypeAlias, AstTypeRef, NirFunction, NirStructDef,
 };
 
+use super::stmt_lowering::lower_stmt_sequence_with_async;
 use super::{
     build_function_return_type_table, build_impl_method_function, impl_method_lookup_key,
     impl_method_symbol_name, infer_missing_function_return_type, is_public_visibility,
-    lower_function, lower_param_with_aliases, lower_stmt_with_async, lower_type_ref_with_aliases,
-    lower_visibility, rewrite_generic_calls_in_function, FunctionSignature, ModuleConstValue,
+    lower_function, lower_param_with_aliases, lower_type_ref_with_aliases, lower_visibility,
+    rewrite_generic_calls_in_function, FunctionSignature, ModuleConstValue,
 };
 use nuis_semantics::model::{
     NirImplDef, NirImplMethod, NirTraitDef, NirTraitMethodSig, NirTypeRef,
@@ -243,7 +244,7 @@ pub(super) fn build_lowered_functions_and_impls(
                 .body
                 .iter()
                 .map(|stmt| {
-                    lower_stmt_with_async(
+                    lower_stmt_sequence_with_async(
                         stmt,
                         &module.domain,
                         false,
@@ -255,7 +256,10 @@ pub(super) fn build_lowered_functions_and_impls(
                         struct_table,
                     )
                 })
-                .collect::<Result<Vec<_>, _>>()?;
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
+                .flatten()
+                .collect::<Vec<_>>();
             methods.push(NirImplMethod {
                 name: method.name.clone(),
                 params: method

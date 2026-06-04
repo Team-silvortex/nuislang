@@ -5,9 +5,10 @@ use nuis_semantics::model::{
     NirStructDef, NirTypeRef,
 };
 
+use super::stmt_lowering::lower_stmt_block_with_async;
 use super::{
-    lower_ast_attributes, lower_param_with_aliases, lower_stmt_with_async,
-    lower_type_ref_with_aliases, lower_visibility, FunctionSignature, ModuleConstValue,
+    lower_ast_attributes, lower_param_with_aliases, lower_type_ref_with_aliases, lower_visibility,
+    FunctionSignature, ModuleConstValue,
 };
 
 pub(super) fn impl_method_lookup_key(for_type: &NirTypeRef, method: &str) -> String {
@@ -114,22 +115,16 @@ pub(super) fn lower_function(
             .as_ref()
             .map(|ty| lower_type_ref_with_aliases(ty, type_aliases))
             .transpose()?,
-        body: function
-            .body
-            .iter()
-            .map(|stmt| {
-                lower_stmt_with_async(
-                    stmt,
-                    current_domain,
-                    function.is_async,
-                    &mut bindings,
-                    module_consts,
-                    function.return_type.as_ref(),
-                    type_aliases,
-                    signatures,
-                    struct_table,
-                )
-            })
-            .collect::<Result<Vec<_>, _>>()?,
+        body: lower_stmt_block_with_async(
+            &function.body,
+            current_domain,
+            function.is_async,
+            &mut bindings,
+            module_consts,
+            function.return_type.as_ref(),
+            type_aliases,
+            signatures,
+            struct_table,
+        )?,
     })
 }

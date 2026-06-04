@@ -99,6 +99,23 @@ pub(crate) fn rewrite_higher_order_template_stmt(
                 specialized_functions,
             )?,
         },
+        AstStmt::DestructureLet {
+            type_ref,
+            fields,
+            value,
+        } => AstStmt::DestructureLet {
+            type_ref: type_ref.clone(),
+            fields: fields.clone(),
+            value: rewrite_higher_order_template_expr(
+                value,
+                callable_bindings,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?,
+        },
         AstStmt::Const { name, ty, value } => AstStmt::Const {
             name: name.clone(),
             ty: ty.clone(),

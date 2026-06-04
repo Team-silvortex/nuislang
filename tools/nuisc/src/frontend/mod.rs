@@ -95,7 +95,6 @@ use self::module_assembly::{
 use self::return_inference::infer_missing_function_return_type;
 use self::signature_building::{build_initial_function_signatures, FunctionSignature};
 use self::specialization_pipeline::build_lowered_functions_and_impls;
-use self::stmt_lowering::lower_stmt_with_async;
 use self::validation::validate_declared_nir_types;
 use self::validation_helpers::{
     async_boundary_violation_detail, async_parameter_violation_detail, render_type_name,

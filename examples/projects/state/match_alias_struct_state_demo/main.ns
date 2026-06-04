@@ -1,0 +1,24 @@
+mod cpu Main {
+  type PacketAlias = Packet;
+
+  struct Packet {
+    kind: i64,
+    ready: bool,
+  }
+
+  fn main() -> i64 {
+    let packet: Packet = Packet { kind: 2, ready: true };
+    let armed: bool = true;
+    while 1 == 1 {
+      match packet {
+        PacketAlias { kind: 1 | 2, ready: true } if armed => {
+          return 7;
+        }
+        _ => {
+          return 9;
+        }
+      }
+    }
+    return 0;
+  }
+}

@@ -237,7 +237,7 @@ pub enum AstMatchPattern {
     IntRangeInclusive(i64, i64),
     Or(Vec<AstMatchPattern>),
     StructFields {
-        type_name: String,
+        type_ref: AstTypeRef,
         fields: Vec<(String, AstMatchPattern)>,
     },
 }
@@ -250,36 +250,16 @@ pub struct AstMatchArm {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[rustfmt::skip]
 pub enum AstStmt {
-    Let {
-        name: String,
-        ty: Option<AstTypeRef>,
-        value: AstExpr,
-    },
-    Const {
-        name: String,
-        ty: Option<AstTypeRef>,
-        value: AstExpr,
-    },
-    Print(AstExpr),
-    Await(AstExpr),
-    If {
-        condition: AstExpr,
-        then_body: Vec<AstStmt>,
-        else_body: Vec<AstStmt>,
-    },
-    Match {
-        value: AstExpr,
-        arms: Vec<AstMatchArm>,
-    },
-    While {
-        condition: AstExpr,
-        body: Vec<AstStmt>,
-    },
-    Break,
-    Continue,
-    Expr(AstExpr),
-    Return(Option<AstExpr>),
+    Let { name: String, ty: Option<AstTypeRef>, value: AstExpr },
+    DestructureLet { type_ref: AstTypeRef, fields: Vec<String>, value: AstExpr },
+    Const { name: String, ty: Option<AstTypeRef>, value: AstExpr },
+    Print(AstExpr), Await(AstExpr),
+    If { condition: AstExpr, then_body: Vec<AstStmt>, else_body: Vec<AstStmt> },
+    Match { value: AstExpr, arms: Vec<AstMatchArm> },
+    While { condition: AstExpr, body: Vec<AstStmt> },
+    Break, Continue, Expr(AstExpr), Return(Option<AstExpr>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

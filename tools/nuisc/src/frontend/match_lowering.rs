@@ -5,9 +5,10 @@ use nuis_semantics::model::{
     NirBinaryOp, NirExpr, NirExprEffectClass, NirStmt, NirStructDef, NirTypeRef,
 };
 
+use super::stmt_lowering::lower_stmt_block_with_async;
 use super::{
-    bool_type, infer_nir_expr_type, lower_expr_with_async, lower_stmt_with_async,
-    FunctionSignature, ModuleConstValue,
+    bool_type, infer_nir_expr_type, lower_expr_with_async, lower_type_ref,
+    lower_type_ref_with_aliases, resolve_ast_type_ref_aliases, FunctionSignature, ModuleConstValue,
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -60,27 +61,26 @@ pub(super) fn lower_match_stmt_with_async(
     }
 
     let mut wildcard_bindings = bindings.clone();
-    let mut else_body = arms[wildcard_index]
-        .body
-        .iter()
-        .map(|stmt| {
-            lower_stmt_with_async(
-                stmt,
-                current_domain,
-                current_function_is_async,
-                &mut wildcard_bindings,
-                module_consts,
-                return_type,
-                type_aliases,
-                signatures,
-                struct_table,
-            )
-        })
-        .collect::<Result<Vec<_>, _>>()?;
+    let mut else_body = lower_stmt_block_with_async(
+        &arms[wildcard_index].body,
+        current_domain,
+        current_function_is_async,
+        &mut wildcard_bindings,
+        module_consts,
+        return_type,
+        type_aliases,
+        signatures,
+        struct_table,
+    )?;
 
     for arm in arms[..wildcard_index].iter().rev() {
-        let mut condition =
-            lower_match_pattern_condition(&arm.pattern, &lowered_value, &value_ty, struct_table)?;
+        let mut condition = lower_match_pattern_condition(
+            &arm.pattern,
+            &lowered_value,
+            &value_ty,
+            type_aliases,
+            struct_table,
+        )?;
         if let Some(guard) = &arm.guard {
             let lowered_guard = lower_expr_with_async(
                 guard,
@@ -109,23 +109,17 @@ pub(super) fn lower_match_stmt_with_async(
             };
         }
         let mut then_bindings = bindings.clone();
-        let then_body = arm
-            .body
-            .iter()
-            .map(|stmt| {
-                lower_stmt_with_async(
-                    stmt,
-                    current_domain,
-                    current_function_is_async,
-                    &mut then_bindings,
-                    module_consts,
-                    return_type,
-                    type_aliases,
-                    signatures,
-                    struct_table,
-                )
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+        let then_body = lower_stmt_block_with_async(
+            &arm.body,
+            current_domain,
+            current_function_is_async,
+            &mut then_bindings,
+            module_consts,
+            return_type,
+            type_aliases,
+            signatures,
+            struct_table,
+        )?;
         else_body = vec![NirStmt::If {
             condition,
             then_body,
@@ -143,6 +137,7 @@ fn lower_match_pattern_condition(
     pattern: &AstMatchPattern,
     lowered_value: &NirExpr,
     value_ty: &NirTypeRef,
+    type_aliases: &BTreeMap<String, AstTypeAlias>,
     struct_table: &BTreeMap<String, NirStructDef>,
 ) -> Result<NirExpr, String> {
     match (pattern, value_ty.scalar_kind()) {
@@ -186,7 +181,13 @@ fn lower_match_pattern_condition(
             let mut conditions = patterns
                 .iter()
                 .map(|pattern| {
-                    lower_match_pattern_condition(pattern, lowered_value, value_ty, struct_table)
+                    lower_match_pattern_condition(
+                        pattern,
+                        lowered_value,
+                        value_ty,
+                        type_aliases,
+                        struct_table,
+                    )
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             let first = conditions
@@ -201,17 +202,22 @@ fn lower_match_pattern_condition(
                     rhs: Box::new(rhs),
                 }))
         }
-        (AstMatchPattern::StructFields { type_name, fields }, _) => {
-            if value_ty.name != *type_name {
+        (AstMatchPattern::StructFields { type_ref, fields }, _) => {
+            let resolved_type_ref = resolve_ast_type_ref_aliases(type_ref, type_aliases)?;
+            let lowered_pattern_ty = lower_type_ref_with_aliases(&resolved_type_ref, type_aliases)?;
+            if *value_ty != lowered_pattern_ty {
                 return Err(format!(
                     "struct match pattern `{}` requires scrutinee of type `{}`, found `{}`",
-                    type_name,
-                    type_name,
+                    lower_type_ref(type_ref).render(),
+                    lowered_pattern_ty.render(),
                     value_ty.render()
                 ));
             }
-            let definition = struct_table.get(type_name).ok_or_else(|| {
-                format!("struct match pattern references unknown struct `{type_name}`")
+            let definition = struct_table.get(&lowered_pattern_ty.name).ok_or_else(|| {
+                format!(
+                    "struct match pattern references unknown struct `{}`",
+                    lowered_pattern_ty.render()
+                )
             })?;
             let mut conditions = Vec::new();
             for (field_name, field_pattern) in fields {
@@ -223,7 +229,8 @@ fn lower_match_pattern_condition(
                 let field_def = definition.field(field_name).ok_or_else(|| {
                     format!(
                         "struct match pattern `{}` references unknown field `{}`",
-                        type_name, field_name
+                        lowered_pattern_ty.render(),
+                        field_name
                     )
                 })?;
                 let field_expr = NirExpr::FieldAccess {
@@ -234,6 +241,7 @@ fn lower_match_pattern_condition(
                     field_pattern,
                     &field_expr,
                     &field_def.ty,
+                    type_aliases,
                     struct_table,
                 )?);
             }

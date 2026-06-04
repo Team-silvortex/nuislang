@@ -13,6 +13,12 @@ pub(super) fn validate_lambda_block_no_capture(
                 validate_lambda_expr_no_capture(value, visible_locals, outer_locals)?;
                 visible_locals.insert(name.clone());
             }
+            AstStmt::DestructureLet { fields, value, .. } => {
+                validate_lambda_expr_no_capture(value, visible_locals, outer_locals)?;
+                for field in fields {
+                    visible_locals.insert(field.clone());
+                }
+            }
             AstStmt::Const { name, value, .. } => {
                 validate_lambda_expr_no_capture(value, visible_locals, outer_locals)?;
                 visible_locals.insert(name.clone());

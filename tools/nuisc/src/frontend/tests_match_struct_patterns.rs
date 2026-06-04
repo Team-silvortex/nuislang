@@ -159,3 +159,83 @@ fn lowers_nested_struct_match_arms_inside_while() {
         other => panic!("expected while statement after bindings, found {other:?}"),
     }
 }
+
+#[test]
+fn lowers_type_alias_struct_match_arms_inside_while() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type PacketAlias = Packet;
+
+          struct Packet {
+            kind: i64,
+            ready: bool,
+          }
+
+          fn main() -> i64 {
+            let armed: bool = true;
+            let packet: Packet = Packet { kind: 2, ready: true };
+            while 1 == 1 {
+              match packet {
+                PacketAlias { kind: 1 | 2, ready: true } if armed => {
+                  return 7;
+                }
+                _ => {
+                  return 9;
+                }
+              }
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    match &module.functions[0].body[2] {
+        NirStmt::While { body, .. } => match &body[0] {
+            NirStmt::If {
+                condition,
+                then_body,
+                else_body,
+            } => {
+                match condition {
+                    NirExpr::Binary {
+                        op: NirBinaryOp::And,
+                        lhs,
+                        rhs,
+                    } => {
+                        match lhs.as_ref() {
+                            NirExpr::Binary {
+                                op: NirBinaryOp::And,
+                                ..
+                            } => {}
+                            other => panic!(
+                                "expected field conjunction term in aliased struct match condition, found {other:?}"
+                            ),
+                        }
+                        assert!(matches!(
+                            rhs.as_ref(),
+                            NirExpr::Bool(true) | NirExpr::Var(_)
+                        ));
+                    }
+                    other => panic!(
+                        "expected `and` condition for guarded aliased struct match arm, found {other:?}"
+                    ),
+                }
+                assert!(matches!(
+                    then_body.as_slice(),
+                    [NirStmt::Return(Some(NirExpr::Int(7)))]
+                ));
+                assert!(matches!(
+                    else_body.as_slice(),
+                    [NirStmt::Return(Some(NirExpr::Int(9)))]
+                ));
+            }
+            other => {
+                panic!("expected lowered aliased struct match if in while body, found {other:?}")
+            }
+        },
+        other => panic!("expected while statement after bindings, found {other:?}"),
+    }
+}

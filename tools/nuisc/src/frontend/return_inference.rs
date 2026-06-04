@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use nuis_semantics::model::{AstExpr, AstFunction, AstImplDef, AstStmt, AstStructDef, AstTypeRef};
 
-use super::{ast_named_type, infer_ast_expr_type, lower_type_ref};
+use super::{ast_named_type, infer_ast_expr_type, lower_type_ref, resolve_ast_type_ref_aliases};
 
 pub(super) fn infer_missing_function_return_type(
     function: &AstFunction,
@@ -78,6 +78,11 @@ fn collect_inferred_return_types_from_block(
                 if let Some(inferred_ty) = inferred {
                     env.insert(name.clone(), inferred_ty);
                 }
+            }
+            AstStmt::DestructureLet {
+                type_ref, fields, ..
+            } => {
+                bind_destructure_fields(type_ref, fields, env, struct_table)?;
             }
             AstStmt::Const { name, ty, .. } => {
                 if let Some(ty) = ty.clone() {
@@ -174,4 +179,30 @@ fn collect_inferred_return_types_from_block(
         }
     }
     Ok(false)
+}
+
+fn bind_destructure_fields(
+    type_ref: &AstTypeRef,
+    fields: &[String],
+    env: &mut BTreeMap<String, AstTypeRef>,
+    struct_table: &BTreeMap<String, AstStructDef>,
+) -> Result<(), String> {
+    let resolved = resolve_ast_type_ref_aliases(type_ref, &BTreeMap::new())?;
+    let Some(struct_def) = struct_table.get(&resolved.name) else {
+        return Ok(());
+    };
+    for field in fields {
+        let Some(struct_field) = struct_def
+            .fields
+            .iter()
+            .find(|candidate| candidate.name == *field)
+        else {
+            return Err(format!(
+                "type `{}` has no field `{}` for destructuring let",
+                resolved.name, field
+            ));
+        };
+        env.insert(field.clone(), struct_field.ty.clone());
+    }
+    Ok(())
 }
