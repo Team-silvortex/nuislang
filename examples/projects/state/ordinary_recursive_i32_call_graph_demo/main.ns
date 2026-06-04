@@ -1,0 +1,27 @@
+mod cpu Main {
+  fn step(value: i32) -> i32 {
+    return value - i32_from_i64(1);
+  }
+
+  fn odd(value: i32) -> i32 {
+    if value == i32_from_i64(0) {
+      return i32_from_i64(0);
+    }
+    return even(step(value));
+  }
+
+  fn even(value: i32) -> i32 {
+    if value == i32_from_i64(0) {
+      return i32_from_i64(1);
+    }
+    return odd(step(value));
+  }
+
+  fn main() -> i64 {
+    let result: i32 = even(i32_from_i64(4));
+    if result == i32_from_i64(1) {
+      return 7;
+    }
+    return 9;
+  }
+}

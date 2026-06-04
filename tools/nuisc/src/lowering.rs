@@ -330,6 +330,9 @@ mod tests_branch_helpers;
 #[path = "lowering/tests_branch_summaries.rs"]
 mod tests_branch_summaries;
 #[cfg(test)]
+#[path = "lowering/tests_direct_calls.rs"]
+mod tests_direct_calls;
+#[cfg(test)]
 #[path = "lowering/tests_kernel_tensor.rs"]
 mod tests_kernel_tensor;
 #[cfg(test)]

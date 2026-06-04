@@ -1,0 +1,33 @@
+mod cpu Main {
+  fn is_zero(value: i32) -> bool {
+    if value == i32_from_i64(0) {
+      return true;
+    }
+    return false;
+  }
+
+  fn step(value: i32) -> i32 {
+    return value - i32_from_i64(1);
+  }
+
+  fn odd(value: i32) -> bool {
+    if is_zero(value) == true {
+      return false;
+    }
+    return even(step(value));
+  }
+
+  fn even(value: i32) -> bool {
+    if is_zero(value) == true {
+      return true;
+    }
+    return odd(step(value));
+  }
+
+  fn main() -> i64 {
+    if even(i32_from_i64(4)) == true {
+      return 7;
+    }
+    return 9;
+  }
+}

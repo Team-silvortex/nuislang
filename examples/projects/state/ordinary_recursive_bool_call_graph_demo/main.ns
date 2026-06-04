@@ -1,0 +1,29 @@
+mod cpu Main {
+  fn flip(flag: bool) -> bool {
+    if flag == true {
+      return false;
+    }
+    return true;
+  }
+
+  fn odd(flag: bool) -> bool {
+    if flag == true {
+      return false;
+    }
+    return even(flip(flag));
+  }
+
+  fn even(flag: bool) -> bool {
+    if flag == true {
+      return true;
+    }
+    return odd(flip(flag));
+  }
+
+  fn main() -> i64 {
+    if even(false) == true {
+      return 7;
+    }
+    return 9;
+  }
+}

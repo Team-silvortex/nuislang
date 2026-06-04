@@ -1,0 +1,2 @@
+name = "ordinary_recursive_mixed_call_graph_demo"
+entry = "main.ns"

@@ -287,6 +287,99 @@ fn cpu_param_binding(kind: CpuCallScalarKind, index: usize) -> LlvmValueRef {
     }
 }
 
+fn emit_typed_return_from_value(
+    body: &mut Vec<String>,
+    next_reg: &mut usize,
+    function_return_kind: CpuCallScalarKind,
+    return_value: &LlvmValueRef,
+) -> bool {
+    match function_return_kind {
+        CpuCallScalarKind::Bool => match return_value {
+            LlvmValueRef::Bool { i1, .. } => {
+                body.push(format!("  ret i1 {i1}"));
+                true
+            }
+            LlvmValueRef::I64(value) => {
+                let as_bool = fresh_reg(next_reg);
+                body.push(format!("  {as_bool} = icmp ne i64 {value}, 0"));
+                body.push(format!("  ret i1 {as_bool}"));
+                true
+            }
+            _ => false,
+        },
+        CpuCallScalarKind::I32 => match return_value {
+            LlvmValueRef::I32(value) => {
+                body.push(format!("  ret i32 {value}"));
+                true
+            }
+            LlvmValueRef::I64(value) => {
+                let as_i32 = fresh_reg(next_reg);
+                body.push(format!("  {as_i32} = trunc i64 {value} to i32"));
+                body.push(format!("  ret i32 {as_i32}"));
+                true
+            }
+            _ => false,
+        },
+        CpuCallScalarKind::I64 => {
+            if let Some(returned) = coerce_to_i64(return_value, body, next_reg) {
+                body.push(format!("  ret i64 {returned}"));
+                true
+            } else {
+                false
+            }
+        }
+    }
+}
+
+fn can_emit_typed_return_from_value(
+    function_return_kind: CpuCallScalarKind,
+    return_value: &LlvmValueRef,
+) -> bool {
+    match function_return_kind {
+        CpuCallScalarKind::Bool => {
+            matches!(
+                return_value,
+                LlvmValueRef::Bool { .. } | LlvmValueRef::I64(_)
+            )
+        }
+        CpuCallScalarKind::I32 => {
+            matches!(return_value, LlvmValueRef::I32(_) | LlvmValueRef::I64(_))
+        }
+        CpuCallScalarKind::I64 => matches!(
+            return_value,
+            LlvmValueRef::I64(_)
+                | LlvmValueRef::TextHandle { .. }
+                | LlvmValueRef::I32(_)
+                | LlvmValueRef::Bool { .. }
+                | LlvmValueRef::F32(_)
+                | LlvmValueRef::F64(_)
+        ),
+    }
+}
+
+fn emit_typed_return_from_last_value(
+    body: &mut Vec<String>,
+    next_reg: &mut usize,
+    function_return_kind: CpuCallScalarKind,
+    last_value: &str,
+) {
+    match function_return_kind {
+        CpuCallScalarKind::Bool => {
+            let as_bool = fresh_reg(next_reg);
+            body.push(format!("  {as_bool} = icmp ne i64 {last_value}, 0"));
+            body.push(format!("  ret i1 {as_bool}"));
+        }
+        CpuCallScalarKind::I32 => {
+            let as_i32 = fresh_reg(next_reg);
+            body.push(format!("  {as_i32} = trunc i64 {last_value} to i32"));
+            body.push(format!("  ret i32 {as_i32}"));
+        }
+        CpuCallScalarKind::I64 => {
+            body.push(format!("  ret i64 {last_value}"));
+        }
+    }
+}
+
 fn emit_cpu_function(
     module: &YirModule,
     resources: &BTreeMap<String, &Resource>,
@@ -419,20 +512,31 @@ fn emit_cpu_function(
                 *last_cpu_value = Some(reg);
             }
             ("cpu", "add") => {
-                let (Some(lhs), Some(rhs)) = (
+                if let (Some(lhs), Some(rhs)) = (
                     get_i64(&registers, &node.op.args[0]),
                     get_i64(&registers, &node.op.args[1]),
-                ) else {
+                ) {
+                    let reg = fresh_reg(&mut next_reg);
+                    body.push(format!("  {reg} = add i64 {lhs}, {rhs}"));
+                    registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                    *last_cpu_value = Some(reg);
+                } else if let (Some(lhs), Some(rhs)) = (
+                    get_i32(&registers, &node.op.args[0]),
+                    get_i32(&registers, &node.op.args[1]),
+                ) {
+                    let reg = fresh_reg(&mut next_reg);
+                    body.push(format!("  {reg} = add i32 {lhs}, {rhs}"));
+                    registers.insert(node.name.clone(), LlvmValueRef::I32(reg.clone()));
+                    let widened = fresh_reg(&mut next_reg);
+                    body.push(format!("  {widened} = sext i32 {reg} to i64"));
+                    *last_cpu_value = Some(widened);
+                } else {
                     body.push(format!(
                         "  ; deferred lowering for cpu.add `{}` because one or more inputs are outside the current CPU LLVM slice",
                         node.name
                     ));
                     continue;
-                };
-                let reg = fresh_reg(&mut next_reg);
-                body.push(format!("  {reg} = add i64 {lhs}, {rhs}"));
-                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                *last_cpu_value = Some(reg);
+                }
             }
             ("cpu", "add_i32") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -895,20 +999,31 @@ fn emit_cpu_function(
                 }
             }
             ("cpu", "sub") => {
-                let (Some(lhs), Some(rhs)) = (
+                if let (Some(lhs), Some(rhs)) = (
                     get_i64(&registers, &node.op.args[0]),
                     get_i64(&registers, &node.op.args[1]),
-                ) else {
+                ) {
+                    let reg = fresh_reg(&mut next_reg);
+                    body.push(format!("  {reg} = sub i64 {lhs}, {rhs}"));
+                    registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                    *last_cpu_value = Some(reg);
+                } else if let (Some(lhs), Some(rhs)) = (
+                    get_i32(&registers, &node.op.args[0]),
+                    get_i32(&registers, &node.op.args[1]),
+                ) {
+                    let reg = fresh_reg(&mut next_reg);
+                    body.push(format!("  {reg} = sub i32 {lhs}, {rhs}"));
+                    registers.insert(node.name.clone(), LlvmValueRef::I32(reg.clone()));
+                    let widened = fresh_reg(&mut next_reg);
+                    body.push(format!("  {widened} = sext i32 {reg} to i64"));
+                    *last_cpu_value = Some(widened);
+                } else {
                     body.push(format!(
                         "  ; deferred lowering for cpu.sub `{}` because one or more inputs are outside the current CPU LLVM slice",
                         node.name
                     ));
                     continue;
-                };
-                let reg = fresh_reg(&mut next_reg);
-                body.push(format!("  {reg} = sub i64 {lhs}, {rhs}"));
-                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                *last_cpu_value = Some(reg);
+                }
             }
             ("cpu", "sub_i32") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -965,20 +1080,31 @@ fn emit_cpu_function(
                 *last_cpu_value = Some(widened);
             }
             ("cpu", "mul") => {
-                let (Some(lhs), Some(rhs)) = (
+                if let (Some(lhs), Some(rhs)) = (
                     get_i64(&registers, &node.op.args[0]),
                     get_i64(&registers, &node.op.args[1]),
-                ) else {
+                ) {
+                    let reg = fresh_reg(&mut next_reg);
+                    body.push(format!("  {reg} = mul i64 {lhs}, {rhs}"));
+                    registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                    *last_cpu_value = Some(reg);
+                } else if let (Some(lhs), Some(rhs)) = (
+                    get_i32(&registers, &node.op.args[0]),
+                    get_i32(&registers, &node.op.args[1]),
+                ) {
+                    let reg = fresh_reg(&mut next_reg);
+                    body.push(format!("  {reg} = mul i32 {lhs}, {rhs}"));
+                    registers.insert(node.name.clone(), LlvmValueRef::I32(reg.clone()));
+                    let widened = fresh_reg(&mut next_reg);
+                    body.push(format!("  {widened} = sext i32 {reg} to i64"));
+                    *last_cpu_value = Some(widened);
+                } else {
                     body.push(format!(
                         "  ; deferred lowering for cpu.mul `{}` because one or more inputs are outside the current CPU LLVM slice",
                         node.name
                     ));
                     continue;
-                };
-                let reg = fresh_reg(&mut next_reg);
-                body.push(format!("  {reg} = mul i64 {lhs}, {rhs}"));
-                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                *last_cpu_value = Some(reg);
+                }
             }
             ("cpu", "mul_i32") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -1035,20 +1161,31 @@ fn emit_cpu_function(
                 *last_cpu_value = Some(widened);
             }
             ("cpu", "div") => {
-                let (Some(lhs), Some(rhs)) = (
+                if let (Some(lhs), Some(rhs)) = (
                     get_i64(&registers, &node.op.args[0]),
                     get_i64(&registers, &node.op.args[1]),
-                ) else {
+                ) {
+                    let reg = fresh_reg(&mut next_reg);
+                    body.push(format!("  {reg} = sdiv i64 {lhs}, {rhs}"));
+                    registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                    *last_cpu_value = Some(reg);
+                } else if let (Some(lhs), Some(rhs)) = (
+                    get_i32(&registers, &node.op.args[0]),
+                    get_i32(&registers, &node.op.args[1]),
+                ) {
+                    let reg = fresh_reg(&mut next_reg);
+                    body.push(format!("  {reg} = sdiv i32 {lhs}, {rhs}"));
+                    registers.insert(node.name.clone(), LlvmValueRef::I32(reg.clone()));
+                    let widened = fresh_reg(&mut next_reg);
+                    body.push(format!("  {widened} = sext i32 {reg} to i64"));
+                    *last_cpu_value = Some(widened);
+                } else {
                     body.push(format!(
                         "  ; deferred lowering for cpu.div `{}` because one or more inputs are outside the current CPU LLVM slice",
                         node.name
                     ));
                     continue;
-                };
-                let reg = fresh_reg(&mut next_reg);
-                body.push(format!("  {reg} = sdiv i64 {lhs}, {rhs}"));
-                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                *last_cpu_value = Some(reg);
+                }
             }
             ("cpu", "div_i32") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -1105,20 +1242,31 @@ fn emit_cpu_function(
                 *last_cpu_value = Some(widened);
             }
             ("cpu", "rem") => {
-                let (Some(lhs), Some(rhs)) = (
+                if let (Some(lhs), Some(rhs)) = (
                     get_i64(&registers, &node.op.args[0]),
                     get_i64(&registers, &node.op.args[1]),
-                ) else {
+                ) {
+                    let reg = fresh_reg(&mut next_reg);
+                    body.push(format!("  {reg} = srem i64 {lhs}, {rhs}"));
+                    registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                    *last_cpu_value = Some(reg);
+                } else if let (Some(lhs), Some(rhs)) = (
+                    get_i32(&registers, &node.op.args[0]),
+                    get_i32(&registers, &node.op.args[1]),
+                ) {
+                    let reg = fresh_reg(&mut next_reg);
+                    body.push(format!("  {reg} = srem i32 {lhs}, {rhs}"));
+                    registers.insert(node.name.clone(), LlvmValueRef::I32(reg.clone()));
+                    let widened = fresh_reg(&mut next_reg);
+                    body.push(format!("  {widened} = sext i32 {reg} to i64"));
+                    *last_cpu_value = Some(widened);
+                } else {
                     body.push(format!(
                         "  ; deferred lowering for cpu.rem `{}` because one or more inputs are outside the current CPU LLVM slice",
                         node.name
                     ));
                     continue;
-                };
-                let reg = fresh_reg(&mut next_reg);
-                body.push(format!("  {reg} = srem i64 {lhs}, {rhs}"));
-                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                *last_cpu_value = Some(reg);
+                }
             }
             ("cpu", "and") => {
                 let (Some(lhs), Some(rhs)) = (
@@ -4375,13 +4523,14 @@ fn emit_cpu_function(
                     ));
                     continue;
                 };
-                let Some(returned) = coerce_to_i64(&return_value, &mut body, &mut next_reg) else {
+                if !can_emit_typed_return_from_value(function_return_kind, &return_value) {
                     body.push(format!(
-                        "  ; deferred lowering for cpu.guard_print_return `{}` because its return value is not coercible to i64",
-                        node.name
+                        "  ; deferred lowering for cpu.guard_print_return `{}` because its return value is not coercible to {}",
+                        node.name,
+                        cpu_scalar_kind_llvm_type(function_return_kind)
                     ));
                     continue;
-                };
+                }
                 let cond_bool = fresh_reg(&mut next_reg);
                 body.push(format!("  {cond_bool} = icmp ne i64 {cond}, 0"));
                 let then_label = fresh_block(&mut next_block, "guard_print_return_then");
@@ -4401,7 +4550,19 @@ fn emit_cpu_function(
                         node.name
                     ));
                 }
-                body.push(format!("  ret i64 {returned}"));
+                if !emit_typed_return_from_value(
+                    &mut body,
+                    &mut next_reg,
+                    function_return_kind,
+                    &return_value,
+                ) {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.guard_print_return `{}` because its return value is not coercible to {}",
+                        node.name,
+                        cpu_scalar_kind_llvm_type(function_return_kind)
+                    ));
+                    continue;
+                }
                 body.push(format!("{cont_label}:"));
             }
             ("cpu", "branch_print_return") => {
@@ -4437,24 +4598,22 @@ fn emit_cpu_function(
                     ));
                     continue;
                 };
-                let Some(then_returned) =
-                    coerce_to_i64(&then_return_value, &mut body, &mut next_reg)
-                else {
+                if !can_emit_typed_return_from_value(function_return_kind, &then_return_value) {
                     body.push(format!(
-                        "  ; deferred lowering for cpu.branch_print_return `{}` because its then-return value is not coercible to i64",
-                        node.name
+                        "  ; deferred lowering for cpu.branch_print_return `{}` because its then-return value is not coercible to {}",
+                        node.name,
+                        cpu_scalar_kind_llvm_type(function_return_kind)
                     ));
                     continue;
-                };
-                let Some(else_returned) =
-                    coerce_to_i64(&else_return_value, &mut body, &mut next_reg)
-                else {
+                }
+                if !can_emit_typed_return_from_value(function_return_kind, &else_return_value) {
                     body.push(format!(
-                        "  ; deferred lowering for cpu.branch_print_return `{}` because its else-return value is not coercible to i64",
-                        node.name
+                        "  ; deferred lowering for cpu.branch_print_return `{}` because its else-return value is not coercible to {}",
+                        node.name,
+                        cpu_scalar_kind_llvm_type(function_return_kind)
                     ));
                     continue;
-                };
+                }
                 let cond_bool = fresh_reg(&mut next_reg);
                 body.push(format!("  {cond_bool} = icmp ne i64 {cond}, 0"));
                 let then_label = fresh_block(&mut next_block, "branch_print_return_then");
@@ -4476,7 +4635,19 @@ fn emit_cpu_function(
                         node.name
                     ));
                 }
-                body.push(format!("  ret i64 {then_returned}"));
+                if !emit_typed_return_from_value(
+                    &mut body,
+                    &mut next_reg,
+                    function_return_kind,
+                    &then_return_value,
+                ) {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.branch_print_return `{}` because its then-return value is not coercible to {}",
+                        node.name,
+                        cpu_scalar_kind_llvm_type(function_return_kind)
+                    ));
+                    continue;
+                }
                 body.push(format!("{else_label}:"));
                 if let Some(input) = coerce_to_cstr(&else_print_value, &mut body, &mut next_reg) {
                     let print_reg = fresh_reg(&mut next_reg);
@@ -4491,7 +4662,19 @@ fn emit_cpu_function(
                         node.name
                     ));
                 }
-                body.push(format!("  ret i64 {else_returned}"));
+                if !emit_typed_return_from_value(
+                    &mut body,
+                    &mut next_reg,
+                    function_return_kind,
+                    &else_return_value,
+                ) {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.branch_print_return `{}` because its else-return value is not coercible to {}",
+                        node.name,
+                        cpu_scalar_kind_llvm_type(function_return_kind)
+                    ));
+                    continue;
+                }
                 state.ends_with_terminal_return = true;
             }
             _ => {
@@ -4510,7 +4693,14 @@ fn emit_cpu_function(
     let body = if state.ends_with_terminal_return {
         state.body.join("\n")
     } else {
-        format!("{}\n  ret i64 {}", state.body.join("\n"), ret)
+        let mut body = state.body;
+        emit_typed_return_from_last_value(
+            &mut body,
+            &mut state.next_reg,
+            function_return_kind,
+            &ret,
+        );
+        body.join("\n")
     };
 
     Ok(EmittedCpuFunction {
@@ -5039,319 +5229,4 @@ fn topological_order(module: &YirModule) -> Result<Vec<String>, String> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::emit_module;
-    use yir_core::{Edge, EdgeKind, Node, Operation, Resource, ResourceKind, YirModule};
-
-    #[test]
-    fn emits_dynamic_declare_for_cpu_extern_calls() {
-        let mut module = YirModule::new("0.1");
-        module.resources.push(Resource {
-            name: "cpu0".to_owned(),
-            kind: ResourceKind::parse("cpu.main"),
-        });
-        module.nodes.push(Node {
-            name: "arg0".to_owned(),
-            resource: "cpu0".to_owned(),
-            op: Operation::parse("cpu.const_i64", vec!["100000".to_owned()]).unwrap(),
-        });
-        module.nodes.push(Node {
-            name: "sleep_call".to_owned(),
-            resource: "cpu0".to_owned(),
-            op: Operation::parse(
-                "cpu.extern_call_i64",
-                vec!["c".to_owned(), "usleep".to_owned(), "arg0".to_owned()],
-            )
-            .unwrap(),
-        });
-        module.edges.push(Edge {
-            kind: EdgeKind::Dep,
-            from: "arg0".to_owned(),
-            to: "sleep_call".to_owned(),
-        });
-
-        let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
-        assert!(llvm_ir.contains("declare i64 @usleep(i64)"));
-        assert!(llvm_ir.contains("call i64 @usleep(i64"));
-    }
-
-    #[test]
-    fn emits_three_arg_cpu_extern_calls() {
-        let mut module = YirModule::new("0.1");
-        module.resources.push(Resource {
-            name: "cpu0".to_owned(),
-            kind: ResourceKind::parse("cpu.main"),
-        });
-        for (name, value) in [("arg0", "1"), ("arg1", "2"), ("arg2", "3")] {
-            module.nodes.push(Node {
-                name: name.to_owned(),
-                resource: "cpu0".to_owned(),
-                op: Operation::parse("cpu.const_i64", vec![value.to_owned()]).unwrap(),
-            });
-        }
-        module.nodes.push(Node {
-            name: "spawn_call".to_owned(),
-            resource: "cpu0".to_owned(),
-            op: Operation::parse(
-                "cpu.extern_call_i64",
-                vec![
-                    "c".to_owned(),
-                    "host_subprocess_spawn".to_owned(),
-                    "arg0".to_owned(),
-                    "arg1".to_owned(),
-                    "arg2".to_owned(),
-                ],
-            )
-            .unwrap(),
-        });
-        for from in ["arg0", "arg1", "arg2"] {
-            module.edges.push(Edge {
-                kind: EdgeKind::Dep,
-                from: from.to_owned(),
-                to: "spawn_call".to_owned(),
-            });
-        }
-
-        let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
-        assert!(llvm_ir.contains("declare i64 @host_subprocess_spawn(i64, i64, i64)"));
-        assert!(llvm_ir.contains("call i64 @host_subprocess_spawn(i64"));
-    }
-
-    #[test]
-    fn emits_helper_function_lanes_and_cpu_call_i64() {
-        let mut module = YirModule::new("0.1");
-        module.resources.push(Resource {
-            name: "cpu0".to_owned(),
-            kind: ResourceKind::parse("cpu.main"),
-        });
-        module.nodes.push(Node {
-            name: "seed".to_owned(),
-            resource: "cpu0".to_owned(),
-            op: Operation::parse("cpu.const_i64", vec!["6".to_owned()]).unwrap(),
-        });
-        module.nodes.push(Node {
-            name: "invoke".to_owned(),
-            resource: "cpu0".to_owned(),
-            op: Operation::parse("cpu.call_i64", vec!["inc".to_owned(), "seed".to_owned()])
-                .unwrap(),
-        });
-        module.edges.push(Edge {
-            kind: EdgeKind::Dep,
-            from: "seed".to_owned(),
-            to: "invoke".to_owned(),
-        });
-
-        module.nodes.push(Node {
-            name: "inc_param_0".to_owned(),
-            resource: "cpu0".to_owned(),
-            op: Operation::parse("cpu.param_i64", vec!["0".to_owned()]).unwrap(),
-        });
-        module.nodes.push(Node {
-            name: "inc_one".to_owned(),
-            resource: "cpu0".to_owned(),
-            op: Operation::parse("cpu.const_i64", vec!["1".to_owned()]).unwrap(),
-        });
-        module.nodes.push(Node {
-            name: "inc_sum".to_owned(),
-            resource: "cpu0".to_owned(),
-            op: Operation::parse(
-                "cpu.add",
-                vec!["inc_param_0".to_owned(), "inc_one".to_owned()],
-            )
-            .unwrap(),
-        });
-        module.nodes.push(Node {
-            name: "inc_ret".to_owned(),
-            resource: "cpu0".to_owned(),
-            op: Operation::parse("cpu.return_i64", vec!["inc_sum".to_owned()]).unwrap(),
-        });
-        module.edges.push(Edge {
-            kind: EdgeKind::Dep,
-            from: "inc_param_0".to_owned(),
-            to: "inc_sum".to_owned(),
-        });
-        module.edges.push(Edge {
-            kind: EdgeKind::Dep,
-            from: "inc_one".to_owned(),
-            to: "inc_sum".to_owned(),
-        });
-        module.edges.push(Edge {
-            kind: EdgeKind::Dep,
-            from: "inc_sum".to_owned(),
-            to: "inc_ret".to_owned(),
-        });
-        for name in ["inc_param_0", "inc_one", "inc_sum", "inc_ret"] {
-            module
-                .node_lanes
-                .insert(name.to_owned(), "fn:inc".to_owned());
-        }
-
-        let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
-        assert!(llvm_ir.contains("define i64 @nuis_fn_inc(i64 %arg0)"));
-        assert!(llvm_ir.contains("call i64 @nuis_fn_inc(i64"));
-    }
-
-    #[test]
-    fn emits_guard_return_as_real_branch() {
-        let mut module = YirModule::new("0.1");
-        module.resources.push(Resource {
-            name: "cpu0".to_owned(),
-            kind: ResourceKind::parse("cpu.main"),
-        });
-        module.nodes.push(Node {
-            name: "cond".to_owned(),
-            resource: "cpu0".to_owned(),
-            op: Operation::parse("cpu.const_bool", vec!["true".to_owned()]).unwrap(),
-        });
-        module.nodes.push(Node {
-            name: "early".to_owned(),
-            resource: "cpu0".to_owned(),
-            op: Operation::parse("cpu.const_i64", vec!["64".to_owned()]).unwrap(),
-        });
-        module.nodes.push(Node {
-            name: "guard".to_owned(),
-            resource: "cpu0".to_owned(),
-            op: Operation::parse(
-                "cpu.guard_return",
-                vec!["cond".to_owned(), "early".to_owned()],
-            )
-            .unwrap(),
-        });
-        module.nodes.push(Node {
-            name: "later".to_owned(),
-            resource: "cpu0".to_owned(),
-            op: Operation::parse("cpu.const_i64", vec!["7".to_owned()]).unwrap(),
-        });
-        for from in ["cond", "early"] {
-            module.edges.push(Edge {
-                kind: EdgeKind::Dep,
-                from: from.to_owned(),
-                to: "guard".to_owned(),
-            });
-        }
-
-        let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
-        assert!(llvm_ir.contains("br i1"));
-        assert!(llvm_ir.contains("guard_return_then."));
-        assert!(llvm_ir.contains("ret i64 %"));
-        assert!(llvm_ir.contains("guard_return_cont."));
-        assert_eq!(llvm_ir.matches("ret i64 ").count(), 2);
-        assert!(
-            llvm_ir.find("guard_return_cont.").unwrap() < llvm_ir.find("= add i64 0, 7").unwrap()
-        );
-    }
-
-    #[test]
-    fn emits_guard_print_return_as_real_branch() {
-        let mut module = YirModule::new("0.1");
-        module.resources.push(Resource {
-            name: "cpu0".to_owned(),
-            kind: ResourceKind::parse("cpu.main"),
-        });
-        module.nodes.push(Node {
-            name: "cond".to_owned(),
-            resource: "cpu0".to_owned(),
-            op: Operation::parse("cpu.const_bool", vec!["true".to_owned()]).unwrap(),
-        });
-        module.nodes.push(Node {
-            name: "msg".to_owned(),
-            resource: "cpu0".to_owned(),
-            op: Operation::parse("cpu.text", vec!["usage".to_owned()]).unwrap(),
-        });
-        module.nodes.push(Node {
-            name: "early".to_owned(),
-            resource: "cpu0".to_owned(),
-            op: Operation::parse("cpu.const_i64", vec!["64".to_owned()]).unwrap(),
-        });
-        module.nodes.push(Node {
-            name: "guard".to_owned(),
-            resource: "cpu0".to_owned(),
-            op: Operation::parse(
-                "cpu.guard_print_return",
-                vec!["cond".to_owned(), "msg".to_owned(), "early".to_owned()],
-            )
-            .unwrap(),
-        });
-        module.nodes.push(Node {
-            name: "later".to_owned(),
-            resource: "cpu0".to_owned(),
-            op: Operation::parse("cpu.const_i64", vec!["7".to_owned()]).unwrap(),
-        });
-        for from in ["cond", "msg", "early"] {
-            module.edges.push(Edge {
-                kind: EdgeKind::Dep,
-                from: from.to_owned(),
-                to: "guard".to_owned(),
-            });
-        }
-
-        let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
-        assert!(llvm_ir.contains("br i1"));
-        assert!(llvm_ir.contains("guard_print_return_then."));
-        assert!(llvm_ir.contains("call i32 @puts(ptr"));
-        assert_eq!(llvm_ir.matches("ret i64 ").count(), 2);
-        assert!(llvm_ir.contains("guard_print_return_cont."));
-    }
-
-    #[test]
-    fn emits_branch_print_return_as_real_two_way_branch() {
-        let mut module = YirModule::new("0.1");
-        module.resources.push(Resource {
-            name: "cpu0".to_owned(),
-            kind: ResourceKind::parse("cpu.main"),
-        });
-        module.nodes.push(Node {
-            name: "cond".to_owned(),
-            resource: "cpu0".to_owned(),
-            op: Operation::parse("cpu.const_bool", vec!["true".to_owned()]).unwrap(),
-        });
-        module.nodes.push(Node {
-            name: "then_msg".to_owned(),
-            resource: "cpu0".to_owned(),
-            op: Operation::parse("cpu.text", vec!["ok".to_owned()]).unwrap(),
-        });
-        module.nodes.push(Node {
-            name: "then_ret".to_owned(),
-            resource: "cpu0".to_owned(),
-            op: Operation::parse("cpu.const_i64", vec!["0".to_owned()]).unwrap(),
-        });
-        module.nodes.push(Node {
-            name: "else_msg".to_owned(),
-            resource: "cpu0".to_owned(),
-            op: Operation::parse("cpu.text", vec!["fail".to_owned()]).unwrap(),
-        });
-        module.nodes.push(Node {
-            name: "else_ret".to_owned(),
-            resource: "cpu0".to_owned(),
-            op: Operation::parse("cpu.const_i64", vec!["64".to_owned()]).unwrap(),
-        });
-        module.nodes.push(Node {
-            name: "branch".to_owned(),
-            resource: "cpu0".to_owned(),
-            op: Operation::parse(
-                "cpu.branch_print_return",
-                vec![
-                    "cond".to_owned(),
-                    "then_msg".to_owned(),
-                    "then_ret".to_owned(),
-                    "else_msg".to_owned(),
-                    "else_ret".to_owned(),
-                ],
-            )
-            .unwrap(),
-        });
-        for from in ["cond", "then_msg", "then_ret", "else_msg", "else_ret"] {
-            module.edges.push(Edge {
-                kind: EdgeKind::Dep,
-                from: from.to_owned(),
-                to: "branch".to_owned(),
-            });
-        }
-
-        let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
-        assert!(llvm_ir.contains("branch_print_return_then."));
-        assert!(llvm_ir.contains("branch_print_return_else."));
-        assert!(llvm_ir.matches("call i32 @puts(ptr").count() >= 2);
-        assert!(llvm_ir.matches("ret i64 ").count() >= 2);
-    }
-}
+mod tests;

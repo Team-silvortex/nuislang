@@ -1,0 +1,2 @@
+name = "ordinary_recursive_i32_call_graph_demo"
+entry = "main.ns"
