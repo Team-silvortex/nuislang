@@ -10,7 +10,9 @@ mod graph_states;
 mod meta_accessors;
 mod meta_packets;
 mod meta_states;
+mod packet_accessors;
 mod packet_helpers;
+mod panel_parts;
 mod render_accessors;
 mod render_packets;
 mod render_states;
@@ -111,6 +113,32 @@ pub(super) fn lower_nova_builtin_call(
         struct_table,
     )? {
         return Ok(Some(meta_accessor_builtin));
+    }
+    if let Some(panel_parts_builtin) = panel_parts::lower_nova_panel_parts_builtin_call(
+        callee,
+        args,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+    )? {
+        return Ok(Some(panel_parts_builtin));
+    }
+    if let Some(packet_accessor_builtin) =
+        packet_accessors::lower_nova_packet_accessor_builtin_call(
+            callee,
+            args,
+            current_domain,
+            current_function_is_async,
+            bindings,
+            module_consts,
+            signatures,
+            struct_table,
+        )?
+    {
+        return Ok(Some(packet_accessor_builtin));
     }
     if let Some(render_packet_builtin) = render_packets::lower_nova_render_packet_builtin_call(
         callee,
