@@ -1,5 +1,6 @@
 mod blocks;
 mod exprs;
+mod hoists;
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -14,6 +15,7 @@ pub(super) fn rewrite_generic_calls_in_function(
     module_const_env: &BTreeMap<String, AstTypeRef>,
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
     generic_templates: &BTreeMap<String, AstFunction>,
+    signatures: &BTreeMap<String, FunctionSignature>,
     impl_lookup: &BTreeMap<(String, String), AstImplDef>,
     struct_table: &BTreeMap<String, AstStructDef>,
     function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
@@ -31,6 +33,7 @@ pub(super) fn rewrite_generic_calls_in_function(
         &mut env,
         visible_type_aliases,
         generic_templates,
+        signatures,
         impl_lookup,
         struct_table,
         function_return_types,

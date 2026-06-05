@@ -354,3 +354,82 @@ fn lowers_named_function_passed_to_named_fn2_function() {
                 && matches!(args.as_slice(), [NirExpr::Int(6), NirExpr::Int(1)])
     ));
 }
+
+#[test]
+fn lowers_no_capture_lambda_passed_to_named_fn3_function() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn apply3(x: i64, y: i64, z: i64, f: Fn3<i64, i64, i64, i64>) -> i64 {
+            return f(x, y, z);
+          }
+
+          fn main() -> i64 {
+            return apply3(6, 1, 2, |x: i64, y: i64, z: i64| -> i64 { return x + y + z; });
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let lambda = module
+        .functions
+        .iter()
+        .find(|function| function.name.starts_with("__lambda_main_"))
+        .expect("expected synthesized lambda function");
+    let specialized = module
+        .functions
+        .iter()
+        .find(|function| function.name.starts_with("__hof_apply3_"))
+        .expect("expected synthesized higher-order specialization");
+    assert_eq!(specialized.params.len(), 3);
+    assert_eq!(specialized.params[0].name, "x");
+    assert_eq!(specialized.params[1].name, "y");
+    assert_eq!(specialized.params[2].name, "z");
+    assert!(matches!(
+        specialized.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee == &lambda.name
+                && matches!(args.as_slice(), [NirExpr::Var(x), NirExpr::Var(y), NirExpr::Var(z)] if x == "x" && y == "y" && z == "z")
+    ));
+}
+
+#[test]
+fn lowers_named_function_passed_to_named_fn3_function() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn plus3(x: i64, y: i64, z: i64) -> i64 {
+            return x + y + z;
+          }
+
+          fn apply3(x: i64, y: i64, z: i64, f: Fn3<i64, i64, i64, i64>) -> i64 {
+            return f(x, y, z);
+          }
+
+          fn main() -> i64 {
+            return apply3(6, 1, 2, plus3);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let plus3 = module
+        .functions
+        .iter()
+        .find(|function| function.name == "plus3")
+        .expect("expected source function");
+    let specialized = module
+        .functions
+        .iter()
+        .find(|function| function.name.starts_with("__hof_apply3_"))
+        .expect("expected synthesized higher-order specialization");
+    assert_eq!(specialized.params.len(), 3);
+    assert!(matches!(
+        specialized.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee == &plus3.name
+                && matches!(args.as_slice(), [NirExpr::Var(x), NirExpr::Var(y), NirExpr::Var(z)] if x == "x" && y == "y" && z == "z")
+    ));
+}

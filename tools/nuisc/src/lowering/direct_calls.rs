@@ -402,8 +402,10 @@ pub(super) fn lower_direct_call_helper_function(
         });
         bindings.insert(param.name.clone(), node_name);
     }
+    let saved_effect_anchor = state.last_effect_anchor.take();
     let returned = lower_function_body(function, state, &mut bindings, false)?
         .ok_or_else(|| format!("function `{}` did not return a value", function.name))?;
+    state.last_effect_anchor = saved_effect_anchor;
     let return_name = format!("__fn_{}_return", function.name);
     let return_instruction = match direct_call_signature_kind(function).ok_or_else(|| {
         format!(

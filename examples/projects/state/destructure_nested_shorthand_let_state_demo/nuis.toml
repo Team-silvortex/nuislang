@@ -1,0 +1,2 @@
+name = "destructure_nested_shorthand_let_state_demo"
+entry = "main.ns"

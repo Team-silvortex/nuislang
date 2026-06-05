@@ -232,12 +232,17 @@ pub struct AstFunction {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AstMatchPattern {
     Wildcard,
+    Bind(String),
     Bool(bool),
     Int(i64),
     IntRangeInclusive(i64, i64),
     Or(Vec<AstMatchPattern>),
-    StructFields {
+    PayloadStruct {
         type_ref: AstTypeRef,
+        payload: Box<AstMatchPattern>,
+    },
+    StructFields {
+        type_ref: Option<AstTypeRef>,
         fields: Vec<(String, AstMatchPattern)>,
     },
 }
@@ -250,10 +255,18 @@ pub struct AstMatchArm {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AstDestructureField {
-    pub field: String,
-    pub binding: String,
+pub enum AstDestructureBinding {
+    Bind(String),
+    Ignore,
+    Nested {
+        type_ref: Option<AstTypeRef>,
+        fields: Vec<AstDestructureField>,
+    },
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[rustfmt::skip]
+pub struct AstDestructureField { pub field: String, pub binding: AstDestructureBinding }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[rustfmt::skip]

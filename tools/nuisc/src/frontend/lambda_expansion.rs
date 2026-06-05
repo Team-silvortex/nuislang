@@ -1,7 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{
-    AstExpr, AstFunction, AstMatchArm, AstModule, AstParam, AstStmt, AstTypeRef, AstVisibility,
+    AstDestructureBinding, AstDestructureField, AstExpr, AstFunction, AstMatchArm, AstModule,
+    AstParam, AstStmt, AstTypeRef, AstVisibility,
 };
 
 use super::lambda_validation::validate_lambda_block_no_capture;
@@ -190,12 +191,11 @@ fn expand_lambda_block(
                     fields: fields.clone(),
                     value: rewritten_value,
                 });
-                for field in fields {
-                    if field.binding == "_" {
-                        continue;
-                    }
-                    aliases.remove(&field.binding);
-                    locals.insert(field.binding.clone());
+                let mut names = Vec::new();
+                collect_destructure_binding_names(fields, &mut names);
+                for name in names {
+                    aliases.remove(&name);
+                    locals.insert(name);
                 }
             }
             AstStmt::Const { name, ty, value } => {
@@ -356,6 +356,18 @@ fn expand_lambda_block(
         }
     }
     Ok(rewritten)
+}
+
+fn collect_destructure_binding_names(fields: &[AstDestructureField], names: &mut Vec<String>) {
+    for field in fields {
+        match &field.binding {
+            AstDestructureBinding::Bind(name) => names.push(name.clone()),
+            AstDestructureBinding::Ignore => {}
+            AstDestructureBinding::Nested { fields, .. } => {
+                collect_destructure_binding_names(fields, names)
+            }
+        }
+    }
 }
 
 fn rewrite_lambda_expr(

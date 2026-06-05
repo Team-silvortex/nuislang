@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use nuis_semantics::model::nir_expr_effect_class;
+use nuis_semantics::model::{AstDestructureBinding, AstDestructureField, NirExpr};
 
 use super::match_lowering::lower_match_stmt_with_async;
 use super::metadata::ModuleConstValue;
@@ -275,35 +276,16 @@ pub(super) fn lower_stmt_sequence_with_async(
         let inferred = infer_nir_expr_type(&lowered, bindings, signatures, struct_table);
         let final_type =
             resolve_declared_or_inferred("destructuring let source", Some(expected), inferred)?;
-        let definition = struct_table.get(&final_type.name).ok_or_else(|| {
-            format!(
-                "destructuring let requires a visible struct type, found `{}`",
-                final_type.render()
-            )
-        })?;
         let mut lowered_stmts = Vec::new();
-        for field in fields {
-            let field_def = definition.field(&field.field).ok_or_else(|| {
-                format!(
-                    "destructuring let `{}` does not have field `{}`",
-                    final_type.render(),
-                    field.field
-                )
-            })?;
-            if field.binding == "_" {
-                continue;
-            }
-            let field_ty = field_def.ty.clone();
-            bindings.insert(field.binding.clone(), field_ty.clone());
-            lowered_stmts.push(NirStmt::Let {
-                name: field.binding.clone(),
-                ty: Some(field_ty),
-                value: nuis_semantics::model::NirExpr::FieldAccess {
-                    base: Box::new(lowered.clone()),
-                    field: field.field.clone(),
-                },
-            });
-        }
+        emit_destructure_bindings(
+            &lowered,
+            &final_type,
+            fields,
+            bindings,
+            type_aliases,
+            struct_table,
+            &mut lowered_stmts,
+        )?;
         return Ok(lowered_stmts);
     }
     Ok(vec![lower_stmt_with_async(
@@ -317,6 +299,75 @@ pub(super) fn lower_stmt_sequence_with_async(
         signatures,
         struct_table,
     )?])
+}
+
+fn emit_destructure_bindings(
+    base: &NirExpr,
+    base_type: &NirTypeRef,
+    fields: &[AstDestructureField],
+    bindings: &mut BTreeMap<String, NirTypeRef>,
+    type_aliases: &BTreeMap<String, AstTypeAlias>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+    lowered_stmts: &mut Vec<NirStmt>,
+) -> Result<(), String> {
+    let definition = struct_table.get(&base_type.name).ok_or_else(|| {
+        format!(
+            "destructuring let requires a visible struct type, found `{}`",
+            base_type.render()
+        )
+    })?;
+    for field in fields {
+        let field_def = definition.field(&field.field).ok_or_else(|| {
+            format!(
+                "destructuring let `{}` does not have field `{}`",
+                base_type.render(),
+                field.field
+            )
+        })?;
+        let field_ty = field_def.ty.clone();
+        let field_expr = NirExpr::FieldAccess {
+            base: Box::new(base.clone()),
+            field: field.field.clone(),
+        };
+        match &field.binding {
+            AstDestructureBinding::Bind(name) => {
+                bindings.insert(name.clone(), field_ty.clone());
+                lowered_stmts.push(NirStmt::Let {
+                    name: name.clone(),
+                    ty: Some(field_ty),
+                    value: field_expr,
+                });
+            }
+            AstDestructureBinding::Ignore => {}
+            AstDestructureBinding::Nested {
+                type_ref,
+                fields: nested_fields,
+            } => {
+                if let Some(type_ref) = type_ref {
+                    let expected = lower_type_ref_with_aliases(type_ref, type_aliases)?;
+                    validate_type_ref(&expected)?;
+                    if expected != field_ty {
+                        return Err(format!(
+                            "nested destructuring field `{}` expects `{}`, found `{}`",
+                            field.field,
+                            expected.render(),
+                            field_ty.render()
+                        ));
+                    }
+                }
+                emit_destructure_bindings(
+                    &field_expr,
+                    &field_ty,
+                    nested_fields,
+                    bindings,
+                    type_aliases,
+                    struct_table,
+                    lowered_stmts,
+                )?;
+            }
+        }
+    }
+    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]

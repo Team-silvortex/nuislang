@@ -187,6 +187,15 @@ fn bind_destructure_fields(
     env: &mut BTreeMap<String, AstTypeRef>,
     struct_table: &BTreeMap<String, AstStructDef>,
 ) -> Result<(), String> {
+    bind_destructure_fields_for_type(type_ref, fields, env, struct_table)
+}
+
+fn bind_destructure_fields_for_type(
+    type_ref: &AstTypeRef,
+    fields: &[nuis_semantics::model::AstDestructureField],
+    env: &mut BTreeMap<String, AstTypeRef>,
+    struct_table: &BTreeMap<String, AstStructDef>,
+) -> Result<(), String> {
     let resolved = resolve_ast_type_ref_aliases(type_ref, &BTreeMap::new())?;
     let Some(struct_def) = struct_table.get(&resolved.name) else {
         return Ok(());
@@ -202,10 +211,19 @@ fn bind_destructure_fields(
                 resolved.name, field.field
             ));
         };
-        if field.binding == "_" {
-            continue;
+        match &field.binding {
+            nuis_semantics::model::AstDestructureBinding::Bind(name) => {
+                env.insert(name.clone(), struct_field.ty.clone());
+            }
+            nuis_semantics::model::AstDestructureBinding::Ignore => {}
+            nuis_semantics::model::AstDestructureBinding::Nested {
+                type_ref,
+                fields: nested_fields,
+            } => {
+                let nested_type = type_ref.as_ref().unwrap_or(&struct_field.ty);
+                bind_destructure_fields_for_type(nested_type, nested_fields, env, struct_table)?;
+            }
         }
-        env.insert(field.binding.clone(), struct_field.ty.clone());
     }
     Ok(())
 }

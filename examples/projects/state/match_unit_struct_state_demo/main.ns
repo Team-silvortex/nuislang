@@ -1,0 +1,15 @@
+mod cpu Main {
+  struct Done {}
+
+  fn main() -> i64 {
+    let value: Done = Done {};
+    match value {
+      Done {} => {
+        return 7;
+      }
+      _ => {
+        return 9;
+      }
+    }
+  }
+}

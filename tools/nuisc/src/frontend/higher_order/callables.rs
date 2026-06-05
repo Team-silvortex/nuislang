@@ -13,6 +13,7 @@ pub(crate) fn callable_type_arity(ty: &AstTypeRef) -> Option<usize> {
     match ty.name.as_str() {
         "Fn1" if ty.generic_args.len() == 2 => Some(1),
         "Fn2" if ty.generic_args.len() == 3 => Some(2),
+        "Fn3" if ty.generic_args.len() == 4 => Some(3),
         _ => None,
     }
 }

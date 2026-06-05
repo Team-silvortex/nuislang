@@ -112,7 +112,7 @@ pub(super) fn lower_expr_with_async(
                 NirExpr::Var(name.clone())
             } else if signatures.contains_key(name) {
                 return Err(format!(
-                    "function symbol `{name}` cannot currently be used as a first-class value; pass it only to `Fn1<...>`/`Fn2<...>` higher-order parameters or invoke it directly"
+                    "function symbol `{name}` cannot currently be used as a first-class value; pass it only to `Fn1<...>`/`Fn2<...>`/`Fn3<...>` higher-order parameters or invoke it directly"
                 ));
             } else {
                 return Err(format!("unknown value `{name}`"));

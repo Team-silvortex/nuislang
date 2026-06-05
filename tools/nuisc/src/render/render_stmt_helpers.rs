@@ -1,4 +1,6 @@
-use nuis_semantics::model::{AstDestructureField, AstExpr, AstStmt, AstTypeRef};
+use nuis_semantics::model::{
+    AstDestructureBinding, AstDestructureField, AstExpr, AstStmt, AstTypeRef,
+};
 
 pub(super) fn render_ast_stmt_inline(stmt: &AstStmt) -> String {
     match stmt {
@@ -44,16 +46,32 @@ pub(super) fn render_ast_type_suffix(ty: Option<&AstTypeRef>) -> String {
 pub(super) fn render_ast_destructure_let(type_ref: &AstTypeRef, fields: &[AstDestructureField], value: &AstExpr) -> String {
     let fields = fields
         .iter()
-        .map(|field| {
-            if field.field == field.binding {
-                field.field.clone()
-            } else if field.binding == "_" {
-                format!("{}: _", field.field)
-            } else {
-                format!("{}: {}", field.field, field.binding)
-            }
-        })
+        .map(render_ast_destructure_field)
         .collect::<Vec<_>>()
         .join(", ");
     format!("let {} {{ {} }} = {}", super::render_ast_type(type_ref), fields, super::render_ast_expr(value))
+}
+
+fn render_ast_destructure_field(field: &AstDestructureField) -> String {
+    match &field.binding {
+        AstDestructureBinding::Bind(binding) if field.field == *binding => field.field.clone(),
+        AstDestructureBinding::Bind(binding) => format!("{}: {}", field.field, binding),
+        AstDestructureBinding::Ignore => format!("{}: _", field.field),
+        AstDestructureBinding::Nested { type_ref, fields } => {
+            let nested = fields
+                .iter()
+                .map(render_ast_destructure_field)
+                .collect::<Vec<_>>()
+                .join(", ");
+            match type_ref {
+                Some(type_ref) => format!(
+                    "{}: {} {{ {} }}",
+                    field.field,
+                    super::render_ast_type(type_ref),
+                    nested
+                ),
+                None => format!("{}: {{ {} }}", field.field, nested),
+            }
+        }
+    }
 }

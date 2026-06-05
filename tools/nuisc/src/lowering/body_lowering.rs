@@ -1,19 +1,45 @@
 use super::*;
 
+fn chain_statement_effect(state: &mut LoweringState<'_>, anchor: &str) {
+    if let Some(previous) = state.last_effect_anchor.as_ref() {
+        if previous != anchor
+            && !state.yir.edges.iter().any(|edge| {
+                edge.from == *previous && edge.to == anchor && matches!(edge.kind, EdgeKind::Effect)
+            })
+        {
+            state.yir.edges.push(Edge {
+                kind: EdgeKind::Effect,
+                from: previous.clone(),
+                to: anchor.to_owned(),
+            });
+        }
+    }
+    state.last_effect_anchor = Some(anchor.to_owned());
+}
+
+fn chain_effectful_expr_stmt(expr: &NirExpr, lowered: &str, state: &mut LoweringState<'_>) {
+    if !matches!(nir_expr_effect_class(expr), NirExprEffectClass::Pure) {
+        chain_statement_effect(state, lowered);
+    }
+}
+
 pub(super) fn lower_function_body(
     function: &NirFunction,
     state: &mut LoweringState<'_>,
     bindings: &mut BTreeMap<String, String>,
     allow_implicit_return: bool,
 ) -> Result<Option<String>, String> {
+    let saved_effect_anchor = state.last_effect_anchor.take();
     for stmt in &function.body {
         match stmt {
             NirStmt::Let { name, value, .. } => {
                 let lowered = lower_expr(value, state, bindings)?;
+                chain_effectful_expr_stmt(value, &lowered, state);
                 bindings.insert(name.clone(), lowered);
             }
             NirStmt::Const { name, value, .. } => {
                 let lowered = lower_expr(value, state, bindings)?;
+                chain_effectful_expr_stmt(value, &lowered, state);
                 bindings.insert(name.clone(), lowered);
             }
             NirStmt::Print(value) => {
@@ -33,8 +59,9 @@ pub(super) fn lower_function_body(
                 state.yir.edges.push(Edge {
                     kind: EdgeKind::Effect,
                     from: lowered,
-                    to: print_name,
+                    to: print_name.clone(),
                 });
+                chain_statement_effect(state, &print_name);
             }
             NirStmt::Await(value) => {
                 let awaited = match value {
@@ -47,8 +74,9 @@ pub(super) fn lower_function_body(
                 state.yir.edges.push(Edge {
                     kind: EdgeKind::Effect,
                     from: awaited,
-                    to: await_name,
+                    to: await_name.clone(),
                 });
+                chain_statement_effect(state, &await_name);
             }
             NirStmt::If {
                 condition,
@@ -58,41 +86,50 @@ pub(super) fn lower_function_body(
                 if let Some(returned) =
                     lower_if_stmt(condition, then_body, else_body, state, bindings)?
                 {
+                    state.last_effect_anchor = saved_effect_anchor.clone();
                     return Ok(Some(returned));
                 }
             }
             NirStmt::While { condition, body } => {
                 if let Some(returned) = lower_while_stmt(condition, body, state, bindings)? {
+                    state.last_effect_anchor = saved_effect_anchor.clone();
                     return Ok(Some(returned));
                 }
             }
             NirStmt::Break => {
+                state.last_effect_anchor = saved_effect_anchor.clone();
                 return Err(
                     "`break` parsed successfully, but loop execution lowering is not implemented yet"
                         .to_owned(),
                 );
             }
             NirStmt::Continue => {
+                state.last_effect_anchor = saved_effect_anchor.clone();
                 return Err(
                     "`continue` parsed successfully, but loop execution lowering is not implemented yet"
                         .to_owned(),
                 );
             }
             NirStmt::Expr(expr) => {
-                let _ = lower_expr(expr, state, bindings)?;
+                let lowered = lower_expr(expr, state, bindings)?;
+                chain_effectful_expr_stmt(expr, &lowered, state);
             }
             NirStmt::Return(value) => {
-                return match value {
-                    Some(value) => Ok(Some(lower_expr(value, state, bindings)?)),
-                    None => Ok(None),
+                let returned = match value {
+                    Some(value) => Some(lower_expr(value, state, bindings)?),
+                    None => None,
                 };
+                state.last_effect_anchor = saved_effect_anchor.clone();
+                return Ok(returned);
             }
         }
     }
 
+    state.last_effect_anchor = saved_effect_anchor.clone();
     if allow_implicit_return {
         Ok(None)
     } else {
+        state.last_effect_anchor = saved_effect_anchor;
         Err(format!(
             "function `{}` ended without `return` in expression-call lowering",
             function.name
@@ -208,9 +245,12 @@ pub(super) fn lower_call_expr(
         local_bindings.insert(param.name.clone(), lowered);
     }
 
+    let caller_effect_anchor = state.last_effect_anchor.take();
     state.call_stack.push(callee.to_owned());
     let returned = lower_function_body(function, state, &mut local_bindings, false)?;
     state.call_stack.pop();
+    let callee_effect_anchor = state.last_effect_anchor.take();
+    state.last_effect_anchor = callee_effect_anchor.or(caller_effect_anchor);
 
     returned.ok_or_else(|| format!("function `{callee}` did not return a value"))
 }

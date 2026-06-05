@@ -183,6 +183,79 @@ fn monomorphizes_zero_arg_generic_from_return_expectation() {
 }
 
 #[test]
+fn monomorphizes_zero_arg_generic_from_nested_call_parameter_expectation() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn typed_zero<T>() -> T {
+            return 0;
+          }
+
+          fn takes_i64(value: i64) -> i64 {
+            return value;
+          }
+
+          fn main() -> i64 {
+            return takes_i64(typed_zero());
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Call { callee, args })))
+            if callee == "takes_i64"
+                && matches!(args.as_slice(), [NirExpr::Call { callee, .. }] if callee == "typed_zero__i64")
+    ));
+}
+
+#[test]
+fn monomorphizes_zero_arg_generic_from_struct_field_expectation() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          struct Boxed {
+            value: i64,
+          }
+
+          fn typed_zero<T>() -> T {
+            return 0;
+          }
+
+          fn main() -> i64 {
+            let boxed: Boxed = Boxed { value: typed_zero() };
+            return boxed.value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.first(),
+        Some(NirStmt::Let {
+            value: NirExpr::StructLiteral { fields, .. },
+            ..
+        }) if matches!(
+            fields.as_slice(),
+            [(field, NirExpr::Call { callee, .. })] if field == "value" && callee == "typed_zero__i64"
+        )
+    ));
+}
+
+#[test]
 fn monomorphizes_generic_function_from_pipe_shaped_argument() {
     let module = parse_nuis_module(
         r#"

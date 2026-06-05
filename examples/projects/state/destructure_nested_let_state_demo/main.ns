@@ -1,0 +1,20 @@
+mod cpu Main {
+  struct Inner {
+    kind: i64,
+    ready: bool,
+  }
+
+  struct Outer {
+    inner: Inner,
+    code: i64,
+  }
+
+  fn main() -> i64 {
+    let value: Outer = Outer {
+      inner: Inner { kind: 7, ready: true },
+      code: 2,
+    };
+    let Outer { inner: Inner { kind: packet_kind, ready: _ }, code } = value;
+    return packet_kind + code;
+  }
+}

@@ -258,3 +258,101 @@ fn lowers_higher_order_call_scrutinee_match_inside_while_via_hoisted_let() {
         other => panic!("expected while statement, found {other:?}"),
     }
 }
+
+#[test]
+fn lowers_generic_fn3_higher_order_lambda_family() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          fn apply3<T: Addable>(x: T, y: T, z: T, f: Fn3<T, T, T, T>) -> T {
+            return f(x, y, z);
+          }
+
+          fn main() -> i64 {
+            return apply3(5, 1, 1, |x: i64, y: i64, z: i64| -> i64 { return x + y + z; });
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let higher_order_concrete = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__hof_apply3_") && function.name.ends_with("__i64")
+        })
+        .expect("expected monomorphized Fn3 higher-order helper");
+    assert!(higher_order_concrete.generic_params.is_empty());
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
+            if callee == &higher_order_concrete.name
+    ));
+}
+
+#[test]
+fn lowers_generic_fn3_alias_higher_order_lambda_family() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type Reducer<T> = Fn3<T, T, T, T>;
+
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          fn apply3<T: Addable>(x: T, y: T, z: T, f: Reducer<T>) -> T {
+            return f(x, y, z);
+          }
+
+          fn main() -> i64 {
+            return apply3(5, 1, 1, |x: i64, y: i64, z: i64| -> i64 { return x + y + z; });
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let higher_order_concrete = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__hof_apply3_") && function.name.ends_with("__i64")
+        })
+        .expect("expected monomorphized Fn3 alias higher-order helper");
+    assert!(higher_order_concrete.generic_params.is_empty());
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
+            if callee == &higher_order_concrete.name
+    ));
+}

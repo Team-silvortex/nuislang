@@ -1,0 +1,12 @@
+mod cpu Main {
+  fn main() -> i64 {
+    let head: ref Node = move(alloc_node(10, null()));
+    let head_ref: ref Node = borrow(head);
+    let current: i64 = load_value(head_ref);
+    borrow_end(head_ref);
+    store_value(head, current + 67);
+    let updated: i64 = load_value(head);
+    free(head);
+    return updated;
+  }
+}

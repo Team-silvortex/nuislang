@@ -1664,6 +1664,7 @@ fn render_nir_impl_method(method: &NirImplMethod) -> String {
 fn render_ast_match_pattern(pattern: &AstMatchPattern) -> String {
     match pattern {
         AstMatchPattern::Wildcard => "_".to_owned(),
+        AstMatchPattern::Bind(name) => name.clone(),
         AstMatchPattern::Bool(value) => value.to_string(),
         AstMatchPattern::Int(value) => value.to_string(),
         AstMatchPattern::IntRangeInclusive(start, end) => format!("{start}..={end}"),
@@ -1672,15 +1673,22 @@ fn render_ast_match_pattern(pattern: &AstMatchPattern) -> String {
             .map(render_ast_match_pattern)
             .collect::<Vec<_>>()
             .join(" | "),
-        AstMatchPattern::StructFields { type_ref, fields } => format!(
-            "{} {{ {} }}",
+        AstMatchPattern::PayloadStruct { type_ref, payload } => format!(
+            "{}({})",
             render_ast_type(type_ref),
-            fields
+            render_ast_match_pattern(payload)
+        ),
+        AstMatchPattern::StructFields { type_ref, fields } => {
+            let fields = fields
                 .iter()
                 .map(|(field, pattern)| format!("{field}: {}", render_ast_match_pattern(pattern)))
                 .collect::<Vec<_>>()
-                .join(", ")
-        ),
+                .join(", ");
+            match type_ref {
+                Some(type_ref) => format!("{} {{ {} }}", render_ast_type(type_ref), fields),
+                None => format!("{{ {} }}", fields),
+            }
+        }
     }
 }
 

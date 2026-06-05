@@ -336,6 +336,9 @@ mod tests_direct_calls;
 #[path = "lowering/tests_higher_order_direct_calls.rs"]
 mod tests_higher_order_direct_calls;
 #[cfg(test)]
+#[path = "lowering/tests_higher_order_direct_calls_fn23.rs"]
+mod tests_higher_order_direct_calls_fn23;
+#[cfg(test)]
 #[path = "lowering/tests_kernel_tensor.rs"]
 mod tests_kernel_tensor;
 #[cfg(test)]

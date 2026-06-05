@@ -1,7 +1,9 @@
 use super::lower_type_ref;
 use super::parse_nuis_ast;
 use super::parse_nuis_module;
-use nuis_semantics::model::{AstDestructureField, AstStmt, AstVisibility, NirExpr, NirStmt};
+use nuis_semantics::model::{
+    AstDestructureBinding, AstDestructureField, AstStmt, AstVisibility, NirExpr, NirStmt,
+};
 
 #[test]
 fn infers_struct_field_type_from_shared_type_helper() {
@@ -111,6 +113,41 @@ fn lowers_project_local_cpu_helper_calls_with_qualified_callees() {
         Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
             if callee == "TaskHelpers.task_policy_completed"
     ));
+}
+
+#[test]
+fn lowers_payload_style_single_field_struct_constructor_sugar() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          struct Just {
+            value: i64,
+          }
+
+          fn main() -> i64 {
+            let payload: Just = Just(7);
+            return payload.value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    match &module.functions[0].body[0] {
+        NirStmt::Let { name, value, .. } => {
+            assert_eq!(name, "payload");
+            assert!(matches!(
+                value,
+                NirExpr::StructLiteral { type_name, fields }
+                    if type_name == "Just"
+                        && matches!(
+                            fields.as_slice(),
+                            [(field, NirExpr::Int(7))] if field == "value"
+                        )
+            ));
+        }
+        other => panic!("expected lowered payload constructor let, found {other:?}"),
+    }
 }
 
 #[test]
@@ -409,11 +446,11 @@ fn parses_struct_destructuring_let_into_ast() {
                 &vec![
                     AstDestructureField {
                         field: "kind".to_owned(),
-                        binding: "kind".to_owned()
+                        binding: AstDestructureBinding::Bind("kind".to_owned())
                     },
                     AstDestructureField {
                         field: "ready".to_owned(),
-                        binding: "ready".to_owned()
+                        binding: AstDestructureBinding::Bind("ready".to_owned())
                     }
                 ]
             );

@@ -1,0 +1,11 @@
+mod cpu Main {
+  fn apply3(x: i64, y: i64, z: i64, f: Fn3<i64, i64, i64, i64>) -> i64 {
+    return f(x, y, z);
+  }
+
+  fn main() -> i64 {
+    return apply3(5, 1, 1, |x: i64, y: i64, z: i64| -> i64 {
+      return x + y + z;
+    });
+  }
+}

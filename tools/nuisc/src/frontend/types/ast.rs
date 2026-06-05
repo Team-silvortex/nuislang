@@ -96,6 +96,12 @@ pub(crate) fn infer_ast_expr_type_inner(
             }
         }),
         AstExpr::Call { callee, args } => match callee.as_str() {
+            _ if struct_table
+                .get(callee)
+                .is_some_and(|definition| definition.fields.len() == 1 && args.len() == 1) =>
+            {
+                Some(ast_named_type(callee))
+            }
             "i32_from_i64" => {
                 let [value] = args.as_slice() else {
                     return None;

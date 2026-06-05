@@ -47,6 +47,8 @@ mod tests_lambda_higher_order;
 #[cfg(test)]
 mod tests_match_patterns;
 #[cfg(test)]
+mod tests_match_struct_bindings;
+#[cfg(test)]
 mod tests_match_struct_patterns;
 #[cfg(test)]
 mod tests_packet_test_meta;

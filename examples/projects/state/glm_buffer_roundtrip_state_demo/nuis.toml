@@ -1,0 +1,2 @@
+name = "glm_buffer_roundtrip_state_demo"
+entry = "main.ns"

@@ -1,0 +1,2 @@
+name = "nested_generic_inference_demo"
+entry = "main.ns"

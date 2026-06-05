@@ -1,0 +1,17 @@
+mod cpu Main {
+  struct Just {
+    value: i64,
+  }
+
+  fn main() -> i64 {
+    let value: Just = Just(7);
+    match value {
+      Just(payload) if payload == 7 => {
+        return payload;
+      }
+      _ => {
+        return 9;
+      }
+    }
+  }
+}

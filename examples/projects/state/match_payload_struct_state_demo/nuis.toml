@@ -1,0 +1,2 @@
+name = "match_payload_struct_state_demo"
+entry = "main.ns"

@@ -48,6 +48,7 @@ pub(super) fn build_lowered_functions_and_impls(
                 module_const_env,
                 visible_type_aliases,
                 generic_templates,
+                signatures,
                 impl_lookup,
                 module_struct_table,
                 &inferred_function_return_types,

@@ -1,0 +1,39 @@
+mod cpu Main {
+  type Reducer<T> = Fn3<T, T, T, T>;
+
+  trait Addable {
+    fn add(lhs: Self, rhs: Self) -> Self;
+  }
+
+  impl Addable for i64 {
+    fn add(lhs: i64, rhs: i64) -> i64 {
+      return lhs + rhs;
+    }
+  }
+
+  fn apply3<T: Addable>(x: T, y: T, z: T, f: Reducer<T>) -> T {
+    return f(x, y, z);
+  }
+
+  fn odd(value: i64) -> i64 {
+    if value == 0 {
+      return 0;
+    }
+    return even(apply3(value, 0, 1, |x: i64, _y: i64, z: i64| -> i64 {
+      return x - z;
+    }));
+  }
+
+  fn even(value: i64) -> i64 {
+    if value == 0 {
+      return 1;
+    }
+    return odd(apply3(value, 0, 1, |x: i64, _y: i64, z: i64| -> i64 {
+      return x - z;
+    }));
+  }
+
+  fn main() -> i64 {
+    return even(4);
+  }
+}

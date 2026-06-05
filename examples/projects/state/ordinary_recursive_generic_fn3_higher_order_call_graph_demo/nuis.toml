@@ -1,0 +1,2 @@
+name = "ordinary_recursive_generic_fn3_higher_order_call_graph_demo"
+entry = "main.ns"

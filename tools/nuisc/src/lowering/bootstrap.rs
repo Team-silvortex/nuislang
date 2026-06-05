@@ -84,6 +84,7 @@ pub(super) fn lower_nir_to_yir_builtin_cpu(module: &NirModule) -> Result<YirModu
         print_counter: 0,
         await_counter: 0,
         call_stack: Vec::new(),
+        last_effect_anchor: None,
     };
 
     for function in module

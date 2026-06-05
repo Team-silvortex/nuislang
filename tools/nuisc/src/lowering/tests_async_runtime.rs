@@ -2,6 +2,25 @@ use super::lower_nir_to_yir_builtin_cpu;
 use crate::frontend::parse_nuis_module;
 use yir_core::EdgeKind;
 
+fn path_exists(yir: &yir_core::YirModule, from: &str, to: &str) -> bool {
+    let mut frontier = vec![from.to_owned()];
+    let mut seen = std::collections::BTreeSet::new();
+    while let Some(current) = frontier.pop() {
+        if current == to {
+            return true;
+        }
+        if !seen.insert(current.clone()) {
+            continue;
+        }
+        for edge in &yir.edges {
+            if edge.from == current {
+                frontier.push(edge.to.clone());
+            }
+        }
+    }
+    false
+}
+
 #[test]
 fn lowers_await_stmt_into_cpu_await_node() {
     let module = parse_nuis_module(
@@ -283,6 +302,71 @@ fn lowers_await_expression_into_value_producing_boundary() {
             && matches!(edge.kind, EdgeKind::Effect)
     }));
     assert_eq!(await_node.op.args.len(), 1);
+}
+
+#[test]
+fn sequences_borrow_end_before_free_in_expr_stmt_order() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let head: ref Node = move(alloc_node(10, null()));
+            let head_ref: ref Node = borrow(head);
+            let current: i64 = load_value(head_ref);
+            borrow_end(head_ref);
+            free(head);
+            return current;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let borrow_end = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "borrow_end")
+        .unwrap();
+    let free = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "free")
+        .unwrap();
+    assert!(yir.edges.iter().any(|edge| {
+        edge.from == borrow_end.name
+            && edge.to == free.name
+            && matches!(edge.kind, EdgeKind::Effect)
+    }));
+}
+
+#[test]
+fn sequences_store_at_before_free_in_expr_stmt_order() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let buffer: ref Buffer = alloc_buffer(3, 0);
+            store_at(buffer, 1, 7);
+            let value: i64 = load_at(buffer, 1);
+            free(buffer);
+            return value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let store = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "store_at")
+        .unwrap();
+    let free = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "free")
+        .unwrap();
+    assert!(path_exists(&yir, &store.name, &free.name));
 }
 
 #[test]

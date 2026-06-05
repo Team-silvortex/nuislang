@@ -1,0 +1,10 @@
+mod cpu Main {
+  fn main() -> i64 {
+    let buffer: ref Buffer = alloc_buffer(3, 0);
+    store_at(buffer, 1, 7);
+    let len: i64 = buffer_len(buffer);
+    let value: i64 = load_at(buffer, 1);
+    free(buffer);
+    return value + len;
+  }
+}

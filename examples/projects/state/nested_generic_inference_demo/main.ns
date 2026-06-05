@@ -1,0 +1,18 @@
+mod cpu Main {
+  struct Boxed {
+    value: i64,
+  }
+
+  fn typed_zero<T>() -> T {
+    return 0;
+  }
+
+  fn takes_i64(value: i64) -> i64 {
+    return value + 7;
+  }
+
+  fn main() -> i64 {
+    let boxed: Boxed = Boxed { value: typed_zero() };
+    return takes_i64(typed_zero()) + boxed.value;
+  }
+}

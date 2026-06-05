@@ -5,6 +5,7 @@ use nuis_semantics::model::{
 };
 
 use super::super::generics::{infer_generic_substitutions, specialize_function_template};
+use super::super::types::ast_type_from_nir;
 use super::super::{lower_type_ref_with_aliases, FunctionSignature};
 use crate::frontend::generic_rewrite::rewrite_generic_calls_in_function;
 
@@ -14,6 +15,7 @@ pub(super) fn rewrite_generic_calls_in_expr(
     env: &BTreeMap<String, AstTypeRef>,
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
     generic_templates: &BTreeMap<String, AstFunction>,
+    signatures: &BTreeMap<String, FunctionSignature>,
     impl_lookup: &BTreeMap<(String, String), AstImplDef>,
     struct_table: &BTreeMap<String, AstStructDef>,
     function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
@@ -28,6 +30,7 @@ pub(super) fn rewrite_generic_calls_in_expr(
             env,
             visible_type_aliases,
             generic_templates,
+            signatures,
             impl_lookup,
             struct_table,
             function_return_types,
@@ -38,13 +41,16 @@ pub(super) fn rewrite_generic_calls_in_expr(
         AstExpr::Call { callee, args } => {
             let rewritten_args = args
                 .iter()
-                .map(|arg| {
+                .enumerate()
+                .map(|(index, arg)| {
+                    let arg_expected = call_arg_expected_type(callee, index, signatures);
                     rewrite_generic_calls_in_expr(
                         arg,
-                        None,
+                        arg_expected.as_ref(),
                         env,
                         visible_type_aliases,
                         generic_templates,
+                        signatures,
                         impl_lookup,
                         struct_table,
                         function_return_types,
@@ -62,6 +68,7 @@ pub(super) fn rewrite_generic_calls_in_expr(
                     env,
                     visible_type_aliases,
                     generic_templates,
+                    signatures,
                     impl_lookup,
                     struct_table,
                     function_return_types,
@@ -91,6 +98,7 @@ pub(super) fn rewrite_generic_calls_in_expr(
                 env,
                 visible_type_aliases,
                 generic_templates,
+                signatures,
                 impl_lookup,
                 struct_table,
                 function_return_types,
@@ -108,6 +116,7 @@ pub(super) fn rewrite_generic_calls_in_expr(
                         env,
                         visible_type_aliases,
                         generic_templates,
+                        signatures,
                         impl_lookup,
                         struct_table,
                         function_return_types,
@@ -123,14 +132,16 @@ pub(super) fn rewrite_generic_calls_in_expr(
             fields: fields
                 .iter()
                 .map(|(name, value)| {
+                    let field_expected = struct_field_expected_type(type_name, name, struct_table);
                     Ok((
                         name.clone(),
                         rewrite_generic_calls_in_expr(
                             value,
-                            None,
+                            field_expected.as_ref(),
                             env,
                             visible_type_aliases,
                             generic_templates,
+                            signatures,
                             impl_lookup,
                             struct_table,
                             function_return_types,
@@ -149,6 +160,7 @@ pub(super) fn rewrite_generic_calls_in_expr(
                 env,
                 visible_type_aliases,
                 generic_templates,
+                signatures,
                 impl_lookup,
                 struct_table,
                 function_return_types,
@@ -166,6 +178,7 @@ pub(super) fn rewrite_generic_calls_in_expr(
                 env,
                 visible_type_aliases,
                 generic_templates,
+                signatures,
                 impl_lookup,
                 struct_table,
                 function_return_types,
@@ -179,6 +192,7 @@ pub(super) fn rewrite_generic_calls_in_expr(
                 env,
                 visible_type_aliases,
                 generic_templates,
+                signatures,
                 impl_lookup,
                 struct_table,
                 function_return_types,
@@ -198,6 +212,7 @@ pub(super) fn ensure_generic_specialization(
     env: &BTreeMap<String, AstTypeRef>,
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
     generic_templates: &BTreeMap<String, AstFunction>,
+    signatures: &BTreeMap<String, FunctionSignature>,
     impl_lookup: &BTreeMap<(String, String), AstImplDef>,
     struct_table: &BTreeMap<String, AstStructDef>,
     function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
@@ -235,6 +250,7 @@ pub(super) fn ensure_generic_specialization(
             &BTreeMap::new(),
             visible_type_aliases,
             generic_templates,
+            signatures,
             impl_lookup,
             struct_table,
             function_return_types,
@@ -265,4 +281,31 @@ pub(super) fn ensure_generic_specialization(
         specialized_functions.push(rewritten);
     }
     Ok(specialized_name)
+}
+
+fn call_arg_expected_type<'a>(
+    callee: &str,
+    index: usize,
+    signatures: &BTreeMap<String, FunctionSignature>,
+) -> Option<AstTypeRef> {
+    signatures
+        .get(callee)
+        .and_then(|signature| signature.params.get(index))
+        .map(ast_type_from_nir)
+}
+
+fn struct_field_expected_type(
+    type_name: &str,
+    field_name: &str,
+    struct_table: &BTreeMap<String, AstStructDef>,
+) -> Option<AstTypeRef> {
+    struct_table
+        .get(type_name)
+        .and_then(|definition| {
+            definition
+                .fields
+                .iter()
+                .find(|field| field.name == field_name)
+        })
+        .map(|field| field.ty.clone())
 }

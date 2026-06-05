@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use nuis_semantics::model::{AstExpr, AstStmt};
+use nuis_semantics::model::{AstDestructureBinding, AstDestructureField, AstExpr, AstStmt};
 
 pub(super) fn validate_lambda_block_no_capture(
     body: &[AstStmt],
@@ -15,12 +15,7 @@ pub(super) fn validate_lambda_block_no_capture(
             }
             AstStmt::DestructureLet { fields, value, .. } => {
                 validate_lambda_expr_no_capture(value, visible_locals, outer_locals)?;
-                for field in fields {
-                    if field.binding == "_" {
-                        continue;
-                    }
-                    visible_locals.insert(field.binding.clone());
-                }
+                collect_destructure_binding_names(fields, visible_locals);
             }
             AstStmt::Const { name, value, .. } => {
                 validate_lambda_expr_no_capture(value, visible_locals, outer_locals)?;
@@ -59,6 +54,23 @@ pub(super) fn validate_lambda_block_no_capture(
         }
     }
     Ok(())
+}
+
+fn collect_destructure_binding_names(
+    fields: &[AstDestructureField],
+    visible_locals: &mut BTreeSet<String>,
+) {
+    for field in fields {
+        match &field.binding {
+            AstDestructureBinding::Bind(name) => {
+                visible_locals.insert(name.clone());
+            }
+            AstDestructureBinding::Ignore => {}
+            AstDestructureBinding::Nested { fields, .. } => {
+                collect_destructure_binding_names(fields, visible_locals);
+            }
+        }
+    }
 }
 
 pub(super) fn validate_lambda_expr_no_capture(

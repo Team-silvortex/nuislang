@@ -10,6 +10,8 @@ use super::lexer::{describe_token, Token};
 
 #[path = "parser_destructure.rs"]
 mod parser_destructure;
+#[path = "parser_match_patterns.rs"]
+mod parser_match_patterns;
 
 pub struct Parser {
     tokens: Vec<Token>,
@@ -1256,121 +1258,6 @@ impl Parser {
         let parsed = self.parse_expr();
         self.allow_struct_literals = old;
         parsed
-    }
-
-    fn parse_condition_expr(&mut self) -> Result<AstExpr, String> {
-        let old = self.allow_struct_literals;
-        self.allow_struct_literals = false;
-        let parsed = self.parse_expr();
-        self.allow_struct_literals = old;
-        parsed
-    }
-
-    fn parse_match_pattern(&mut self) -> Result<AstMatchPattern, String> {
-        let mut patterns = vec![self.parse_single_match_pattern()?];
-        while self.peek_symbol('|') && !self.peek_symbol_pair('|', '|') {
-            self.expect_symbol('|')?;
-            patterns.push(self.parse_single_match_pattern()?);
-        }
-        if patterns.len() == 1 {
-            return Ok(patterns.pop().expect("pattern exists"));
-        }
-        if patterns
-            .iter()
-            .any(|pattern| matches!(pattern, AstMatchPattern::Wildcard))
-        {
-            return Err(
-                "minimal `match` does not allow `_` inside multi-pattern arms; use a final standalone `_ => ...` arm"
-                    .to_owned(),
-            );
-        }
-        Ok(AstMatchPattern::Or(patterns))
-    }
-
-    fn parse_single_match_pattern(&mut self) -> Result<AstMatchPattern, String> {
-        match self.next() {
-            Some(Token::Word(word)) if word == "_" => Ok(AstMatchPattern::Wildcard),
-            Some(Token::Word(word)) if word == "true" => Ok(AstMatchPattern::Bool(true)),
-            Some(Token::Word(word)) if word == "false" => Ok(AstMatchPattern::Bool(false)),
-            Some(Token::Word(_word)) if self.peek_symbol('{') || self.peek_symbol('<') => {
-                self.cursor = self.cursor.saturating_sub(1);
-                let type_ref = self.parse_type_ref()?;
-                if !self.peek_symbol('{') {
-                    return Err("expected `{` after struct match pattern type".to_owned());
-                }
-                self.expect_symbol('{')?;
-                let mut fields = Vec::new();
-                while !self.peek_symbol('}') {
-                    let field_name = match self.next() {
-                        Some(Token::Word(name)) => name,
-                        Some(Token::Symbol('}')) => {
-                            self.cursor = self.cursor.saturating_sub(1);
-                            break;
-                        }
-                        Some(other) => {
-                            return Err(format!(
-                                "expected field name in struct match pattern, found {}",
-                                describe_token(&other)
-                            ))
-                        }
-                        None => {
-                            return Err("unexpected end of input in struct match pattern field list".to_owned())
-                        }
-                    };
-                    self.expect_symbol(':')?;
-                    let pattern = self.parse_match_pattern()?;
-                    fields.push((field_name, pattern));
-                    if self.peek_symbol(',') {
-                        self.expect_symbol(',')?;
-                    }
-                }
-                self.expect_symbol('}')?;
-                if fields.is_empty() {
-                    return Err("minimal `match` struct patterns require at least one field".to_owned());
-                }
-                Ok(AstMatchPattern::StructFields {
-                    type_ref,
-                    fields,
-                })
-            }
-            Some(Token::Integer(value)) => {
-                if self.peek_symbol('.')
-                    && matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol('.')))
-                {
-                    self.expect_symbol('.')?;
-                    self.expect_symbol('.')?;
-                    self.expect_symbol('=')?;
-                    let end = match self.next() {
-                        Some(Token::Integer(value)) => value,
-                        Some(other) => {
-                            return Err(format!(
-                                "expected integer literal after `..=` in match range pattern, found {}",
-                                describe_token(&other)
-                            ))
-                        }
-                        None => {
-                            return Err(
-                                "unexpected end of input after `..=` in match range pattern"
-                                    .to_owned(),
-                            )
-                        }
-                    };
-                    if value > end {
-                        return Err(format!(
-                            "inclusive match range `{value}..={end}` must have start <= end"
-                        ));
-                    }
-                    Ok(AstMatchPattern::IntRangeInclusive(value, end))
-                } else {
-                    Ok(AstMatchPattern::Int(value))
-                }
-            }
-            Some(other) => Err(format!(
-                "expected `true`, `false`, integer literal, integer range, struct field pattern, or `_` in match arm pattern, found {}",
-                describe_token(&other)
-            )),
-            None => Err("unexpected end of input in match arm pattern".to_owned()),
-        }
     }
 
     fn parse_break_stmt(&mut self) -> Result<AstStmt, String> {
