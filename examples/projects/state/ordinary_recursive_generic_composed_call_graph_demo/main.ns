@@ -1,0 +1,45 @@
+mod cpu Main {
+  trait Addable {
+    fn add(lhs: Self, rhs: Self) -> Self;
+  }
+
+  impl Addable for i64 {
+    fn add(lhs: i64, rhs: i64) -> i64 {
+      return lhs + rhs;
+    }
+  }
+
+  fn step(value: i32) -> i32 {
+    return value - i32_from_i64(1);
+  }
+
+  fn near_zero(value: i64) -> bool {
+    let narrowed: i32 = i32_from_i64(value);
+    if step(narrowed) == i32_from_i64(0) {
+      return true;
+    }
+    return false;
+  }
+
+  fn apply<T: Addable>(x: T, f: Fn1<T, T>) -> T {
+    return f(x);
+  }
+
+  fn odd(value: i64) -> i64 {
+    if near_zero(value) == true {
+      return 0;
+    }
+    return even(apply(value, |v: i64| -> i64 { return v - 1; }));
+  }
+
+  fn even(value: i64) -> i64 {
+    if near_zero(value) == true {
+      return 1;
+    }
+    return odd(apply(value, |v: i64| -> i64 { return v - 1; }));
+  }
+
+  fn main() -> i64 {
+    return even(4);
+  }
+}

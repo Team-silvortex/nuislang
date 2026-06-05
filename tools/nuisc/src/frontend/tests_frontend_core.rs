@@ -1,7 +1,7 @@
 use super::lower_type_ref;
 use super::parse_nuis_ast;
 use super::parse_nuis_module;
-use nuis_semantics::model::{AstStmt, AstVisibility, NirExpr, NirStmt};
+use nuis_semantics::model::{AstDestructureField, AstStmt, AstVisibility, NirExpr, NirStmt};
 
 #[test]
 fn infers_struct_field_type_from_shared_type_helper() {
@@ -404,54 +404,21 @@ fn parses_struct_destructuring_let_into_ast() {
             value,
         } => {
             assert_eq!(type_ref.name, "Packet");
-            assert_eq!(fields, &vec!["kind".to_owned(), "ready".to_owned()]);
+            assert_eq!(
+                fields,
+                &vec![
+                    AstDestructureField {
+                        field: "kind".to_owned(),
+                        binding: "kind".to_owned()
+                    },
+                    AstDestructureField {
+                        field: "ready".to_owned(),
+                        binding: "ready".to_owned()
+                    }
+                ]
+            );
             assert!(matches!(value, nuis_semantics::model::AstExpr::Var(name) if name == "packet"));
         }
         other => panic!("expected destructuring let statement, found {other:?}"),
-    }
-}
-
-#[test]
-fn lowers_struct_destructuring_let_into_field_bindings() {
-    let module = parse_nuis_module(
-        r#"
-        mod cpu Main {
-          struct Packet {
-            kind: i64,
-            ready: bool,
-          }
-
-          fn main() -> i64 {
-            let packet: Packet = Packet { kind: 7, ready: true };
-            let Packet { kind, ready } = packet;
-            if ready {
-              return kind;
-            }
-            return 9;
-          }
-        }
-        "#,
-    )
-    .unwrap();
-
-    match &module.functions[0].body[1] {
-        NirStmt::Let { name, value, .. } => {
-            assert_eq!(name, "kind");
-            assert!(matches!(
-                value,
-                NirExpr::FieldAccess { field, .. } if field == "kind"
-            ));
-        }
-        other => panic!("expected first destructured field binding, found {other:?}"),
-    }
-    match &module.functions[0].body[2] {
-        NirStmt::Let { name, value, .. } => {
-            assert_eq!(name, "ready");
-            assert!(matches!(
-                value,
-                NirExpr::FieldAccess { field, .. } if field == "ready"
-            ));
-        }
-        other => panic!("expected second destructured field binding, found {other:?}"),
     }
 }

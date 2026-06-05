@@ -1,0 +1,15 @@
+mod cpu Main {
+  struct Packet {
+    kind: i64,
+    ready: bool,
+  }
+
+  fn main() -> i64 {
+    let packet: Packet = Packet { kind: 7, ready: true };
+    let Packet { kind: packet_kind, ready: is_ready } = packet;
+    if is_ready {
+      return packet_kind;
+    }
+    return 9;
+  }
+}

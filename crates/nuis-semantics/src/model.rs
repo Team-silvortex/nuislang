@@ -250,10 +250,16 @@ pub struct AstMatchArm {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AstDestructureField {
+    pub field: String,
+    pub binding: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[rustfmt::skip]
 pub enum AstStmt {
     Let { name: String, ty: Option<AstTypeRef>, value: AstExpr },
-    DestructureLet { type_ref: AstTypeRef, fields: Vec<String>, value: AstExpr },
+    DestructureLet { type_ref: AstTypeRef, fields: Vec<AstDestructureField>, value: AstExpr },
     Const { name: String, ty: Option<AstTypeRef>, value: AstExpr },
     Print(AstExpr), Await(AstExpr),
     If { condition: AstExpr, then_body: Vec<AstStmt>, else_body: Vec<AstStmt> },

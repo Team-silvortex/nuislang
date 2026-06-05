@@ -8,6 +8,9 @@ use nuis_semantics::model::{
 
 use super::lexer::{describe_token, Token};
 
+#[path = "parser_destructure.rs"]
+mod parser_destructure;
+
 pub struct Parser {
     tokens: Vec<Token>,
     cursor: usize,
@@ -1137,38 +1140,8 @@ impl Parser {
 
     fn parse_let_stmt(&mut self) -> Result<AstStmt, String> {
         self.expect_word("let")?;
-        #[rustfmt::skip]
-        fn duplicate_destructure_field_error(field: &str) -> String { format!("duplicate field `{field}` in destructuring let pattern") }
-        #[rustfmt::skip]
-        let starts_destructure = matches!(self.tokens.get(self.cursor), Some(Token::Word(_)))
-            && (matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol('{'))) || matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol('<'))));
-        if starts_destructure {
-            let type_ref = self.parse_type_ref()?;
-            self.expect_symbol('{')?;
-            let mut fields = Vec::new();
-            while !self.peek_symbol('}') {
-                let field = self.expect_ident()?;
-                if fields.iter().any(|existing| existing == &field) {
-                    return Err(duplicate_destructure_field_error(&field));
-                }
-                fields.push(field);
-                if !self.peek_symbol(',') {
-                    break;
-                }
-                self.expect_symbol(',')?;
-            }
-            self.expect_symbol('}')?;
-            if fields.is_empty() {
-                return Err("destructuring let pattern requires at least one field".to_owned());
-            }
-            self.expect_symbol('=')?;
-            let value = self.parse_expr()?;
-            self.expect_symbol(';')?;
-            return Ok(AstStmt::DestructureLet {
-                type_ref,
-                fields,
-                value,
-            });
+        if self.starts_destructure_let() {
+            return self.parse_destructure_let_stmt();
         }
         let name = self.expect_ident()?;
         let ty = self.parse_optional_type_annotation()?;

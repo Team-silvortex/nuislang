@@ -191,8 +191,11 @@ fn expand_lambda_block(
                     value: rewritten_value,
                 });
                 for field in fields {
-                    aliases.remove(field);
-                    locals.insert(field.clone());
+                    if field.binding == "_" {
+                        continue;
+                    }
+                    aliases.remove(&field.binding);
+                    locals.insert(field.binding.clone());
                 }
             }
             AstStmt::Const { name, ty, value } => {

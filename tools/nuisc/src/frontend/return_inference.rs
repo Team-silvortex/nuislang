@@ -183,7 +183,7 @@ fn collect_inferred_return_types_from_block(
 
 fn bind_destructure_fields(
     type_ref: &AstTypeRef,
-    fields: &[String],
+    fields: &[nuis_semantics::model::AstDestructureField],
     env: &mut BTreeMap<String, AstTypeRef>,
     struct_table: &BTreeMap<String, AstStructDef>,
 ) -> Result<(), String> {
@@ -195,14 +195,17 @@ fn bind_destructure_fields(
         let Some(struct_field) = struct_def
             .fields
             .iter()
-            .find(|candidate| candidate.name == *field)
+            .find(|candidate| candidate.name == field.field)
         else {
             return Err(format!(
                 "type `{}` has no field `{}` for destructuring let",
-                resolved.name, field
+                resolved.name, field.field
             ));
         };
-        env.insert(field.clone(), struct_field.ty.clone());
+        if field.binding == "_" {
+            continue;
+        }
+        env.insert(field.binding.clone(), struct_field.ty.clone());
     }
     Ok(())
 }

@@ -1,4 +1,4 @@
-use nuis_semantics::model::{AstExpr, AstStmt, AstTypeRef};
+use nuis_semantics::model::{AstDestructureField, AstExpr, AstStmt, AstTypeRef};
 
 pub(super) fn render_ast_stmt_inline(stmt: &AstStmt) -> String {
     match stmt {
@@ -41,6 +41,19 @@ pub(super) fn render_ast_type_suffix(ty: Option<&AstTypeRef>) -> String {
 }
 
 #[rustfmt::skip]
-pub(super) fn render_ast_destructure_let(type_ref: &AstTypeRef, fields: &[String], value: &AstExpr) -> String {
-    format!("let {} {{ {} }} = {}", super::render_ast_type(type_ref), fields.join(", "), super::render_ast_expr(value))
+pub(super) fn render_ast_destructure_let(type_ref: &AstTypeRef, fields: &[AstDestructureField], value: &AstExpr) -> String {
+    let fields = fields
+        .iter()
+        .map(|field| {
+            if field.field == field.binding {
+                field.field.clone()
+            } else if field.binding == "_" {
+                format!("{}: _", field.field)
+            } else {
+                format!("{}: {}", field.field, field.binding)
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("let {} {{ {} }} = {}", super::render_ast_type(type_ref), fields, super::render_ast_expr(value))
 }

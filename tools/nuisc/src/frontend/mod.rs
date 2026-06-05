@@ -35,6 +35,8 @@ mod tests_consts_aliases;
 #[cfg(test)]
 mod tests_control_flow;
 #[cfg(test)]
+mod tests_destructure_let;
+#[cfg(test)]
 mod tests_frontend_core;
 #[cfg(test)]
 mod tests_generics;

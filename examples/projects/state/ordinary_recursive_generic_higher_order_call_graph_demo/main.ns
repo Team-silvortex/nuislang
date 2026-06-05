@@ -1,0 +1,33 @@
+mod cpu Main {
+  trait Addable {
+    fn add(lhs: Self, rhs: Self) -> Self;
+  }
+
+  impl Addable for i64 {
+    fn add(lhs: i64, rhs: i64) -> i64 {
+      return lhs + rhs;
+    }
+  }
+
+  fn apply<T: Addable>(x: T, f: Fn1<T, T>) -> T {
+    return f(x);
+  }
+
+  fn odd(value: i64) -> i64 {
+    if value == 0 {
+      return 0;
+    }
+    return even(apply(value, |v: i64| -> i64 { return v - 1; }));
+  }
+
+  fn even(value: i64) -> i64 {
+    if value == 0 {
+      return 1;
+    }
+    return odd(apply(value, |v: i64| -> i64 { return v - 1; }));
+  }
+
+  fn main() -> i64 {
+    return even(4);
+  }
+}

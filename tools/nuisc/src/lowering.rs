@@ -333,6 +333,9 @@ mod tests_branch_summaries;
 #[path = "lowering/tests_direct_calls.rs"]
 mod tests_direct_calls;
 #[cfg(test)]
+#[path = "lowering/tests_higher_order_direct_calls.rs"]
+mod tests_higher_order_direct_calls;
+#[cfg(test)]
 #[path = "lowering/tests_kernel_tensor.rs"]
 mod tests_kernel_tensor;
 #[cfg(test)]
@@ -347,3 +350,6 @@ mod tests_loops_basic;
 #[cfg(test)]
 #[path = "lowering/tests_recursion.rs"]
 mod tests_recursion;
+#[cfg(test)]
+#[path = "lowering/tests_recursive_composed_calls.rs"]
+mod tests_recursive_composed_calls;

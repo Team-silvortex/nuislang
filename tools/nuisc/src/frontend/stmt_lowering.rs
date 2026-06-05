@@ -283,21 +283,24 @@ pub(super) fn lower_stmt_sequence_with_async(
         })?;
         let mut lowered_stmts = Vec::new();
         for field in fields {
-            let field_def = definition.field(field).ok_or_else(|| {
+            let field_def = definition.field(&field.field).ok_or_else(|| {
                 format!(
                     "destructuring let `{}` does not have field `{}`",
                     final_type.render(),
-                    field
+                    field.field
                 )
             })?;
+            if field.binding == "_" {
+                continue;
+            }
             let field_ty = field_def.ty.clone();
-            bindings.insert(field.clone(), field_ty.clone());
+            bindings.insert(field.binding.clone(), field_ty.clone());
             lowered_stmts.push(NirStmt::Let {
-                name: field.clone(),
+                name: field.binding.clone(),
                 ty: Some(field_ty),
                 value: nuis_semantics::model::NirExpr::FieldAccess {
                     base: Box::new(lowered.clone()),
-                    field: field.clone(),
+                    field: field.field.clone(),
                 },
             });
         }
