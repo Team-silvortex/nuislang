@@ -39,6 +39,10 @@ mod tests_destructure_let;
 #[cfg(test)]
 mod tests_frontend_core;
 #[cfg(test)]
+mod tests_generic_constraints;
+#[cfg(test)]
+mod tests_generic_method_bounds;
+#[cfg(test)]
 mod tests_generics;
 #[cfg(test)]
 mod tests_higher_order;
@@ -62,7 +66,10 @@ mod tests_test_functions;
 mod tests_types_async_window;
 mod types;
 mod validation;
+mod validation_generic_constraints;
 mod validation_helpers;
+mod validation_method_bounds;
+mod validation_trait_bounds;
 
 use std::collections::BTreeMap;
 
@@ -100,6 +107,7 @@ use self::return_inference::infer_missing_function_return_type;
 use self::signature_building::{build_initial_function_signatures, FunctionSignature};
 use self::specialization_pipeline::build_lowered_functions_and_impls;
 use self::validation::validate_declared_nir_types;
+use self::validation_generic_constraints::validate_ast_generic_constraints;
 use self::validation_helpers::{
     async_boundary_violation_detail, async_parameter_violation_detail, render_type_name,
     select_expected_semantic_token_type, validate_test_function_signature, validate_type_ref,
@@ -178,6 +186,12 @@ pub fn lower_project_ast_to_nir(
         build_initial_function_signatures(module, &local_cpu_helpers, &visible_type_aliases)?;
     let module_struct_table = build_module_struct_table(module);
     let impl_lookup = build_impl_lookup(module, &visible_type_aliases)?;
+    validate_ast_generic_constraints(
+        module,
+        &local_cpu_helpers,
+        &visible_type_aliases,
+        &impl_lookup,
+    )?;
     let const_assembly = assemble_module_consts(
         module,
         &local_cpu_helpers,
