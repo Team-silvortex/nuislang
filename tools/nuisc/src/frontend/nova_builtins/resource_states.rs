@@ -300,6 +300,7 @@ fn build_five_field_state(
     )?;
     Ok(NirExpr::StructLiteral {
         type_name: state_type.to_owned(),
+        type_args: Vec::new(),
         fields: vec![
             (fields[0].to_owned(), field(packet.clone(), fields[0])),
             (fields[1].to_owned(), field(packet.clone(), fields[1])),

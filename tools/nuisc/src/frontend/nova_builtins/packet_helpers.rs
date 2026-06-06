@@ -37,6 +37,7 @@ pub(super) fn build_struct_literal(
 ) -> NirExpr {
     NirExpr::StructLiteral {
         type_name: type_name.to_owned(),
+        type_args: Vec::new(),
         fields: field_names
             .iter()
             .zip(values)

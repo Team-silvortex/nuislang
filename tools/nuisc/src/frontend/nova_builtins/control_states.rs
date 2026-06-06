@@ -30,6 +30,7 @@ pub(super) fn lower_nova_control_state_builtin_call(
             )?;
             NirExpr::StructLiteral {
                 type_name: "NovaSliderState".to_owned(),
+                type_args: Vec::new(),
                 fields: vec![
                     ("value".to_owned(), field(packet.clone(), "value")),
                     ("min".to_owned(), field(packet.clone(), "min")),
@@ -53,6 +54,7 @@ pub(super) fn lower_nova_control_state_builtin_call(
             )?;
             NirExpr::StructLiteral {
                 type_name: "NovaToggleState".to_owned(),
+                type_args: Vec::new(),
                 fields: vec![
                     ("live".to_owned(), field(packet.clone(), "live")),
                     ("disabled".to_owned(), field(packet, "disabled")),
@@ -73,6 +75,7 @@ pub(super) fn lower_nova_control_state_builtin_call(
             )?;
             NirExpr::StructLiteral {
                 type_name: "NovaTextInputState".to_owned(),
+                type_args: Vec::new(),
                 fields: vec![
                     ("dirty".to_owned(), field(packet.clone(), "dirty")),
                     ("read_only".to_owned(), field(packet.clone(), "read_only")),
@@ -94,6 +97,7 @@ pub(super) fn lower_nova_control_state_builtin_call(
             )?;
             NirExpr::StructLiteral {
                 type_name: "NovaSelectState".to_owned(),
+                type_args: Vec::new(),
                 fields: vec![
                     ("committed".to_owned(), field(packet.clone(), "committed")),
                     ("multiple".to_owned(), field(packet.clone(), "multiple")),
@@ -115,6 +119,7 @@ pub(super) fn lower_nova_control_state_builtin_call(
             )?;
             NirExpr::StructLiteral {
                 type_name: "NovaCheckboxState".to_owned(),
+                type_args: Vec::new(),
                 fields: vec![
                     ("checked".to_owned(), field(packet.clone(), "checked")),
                     ("disabled".to_owned(), field(packet, "disabled")),
@@ -135,6 +140,7 @@ pub(super) fn lower_nova_control_state_builtin_call(
             )?;
             NirExpr::StructLiteral {
                 type_name: "NovaRadioState".to_owned(),
+                type_args: Vec::new(),
                 fields: vec![
                     ("selected".to_owned(), field(packet.clone(), "selected")),
                     ("options".to_owned(), field(packet.clone(), "options")),
@@ -156,6 +162,7 @@ pub(super) fn lower_nova_control_state_builtin_call(
             )?;
             NirExpr::StructLiteral {
                 type_name: "NovaTextAreaState".to_owned(),
+                type_args: Vec::new(),
                 fields: vec![
                     ("lines".to_owned(), field(packet.clone(), "lines")),
                     ("scroll".to_owned(), field(packet.clone(), "scroll")),

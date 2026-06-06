@@ -23,6 +23,20 @@ pub(super) fn build_visible_struct_defs(
                 annotations: lower_ast_attributes(&definition.attributes),
                 visibility: lower_visibility(definition.visibility),
                 name: definition.name.clone(),
+                generic_params: definition
+                    .generic_params
+                    .iter()
+                    .map(|param| {
+                        Ok(NirGenericParam {
+                            name: param.name.clone(),
+                            bound: param
+                                .bound
+                                .as_ref()
+                                .map(|ty| lower_type_ref_with_aliases(ty, visible_type_aliases))
+                                .transpose()?,
+                        })
+                    })
+                    .collect::<Result<Vec<_>, String>>()?,
                 fields: definition
                     .fields
                     .iter()
@@ -47,6 +61,22 @@ pub(super) fn build_visible_struct_defs(
                         annotations: helper_visible_struct_annotations(definition),
                         visibility: lower_visibility(definition.visibility),
                         name: definition.name.clone(),
+                        generic_params: definition
+                            .generic_params
+                            .iter()
+                            .map(|param| {
+                                Ok(NirGenericParam {
+                                    name: param.name.clone(),
+                                    bound: param
+                                        .bound
+                                        .as_ref()
+                                        .map(|ty| {
+                                            lower_type_ref_with_aliases(ty, visible_type_aliases)
+                                        })
+                                        .transpose()?,
+                                })
+                            })
+                            .collect::<Result<Vec<_>, String>>()?,
                         fields: definition
                             .fields
                             .iter()

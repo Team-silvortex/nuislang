@@ -133,6 +133,11 @@ fn lower_payload_struct_constructor_sugar(
             "payload-style struct constructor `{callee}(...)` requires struct `{callee}` to have exactly one field"
         ));
     }
+    if !definition.generic_params.is_empty() {
+        return Err(format!(
+            "payload-style struct constructor `{callee}(...)` is not yet supported for generic structs; use `{callee} {{ ... }}` with an explicit expected type"
+        ));
+    }
     let hidden_private_fields = hidden_private_field_count(definition);
     if hidden_private_fields > 0 {
         return Err(format!(
@@ -161,6 +166,7 @@ fn lower_payload_struct_constructor_sugar(
     let _ = resolve_declared_or_inferred(&field.name, Some(field.ty.clone()), inferred)?;
     Ok(Some(NirExpr::StructLiteral {
         type_name: callee.to_owned(),
+        type_args: Vec::new(),
         fields: vec![(field.name.clone(), lowered)],
     }))
 }

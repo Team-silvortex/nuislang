@@ -88,6 +88,7 @@ pub struct AstStructDef {
     pub visibility: AstVisibility,
     pub attributes: Vec<AstAttribute>,
     pub name: String,
+    pub generic_params: Vec<AstGenericParam>,
     pub fields: Vec<AstStructField>,
 }
 
@@ -414,6 +415,7 @@ pub struct NirStructDef {
     pub visibility: NirVisibility,
     pub annotations: Vec<NirAnnotation>,
     pub name: String,
+    pub generic_params: Vec<NirGenericParam>,
     pub fields: Vec<NirStructField>,
 }
 
@@ -1495,6 +1497,7 @@ pub enum NirExpr {
     },
     StructLiteral {
         type_name: String,
+        type_args: Vec<NirTypeRef>,
         fields: Vec<(String, NirExpr)>,
     },
     FieldAccess {

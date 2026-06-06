@@ -189,6 +189,11 @@ impl Parser {
         let (visibility, attributes) = self.parse_visibility_and_attribute_list()?;
         self.expect_word("struct")?;
         let name = self.expect_ident()?;
+        let generic_params = if self.peek_symbol('<') {
+            self.parse_generic_param_decl_list()?
+        } else {
+            Vec::new()
+        };
         self.expect_symbol('{')?;
         let mut fields = Vec::new();
         while !self.peek_symbol('}') {
@@ -214,6 +219,7 @@ impl Parser {
             visibility,
             attributes,
             name,
+            generic_params,
             fields,
         })
     }

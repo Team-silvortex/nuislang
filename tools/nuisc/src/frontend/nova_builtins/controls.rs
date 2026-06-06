@@ -97,6 +97,7 @@ pub(super) fn lower_nova_control_builtin_call(
                 .unwrap_or_else(|| NirExpr::Int(0));
             NirExpr::StructLiteral {
                 type_name: "NovaSliderPacket".to_owned(),
+                type_args: Vec::new(),
                 fields: vec![
                     ("value".to_owned(), value),
                     ("min".to_owned(), min_expr),
@@ -139,6 +140,7 @@ pub(super) fn lower_nova_control_builtin_call(
             };
             NirExpr::StructLiteral {
                 type_name: type_name.to_owned(),
+                type_args: Vec::new(),
                 fields: vec![("value".to_owned(), value), ("max".to_owned(), max_expr)],
             }
         }
@@ -171,6 +173,7 @@ pub(super) fn lower_nova_control_builtin_call(
                 .unwrap_or_else(|| NirExpr::Int(0));
             NirExpr::StructLiteral {
                 type_name: "NovaTogglePacket".to_owned(),
+                type_args: Vec::new(),
                 fields: vec![("live".to_owned(), live), ("disabled".to_owned(), disabled)],
             }
         }
@@ -211,6 +214,7 @@ pub(super) fn lower_nova_control_builtin_call(
                 .unwrap_or_else(|| active.clone());
             NirExpr::StructLiteral {
                 type_name: "NovaButtonPacket".to_owned(),
+                type_args: Vec::new(),
                 fields: vec![
                     ("active".to_owned(), active),
                     ("accent".to_owned(), accent),
@@ -289,6 +293,7 @@ pub(super) fn lower_nova_control_builtin_call(
                 .unwrap_or_else(|| NirExpr::Int(0));
             NirExpr::StructLiteral {
                 type_name: "NovaTextInputPacket".to_owned(),
+                type_args: Vec::new(),
                 fields: vec![
                     ("echo".to_owned(), echo),
                     ("caret".to_owned(), caret),
@@ -371,6 +376,7 @@ pub(super) fn lower_nova_control_builtin_call(
                 .unwrap_or_else(|| NirExpr::Int(1));
             NirExpr::StructLiteral {
                 type_name: "NovaSelectPacket".to_owned(),
+                type_args: Vec::new(),
                 fields: vec![
                     ("selected".to_owned(), selected),
                     ("accent".to_owned(), accent),
@@ -417,6 +423,7 @@ pub(super) fn lower_nova_control_builtin_call(
                 .unwrap_or_else(|| NirExpr::Int(0));
             NirExpr::StructLiteral {
                 type_name: "NovaCheckboxPacket".to_owned(),
+                type_args: Vec::new(),
                 fields: vec![
                     ("checked".to_owned(), checked),
                     ("accent".to_owned(), accent),
@@ -471,6 +478,7 @@ pub(super) fn lower_nova_control_builtin_call(
                 .unwrap_or_else(|| NirExpr::Int(0));
             NirExpr::StructLiteral {
                 type_name: "NovaRadioPacket".to_owned(),
+                type_args: Vec::new(),
                 fields: vec![
                     ("selected".to_owned(), selected),
                     ("options".to_owned(), options),
@@ -552,6 +560,7 @@ pub(super) fn lower_nova_control_builtin_call(
                 .unwrap_or_else(|| NirExpr::Int(0));
             NirExpr::StructLiteral {
                 type_name: "NovaTextAreaPacket".to_owned(),
+                type_args: Vec::new(),
                 fields: vec![
                     ("lines".to_owned(), lines),
                     ("scroll".to_owned(), scroll),

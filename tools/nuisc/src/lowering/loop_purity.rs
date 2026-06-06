@@ -189,8 +189,13 @@ pub(super) fn substitute_branch_binding(
                 .map(|arg| substitute_branch_binding(arg, binding_name, binding_value))
                 .collect(),
         },
-        NirExpr::StructLiteral { type_name, fields } => NirExpr::StructLiteral {
+        NirExpr::StructLiteral {
+            type_name,
+            type_args,
+            fields,
+        } => NirExpr::StructLiteral {
             type_name: type_name.clone(),
+            type_args: type_args.clone(),
             fields: fields
                 .iter()
                 .map(|(field, value)| {

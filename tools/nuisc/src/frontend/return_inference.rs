@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use nuis_semantics::model::{AstExpr, AstFunction, AstImplDef, AstStmt, AstStructDef, AstTypeRef};
 
+use super::validation_binding_env::instantiate_ast_struct_field_type;
 use super::{ast_named_type, infer_ast_expr_type, lower_type_ref, resolve_ast_type_ref_aliases};
 
 pub(super) fn infer_missing_function_return_type(
@@ -211,16 +212,17 @@ fn bind_destructure_fields_for_type(
                 resolved.name, field.field
             ));
         };
+        let field_ty = instantiate_ast_struct_field_type(&resolved, struct_def, &struct_field.ty);
         match &field.binding {
             nuis_semantics::model::AstDestructureBinding::Bind(name) => {
-                env.insert(name.clone(), struct_field.ty.clone());
+                env.insert(name.clone(), field_ty.clone());
             }
             nuis_semantics::model::AstDestructureBinding::Ignore => {}
             nuis_semantics::model::AstDestructureBinding::Nested {
                 type_ref,
                 fields: nested_fields,
             } => {
-                let nested_type = type_ref.as_ref().unwrap_or(&struct_field.ty);
+                let nested_type = type_ref.as_ref().unwrap_or(&field_ty);
                 bind_destructure_fields_for_type(nested_type, nested_fields, env, struct_table)?;
             }
         }

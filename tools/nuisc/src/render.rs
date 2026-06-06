@@ -1,15 +1,18 @@
 mod render_stmt_helpers;
+mod render_struct_helpers;
 
 use self::render_stmt_helpers::{
     render_ast_destructure_let, render_ast_stmt_inline, render_ast_type_suffix,
 };
+use self::render_struct_helpers::{
+    render_ast_struct, render_nir_struct, render_nir_type_arg_suffix,
+};
 use nuis_semantics::model::{
     AstAttribute, AstAttributeArg, AstAttributeValue, AstBinaryOp, AstExpr, AstExternInterface,
     AstFunction, AstGenericParam, AstImplDef, AstImplMethod, AstMatchPattern, AstModule, AstStmt,
-    AstStructDef, AstTraitDef, AstTraitMethodSig, AstVisibility, NirAnnotation, NirAttributeArg,
+    AstTraitDef, AstTraitMethodSig, AstVisibility, NirAnnotation, NirAttributeArg,
     NirAttributeValue, NirBinaryOp, NirExpr, NirExternInterface, NirFunction, NirGenericParam,
-    NirImplDef, NirImplMethod, NirModule, NirStmt, NirStructDef, NirTraitDef, NirTraitMethodSig,
-    NirVisibility,
+    NirImplDef, NirImplMethod, NirModule, NirStmt, NirTraitDef, NirTraitMethodSig, NirVisibility,
 };
 use yir_core::YirModule;
 
@@ -449,28 +452,6 @@ fn render_ast_expr(value: &AstExpr) -> String {
             render_ast_expr(rhs)
         ),
     }
-}
-
-fn render_ast_struct(definition: &AstStructDef) -> String {
-    let mut out = String::new();
-    let attribute_prefix = render_ast_attributes(&definition.attributes);
-    let visibility_prefix = render_ast_visibility(definition.visibility);
-    out.push_str(&format!(
-        "  {}{}struct {}\n",
-        attribute_prefix, visibility_prefix, definition.name
-    ));
-    for field in &definition.fields {
-        let field_prefix = render_ast_attributes(&field.attributes);
-        let field_visibility = render_ast_visibility(field.visibility);
-        out.push_str(&format!(
-            "    {}{}field {}: {}\n",
-            field_prefix,
-            field_visibility,
-            field.name,
-            render_ast_type(&field.ty)
-        ));
-    }
-    out
 }
 
 fn render_ast_trait(definition: &AstTraitDef) -> String {
@@ -1186,9 +1167,14 @@ fn render_nir_expr(value: &NirExpr) -> String {
                 .collect::<Vec<_>>()
                 .join(", ")
         ),
-        NirExpr::StructLiteral { type_name, fields } => format!(
-            "{} {{ {} }}",
+        NirExpr::StructLiteral {
             type_name,
+            type_args,
+            fields,
+        } => format!(
+            "{}{} {{ {} }}",
+            type_name,
+            render_nir_type_arg_suffix(type_args),
             fields
                 .iter()
                 .map(|(name, value)| format!("{name}: {}", render_nir_expr(value)))
@@ -1203,28 +1189,6 @@ fn render_nir_expr(value: &NirExpr) -> String {
             render_nir_expr(rhs)
         ),
     }
-}
-
-fn render_nir_struct(definition: &NirStructDef) -> String {
-    let mut out = String::new();
-    let annotation_prefix = render_nir_annotations(&definition.annotations);
-    let visibility_prefix = render_nir_visibility(definition.visibility);
-    out.push_str(&format!(
-        "  {}{}struct {}\n",
-        annotation_prefix, visibility_prefix, definition.name
-    ));
-    for field in &definition.fields {
-        let field_prefix = render_nir_annotations(&field.annotations);
-        let field_visibility = render_nir_visibility(field.visibility);
-        out.push_str(&format!(
-            "    {}{}field {}: {}\n",
-            field_prefix,
-            field_visibility,
-            field.name,
-            render_nir_type(&field.ty)
-        ));
-    }
-    out
 }
 
 fn render_nir_trait(definition: &NirTraitDef) -> String {

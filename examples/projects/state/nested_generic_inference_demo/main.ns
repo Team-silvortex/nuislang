@@ -1,6 +1,6 @@
 mod cpu Main {
-  struct Boxed {
-    value: i64,
+  struct Boxed<T> {
+    value: T,
   }
 
   fn typed_zero<T>() -> T {
@@ -12,7 +12,7 @@ mod cpu Main {
   }
 
   fn main() -> i64 {
-    let boxed: Boxed = Boxed { value: typed_zero() };
+    let boxed: Boxed<i64> = Boxed { value: typed_zero() };
     return takes_i64(typed_zero()) + boxed.value;
   }
 }

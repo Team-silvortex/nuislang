@@ -138,7 +138,7 @@ fn lowers_payload_style_single_field_struct_constructor_sugar() {
             assert_eq!(name, "payload");
             assert!(matches!(
                 value,
-                NirExpr::StructLiteral { type_name, fields }
+                NirExpr::StructLiteral { type_name, fields, .. }
                     if type_name == "Just"
                         && matches!(
                             fields.as_slice(),

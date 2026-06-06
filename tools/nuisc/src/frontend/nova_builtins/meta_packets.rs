@@ -102,6 +102,7 @@ pub(super) fn lower_nova_meta_packet_builtin_call(
     ];
     Ok(Some(NirExpr::StructLiteral {
         type_name: type_name.to_owned(),
+        type_args: Vec::new(),
         fields: fields
             .into_iter()
             .map(|(field, index)| (field.to_owned(), values[index].clone()))

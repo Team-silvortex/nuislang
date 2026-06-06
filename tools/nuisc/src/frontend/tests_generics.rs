@@ -221,8 +221,8 @@ fn monomorphizes_zero_arg_generic_from_struct_field_expectation() {
     let module = parse_nuis_module(
         r#"
         mod cpu Main {
-          struct Boxed {
-            value: i64,
+          struct Boxed<T> {
+            value: T,
           }
 
           fn typed_zero<T>() -> T {
@@ -230,7 +230,7 @@ fn monomorphizes_zero_arg_generic_from_struct_field_expectation() {
           }
 
           fn main() -> i64 {
-            let boxed: Boxed = Boxed { value: typed_zero() };
+            let boxed: Boxed<i64> = Boxed { value: typed_zero() };
             return boxed.value;
           }
         }

@@ -113,6 +113,7 @@ pub(super) fn lower_nova_panel_parts_builtin_call(
     }
     Ok(Some(NirExpr::StructLiteral {
         type_name: "NovaPanelPacket".to_owned(),
+        type_args: Vec::new(),
         fields,
     }))
 }

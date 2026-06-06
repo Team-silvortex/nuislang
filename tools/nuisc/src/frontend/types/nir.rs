@@ -369,7 +369,11 @@ pub(crate) fn infer_nir_expr_type(
             .get(callee)
             .and_then(|sig| sig.return_type.clone()),
         NirExpr::MethodCall { .. } => None,
-        NirExpr::StructLiteral { type_name, .. } => Some(named_type(type_name)),
+        NirExpr::StructLiteral {
+            type_name,
+            type_args,
+            ..
+        } => Some(generic_named_type(type_name, type_args.clone())),
         NirExpr::FieldAccess { base, field } => {
             let base_ty = infer_nir_expr_type(base, bindings, signatures, struct_table)?;
             struct_field_type(&base_ty, field, struct_table)
@@ -537,19 +541,15 @@ pub(crate) fn ref_type(name: &str) -> NirTypeRef {
 pub(crate) fn i64_type() -> NirTypeRef {
     named_type("i64")
 }
-
 pub(crate) fn i32_type() -> NirTypeRef {
     named_type("i32")
 }
-
 pub(crate) fn bool_type() -> NirTypeRef {
     named_type("bool")
 }
-
 pub(crate) fn string_type() -> NirTypeRef {
     named_type("String")
 }
-
 pub(crate) fn unit_type() -> NirTypeRef {
     named_type("Unit")
 }
@@ -562,8 +562,18 @@ pub(crate) fn struct_field_type(
     if let Some(builtin) = builtin_struct_field_type(&base_ty.name, field) {
         return Some(builtin);
     }
-    struct_table
-        .get(&base_ty.name)?
-        .field(field)
-        .map(|field| field.ty.clone())
+    let definition = struct_table.get(&base_ty.name)?;
+    Some(instantiate_struct_field_type(
+        base_ty,
+        definition,
+        &definition.field(field)?.ty,
+    ))
+}
+
+pub(crate) fn instantiate_struct_field_type(
+    base_ty: &NirTypeRef,
+    definition: &NirStructDef,
+    field_ty: &NirTypeRef,
+) -> NirTypeRef {
+    super::struct_generics::instantiate_struct_field_type(base_ty, definition, field_ty)
 }

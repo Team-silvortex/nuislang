@@ -1,3 +1,7 @@
+#[path = "optimize_expr_helpers.rs"]
+mod optimize_expr_helpers;
+
+use self::optimize_expr_helpers::{is_inline_safe_arg, simplify_expr_vec};
 use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{
@@ -741,7 +745,11 @@ fn simplify_expr(
                 left || right,
             )
         }
-        NirExpr::StructLiteral { type_name, fields } => {
+        NirExpr::StructLiteral {
+            type_name,
+            type_args,
+            fields,
+        } => {
             let mut changed = false;
             let fields = fields
                 .into_iter()
@@ -752,7 +760,14 @@ fn simplify_expr(
                     (name, value)
                 })
                 .collect();
-            (NirExpr::StructLiteral { type_name, fields }, changed)
+            (
+                NirExpr::StructLiteral {
+                    type_name,
+                    type_args,
+                    fields,
+                },
+                changed,
+            )
         }
         NirExpr::FieldAccess { base, field } => {
             let (base, changed) = simplify_expr(*base, env, inline_templates, active_inline);
@@ -785,42 +800,19 @@ fn simplify_expr(
     }
 }
 
-fn simplify_expr_vec(
-    values: Vec<NirExpr>,
-    env: &BTreeMap<String, NirExpr>,
-    inline_templates: &BTreeMap<String, InlineTemplate>,
-    active_inline: &mut BTreeSet<String>,
-) -> (Vec<NirExpr>, bool) {
-    let mut changed = false;
-    let values = values
-        .into_iter()
-        .map(|value| {
-            let (value, value_changed) = simplify_expr(value, env, inline_templates, active_inline);
-            changed |= value_changed;
-            value
-        })
-        .collect();
-    (values, changed)
-}
-
-fn is_inline_safe_arg(expr: &NirExpr) -> bool {
-    matches!(
-        nir_expr_effect_class(expr),
-        NirExprEffectClass::Pure
-            | NirExprEffectClass::LocalReadOnly
-            | NirExprEffectClass::HostReadOnly
-            | NirExprEffectClass::DomainReadOnly
-    )
-}
-
 fn substitute_inline_params(expr: &NirExpr, substitutions: &BTreeMap<String, NirExpr>) -> NirExpr {
     match expr {
         NirExpr::Var(name) => substitutions
             .get(name)
             .cloned()
             .unwrap_or_else(|| NirExpr::Var(name.clone())),
-        NirExpr::StructLiteral { type_name, fields } => NirExpr::StructLiteral {
+        NirExpr::StructLiteral {
+            type_name,
+            type_args,
+            fields,
+        } => NirExpr::StructLiteral {
             type_name: type_name.clone(),
+            type_args: type_args.clone(),
             fields: fields
                 .iter()
                 .map(|(name, value)| (name.clone(), substitute_inline_params(value, substitutions)))

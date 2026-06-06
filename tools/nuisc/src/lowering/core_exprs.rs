@@ -1,3 +1,5 @@
+use nuis_semantics::model::NirTypeRef;
+
 use super::*;
 
 pub(super) fn lower_core_expr(
@@ -46,9 +48,13 @@ pub(super) fn lower_core_expr(
         } => Some(lower_store_at(buffer, index, value, state, bindings)),
         NirExpr::Free(value) => Some(lower_free(value, state, bindings)),
         NirExpr::Binary { op, lhs, rhs } => Some(lower_binary(op, lhs, rhs, state, bindings)),
-        NirExpr::StructLiteral { type_name, fields } => {
-            Some(lower_struct_literal(type_name, fields, state, bindings))
-        }
+        NirExpr::StructLiteral {
+            type_name,
+            type_args,
+            fields,
+        } => Some(lower_struct_literal(
+            type_name, type_args, fields, state, bindings,
+        )),
         NirExpr::FieldAccess { base, field } => {
             Some(lower_field_access(base, field, state, bindings))
         }
@@ -358,6 +364,7 @@ fn lower_binary(
 
 fn lower_struct_literal(
     type_name: &str,
+    _type_args: &[NirTypeRef],
     fields: &[(String, NirExpr)],
     state: &mut LoweringState<'_>,
     bindings: &BTreeMap<String, String>,

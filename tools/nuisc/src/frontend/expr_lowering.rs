@@ -4,8 +4,9 @@ use super::binary_lowering::lower_binary_expr_with_async;
 use super::metadata::{hidden_private_field_count, ModuleConstValue};
 use super::validation_helpers::render_type_name;
 use super::{
-    infer_nir_expr_type, lower_call_expr_with_async, resolve_declared_or_inferred,
-    struct_field_type, AstExpr, FunctionSignature, NirExpr, NirStructDef, NirTypeRef,
+    infer_nir_expr_type, instantiate_struct_field_type, lower_call_expr_with_async, named_type,
+    resolve_declared_or_inferred, struct_field_type, AstExpr, FunctionSignature, NirExpr,
+    NirStructDef, NirTypeRef,
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -290,6 +291,23 @@ pub(super) fn lower_expr_with_async(
             let definition = struct_table
                 .get(type_name)
                 .ok_or_else(|| format!("unknown struct type `{}`", type_name))?;
+            let literal_ty = if definition.generic_params.is_empty() {
+                named_type(type_name)
+            } else if let Some(expected) = expected {
+                if expected.name != *type_name {
+                    return Err(format!(
+                        "cannot infer generic arguments for struct literal `{}` from expected type `{}`",
+                        type_name,
+                        expected.render()
+                    ));
+                }
+                expected.clone()
+            } else {
+                return Err(format!(
+                    "cannot infer generic arguments for struct literal `{}` in the current frontend; add an explicit expected type",
+                    type_name
+                ));
+            };
             let hidden_private_fields = hidden_private_field_count(definition);
             if hidden_private_fields > 0 {
                 return Err(format!(
@@ -319,10 +337,12 @@ pub(super) fn lower_expr_with_async(
                     module_consts,
                     signatures,
                     struct_table,
-                    Some(&field.ty),
+                    Some(&instantiate_struct_field_type(&literal_ty, definition, &field.ty)),
                 )?;
                 let inferred = infer_nir_expr_type(&lowered, bindings, signatures, struct_table);
-                let _ = resolve_declared_or_inferred(name, Some(field.ty.clone()), inferred)?;
+                let expected_field_ty =
+                    instantiate_struct_field_type(&literal_ty, definition, &field.ty);
+                let _ = resolve_declared_or_inferred(name, Some(expected_field_ty), inferred)?;
                 lowered_fields.push((name.clone(), lowered));
             }
             if definition.fields.len() != lowered_fields.len() {
@@ -334,6 +354,7 @@ pub(super) fn lower_expr_with_async(
             }
             NirExpr::StructLiteral {
                 type_name: type_name.clone(),
+                type_args: literal_ty.generic_args,
                 fields: lowered_fields,
             }
         }

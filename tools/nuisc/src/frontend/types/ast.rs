@@ -5,6 +5,7 @@ use nuis_semantics::model::{
 };
 
 use super::super::lower_type_ref;
+use super::super::validation_binding_env::instantiate_ast_struct_field_type;
 
 pub(crate) fn ast_type_from_nir(ty: &NirTypeRef) -> AstTypeRef {
     AstTypeRef {
@@ -361,7 +362,14 @@ pub(crate) fn infer_ast_expr_type_inner(
             }
             None
         }
-        AstExpr::StructLiteral { type_name, .. } => Some(ast_named_type(type_name)),
+        AstExpr::StructLiteral { type_name, .. } => {
+            let definition = struct_table.get(type_name)?;
+            if definition.generic_params.is_empty() {
+                Some(ast_named_type(type_name))
+            } else {
+                None
+            }
+        }
         AstExpr::FieldAccess { base, field } => {
             let base_ty = infer_ast_expr_type_inner(
                 base,
@@ -376,7 +384,7 @@ pub(crate) fn infer_ast_expr_type_inner(
                 .fields
                 .iter()
                 .find(|item| item.name == *field)
-                .map(|field| field.ty.clone())
+                .map(|field| instantiate_ast_struct_field_type(&base_ty, definition, &field.ty))
         }
         AstExpr::Binary { op, lhs, rhs } => match op {
             AstBinaryOp::Eq

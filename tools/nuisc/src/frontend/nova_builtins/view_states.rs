@@ -30,6 +30,7 @@ pub(super) fn lower_nova_view_state_builtin_call(
             )?;
             NirExpr::StructLiteral {
                 type_name: "NovaTabsState".to_owned(),
+                type_args: Vec::new(),
                 fields: vec![
                     ("active".to_owned(), field(packet.clone(), "active")),
                     ("count".to_owned(), field(packet.clone(), "count")),
@@ -51,6 +52,7 @@ pub(super) fn lower_nova_view_state_builtin_call(
             )?;
             NirExpr::StructLiteral {
                 type_name: "NovaListState".to_owned(),
+                type_args: Vec::new(),
                 fields: vec![
                     ("selected".to_owned(), field(packet.clone(), "selected")),
                     ("items".to_owned(), field(packet.clone(), "items")),
@@ -72,6 +74,7 @@ pub(super) fn lower_nova_view_state_builtin_call(
             )?;
             NirExpr::StructLiteral {
                 type_name: "NovaTableState".to_owned(),
+                type_args: Vec::new(),
                 fields: vec![
                     ("rows".to_owned(), field(packet.clone(), "rows")),
                     ("cols".to_owned(), field(packet.clone(), "cols")),
@@ -97,6 +100,7 @@ pub(super) fn lower_nova_view_state_builtin_call(
             )?;
             NirExpr::StructLiteral {
                 type_name: "NovaTreeState".to_owned(),
+                type_args: Vec::new(),
                 fields: vec![
                     ("selected".to_owned(), field(packet.clone(), "selected")),
                     ("nodes".to_owned(), field(packet.clone(), "nodes")),
@@ -118,6 +122,7 @@ pub(super) fn lower_nova_view_state_builtin_call(
             )?;
             NirExpr::StructLiteral {
                 type_name: "NovaInspectorState".to_owned(),
+                type_args: Vec::new(),
                 fields: vec![
                     ("selected".to_owned(), field(packet.clone(), "selected")),
                     ("fields".to_owned(), field(packet.clone(), "fields")),
@@ -139,6 +144,7 @@ pub(super) fn lower_nova_view_state_builtin_call(
             )?;
             NirExpr::StructLiteral {
                 type_name: "NovaOutlineState".to_owned(),
+                type_args: Vec::new(),
                 fields: vec![
                     ("selected".to_owned(), field(packet.clone(), "selected")),
                     ("items".to_owned(), field(packet.clone(), "items")),

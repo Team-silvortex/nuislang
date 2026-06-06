@@ -61,6 +61,7 @@ pub(super) fn lower_nova_view_builtin_call(
                 .unwrap_or_else(|| NirExpr::Int(0));
             NirExpr::StructLiteral {
                 type_name: "NovaTabsPacket".to_owned(),
+                type_args: Vec::new(),
                 fields: vec![
                     ("active".to_owned(), active),
                     ("count".to_owned(), count),
@@ -114,6 +115,7 @@ pub(super) fn lower_nova_view_builtin_call(
                 .unwrap_or_else(|| NirExpr::Int(0));
             NirExpr::StructLiteral {
                 type_name: "NovaListPacket".to_owned(),
+                type_args: Vec::new(),
                 fields: vec![
                     ("selected".to_owned(), selected),
                     ("items".to_owned(), items),
@@ -167,6 +169,7 @@ pub(super) fn lower_nova_view_builtin_call(
                 .unwrap_or_else(|| NirExpr::Int(1));
             NirExpr::StructLiteral {
                 type_name: "NovaTablePacket".to_owned(),
+                type_args: Vec::new(),
                 fields: vec![
                     ("rows".to_owned(), rows),
                     ("cols".to_owned(), cols),
@@ -213,6 +216,7 @@ pub(super) fn lower_nova_view_builtin_call(
             )?;
             NirExpr::StructLiteral {
                 type_name: "NovaTreePacket".to_owned(),
+                type_args: Vec::new(),
                 fields: vec![
                     ("selected".to_owned(), selected),
                     ("nodes".to_owned(), nodes),
@@ -259,6 +263,7 @@ pub(super) fn lower_nova_view_builtin_call(
             )?;
             NirExpr::StructLiteral {
                 type_name: "NovaInspectorPacket".to_owned(),
+                type_args: Vec::new(),
                 fields: vec![
                     ("selected".to_owned(), selected),
                     ("fields".to_owned(), fields),
@@ -305,6 +310,7 @@ pub(super) fn lower_nova_view_builtin_call(
             )?;
             NirExpr::StructLiteral {
                 type_name: "NovaOutlinePacket".to_owned(),
+                type_args: Vec::new(),
                 fields: vec![
                     ("selected".to_owned(), selected),
                     ("items".to_owned(), items),
@@ -351,6 +357,7 @@ pub(super) fn lower_nova_view_builtin_call(
             )?;
             NirExpr::StructLiteral {
                 type_name: "NovaSelectionPacket".to_owned(),
+                type_args: Vec::new(),
                 fields: vec![
                     ("selected".to_owned(), selected),
                     ("span".to_owned(), span),
@@ -373,6 +380,7 @@ pub(super) fn lower_nova_view_builtin_call(
             )?;
             NirExpr::StructLiteral {
                 type_name: "NovaFocusPacket".to_owned(),
+                type_args: Vec::new(),
                 fields: vec![("slot".to_owned(), slot)],
             }
         }
@@ -406,6 +414,7 @@ pub(super) fn lower_nova_view_builtin_call(
             )?;
             NirExpr::StructLiteral {
                 type_name: "NovaSliderGroupPacket".to_owned(),
+                type_args: Vec::new(),
                 fields: vec![
                     ("color".to_owned(), color),
                     ("speed".to_owned(), speed),

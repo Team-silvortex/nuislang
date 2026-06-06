@@ -60,13 +60,14 @@ pub(super) fn bind_destructure_fields_for_type(
                 resolved.name, field.field
             ));
         };
+        let field_ty = instantiate_ast_struct_field_type(&resolved, struct_def, &struct_field.ty);
         match &field.binding {
             AstDestructureBinding::Bind(name) => {
-                env.insert(name.clone(), struct_field.ty.clone());
+                env.insert(name.clone(), field_ty.clone());
             }
             AstDestructureBinding::Ignore => {}
             AstDestructureBinding::Nested { type_ref, fields } => {
-                let nested_type = type_ref.as_ref().unwrap_or(&struct_field.ty);
+                let nested_type = type_ref.as_ref().unwrap_or(&field_ty);
                 bind_destructure_fields_for_type(
                     nested_type,
                     fields,
@@ -99,8 +100,10 @@ pub(super) fn bind_match_pattern_for_type(
             let Some(payload_field) = struct_def.fields.first() else {
                 return Ok(());
             };
+            let payload_ty =
+                instantiate_ast_struct_field_type(&resolved, struct_def, &payload_field.ty);
             bind_match_pattern_for_type(
-                &payload_field.ty,
+                &payload_ty,
                 payload,
                 visible_type_aliases,
                 visible_structs,
@@ -124,8 +127,10 @@ pub(super) fn bind_match_pattern_for_type(
                 else {
                     continue;
                 };
+                let field_ty =
+                    instantiate_ast_struct_field_type(&resolved, struct_def, &struct_field.ty);
                 bind_match_pattern_for_type(
-                    &struct_field.ty,
+                    &field_ty,
                     field_pattern,
                     visible_type_aliases,
                     visible_structs,
@@ -150,4 +155,42 @@ pub(super) fn bind_match_pattern_for_type(
         | AstMatchPattern::IntRangeInclusive(_, _) => {}
     }
     Ok(())
+}
+
+pub(super) fn instantiate_ast_struct_field_type(
+    base_ty: &AstTypeRef,
+    definition: &AstStructDef,
+    field_ty: &AstTypeRef,
+) -> AstTypeRef {
+    if definition.generic_params.len() != base_ty.generic_args.len() {
+        return field_ty.clone();
+    }
+    let substitutions = definition
+        .generic_params
+        .iter()
+        .map(|param| param.name.clone())
+        .zip(base_ty.generic_args.iter().cloned())
+        .collect::<BTreeMap<_, _>>();
+    substitute_ast_struct_generic_type(field_ty, &substitutions)
+}
+
+fn substitute_ast_struct_generic_type(
+    ty: &AstTypeRef,
+    substitutions: &BTreeMap<String, AstTypeRef>,
+) -> AstTypeRef {
+    if ty.generic_args.is_empty() && !ty.is_optional && !ty.is_ref {
+        if let Some(substitution) = substitutions.get(&ty.name) {
+            return substitution.clone();
+        }
+    }
+    AstTypeRef {
+        name: ty.name.clone(),
+        generic_args: ty
+            .generic_args
+            .iter()
+            .map(|arg| substitute_ast_struct_generic_type(arg, substitutions))
+            .collect(),
+        is_optional: ty.is_optional,
+        is_ref: ty.is_ref,
+    }
 }

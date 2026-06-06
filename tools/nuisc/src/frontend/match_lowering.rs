@@ -7,8 +7,9 @@ use nuis_semantics::model::{
 
 use super::stmt_lowering::lower_stmt_block_with_async;
 use super::{
-    bool_type, infer_nir_expr_type, lower_expr_with_async, lower_type_ref,
-    lower_type_ref_with_aliases, resolve_ast_type_ref_aliases, FunctionSignature, ModuleConstValue,
+    bool_type, infer_nir_expr_type, instantiate_struct_field_type, lower_expr_with_async,
+    lower_type_ref, lower_type_ref_with_aliases, resolve_ast_type_ref_aliases, FunctionSignature,
+    ModuleConstValue,
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -189,8 +190,13 @@ fn substitute_pattern_binding_vars(
                 .map(|arg| substitute_pattern_binding_vars(arg, pattern_bindings))
                 .collect(),
         },
-        NirExpr::StructLiteral { type_name, fields } => NirExpr::StructLiteral {
+        NirExpr::StructLiteral {
+            type_name,
+            type_args,
+            fields,
+        } => NirExpr::StructLiteral {
             type_name: type_name.clone(),
+            type_args: type_args.clone(),
             fields: fields
                 .iter()
                 .map(|(field, value)| {
@@ -313,6 +319,8 @@ fn lower_match_pattern_condition_and_bindings(
                 ));
             }
             let field = &definition.fields[0];
+            let field_ty =
+                instantiate_struct_field_type(&lowered_pattern_ty, definition, &field.ty);
             let field_expr = NirExpr::FieldAccess {
                 base: Box::new(lowered_value.clone()),
                 field: field.name.clone(),
@@ -322,7 +330,7 @@ fn lower_match_pattern_condition_and_bindings(
                 other => lower_match_pattern_condition_and_bindings(
                     other,
                     &field_expr,
-                    &field.ty,
+                    &field_ty,
                     type_aliases,
                     struct_table,
                 ),
@@ -370,10 +378,12 @@ fn lower_match_pattern_condition_and_bindings(
                     base: Box::new(lowered_value.clone()),
                     field: field_name.clone(),
                 };
+                let field_ty =
+                    instantiate_struct_field_type(&lowered_pattern_ty, definition, &field_def.ty);
                 let (field_condition, field_bindings) = lower_match_pattern_condition_and_bindings(
                     field_pattern,
                     &field_expr,
-                    &field_def.ty,
+                    &field_ty,
                     type_aliases,
                     struct_table,
                 )?;

@@ -45,13 +45,18 @@ pub(super) fn validate_ast_generic_constraints(
     }
 
     for definition in &module.structs {
+        let generic_bounds = build_generic_bound_env(
+            &definition.generic_params,
+            &visible_trait_names,
+            &format!("struct `{}`", definition.name),
+        )?;
         for field in &definition.fields {
             validate_ast_type_ref_generic_constraints(
                 &field.ty,
                 visible_type_aliases,
                 impl_lookup,
                 &visible_trait_names,
-                &BTreeMap::new(),
+                &generic_bounds,
                 &format!("struct `{}` field `{}`", definition.name, field.name),
             )?;
         }

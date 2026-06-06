@@ -7,9 +7,9 @@ use super::match_lowering::lower_match_stmt_with_async;
 use super::metadata::ModuleConstValue;
 use super::validation_helpers::validate_type_ref;
 use super::{
-    bool_type, infer_nir_expr_type, lower_expr_with_async, lower_type_ref_with_aliases,
-    resolve_declared_or_inferred, AstStmt, AstTypeAlias, AstTypeRef, FunctionSignature, NirStmt,
-    NirStructDef, NirTypeRef,
+    bool_type, infer_nir_expr_type, instantiate_struct_field_type, lower_expr_with_async,
+    lower_type_ref_with_aliases, resolve_declared_or_inferred, AstStmt, AstTypeAlias, AstTypeRef,
+    FunctionSignature, NirStmt, NirStructDef, NirTypeRef,
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -324,7 +324,7 @@ fn emit_destructure_bindings(
                 field.field
             )
         })?;
-        let field_ty = field_def.ty.clone();
+        let field_ty = instantiate_struct_field_type(base_type, definition, &field_def.ty);
         let field_expr = NirExpr::FieldAccess {
             base: Box::new(base.clone()),
             field: field.field.clone(),

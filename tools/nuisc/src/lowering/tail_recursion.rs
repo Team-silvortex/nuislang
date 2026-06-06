@@ -378,8 +378,13 @@ fn canonicalize_tail_recursive_loop_arg(
                 })
                 .collect(),
         },
-        NirExpr::StructLiteral { type_name, fields } => NirExpr::StructLiteral {
+        NirExpr::StructLiteral {
+            type_name,
+            type_args,
+            fields,
+        } => NirExpr::StructLiteral {
             type_name: type_name.clone(),
+            type_args: type_args.clone(),
             fields: fields
                 .iter()
                 .map(|(field, value)| {
@@ -492,8 +497,13 @@ fn canonicalize_tail_recursive_condition_expr(
                 })
                 .collect(),
         },
-        NirExpr::StructLiteral { type_name, fields } => NirExpr::StructLiteral {
+        NirExpr::StructLiteral {
+            type_name,
+            type_args,
+            fields,
+        } => NirExpr::StructLiteral {
             type_name: type_name.clone(),
+            type_args: type_args.clone(),
             fields: fields
                 .iter()
                 .map(|(field, value)| {

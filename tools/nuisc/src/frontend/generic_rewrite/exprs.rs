@@ -132,7 +132,17 @@ pub(super) fn rewrite_generic_calls_in_expr(
             fields: fields
                 .iter()
                 .map(|(name, value)| {
-                    let field_expected = struct_field_expected_type(type_name, name, struct_table);
+                    let literal_ty = expected
+                        .filter(|ty| ty.name == *type_name)
+                        .cloned()
+                        .unwrap_or_else(|| AstTypeRef {
+                            name: type_name.clone(),
+                            generic_args: Vec::new(),
+                            is_optional: false,
+                            is_ref: false,
+                        });
+                    let field_expected =
+                        struct_field_expected_type(&literal_ty, name, struct_table);
                     Ok((
                         name.clone(),
                         rewrite_generic_calls_in_expr(
@@ -295,17 +305,18 @@ fn call_arg_expected_type<'a>(
 }
 
 fn struct_field_expected_type(
-    type_name: &str,
+    literal_ty: &AstTypeRef,
     field_name: &str,
     struct_table: &BTreeMap<String, AstStructDef>,
 ) -> Option<AstTypeRef> {
-    struct_table
-        .get(type_name)
-        .and_then(|definition| {
-            definition
-                .fields
-                .iter()
-                .find(|field| field.name == field_name)
-        })
-        .map(|field| field.ty.clone())
+    let definition = struct_table.get(&literal_ty.name)?;
+    let field = definition
+        .fields
+        .iter()
+        .find(|field| field.name == field_name)?;
+    Some(
+        super::super::validation_binding_env::instantiate_ast_struct_field_type(
+            literal_ty, definition, &field.ty,
+        ),
+    )
 }
