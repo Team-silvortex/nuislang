@@ -157,20 +157,19 @@ It keeps the current repository honest about where it is today:
 So, for now, treat `join(...)` as:
 
 * a task payload boundary
-* not yet a finalized `GLM` consume boundary
+* now a finalized `GLM` consume boundary for task handles
 
-That gap is one of the main reasons this area should stay conservative until
-the concurrent memory model is stronger.
+That tighter rule is one of the main reasons this area should still stay
+conservative until the concurrent memory model is stronger.
 
 One useful current probe shape is:
 
 * direct `join(task)` for payload extraction
 * followed later by `join_result(task)` for observation
 
-That shape is intentionally still possible today because `join(...)` has not
-yet been elevated to a graph-level consume boundary. If the repository later
-promotes `join(...)` into final ownership transfer semantics, this is exactly
-the kind of sample that should be revisited.
+That shape is intentionally no longer possible today because both `join(...)`
+and `join_result(...)` now consume the same task handle. It remains useful as
+an explicit negative probe for stricter task ownership semantics.
 
 Current concrete probes:
 

@@ -333,8 +333,8 @@ project/front-door compilation shape:
   * useful for testing that cancellation-sensitive paths do **not** contract
     too aggressively
 * [task_join_nonconsuming_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_join_nonconsuming_probe_demo)
-  * good future regression probe if local contraction begins to interact with
-    a stricter future `join(...)` boundary
+  * useful current negative probe when local contraction interacts with the
+    now-stricter `join(...)` consume boundary
 
 ### What To Avoid As First Probes
 
@@ -343,7 +343,7 @@ first contraction targets:
 
 * borrowed/ref payload invalids
 * resource-bearing external-handle probes
-* samples whose main purpose is future `GLM` tightening rather than local
+* samples whose main purpose is `GLM` boundary conflict rather than local
   async-state simplification
 
 That is because the first contraction work should stay on value-like task

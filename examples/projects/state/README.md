@@ -1,26 +1,34 @@
 # State And Persistence Project Companions
 
-This folder contains narrow project-form location, config, cache, and
-persistence companions.
+This folder is the project-form companion area for:
 
-Start here:
+* stateful control flow
+* recursion and loop lowering
+* pattern matching and destructuring
+* generic method-bound validation routes
+* small runtime location/config/cache probes
+* current GLM/state ownership probes
+
+Use this README as a router, not as a full inventory.
+
+## Start Here
+
+If you want the shortest current route, read:
+
+* [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
+* [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+
+Then use the focused clusters below.
+
+## Focused Clusters
 
 Generic method-bound route:
 
 * [generic_method_bound_if_binding_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_if_binding_demo)
-  positive path:
-  `match` binding introduces `local`, then `if` branch calls `local.add(local)`
-  under `T: Addable`
 * [generic_method_bound_nested_match_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_nested_match_demo)
-  positive path:
-  outer `match` binding survives into an inner `match` arm before the
-  generic method call
 * [generic_method_bound_guarded_nested_match_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_guarded_nested_match_demo)
-  positive path:
-  outer `match` binding survives into a guarded inner `match` arm before the
-  generic method call
 
-These three companions are the current shortest user-facing route for:
+This is the shortest user-facing path for:
 
 * alias-wrapped generic receivers
 * `T: Addable` method calls
@@ -28,117 +36,49 @@ These three companions are the current shortest user-facing route for:
 * binding visibility through nested `match`
 * guard-preserving nested `match`
 
-* [cwd_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/cwd_runtime_demo)
-* [temp_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/temp_runtime_demo)
-* [tail_return_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_return_demo)
-* [tail_recursive_sum_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_sum_demo)
-* [tail_recursive_branching_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_branching_demo)
-* [tail_recursive_factorial_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_factorial_demo)
-* [tail_recursive_multi_carry_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_multi_carry_demo)
-* [tail_recursive_branching_multi_carry_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_branching_multi_carry_demo)
-* [tail_recursive_carry_condition_multi_carry_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_carry_condition_multi_carry_demo)
-* [tail_recursive_cross_carry_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_cross_carry_demo)
-* [tail_recursive_branching_cross_carry_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_branching_cross_carry_demo)
-* [ordinary_recursive_factorial_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_factorial_demo)
-* [ordinary_recursive_fn2_higher_order_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_fn2_higher_order_call_graph_demo)
-* [ordinary_recursive_bool_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_bool_demo)
-* [ordinary_recursive_bool_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_bool_call_graph_demo)
-* [ordinary_recursive_higher_order_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_higher_order_call_graph_demo)
-* [ordinary_recursive_generic_alias_higher_order_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_generic_alias_higher_order_call_graph_demo)
-* [ordinary_recursive_generic_alias_composed_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_generic_alias_composed_call_graph_demo)
-* [ordinary_recursive_generic_alias_fn3_higher_order_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_generic_alias_fn3_higher_order_call_graph_demo)
-* [ordinary_recursive_generic_fn2_higher_order_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_generic_fn2_higher_order_call_graph_demo)
-* [ordinary_recursive_generic_fn3_higher_order_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_generic_fn3_higher_order_call_graph_demo)
-* [ordinary_recursive_generic_higher_order_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_generic_higher_order_call_graph_demo)
-* [ordinary_recursive_generic_composed_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_generic_composed_call_graph_demo)
-* [ordinary_recursive_i32_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_i32_demo)
-* [ordinary_recursive_i32_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_i32_call_graph_demo)
-* [ordinary_recursive_lambda_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_lambda_call_graph_demo)
-* [ordinary_recursive_mixed_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_mixed_call_graph_demo)
-* [ordinary_recursive_tri_scalar_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_tri_scalar_call_graph_demo)
-* [ordinary_recursive_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_call_graph_demo)
-* [ordinary_recursive_composed_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_composed_call_graph_demo)
+Pattern / destructuring route:
+
+* [destructure_let_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/destructure_let_state_demo)
+* [destructure_nested_shorthand_let_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/destructure_nested_shorthand_let_state_demo)
+* [match_payload_struct_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_payload_struct_state_demo)
+* [match_struct_binding_shorthand_guard_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_struct_binding_shorthand_guard_state_demo)
+* [match_unit_struct_guard_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_unit_struct_guard_state_demo)
+
+Recursion / higher-order route:
+
 * [ordinary_mutual_recursive_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_mutual_recursive_demo)
-* [home_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/home_runtime_demo)
+* [ordinary_recursive_composed_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_composed_call_graph_demo)
+* [ordinary_recursive_generic_alias_fn3_higher_order_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_generic_alias_fn3_higher_order_call_graph_demo)
+* [lambda_alias_fn3_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/lambda_alias_fn3_demo)
+
+Loop / lowering route:
+
+* [counted_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/counted_while_demo)
+* [guarded_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/guarded_while_demo)
+* [flow_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/flow_branching_while_demo)
+* [post_flow_branching_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_continuing_while_demo)
+* [tail_recursive_branching_cross_carry_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_branching_cross_carry_demo)
+
+GLM / state ownership route:
+
 * [glm_borrow_end_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/glm_borrow_end_state_demo)
 * [glm_buffer_roundtrip_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/glm_buffer_roundtrip_state_demo)
+
+Runtime location/config route:
+
+* [cwd_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/cwd_runtime_demo)
+* [home_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/home_runtime_demo)
 * [location_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/location_runtime_demo)
-* [match_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_branching_while_demo)
-* [match_expr_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_expr_branching_while_demo)
-* [match_guarded_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_guarded_while_demo)
-* [match_guard_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_guard_state_demo)
-* [match_guard_or_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_guard_or_state_demo)
-* [match_guard_range_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_guard_range_state_demo)
-* [match_multi_guard_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_multi_guard_state_demo)
-* [match_multi_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_multi_state_demo)
-* [match_alias_struct_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_alias_struct_state_demo)
-* [match_nested_struct_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_nested_struct_state_demo)
-* [match_payload_struct_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_payload_struct_state_demo)
-* [match_struct_binding_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_struct_binding_state_demo)
-* [match_struct_binding_guard_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_struct_binding_guard_state_demo)
-* [match_struct_binding_shorthand_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_struct_binding_shorthand_state_demo)
-* [match_struct_binding_shorthand_guard_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_struct_binding_shorthand_guard_state_demo)
-* [match_struct_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_struct_state_demo)
-* [generic_method_bound_if_binding_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_if_binding_demo)
-* [generic_method_bound_nested_match_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_nested_match_demo)
-* [generic_method_bound_guarded_nested_match_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_guarded_nested_match_demo)
-* [match_unit_struct_guard_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_unit_struct_guard_state_demo)
-* [match_unit_struct_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_unit_struct_state_demo)
-* [match_or_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_or_state_demo)
-* [match_range_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_range_state_demo)
-* [match_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_state_demo)
-* [nested_generic_alias_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/nested_generic_alias_demo)
-* [nested_generic_callable_alias_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/nested_generic_callable_alias_demo)
-* [nested_generic_inference_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/nested_generic_inference_demo)
 * [config_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/config_runtime_demo)
-* [bool_match_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/bool_match_state_demo)
-* [bool_match_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/bool_match_branching_while_demo)
-* [branch_return_inference_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/branch_return_inference_demo)
-* [branch_const_inference_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/branch_const_inference_demo)
 * [config_cache_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/config_cache_demo)
-* [const_inference_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/const_inference_demo)
-* [guarded_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/guarded_while_demo)
-* [lambda_alias_fn1_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/lambda_alias_fn1_demo)
-* [lambda_alias_fn3_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/lambda_alias_fn3_demo)
-* [lambda_generic_fn1_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/lambda_generic_fn1_demo)
-* [lambda_fn2_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/lambda_fn2_demo)
-* [lambda_fn3_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/lambda_fn3_demo)
-* [lambda_higher_order_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/lambda_higher_order_demo)
-* [lambda_immediate_call_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/lambda_immediate_call_demo)
-* [lambda_increment_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/lambda_increment_demo)
-* [lambda_match_flow_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/lambda_match_flow_continuing_while_demo)
-* [lambda_match_or_flow_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/lambda_match_or_flow_continuing_while_demo)
-* [lambda_match_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/lambda_match_branching_while_demo)
-* [lambda_match_guarded_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/lambda_match_guarded_demo)
-* [lambda_named_function_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/lambda_named_function_demo)
-* [lambda_trait_generic_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/lambda_trait_generic_demo)
-* [counted_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/counted_while_demo)
-* [bounded_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/bounded_while_demo)
-* [double_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/double_branching_while_demo)
-* [destructure_let_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/destructure_let_state_demo)
-* [destructure_nested_let_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/destructure_nested_let_state_demo)
-* [destructure_nested_shorthand_let_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/destructure_nested_shorthand_let_state_demo)
-* [destructure_rename_let_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/destructure_rename_let_state_demo)
-* [equality_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/equality_while_demo)
-* [equality_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/equality_branching_while_demo)
-* [inequality_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/inequality_while_demo)
-* [accumulating_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/accumulating_while_demo)
-* [chained_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/chained_while_demo)
-* [branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/branching_while_demo)
-* [breaking_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/breaking_while_demo)
-* [carried_breaking_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/carried_breaking_while_demo)
-* [flow_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/flow_branching_while_demo)
-* [flow_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/flow_continuing_while_demo)
-* [post_flow_breaking_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_breaking_while_demo)
-* [post_flow_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_while_demo)
-* [post_flow_branching_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_continuing_while_demo)
-* [post_flow_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_continuing_while_demo)
-* [return_inference_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/return_inference_demo)
-* [sliding_window_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/sliding_window_state_demo)
+* [kv_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/kv_runtime_demo)
+* [cache_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/cache_runtime_demo)
+* [temp_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/temp_runtime_demo)
 
-Reading rule:
+## Reading Rule
 
-* use [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
-  for the project-wide route
-* use [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
-  for the shortest repo-level route
+If you are exploring broadly:
+
+* use the clusters above first
+* use [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md) for repo-level shortest paths
+* browse the folder directly for wider sibling probes once you already know the cluster you care about

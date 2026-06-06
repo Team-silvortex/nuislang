@@ -10,6 +10,30 @@ The current goal is:
 * separate narrow canonical examples from wider exploratory examples
 * avoid deleting files that still carry regression, bridge, or packaging value
 
+## Current Audit Snapshot
+
+Latest audit result:
+
+* `examples/projects/state/` currently has no orphaned project companion
+  directories with zero doc/test/source references
+* `examples/projects/task/` currently has no orphaned project companion
+  directories with zero doc/test/source references
+* current cleanup pressure is therefore no longer “delete obviously unused
+  project demos”
+* current cleanup pressure is now mostly:
+  - duplicate README entrypoints
+  - outdated semantic wording after async/GLM rule tightening
+  - overlong local inventory READMEs that repeat routes already covered by
+    `current-mainline-map.md`
+
+Practical reading:
+
+* if a demo still appears in a local README, `current-mainline-map.md`,
+  reference docs, or focused tests, treat it as live until a narrower
+  replacement path is chosen
+* prefer deleting duplicate routes before deleting the underlying probe/demo
+  itself
+
 ## Cleanup Rule
 
 Use three buckets:
