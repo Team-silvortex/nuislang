@@ -24,6 +24,10 @@ local README for the area you are actively touching.
   [examples/ns/README.md](/Users/Shared/chroot/dev/nuislang/examples/ns/README.md)
 * project examples:
   [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
+  current shortest generic-bound route:
+  [generic_method_bound_if_binding_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_if_binding_demo) ->
+  [generic_method_bound_nested_match_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_nested_match_demo) ->
+  [generic_method_bound_guarded_nested_match_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_guarded_nested_match_demo)
 * `std` growth path:
   [stdlib/std/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
 * annotation / intrinsic future edge:

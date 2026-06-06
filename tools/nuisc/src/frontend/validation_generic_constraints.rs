@@ -1,16 +1,22 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{
-    AstFunction, AstImplDef, AstMatchArm, AstModule, AstStmt, AstTypeAlias, AstTypeRef,
+    AstFunction, AstImplDef, AstMatchArm, AstModule, AstStmt, AstStructDef, AstTypeAlias,
+    AstTypeRef,
 };
 
+use super::validation_binding_env::{
+    bind_destructure_fields_for_type, bind_match_pattern_for_type, collect_visible_structs,
+    simple_match_value_type,
+};
 use super::validation_method_bounds::{
     collect_visible_trait_methods, simple_local_stmt_type, validate_expr_generic_method_bounds,
 };
 use super::validation_trait_bounds::{
-    build_generic_bound_env, collect_visible_trait_names, validate_generic_bound_type,
+    alias_param_context, alias_target_context, build_generic_bound_env,
+    collect_visible_trait_names, validate_generic_bound_satisfaction, validate_generic_bound_type,
 };
-use super::{lower_type_ref, resolve_ast_type_ref_aliases, substitute_ast_type_alias_target};
+use super::{lower_type_ref, substitute_ast_type_alias_target};
 
 pub(super) fn validate_ast_generic_constraints(
     module: &AstModule,
@@ -20,6 +26,7 @@ pub(super) fn validate_ast_generic_constraints(
 ) -> Result<(), String> {
     let visible_trait_names = collect_visible_trait_names(module, local_cpu_helpers);
     let visible_trait_methods = collect_visible_trait_methods(module, local_cpu_helpers);
+    let visible_structs = collect_visible_structs(module, local_cpu_helpers);
 
     for alias in &module.type_aliases {
         let generic_bounds = build_generic_bound_env(
@@ -193,6 +200,7 @@ pub(super) fn validate_ast_generic_constraints(
             impl_lookup,
             &visible_trait_names,
             &visible_trait_methods,
+            &visible_structs,
         )?;
     }
 
@@ -205,6 +213,7 @@ fn validate_function_generic_constraints(
     impl_lookup: &BTreeMap<(String, String), AstImplDef>,
     visible_trait_names: &BTreeSet<String>,
     visible_trait_methods: &BTreeMap<String, BTreeSet<String>>,
+    visible_structs: &BTreeMap<String, AstStructDef>,
 ) -> Result<(), String> {
     let generic_bounds = build_generic_bound_env(
         &function.generic_params,
@@ -248,6 +257,7 @@ fn validate_function_generic_constraints(
             impl_lookup,
             visible_trait_names,
             visible_trait_methods,
+            visible_structs,
             &generic_param_names,
             &generic_bounds,
             &mut local_type_env,
@@ -263,6 +273,7 @@ fn validate_stmt_generic_constraints(
     impl_lookup: &BTreeMap<(String, String), AstImplDef>,
     visible_trait_names: &BTreeSet<String>,
     visible_trait_methods: &BTreeMap<String, BTreeSet<String>>,
+    visible_structs: &BTreeMap<String, AstStructDef>,
     generic_param_names: &BTreeSet<String>,
     generic_bounds: &BTreeMap<String, String>,
     local_type_env: &mut BTreeMap<String, AstTypeRef>,
@@ -319,6 +330,17 @@ fn validate_stmt_generic_constraints(
                 generic_bounds,
                 &format!("{context} destructure type"),
             )?;
+            let fields = match stmt {
+                AstStmt::DestructureLet { fields, .. } => fields,
+                _ => unreachable!(),
+            };
+            bind_destructure_fields_for_type(
+                type_ref,
+                fields,
+                visible_type_aliases,
+                visible_structs,
+                local_type_env,
+            )?;
         }
         AstStmt::If {
             condition,
@@ -343,6 +365,7 @@ fn validate_stmt_generic_constraints(
                     impl_lookup,
                     visible_trait_names,
                     visible_trait_methods,
+                    visible_structs,
                     generic_param_names,
                     generic_bounds,
                     &mut then_env,
@@ -357,6 +380,7 @@ fn validate_stmt_generic_constraints(
                     impl_lookup,
                     visible_trait_names,
                     visible_trait_methods,
+                    visible_structs,
                     generic_param_names,
                     generic_bounds,
                     &mut else_env,
@@ -374,8 +398,17 @@ fn validate_stmt_generic_constraints(
                 local_type_env,
                 context,
             )?;
-            for AstMatchArm { body, .. } in arms {
+            for AstMatchArm { pattern, body, .. } in arms {
                 let mut arm_env = local_type_env.clone();
+                if let Some(match_value_ty) = simple_match_value_type(value, local_type_env) {
+                    bind_match_pattern_for_type(
+                        &match_value_ty,
+                        pattern,
+                        visible_type_aliases,
+                        visible_structs,
+                        &mut arm_env,
+                    )?;
+                }
                 for nested in body {
                     validate_stmt_generic_constraints(
                         nested,
@@ -383,6 +416,7 @@ fn validate_stmt_generic_constraints(
                         impl_lookup,
                         visible_trait_names,
                         visible_trait_methods,
+                        visible_structs,
                         generic_param_names,
                         generic_bounds,
                         &mut arm_env,
@@ -409,6 +443,7 @@ fn validate_stmt_generic_constraints(
                     impl_lookup,
                     visible_trait_names,
                     visible_trait_methods,
+                    visible_structs,
                     generic_param_names,
                     generic_bounds,
                     &mut loop_env,
@@ -533,41 +568,4 @@ fn validate_ast_type_ref_generic_constraints_inner(
     )?;
     visiting.remove(&visit_key);
     Ok(())
-}
-
-fn validate_generic_bound_satisfaction(
-    ty: &AstTypeRef,
-    required_bound: &str,
-    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
-    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
-    generic_bounds: &BTreeMap<String, String>,
-    context: &str,
-) -> Result<(), String> {
-    let resolved = resolve_ast_type_ref_aliases(ty, visible_type_aliases)?;
-    if resolved.generic_args.is_empty() {
-        if let Some(actual_bound) = generic_bounds.get(&resolved.name) {
-            if actual_bound == required_bound {
-                return Ok(());
-            }
-        }
-    }
-    let rendered = lower_type_ref(&resolved).render();
-    if impl_lookup.contains_key(&(required_bound.to_owned(), rendered.clone())) {
-        return Ok(());
-    }
-    Err(format!(
-        "type `{}` does not satisfy bound `{}` for {}",
-        rendered, required_bound, context
-    ))
-}
-
-fn alias_param_context(parent_context: &str, alias_name: &str, param_name: &str) -> String {
-    format!(
-        "{} via type alias `{}` generic parameter `{}`",
-        parent_context, alias_name, param_name
-    )
-}
-
-fn alias_target_context(parent_context: &str, alias_name: &str) -> String {
-    format!("{parent_context} via type alias `{alias_name}` target")
 }

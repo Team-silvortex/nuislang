@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use nuis_semantics::model::{AstGenericParam, AstModule, AstTypeRef};
+use nuis_semantics::model::{AstGenericParam, AstImplDef, AstModule, AstTypeAlias, AstTypeRef};
 
-use super::{is_public_visibility, lower_type_ref};
+use super::{is_public_visibility, lower_type_ref, resolve_ast_type_ref_aliases};
 
 pub(super) fn collect_visible_trait_names(
     module: &AstModule,
@@ -59,4 +59,45 @@ pub(super) fn validate_generic_bound_type(
         ));
     }
     Ok(bound.name.clone())
+}
+
+pub(super) fn validate_generic_bound_satisfaction(
+    ty: &AstTypeRef,
+    required_bound: &str,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
+    generic_bounds: &BTreeMap<String, String>,
+    context: &str,
+) -> Result<(), String> {
+    let resolved = resolve_ast_type_ref_aliases(ty, visible_type_aliases)?;
+    if resolved.generic_args.is_empty() {
+        if let Some(actual_bound) = generic_bounds.get(&resolved.name) {
+            if actual_bound == required_bound {
+                return Ok(());
+            }
+        }
+    }
+    let rendered = lower_type_ref(&resolved).render();
+    if impl_lookup.contains_key(&(required_bound.to_owned(), rendered.clone())) {
+        return Ok(());
+    }
+    Err(format!(
+        "type `{}` does not satisfy bound `{}` for {}",
+        rendered, required_bound, context
+    ))
+}
+
+pub(super) fn alias_param_context(
+    parent_context: &str,
+    alias_name: &str,
+    param_name: &str,
+) -> String {
+    format!(
+        "{} via type alias `{}` generic parameter `{}`",
+        parent_context, alias_name, param_name
+    )
+}
+
+pub(super) fn alias_target_context(parent_context: &str, alias_name: &str) -> String {
+    format!("{parent_context} via type alias `{alias_name}` target")
 }

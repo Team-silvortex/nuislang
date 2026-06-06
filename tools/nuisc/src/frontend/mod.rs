@@ -43,6 +43,12 @@ mod tests_generic_constraints;
 #[cfg(test)]
 mod tests_generic_method_bounds;
 #[cfg(test)]
+mod tests_generic_method_bounds_control_flow;
+#[cfg(test)]
+mod tests_generic_method_bounds_if_bindings;
+#[cfg(test)]
+mod tests_generic_method_bounds_nested_match;
+#[cfg(test)]
 mod tests_generics;
 #[cfg(test)]
 mod tests_higher_order;
@@ -66,6 +72,7 @@ mod tests_test_functions;
 mod tests_types_async_window;
 mod types;
 mod validation;
+mod validation_binding_env;
 mod validation_generic_constraints;
 mod validation_helpers;
 mod validation_method_bounds;

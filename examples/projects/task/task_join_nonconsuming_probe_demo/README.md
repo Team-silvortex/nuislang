@@ -2,7 +2,7 @@
 
 This project is a **design probe**.
 
-It is intentionally legal today.
+It is intentionally invalid today.
 
 The point of the sample is to keep one very specific shape visible:
 
@@ -11,10 +11,12 @@ The point of the sample is to keep one very specific shape visible:
 
 Current meaning:
 
-* the repository still treats `join(...)` as a task payload boundary
-* it does **not** yet treat `join(...)` as a graph-level `GLM` consume boundary
+* the repository now treats both `join(...)` and `join_result(...)` as
+  task-handle `GLM` consume boundaries
+* this sample exists to keep the old non-consuming shape visible as an explicit
+  conflict probe
 
-That is why this sample currently passes `check` and `build`.
+That is why this sample is expected to fail `check` and `build`.
 
 ## Why This Sample Exists
 
@@ -38,12 +40,10 @@ the task contract may need to define a more explicit split between:
 
 Treat this project as:
 
-* a current regression probe for the repository's present task semantics
-* not a promise that this shape will remain legal forever
+* a current regression probe for the repository's stricter task ownership
+  semantics
+* a concrete example of a shape that used to be tolerated but is now rejected
 
-If task ownership rules become stricter in future `GLM` work, revisit this
-sample first.
-
-For the likely migration direction under a stricter future consume rule, see:
+For the migration direction under the stricter consume rule, see:
 
 * [FUTURE_CONSUME_SKETCH.md](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_join_nonconsuming_probe_demo/FUTURE_CONSUME_SKETCH.md)

@@ -429,6 +429,8 @@ cargo run -p nuis -- check examples/projects/task/task_cli_tooling_demo
 cargo run -p nuis -- build examples/projects/task/task_cli_tooling_demo /private/tmp/task_cli_tooling_demo_out
 cargo run -p nuis -- check examples/projects/task/task_cancel_branch_demo
 cargo run -p nuis -- build examples/projects/task/task_cancel_branch_demo /private/tmp/task_cancel_branch_demo_out
+# expected failure: join(task) followed by join_result(task) now violates
+# task-handle consume semantics
 cargo run -p nuis -- check examples/projects/task/task_join_nonconsuming_probe_demo
 cargo run -p nuis -- build examples/projects/task/task_join_nonconsuming_probe_demo /private/tmp/task_join_nonconsuming_probe_demo_out
 cargo run -p nuis -- check examples/projects/filesystem/fs_metadata_runtime_demo

@@ -1,0 +1,2 @@
+name = "generic_method_bound_guarded_nested_match_demo"
+entry = "main.ns"

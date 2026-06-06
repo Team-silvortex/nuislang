@@ -5,6 +5,29 @@ persistence companions.
 
 Start here:
 
+Generic method-bound route:
+
+* [generic_method_bound_if_binding_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_if_binding_demo)
+  positive path:
+  `match` binding introduces `local`, then `if` branch calls `local.add(local)`
+  under `T: Addable`
+* [generic_method_bound_nested_match_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_nested_match_demo)
+  positive path:
+  outer `match` binding survives into an inner `match` arm before the
+  generic method call
+* [generic_method_bound_guarded_nested_match_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_guarded_nested_match_demo)
+  positive path:
+  outer `match` binding survives into a guarded inner `match` arm before the
+  generic method call
+
+These three companions are the current shortest user-facing route for:
+
+* alias-wrapped generic receivers
+* `T: Addable` method calls
+* binding visibility through `if`
+* binding visibility through nested `match`
+* guard-preserving nested `match`
+
 * [cwd_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/cwd_runtime_demo)
 * [temp_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/temp_runtime_demo)
 * [tail_return_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_return_demo)
@@ -56,6 +79,9 @@ Start here:
 * [match_struct_binding_shorthand_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_struct_binding_shorthand_state_demo)
 * [match_struct_binding_shorthand_guard_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_struct_binding_shorthand_guard_state_demo)
 * [match_struct_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_struct_state_demo)
+* [generic_method_bound_if_binding_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_if_binding_demo)
+* [generic_method_bound_nested_match_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_nested_match_demo)
+* [generic_method_bound_guarded_nested_match_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_guarded_nested_match_demo)
 * [match_unit_struct_guard_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_unit_struct_guard_state_demo)
 * [match_unit_struct_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_unit_struct_state_demo)
 * [match_or_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_or_state_demo)

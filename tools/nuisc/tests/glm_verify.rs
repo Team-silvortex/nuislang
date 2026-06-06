@@ -84,6 +84,30 @@ fn glm_profile_classifies_free_as_lifetime_end() {
 }
 
 #[test]
+fn glm_profile_classifies_join_as_res_own() {
+    let profile = nir_glm_profile(&NirExpr::CpuJoin(Box::new(NirExpr::Var("task".to_owned()))))
+        .expect("join should have a GLM profile");
+    assert_eq!(profile.result_class, NirGlmValueClass::Val);
+    assert_eq!(profile.accesses.len(), 1);
+    assert_eq!(profile.accesses[0].class, NirGlmValueClass::Res);
+    assert_eq!(profile.accesses[0].mode, NirGlmUseMode::Own);
+    assert_eq!(profile.effect, NirGlmEffect::None);
+}
+
+#[test]
+fn glm_profile_classifies_join_result_as_res_own() {
+    let profile = nir_glm_profile(&NirExpr::CpuJoinResult(Box::new(NirExpr::Var(
+        "task".to_owned(),
+    ))))
+    .expect("join_result should have a GLM profile");
+    assert_eq!(profile.result_class, NirGlmValueClass::Val);
+    assert_eq!(profile.accesses.len(), 1);
+    assert_eq!(profile.accesses[0].class, NirGlmValueClass::Res);
+    assert_eq!(profile.accesses[0].mode, NirGlmUseMode::Own);
+    assert_eq!(profile.effect, NirGlmEffect::None);
+}
+
+#[test]
 fn glm_verifier_accepts_borrow_end_then_write_then_free_sequence() {
     let module = module_with_body(vec![
         NirStmt::Let {
@@ -139,4 +163,46 @@ fn glm_verifier_rejects_write_during_active_borrow() {
 
     let error = verify_nir_module(&module).unwrap_err();
     assert!(error.contains("cannot write `head` while borrow(s) are active"));
+}
+
+#[test]
+fn glm_verifier_rejects_join_result_after_join_of_same_task() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "task".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::Expr(NirExpr::CpuJoin(Box::new(NirExpr::Var("task".to_owned())))),
+        NirStmt::Expr(NirExpr::CpuJoinResult(Box::new(NirExpr::Var(
+            "task".to_owned(),
+        )))),
+    ]);
+
+    let error = verify_nir_module(&module).unwrap_err();
+    assert!(error.contains("use of moved value `task`"));
+}
+
+#[test]
+fn glm_verifier_rejects_use_after_free_in_expr_statements() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "head".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::Expr(NirExpr::Free(Box::new(NirExpr::Var("head".to_owned())))),
+        NirStmt::Expr(NirExpr::LoadValue(Box::new(NirExpr::Var(
+            "head".to_owned(),
+        )))),
+    ]);
+
+    let error = verify_nir_module(&module).unwrap_err();
+    assert!(error.contains("use of moved value `head`"));
 }

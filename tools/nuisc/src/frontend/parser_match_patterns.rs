@@ -90,6 +90,7 @@ impl Parser {
                     Err("expected `{` or `(` after struct match pattern type".to_owned())
                 }
             }
+            Some(Token::Word(word)) => Ok(AstMatchPattern::Bind(word)),
             Some(Token::Integer(value)) => {
                 if self.peek_symbol('.')
                     && matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol('.')))
