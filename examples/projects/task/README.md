@@ -12,6 +12,9 @@ Start here:
 * [task_memory_session_policy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_memory_session_policy_demo)
 * [task_memory_session_packet_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_memory_session_packet_demo)
 * [task_httpish_response_packet_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_httpish_response_packet_demo)
+* [task_httpish_session_policy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_httpish_session_policy_demo)
+* [task_httpish_response_slots_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_httpish_response_slots_demo)
+* [task_httpish_header_session_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_httpish_header_session_demo)
 * [task_status_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_status_observe_demo)
 * [task_completed_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_completed_observe_demo)
 * [task_compare_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_compare_observe_demo)
@@ -38,6 +41,9 @@ Short reading rule:
   [task_memory_session_policy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_memory_session_policy_demo) ->
   [task_memory_session_packet_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_memory_session_packet_demo) ->
   [task_httpish_response_packet_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_httpish_response_packet_demo) ->
+  [task_httpish_session_policy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_httpish_session_policy_demo) ->
+  [task_httpish_response_slots_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_httpish_response_slots_demo) ->
+  [task_httpish_header_session_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_httpish_header_session_demo) ->
   [task_status_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_status_observe_demo) ->
   [task_completed_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_completed_observe_demo) ->
   [task_compare_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_compare_observe_demo) ->

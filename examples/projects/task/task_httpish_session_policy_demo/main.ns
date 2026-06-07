@@ -1,0 +1,192 @@
+mod cpu Main {
+  struct RequestPlan {
+    method_code: i64,
+    path_code: i64,
+    timeout_ns: i64,
+    retry_budget: i64
+  }
+
+  struct SessionPolicy {
+    primary_weight: i64,
+    secondary_weight: i64,
+    fallback_penalty: i64
+  }
+
+  struct ResponsePacket {
+    status_code: i64,
+    body_code: i64,
+    retry_code: i64,
+    staged_total: i64
+  }
+
+  async fn fetch_primary(seed: i64) -> i64 {
+    return seed + 40;
+  }
+
+  async fn fetch_secondary(seed: i64) -> i64 {
+    return seed + 17;
+  }
+
+  async fn fetch_fallback(seed: i64) -> i64 {
+    return seed + 3;
+  }
+
+  fn load_seed() -> i64 {
+    let head: ref Node = move(alloc_node(9, null()));
+    let head_ref: ref Node = borrow(head);
+    let seed: i64 = load_value(head_ref);
+    borrow_end(head_ref);
+    free(head);
+    return seed;
+  }
+
+  fn build_request_plan(seed: i64) -> RequestPlan {
+    return RequestPlan {
+      method_code: 2,
+      path_code: seed + 1400,
+      timeout_ns: 0,
+      retry_budget: 2
+    };
+  }
+
+  fn build_session_policy(plan: RequestPlan) -> SessionPolicy {
+    return SessionPolicy {
+      primary_weight: plan.method_code + 10,
+      secondary_weight: plan.retry_budget + 20,
+      fallback_penalty: 5
+    };
+  }
+
+  fn selected_task_value(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return task_value(result);
+    }
+    return 0;
+  }
+
+  fn selected_status_code(
+    policy: SessionPolicy,
+    primary_result: TaskResult<i64>,
+    secondary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    if task_completed(primary_result) {
+      return 200 + policy.primary_weight;
+    }
+    if task_completed(secondary_result) {
+      return 220 + policy.secondary_weight;
+    }
+    if task_completed(fallback_result) {
+      return 250 - policy.fallback_penalty;
+    }
+    return 504;
+  }
+
+  fn selected_body_code(
+    policy: SessionPolicy,
+    primary_result: TaskResult<i64>,
+    secondary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    if task_completed(primary_result) {
+      return selected_task_value(primary_result) + policy.primary_weight;
+    }
+    if task_completed(secondary_result) {
+      return selected_task_value(secondary_result) + policy.secondary_weight;
+    }
+    if task_completed(fallback_result) {
+      return selected_task_value(fallback_result) - policy.fallback_penalty;
+    }
+    return 1;
+  }
+
+  fn selected_retry_code(
+    plan: RequestPlan,
+    primary_result: TaskResult<i64>,
+    secondary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    if task_completed(primary_result) {
+      return 0;
+    }
+    if task_completed(secondary_result) {
+      return plan.retry_budget;
+    }
+    if task_completed(fallback_result) {
+      return plan.retry_budget + 1;
+    }
+    return plan.retry_budget + 9;
+  }
+
+  fn stage_response_packet(
+    plan: RequestPlan,
+    status_code: i64,
+    body_code: i64,
+    retry_code: i64
+  ) -> ResponsePacket {
+    let scratch: ref Buffer = alloc_buffer(5, 0);
+    store_at(scratch, 0, plan.method_code);
+    store_at(scratch, 1, plan.path_code);
+    store_at(scratch, 2, status_code);
+    store_at(scratch, 3, body_code);
+    store_at(scratch, 4, retry_code);
+    let staged_status: i64 = load_at(scratch, 2);
+    let staged_body: i64 = load_at(scratch, 3);
+    let staged_retry: i64 = load_at(scratch, 4);
+    let staged_total: i64 =
+      load_at(scratch, 0)
+      + load_at(scratch, 1)
+      + staged_status
+      + staged_body
+      + staged_retry;
+    free(scratch);
+    return ResponsePacket {
+      status_code: staged_status,
+      body_code: staged_body,
+      retry_code: staged_retry,
+      staged_total: staged_total
+    };
+  }
+
+  fn execute_session(plan: RequestPlan, policy: SessionPolicy) -> ResponsePacket {
+    let primary_result: TaskResult<i64> = join_result(
+      timeout(spawn(fetch_primary(plan.path_code)), plan.timeout_ns)
+    );
+    let secondary_result: TaskResult<i64> = join_result(
+      timeout(
+        spawn(fetch_secondary(plan.path_code + policy.secondary_weight)),
+        plan.timeout_ns
+      )
+    );
+    let fallback_result: TaskResult<i64> = join_result(
+      spawn(fetch_fallback(plan.method_code + plan.retry_budget))
+    );
+    let status_code: i64 = selected_status_code(
+      policy,
+      primary_result,
+      secondary_result,
+      fallback_result
+    );
+    let body_code: i64 = selected_body_code(
+      policy,
+      primary_result,
+      secondary_result,
+      fallback_result
+    );
+    let retry_code: i64 = selected_retry_code(
+      plan,
+      primary_result,
+      secondary_result,
+      fallback_result
+    );
+    return stage_response_packet(plan, status_code, body_code, retry_code);
+  }
+
+  fn main() -> i64 {
+    let seed: i64 = load_seed();
+    let plan: RequestPlan = build_request_plan(seed);
+    let policy: SessionPolicy = build_session_policy(plan);
+    let packet: ResponsePacket = execute_session(plan, policy);
+    return packet.status_code + packet.body_code + packet.retry_code + packet.staged_total;
+  }
+}

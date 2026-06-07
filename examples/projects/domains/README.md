@@ -81,6 +81,10 @@ Start here:
   [net_dnsish_protocol_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_dnsish_protocol_recipe_demo) ->
   [net_dnsish_query_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_dnsish_query_recipe_demo) ->
   [net_httpish_protocol_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_protocol_recipe_demo) ->
+  [net_httpish_header_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_header_session_recipe_demo) ->
+  [net_httpish_header_service_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_header_service_session_recipe_demo) ->
+  [net_httpish_exchange_contract_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_exchange_contract_demo) ->
+  [net_httpish_exchange_contract_service_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_exchange_contract_service_demo) ->
   [net_httpish_client_session_packet_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_client_session_packet_recipe_demo) ->
   [net_httpish_service_session_packet_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_service_session_packet_recipe_demo) ->
   [net_http_client_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_recipe_demo) ->

@@ -49,3 +49,39 @@ fn compiles_httpish_service_session_packet_recipe_project() {
     nuisc::pipeline::compile_project(project)
         .expect("httpish service session packet project should compile");
 }
+
+#[test]
+fn compiles_httpish_header_session_recipe_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_header_session_recipe_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("httpish header session project should compile");
+}
+
+#[test]
+fn compiles_httpish_header_service_session_recipe_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_header_service_session_recipe_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("httpish header service session project should compile");
+}
+
+#[test]
+fn compiles_httpish_exchange_contract_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_exchange_contract_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("httpish exchange contract project should compile");
+}
+
+#[test]
+fn compiles_httpish_exchange_contract_service_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_exchange_contract_service_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("httpish exchange contract service project should compile");
+}

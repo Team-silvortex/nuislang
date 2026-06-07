@@ -1,0 +1,291 @@
+mod cpu Main {
+  struct RequestPlan {
+    method_code: i64,
+    path_code: i64,
+    timeout_ns: i64,
+    retry_budget: i64
+  }
+
+  struct RequestHeaders {
+    auth_code: i64,
+    trace_code: i64
+  }
+
+  struct SessionPolicy {
+    status_bias: i64,
+    request_header_bias: i64,
+    response_header_bias: i64,
+    body_bias: i64,
+    retry_bias: i64
+  }
+
+  struct ResponsePacket {
+    status_code: i64,
+    request_header_code: i64,
+    response_header_code: i64,
+    body_code: i64,
+    retry_code: i64,
+    staged_total: i64
+  }
+
+  async fn fetch_primary(seed: i64) -> i64 {
+    return seed + 40;
+  }
+
+  async fn fetch_secondary(seed: i64) -> i64 {
+    return seed + 12;
+  }
+
+  async fn fetch_fallback(seed: i64) -> i64 {
+    return seed + 4;
+  }
+
+  fn load_seed() -> i64 {
+    let head: ref Node = move(alloc_node(13, null()));
+    let head_ref: ref Node = borrow(head);
+    let seed: i64 = load_value(head_ref);
+    borrow_end(head_ref);
+    free(head);
+    return seed;
+  }
+
+  fn build_request_plan(seed: i64) -> RequestPlan {
+    return RequestPlan {
+      method_code: 4,
+      path_code: seed + 1800,
+      timeout_ns: 0,
+      retry_budget: 4
+    };
+  }
+
+  fn build_request_headers(plan: RequestPlan) -> RequestHeaders {
+    return RequestHeaders {
+      auth_code: plan.method_code + 70,
+      trace_code: plan.path_code + 80
+    };
+  }
+
+  fn build_session_policy(plan: RequestPlan) -> SessionPolicy {
+    return SessionPolicy {
+      status_bias: 20 + plan.method_code,
+      request_header_bias: 30 + plan.retry_budget,
+      response_header_bias: 40 + plan.method_code + plan.retry_budget,
+      body_bias: 50 + plan.method_code,
+      retry_bias: 5 + plan.retry_budget
+    };
+  }
+
+  fn selected_task_value(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return task_value(result);
+    }
+    return 0;
+  }
+
+  fn selected_status_code(
+    policy: SessionPolicy,
+    primary_result: TaskResult<i64>,
+    secondary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    if task_completed(primary_result) {
+      return 180 + policy.status_bias;
+    }
+    if task_completed(secondary_result) {
+      return 190 + policy.status_bias;
+    }
+    if task_completed(fallback_result) {
+      return 200 + policy.status_bias;
+    }
+    return 504;
+  }
+
+  fn selected_request_header_code(
+    headers: RequestHeaders,
+    policy: SessionPolicy,
+    primary_result: TaskResult<i64>,
+    secondary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    if task_completed(primary_result) {
+      return headers.auth_code + policy.request_header_bias;
+    }
+    if task_completed(secondary_result) {
+      return headers.trace_code + policy.request_header_bias;
+    }
+    if task_completed(fallback_result) {
+      return headers.auth_code + headers.trace_code + policy.request_header_bias;
+    }
+    return policy.request_header_bias;
+  }
+
+  fn selected_response_header_code(
+    plan: RequestPlan,
+    policy: SessionPolicy,
+    primary_result: TaskResult<i64>,
+    secondary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    if task_completed(primary_result) {
+      return plan.method_code + policy.response_header_bias;
+    }
+    if task_completed(secondary_result) {
+      return plan.path_code + policy.response_header_bias;
+    }
+    if task_completed(fallback_result) {
+      return plan.retry_budget + policy.response_header_bias;
+    }
+    return policy.response_header_bias;
+  }
+
+  fn selected_body_code(
+    policy: SessionPolicy,
+    primary_result: TaskResult<i64>,
+    secondary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    if task_completed(primary_result) {
+      return selected_task_value(primary_result) + policy.body_bias;
+    }
+    if task_completed(secondary_result) {
+      return selected_task_value(secondary_result) + policy.body_bias;
+    }
+    if task_completed(fallback_result) {
+      return selected_task_value(fallback_result) + policy.body_bias;
+    }
+    return 1;
+  }
+
+  fn selected_retry_code(
+    plan: RequestPlan,
+    policy: SessionPolicy,
+    primary_result: TaskResult<i64>,
+    secondary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    if task_completed(primary_result) {
+      return policy.retry_bias;
+    }
+    if task_completed(secondary_result) {
+      return plan.retry_budget + policy.retry_bias;
+    }
+    if task_completed(fallback_result) {
+      return plan.retry_budget + policy.retry_bias + 1;
+    }
+    return plan.retry_budget + policy.retry_bias + 9;
+  }
+
+  fn stage_response_packet(
+    headers: RequestHeaders,
+    status_code: i64,
+    request_header_code: i64,
+    response_header_code: i64,
+    body_code: i64,
+    retry_code: i64
+  ) -> ResponsePacket {
+    let scratch: ref Buffer = alloc_buffer(7, 0);
+    store_at(scratch, 0, headers.auth_code);
+    store_at(scratch, 1, headers.trace_code);
+    store_at(scratch, 2, status_code);
+    store_at(scratch, 3, request_header_code);
+    store_at(scratch, 4, response_header_code);
+    store_at(scratch, 5, body_code);
+    store_at(scratch, 6, retry_code);
+    let staged_status: i64 = load_at(scratch, 2);
+    let staged_request_header: i64 = load_at(scratch, 3);
+    let staged_response_header: i64 = load_at(scratch, 4);
+    let staged_body: i64 = load_at(scratch, 5);
+    let staged_retry: i64 = load_at(scratch, 6);
+    let staged_total: i64 =
+      load_at(scratch, 0)
+      + load_at(scratch, 1)
+      + staged_status
+      + staged_request_header
+      + staged_response_header
+      + staged_body
+      + staged_retry;
+    free(scratch);
+    return ResponsePacket {
+      status_code: staged_status,
+      request_header_code: staged_request_header,
+      response_header_code: staged_response_header,
+      body_code: staged_body,
+      retry_code: staged_retry,
+      staged_total: staged_total
+    };
+  }
+
+  fn execute_session(
+    plan: RequestPlan,
+    headers: RequestHeaders,
+    policy: SessionPolicy
+  ) -> ResponsePacket {
+    let primary_result: TaskResult<i64> = join_result(
+      timeout(spawn(fetch_primary(plan.path_code + headers.auth_code)), plan.timeout_ns)
+    );
+    let secondary_result: TaskResult<i64> = join_result(
+      timeout(
+        spawn(fetch_secondary(plan.path_code + headers.trace_code)),
+        plan.timeout_ns
+      )
+    );
+    let fallback_result: TaskResult<i64> = join_result(
+      spawn(fetch_fallback(plan.method_code + plan.retry_budget))
+    );
+    let status_code: i64 = selected_status_code(
+      policy,
+      primary_result,
+      secondary_result,
+      fallback_result
+    );
+    let request_header_code: i64 = selected_request_header_code(
+      headers,
+      policy,
+      primary_result,
+      secondary_result,
+      fallback_result
+    );
+    let response_header_code: i64 = selected_response_header_code(
+      plan,
+      policy,
+      primary_result,
+      secondary_result,
+      fallback_result
+    );
+    let body_code: i64 = selected_body_code(
+      policy,
+      primary_result,
+      secondary_result,
+      fallback_result
+    );
+    let retry_code: i64 = selected_retry_code(
+      plan,
+      policy,
+      primary_result,
+      secondary_result,
+      fallback_result
+    );
+    return stage_response_packet(
+      headers,
+      status_code,
+      request_header_code,
+      response_header_code,
+      body_code,
+      retry_code
+    );
+  }
+
+  fn main() -> i64 {
+    let seed: i64 = load_seed();
+    let plan: RequestPlan = build_request_plan(seed);
+    let headers: RequestHeaders = build_request_headers(plan);
+    let policy: SessionPolicy = build_session_policy(plan);
+    let packet: ResponsePacket = execute_session(plan, headers, policy);
+    return packet.status_code
+      + packet.request_header_code
+      + packet.response_header_code
+      + packet.body_code
+      + packet.retry_code
+      + packet.staged_total;
+  }
+}

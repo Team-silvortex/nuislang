@@ -1,0 +1,334 @@
+use network NetworkUnit;
+
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+  extern "c" fn host_monotonic_time_ns() -> i64;
+  extern "c" fn host_network_open_tcp_stream(
+    remote_port: i64,
+    connect_timeout_ms: i64
+  ) -> i64;
+  extern "c" fn host_network_send_owned(
+    handle: i64,
+    stream_window: i64,
+    send_window: i64
+  ) -> i64;
+  extern "c" fn host_network_recv_owned(
+    handle: i64,
+    stream_window: i64,
+    recv_window: i64
+  ) -> i64;
+  extern "c" fn host_network_recv_http_status_owned(
+    handle: i64,
+    stream_window: i64,
+    recv_window: i64
+  ) -> i64;
+  extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+  struct RequestPlan {
+    method_code: i64,
+    path_code: i64,
+    timeout_budget: i64,
+    retry_budget: i64
+  }
+
+  struct RequestHeaders {
+    auth_code: i64,
+    trace_code: i64,
+    accept_code: i64
+  }
+
+  struct ResponsePacket {
+    method_code: i64,
+    path_code: i64,
+    request_header_code: i64,
+    status_code: i64,
+    response_header_code: i64,
+    body_code: i64,
+    retry_code: i64,
+    exchange_total: i64
+  }
+
+  struct ExchangeContractSummary {
+    argv_count: i64,
+    transport_family: i64,
+    protocol_kind: i64,
+    protocol_version: i64,
+    protocol_header_bytes: i64,
+    timeout_budget: i64,
+    retry_budget: i64,
+    request_bytes: i64,
+    response_bytes: i64,
+    open_handle: i64,
+    send_ready: i64,
+    recv_ready: i64,
+    method_code: i64,
+    path_code: i64,
+    request_header_code: i64,
+    status_code: i64,
+    response_header_code: i64,
+    body_code: i64,
+    retry_code: i64,
+    exchange_total: i64,
+    close_value: i64,
+    tick_ns: i64
+  }
+
+  fn encode_send_ready(result: NetworkResult<i64>) -> i64 {
+    if network_send_ready(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_recv_ready(result: NetworkResult<i64>) -> i64 {
+    if network_recv_ready(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_value(result: NetworkResult<i64>) -> i64 {
+    return network_value(result);
+  }
+
+  fn build_request_plan(
+    protocol_kind: i64,
+    protocol_version: i64,
+    protocol_header_bytes: i64,
+    timeout_budget: i64,
+    retry_budget: i64
+  ) -> RequestPlan {
+    return RequestPlan {
+      method_code: 64 + protocol_kind,
+      path_code: 1000 + protocol_version + protocol_header_bytes,
+      timeout_budget: timeout_budget,
+      retry_budget: retry_budget
+    };
+  }
+
+  fn build_request_headers(
+    plan: RequestPlan,
+    protocol_header_bytes: i64
+  ) -> RequestHeaders {
+    return RequestHeaders {
+      auth_code: plan.method_code + protocol_header_bytes,
+      trace_code: plan.path_code + protocol_header_bytes,
+      accept_code: protocol_header_bytes + plan.retry_budget
+    };
+  }
+
+  fn request_header_code(headers: RequestHeaders) -> i64 {
+    return headers.auth_code + headers.trace_code + headers.accept_code;
+  }
+
+  fn response_status_code(
+    plan: RequestPlan,
+    send_result: NetworkResult<i64>,
+    status_result: NetworkResult<i64>
+  ) -> i64 {
+    if network_recv_ready(status_result) {
+      return encode_value(status_result) + plan.method_code;
+    }
+    if network_send_ready(send_result) {
+      return 202 + plan.retry_budget;
+    }
+    return 504;
+  }
+
+  fn response_header_code(
+    plan: RequestPlan,
+    headers: RequestHeaders,
+    recv_window: i64,
+    status_result: NetworkResult<i64>
+  ) -> i64 {
+    if network_recv_ready(status_result) {
+      return headers.trace_code + recv_window;
+    }
+    return headers.auth_code + plan.path_code + recv_window;
+  }
+
+  fn response_body_code(
+    plan: RequestPlan,
+    headers: RequestHeaders,
+    recv_result: NetworkResult<i64>,
+    send_result: NetworkResult<i64>
+  ) -> i64 {
+    if network_recv_ready(recv_result) {
+      return encode_value(recv_result) + headers.accept_code;
+    }
+    if network_send_ready(send_result) {
+      return encode_value(send_result) + plan.path_code;
+    }
+    return plan.retry_budget;
+  }
+
+  fn retry_code(
+    plan: RequestPlan,
+    recv_result: NetworkResult<i64>,
+    send_result: NetworkResult<i64>
+  ) -> i64 {
+    if network_recv_ready(recv_result) {
+      return 0;
+    }
+    if network_send_ready(send_result) {
+      return plan.retry_budget;
+    }
+    return plan.retry_budget + 1;
+  }
+
+  fn stage_response_packet(
+    plan: RequestPlan,
+    request_header_code: i64,
+    status_code: i64,
+    response_header_code: i64,
+    body_code: i64,
+    retry_code: i64
+  ) -> ResponsePacket {
+    let scratch: ref Buffer = alloc_buffer(8, 0);
+    store_at(scratch, 0, plan.method_code);
+    store_at(scratch, 1, plan.path_code);
+    store_at(scratch, 2, request_header_code);
+    store_at(scratch, 3, status_code);
+    store_at(scratch, 4, response_header_code);
+    store_at(scratch, 5, body_code);
+    store_at(scratch, 6, retry_code);
+    store_at(scratch, 7, plan.timeout_budget);
+    let staged_method: i64 = load_at(scratch, 0);
+    let staged_path: i64 = load_at(scratch, 1);
+    let staged_request_header: i64 = load_at(scratch, 2);
+    let staged_status: i64 = load_at(scratch, 3);
+    let staged_response_header: i64 = load_at(scratch, 4);
+    let staged_body: i64 = load_at(scratch, 5);
+    let staged_retry: i64 = load_at(scratch, 6);
+    let exchange_total: i64 =
+      staged_method
+      + staged_path
+      + staged_request_header
+      + staged_status
+      + staged_response_header
+      + staged_body
+      + staged_retry
+      + load_at(scratch, 7);
+    free(scratch);
+    return ResponsePacket {
+      method_code: staged_method,
+      path_code: staged_path,
+      request_header_code: staged_request_header,
+      status_code: staged_status,
+      response_header_code: staged_response_header,
+      body_code: staged_body,
+      retry_code: staged_retry,
+      exchange_total: exchange_total
+    };
+  }
+
+  fn capture_exchange_contract_summary() -> ExchangeContractSummary {
+    let argv_count: i64 = host_argv_count();
+    let transport_family: i64 = network_profile_transport_family("NetworkUnit");
+    let timeout_budget: i64 = network_profile_timeout_budget("NetworkUnit");
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+    let protocol_kind: i64 = network_profile_protocol_kind("NetworkUnit");
+    let protocol_version: i64 = network_profile_protocol_version("NetworkUnit");
+    let protocol_header_bytes: i64 =
+      network_profile_protocol_header_bytes("NetworkUnit");
+    let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+    let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+    let plan: RequestPlan = build_request_plan(
+      protocol_kind,
+      protocol_version,
+      protocol_header_bytes,
+      timeout_budget,
+      retry_budget
+    );
+    let headers: RequestHeaders = build_request_headers(plan, protocol_header_bytes);
+    let request_bytes: i64 =
+      protocol_header_bytes
+      + protocol_version
+      + headers.accept_code
+      + request_header_code(headers)
+      + send_window;
+    let open_handle: i64 = host_network_open_tcp_stream(
+      remote_port,
+      connect_timeout_ms
+    );
+    let send_result: NetworkResult<i64> = network_result(
+      host_network_send_owned(open_handle, stream_window, send_window)
+    );
+    let status_result: NetworkResult<i64> = network_result(
+      host_network_recv_http_status_owned(open_handle, stream_window, recv_window)
+    );
+    let recv_result: NetworkResult<i64> = network_result(
+      host_network_recv_owned(open_handle, stream_window, recv_window)
+    );
+    let packet: ResponsePacket = stage_response_packet(
+      plan,
+      request_header_code(headers),
+      response_status_code(plan, send_result, status_result),
+      response_header_code(plan, headers, recv_window, status_result),
+      response_body_code(plan, headers, recv_result, send_result),
+      retry_code(plan, recv_result, send_result)
+    );
+    let response_bytes: i64 =
+      protocol_header_bytes + recv_window + packet.response_header_code;
+    let close_value: i64 = host_network_close_owned(open_handle);
+    let tick_ns: i64 = host_monotonic_time_ns();
+
+    return ExchangeContractSummary {
+      argv_count: argv_count,
+      transport_family: transport_family,
+      protocol_kind: protocol_kind,
+      protocol_version: protocol_version,
+      protocol_header_bytes: protocol_header_bytes,
+      timeout_budget: timeout_budget,
+      retry_budget: retry_budget,
+      request_bytes: request_bytes,
+      response_bytes: response_bytes,
+      open_handle: open_handle,
+      send_ready: encode_send_ready(send_result),
+      recv_ready: encode_recv_ready(status_result),
+      method_code: packet.method_code,
+      path_code: packet.path_code,
+      request_header_code: packet.request_header_code,
+      status_code: packet.status_code,
+      response_header_code: packet.response_header_code,
+      body_code: packet.body_code,
+      retry_code: packet.retry_code,
+      exchange_total: packet.exchange_total,
+      close_value: close_value,
+      tick_ns: tick_ns
+    };
+  }
+
+  fn summarize_exchange_contract_demo() -> i64 {
+    let summary: ExchangeContractSummary = capture_exchange_contract_summary();
+    return summary.argv_count
+      + summary.transport_family
+      + summary.protocol_kind
+      + summary.protocol_version
+      + summary.protocol_header_bytes
+      + summary.timeout_budget
+      + summary.retry_budget
+      + summary.request_bytes
+      + summary.response_bytes
+      + summary.open_handle
+      + summary.send_ready
+      + summary.recv_ready
+      + summary.method_code
+      + summary.path_code
+      + summary.request_header_code
+      + summary.status_code
+      + summary.response_header_code
+      + summary.body_code
+      + summary.retry_code
+      + summary.exchange_total
+      + summary.close_value
+      + summary.tick_ns;
+  }
+
+  fn main() {
+    print(summarize_exchange_contract_demo());
+  }
+}
