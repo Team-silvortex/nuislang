@@ -1,0 +1,178 @@
+use network NetworkUnit;
+
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+  extern "c" fn host_monotonic_time_ns() -> i64;
+
+  struct NetHttpishRequestPlan {
+    method_code: i64,
+    path_code: i64,
+    timeout_ns: i64
+  }
+
+  struct NetHttpishResponsePacket {
+    status_code: i64,
+    body_code: i64,
+    staged_total: i64
+  }
+
+  struct NetHttpishClientSessionPacketSummary {
+    argv_count: i64,
+    protocol_kind: i64,
+    protocol_version: i64,
+    protocol_header_bytes: i64,
+    timeout_budget: i64,
+    retry_budget: i64,
+    status_code: i64,
+    body_code: i64,
+    staged_total: i64,
+    lane_value: i64,
+    tick_ns: i64
+  }
+
+  async fn fetch_primary(seed: i64) -> i64 {
+    return seed + 40;
+  }
+
+  async fn fetch_fallback(seed: i64) -> i64 {
+    return seed + 5;
+  }
+
+  fn build_request_plan(
+    protocol_kind: i64,
+    protocol_version: i64,
+    protocol_header_bytes: i64,
+    timeout_budget: i64
+  ) -> NetHttpishRequestPlan {
+    return NetHttpishRequestPlan {
+      method_code: 64 + protocol_kind,
+      path_code: 1000 + protocol_version + protocol_header_bytes,
+      timeout_ns: timeout_budget
+    };
+  }
+
+  fn encode_value(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return task_value(result);
+    }
+    return 0;
+  }
+
+  fn select_status_code(
+    primary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    if task_completed(primary_result) {
+      return 200;
+    }
+    if task_completed(fallback_result) {
+      return 206;
+    }
+    return 504;
+  }
+
+  fn select_body_code(
+    primary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    if task_completed(primary_result) {
+      return encode_value(primary_result);
+    }
+    if task_completed(fallback_result) {
+      return encode_value(fallback_result);
+    }
+    return 1;
+  }
+
+  fn stage_response_packet(
+    plan: NetHttpishRequestPlan,
+    status_code: i64,
+    body_code: i64
+  ) -> NetHttpishResponsePacket {
+    let scratch: ref Buffer = alloc_buffer(4, 0);
+    store_at(scratch, 0, plan.method_code);
+    store_at(scratch, 1, plan.path_code);
+    store_at(scratch, 2, status_code);
+    store_at(scratch, 3, body_code);
+    let staged_status: i64 = load_at(scratch, 2);
+    let staged_body: i64 = load_at(scratch, 3);
+    let staged_total: i64 =
+      load_at(scratch, 0) + load_at(scratch, 1) + staged_status + staged_body;
+    free(scratch);
+    return NetHttpishResponsePacket {
+      status_code: staged_status,
+      body_code: staged_body,
+      staged_total: staged_total
+    };
+  }
+
+  fn capture_net_httpish_client_session_packet_summary()
+    -> NetHttpishClientSessionPacketSummary {
+    let argv_count: i64 = host_argv_count();
+    let protocol_kind: i64 = network_profile_protocol_kind("NetworkUnit");
+    let protocol_version: i64 = network_profile_protocol_version("NetworkUnit");
+    let protocol_header_bytes: i64 =
+      network_profile_protocol_header_bytes("NetworkUnit");
+    let timeout_budget: i64 = network_profile_timeout_budget("NetworkUnit");
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+    let tick_ns: i64 = host_monotonic_time_ns();
+    let request_plan: NetHttpishRequestPlan = build_request_plan(
+      protocol_kind,
+      protocol_version,
+      protocol_header_bytes,
+      timeout_budget
+    );
+    let primary_result: TaskResult<i64> = join_result(
+      timeout(spawn(fetch_primary(request_plan.path_code)), request_plan.timeout_ns)
+    );
+    let fallback_result: TaskResult<i64> =
+      join_result(spawn(fetch_fallback(request_plan.method_code)));
+    let packet: NetHttpishResponsePacket = stage_response_packet(
+      request_plan,
+      select_status_code(primary_result, fallback_result),
+      select_body_code(primary_result, fallback_result)
+    );
+
+    return NetHttpishClientSessionPacketSummary {
+      argv_count: argv_count,
+      protocol_kind: protocol_kind,
+      protocol_version: protocol_version,
+      protocol_header_bytes: protocol_header_bytes,
+      timeout_budget: timeout_budget,
+      retry_budget: retry_budget,
+      status_code: packet.status_code,
+      body_code: packet.body_code,
+      staged_total: packet.staged_total,
+      lane_value: argv_count
+        + protocol_kind
+        + protocol_version
+        + protocol_header_bytes
+        + timeout_budget
+        + retry_budget
+        + packet.status_code
+        + packet.body_code
+        + packet.staged_total,
+      tick_ns: tick_ns
+    };
+  }
+
+  fn summarize_net_httpish_client_session_packet_recipe() -> i64 {
+    let summary: NetHttpishClientSessionPacketSummary =
+      capture_net_httpish_client_session_packet_summary();
+    return summary.argv_count
+      + summary.protocol_kind
+      + summary.protocol_version
+      + summary.protocol_header_bytes
+      + summary.timeout_budget
+      + summary.retry_budget
+      + summary.status_code
+      + summary.body_code
+      + summary.staged_total
+      + summary.lane_value
+      + summary.tick_ns;
+  }
+
+  fn main() {
+    print(summarize_net_httpish_client_session_packet_recipe());
+  }
+}

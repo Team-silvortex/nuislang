@@ -1,0 +1,92 @@
+mod cpu Main {
+  struct TaskSessionPacket {
+    status_code: i64,
+    payload: i64,
+    staged_total: i64
+  }
+
+  async fn primary(seed: i64) -> i64 {
+    return seed + 10;
+  }
+
+  async fn secondary(seed: i64) -> i64 {
+    return seed + 20;
+  }
+
+  fn encode_value(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return task_value(result);
+    }
+    return 0;
+  }
+
+  fn select_status_code(
+    primary_result: TaskResult<i64>,
+    secondary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    if task_completed(primary_result) {
+      return 200;
+    }
+    if task_completed(secondary_result) {
+      return 206;
+    }
+    if task_timed_out(fallback_result) {
+      return 504;
+    }
+    return 500;
+  }
+
+  fn select_payload(
+    primary_result: TaskResult<i64>,
+    secondary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    if task_completed(primary_result) {
+      return encode_value(primary_result);
+    }
+    if task_completed(secondary_result) {
+      return encode_value(secondary_result);
+    }
+    if task_timed_out(fallback_result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn stage_session_packet(seed: i64, status_code: i64, payload: i64) -> TaskSessionPacket {
+    let scratch: ref Buffer = alloc_buffer(3, 0);
+    store_at(scratch, 0, seed);
+    store_at(scratch, 1, status_code);
+    store_at(scratch, 2, payload);
+    let staged_status: i64 = load_at(scratch, 1);
+    let staged_payload: i64 = load_at(scratch, 2);
+    let staged_total: i64 = load_at(scratch, 0) + staged_status + staged_payload;
+    free(scratch);
+    return TaskSessionPacket {
+      status_code: staged_status,
+      payload: staged_payload,
+      staged_total: staged_total
+    };
+  }
+
+  fn capture_task_session_packet(seed: i64, limit: i64) -> TaskSessionPacket {
+    let primary_result: TaskResult<i64> = join_result(spawn(primary(seed)));
+    let secondary_result: TaskResult<i64> = join_result(spawn(secondary(seed)));
+    let fallback_result: TaskResult<i64> = join_result(timeout(spawn(primary(seed)), limit));
+    let status_code: i64 = select_status_code(primary_result, secondary_result, fallback_result);
+    let payload: i64 = select_payload(primary_result, secondary_result, fallback_result);
+    return stage_session_packet(seed, status_code, payload);
+  }
+
+  fn main() -> i64 {
+    let head: ref Node = move(alloc_node(7, null()));
+    let head_ref: ref Node = borrow(head);
+    let seed: i64 = load_value(head_ref);
+    borrow_end(head_ref);
+    free(head);
+
+    let packet: TaskSessionPacket = capture_task_session_packet(seed, 0);
+    return packet.status_code + packet.payload + packet.staged_total;
+  }
+}

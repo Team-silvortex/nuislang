@@ -17,8 +17,30 @@ fn chain_statement_effect(state: &mut LoweringState<'_>, anchor: &str) {
     state.last_effect_anchor = Some(anchor.to_owned());
 }
 
-fn chain_effectful_expr_stmt(expr: &NirExpr, lowered: &str, state: &mut LoweringState<'_>) {
-    if !matches!(nir_expr_effect_class(expr), NirExprEffectClass::Pure) {
+fn expr_requires_statement_anchor(expr: &NirExpr) -> bool {
+    if nir_expr_effect_class(expr) != NirExprEffectClass::Pure {
+        return true;
+    }
+
+    match expr {
+        NirExpr::CastI64ToI32(value)
+        | NirExpr::IsNull(value)
+        | NirExpr::FieldAccess { base: value, .. } => expr_requires_statement_anchor(value),
+        NirExpr::Binary { lhs, rhs, .. } => {
+            expr_requires_statement_anchor(lhs) || expr_requires_statement_anchor(rhs)
+        }
+        NirExpr::StructLiteral { fields, .. } => fields
+            .iter()
+            .any(|(_, value)| expr_requires_statement_anchor(value)),
+        NirExpr::Null | NirExpr::Bool(_) | NirExpr::Text(_) | NirExpr::Int(_) | NirExpr::Var(_) => {
+            false
+        }
+        _ => false,
+    }
+}
+
+fn chain_nonpure_expr_stmt(expr: &NirExpr, lowered: &str, state: &mut LoweringState<'_>) {
+    if expr_requires_statement_anchor(expr) {
         chain_statement_effect(state, lowered);
     }
 }
@@ -34,12 +56,12 @@ pub(super) fn lower_function_body(
         match stmt {
             NirStmt::Let { name, value, .. } => {
                 let lowered = lower_expr(value, state, bindings)?;
-                chain_effectful_expr_stmt(value, &lowered, state);
+                chain_nonpure_expr_stmt(value, &lowered, state);
                 bindings.insert(name.clone(), lowered);
             }
             NirStmt::Const { name, value, .. } => {
                 let lowered = lower_expr(value, state, bindings)?;
-                chain_effectful_expr_stmt(value, &lowered, state);
+                chain_nonpure_expr_stmt(value, &lowered, state);
                 bindings.insert(name.clone(), lowered);
             }
             NirStmt::Print(value) => {
@@ -112,7 +134,7 @@ pub(super) fn lower_function_body(
             }
             NirStmt::Expr(expr) => {
                 let lowered = lower_expr(expr, state, bindings)?;
-                chain_effectful_expr_stmt(expr, &lowered, state);
+                chain_nonpure_expr_stmt(expr, &lowered, state);
             }
             NirStmt::Return(value) => {
                 let returned = match value {

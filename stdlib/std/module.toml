@@ -210,6 +210,7 @@ source_modules = [
   "net_httpish_path_compare_recipe.ns",
   "net_protocol_session_recipe.ns",
   "net_httpish_session_recipe.ns",
+  "net_httpish_client_session_packet_recipe.ns",
   "net_session_recipe.ns",
   "cli_runtime_recipe.ns",
   "report_runtime_recipe.ns",

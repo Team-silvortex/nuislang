@@ -1,0 +1,5 @@
+name = "task_memory_session_policy_demo"
+version = "0.1.0"
+
+[project]
+entry = "main.ns"

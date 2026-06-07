@@ -31,3 +31,12 @@ fn compiles_http_service_lane_recipe_project() {
     );
     nuisc::pipeline::compile_project(project).expect("http service lane project should compile");
 }
+
+#[test]
+fn compiles_httpish_client_session_packet_recipe_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_client_session_packet_recipe_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("httpish client session packet project should compile");
+}

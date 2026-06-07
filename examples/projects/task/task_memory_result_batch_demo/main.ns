@@ -1,0 +1,37 @@
+mod cpu Main {
+  async fn alpha(seed: i64) -> i64 {
+    return seed + 10;
+  }
+
+  async fn beta(seed: i64) -> i64 {
+    return seed + 20;
+  }
+
+  fn encode_value(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return task_value(result);
+    }
+    return 0;
+  }
+
+  fn stage_pair(lhs: i64, rhs: i64) -> i64 {
+    let scratch: ref Buffer = alloc_buffer(2, 0);
+    store_at(scratch, 0, lhs);
+    store_at(scratch, 1, rhs);
+    let total: i64 = load_at(scratch, 0) + load_at(scratch, 1);
+    free(scratch);
+    return total;
+  }
+
+  fn main() -> i64 {
+    let head: ref Node = move(alloc_node(7, null()));
+    let head_ref: ref Node = borrow(head);
+    let seed: i64 = load_value(head_ref);
+    borrow_end(head_ref);
+    free(head);
+
+    let alpha_result: TaskResult<i64> = join_result(spawn(alpha(seed)));
+    let beta_result: TaskResult<i64> = join_result(spawn(beta(seed)));
+    return stage_pair(encode_value(alpha_result), encode_value(beta_result));
+  }
+}

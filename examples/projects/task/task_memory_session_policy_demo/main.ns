@@ -1,0 +1,98 @@
+mod cpu Main {
+  struct TaskMemorySessionSummary {
+    primary_completed: i64,
+    secondary_completed: i64,
+    fallback_timed_out: i64,
+    selected_value: i64,
+    staged_total: i64
+  }
+
+  async fn primary(seed: i64) -> i64 {
+    return seed + 10;
+  }
+
+  async fn secondary(seed: i64) -> i64 {
+    return seed + 20;
+  }
+
+  fn encode_completed(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_timed_out(result: TaskResult<i64>) -> i64 {
+    if task_timed_out(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_value(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return task_value(result);
+    }
+    return 0;
+  }
+
+  fn select_session_value(
+    primary_result: TaskResult<i64>,
+    secondary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    if task_completed(primary_result) {
+      return encode_value(primary_result) + 100;
+    }
+    if task_completed(secondary_result) {
+      return encode_value(secondary_result) + 10;
+    }
+    if task_timed_out(fallback_result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn stage_session_value(seed: i64, selected_value: i64) -> i64 {
+    let scratch: ref Buffer = alloc_buffer(2, 0);
+    store_at(scratch, 0, seed);
+    store_at(scratch, 1, selected_value);
+    let staged_total: i64 = load_at(scratch, 0) + load_at(scratch, 1);
+    free(scratch);
+    return staged_total;
+  }
+
+  fn capture_task_memory_session(seed: i64, limit: i64) -> TaskMemorySessionSummary {
+    let primary_result: TaskResult<i64> = join_result(spawn(primary(seed)));
+    let secondary_result: TaskResult<i64> = join_result(spawn(secondary(seed)));
+    let fallback_result: TaskResult<i64> = join_result(timeout(spawn(primary(seed)), limit));
+    let selected_value: i64 = select_session_value(
+      primary_result,
+      secondary_result,
+      fallback_result
+    );
+
+    return TaskMemorySessionSummary {
+      primary_completed: encode_completed(primary_result),
+      secondary_completed: encode_completed(secondary_result),
+      fallback_timed_out: encode_timed_out(fallback_result),
+      selected_value: selected_value,
+      staged_total: stage_session_value(seed, selected_value)
+    };
+  }
+
+  fn main() -> i64 {
+    let head: ref Node = move(alloc_node(7, null()));
+    let head_ref: ref Node = borrow(head);
+    let seed: i64 = load_value(head_ref);
+    borrow_end(head_ref);
+    free(head);
+
+    let summary: TaskMemorySessionSummary = capture_task_memory_session(seed, 0);
+    return summary.primary_completed
+      + summary.secondary_completed
+      + summary.fallback_timed_out
+      + summary.selected_value
+      + summary.staged_total;
+  }
+}

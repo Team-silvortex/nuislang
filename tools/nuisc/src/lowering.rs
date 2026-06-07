@@ -321,6 +321,9 @@ fn lower_expr(
 }
 
 #[cfg(test)]
+#[path = "lowering/tests_async_memory.rs"]
+mod tests_async_memory;
+#[cfg(test)]
 #[path = "lowering/tests_async_runtime.rs"]
 mod tests_async_runtime;
 #[cfg(test)]

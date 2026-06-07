@@ -6,6 +6,12 @@ This folder contains narrow project-form companions for the current task-facing
 Start here:
 
 * [task_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_runtime_demo)
+* [task_memory_roundtrip_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_memory_roundtrip_demo)
+* [task_memory_result_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_memory_result_branch_demo)
+* [task_memory_result_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_memory_result_batch_demo)
+* [task_memory_session_policy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_memory_session_policy_demo)
+* [task_memory_session_packet_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_memory_session_packet_demo)
+* [task_httpish_response_packet_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_httpish_response_packet_demo)
 * [task_status_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_status_observe_demo)
 * [task_completed_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_completed_observe_demo)
 * [task_compare_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_compare_observe_demo)
@@ -26,6 +32,12 @@ Short reading rule:
 
 * semantic core:
   [task_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_runtime_demo) ->
+  [task_memory_roundtrip_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_memory_roundtrip_demo) ->
+  [task_memory_result_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_memory_result_branch_demo) ->
+  [task_memory_result_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_memory_result_batch_demo) ->
+  [task_memory_session_policy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_memory_session_policy_demo) ->
+  [task_memory_session_packet_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_memory_session_packet_demo) ->
+  [task_httpish_response_packet_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_httpish_response_packet_demo) ->
   [task_status_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_status_observe_demo) ->
   [task_completed_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_completed_observe_demo) ->
   [task_compare_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_compare_observe_demo) ->

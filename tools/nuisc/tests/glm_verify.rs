@@ -219,6 +219,91 @@ fn glm_verifier_rejects_write_during_active_borrow() {
 }
 
 #[test]
+fn glm_verifier_accepts_task_result_fanin_staged_through_buffer() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "head".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(7)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::Let {
+            name: "head_ref".to_owned(),
+            ty: None,
+            value: NirExpr::Borrow(Box::new(NirExpr::Var("head".to_owned()))),
+        },
+        NirStmt::Let {
+            name: "seed".to_owned(),
+            ty: None,
+            value: NirExpr::LoadValue(Box::new(NirExpr::Var("head_ref".to_owned()))),
+        },
+        NirStmt::Expr(NirExpr::BorrowEnd(Box::new(NirExpr::Var(
+            "head_ref".to_owned(),
+        )))),
+        NirStmt::Expr(NirExpr::Free(Box::new(NirExpr::Var("head".to_owned())))),
+        NirStmt::Let {
+            name: "alpha_result".to_owned(),
+            ty: None,
+            value: NirExpr::CpuJoinResult(Box::new(NirExpr::CpuSpawn {
+                callee: "alpha".to_owned(),
+                args: vec![NirExpr::Var("seed".to_owned())],
+            })),
+        },
+        NirStmt::Let {
+            name: "beta_result".to_owned(),
+            ty: None,
+            value: NirExpr::CpuJoinResult(Box::new(NirExpr::CpuSpawn {
+                callee: "beta".to_owned(),
+                args: vec![NirExpr::Var("seed".to_owned())],
+            })),
+        },
+        NirStmt::Let {
+            name: "scratch".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocBuffer {
+                len: Box::new(NirExpr::Int(2)),
+                fill: Box::new(NirExpr::Int(0)),
+            })),
+        },
+        NirStmt::If {
+            condition: NirExpr::CpuTaskCompleted(Box::new(NirExpr::Var("alpha_result".to_owned()))),
+            then_body: vec![NirStmt::Expr(NirExpr::StoreAt {
+                buffer: Box::new(NirExpr::Var("scratch".to_owned())),
+                index: Box::new(NirExpr::Int(0)),
+                value: Box::new(NirExpr::CpuTaskValue(Box::new(NirExpr::Var(
+                    "alpha_result".to_owned(),
+                )))),
+            })],
+            else_body: vec![],
+        },
+        NirStmt::If {
+            condition: NirExpr::CpuTaskCompleted(Box::new(NirExpr::Var("beta_result".to_owned()))),
+            then_body: vec![NirStmt::Expr(NirExpr::StoreAt {
+                buffer: Box::new(NirExpr::Var("scratch".to_owned())),
+                index: Box::new(NirExpr::Int(1)),
+                value: Box::new(NirExpr::CpuTaskValue(Box::new(NirExpr::Var(
+                    "beta_result".to_owned(),
+                )))),
+            })],
+            else_body: vec![],
+        },
+        NirStmt::Expr(NirExpr::LoadAt {
+            buffer: Box::new(NirExpr::Var("scratch".to_owned())),
+            index: Box::new(NirExpr::Int(0)),
+        }),
+        NirStmt::Expr(NirExpr::LoadAt {
+            buffer: Box::new(NirExpr::Var("scratch".to_owned())),
+            index: Box::new(NirExpr::Int(1)),
+        }),
+        NirStmt::Expr(NirExpr::Free(Box::new(NirExpr::Var("scratch".to_owned())))),
+    ]);
+
+    verify_nir_module(&module).unwrap();
+}
+
+#[test]
 fn glm_verifier_rejects_join_result_after_join_of_same_task() {
     let module = module_with_body(vec![
         NirStmt::Let {
@@ -422,4 +507,80 @@ fn glm_verifier_rejects_use_after_free_in_expr_statements() {
 
     let error = verify_nir_module(&module).unwrap_err();
     assert!(error.contains("use of moved value `head`"));
+}
+
+#[test]
+fn glm_verifier_accepts_memory_task_roundtrip_after_borrow_end() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "head".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(5)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::Let {
+            name: "head_ref".to_owned(),
+            ty: None,
+            value: NirExpr::Borrow(Box::new(NirExpr::Var("head".to_owned()))),
+        },
+        NirStmt::Let {
+            name: "seed".to_owned(),
+            ty: None,
+            value: NirExpr::LoadValue(Box::new(NirExpr::Var("head_ref".to_owned()))),
+        },
+        NirStmt::Expr(NirExpr::BorrowEnd(Box::new(NirExpr::Var(
+            "head_ref".to_owned(),
+        )))),
+        NirStmt::Let {
+            name: "scratch".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocBuffer {
+                len: Box::new(NirExpr::Int(2)),
+                fill: Box::new(NirExpr::Int(0)),
+            })),
+        },
+        NirStmt::Expr(NirExpr::StoreAt {
+            buffer: Box::new(NirExpr::Var("scratch".to_owned())),
+            index: Box::new(NirExpr::Int(0)),
+            value: Box::new(NirExpr::Var("seed".to_owned())),
+        }),
+        NirStmt::Let {
+            name: "task".to_owned(),
+            ty: None,
+            value: NirExpr::CpuSpawn {
+                callee: "ping".to_owned(),
+                args: vec![NirExpr::Var("seed".to_owned())],
+            },
+        },
+        NirStmt::Let {
+            name: "result".to_owned(),
+            ty: None,
+            value: NirExpr::CpuJoinResult(Box::new(NirExpr::Var("task".to_owned()))),
+        },
+        NirStmt::If {
+            condition: NirExpr::CpuTaskCompleted(Box::new(NirExpr::Var("result".to_owned()))),
+            then_body: vec![
+                NirStmt::Let {
+                    name: "observed".to_owned(),
+                    ty: None,
+                    value: NirExpr::CpuTaskValue(Box::new(NirExpr::Var("result".to_owned()))),
+                },
+                NirStmt::Expr(NirExpr::StoreAt {
+                    buffer: Box::new(NirExpr::Var("scratch".to_owned())),
+                    index: Box::new(NirExpr::Int(1)),
+                    value: Box::new(NirExpr::Var("observed".to_owned())),
+                }),
+                NirStmt::Expr(NirExpr::Free(Box::new(NirExpr::Var("scratch".to_owned())))),
+                NirStmt::Expr(NirExpr::Free(Box::new(NirExpr::Var("head".to_owned())))),
+            ],
+            else_body: vec![
+                NirStmt::Expr(NirExpr::Free(Box::new(NirExpr::Var("scratch".to_owned())))),
+                NirStmt::Expr(NirExpr::Free(Box::new(NirExpr::Var("head".to_owned())))),
+            ],
+        },
+    ]);
+
+    verify_nir_module(&module).unwrap();
 }

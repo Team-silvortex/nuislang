@@ -1,0 +1,10 @@
+name = "net_httpish_client_session_packet_recipe_demo"
+version = "0.1.0"
+
+[project]
+entry = "main.ns"
+modules = ["main.ns", "network_unit.ns"]
+
+abis = [
+  { name = "cpu-main", kind = "staticlib", target = "host-native" }
+]

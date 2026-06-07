@@ -1,0 +1,32 @@
+mod cpu Main {
+  async fn amplify(seed: i64) -> i64 {
+    return seed + 30;
+  }
+
+  fn encode_observed(seed: i64, observed: i64) -> i64 {
+    let scratch: ref Buffer = alloc_buffer(2, 0);
+    store_at(scratch, 0, seed);
+    store_at(scratch, 1, observed);
+    let replay: i64 = load_at(scratch, 0) + load_at(scratch, 1);
+    free(scratch);
+    return replay;
+  }
+
+  fn encode_completed(seed: i64, result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return encode_observed(seed, task_value(result));
+    }
+    return 0;
+  }
+
+  fn main() -> i64 {
+    let head: ref Node = move(alloc_node(5, null()));
+    let head_ref: ref Node = borrow(head);
+    let seed: i64 = load_value(head_ref);
+    borrow_end(head_ref);
+    free(head);
+
+    let result: TaskResult<i64> = join_result(spawn(amplify(seed)));
+    return encode_completed(seed, result);
+  }
+}

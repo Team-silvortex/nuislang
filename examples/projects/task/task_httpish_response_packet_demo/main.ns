@@ -1,0 +1,106 @@
+mod cpu Main {
+  struct RequestPlan {
+    method_code: i64,
+    path_code: i64,
+    timeout_ns: i64
+  }
+
+  struct ResponsePacket {
+    status_code: i64,
+    body_code: i64,
+    staged_total: i64
+  }
+
+  async fn fetch_primary(seed: i64) -> i64 {
+    return seed + 40;
+  }
+
+  async fn fetch_fallback(seed: i64) -> i64 {
+    return seed + 5;
+  }
+
+  fn build_request_plan(seed: i64) -> RequestPlan {
+    return RequestPlan {
+      method_code: 1,
+      path_code: seed + 1000,
+      timeout_ns: 0
+    };
+  }
+
+  fn encode_value(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return task_value(result);
+    }
+    return 0;
+  }
+
+  fn select_status_code(
+    primary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    if task_completed(primary_result) {
+      return 200;
+    }
+    if task_completed(fallback_result) {
+      return 206;
+    }
+    return 504;
+  }
+
+  fn select_body_code(
+    primary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    if task_completed(primary_result) {
+      return encode_value(primary_result);
+    }
+    if task_completed(fallback_result) {
+      return encode_value(fallback_result);
+    }
+    return 1;
+  }
+
+  fn stage_response_packet(
+    plan: RequestPlan,
+    status_code: i64,
+    body_code: i64
+  ) -> ResponsePacket {
+    let scratch: ref Buffer = alloc_buffer(4, 0);
+    store_at(scratch, 0, plan.method_code);
+    store_at(scratch, 1, plan.path_code);
+    store_at(scratch, 2, status_code);
+    store_at(scratch, 3, body_code);
+    let staged_status: i64 = load_at(scratch, 2);
+    let staged_body: i64 = load_at(scratch, 3);
+    let staged_total: i64 =
+      load_at(scratch, 0) + load_at(scratch, 1) + staged_status + staged_body;
+    free(scratch);
+    return ResponsePacket {
+      status_code: staged_status,
+      body_code: staged_body,
+      staged_total: staged_total
+    };
+  }
+
+  fn execute_request(plan: RequestPlan) -> ResponsePacket {
+    let primary_result: TaskResult<i64> =
+      join_result(timeout(spawn(fetch_primary(plan.path_code)), plan.timeout_ns));
+    let fallback_result: TaskResult<i64> =
+      join_result(spawn(fetch_fallback(plan.method_code)));
+    let status_code: i64 = select_status_code(primary_result, fallback_result);
+    let body_code: i64 = select_body_code(primary_result, fallback_result);
+    return stage_response_packet(plan, status_code, body_code);
+  }
+
+  fn main() -> i64 {
+    let head: ref Node = move(alloc_node(7, null()));
+    let head_ref: ref Node = borrow(head);
+    let seed: i64 = load_value(head_ref);
+    borrow_end(head_ref);
+    free(head);
+
+    let plan: RequestPlan = build_request_plan(seed);
+    let packet: ResponsePacket = execute_request(plan);
+    return packet.status_code + packet.body_code + packet.staged_total;
+  }
+}
