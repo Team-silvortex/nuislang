@@ -31,6 +31,8 @@ pub(super) fn resolve_project_profile_refs(module: &mut YirModule) -> Result<(),
         return Ok(());
     }
 
+    let replacement_sources = replacements.keys().cloned().collect::<BTreeSet<_>>();
+
     for node in &mut module.nodes {
         if node.op.is_cpu_semantic_op(SemanticOp::CpuProjectProfileRef) {
             continue;
@@ -45,14 +47,9 @@ pub(super) fn resolve_project_profile_refs(module: &mut YirModule) -> Result<(),
             }
         }
     }
-    for edge in &mut module.edges {
-        if let Some(target) = replacements.get(&edge.from) {
-            edge.from = target.clone();
-        }
-        if let Some(target) = replacements.get(&edge.to) {
-            edge.to = target.clone();
-        }
-    }
+    module.edges.retain(|edge| {
+        !replacement_sources.contains(&edge.from) && !replacement_sources.contains(&edge.to)
+    });
     let replacement_targets = replacements.values().cloned().collect::<BTreeSet<_>>();
     let resource_families = module
         .resources
@@ -70,23 +67,29 @@ pub(super) fn resolve_project_profile_refs(module: &mut YirModule) -> Result<(),
             continue;
         }
         for arg in &node.op.args {
-            if !replacement_targets.contains(arg) {
+            let dependency = if replacement_targets.contains(arg) {
+                Some(arg.as_str())
+            } else if let Some((_field, value)) = arg.split_once('=') {
+                replacement_targets.contains(value).then_some(value)
+            } else {
+                None
+            };
+            let Some(dependency) = dependency else {
                 continue;
-            }
+            };
             let edge_kind = inferred_project_dependency_edge_kind(
                 &resource_families,
                 &node_resources,
-                arg,
+                dependency,
                 &node.name,
             );
-            let exists = module
-                .edges
-                .iter()
-                .any(|edge| edge.kind == edge_kind && edge.from == *arg && edge.to == node.name);
+            let exists = module.edges.iter().any(|edge| {
+                edge.kind == edge_kind && edge.from == dependency && edge.to == node.name
+            });
             if !exists {
                 extra_dep_edges.push(yir_core::Edge {
                     kind: edge_kind,
-                    from: arg.clone(),
+                    from: dependency.to_owned(),
                     to: node.name.clone(),
                 });
             }

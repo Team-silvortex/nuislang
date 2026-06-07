@@ -5189,6 +5189,9 @@ fn topological_order(module: &YirModule) -> Result<Vec<String>, String> {
             .get(&node.name)
             .cloned()
             .unwrap_or_else(|| "main".to_owned());
+        if matches!(lane.as_str(), "profile" | "contract") {
+            continue;
+        }
         let key = (node.resource.clone(), lane);
         if let Some(previous) = last_cpu_node_on_lane.insert(key, node.name.clone()) {
             adjacency

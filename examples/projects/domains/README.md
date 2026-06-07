@@ -91,8 +91,10 @@ Start here:
   [net_http_response_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_response_recipe_demo) ->
   [net_http_client_exchange_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_exchange_recipe_demo) ->
   [net_http_client_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_session_recipe_demo) ->
+  [net_http_client_lane_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_lane_recipe_demo) ->
   [net_http_client_get_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_get_recipe_demo) ->
   [net_http_client_post_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_post_recipe_demo) ->
+  [net_http_service_lane_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_service_lane_recipe_demo) ->
   [net_httpish_request_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_request_recipe_demo) ->
   [net_httpish_response_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_response_recipe_demo) ->
   [net_httpish_roundtrip_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_roundtrip_recipe_demo) ->

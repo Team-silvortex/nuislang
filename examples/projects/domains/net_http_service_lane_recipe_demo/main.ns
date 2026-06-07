@@ -1,0 +1,190 @@
+use network NetworkUnit;
+
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+  extern "c" fn host_monotonic_time_ns() -> i64;
+  extern "c" fn host_network_open_tcp_listener(
+    local_port: i64,
+    read_timeout_ms: i64,
+    write_timeout_ms: i64
+  ) -> i64;
+  extern "c" fn host_network_accept_owned(
+    listener_handle: i64,
+    read_timeout_ms: i64,
+    write_timeout_ms: i64
+  ) -> i64;
+  extern "c" fn host_network_recv_owned(
+    handle: i64,
+    stream_window: i64,
+    recv_window: i64
+  ) -> i64;
+  extern "c" fn host_network_send_owned(
+    handle: i64,
+    stream_window: i64,
+    send_window: i64
+  ) -> i64;
+  extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+  struct NetHttpServiceLaneSummary {
+    argv_count: i64,
+    transport_family: i64,
+    endpoint_kind: i64,
+    retry_budget: i64,
+    protocol_kind: i64,
+    protocol_version: i64,
+    protocol_header_bytes: i64,
+    local_port: i64,
+    read_timeout_ms: i64,
+    write_timeout_ms: i64,
+    stream_window: i64,
+    recv_window: i64,
+    send_window: i64,
+    listener_handle: i64,
+    accept_ready: i64,
+    recv_ready: i64,
+    send_ready: i64,
+    request_head_bytes: i64,
+    request_body_bytes: i64,
+    response_head_bytes: i64,
+    response_body_bytes: i64,
+    service_value: i64,
+    tick_ns: i64
+  }
+
+  fn encode_accept_ready(result: NetworkResult<i64>) -> i64 {
+    if network_accept_ready(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_send_ready(result: NetworkResult<i64>) -> i64 {
+    if network_send_ready(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_recv_ready(result: NetworkResult<i64>) -> i64 {
+    if network_recv_ready(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_value(result: NetworkResult<i64>) -> i64 {
+    return network_value(result);
+  }
+
+  fn capture_net_http_service_lane_summary() -> NetHttpServiceLaneSummary {
+    let argv_count: i64 = host_argv_count();
+    let transport_family: i64 = network_profile_transport_family("NetworkUnit");
+    let endpoint_kind: i64 = network_profile_endpoint_kind("NetworkUnit");
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+    let protocol_kind: i64 = network_profile_protocol_kind("NetworkUnit");
+    let protocol_version: i64 = network_profile_protocol_version("NetworkUnit");
+    let protocol_header_bytes: i64 =
+      network_profile_protocol_header_bytes("NetworkUnit");
+    let local_port: i64 = network_profile_local_port("NetworkUnit");
+    let read_timeout_ms: i64 = network_profile_read_timeout("NetworkUnit");
+    let write_timeout_ms: i64 = network_profile_write_timeout("NetworkUnit");
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+    let listener_handle: i64 = host_network_open_tcp_listener(
+      local_port,
+      read_timeout_ms,
+      write_timeout_ms
+    );
+    let accept_result: NetworkResult<i64> = network_result(
+      host_network_accept_owned(listener_handle, read_timeout_ms, write_timeout_ms)
+    );
+    let accepted_handle: i64 = encode_value(accept_result);
+    let recv_result: NetworkResult<i64> = network_result(
+      host_network_recv_owned(accepted_handle, stream_window, recv_window)
+    );
+    let send_result: NetworkResult<i64> = network_result(
+      host_network_send_owned(accepted_handle, stream_window, send_window)
+    );
+    let recv_value: i64 = encode_value(recv_result);
+    let send_value: i64 = encode_value(send_result);
+    let request_head_bytes: i64 = protocol_header_bytes + protocol_version + 16;
+    let request_body_bytes: i64 = stream_window + recv_window + retry_budget;
+    let response_head_bytes: i64 = protocol_header_bytes + 12;
+    let response_body_bytes: i64 = stream_window + send_window + protocol_kind;
+    let accepted_close_value: i64 = host_network_close_owned(accepted_handle);
+    let listener_close_value: i64 = host_network_close_owned(listener_handle);
+    let tick_ns: i64 = host_monotonic_time_ns();
+
+    return NetHttpServiceLaneSummary {
+      argv_count: argv_count,
+      transport_family: transport_family,
+      endpoint_kind: endpoint_kind,
+      retry_budget: retry_budget,
+      protocol_kind: protocol_kind,
+      protocol_version: protocol_version,
+      protocol_header_bytes: protocol_header_bytes,
+      local_port: local_port,
+      read_timeout_ms: read_timeout_ms,
+      write_timeout_ms: write_timeout_ms,
+      stream_window: stream_window,
+      recv_window: recv_window,
+      send_window: send_window,
+      listener_handle: listener_handle,
+      accept_ready: encode_accept_ready(accept_result),
+      recv_ready: encode_recv_ready(recv_result),
+      send_ready: encode_send_ready(send_result),
+      request_head_bytes: request_head_bytes,
+      request_body_bytes: request_body_bytes,
+      response_head_bytes: response_head_bytes,
+      response_body_bytes: response_body_bytes,
+      service_value: transport_family
+        + endpoint_kind
+        + retry_budget
+        + protocol_kind
+        + local_port
+        + listener_handle
+        + request_head_bytes
+        + request_body_bytes
+        + response_head_bytes
+        + response_body_bytes
+        + recv_value
+        + send_value
+        + accepted_close_value
+        + listener_close_value,
+      tick_ns: tick_ns
+    };
+  }
+
+  fn summarize_net_http_service_lane_recipe() -> i64 {
+    let summary: NetHttpServiceLaneSummary =
+      capture_net_http_service_lane_summary();
+    return summary.argv_count
+      + summary.transport_family
+      + summary.endpoint_kind
+      + summary.retry_budget
+      + summary.protocol_kind
+      + summary.protocol_version
+      + summary.protocol_header_bytes
+      + summary.local_port
+      + summary.read_timeout_ms
+      + summary.write_timeout_ms
+      + summary.stream_window
+      + summary.recv_window
+      + summary.send_window
+      + summary.listener_handle
+      + summary.accept_ready
+      + summary.recv_ready
+      + summary.send_ready
+      + summary.request_head_bytes
+      + summary.request_body_bytes
+      + summary.response_head_bytes
+      + summary.response_body_bytes
+      + summary.service_value
+      + summary.tick_ns;
+  }
+
+  fn main() {
+    print(summarize_net_http_service_lane_recipe());
+  }
+}
