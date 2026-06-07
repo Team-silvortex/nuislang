@@ -5,20 +5,21 @@ mod cpu Main {
   extern "c" fn host_argv_count() -> i64;
   extern "c" fn host_monotonic_time_ns() -> i64;
 
-  struct NetHttpishRequestPlan {
-    method_code: i64,
-    path_code: i64,
+  struct NetHttpishAcceptPlan {
+    listen_code: i64,
+    route_code: i64,
     timeout_ns: i64
   }
 
-  struct NetHttpishResponsePacket {
+  struct NetHttpishServicePacket {
     status_code: i64,
     body_code: i64,
     staged_total: i64
   }
 
-  struct NetHttpishClientSessionPacketSummary {
+  struct NetHttpishServiceSessionPacketSummary {
     argv_count: i64,
+    endpoint_kind: i64,
     protocol_kind: i64,
     protocol_version: i64,
     protocol_header_bytes: i64,
@@ -31,34 +32,35 @@ mod cpu Main {
     tick_ns: i64
   }
 
-  async fn fetch_primary(seed: i64) -> i64 {
-    return seed + 40;
+  async fn recv_primary(seed: i64) -> i64 {
+    return seed + 30;
   }
 
-  async fn fetch_fallback(seed: i64) -> i64 {
-    return seed + 5;
+  async fn recv_fallback(seed: i64) -> i64 {
+    return seed + 4;
   }
 
-  fn stage_response_packet(
-    plan: NetHttpishRequestPlan,
+  fn stage_service_packet(
+    plan: NetHttpishAcceptPlan,
     status_code: i64,
     body_code: i64
-  ) -> NetHttpishResponsePacket {
-    return NetHttpishResponsePacket {
+  ) -> NetHttpishServicePacket {
+    return NetHttpishServicePacket {
       status_code: status_code,
       body_code: body_code,
       staged_total: NetHttpishPacketShapes.staged_packet_total(
-        plan.method_code,
-        plan.path_code,
+        plan.listen_code,
+        plan.route_code,
         status_code,
         body_code
       )
     };
   }
 
-  fn capture_net_httpish_client_session_packet_summary()
-    -> NetHttpishClientSessionPacketSummary {
+  fn capture_net_httpish_service_session_packet_summary()
+    -> NetHttpishServiceSessionPacketSummary {
     let argv_count: i64 = host_argv_count();
+    let endpoint_kind: i64 = network_profile_endpoint_kind("NetworkUnit");
     let protocol_kind: i64 = network_profile_protocol_kind("NetworkUnit");
     let protocol_version: i64 = network_profile_protocol_version("NetworkUnit");
     let protocol_header_bytes: i64 =
@@ -66,27 +68,28 @@ mod cpu Main {
     let timeout_budget: i64 = network_profile_timeout_budget("NetworkUnit");
     let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
     let tick_ns: i64 = host_monotonic_time_ns();
-    let request_plan: NetHttpishRequestPlan = NetHttpishRequestPlan {
-      method_code: NetHttpishPacketShapes.client_method_code(protocol_kind),
-      path_code: NetHttpishPacketShapes.client_path_code(
-        protocol_version,
-        protocol_header_bytes
+    let accept_plan: NetHttpishAcceptPlan = NetHttpishAcceptPlan {
+      listen_code: NetHttpishPacketShapes.service_listen_code(endpoint_kind),
+      route_code: NetHttpishPacketShapes.service_route_code(
+        protocol_kind,
+        protocol_version
       ),
       timeout_ns: timeout_budget
     };
     let primary_result: TaskResult<i64> = join_result(
-      timeout(spawn(fetch_primary(request_plan.path_code)), request_plan.timeout_ns)
+      timeout(spawn(recv_primary(accept_plan.route_code)), accept_plan.timeout_ns)
     );
     let fallback_result: TaskResult<i64> =
-      join_result(spawn(fetch_fallback(request_plan.method_code)));
-    let packet: NetHttpishResponsePacket = stage_response_packet(
-      request_plan,
-      NetHttpishPacketShapes.client_status_code(primary_result, fallback_result),
-      NetHttpishPacketShapes.client_body_code(primary_result, fallback_result)
+      join_result(spawn(recv_fallback(accept_plan.listen_code)));
+    let packet: NetHttpishServicePacket = stage_service_packet(
+      accept_plan,
+      NetHttpishPacketShapes.service_status_code(primary_result, fallback_result),
+      NetHttpishPacketShapes.service_body_code(primary_result, fallback_result)
     );
 
-    return NetHttpishClientSessionPacketSummary {
+    return NetHttpishServiceSessionPacketSummary {
       argv_count: argv_count,
+      endpoint_kind: endpoint_kind,
       protocol_kind: protocol_kind,
       protocol_version: protocol_version,
       protocol_header_bytes: protocol_header_bytes,
@@ -96,6 +99,7 @@ mod cpu Main {
       body_code: packet.body_code,
       staged_total: packet.staged_total,
       lane_value: argv_count
+        + endpoint_kind
         + protocol_kind
         + protocol_version
         + protocol_header_bytes
@@ -108,10 +112,11 @@ mod cpu Main {
     };
   }
 
-  fn summarize_net_httpish_client_session_packet_recipe() -> i64 {
-    let summary: NetHttpishClientSessionPacketSummary =
-      capture_net_httpish_client_session_packet_summary();
+  fn summarize_net_httpish_service_session_packet_recipe() -> i64 {
+    let summary: NetHttpishServiceSessionPacketSummary =
+      capture_net_httpish_service_session_packet_summary();
     return summary.argv_count
+      + summary.endpoint_kind
       + summary.protocol_kind
       + summary.protocol_version
       + summary.protocol_header_bytes
@@ -125,6 +130,6 @@ mod cpu Main {
   }
 
   fn main() {
-    print(summarize_net_httpish_client_session_packet_recipe());
+    print(summarize_net_httpish_service_session_packet_recipe());
   }
 }

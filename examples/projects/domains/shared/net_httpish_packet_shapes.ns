@@ -1,0 +1,88 @@
+mod cpu NetHttpishPacketShapes {
+  pub fn client_method_code(protocol_kind: i64) -> i64 {
+    return 64 + protocol_kind;
+  }
+
+  pub fn client_path_code(protocol_version: i64, protocol_header_bytes: i64) -> i64 {
+    return 1000 + protocol_version + protocol_header_bytes;
+  }
+
+  pub fn service_listen_code(endpoint_kind: i64) -> i64 {
+    return 700 + endpoint_kind;
+  }
+
+  pub fn service_route_code(protocol_kind: i64, protocol_version: i64) -> i64 {
+    return 900 + protocol_kind + protocol_version;
+  }
+
+  pub fn selected_task_value(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return task_value(result);
+    }
+    return 0;
+  }
+
+  pub fn client_status_code(
+    primary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    if task_completed(primary_result) {
+      return 200;
+    }
+    if task_completed(fallback_result) {
+      return 206;
+    }
+    return 504;
+  }
+
+  pub fn client_body_code(
+    primary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    if task_completed(primary_result) {
+      return selected_task_value(primary_result);
+    }
+    if task_completed(fallback_result) {
+      return selected_task_value(fallback_result);
+    }
+    return 1;
+  }
+
+  pub fn service_status_code(
+    primary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    if task_completed(primary_result) {
+      return 200;
+    }
+    if task_completed(fallback_result) {
+      return 202;
+    }
+    return 504;
+  }
+
+  pub fn service_body_code(
+    primary_result: TaskResult<i64>,
+    fallback_result: TaskResult<i64>
+  ) -> i64 {
+    if task_completed(primary_result) {
+      return selected_task_value(primary_result);
+    }
+    if task_completed(fallback_result) {
+      return selected_task_value(fallback_result);
+    }
+    return 1;
+  }
+
+  pub fn staged_packet_total(slot0: i64, slot1: i64, slot2: i64, slot3: i64) -> i64 {
+    let scratch: ref Buffer = alloc_buffer(4, 0);
+    store_at(scratch, 0, slot0);
+    store_at(scratch, 1, slot1);
+    store_at(scratch, 2, slot2);
+    store_at(scratch, 3, slot3);
+    let staged_total: i64 =
+      load_at(scratch, 0) + load_at(scratch, 1) + load_at(scratch, 2) + load_at(scratch, 3);
+    free(scratch);
+    return staged_total;
+  }
+}

@@ -40,3 +40,12 @@ fn compiles_httpish_client_session_packet_recipe_project() {
     nuisc::pipeline::compile_project(project)
         .expect("httpish client session packet project should compile");
 }
+
+#[test]
+fn compiles_httpish_service_session_packet_recipe_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_service_session_packet_recipe_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("httpish service session packet project should compile");
+}
