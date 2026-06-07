@@ -92,8 +92,12 @@ pub(super) fn bind_match_pattern_for_type(
         AstMatchPattern::Bind(name) => {
             env.insert(name.clone(), type_ref.clone());
         }
-        AstMatchPattern::PayloadStruct { type_ref, payload } => {
-            let resolved = resolve_ast_type_ref_aliases(type_ref, visible_type_aliases)?;
+        AstMatchPattern::PayloadStruct {
+            type_ref: pattern_type_ref,
+            payload,
+        } => {
+            let resolved =
+                resolve_match_pattern_type_ref(pattern_type_ref, type_ref, visible_type_aliases)?;
             let Some(struct_def) = visible_structs.get(&resolved.name) else {
                 return Ok(());
             };
@@ -115,7 +119,8 @@ pub(super) fn bind_match_pattern_for_type(
             fields,
         } => {
             let match_type = explicit_type.as_ref().unwrap_or(type_ref);
-            let resolved = resolve_ast_type_ref_aliases(match_type, visible_type_aliases)?;
+            let resolved =
+                resolve_match_pattern_type_ref(match_type, type_ref, visible_type_aliases)?;
             let Some(struct_def) = visible_structs.get(&resolved.name) else {
                 return Ok(());
             };
@@ -155,6 +160,23 @@ pub(super) fn bind_match_pattern_for_type(
         | AstMatchPattern::IntRangeInclusive(_, _) => {}
     }
     Ok(())
+}
+
+fn resolve_match_pattern_type_ref(
+    pattern_type_ref: &AstTypeRef,
+    scrutinee_type_ref: &AstTypeRef,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+) -> Result<AstTypeRef, String> {
+    let resolved = resolve_ast_type_ref_aliases(pattern_type_ref, visible_type_aliases)?;
+    if resolved.name == scrutinee_type_ref.name
+        && resolved.generic_args.is_empty()
+        && !scrutinee_type_ref.generic_args.is_empty()
+        && !resolved.is_optional
+        && !resolved.is_ref
+    {
+        return Ok(scrutinee_type_ref.clone());
+    }
+    Ok(resolved)
 }
 
 pub(super) fn instantiate_ast_struct_field_type(

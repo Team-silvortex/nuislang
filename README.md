@@ -26,6 +26,7 @@ That model is increasingly enforced through `YIR` contracts, project validation,
 Current phase snapshot:
 
 * [docs/versioning/nuis-0.13.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.13.0-snapshot.md)
+* [docs/versioning/nuis-0.16.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-compile-workflow.md)
 
 ## Toolchain
 
@@ -46,20 +47,35 @@ Current responsibility split:
 
 ## Quick Start
 
-Recommended first commands:
+Recommended default compile workflow:
 
 ```bash
 cargo run -p nuis -- project-doctor examples/projects/window_controls_demo
 cargo run -p nuis -- check examples/projects/window_controls_demo
 cargo run -p nuis -- test examples/projects/window_controls_demo
+cargo run -p nuis -- build examples/projects/window_controls_demo examples/bins/window_controls_demo_project
+cargo run -p nuis -- release-check examples/projects/window_controls_demo examples/bins/window_controls_demo_project_release
+```
+
+Useful follow-up variants:
+
+```bash
 cargo run -p nuis -- test --list examples/projects/window_controls_demo
 cargo run -p nuis -- test --ignored examples/projects/window_controls_demo
 cargo run -p nuis -- test --include-ignored examples/projects/window_controls_demo
 cargo run -p nuis -- test --exact examples/projects/window_controls_demo smoke_add
 cargo run -p nuis -- test --ignored --exact examples/projects/window_controls_demo smoke_skip
 cargo run -p nuis -- project-status examples/projects/window_controls_demo
-cargo run -p nuis -- build examples/projects/window_controls_demo examples/bins/window_controls_demo_project
+cargo run -p nuis -- project-lock-abi examples/projects/window_controls_demo
 ```
+
+The `0.16.0` rule of thumb should be:
+
+* `project-doctor` before deep work on a project
+* `check` for compile/validation truth
+* `test` for language-level behavior
+* `build` for artifact emission
+* `release-check` before calling the result release-ready
 
 Current language-level test declarations use:
 
@@ -71,15 +87,10 @@ test("expected_failure", should_fail=true, reason="must reject zero") fn expecte
 test("slow_async", timeout_ms=25, clock_domain="global", clock_policy="bridge") async fn slow_async() -> i64 { return 1; }
 ```
 
-When a timed test uses `clock_domain`, `nuis test` now shows both the declared
-domain and the runner-resolved domain in execution output, including the current
-canonical staging codes. In the current MVP, `global (2)` still resolves to the
-host monotonic clock `monotonic (0)`. The output now also reports the canonical
-bridge name, such as `global_to_monotonic_tick_bridge`, the resolved compiler-
-known host-read surface such as `clock_tick`, together with the host deadline
-source such as `host_monotonic_deadline` or `host_wall_deadline`. The current
-explicit way to acknowledge that bridge is `clock_policy="bridge"` alongside
-`clock_domain="global"`.
+Timed tests already support `timeout_ms`, `clock_domain`, and
+`clock_policy="bridge"`. `nuis test` reports both declared and resolved clock
+metadata at run time. For the current contract and bridge semantics, read
+[docs/reference/cpu-task-scheduler-clock.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-scheduler-clock.md).
 
 Useful inspection commands:
 

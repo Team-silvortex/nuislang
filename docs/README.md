@@ -23,8 +23,13 @@ If you want to understand the repository as it exists today, start here:
 
 * [current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
 * [versioning/nuis-0.13.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.13.0-snapshot.md)
+* [versioning/nuis-0.16.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-compile-workflow.md)
 * [reference/README.md](/Users/Shared/chroot/dev/nuislang/docs/reference/README.md)
 * [repo-layout.md](/Users/Shared/chroot/dev/nuislang/docs/repo-layout.md)
+
+If your immediate question is “what is the canonical compile route today?”,
+start with the `0.16.0` workflow file before drilling into deeper reference
+material.
 
 Then branch by the kind of truth you want:
 

@@ -39,6 +39,7 @@ This is the shortest user-facing path for:
 Pattern / destructuring route:
 
 * [generic_struct_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_struct_state_demo)
+* [generic_payload_struct_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_payload_struct_state_demo)
 * [destructure_let_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/destructure_let_state_demo)
 * [destructure_nested_shorthand_let_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/destructure_nested_shorthand_let_state_demo)
 * [match_payload_struct_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_payload_struct_state_demo)

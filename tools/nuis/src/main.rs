@@ -2753,6 +2753,19 @@ fn print_help() {
     println!("nuis toolchain frontdoor");
     println!("usage:");
     println!();
+    println!("  default compile workflow:");
+    println!("    nuis project-doctor [project-dir|nuis.toml]");
+    println!("    nuis check [input.ns|project-dir|nuis.toml]");
+    println!(
+        "    nuis test [--list] [--ignored|--include-ignored] [--exact] [input.ns|project-dir|nuis.toml] [filter]"
+    );
+    println!(
+        "    nuis build [--verbose-cache] [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] <output-dir>"
+    );
+    println!(
+        "    nuis release-check [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] [output-dir]"
+    );
+    println!();
     println!("  general:");
     println!("    nuis status");
     println!("    nuis registry");
@@ -2786,9 +2799,6 @@ fn print_help() {
     println!("    nuis cache-prune [--all] [--keep N] [--json] [input.ns|project-dir|nuis.toml]");
     println!();
     println!("  release and package:");
-    println!(
-        "    nuis release-check [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] [output-dir]"
-    );
     println!("    nuis pack-nustar <package-id> <output.nustar>");
     println!("    nuis inspect-nustar <input.nustar>");
     println!("    nuis loader-contract <package-id>");

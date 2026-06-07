@@ -77,6 +77,7 @@ pub(super) fn lower_call_expr_with_async(
         module_consts,
         signatures,
         struct_table,
+        expected,
         allow_async_calls,
     )? {
         return Ok(payload_struct_constructor);
@@ -120,6 +121,7 @@ fn lower_payload_struct_constructor_sugar(
     module_consts: &BTreeMap<String, ModuleConstValue>,
     signatures: &BTreeMap<String, FunctionSignature>,
     struct_table: &BTreeMap<String, NirStructDef>,
+    expected: Option<&NirTypeRef>,
     allow_async_calls: bool,
 ) -> Result<Option<NirExpr>, String> {
     if signatures.contains_key(callee) {
@@ -131,11 +133,6 @@ fn lower_payload_struct_constructor_sugar(
     if definition.fields.len() != 1 {
         return Err(format!(
             "payload-style struct constructor `{callee}(...)` requires struct `{callee}` to have exactly one field"
-        ));
-    }
-    if !definition.generic_params.is_empty() {
-        return Err(format!(
-            "payload-style struct constructor `{callee}(...)` is not yet supported for generic structs; use `{callee} {{ ... }}` with an explicit expected type"
         ));
     }
     let hidden_private_fields = hidden_private_field_count(definition);
@@ -150,7 +147,42 @@ fn lower_payload_struct_constructor_sugar(
             "payload-style struct constructor `{callee}(...)` expects exactly 1 arg"
         ));
     }
+    let constructor_ty = if definition.generic_params.is_empty() {
+        NirTypeRef {
+            name: callee.to_owned(),
+            generic_args: Vec::new(),
+            is_optional: false,
+            is_ref: false,
+        }
+    } else {
+        let Some(expected) = expected else {
+            return Err(format!(
+                "cannot infer generic arguments for payload-style struct constructor `{callee}(...)`; add an explicit expected type"
+            ));
+        };
+        if expected.name != callee {
+            return Err(format!(
+                "payload-style struct constructor `{callee}(...)` requires expected type `{callee}<...>`, found `{}`",
+                expected.render()
+            ));
+        }
+        if expected.generic_args.len() != definition.generic_params.len()
+            || expected.is_optional
+            || expected.is_ref
+        {
+            return Err(format!(
+                "payload-style struct constructor `{callee}(...)` requires expected type `{callee}<...>`, found `{}`",
+                expected.render()
+            ));
+        }
+        expected.clone()
+    };
     let field = &definition.fields[0];
+    let field_ty = if definition.generic_params.is_empty() {
+        field.ty.clone()
+    } else {
+        super::instantiate_struct_field_type(&constructor_ty, definition, &field.ty)
+    };
     let lowered = lower_expr_with_async(
         &args[0],
         current_domain,
@@ -159,14 +191,14 @@ fn lower_payload_struct_constructor_sugar(
         module_consts,
         signatures,
         struct_table,
-        Some(&field.ty),
+        Some(&field_ty),
         allow_async_calls,
     )?;
     let inferred = infer_nir_expr_type(&lowered, bindings, signatures, struct_table);
-    let _ = resolve_declared_or_inferred(&field.name, Some(field.ty.clone()), inferred)?;
+    let _ = resolve_declared_or_inferred(&field.name, Some(field_ty), inferred)?;
     Ok(Some(NirExpr::StructLiteral {
         type_name: callee.to_owned(),
-        type_args: Vec::new(),
+        type_args: constructor_ty.generic_args,
         fields: vec![(field.name.clone(), lowered)],
     }))
 }

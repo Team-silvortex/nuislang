@@ -9,9 +9,13 @@ Start with:
 
 * [nuis-0.13.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.13.0-snapshot.md)
 * [nuis-0.13.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.13.0-release-checklist.md)
+* [nuis-0.16.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-compile-workflow.md)
 
 Those files are the shortest current “what is real enough to stand on” summary
 for the `0.13.0` phase.
+
+The `0.16.0` workflow file is the current operational target for a cleaner,
+more teachable `nuis` compile route.
 
 ## Expected Broader Scope Later
 

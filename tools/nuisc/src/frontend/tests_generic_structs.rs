@@ -94,3 +94,43 @@ fn lowers_generic_struct_destructuring_let() {
         other => panic!("expected lowered destructured field let, found {other:?}"),
     }
 }
+
+#[test]
+fn lowers_generic_payload_struct_constructor_with_expected_type() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          struct Just<T> {
+            value: T,
+          }
+
+          fn main() -> i64 {
+            let payload: Just<i64> = Just(7);
+            return payload.value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    match &module.functions[0].body[0] {
+        NirStmt::Let { name, ty, value } => {
+            assert_eq!(name, "payload");
+            assert_eq!(ty.as_ref().unwrap().render(), "Just<i64>");
+            assert!(matches!(
+                value,
+                NirExpr::StructLiteral {
+                    type_name,
+                    type_args,
+                    fields,
+                } if type_name == "Just"
+                    && matches!(type_args.as_slice(), [ty] if ty.render() == "i64")
+                    && matches!(
+                        fields.as_slice(),
+                        [(field, NirExpr::Int(7))] if field == "value"
+                    )
+            ));
+        }
+        other => panic!("expected lowered generic payload constructor let, found {other:?}"),
+    }
+}

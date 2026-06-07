@@ -297,7 +297,8 @@ fn lower_match_pattern_condition_and_bindings(
         }
         (AstMatchPattern::PayloadStruct { type_ref, payload }, _) => {
             let resolved_type_ref = resolve_ast_type_ref_aliases(type_ref, type_aliases)?;
-            let lowered_pattern_ty = lower_type_ref_with_aliases(&resolved_type_ref, type_aliases)?;
+            let lowered_pattern_ty =
+                lower_pattern_type_for_scrutinee(&resolved_type_ref, value_ty, type_aliases)?;
             if *value_ty != lowered_pattern_ty {
                 return Err(format!(
                     "payload-style struct match pattern `{}` requires scrutinee of type `{}`, found `{}`",
@@ -340,7 +341,7 @@ fn lower_match_pattern_condition_and_bindings(
             let lowered_pattern_ty = if let Some(type_ref) = type_ref {
                 let resolved_type_ref = resolve_ast_type_ref_aliases(type_ref, type_aliases)?;
                 let lowered_pattern_ty =
-                    lower_type_ref_with_aliases(&resolved_type_ref, type_aliases)?;
+                    lower_pattern_type_for_scrutinee(&resolved_type_ref, value_ty, type_aliases)?;
                 if *value_ty != lowered_pattern_ty {
                     return Err(format!(
                         "struct match pattern `{}` requires scrutinee of type `{}`, found `{}`",
@@ -425,4 +426,21 @@ fn lower_match_pattern_condition_and_bindings(
             vec![(name.clone(), value_ty.clone(), lowered_value.clone())],
         )),
     }
+}
+
+fn lower_pattern_type_for_scrutinee(
+    resolved_type_ref: &AstTypeRef,
+    value_ty: &NirTypeRef,
+    type_aliases: &BTreeMap<String, AstTypeAlias>,
+) -> Result<NirTypeRef, String> {
+    let lowered = lower_type_ref_with_aliases(resolved_type_ref, type_aliases)?;
+    if lowered.name == value_ty.name
+        && lowered.generic_args.is_empty()
+        && !value_ty.generic_args.is_empty()
+        && !lowered.is_optional
+        && !lowered.is_ref
+    {
+        return Ok(value_ty.clone());
+    }
+    Ok(lowered)
 }

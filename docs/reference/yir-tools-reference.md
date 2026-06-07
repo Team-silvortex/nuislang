@@ -78,6 +78,47 @@ Current reference commands:
 `nuis` is the current front-door workflow tool. It should grow into the
 user-facing toolchain surface while reusing `nuisc` as the compiler core.
 
+### Default compile workflow
+
+For `0.16.0`, the default command order should be read as:
+
+```text
+project-doctor -> check -> test -> build -> release-check
+```
+
+Shortest project route:
+
+```bash
+cargo run -p nuis -- project-doctor <project-dir|nuis.toml>
+cargo run -p nuis -- check <project-dir|nuis.toml>
+cargo run -p nuis -- test <project-dir|nuis.toml>
+cargo run -p nuis -- build <project-dir|nuis.toml> <output-dir>
+cargo run -p nuis -- release-check <project-dir|nuis.toml> <output-dir>
+```
+
+Shortest single-source route:
+
+```bash
+cargo run -p nuis -- check <input.ns>
+cargo run -p nuis -- test <input.ns>
+cargo run -p nuis -- build <input.ns> <output-dir>
+```
+
+### Debug workflow
+
+When `check` fails and you need compiler-shape visibility, use this order:
+
+```text
+dump-ast -> dump-nir -> dump-yir -> scheduler-view
+```
+
+Use:
+
+* `dump-ast` for parser, annotation, and surface-shape issues
+* `dump-nir` for frontend typing, generic rewrite, and pattern lowering issues
+* `dump-yir` for lowering/result-family/verifier-adjacent issues
+* `scheduler-view` for lane and scheduling inspection
+
 Current `nustar` loading policy is:
 
 * static index
