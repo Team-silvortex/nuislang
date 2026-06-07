@@ -1111,25 +1111,25 @@ fn project_plan_domains_json(
         .join(","))
 }
 
-fn project_management_json_fields(include_galaxy_flow: bool) -> Vec<String> {
+fn project_workflow_json_fields(include_galaxy_flow: bool) -> Vec<String> {
     let mut fields = vec![
         json_field(
-            "project_management_navigation",
-            nuisc::project_management_navigation_brief(),
+            "project_compile_workflow",
+            nuisc::project_compile_workflow_brief(),
         ),
         json_field(
-            "project_management_samples",
-            nuisc::project_management_samples_brief(),
+            "project_compile_samples",
+            nuisc::project_compile_samples_brief(),
         ),
         json_field(
-            "project_management_tests",
-            nuisc::project_management_test_samples_brief(),
+            "project_test_workflow",
+            nuisc::project_test_workflow_brief(),
         ),
     ];
     if include_galaxy_flow {
         fields.push(json_field(
-            "project_management_galaxy",
-            nuisc::project_management_galaxy_samples_brief(),
+            "project_galaxy_workflow",
+            nuisc::project_galaxy_workflow_brief(),
         ));
     }
     fields
@@ -1638,7 +1638,7 @@ fn handle_project_status_json(input: std::path::PathBuf) -> Result<(), String> {
     ];
     fields.extend(project_plan_json_fields(&plan));
     fields.push(json_usize_field("tests_declared", declared_tests.len()));
-    fields.extend(project_management_json_fields(include_galaxy_flow));
+    fields.extend(project_workflow_json_fields(include_galaxy_flow));
     fields.push(json_field(
         "abi_mode",
         if plan.abi_resolution.explicit {
@@ -2313,7 +2313,7 @@ fn handle_project_doctor_json(input: std::path::PathBuf) -> Result<(), String> {
     fields.extend(project_plan_json_fields(&plan));
     fields.push(json_usize_field("tests_declared", declared_tests.len()));
     fields.push(json_usize_field("tests_missing", missing_tests.len()));
-    fields.extend(project_management_json_fields(include_galaxy_flow));
+    fields.extend(project_workflow_json_fields(include_galaxy_flow));
     fields.push(json_field(
         "abi_mode",
         if plan.abi_resolution.explicit {
@@ -2455,21 +2455,21 @@ fn print_scheduler_sample_field(label: &str, value: &str) {
 
 fn print_project_management_hints(include_galaxy_flow: bool) {
     println!(
-        "  project_management_navigation: {}",
-        nuisc::project_management_navigation_brief()
+        "  project_compile_workflow: {}",
+        nuisc::project_compile_workflow_brief()
     );
     print_scheduler_sample_field(
-        "project_management_samples",
-        nuisc::project_management_samples_brief(),
+        "project_compile_samples",
+        nuisc::project_compile_samples_brief(),
     );
     print_scheduler_sample_field(
-        "project_management_tests",
-        nuisc::project_management_test_samples_brief(),
+        "project_test_workflow",
+        nuisc::project_test_workflow_brief(),
     );
     if include_galaxy_flow {
         print_scheduler_sample_field(
-            "project_management_galaxy",
-            nuisc::project_management_galaxy_samples_brief(),
+            "project_galaxy_workflow",
+            nuisc::project_galaxy_workflow_brief(),
         );
     }
 }
@@ -2765,21 +2765,12 @@ fn print_help() {
     println!(
         "    nuis release-check [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] [output-dir]"
     );
-    println!();
     println!("  general:");
     println!("    nuis status");
     println!("    nuis registry");
     println!("    nuis fmt [input.ns|project-dir|nuis.toml]");
     println!("    nuis bindings <input.ns|project-dir|nuis.toml>");
-    println!();
-    println!("  build and inspect:");
-    println!("    nuis check [input.ns|project-dir|nuis.toml]");
-    println!(
-        "    nuis test [--list] [--ignored|--include-ignored] [--exact] [input.ns|project-dir|nuis.toml] [filter]"
-    );
-    println!(
-        "    nuis build [--verbose-cache] [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] <output-dir>"
-    );
+    println!("  inspection and debug:");
     println!("    nuis dump-ast [input.ns|project-dir|nuis.toml]");
     println!("    nuis dump-nir [input.ns|project-dir|nuis.toml]");
     println!("    nuis dump-yir [input.ns|project-dir|nuis.toml]");
@@ -2790,7 +2781,6 @@ fn print_help() {
     println!("    nuis project-doctor [--json] [project-dir|nuis.toml]");
     println!("    nuis project-status [--json] [project-dir|nuis.toml]");
     println!("    nuis project-lock-abi [project-dir|nuis.toml]");
-    println!();
     println!("  cache:");
     println!(
         "    nuis cache-status [--all] [--verbose-cache] [--json] [input.ns|project-dir|nuis.toml]"

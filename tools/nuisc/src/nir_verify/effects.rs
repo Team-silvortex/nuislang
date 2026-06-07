@@ -61,8 +61,15 @@ pub(super) fn note_binding_effects(
         NirExpr::Move(inner)
         | NirExpr::Free(inner)
         | NirExpr::CpuJoin(inner)
+        | NirExpr::CpuCancel(inner)
         | NirExpr::CpuJoinResult(inner) => {
             if let Some(source) = expr_resource_key(inner) {
+                moved.insert(source.clone());
+                borrows.remove(&source);
+            }
+        }
+        NirExpr::CpuTimeout { task, .. } => {
+            if let Some(source) = expr_resource_key(task) {
                 moved.insert(source.clone());
                 borrows.remove(&source);
             }

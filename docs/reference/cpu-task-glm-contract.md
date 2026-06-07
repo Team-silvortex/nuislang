@@ -131,6 +131,33 @@ So the current repository already treats task observation as a distinct
 graph-visible boundary, even if it has not yet elevated tasks to a richer GLM
 resource class.
 
+## Current TaskResult Observation Classification
+
+Today `TaskResult<T>` is best read as the current observation handle.
+
+At the current `GLM` layer:
+
+* `task_completed(...)`
+* `task_timed_out(...)`
+* `task_cancelled(...)`
+* `task_value(...)`
+
+are all modeled as read-only observation uses on that handle.
+
+So, for now:
+
+* `join_result(...)` is the consuming boundary for the raw task handle
+* the returned `TaskResult<T>` is the reusable observation boundary
+* `task_*` helpers are read-only probes/extractors on that observation handle
+
+This matches the current repository examples, where code often does:
+
+1. `let result = join_result(task);`
+2. `if task_completed(result) { ... }`
+3. `task_value(result)`
+
+That shape is intentionally still legal today.
+
 ## Current Join Classification
 
 Today `join(...)` should be read carefully.
@@ -143,9 +170,9 @@ At the language/task-contract layer:
 But at the current graph-lifetime layer:
 
 * `cpu.join` is still only approximated through the generic async-core path
-* that means its task input is still modeled as a `val Read`
-* it is **not** yet modeled as a graph-level `Own` consume
-* it does **not** yet imply a dedicated lifetime-end edge class
+* its task input is now modeled as a `res Own` consume
+* it is now treated as a finalized task-handle consume boundary
+* it still does **not** imply a dedicated task-only lifetime-end edge class
 
 That is an intentional staging choice.
 
@@ -191,16 +218,18 @@ At the language/task-contract layer:
 
 But at the current graph-lifetime layer:
 
-* `cpu.cancel` still flows through the generic async-core approximation
-* `cpu.timeout` still flows through the generic async-core approximation
-* their task inputs are still modeled as `val Read`
-* neither is yet modeled as a graph-level lifetime-end effect
-* neither yet introduces a task-specific ownership handoff rule
+* `cpu.cancel` now consumes its incoming task handle as `res Own`
+* `cpu.timeout` now consumes its incoming task handle as `res Own`
+* both are now treated as task-handle ownership-transfer boundaries
+* both currently return a new `Task<T>`-shaped handle, so the strongest current
+  reading is “consume old handle, produce replacement handle”
+* neither is yet modeled as a dedicated task-only lifetime-end effect
 
 So, for now, treat both as:
 
 * lifecycle-shaping task operations
-* not yet finalized `GLM` lifetime-end boundaries
+* finalized task-handle consume/replace boundaries
+* not yet finalized task-only lifetime-end boundaries
 
 This is another intentional staging choice: task lifecycle semantics already
 exist, but their final ownership/lifetime consequences are still open design
@@ -215,7 +244,8 @@ In particular, the repository does **not** yet fully specify:
 * whether task payloads are copied, transferred, or wrapped
 * whether `spawn(...)` should count as a dedicated ownership-origin event in final `GLM`
 * whether `join(...)` should count as a consuming event in final `GLM`
-* whether `cancel(...)` or `timeout(...)` should carry lifetime-end meaning
+* whether `cancel(...)` or `timeout(...)` should eventually carry task-specific
+  lifetime-end meaning beyond the current consume/replace boundary
 * whether `Task<T>` should eventually become a `res`-class graph object
 * what lifetime and alias rules hold across worker/lane/runtime boundaries
 

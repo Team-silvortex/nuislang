@@ -336,59 +336,48 @@ project-doctor
   -> check
   -> test
   -> build
+  -> release-check
 ```
 
 Read that as:
 
 * `project-doctor`
-  first health check; use this when you want to know whether a project is
-  missing `galaxy.toml`, `nuis.galaxy.lock`, synced deps, or `ns-nova`
-  framework metadata
+  first health check for missing `galaxy.toml`, `nuis.galaxy.lock`, synced
+  deps, test inputs, or `ns-nova` metadata
 * `project-status`
-  structural and ABI-resolution view of the project itself
-  it now also reflects the compiler's normalized project organization model,
-  so entry selection and resolved domain coverage come from the same shared
-  `project` view used by build metadata
-* `check` / `build`
-  project inputs now first materialize a shared `ProjectCompilationPlan`
-  so organization, exchange routes, ABI resolution, and effective synthetic
-  project input naming come from one compiler-side plan instead of each front
-  door recomputing them separately
+  structural and ABI-resolution view of the same normalized project model used
+  by build metadata
+* `check` / `build` / `release-check`
+  all derive from one shared `ProjectCompilationPlan`, so organization,
+  exchange routes, ABI resolution, and synthetic input naming stay unified
 * `scheduler-view`
-  focused scheduler-contract view for the current input; use this when you
-  want the short `placement / timing / result / summary / observer`
-  projection without the rest of the project-health output
-  `--json` now emits the same view as structured data, including:
-  `scheduler_sample_navigation`, `scheduler_result_samples`,
-  `scheduler_transport_samples`, and `scheduler_summary_samples`
+  focused `placement / timing / result / summary / observer` projection;
+  `--json` mirrors the same view as structured data
 * `project-lock-abi`
-  optional materialization step once you want the current host-matching ABI set
-  written into the manifest
+  optional freeze step for the current host-matching ABI set
 * `check`
   semantic/project validation
 * `test`
-  front-door test pass for a single `.ns` input or a project manifest; it can list discovered language-level tests, filter them by substring or exact test name/label, and execute the current MVP runner for `mod cpu` tests with `() -> bool|i64`. By default `ignored` tests are omitted from execution, `--ignored` runs only them, and `--include-ignored` runs them alongside normal tests. Current status labels are `PASS`, `FAIL`, `SKIP`, `XFAIL`, and `XPASS`.
-  Test declarations now use `test(...) fn ...`, for example `test("smoke_add", ignored=true) fn smoke_add() -> i64 { ... }`, `test("expected_failure", should_fail=true, reason="must reject zero") fn expected_failure() -> i64 { ... }`, or `test("slow_async", timeout_ms=25, clock_domain="global", clock_policy="bridge") async fn slow_async() -> i64 { ... }`.
-  `clock_domain` currently accepts `monotonic`, `wall`, and `global`. In the current front-door runner, `global` is provisionally mapped onto the host monotonic clock so async tests can start expressing cross-domain timing intent without waiting for a full runtime-wide clock bridge. `nuis test` also prints the resolved runner clock domain during execution so this mapping is visible in test output.
-  The current output shape uses `declared_clock_domain: ...` and `resolved_clock_domain: ...`, and now also includes the current canonical staging codes such as `global (2)` and `monotonic (0)`, plus `resolved_clock_bridge: ...`, `resolved_clock_surface: ...`, and `resolved_clock_source: ...` lines such as `global_to_monotonic_tick_bridge`, `clock_tick`, and `host_monotonic_deadline` or `host_wall_deadline`, so this bridge stays explicit.
-  `clock_policy` currently accepts only `bridge`, and only together with `clock_domain="global"` plus `timeout_ms=...`, so the front-door runner bridge remains explicit rather than implicit.
+  front-door test pass for single-file or project inputs; it supports
+  `--list`, substring or exact filtering, `--ignored`, and
+  `--include-ignored`, and the current runner status labels are `PASS`, `FAIL`,
+  `SKIP`, `XFAIL`, and `XPASS`
+  timed tests already support `timeout_ms`, `clock_domain`, and
+  `clock_policy="bridge"`; see
+  [cpu-task-scheduler-clock.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-scheduler-clock.md)
+  for the current clock/bridge contract
 * `build`
   artifact generation
-  current project builds now also emit `nuis.project.plan.txt`
-  current project builds now also emit `nuis.project.organization.txt`
-  `nuis.project.exchange.txt`, and `nuis.project.packet.txt`
-  alongside the existing project manifest/modules/links/ABI indexes
-  the packet index now records packet shape, field-order, and coarse field kind/role metadata
-  it now also records a first encode skeleton through `packet_encode_shape`,
-  `payload_bytes`, `payload_layout`, plus per-field `wire_kind` / `fixed_width`
-  `@packet_field` currently means a payload slot specifically
-  `@packet_control_field` currently means an explicit control-plane slot
-  so control-plane roles must use the latter, while async-carrier / unsupported-shape roles are still rejected
-  current packet validation is intentionally narrow: `@packet` structs must be non-empty, must include at least one `@packet_field`, and currently reject `ref` / optional fields
-  control-plane families like `Marker<...>` / `HandleTable<...>` are now allowed only through `@packet_control_field`
+  emits the concrete output directory plus project-side indexes such as
+  `nuis.project.plan.txt`, `nuis.project.organization.txt`,
+  `nuis.project.exchange.txt`, `nuis.project.packet.txt`,
+  `nuis.project.host_ffi.txt`, and `nuis.project.abi.txt`
+  packet metadata now records shape, field order, coarse field role, and a
+  first encode skeleton; packet validation is still intentionally narrow, and
   async-carrier families like `Task<...>` / `*Result<...>` are still rejected
-  `verify-build-manifest` now also checks the referenced `plan_index`
-  and `packet_index` when the build manifest includes them
+* `release-check`
+  final release-facing pass; use this when you want the default compile route
+  to end in a reproducible output directory plus build-manifest verification
 
 For framework/package-aware projects, the current companion `galaxy` flow is:
 
@@ -401,75 +390,46 @@ galaxy init
 ```
 
 `nuis project-status` and `nuis project-doctor` now also print this same route
-as lightweight front-door hints:
+as lightweight front-door hints, using the clearer
+`project_compile_*` / `project_test_workflow` naming:
 
-* `project_management_navigation`
-  * `health -> structure -> scheduler -> abi_lock -> check -> test -> build`
-* `project_management_samples`
-  * `health=nuis project-doctor <project-dir>`
-  * `structure=nuis project-status <project-dir>`
-  * `scheduler=nuis scheduler-view <project-dir>`
-  * `abi_lock=nuis project-lock-abi <project-dir>`
-  * `validate=nuis check <project-dir> -> nuis test <project-dir> -> nuis build <project-dir>`
-* `project_management_tests`
-  * `list=nuis test --list <project-dir>`
-  * `exact=nuis test --exact <project-dir> <test-name>`
-  * `ignored=nuis test --ignored <project-dir>`
-  * `include_ignored=nuis test --include-ignored <project-dir>`
-* `project_management_galaxy`
-  * printed when the project already has `galaxy.toml` or declared galaxy deps
-  * `nuis galaxy init <project-dir> -> nuis galaxy check <project-dir> -> nuis galaxy lock-deps <project-dir> -> nuis galaxy sync-deps <project-dir> -> nuis project-doctor <project-dir>`
+* `project_compile_workflow`
+  * `health -> structure -> scheduler -> abi_lock -> check -> test -> build -> release_check`
+* `project_compile_samples`
+  * `health=nuis project-doctor <project-dir>; structure=nuis project-status <project-dir>; scheduler=nuis scheduler-view <project-dir>; abi_lock=nuis project-lock-abi <project-dir>; compile=nuis check <project-dir> -> nuis test <project-dir> -> nuis build <project-dir> -> nuis release-check <project-dir> <output-dir>`
+* `project_test_workflow`
+  * `list=nuis test --list <project-dir>; exact=nuis test --exact <project-dir> <test-name>; ignored=nuis test --ignored <project-dir>; include_ignored=nuis test --include-ignored <project-dir>`
+* `project_galaxy_workflow`
+  * printed when the project already has `galaxy.toml` or declared galaxy deps:
+    `nuis galaxy init <project-dir> -> nuis galaxy check <project-dir> -> nuis galaxy lock-deps <project-dir> -> nuis galaxy sync-deps <project-dir> -> nuis project-doctor <project-dir>`
 
 Current project-aware front doors now also share a normalized compiler-side
 plan summary:
 
 * `project_plan`
   * printed by `project-status`, `project-doctor`, `scheduler-view`,
-    `project-lock-abi`, `galaxy check`, `galaxy doctor`,
-    `galaxy lock-deps`, `galaxy verify-lock`, and `galaxy sync-deps`
-  * current shape:
-    `entry=<entry> domains=<...> exchanges=<n> abi_mode=<...>`
-  * the emitted `nuis.project.plan.txt` now also records:
-    `dependencies`, `synthetic_input_kind/synthetic_input`, and `output_intents`
-  * dependency rows now also carry a category; current project-managed
-    package deps land in `package-registry`
+    `project-lock-abi`, and the `galaxy` project-management commands
+  * current shape: `entry=<entry> domains=<...> exchanges=<n> abi_mode=<...>`
+  * `nuis.project.plan.txt` also records `dependencies`,
+    `synthetic_input_kind/synthetic_input`, and `output_intents`
+  * dependency rows now also carry a category; current project-managed package
+    deps land in `package-registry`
   * `scheduler-view --json <project-dir>` now also emits the project-side
-    classification fields directly:
-    `project_plan_dependency_categories`,
-    `project_plan_output_categories`,
-    `project_exchange_route_classes`
-  * `project-status --json <project-dir>` and
-    `project-doctor --json <project-dir>` now also emit the same project-plan
-    structure fields directly, plus their current workbench state
+    classification fields directly: `project_plan_dependency_categories`,
+    `project_plan_output_categories`, `project_exchange_route_classes`
+  * `project-status --json` and `project-doctor --json` emit the same
+    project-plan structure fields directly, plus their current workbench state
 
 Typical commands:
 
 ```bash
 cargo run -p nuis -- project-doctor examples/projects/window_controls_demo
-cargo run -p nuis -- project-status examples/projects/window_controls_demo
-cargo run -p nuis -- project-lock-abi examples/projects/window_controls_demo
 cargo run -p nuis -- test examples/projects/window_controls_demo
-cargo run -p nuis -- test --list examples/projects/window_controls_demo
-cargo run -p nuis -- test --ignored examples/projects/window_controls_demo
-cargo run -p nuis -- test --include-ignored examples/projects/window_controls_demo
-cargo run -p nuis -- test examples/projects/window_controls_demo smoke
 cargo run -p nuis -- test --exact examples/projects/window_controls_demo smoke_add
-cargo run -p nuis -- test --ignored --exact examples/projects/window_controls_demo smoke_skip
-
 cargo run -p nuis -- galaxy init examples/projects/window_controls_demo --framework ns-nova
-cargo run -p nuis -- galaxy check examples/projects/window_controls_demo
-cargo run -p nuis -- galaxy lock-deps examples/projects/window_controls_demo
-cargo run -p nuis -- galaxy sync-deps examples/projects/window_controls_demo
 cargo run -p nuis -- dump-yir examples/projects/domains/network_host_control_runtime_demo
 ```
-
-Important current distinction:
-
-* `project-*` commands answer “is this `nuis` project healthy and buildable?”
-* `galaxy *` commands answer “is this project packaged, locked, and dependency-synced as a shareable package/framework project?”
-
 ## Build Override Notes
-
 Current CPU build override surface:
 
 ```text
@@ -484,8 +444,7 @@ nuisc compile --target <clang-target-triple> <input> <output-dir>
 Important current rule:
 
 * CPU ABI support is intended to come from `nustar` registration, not hardcoded `nuisc` tables
-* explicit CPU overrides are checked against registered `abi_targets`
-* project auto-ABI selection also prefers registered `abi_targets`
+* explicit CPU overrides and project auto-ABI selection are both checked against registered `abi_targets`
 * current window-hosted AppKit bundle packaging still rejects cross-target output instead of pretending to support it
 
 ## Core compiler

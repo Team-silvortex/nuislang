@@ -111,19 +111,19 @@ pub fn std_net_recipe_samples_brief(domain: &str) -> Option<&'static str> {
     }
 }
 
-pub fn project_management_navigation_brief() -> &'static str {
-    "health -> structure -> scheduler -> abi_lock -> check -> test -> build"
+pub fn project_compile_workflow_brief() -> &'static str {
+    "health -> structure -> scheduler -> abi_lock -> check -> test -> build -> release_check"
 }
 
-pub fn project_management_samples_brief() -> &'static str {
-    "health=nuis project-doctor <project-dir>; structure=nuis project-status <project-dir>; scheduler=nuis scheduler-view <project-dir>; abi_lock=nuis project-lock-abi <project-dir>; validate=nuis check <project-dir> -> nuis test <project-dir> -> nuis build <project-dir>"
+pub fn project_compile_samples_brief() -> &'static str {
+    "health=nuis project-doctor <project-dir>; structure=nuis project-status <project-dir>; scheduler=nuis scheduler-view <project-dir>; abi_lock=nuis project-lock-abi <project-dir>; compile=nuis check <project-dir> -> nuis test <project-dir> -> nuis build <project-dir> -> nuis release-check <project-dir> <output-dir>"
 }
 
-pub fn project_management_test_samples_brief() -> &'static str {
+pub fn project_test_workflow_brief() -> &'static str {
     "list=nuis test --list <project-dir>; exact=nuis test --exact <project-dir> <test-name>; ignored=nuis test --ignored <project-dir>; include_ignored=nuis test --include-ignored <project-dir>"
 }
 
-pub fn project_management_galaxy_samples_brief() -> &'static str {
+pub fn project_galaxy_workflow_brief() -> &'static str {
     "galaxy=nuis galaxy init <project-dir> -> nuis galaxy check <project-dir> -> nuis galaxy lock-deps <project-dir> -> nuis galaxy sync-deps <project-dir> -> nuis project-doctor <project-dir>"
 }
 

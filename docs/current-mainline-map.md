@@ -15,6 +15,8 @@ local README for the area you are actively touching.
   [versioning/nuis-0.13.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.13.0-release-checklist.md)
 * current compile workflow target:
   [versioning/nuis-0.16.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-compile-workflow.md)
+* current binary-compile maturity target:
+  [versioning/nuis-0.16.0-binary-compile-maturity.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-binary-compile-maturity.md)
 * implementation-truth docs:
   [reference/README.md](/Users/Shared/chroot/dev/nuislang/docs/reference/README.md)
 * repo structure:

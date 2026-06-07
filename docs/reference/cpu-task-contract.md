@@ -192,6 +192,8 @@ If you want code that fits the current system well:
 * do not assume real parallel execution just because task syntax exists
 * treat `task_*` helpers as observation-only APIs, not as alternate
   `join(...)` spellings
+* treat `TaskResult<T>` as the current reusable observation handle, not a
+  consume-once payload object
 
 ## Related References
 
