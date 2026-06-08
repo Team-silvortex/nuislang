@@ -3,13 +3,18 @@ use nuis_semantics::model::{AstDestructureBinding, AstDestructureField};
 
 impl Parser {
     pub(super) fn starts_destructure_let(&self) -> bool {
-        matches!(self.tokens.get(self.cursor), Some(Token::Word(_)))
-            && (matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol('{')))
-                || matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol('<'))))
+        matches!(self.tokens.get(self.cursor), Some(Token::Symbol('{')))
+            || matches!(self.tokens.get(self.cursor), Some(Token::Word(_)))
+                && (matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol('{')))
+                    || matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol('<'))))
     }
 
     pub(super) fn parse_destructure_let_stmt(&mut self) -> Result<AstStmt, String> {
-        let type_ref = self.parse_type_ref()?;
+        let type_ref = if self.peek_symbol('{') {
+            None
+        } else {
+            Some(self.parse_type_ref()?)
+        };
         let fields = self.parse_destructure_fields()?;
         if fields.is_empty() {
             return Err("destructuring let pattern requires at least one field".to_owned());

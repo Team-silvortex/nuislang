@@ -12,7 +12,7 @@ pub(super) fn render_ast_stmt_inline(stmt: &AstStmt) -> String {
             type_ref,
             fields,
             value,
-        } => render_ast_destructure_let(type_ref, fields, value),
+        } => render_ast_destructure_let(type_ref.as_ref(), fields, value),
         AstStmt::Const { name, ty, value } => {
             let suffix = render_ast_type_suffix(ty.as_ref());
             format!(
@@ -43,13 +43,16 @@ pub(super) fn render_ast_type_suffix(ty: Option<&AstTypeRef>) -> String {
 }
 
 #[rustfmt::skip]
-pub(super) fn render_ast_destructure_let(type_ref: &AstTypeRef, fields: &[AstDestructureField], value: &AstExpr) -> String {
+pub(super) fn render_ast_destructure_let(type_ref: Option<&AstTypeRef>, fields: &[AstDestructureField], value: &AstExpr) -> String {
     let fields = fields
         .iter()
         .map(render_ast_destructure_field)
         .collect::<Vec<_>>()
         .join(", ");
-    format!("let {} {{ {} }} = {}", super::render_ast_type(type_ref), fields, super::render_ast_expr(value))
+    match type_ref {
+        Some(type_ref) => format!("let {} {{ {} }} = {}", super::render_ast_type(type_ref), fields, super::render_ast_expr(value)),
+        None => format!("let {{ {} }} = {}", fields, super::render_ast_expr(value)),
+    }
 }
 
 fn render_ast_destructure_field(field: &AstDestructureField) -> String {

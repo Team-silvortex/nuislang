@@ -1,0 +1,25 @@
+mod cpu Main {
+  struct Boxed<T> {
+    value: T,
+  }
+
+  struct Outer<T> {
+    inner: Boxed<T>,
+    code: T,
+  }
+
+  fn main() -> i64 {
+    let value: Outer<i64> = Outer<i64> {
+      inner: Boxed<i64> { value: 7 },
+      code: 5,
+    };
+    match value {
+      Outer<i64> { inner: { value: payload }, code: 5 } if payload == 7 => {
+        return payload;
+      }
+      _ => {
+        return 9;
+      }
+    }
+  }
+}

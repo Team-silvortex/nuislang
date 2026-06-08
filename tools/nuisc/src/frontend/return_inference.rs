@@ -81,9 +81,22 @@ fn collect_inferred_return_types_from_block(
                 }
             }
             AstStmt::DestructureLet {
-                type_ref, fields, ..
+                type_ref,
+                fields,
+                value,
             } => {
-                bind_destructure_fields(type_ref, fields, env, struct_table)?;
+                let root_type = type_ref.clone().or_else(|| {
+                    infer_ast_expr_type(
+                        value,
+                        env,
+                        impl_lookup,
+                        struct_table,
+                        function_return_types,
+                    )
+                });
+                if let Some(root_type) = root_type.as_ref() {
+                    bind_destructure_fields(root_type, fields, env, struct_table)?;
+                }
             }
             AstStmt::Const { name, ty, .. } => {
                 if let Some(ty) = ty.clone() {

@@ -41,6 +41,8 @@ mod tests_frontend_core;
 #[cfg(test)]
 mod tests_generic_constraints;
 #[cfg(test)]
+mod tests_generic_destructure_let;
+#[cfg(test)]
 mod tests_generic_method_bounds;
 #[cfg(test)]
 mod tests_generic_method_bounds_control_flow;
@@ -58,6 +60,8 @@ mod tests_higher_order;
 mod tests_lambda_higher_order;
 #[cfg(test)]
 mod tests_match_patterns;
+#[cfg(test)]
+mod tests_match_payload_bindings;
 #[cfg(test)]
 mod tests_match_struct_bindings;
 #[cfg(test)]

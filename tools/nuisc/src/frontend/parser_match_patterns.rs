@@ -74,6 +74,10 @@ impl Parser {
 
     fn parse_single_match_pattern(&mut self) -> Result<AstMatchPattern, String> {
         match self.next() {
+            Some(Token::Symbol('{')) => {
+                self.cursor = self.cursor.saturating_sub(1);
+                self.parse_struct_match_pattern_with_fields(None)
+            }
             Some(Token::Word(word)) if word == "_" => Ok(AstMatchPattern::Wildcard),
             Some(Token::Word(word)) if word == "true" => Ok(AstMatchPattern::Bool(true)),
             Some(Token::Word(word)) if word == "false" => Ok(AstMatchPattern::Bool(false)),

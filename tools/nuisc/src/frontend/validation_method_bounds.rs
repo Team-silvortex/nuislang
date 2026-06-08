@@ -167,7 +167,7 @@ fn insert_trait_methods(
     );
 }
 
-fn simple_local_expr_type(
+pub(super) fn simple_local_expr_type(
     expr: &AstExpr,
     local_type_env: &BTreeMap<String, AstTypeRef>,
 ) -> Option<AstTypeRef> {

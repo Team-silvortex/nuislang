@@ -10,7 +10,8 @@ use super::validation_binding_env::{
     simple_match_value_type,
 };
 use super::validation_method_bounds::{
-    collect_visible_trait_methods, simple_local_stmt_type, validate_expr_generic_method_bounds,
+    collect_visible_trait_methods, simple_local_expr_type, simple_local_stmt_type,
+    validate_expr_generic_method_bounds,
 };
 use super::validation_trait_bounds::{
     alias_param_context, alias_target_context, build_generic_bound_env,
@@ -327,25 +328,32 @@ fn validate_stmt_generic_constraints(
                 local_type_env,
                 context,
             )?;
-            validate_ast_type_ref_generic_constraints(
-                type_ref,
-                visible_type_aliases,
-                impl_lookup,
-                visible_trait_names,
-                generic_bounds,
-                &format!("{context} destructure type"),
-            )?;
+            if let Some(type_ref) = type_ref {
+                validate_ast_type_ref_generic_constraints(
+                    type_ref,
+                    visible_type_aliases,
+                    impl_lookup,
+                    visible_trait_names,
+                    generic_bounds,
+                    &format!("{context} destructure type"),
+                )?;
+            }
             let fields = match stmt {
                 AstStmt::DestructureLet { fields, .. } => fields,
                 _ => unreachable!(),
             };
-            bind_destructure_fields_for_type(
-                type_ref,
-                fields,
-                visible_type_aliases,
-                visible_structs,
-                local_type_env,
-            )?;
+            let root_type = type_ref
+                .clone()
+                .or_else(|| simple_local_expr_type(value, local_type_env));
+            if let Some(root_type) = root_type.as_ref() {
+                bind_destructure_fields_for_type(
+                    root_type,
+                    fields,
+                    visible_type_aliases,
+                    visible_structs,
+                    local_type_env,
+                )?;
+            }
         }
         AstStmt::If {
             condition,

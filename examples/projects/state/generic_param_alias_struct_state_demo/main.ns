@@ -1,0 +1,20 @@
+mod cpu Main {
+  type BoxAlias<T> = Boxed<T>;
+
+  struct Boxed<T> {
+    value: T,
+  }
+
+  fn main() -> i64 {
+    let boxed: BoxAlias<i64> = Boxed<i64> { value: 7 };
+    let BoxAlias<i64> { value } = boxed;
+    match boxed {
+      BoxAlias<i64> { value: payload } if payload == value => {
+        return payload;
+      }
+      _ => {
+        return 9;
+      }
+    }
+  }
+}

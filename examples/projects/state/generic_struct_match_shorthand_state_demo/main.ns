@@ -1,12 +1,12 @@
 mod cpu Main {
-  struct Just<T> {
+  struct Boxed<T> {
     value: T,
   }
 
   fn main() -> i64 {
-    let value = Just<i64>(7);
+    let value = Boxed<i64> { value: 7 };
     match value {
-      Just<i64>(payload) if payload == 7 => {
+      { value: payload } if payload == 7 => {
         return payload;
       }
       _ => {

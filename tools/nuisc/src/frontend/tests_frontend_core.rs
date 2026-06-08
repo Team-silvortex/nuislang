@@ -440,7 +440,7 @@ fn parses_struct_destructuring_let_into_ast() {
             fields,
             value,
         } => {
-            assert_eq!(type_ref.name, "Packet");
+            assert_eq!(type_ref.as_ref().unwrap().name, "Packet");
             assert_eq!(
                 fields,
                 &vec![

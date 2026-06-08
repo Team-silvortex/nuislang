@@ -136,6 +136,74 @@ fn lowers_generic_struct_destructuring_let() {
 }
 
 #[test]
+fn lowers_generic_struct_destructuring_let_with_alias_type_head() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type BoxI64 = Boxed<i64>;
+
+          struct Boxed<T> {
+            value: T,
+          }
+
+          fn main() -> i64 {
+            let boxed: BoxI64 = Boxed<i64> { value: 7 };
+            let BoxI64 { value } = boxed;
+            return value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    match &module.functions[0].body[1] {
+        NirStmt::Let { name, ty, value } => {
+            assert_eq!(name, "value");
+            assert_eq!(ty.as_ref().unwrap().render(), "i64");
+            assert!(matches!(
+                value,
+                NirExpr::FieldAccess { field, .. } if field == "value"
+            ));
+        }
+        other => panic!("expected lowered aliased generic destructured field let, found {other:?}"),
+    }
+}
+
+#[test]
+fn lowers_generic_struct_destructuring_let_with_generic_alias_type_head() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type BoxAlias<T> = Boxed<T>;
+
+          struct Boxed<T> {
+            value: T,
+          }
+
+          fn main() -> i64 {
+            let boxed: BoxAlias<i64> = Boxed<i64> { value: 7 };
+            let BoxAlias<i64> { value } = boxed;
+            return value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    match &module.functions[0].body[1] {
+        NirStmt::Let { name, ty, value } => {
+            assert_eq!(name, "value");
+            assert_eq!(ty.as_ref().unwrap().render(), "i64");
+            assert!(matches!(
+                value,
+                NirExpr::FieldAccess { field, .. } if field == "value"
+            ));
+        }
+        other => panic!("expected lowered generic-aliased destructured field let, found {other:?}"),
+    }
+}
+
+#[test]
 fn lowers_generic_payload_struct_constructor_with_expected_type() {
     let module = parse_nuis_module(
         r#"

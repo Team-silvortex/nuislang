@@ -33,7 +33,7 @@ fn parses_struct_destructuring_let_into_ast() {
             fields,
             value,
         } => {
-            assert_eq!(type_ref.name, "Packet");
+            assert_eq!(type_ref.as_ref().unwrap().name, "Packet");
             assert_eq!(
                 fields,
                 &vec![bind_field("kind", "kind"), bind_field("ready", "ready"),]
@@ -73,7 +73,7 @@ fn parses_struct_destructuring_let_with_renamed_bindings() {
             fields,
             value,
         } => {
-            assert_eq!(type_ref.name, "Packet");
+            assert_eq!(type_ref.as_ref().unwrap().name, "Packet");
             assert_eq!(
                 fields,
                 &vec![
@@ -150,7 +150,7 @@ fn parses_nested_struct_destructuring_let_into_ast() {
         AstStmt::DestructureLet {
             type_ref, fields, ..
         } => {
-            assert_eq!(type_ref.name, "Outer");
+            assert_eq!(type_ref.as_ref().unwrap().name, "Outer");
             assert_eq!(
                 fields,
                 &vec![
@@ -199,7 +199,7 @@ fn parses_nested_struct_destructuring_let_without_repeated_type_head() {
         AstStmt::DestructureLet {
             type_ref, fields, ..
         } => {
-            assert_eq!(type_ref.name, "Outer");
+            assert_eq!(type_ref.as_ref().unwrap().name, "Outer");
             assert_eq!(
                 fields,
                 &vec![

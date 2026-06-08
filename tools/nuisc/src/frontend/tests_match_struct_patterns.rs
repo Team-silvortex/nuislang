@@ -1,5 +1,5 @@
-use super::parse_nuis_module;
-use nuis_semantics::model::{NirBinaryOp, NirExpr, NirStmt};
+use super::{parse_nuis_ast, parse_nuis_module};
+use nuis_semantics::model::{AstMatchPattern, NirBinaryOp, NirExpr, NirStmt};
 
 #[test]
 fn lowers_struct_field_match_arms_inside_while() {
@@ -297,6 +297,134 @@ fn lowers_zero_field_struct_match_arm_inside_while() {
             }
         },
         other => panic!("expected while statement after bindings, found {other:?}"),
+    }
+}
+
+#[test]
+fn parses_shorthand_generic_struct_match_pattern_into_ast() {
+    let ast = parse_nuis_ast(
+        r#"
+        mod cpu Main {
+          struct Boxed<T> {
+            value: T,
+          }
+
+          fn main() -> i64 {
+            let value = Boxed<i64> { value: 7 };
+            match value {
+              { value: payload } => {
+                return payload;
+              }
+              _ => {
+                return 9;
+              }
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    match &ast.functions[0].body[1] {
+        nuis_semantics::model::AstStmt::Match { arms, .. } => match &arms[0].pattern {
+            AstMatchPattern::StructFields { type_ref, fields } => {
+                assert!(type_ref.is_none());
+                assert!(matches!(
+                    fields.as_slice(),
+                    [(field, AstMatchPattern::Bind(name))]
+                        if field == "value" && name == "payload"
+                ));
+            }
+            other => panic!("expected shorthand struct match pattern, found {other:?}"),
+        },
+        other => panic!("expected match statement, found {other:?}"),
+    }
+}
+
+#[test]
+fn parses_aliased_generic_struct_match_pattern_into_ast() {
+    let ast = parse_nuis_ast(
+        r#"
+        mod cpu Main {
+          type BoxI64 = Boxed<i64>;
+
+          struct Boxed<T> {
+            value: T,
+          }
+
+          fn main() -> i64 {
+            let value: BoxI64 = Boxed<i64> { value: 7 };
+            match value {
+              BoxI64 { value: payload } => {
+                return payload;
+              }
+              _ => {
+                return 9;
+              }
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    match &ast.functions[0].body[1] {
+        nuis_semantics::model::AstStmt::Match { arms, .. } => match &arms[0].pattern {
+            AstMatchPattern::StructFields { type_ref, fields } => {
+                assert_eq!(type_ref.as_ref().unwrap().name, "BoxI64");
+                assert!(matches!(
+                    fields.as_slice(),
+                    [(field, AstMatchPattern::Bind(name))]
+                        if field == "value" && name == "payload"
+                ));
+            }
+            other => panic!("expected aliased generic struct match pattern, found {other:?}"),
+        },
+        other => panic!("expected match statement, found {other:?}"),
+    }
+}
+
+#[test]
+fn parses_generic_aliased_struct_match_pattern_into_ast() {
+    let ast = parse_nuis_ast(
+        r#"
+        mod cpu Main {
+          type BoxAlias<T> = Boxed<T>;
+
+          struct Boxed<T> {
+            value: T,
+          }
+
+          fn main() -> i64 {
+            let value: BoxAlias<i64> = Boxed<i64> { value: 7 };
+            match value {
+              BoxAlias<i64> { value: payload } => {
+                return payload;
+              }
+              _ => {
+                return 9;
+              }
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    match &ast.functions[0].body[1] {
+        nuis_semantics::model::AstStmt::Match { arms, .. } => match &arms[0].pattern {
+            AstMatchPattern::StructFields { type_ref, fields } => {
+                assert_eq!(type_ref.as_ref().unwrap().name, "BoxAlias");
+                assert_eq!(type_ref.as_ref().unwrap().generic_args[0].name, "i64");
+                assert!(matches!(
+                    fields.as_slice(),
+                    [(field, AstMatchPattern::Bind(name))]
+                        if field == "value" && name == "payload"
+                ));
+            }
+            other => panic!("expected generic-aliased struct match pattern, found {other:?}"),
+        },
+        other => panic!("expected match statement, found {other:?}"),
     }
 }
 

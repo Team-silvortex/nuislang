@@ -118,7 +118,7 @@ pub fn render_ast(module: &AstModule) -> String {
                     value,
                 } => out.push_str(&format!(
                     "    {}\n",
-                    render_ast_destructure_let(type_ref, fields, value)
+                    render_ast_destructure_let(type_ref.as_ref(), fields, value)
                 )),
                 AstStmt::Const { name, ty, value } => {
                     let type_suffix = render_ast_type_suffix(ty.as_ref());

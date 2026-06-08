@@ -265,7 +265,7 @@ fn rewrite_generic_calls_in_stmt(
             fields: fields.clone(),
             value: rewrite_generic_calls_in_expr(
                 value,
-                Some(type_ref),
+                type_ref.as_ref(),
                 env,
                 visible_type_aliases,
                 generic_templates,

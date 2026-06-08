@@ -193,7 +193,10 @@ pub(crate) fn specialize_stmt_types(
                     fields,
                     value,
                 } => AstStmt::DestructureLet {
-                    type_ref: specialize_ast_type_ref(type_ref, substitutions)?,
+                    type_ref: type_ref
+                        .as_ref()
+                        .map(|type_ref| specialize_ast_type_ref(type_ref, substitutions))
+                        .transpose()?,
                     fields: fields.clone(),
                     value: value.clone(),
                 },

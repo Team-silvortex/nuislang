@@ -250,8 +250,13 @@ pub(super) fn lower_stmt_sequence_with_async(
         value,
     } = stmt
     {
-        let expected = lower_type_ref_with_aliases(type_ref, type_aliases)?;
-        validate_type_ref(&expected)?;
+        let expected = type_ref
+            .as_ref()
+            .map(|type_ref| lower_type_ref_with_aliases(type_ref, type_aliases))
+            .transpose()?;
+        if let Some(expected) = expected.as_ref() {
+            validate_type_ref(expected)?;
+        }
         let lowered = lower_expr_with_async(
             value,
             current_domain,
@@ -260,7 +265,7 @@ pub(super) fn lower_stmt_sequence_with_async(
             module_consts,
             signatures,
             struct_table,
-            Some(&expected),
+            expected.as_ref(),
             false,
         )?;
         match nir_expr_effect_class(&lowered) {
@@ -275,7 +280,7 @@ pub(super) fn lower_stmt_sequence_with_async(
         }
         let inferred = infer_nir_expr_type(&lowered, bindings, signatures, struct_table);
         let final_type =
-            resolve_declared_or_inferred("destructuring let source", Some(expected), inferred)?;
+            resolve_declared_or_inferred("destructuring let source", expected, inferred)?;
         let mut lowered_stmts = Vec::new();
         emit_destructure_bindings(
             &lowered,
