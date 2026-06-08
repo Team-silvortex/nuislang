@@ -10,6 +10,7 @@ enum LlvmValueRef {
     I64(String),
     F32(String),
     F64(String),
+    NetworkResult(NetworkResultLlvmValueRef),
     Struct(StructLlvmValueRef),
     Ptr(String),
     TextHandle { ptr: String, handle: String },
@@ -20,6 +21,12 @@ enum LlvmValueRef {
 struct StructLlvmValueRef {
     type_name: String,
     fields: Vec<(String, LlvmValueRef)>,
+}
+
+#[derive(Clone)]
+struct NetworkResultLlvmValueRef {
+    state: String,
+    value: Box<LlvmValueRef>,
 }
 
 struct LlvmLoweringState {
@@ -255,6 +262,81 @@ fn lower_cpu_pointer_node(node: &Node, state: &mut LlvmLoweringState) -> bool {
     }
 }
 
+fn lower_network_observer_node(node: &Node, state: &mut LlvmLoweringState) -> bool {
+    match node.op.instruction.as_str() {
+        "observe" => {
+            let Some(value_ref) = state.registers.get(&node.op.args[0]).cloned() else {
+                state.body.push(format!(
+                    "  ; deferred lowering for network.observe `{}` because its input is outside the current CPU LLVM slice",
+                    node.name
+                ));
+                return true;
+            };
+            state.registers.insert(
+                node.name.clone(),
+                LlvmValueRef::NetworkResult(NetworkResultLlvmValueRef {
+                    state: node.op.args[1].clone(),
+                    value: Box::new(value_ref),
+                }),
+            );
+            true
+        }
+        "is_config_ready" | "is_send_ready" | "is_recv_ready" | "is_connect_ready"
+        | "is_accept_ready" | "is_closed" => {
+            let Some(result) = get_network_result(&state.registers, &node.op.args[0]) else {
+                state.body.push(format!(
+                    "  ; deferred lowering for network.{} `{}` because its result is outside the current CPU LLVM slice",
+                    node.op.instruction, node.name
+                ));
+                return true;
+            };
+            let wanted_state = match node.op.instruction.as_str() {
+                "is_config_ready" => "config_ready",
+                "is_send_ready" => "send_ready",
+                "is_recv_ready" => "recv_ready",
+                "is_connect_ready" => "connect_ready",
+                "is_accept_ready" => "accept_ready",
+                "is_closed" => "closed",
+                _ => unreachable!(),
+            };
+            let i1 = if result.state == wanted_state {
+                "true".to_owned()
+            } else {
+                "false".to_owned()
+            };
+            let widened = fresh_reg(&mut state.next_reg);
+            state
+                .body
+                .push(format!("  {widened} = zext i1 {i1} to i64"));
+            state.registers.insert(
+                node.name.clone(),
+                LlvmValueRef::Bool {
+                    i1,
+                    i64: widened.clone(),
+                },
+            );
+            state.last_cpu_value = Some(widened);
+            true
+        }
+        "value" => {
+            let Some(result) = get_network_result(&state.registers, &node.op.args[0]) else {
+                state.body.push(format!(
+                    "  ; deferred lowering for network.value `{}` because its result is outside the current CPU LLVM slice",
+                    node.name
+                ));
+                return true;
+            };
+            let value_ref = (*result.value).clone();
+            state.registers.insert(node.name.clone(), value_ref.clone());
+            if let Some(as_i64) = coerce_to_i64(&value_ref, &mut state.body, &mut state.next_reg) {
+                state.last_cpu_value = Some(as_i64);
+            }
+            true
+        }
+        _ => false,
+    }
+}
+
 fn cpu_call_scalar_kind_for_instruction(instruction: &str) -> Option<CpuCallScalarKind> {
     match instruction {
         "param_bool" | "call_bool" | "return_bool" => Some(CpuCallScalarKind::Bool),
@@ -430,6 +512,10 @@ fn emit_cpu_function(
             .get(&node.resource)
             .copied()
             .ok_or_else(|| format!("unknown resource `{}`", node.resource))?;
+
+        if resource.kind.is_family("network") && lower_network_observer_node(node, &mut state) {
+            continue;
+        }
 
         if !resource.kind.is_family("cpu") {
             state.body.push(format!(
@@ -4999,6 +5085,16 @@ fn get_struct<'a>(
 ) -> Option<&'a StructLlvmValueRef> {
     match registers.get(name) {
         Some(LlvmValueRef::Struct(value)) => Some(value),
+        _ => None,
+    }
+}
+
+fn get_network_result<'a>(
+    registers: &'a BTreeMap<String, LlvmValueRef>,
+    name: &str,
+) -> Option<&'a NetworkResultLlvmValueRef> {
+    match registers.get(name) {
+        Some(LlvmValueRef::NetworkResult(result)) => Some(result),
         _ => None,
     }
 }

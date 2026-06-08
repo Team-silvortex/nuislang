@@ -639,9 +639,9 @@ fn build_test_harness_module(ast: &AstModule, test_function: &AstFunction) -> As
 }
 
 fn build_test_main_function(test_function: &AstFunction) -> AstFunction {
+    #[rustfmt::skip]
     let test_call = AstExpr::Call {
-        callee: test_function.name.clone(),
-        args: vec![],
+        callee: test_function.name.clone(), generic_args: vec![], args: vec![],
     };
     let body = match test_function.return_type.as_ref() {
         Some(return_type) if return_type.name == "bool" && !return_type.is_ref => {

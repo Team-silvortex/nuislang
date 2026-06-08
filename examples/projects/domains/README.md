@@ -65,6 +65,8 @@ Start here:
   [net_tcp_connect_socket_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_connect_socket_recipe_demo) ->
   [net_tcp_client_flow_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_client_flow_recipe_demo) ->
   [net_tcp_socket_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_socket_recipe_demo) ->
+  [net_tcp_send_runtime_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_send_runtime_probe_demo) ->
+  [net_tcp_socket_runtime_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_socket_runtime_probe_demo) ->
   [net_tcp_server_socket_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_server_socket_recipe_demo) ->
   [net_tcp_server_flow_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_server_flow_recipe_demo) ->
   [net_tcp_accepted_socket_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_tcp_accepted_socket_recipe_demo) ->
@@ -85,9 +87,13 @@ Start here:
   [net_httpish_header_service_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_header_service_session_recipe_demo) ->
   [net_httpish_exchange_contract_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_exchange_contract_demo) ->
   [net_httpish_exchange_contract_service_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_exchange_contract_service_demo) ->
+  [net_httpish_exchange_blocks_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_exchange_blocks_demo) ->
+  [net_httpish_exchange_blocks_service_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_exchange_blocks_service_demo) ->
   [net_httpish_client_session_packet_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_client_session_packet_recipe_demo) ->
   [net_httpish_service_session_packet_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_service_session_packet_recipe_demo) ->
   [net_http_client_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_recipe_demo) ->
+  [net_http_status_runtime_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_status_runtime_probe_demo) ->
+  [net_http_client_runtime_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_runtime_probe_demo) ->
   [net_http_request_builder_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_request_builder_recipe_demo) ->
   [net_http_client_headers_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_headers_recipe_demo) ->
   [net_http_client_url_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_url_recipe_demo) ->
@@ -134,6 +140,8 @@ Start here:
   [network_endpoint_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_endpoint_profile_demo) ->
   [network_host_control_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_control_runtime_demo) ->
   [network_host_handle_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_handle_runtime_demo) ->
+  [network_host_handle_runtime_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_handle_runtime_probe_demo) ->
+  [network_loopback_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_loopback_runtime_demo) ->
   [network_host_handle_transport_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_handle_transport_runtime_demo) ->
   [network_owned_transport_result_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_owned_transport_result_demo) ->
   [network_owned_transport_result_task_policy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_owned_transport_result_task_policy_demo) ->
@@ -199,8 +207,15 @@ Start here:
   [network_host_control_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_control_runtime_demo)
 * network host handle runtime:
   [network_host_handle_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_handle_runtime_demo)
+* network host open surface runtime:
+  [network_host_open_surface_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_open_surface_runtime_demo)
 * network host handle transport runtime:
   [network_host_handle_transport_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_handle_transport_runtime_demo)
+
+If you are validating real socket behavior on another host, use the runtime
+probe order in:
+
+* [network-runtime-host-validation.md](/Users/Shared/chroot/dev/nuislang/docs/reference/network-runtime-host-validation.md)
 * network owned transport result:
   [network_owned_transport_result_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_owned_transport_result_demo)
 * network owned transport result policy:

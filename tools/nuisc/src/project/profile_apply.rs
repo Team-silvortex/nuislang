@@ -294,15 +294,22 @@ pub(super) fn collect_profile_int_bindings(body: &[AstStmt]) -> BTreeMap<String,
 pub(super) fn extract_profile_call(stmt: &AstStmt) -> Option<(&str, &str, &[AstExpr])> {
     match stmt {
         AstStmt::Let { name, value, .. } | AstStmt::Const { name, value, .. } => {
-            if let AstExpr::Call { callee, args } = value {
+            if let AstExpr::Call {
+                callee,
+                generic_args: _,
+                args,
+            } = value
+            {
                 Some((name.as_str(), callee.as_str(), args.as_slice()))
             } else {
                 None
             }
         }
-        AstStmt::Expr(AstExpr::Call { callee, args }) => {
-            Some((callee.as_str(), callee.as_str(), args.as_slice()))
-        }
+        AstStmt::Expr(AstExpr::Call {
+            callee,
+            generic_args: _,
+            args,
+        }) => Some((callee.as_str(), callee.as_str(), args.as_slice())),
         _ => None,
     }
 }

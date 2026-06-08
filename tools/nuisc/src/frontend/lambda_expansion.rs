@@ -455,6 +455,7 @@ fn rewrite_lambda_expr(
                     )?;
                     AstExpr::Call {
                         callee: synthesized_name,
+                        generic_args: Vec::new(),
                         args: rewritten_args,
                     }
                 }
@@ -463,6 +464,7 @@ fn rewrite_lambda_expr(
                         .get(name)
                         .cloned()
                         .unwrap_or_else(|| name.clone()),
+                    generic_args: Vec::new(),
                     args: rewritten_args,
                 },
                 _ => {
@@ -473,11 +475,16 @@ fn rewrite_lambda_expr(
                 }
             }
         }
-        AstExpr::Call { callee, args } => AstExpr::Call {
+        AstExpr::Call {
+            callee,
+            generic_args,
+            args,
+        } => AstExpr::Call {
             callee: lambda_aliases
                 .get(callee)
                 .cloned()
                 .unwrap_or_else(|| callee.clone()),
+            generic_args: generic_args.clone(),
             args: args
                 .iter()
                 .map(|arg| {
@@ -523,8 +530,13 @@ fn rewrite_lambda_expr(
                 })
                 .collect::<Result<Vec<_>, _>>()?,
         },
-        AstExpr::StructLiteral { type_name, fields } => AstExpr::StructLiteral {
+        AstExpr::StructLiteral {
+            type_name,
+            type_args,
+            fields,
+        } => AstExpr::StructLiteral {
             type_name: type_name.clone(),
+            type_args: type_args.clone(),
             fields: fields
                 .iter()
                 .map(|(name, value)| {

@@ -147,8 +147,13 @@ pub(super) fn lower_expr_with_async(
                 unit: unit.clone(),
             }
         }
-        AstExpr::Call { callee, args } => lower_call_expr_with_async(
+        AstExpr::Call {
             callee,
+            generic_args,
+            args,
+        } => lower_call_expr_with_async(
+            callee,
+            generic_args,
             args,
             current_domain,
             current_function_is_async,
@@ -287,12 +292,37 @@ pub(super) fn lower_expr_with_async(
                     .collect::<Result<Vec<_>, _>>()?,
             }
         }
-        AstExpr::StructLiteral { type_name, fields } => {
+        AstExpr::StructLiteral {
+            type_name,
+            type_args,
+            fields,
+        } => {
             let definition = struct_table
                 .get(type_name)
                 .ok_or_else(|| format!("unknown struct type `{}`", type_name))?;
             let literal_ty = if definition.generic_params.is_empty() {
+                if !type_args.is_empty() {
+                    return Err(format!(
+                        "struct literal `{}` does not accept explicit generic arguments because struct `{}` is not generic",
+                        type_name, type_name
+                    ));
+                }
                 named_type(type_name)
+            } else if !type_args.is_empty() {
+                if type_args.len() != definition.generic_params.len() {
+                    return Err(format!(
+                        "struct literal `{}<...>` expects {} generic argument(s), found {}",
+                        type_name,
+                        definition.generic_params.len(),
+                        type_args.len()
+                    ));
+                }
+                NirTypeRef {
+                    name: type_name.clone(),
+                    generic_args: type_args.iter().map(super::lower_type_ref).collect(),
+                    is_optional: false,
+                    is_ref: false,
+                }
             } else if let Some(expected) = expected {
                 if expected.name != *type_name {
                     return Err(format!(

@@ -1,0 +1,103 @@
+use network NetworkUnit;
+
+mod cpu Main {
+  extern "c" fn host_network_open_udp_datagram(
+    local_port: i64,
+    remote_port: i64
+  ) -> i64;
+  extern "c" fn host_network_open_tcp_listener(
+    local_port: i64,
+    read_timeout_ms: i64,
+    write_timeout_ms: i64
+  ) -> i64;
+  extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+  struct NetworkHostOpenSurfaceSummary {
+    base_local_port: i64,
+    remote_port: i64,
+    read_timeout_ms: i64,
+    write_timeout_ms: i64,
+    udp_local_only_port: i64,
+    udp_connected_only_port: i64,
+    udp_full_port: i64,
+    tcp_listener_port: i64,
+    udp_local_only_handle: i64,
+    udp_connected_only_handle: i64,
+    udp_full_handle: i64,
+    tcp_listener_handle: i64,
+    udp_local_only_close: i64,
+    udp_connected_only_close: i64,
+    udp_full_close: i64,
+    tcp_listener_close: i64
+  }
+
+  fn capture_network_host_open_surface_summary() -> NetworkHostOpenSurfaceSummary {
+    let base_local_port: i64 = network_profile_local_port("NetworkUnit");
+    let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+    let read_timeout_ms: i64 = network_profile_read_timeout("NetworkUnit");
+    let write_timeout_ms: i64 = network_profile_write_timeout("NetworkUnit");
+
+    let udp_local_only_port: i64 = base_local_port + 11;
+    let udp_connected_only_port: i64 = base_local_port + 12;
+    let udp_full_port: i64 = base_local_port + 13;
+    let tcp_listener_port: i64 = base_local_port + 14;
+
+    let udp_local_only_handle: i64 =
+      host_network_open_udp_datagram(udp_local_only_port, 0);
+    let udp_connected_only_handle: i64 =
+      host_network_open_udp_datagram(0, remote_port);
+    let udp_full_handle: i64 =
+      host_network_open_udp_datagram(udp_full_port, remote_port);
+    let tcp_listener_handle: i64 = host_network_open_tcp_listener(
+      tcp_listener_port,
+      read_timeout_ms,
+      write_timeout_ms
+    );
+
+    let udp_local_only_close: i64 = host_network_close_owned(udp_local_only_handle);
+    let udp_connected_only_close: i64 = host_network_close_owned(udp_connected_only_handle);
+    let udp_full_close: i64 = host_network_close_owned(udp_full_handle);
+    let tcp_listener_close: i64 = host_network_close_owned(tcp_listener_handle);
+
+    return NetworkHostOpenSurfaceSummary {
+      base_local_port: base_local_port,
+      remote_port: remote_port,
+      read_timeout_ms: read_timeout_ms,
+      write_timeout_ms: write_timeout_ms,
+      udp_local_only_port: udp_local_only_port,
+      udp_connected_only_port: udp_connected_only_port,
+      udp_full_port: udp_full_port,
+      tcp_listener_port: tcp_listener_port,
+      udp_local_only_handle: udp_local_only_handle,
+      udp_connected_only_handle: udp_connected_only_handle,
+      udp_full_handle: udp_full_handle,
+      tcp_listener_handle: tcp_listener_handle,
+      udp_local_only_close: udp_local_only_close,
+      udp_connected_only_close: udp_connected_only_close,
+      udp_full_close: udp_full_close,
+      tcp_listener_close: tcp_listener_close
+    };
+  }
+
+  fn main() {
+    let summary: NetworkHostOpenSurfaceSummary =
+      capture_network_host_open_surface_summary();
+
+    print(summary.base_local_port);
+    print(summary.remote_port);
+    print(summary.read_timeout_ms);
+    print(summary.write_timeout_ms);
+    print(summary.udp_local_only_port);
+    print(summary.udp_connected_only_port);
+    print(summary.udp_full_port);
+    print(summary.tcp_listener_port);
+    print(summary.udp_local_only_handle);
+    print(summary.udp_connected_only_handle);
+    print(summary.udp_full_handle);
+    print(summary.tcp_listener_handle);
+    print(summary.udp_local_only_close);
+    print(summary.udp_connected_only_close);
+    print(summary.udp_full_close);
+    print(summary.tcp_listener_close);
+  }
+}

@@ -4,7 +4,7 @@ mod cpu Main {
   }
 
   fn main() -> i64 {
-    let value: Just<i64> = Just(7);
+    let value = Just<i64>(7);
     match value {
       Just(payload) if payload == 7 => {
         return payload;

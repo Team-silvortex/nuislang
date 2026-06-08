@@ -1,0 +1,186 @@
+use network NetworkUnit;
+
+mod cpu Main {
+  extern "c" fn host_network_open_tcp_listener(
+    local_port: i64,
+    read_timeout_ms: i64,
+    write_timeout_ms: i64
+  ) -> i64;
+  extern "c" fn host_network_accept_owned(
+    listener_handle: i64,
+    read_timeout_ms: i64,
+    write_timeout_ms: i64
+  ) -> i64;
+  extern "c" fn host_network_open_tcp_stream(
+    remote_port: i64,
+    connect_timeout_ms: i64
+  ) -> i64;
+  extern "c" fn host_network_send_owned(
+    handle: i64,
+    stream_window: i64,
+    send_window: i64
+  ) -> i64;
+  extern "c" fn host_network_recv_owned(
+    handle: i64,
+    stream_window: i64,
+    recv_window: i64
+  ) -> i64;
+  extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+  struct LoopbackRuntimeSummary {
+    local_port: i64,
+    connect_timeout_ms: i64,
+    read_timeout_ms: i64,
+    write_timeout_ms: i64,
+    stream_window: i64,
+    recv_window: i64,
+    send_window: i64,
+    listener_handle: i64,
+    client_handle: i64,
+    client_send_value: i64,
+    client_recv_value: i64,
+    client_close_value: i64,
+    server_task_completed: i64,
+    server_task_value: i64,
+    listener_close_value: i64,
+    loopback_total: i64
+  }
+
+  async fn run_server_session(
+    listener_handle: i64,
+    read_timeout_ms: i64,
+    write_timeout_ms: i64,
+    stream_window: i64,
+    recv_window: i64,
+    send_window: i64
+  ) -> i64 {
+    let accepted_result: NetworkResult<i64> = network_result(
+      host_network_accept_owned(listener_handle, read_timeout_ms, write_timeout_ms)
+    );
+    let accepted_handle: i64 = network_value(accepted_result);
+    let recv_result: NetworkResult<i64> = network_result(
+      host_network_recv_owned(accepted_handle, stream_window, recv_window)
+    );
+    let send_result: NetworkResult<i64> = network_result(
+      host_network_send_owned(accepted_handle, stream_window, send_window)
+    );
+    let recv_value: i64 = network_value(recv_result);
+    let send_value: i64 = network_value(send_result);
+    let accepted_close_value: i64 = host_network_close_owned(accepted_handle);
+
+    return accepted_handle + recv_value + send_value + accepted_close_value;
+  }
+
+  fn encode_task_completed(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_task_value(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return task_value(result);
+    }
+    return 0;
+  }
+
+  fn capture_loopback_runtime_summary() -> LoopbackRuntimeSummary {
+    let local_port: i64 = network_profile_local_port("NetworkUnit");
+    let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
+    let read_timeout_ms: i64 = network_profile_read_timeout("NetworkUnit");
+    let write_timeout_ms: i64 = network_profile_write_timeout("NetworkUnit");
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+
+    let listener_handle: i64 = host_network_open_tcp_listener(
+      local_port,
+      read_timeout_ms,
+      write_timeout_ms
+    );
+    let server_task: Task<i64> = spawn(
+      run_server_session(
+        listener_handle,
+        read_timeout_ms,
+        write_timeout_ms,
+        stream_window,
+        recv_window,
+        send_window
+      )
+    );
+
+    let client_handle: i64 = host_network_open_tcp_stream(
+      local_port,
+      connect_timeout_ms
+    );
+    let client_send_result: NetworkResult<i64> = network_result(
+      host_network_send_owned(client_handle, stream_window, send_window)
+    );
+    let client_recv_result: NetworkResult<i64> = network_result(
+      host_network_recv_owned(client_handle, stream_window, recv_window)
+    );
+    let client_send_value: i64 = network_value(client_send_result);
+    let client_recv_value: i64 = network_value(client_recv_result);
+    let client_close_value: i64 = host_network_close_owned(client_handle);
+
+    let server_result: TaskResult<i64> = join_result(server_task);
+    let server_task_completed: i64 = encode_task_completed(server_result);
+    let server_task_value: i64 = encode_task_value(server_result);
+
+    let listener_close_value: i64 = host_network_close_owned(listener_handle);
+
+    return LoopbackRuntimeSummary {
+      local_port: local_port,
+      connect_timeout_ms: connect_timeout_ms,
+      read_timeout_ms: read_timeout_ms,
+      write_timeout_ms: write_timeout_ms,
+      stream_window: stream_window,
+      recv_window: recv_window,
+      send_window: send_window,
+      listener_handle: listener_handle,
+      client_handle: client_handle,
+      client_send_value: client_send_value,
+      client_recv_value: client_recv_value,
+      client_close_value: client_close_value,
+      server_task_completed: server_task_completed,
+      server_task_value: server_task_value,
+      listener_close_value: listener_close_value,
+      loopback_total: local_port
+        + connect_timeout_ms
+        + read_timeout_ms
+        + write_timeout_ms
+        + stream_window
+        + recv_window
+        + send_window
+        + listener_handle
+        + client_handle
+        + client_send_value
+        + client_recv_value
+        + client_close_value
+        + server_task_completed
+        + server_task_value
+        + listener_close_value
+    };
+  }
+
+  fn main() {
+    let summary: LoopbackRuntimeSummary = capture_loopback_runtime_summary();
+    print(summary.local_port);
+    print(summary.connect_timeout_ms);
+    print(summary.read_timeout_ms);
+    print(summary.write_timeout_ms);
+    print(summary.stream_window);
+    print(summary.recv_window);
+    print(summary.send_window);
+    print(summary.listener_handle);
+    print(summary.client_handle);
+    print(summary.client_send_value);
+    print(summary.client_recv_value);
+    print(summary.client_close_value);
+    print(summary.server_task_completed);
+    print(summary.server_task_value);
+    print(summary.listener_close_value);
+    print(summary.loopback_total);
+  }
+}

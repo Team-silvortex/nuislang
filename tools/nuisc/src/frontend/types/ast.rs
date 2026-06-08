@@ -96,12 +96,20 @@ pub(crate) fn infer_ast_expr_type_inner(
                 Some(ty)
             }
         }),
-        AstExpr::Call { callee, args } => match callee.as_str() {
+        AstExpr::Call {
+            callee,
+            generic_args,
+            args,
+        } => match callee.as_str() {
             _ if struct_table
                 .get(callee)
                 .is_some_and(|definition| definition.fields.len() == 1 && args.len() == 1) =>
             {
-                Some(ast_named_type(callee))
+                if generic_args.is_empty() {
+                    Some(ast_named_type(callee))
+                } else {
+                    Some(ast_generic_named_type(callee, generic_args.clone()))
+                }
             }
             "i32_from_i64" => {
                 let [value] = args.as_slice() else {
@@ -362,10 +370,16 @@ pub(crate) fn infer_ast_expr_type_inner(
             }
             None
         }
-        AstExpr::StructLiteral { type_name, .. } => {
+        AstExpr::StructLiteral {
+            type_name,
+            type_args,
+            ..
+        } => {
             let definition = struct_table.get(type_name)?;
             if definition.generic_params.is_empty() {
                 Some(ast_named_type(type_name))
+            } else if type_args.len() == definition.generic_params.len() {
+                Some(ast_generic_named_type(type_name, type_args.clone()))
             } else {
                 None
             }

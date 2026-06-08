@@ -1519,8 +1519,7 @@ static int64_t nuis_host_network_connect_probe(
 ) {
     if (local_port <= 0 || remote_port <= 0) return 0;
     if (connect_timeout_ms < 0) return 0;
-    (void)nuis_network_try_connect_probe(local_port, remote_port, connect_timeout_ms);
-    return local_port + remote_port + connect_timeout_ms;
+    return nuis_network_try_connect_probe(local_port, remote_port, connect_timeout_ms) ? 1 : 0;
 }
 
 static int64_t nuis_host_network_accept_probe(
@@ -1530,8 +1529,7 @@ static int64_t nuis_host_network_accept_probe(
 ) {
     if (local_port <= 0) return 0;
     if (read_timeout_ms < 0 || write_timeout_ms < 0) return 0;
-    (void)nuis_network_try_accept_probe(local_port, read_timeout_ms, write_timeout_ms);
-    return local_port + read_timeout_ms + write_timeout_ms;
+    return nuis_network_try_accept_probe(local_port, read_timeout_ms, write_timeout_ms) ? 1 : 0;
 }
 
 static int64_t nuis_host_network_close(int64_t handle) {
@@ -1547,8 +1545,7 @@ static int64_t nuis_host_network_send_probe(
 ) {
     if (stream_window <= 0 || send_window <= 0 || remote_port <= 0) return 0;
     (void)remote_port;
-    (void)nuis_network_try_send_probe(stream_window, send_window);
-    return stream_window + send_window + remote_port;
+    return nuis_network_try_send_probe(stream_window, send_window) ? 1 : 0;
 }
 
 static int64_t nuis_host_network_recv_probe(
@@ -1558,8 +1555,7 @@ static int64_t nuis_host_network_recv_probe(
 ) {
     if (stream_window <= 0 || recv_window <= 0 || local_port <= 0) return 0;
     (void)local_port;
-    (void)nuis_network_try_recv_probe(stream_window, recv_window);
-    return stream_window + recv_window + local_port;
+    return nuis_network_try_recv_probe(stream_window, recv_window) ? 1 : 0;
 }
 
 static int64_t nuis_host_dir_open(int64_t path_handle) {

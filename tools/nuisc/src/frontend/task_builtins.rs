@@ -31,6 +31,7 @@ pub(super) fn lower_task_builtin_call(
             };
             let AstExpr::Call {
                 callee: spawned_callee,
+                generic_args: spawned_generic_args,
                 args: spawned_args,
             } = call
             else {
@@ -38,6 +39,12 @@ pub(super) fn lower_task_builtin_call(
                     "spawn(...) expects an async function call like `spawn(task())`".to_owned(),
                 );
             };
+            if !spawned_generic_args.is_empty() {
+                return Err(
+                    "spawn(...) does not yet support explicit generic arguments on the spawned call"
+                        .to_owned(),
+                );
+            }
             let signature = signatures.get(spawned_callee).ok_or_else(|| {
                 format!("spawn(...) references unknown function `{spawned_callee}`")
             })?;

@@ -282,11 +282,16 @@ pub(crate) fn rewrite_higher_order_template_expr(
                 "higher-order function parameter `{name}` can currently only be used in direct call position"
             ))
         }
-        AstExpr::Call { callee, args } if callable_bindings.contains_key(callee) => AstExpr::Call {
+        AstExpr::Call {
+            callee,
+            generic_args,
+            args,
+        } if callable_bindings.contains_key(callee) => AstExpr::Call {
             callee: callable_bindings
                 .get(callee)
                 .cloned()
                 .unwrap_or_else(|| callee.clone()),
+            generic_args: generic_args.clone(),
             args: args
                 .iter()
                 .map(|arg| {
@@ -302,15 +307,26 @@ pub(crate) fn rewrite_higher_order_template_expr(
                 })
                 .collect::<Result<Vec<_>, _>>()?,
         },
-        AstExpr::Call { callee, args } if templates.contains_key(callee) => specialize_higher_order_call(
+        AstExpr::Call {
             callee,
+            generic_args,
             args,
-            templates,
-            function_table,
-            visible_type_aliases,
-            specialized_cache,
-            specialized_functions,
-        )?,
+        } if templates.contains_key(callee) => {
+            if !generic_args.is_empty() {
+                return Err(format!(
+                    "explicit generic arguments are not yet supported for higher-order template call `{callee}<...>(...)`"
+                ));
+            }
+            specialize_higher_order_call(
+                callee,
+                args,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?
+        }
         AstExpr::Await(value) => AstExpr::Await(Box::new(rewrite_higher_order_template_expr(
             value,
             callable_bindings,
@@ -320,8 +336,13 @@ pub(crate) fn rewrite_higher_order_template_expr(
             specialized_cache,
             specialized_functions,
         )?)),
-        AstExpr::Call { callee, args } => AstExpr::Call {
+        AstExpr::Call {
+            callee,
+            generic_args,
+            args,
+        } => AstExpr::Call {
             callee: callee.clone(),
+            generic_args: generic_args.clone(),
             args: args
                 .iter()
                 .map(|arg| {
@@ -392,8 +413,13 @@ pub(crate) fn rewrite_higher_order_template_expr(
                 })
                 .collect::<Result<Vec<_>, _>>()?,
         },
-        AstExpr::StructLiteral { type_name, fields } => AstExpr::StructLiteral {
+        AstExpr::StructLiteral {
+            type_name,
+            type_args,
+            fields,
+        } => AstExpr::StructLiteral {
             type_name: type_name.clone(),
+            type_args: type_args.clone(),
             fields: fields
                 .iter()
                 .map(|(name, value)| {

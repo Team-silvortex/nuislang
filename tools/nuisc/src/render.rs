@@ -10,7 +10,7 @@ use self::render_struct_helpers::{
 use nuis_semantics::model::{
     AstAttribute, AstAttributeArg, AstAttributeValue, AstBinaryOp, AstExpr, AstExternInterface,
     AstFunction, AstGenericParam, AstImplDef, AstImplMethod, AstMatchPattern, AstModule, AstStmt,
-    AstTraitDef, AstTraitMethodSig, AstVisibility, NirAnnotation, NirAttributeArg,
+    AstTraitDef, AstTraitMethodSig, AstTypeRef, AstVisibility, NirAnnotation, NirAttributeArg,
     NirAttributeValue, NirBinaryOp, NirExpr, NirExternInterface, NirFunction, NirGenericParam,
     NirImplDef, NirImplMethod, NirModule, NirStmt, NirTraitDef, NirTraitMethodSig, NirVisibility,
 };
@@ -406,9 +406,14 @@ fn render_ast_expr(value: &AstExpr) -> String {
         }
         AstExpr::Await(value) => format!("await {}", render_ast_expr(value)),
         AstExpr::Instantiate { domain, unit } => format!("instantiate {} {}", domain, unit),
-        AstExpr::Call { callee, args } => format!(
-            "{}({})",
+        AstExpr::Call {
             callee,
+            generic_args,
+            args,
+        } => format!(
+            "{}{}({})",
+            callee,
+            render_ast_generic_args(generic_args),
             args.iter()
                 .map(render_ast_expr)
                 .collect::<Vec<_>>()
@@ -435,9 +440,14 @@ fn render_ast_expr(value: &AstExpr) -> String {
                 .collect::<Vec<_>>()
                 .join(", ")
         ),
-        AstExpr::StructLiteral { type_name, fields } => format!(
-            "{} {{ {} }}",
+        AstExpr::StructLiteral {
             type_name,
+            type_args,
+            fields,
+        } => format!(
+            "{}{} {{ {} }}",
+            type_name,
+            render_ast_generic_args(type_args),
             fields
                 .iter()
                 .map(|(name, value)| format!("{name}: {}", render_ast_expr(value)))
@@ -451,6 +461,20 @@ fn render_ast_expr(value: &AstExpr) -> String {
             render_ast_binary_op(*op),
             render_ast_expr(rhs)
         ),
+    }
+}
+
+fn render_ast_generic_args(args: &[AstTypeRef]) -> String {
+    if args.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "<{}>",
+            args.iter()
+                .map(render_ast_type)
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
     }
 }
 

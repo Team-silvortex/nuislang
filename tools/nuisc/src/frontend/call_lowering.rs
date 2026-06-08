@@ -35,6 +35,7 @@ pub(super) fn lower_binary_expr(
 #[allow(dead_code)]
 pub(super) fn lower_call_expr(
     callee: &str,
+    generic_args: &[nuis_semantics::model::AstTypeRef],
     args: &[AstExpr],
     current_domain: &str,
     bindings: &BTreeMap<String, NirTypeRef>,
@@ -44,6 +45,7 @@ pub(super) fn lower_call_expr(
 ) -> Result<NirExpr, String> {
     lower_call_expr_with_async(
         callee,
+        generic_args,
         args,
         current_domain,
         false,
@@ -58,6 +60,7 @@ pub(super) fn lower_call_expr(
 
 pub(super) fn lower_call_expr_with_async(
     callee: &str,
+    generic_args: &[nuis_semantics::model::AstTypeRef],
     args: &[AstExpr],
     current_domain: &str,
     current_function_is_async: bool,
@@ -70,6 +73,7 @@ pub(super) fn lower_call_expr_with_async(
 ) -> Result<NirExpr, String> {
     if let Some(payload_struct_constructor) = lower_payload_struct_constructor_sugar(
         callee,
+        generic_args,
         args,
         current_domain,
         current_function_is_async,
@@ -114,6 +118,7 @@ pub(super) fn lower_call_expr_with_async(
 #[allow(clippy::too_many_arguments)]
 fn lower_payload_struct_constructor_sugar(
     callee: &str,
+    generic_args: &[nuis_semantics::model::AstTypeRef],
     args: &[AstExpr],
     current_domain: &str,
     current_function_is_async: bool,
@@ -148,9 +153,28 @@ fn lower_payload_struct_constructor_sugar(
         ));
     }
     let constructor_ty = if definition.generic_params.is_empty() {
+        if !generic_args.is_empty() {
+            return Err(format!(
+                "payload-style struct constructor `{callee}(...)` does not accept explicit generic arguments because struct `{callee}` is not generic"
+            ));
+        }
         NirTypeRef {
             name: callee.to_owned(),
             generic_args: Vec::new(),
+            is_optional: false,
+            is_ref: false,
+        }
+    } else if !generic_args.is_empty() {
+        if generic_args.len() != definition.generic_params.len() {
+            return Err(format!(
+                "payload-style struct constructor `{callee}<...>(...)` expects {} generic argument(s), found {}",
+                definition.generic_params.len(),
+                generic_args.len()
+            ));
+        }
+        NirTypeRef {
+            name: callee.to_owned(),
+            generic_args: generic_args.iter().map(super::lower_type_ref).collect(),
             is_optional: false,
             is_ref: false,
         }

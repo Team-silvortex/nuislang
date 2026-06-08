@@ -304,6 +304,7 @@ pub enum AstExpr {
     },
     Call {
         callee: String,
+        generic_args: Vec<AstTypeRef>,
         args: Vec<AstExpr>,
     },
     Invoke {
@@ -317,6 +318,7 @@ pub enum AstExpr {
     },
     StructLiteral {
         type_name: String,
+        type_args: Vec<AstTypeRef>,
         fields: Vec<(String, AstExpr)>,
     },
     FieldAccess {

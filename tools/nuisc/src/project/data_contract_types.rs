@@ -19,6 +19,7 @@ pub(super) fn find_profile_call_declared_type(
                 value:
                     AstExpr::Call {
                         callee: stmt_callee,
+                        generic_args: _,
                         args,
                     },
                 ..
@@ -28,6 +29,7 @@ pub(super) fn find_profile_call_declared_type(
                 value:
                     AstExpr::Call {
                         callee: stmt_callee,
+                        generic_args: _,
                         args,
                     },
                 ..

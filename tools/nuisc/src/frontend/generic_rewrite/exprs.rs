@@ -38,7 +38,11 @@ pub(super) fn rewrite_generic_calls_in_expr(
             specialized_functions,
             specialized_signatures,
         )?)),
-        AstExpr::Call { callee, args } => {
+        AstExpr::Call {
+            callee,
+            generic_args,
+            args,
+        } => {
             let rewritten_args = args
                 .iter()
                 .enumerate()
@@ -78,11 +82,13 @@ pub(super) fn rewrite_generic_calls_in_expr(
                 )?;
                 AstExpr::Call {
                     callee: specialized_name,
+                    generic_args: generic_args.clone(),
                     args: rewritten_args,
                 }
             } else {
                 AstExpr::Call {
                     callee: callee.clone(),
+                    generic_args: generic_args.clone(),
                     args: rewritten_args,
                 }
             }
@@ -127,8 +133,13 @@ pub(super) fn rewrite_generic_calls_in_expr(
                 })
                 .collect::<Result<Vec<_>, _>>()?,
         },
-        AstExpr::StructLiteral { type_name, fields } => AstExpr::StructLiteral {
+        AstExpr::StructLiteral {
+            type_name,
+            type_args,
+            fields,
+        } => AstExpr::StructLiteral {
             type_name: type_name.clone(),
+            type_args: type_args.clone(),
             fields: fields
                 .iter()
                 .map(|(name, value)| {

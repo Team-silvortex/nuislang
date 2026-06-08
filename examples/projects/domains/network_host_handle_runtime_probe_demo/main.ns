@@ -11,17 +11,18 @@ mod cpu Main {
   ) -> i64;
   extern "c" fn host_network_close_owned(handle: i64) -> i64;
 
-  struct NetworkHostHandleSummary {
+  struct NetworkHostHandleProbeSummary {
     local_port: i64,
     remote_port: i64,
     connect_timeout_ms: i64,
     tcp_handle: i64,
     udp_handle: i64,
     tcp_close_code: i64,
-    udp_close_code: i64
+    udp_close_code: i64,
+    probe_total: i64
   }
 
-  fn capture_network_host_handle_summary() -> NetworkHostHandleSummary {
+  fn capture_network_host_handle_probe_summary() -> NetworkHostHandleProbeSummary {
     let local_port: i64 = network_profile_local_port("NetworkUnit");
     let remote_port: i64 = network_profile_remote_port("NetworkUnit");
     let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
@@ -33,19 +34,27 @@ mod cpu Main {
     let tcp_close_code: i64 = host_network_close_owned(tcp_handle);
     let udp_close_code: i64 = host_network_close_owned(udp_handle);
 
-    return NetworkHostHandleSummary {
+    return NetworkHostHandleProbeSummary {
       local_port: local_port,
       remote_port: remote_port,
       connect_timeout_ms: connect_timeout_ms,
       tcp_handle: tcp_handle,
       udp_handle: udp_handle,
       tcp_close_code: tcp_close_code,
-      udp_close_code: udp_close_code
+      udp_close_code: udp_close_code,
+      probe_total: local_port
+        + remote_port
+        + connect_timeout_ms
+        + tcp_handle
+        + udp_handle
+        + tcp_close_code
+        + udp_close_code
     };
   }
 
   fn main() {
-    let summary: NetworkHostHandleSummary = capture_network_host_handle_summary();
+    let summary: NetworkHostHandleProbeSummary =
+      capture_network_host_handle_probe_summary();
     print(summary.local_port);
     print(summary.remote_port);
     print(summary.connect_timeout_ms);
@@ -53,5 +62,6 @@ mod cpu Main {
     print(summary.udp_handle);
     print(summary.tcp_close_code);
     print(summary.udp_close_code);
+    print(summary.probe_total);
   }
 }

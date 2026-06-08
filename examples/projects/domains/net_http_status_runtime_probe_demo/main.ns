@@ -1,0 +1,78 @@
+use network NetworkUnit;
+
+mod cpu Main {
+  extern "c" fn host_network_open_tcp_stream(
+    remote_port: i64,
+    connect_timeout_ms: i64
+  ) -> i64;
+  extern "c" fn host_network_recv_http_status_owned(
+    handle: i64,
+    stream_window: i64,
+    recv_window: i64
+  ) -> i64;
+  extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+  struct NetHttpStatusRuntimeProbeSummary {
+    remote_port: i64,
+    connect_timeout_ms: i64,
+    stream_window: i64,
+    recv_window: i64,
+    open_handle: i64,
+    status_ready: i64,
+    status_value: i64,
+    close_value: i64,
+    probe_total: i64
+  }
+
+  fn capture_net_http_status_runtime_probe_summary()
+    -> NetHttpStatusRuntimeProbeSummary {
+    let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+    let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let open_handle: i64 = host_network_open_tcp_stream(
+      remote_port,
+      connect_timeout_ms
+    );
+    let status_result: NetworkResult<i64> = network_result(
+      host_network_recv_http_status_owned(open_handle, stream_window, recv_window)
+    );
+    let close_value: i64 = host_network_close_owned(open_handle);
+    let status_ready: i64 = 1;
+    let status_value: i64 = network_value(status_result);
+
+    return NetHttpStatusRuntimeProbeSummary {
+      remote_port: remote_port,
+      connect_timeout_ms: connect_timeout_ms,
+      stream_window: stream_window,
+      recv_window: recv_window,
+      open_handle: open_handle,
+      status_ready: status_ready,
+      status_value: status_value,
+      close_value: close_value,
+      probe_total: remote_port
+        + connect_timeout_ms
+        + stream_window
+        + recv_window
+        + open_handle
+        + status_ready
+        + status_value
+        + close_value
+    };
+  }
+
+  fn main() {
+    let summary: NetHttpStatusRuntimeProbeSummary =
+      capture_net_http_status_runtime_probe_summary();
+
+    print(summary.remote_port);
+    print(summary.connect_timeout_ms);
+    print(summary.stream_window);
+    print(summary.recv_window);
+    print(summary.open_handle);
+    print(summary.status_ready);
+    print(summary.status_value);
+    print(summary.close_value);
+    print(summary.probe_total);
+  }
+}

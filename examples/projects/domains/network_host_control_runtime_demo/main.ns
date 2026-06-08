@@ -51,15 +51,14 @@ mod cpu Main {
 
   fn main() {
     let summary: NetworkHostControlSummary = capture_network_host_control_summary();
-    print(
-      summary.local_port
-        + summary.remote_port
-        + summary.connect_timeout_ms
-        + summary.read_timeout_ms
-        + summary.write_timeout_ms
-        + summary.connect_probe
-        + summary.accept_probe
-        + summary.close_code
-    );
+
+    print(summary.local_port);
+    print(summary.remote_port);
+    print(summary.connect_timeout_ms);
+    print(summary.read_timeout_ms);
+    print(summary.write_timeout_ms);
+    print(summary.connect_probe);
+    print(summary.accept_probe);
+    print(summary.close_code);
   }
 }

@@ -1039,18 +1039,7 @@ impl Parser {
         };
         let name = self.expect_ident()?;
         let generic_args = if self.peek_symbol('<') {
-            self.expect_symbol('<')?;
-            let mut args = Vec::new();
-            loop {
-                args.push(self.parse_type_ref()?);
-                if self.peek_symbol(',') {
-                    self.expect_symbol(',')?;
-                } else {
-                    break;
-                }
-            }
-            self.expect_symbol('>')?;
-            args
+            self.parse_type_arg_list()?
         } else {
             Vec::new()
         };
@@ -1066,6 +1055,21 @@ impl Parser {
             is_optional,
             is_ref,
         })
+    }
+
+    fn parse_type_arg_list(&mut self) -> Result<Vec<AstTypeRef>, String> {
+        self.expect_symbol('<')?;
+        let mut args = Vec::new();
+        loop {
+            args.push(self.parse_type_ref()?);
+            if self.peek_symbol(',') {
+                self.expect_symbol(',')?;
+            } else {
+                break;
+            }
+        }
+        self.expect_symbol('>')?;
+        Ok(args)
     }
 
     #[rustfmt::skip]
@@ -1117,7 +1121,14 @@ impl Parser {
         let expr = self.parse_expr()?;
         self.expect_symbol(';')?;
         match expr {
-            AstExpr::Call { callee, args } if callee == "print" => {
+            AstExpr::Call {
+                callee,
+                generic_args,
+                args,
+            } if callee == "print" => {
+                if !generic_args.is_empty() {
+                    return Err("print does not accept explicit generic arguments".to_owned());
+                }
                 if args.len() != 1 {
                     return Err("print requires exactly one argument".to_owned());
                 }
@@ -1179,6 +1190,7 @@ impl Parser {
             let expr = self.parse_expr()?;
             AstExpr::Call {
                 callee: "data_output_pipe".to_owned(),
+                generic_args: Vec::new(),
                 args: vec![expr],
             }
         } else if self.peek_word("input") {
@@ -1186,6 +1198,7 @@ impl Parser {
             let expr = self.parse_expr()?;
             AstExpr::Call {
                 callee: "data_input_pipe".to_owned(),
+                generic_args: Vec::new(),
                 args: vec![expr],
             }
         } else if self.peek_word("marker") {
@@ -1193,6 +1206,7 @@ impl Parser {
             let expr = self.parse_expr()?;
             AstExpr::Call {
                 callee: "data_marker".to_owned(),
+                generic_args: Vec::new(),
                 args: vec![expr],
             }
         } else {
@@ -1461,7 +1475,11 @@ impl Parser {
                 let args = self.parse_argument_list(')')?;
                 self.expect_symbol(')')?;
                 expr = match expr {
-                    AstExpr::Var(callee) => AstExpr::Call { callee, args },
+                    AstExpr::Var(callee) => AstExpr::Call {
+                        callee,
+                        generic_args: Vec::new(),
+                        args,
+                    },
                     other => AstExpr::Invoke {
                         callee: Box::new(other),
                         args,
@@ -1519,17 +1537,24 @@ impl Parser {
             Some(Token::String(text)) => Ok(AstExpr::Text(text)),
             Some(Token::Integer(value)) => Ok(AstExpr::Int(value)),
             Some(Token::Word(name)) => {
+                let explicit_generic_args =
+                    self.try_parse_expr_type_arg_list_followed_by_call_or_literal()?;
                 if self.peek_symbol('(') {
                     self.expect_symbol('(')?;
                     let args = self.parse_argument_list(')')?;
                     self.expect_symbol(')')?;
-                    Ok(AstExpr::Call { callee: name, args })
+                    Ok(AstExpr::Call {
+                        callee: name,
+                        generic_args: explicit_generic_args.unwrap_or_default(),
+                        args,
+                    })
                 } else if self.allow_struct_literals && self.peek_symbol('{') {
                     self.expect_symbol('{')?;
                     let fields = self.parse_struct_field_list()?;
                     self.expect_symbol('}')?;
                     Ok(AstExpr::StructLiteral {
                         type_name: name,
+                        type_args: explicit_generic_args.unwrap_or_default(),
                         fields,
                     })
                 } else {
@@ -1563,6 +1588,32 @@ impl Parser {
             }
         }
         Ok(args)
+    }
+
+    fn try_parse_expr_type_arg_list_followed_by_call_or_literal(
+        &mut self,
+    ) -> Result<Option<Vec<AstTypeRef>>, String> {
+        if !self.peek_symbol('<') {
+            return Ok(None);
+        }
+        let checkpoint = self.cursor;
+        let parsed = self.parse_type_arg_list();
+        match parsed {
+            Ok(type_args)
+                if self.peek_symbol('(')
+                    || (self.allow_struct_literals && self.peek_symbol('{')) =>
+            {
+                Ok(Some(type_args))
+            }
+            Ok(_) => {
+                self.cursor = checkpoint;
+                Ok(None)
+            }
+            Err(_) => {
+                self.cursor = checkpoint;
+                Ok(None)
+            }
+        }
     }
 
     fn parse_lambda_param_list(&mut self) -> Result<Vec<AstParam>, String> {

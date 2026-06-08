@@ -60,7 +60,12 @@ fn rewrite_generic_stmt_with_hoists(
 ) -> Result<Vec<AstStmt>, String> {
     match stmt {
         AstStmt::Let { name, ty, value } => {
-            let AstExpr::Call { callee, args } = value else {
+            let AstExpr::Call {
+                callee,
+                generic_args,
+                args,
+            } = value
+            else {
                 return Ok(vec![rewrite_generic_calls_in_stmt(
                     stmt,
                     current_return_type,
@@ -110,6 +115,7 @@ fn rewrite_generic_stmt_with_hoists(
             let rewritten_value = rewrite_generic_calls_in_expr(
                 &AstExpr::Call {
                     callee: callee.clone(),
+                    generic_args: generic_args.clone(),
                     args: rewritten_args,
                 },
                 ty.as_ref(),
@@ -143,9 +149,11 @@ fn rewrite_generic_stmt_with_hoists(
             });
             Ok(hoisted)
         }
-        AstStmt::Return(Some(AstExpr::Call { callee, args }))
-            if generic_templates.contains_key(callee) =>
-        {
+        AstStmt::Return(Some(AstExpr::Call {
+            callee,
+            generic_args,
+            args,
+        })) if generic_templates.contains_key(callee) => {
             let (mut hoisted, rewritten_args) = hoist_direct_result_wrapper_args(
                 args,
                 "__nuis_generic_return_arg",
@@ -164,6 +172,7 @@ fn rewrite_generic_stmt_with_hoists(
             let rewritten_value = rewrite_generic_calls_in_expr(
                 &AstExpr::Call {
                     callee: callee.clone(),
+                    generic_args: generic_args.clone(),
                     args: rewritten_args,
                 },
                 current_return_type,

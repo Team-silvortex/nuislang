@@ -59,16 +59,14 @@ mod cpu Main {
   fn main() {
     let summary: NetworkHostHandleTransportSummary =
       capture_network_host_handle_transport_summary();
-    print(
-      summary.stream_window
-        + summary.recv_window
-        + summary.send_window
-        + summary.local_port
-        + summary.remote_port
-        + summary.handle
-        + summary.send_code
-        + summary.recv_code
-        + summary.close_code
-    );
+    print(summary.stream_window);
+    print(summary.recv_window);
+    print(summary.send_window);
+    print(summary.local_port);
+    print(summary.remote_port);
+    print(summary.handle);
+    print(summary.send_code);
+    print(summary.recv_code);
+    print(summary.close_code);
   }
 }

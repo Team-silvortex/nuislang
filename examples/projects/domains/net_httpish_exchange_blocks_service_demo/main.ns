@@ -1,0 +1,378 @@
+use network NetworkUnit;
+
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+  extern "c" fn host_monotonic_time_ns() -> i64;
+  extern "c" fn host_network_open_tcp_listener(
+    local_port: i64,
+    read_timeout_ms: i64,
+    write_timeout_ms: i64
+  ) -> i64;
+  extern "c" fn host_network_accept_owned(
+    listener_handle: i64,
+    read_timeout_ms: i64,
+    write_timeout_ms: i64
+  ) -> i64;
+  extern "c" fn host_network_recv_owned(
+    handle: i64,
+    stream_window: i64,
+    recv_window: i64
+  ) -> i64;
+  extern "c" fn host_network_send_owned(
+    handle: i64,
+    stream_window: i64,
+    send_window: i64
+  ) -> i64;
+  extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+  struct AcceptPlan {
+    method_code: i64,
+    path_code: i64,
+    listen_code: i64,
+    route_code: i64,
+    timeout_budget: i64,
+    retry_budget: i64
+  }
+
+  struct HeaderBlocks {
+    auth_code: i64,
+    trace_code: i64,
+    accept_code: i64
+  }
+
+  struct ExchangeBlocks {
+    request_line_code: i64,
+    request_header_block_code: i64,
+    request_body_block_code: i64,
+    status_line_code: i64,
+    response_header_block_code: i64,
+    response_body_block_code: i64,
+    retry_block_code: i64,
+    exchange_total: i64
+  }
+
+  struct ExchangeBlocksServiceSummary {
+    argv_count: i64,
+    endpoint_kind: i64,
+    transport_family: i64,
+    protocol_kind: i64,
+    protocol_version: i64,
+    protocol_header_bytes: i64,
+    timeout_budget: i64,
+    retry_budget: i64,
+    request_bytes: i64,
+    response_bytes: i64,
+    listener_handle: i64,
+    accepted_handle: i64,
+    accept_ready: i64,
+    recv_ready: i64,
+    send_ready: i64,
+    request_line_code: i64,
+    request_header_block_code: i64,
+    request_body_block_code: i64,
+    status_line_code: i64,
+    response_header_block_code: i64,
+    response_body_block_code: i64,
+    retry_block_code: i64,
+    exchange_total: i64,
+    close_value: i64,
+    tick_ns: i64
+  }
+
+  fn encode_accept_ready(result: NetworkResult<i64>) -> i64 {
+    if network_accept_ready(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_recv_ready(result: NetworkResult<i64>) -> i64 {
+    if network_recv_ready(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_send_ready(result: NetworkResult<i64>) -> i64 {
+    if network_send_ready(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_value(result: NetworkResult<i64>) -> i64 {
+    return network_value(result);
+  }
+
+  fn build_accept_plan(
+    endpoint_kind: i64,
+    protocol_kind: i64,
+    protocol_version: i64,
+    timeout_budget: i64,
+    retry_budget: i64
+  ) -> AcceptPlan {
+    return AcceptPlan {
+      method_code: 64 + protocol_kind,
+      path_code: 1000 + protocol_version + endpoint_kind,
+      listen_code: 700 + endpoint_kind,
+      route_code: 900 + protocol_kind + protocol_version,
+      timeout_budget: timeout_budget,
+      retry_budget: retry_budget
+    };
+  }
+
+  fn build_header_blocks(
+    plan: AcceptPlan,
+    protocol_header_bytes: i64
+  ) -> HeaderBlocks {
+    return HeaderBlocks {
+      auth_code: plan.listen_code + protocol_header_bytes,
+      trace_code: plan.route_code + protocol_header_bytes,
+      accept_code: protocol_header_bytes + plan.retry_budget
+    };
+  }
+
+  fn request_line_code(plan: AcceptPlan) -> i64 {
+    return plan.method_code + plan.path_code;
+  }
+
+  fn request_header_block_code(headers: HeaderBlocks) -> i64 {
+    return headers.auth_code + headers.trace_code + headers.accept_code;
+  }
+
+  fn request_body_block_code(
+    plan: AcceptPlan,
+    headers: HeaderBlocks,
+    recv_result: NetworkResult<i64>
+  ) -> i64 {
+    if network_recv_ready(recv_result) {
+      return encode_value(recv_result) + headers.auth_code + plan.path_code;
+    }
+    return plan.retry_budget + headers.accept_code;
+  }
+
+  fn status_line_code(
+    plan: AcceptPlan,
+    accept_result: NetworkResult<i64>,
+    recv_result: NetworkResult<i64>
+  ) -> i64 {
+    if network_accept_ready(accept_result) {
+      return 200 + plan.timeout_budget;
+    }
+    if network_recv_ready(recv_result) {
+      return 202 + plan.retry_budget;
+    }
+    return 504;
+  }
+
+  fn response_header_block_code(
+    plan: AcceptPlan,
+    headers: HeaderBlocks,
+    recv_window: i64,
+    send_result: NetworkResult<i64>
+  ) -> i64 {
+    if network_send_ready(send_result) {
+      return headers.trace_code + recv_window;
+    }
+    return headers.auth_code + plan.path_code + recv_window;
+  }
+
+  fn response_body_block_code(
+    plan: AcceptPlan,
+    headers: HeaderBlocks,
+    recv_result: NetworkResult<i64>,
+    send_result: NetworkResult<i64>
+  ) -> i64 {
+    if network_recv_ready(recv_result) {
+      return encode_value(recv_result) + headers.accept_code;
+    }
+    if network_send_ready(send_result) {
+      return encode_value(send_result) + plan.route_code;
+    }
+    return plan.retry_budget;
+  }
+
+  fn retry_block_code(
+    plan: AcceptPlan,
+    recv_result: NetworkResult<i64>,
+    send_result: NetworkResult<i64>
+  ) -> i64 {
+    if network_send_ready(send_result) {
+      return 0;
+    }
+    if network_recv_ready(recv_result) {
+      return plan.retry_budget;
+    }
+    return plan.retry_budget + 1;
+  }
+
+  fn stage_exchange_blocks(
+    request_line_code: i64,
+    request_header_block_code: i64,
+    request_body_block_code: i64,
+    status_line_code: i64,
+    response_header_block_code: i64,
+    response_body_block_code: i64,
+    retry_block_code: i64,
+    timeout_budget: i64
+  ) -> ExchangeBlocks {
+    let scratch: ref Buffer = alloc_buffer(8, 0);
+    store_at(scratch, 0, request_line_code);
+    store_at(scratch, 1, request_header_block_code);
+    store_at(scratch, 2, request_body_block_code);
+    store_at(scratch, 3, status_line_code);
+    store_at(scratch, 4, response_header_block_code);
+    store_at(scratch, 5, response_body_block_code);
+    store_at(scratch, 6, retry_block_code);
+    store_at(scratch, 7, timeout_budget);
+    let staged_request_line: i64 = load_at(scratch, 0);
+    let staged_request_headers: i64 = load_at(scratch, 1);
+    let staged_request_body: i64 = load_at(scratch, 2);
+    let staged_status: i64 = load_at(scratch, 3);
+    let staged_response_headers: i64 = load_at(scratch, 4);
+    let staged_response_body: i64 = load_at(scratch, 5);
+    let staged_retry: i64 = load_at(scratch, 6);
+    let exchange_total: i64 =
+      staged_request_line
+      + staged_request_headers
+      + staged_request_body
+      + staged_status
+      + staged_response_headers
+      + staged_response_body
+      + staged_retry
+      + load_at(scratch, 7);
+    free(scratch);
+    return ExchangeBlocks {
+      request_line_code: staged_request_line,
+      request_header_block_code: staged_request_headers,
+      request_body_block_code: staged_request_body,
+      status_line_code: staged_status,
+      response_header_block_code: staged_response_headers,
+      response_body_block_code: staged_response_body,
+      retry_block_code: staged_retry,
+      exchange_total: exchange_total
+    };
+  }
+
+  fn capture_exchange_blocks_service_summary() -> ExchangeBlocksServiceSummary {
+    let argv_count: i64 = host_argv_count();
+    let endpoint_kind: i64 = network_profile_endpoint_kind("NetworkUnit");
+    let transport_family: i64 = network_profile_transport_family("NetworkUnit");
+    let protocol_kind: i64 = network_profile_protocol_kind("NetworkUnit");
+    let protocol_version: i64 = network_profile_protocol_version("NetworkUnit");
+    let protocol_header_bytes: i64 =
+      network_profile_protocol_header_bytes("NetworkUnit");
+    let timeout_budget: i64 = network_profile_timeout_budget("NetworkUnit");
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+    let read_timeout_ms: i64 = network_profile_read_timeout("NetworkUnit");
+    let write_timeout_ms: i64 = network_profile_write_timeout("NetworkUnit");
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+    let local_port: i64 = network_profile_local_port("NetworkUnit");
+    let tick_ns: i64 = host_monotonic_time_ns();
+    let plan: AcceptPlan = build_accept_plan(
+      endpoint_kind,
+      protocol_kind,
+      protocol_version,
+      timeout_budget,
+      retry_budget
+    );
+    let headers: HeaderBlocks = build_header_blocks(plan, protocol_header_bytes);
+    let request_bytes: i64 =
+      protocol_header_bytes
+      + protocol_version
+      + request_header_block_code(headers)
+      + recv_window;
+    let listener_handle: i64 = host_network_open_tcp_listener(
+      local_port,
+      read_timeout_ms,
+      write_timeout_ms
+    );
+    let accept_result: NetworkResult<i64> = network_result(
+      host_network_accept_owned(listener_handle, read_timeout_ms, write_timeout_ms)
+    );
+    let accepted_handle: i64 = encode_value(accept_result);
+    let recv_result: NetworkResult<i64> = network_result(
+      host_network_recv_owned(accepted_handle, stream_window, recv_window)
+    );
+    let send_result: NetworkResult<i64> = network_result(
+      host_network_send_owned(accepted_handle, stream_window, send_window)
+    );
+    let blocks: ExchangeBlocks = stage_exchange_blocks(
+      request_line_code(plan),
+      request_header_block_code(headers),
+      request_body_block_code(plan, headers, recv_result),
+      status_line_code(plan, accept_result, recv_result),
+      response_header_block_code(plan, headers, recv_window, send_result),
+      response_body_block_code(plan, headers, recv_result, send_result),
+      retry_block_code(plan, recv_result, send_result),
+      timeout_budget
+    );
+    let response_bytes: i64 =
+      protocol_header_bytes + send_window + blocks.response_header_block_code;
+    let close_value: i64 = host_network_close_owned(accepted_handle);
+
+    return ExchangeBlocksServiceSummary {
+      argv_count: argv_count,
+      endpoint_kind: endpoint_kind,
+      transport_family: transport_family,
+      protocol_kind: protocol_kind,
+      protocol_version: protocol_version,
+      protocol_header_bytes: protocol_header_bytes,
+      timeout_budget: timeout_budget,
+      retry_budget: retry_budget,
+      request_bytes: request_bytes,
+      response_bytes: response_bytes,
+      listener_handle: listener_handle,
+      accepted_handle: accepted_handle,
+      accept_ready: encode_accept_ready(accept_result),
+      recv_ready: encode_recv_ready(recv_result),
+      send_ready: encode_send_ready(send_result),
+      request_line_code: blocks.request_line_code,
+      request_header_block_code: blocks.request_header_block_code,
+      request_body_block_code: blocks.request_body_block_code,
+      status_line_code: blocks.status_line_code,
+      response_header_block_code: blocks.response_header_block_code,
+      response_body_block_code: blocks.response_body_block_code,
+      retry_block_code: blocks.retry_block_code,
+      exchange_total: blocks.exchange_total,
+      close_value: close_value,
+      tick_ns: tick_ns
+    };
+  }
+
+  fn summarize_exchange_blocks_service_demo() -> i64 {
+    let summary: ExchangeBlocksServiceSummary =
+      capture_exchange_blocks_service_summary();
+    return summary.argv_count
+      + summary.endpoint_kind
+      + summary.transport_family
+      + summary.protocol_kind
+      + summary.protocol_version
+      + summary.protocol_header_bytes
+      + summary.timeout_budget
+      + summary.retry_budget
+      + summary.request_bytes
+      + summary.response_bytes
+      + summary.listener_handle
+      + summary.accepted_handle
+      + summary.accept_ready
+      + summary.recv_ready
+      + summary.send_ready
+      + summary.request_line_code
+      + summary.request_header_block_code
+      + summary.request_body_block_code
+      + summary.status_line_code
+      + summary.response_header_block_code
+      + summary.response_body_block_code
+      + summary.retry_block_code
+      + summary.exchange_total
+      + summary.close_value
+      + summary.tick_ns;
+  }
+
+  fn main() {
+    print(summarize_exchange_blocks_service_demo());
+  }
+}

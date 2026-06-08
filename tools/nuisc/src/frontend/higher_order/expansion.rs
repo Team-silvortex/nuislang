@@ -282,7 +282,16 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
     specialized_functions: &mut Vec<AstFunction>,
 ) -> Result<AstExpr, String> {
     Ok(match expr {
-        AstExpr::Call { callee, args } if templates.contains_key(callee) => {
+        AstExpr::Call {
+            callee,
+            generic_args,
+            args,
+        } if templates.contains_key(callee) => {
+            if !generic_args.is_empty() {
+                return Err(format!(
+                    "explicit generic arguments are not yet supported for higher-order template call `{callee}<...>(...)`"
+                ));
+            }
             specialize_higher_order_call(
                 callee,
                 args,
@@ -301,8 +310,13 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
             specialized_cache,
             specialized_functions,
         )?)),
-        AstExpr::Call { callee, args } => AstExpr::Call {
+        AstExpr::Call {
+            callee,
+            generic_args,
+            args,
+        } => AstExpr::Call {
             callee: callee.clone(),
+            generic_args: generic_args.clone(),
             args: args
                 .iter()
                 .map(|arg| {
@@ -368,8 +382,13 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
                 })
                 .collect::<Result<Vec<_>, _>>()?,
         },
-        AstExpr::StructLiteral { type_name, fields } => AstExpr::StructLiteral {
+        AstExpr::StructLiteral {
+            type_name,
+            type_args,
+            fields,
+        } => AstExpr::StructLiteral {
             type_name: type_name.clone(),
+            type_args: type_args.clone(),
             fields: fields
                 .iter()
                 .map(|(name, value)| {
@@ -508,6 +527,7 @@ pub(crate) fn specialize_higher_order_call(
 
     Ok(AstExpr::Call {
         callee: specialized_name,
+        generic_args: Vec::new(),
         args: ordinary_args,
     })
 }
