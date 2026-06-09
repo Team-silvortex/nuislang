@@ -279,6 +279,68 @@ fn lowers_generic_payload_alias_into_generic_fn1_higher_order_lambda_family() {
 }
 
 #[test]
+fn lowers_inferred_generic_payload_alias_into_generic_fn1_higher_order_lambda_family() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type JustAlias<T> = Just<T>;
+          type Mapper<T> = Fn1<T, T>;
+
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          struct Just<T> {
+            value: T,
+          }
+
+          fn apply_payload<T: Addable>(value: JustAlias<T>, f: Mapper<T>) -> T {
+            match value {
+              JustAlias<T>(payload) => {
+                return f(payload);
+              }
+              _ => {
+                return value.value;
+              }
+            }
+          }
+
+          fn main() -> i64 {
+            return apply_payload(JustAlias(6), |x: i64| -> i64 { return x + 1; });
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let higher_order_concrete = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__hof_apply_payload_") && function.name.ends_with("__i64")
+        })
+        .expect("expected monomorphized inferred payload higher-order helper");
+    assert!(higher_order_concrete.generic_params.is_empty());
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
+            if callee == &higher_order_concrete.name
+    ));
+}
+
+#[test]
 fn lowers_generic_payload_alias_method_bound_and_higher_order_combo() {
     let module = parse_nuis_module(
         r#"

@@ -261,6 +261,84 @@ fn lowers_aliased_generic_struct_field_binding_visible_in_guard_inside_while() {
 }
 
 #[test]
+fn lowers_inferred_aliased_generic_struct_field_binding_visible_in_guard_inside_while() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type BoxAlias<T> = Boxed<T>;
+
+          struct Boxed<T> {
+            value: T,
+          }
+
+          fn main() -> i64 {
+            let value = BoxAlias { value: 7 };
+            while 1 == 1 {
+              match value {
+                BoxAlias<i64> { value: payload } if payload == 7 => {
+                  return payload;
+                }
+                _ => {
+                  return 9;
+                }
+              }
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    match &module.functions[0].body[1] {
+        NirStmt::While { body, .. } => match &body[0] {
+            NirStmt::If {
+                condition,
+                then_body,
+                else_body,
+            } => {
+                assert!(matches!(
+                    condition,
+                    NirExpr::Binary {
+                        op: NirBinaryOp::And,
+                        lhs,
+                        rhs
+                    } if matches!(lhs.as_ref(), NirExpr::Bool(true))
+                        && matches!(
+                            rhs.as_ref(),
+                            NirExpr::Binary {
+                                op: NirBinaryOp::Eq,
+                                lhs,
+                                rhs
+                            } if matches!(
+                                lhs.as_ref(),
+                                NirExpr::FieldAccess { field, .. } if field == "value"
+                            ) && matches!(rhs.as_ref(), NirExpr::Int(7))
+                        )
+                ));
+                assert!(matches!(
+                    then_body.as_slice(),
+                    [
+                        NirStmt::Let { name, ty, .. },
+                        NirStmt::Return(Some(NirExpr::Var(result)))
+                    ] if name == "payload"
+                        && result == "payload"
+                        && matches!(ty, Some(ty) if ty.render() == "i64")
+                ));
+                assert!(matches!(
+                    else_body.as_slice(),
+                    [NirStmt::Return(Some(NirExpr::Int(9)))]
+                ));
+            }
+            other => panic!(
+                "expected lowered inferred aliased generic struct match if in while body, found {other:?}"
+            ),
+        },
+        other => panic!("expected while statement after inferred alias struct binding, found {other:?}"),
+    }
+}
+
+#[test]
 fn lowers_generic_aliased_struct_field_binding_visible_in_guard_inside_while() {
     let module = parse_nuis_module(
         r#"

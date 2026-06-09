@@ -182,6 +182,40 @@ fn lowers_nested_generic_struct_destructuring_let_without_repeated_type_head() {
 }
 
 #[test]
+fn lowers_inferred_alias_generic_struct_shorthand_destructuring_let() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type BoxAlias<T> = Boxed<T>;
+
+          struct Boxed<T> {
+            value: T,
+          }
+
+          fn main() -> i64 {
+            let value = BoxAlias { value: 7 };
+            let { value: payload } = value;
+            return payload;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    match &module.functions[0].body[1] {
+        NirStmt::Let { name, ty, value } => {
+            assert_eq!(name, "payload");
+            assert!(matches!(ty, Some(ty) if ty.render() == "i64"));
+            assert!(matches!(
+                value,
+                NirExpr::FieldAccess { field, .. } if field == "value"
+            ));
+        }
+        other => panic!("expected inferred alias shorthand destructured binding, found {other:?}"),
+    }
+}
+
+#[test]
 fn lowers_nested_generic_alias_struct_destructuring_let() {
     let module = parse_nuis_module(
         r#"

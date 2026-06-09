@@ -22,6 +22,8 @@ looks like the `0.16.0` line it claims to describe.
   still matches actual frontend validation coverage
 * [ ] confirm [nuis-0.16.0-generic-constraint-gaps.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-constraint-gaps.md)
   still reflects the remaining follow-up list honestly
+* [ ] confirm [nuis-0.16.0-generic-surface-audit.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-surface-audit.md)
+  still matches the test-backed generic crossover matrix
 * [ ] confirm [README.md](/Users/Shared/chroot/dev/nuislang/README.md),
   [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md),
   and [docs/reference/README.md](/Users/Shared/chroot/dev/nuislang/docs/reference/README.md)
@@ -50,13 +52,16 @@ looks like the `0.16.0` line it claims to describe.
 * [ ] payload-constructor matrix:
   direct explicit / expected / inferred routes and transparent alias explicit /
   inferred routes still match the checked-in tests and docs
-* [ ] unsupported alias constructor diagnostics:
-  non-transparent alias targets and alias generic-arity mismatches still fail
-  directly and honestly
+* [ ] alias constructor diagnostics:
+  non-transparent or insufficiently inferred alias constructor routes still
+  fail directly and honestly when they cannot be resolved
 * [ ] generic constraint / method-bound diagnostics:
   alias-chain and control-flow-local binding routes still behave clearly
 * [ ] generic constraint coverage map:
   lambda/higher-order/call-inferred/destructure routes still match the checked-in tests
+* [ ] generic surface audit matrix:
+  constructor / literal / specialization / pattern / destructure / method-bound crossover rows
+  still match the checked-in tests
 * [ ] async ownership:
   `join`, `join_result`, `cancel`, and `timeout` stay aligned with verifier
   truth

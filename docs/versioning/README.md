@@ -16,6 +16,7 @@ Start with:
 * [nuis-0.16.0-binary-compile-maturity.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-binary-compile-maturity.md)
 * [nuis-0.16.0-generic-constraint-coverage.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-constraint-coverage.md)
 * [nuis-0.16.0-generic-constraint-gaps.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-constraint-gaps.md)
+* [nuis-0.16.0-generic-surface-audit.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-surface-audit.md)
 
 Those files are the shortest current “what is real enough to stand on” anchors
 for the active version lines.
@@ -36,6 +37,10 @@ intentionally narrower.
 
 The `0.16.0` generic-constraint gaps file is the small working checklist for
 what still looks worth tightening after that coverage map.
+
+The `0.16.0` generic-surface audit file is the compiler-facing closure matrix
+for which generic constructor / specialization / pattern / method-bound
+crossovers already have test-backed coverage.
 
 ## Expected Broader Scope Later
 

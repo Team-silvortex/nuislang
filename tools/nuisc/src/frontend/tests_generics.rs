@@ -324,6 +324,49 @@ fn monomorphizes_generic_function_from_inferred_alias_struct_literal_argument() 
 }
 
 #[test]
+fn monomorphizes_generic_function_from_inferred_non_transparent_alias_struct_literal_argument() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type WrappedStructAlias<T> = Wrapper<Boxed<T>>;
+
+          struct Boxed<T> {
+            value: T,
+          }
+
+          struct Wrapper<T> {
+            inner: T,
+            tag: i64,
+          }
+
+          fn unwrap_wrapped<T>(wrapped: Wrapper<Boxed<T>>) -> T {
+            return wrapped.inner.value;
+          }
+
+          fn main() -> i64 {
+            return unwrap_wrapped(WrappedStructAlias {
+              inner: Boxed { value: 7 },
+              tag: 1,
+            });
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
+            if callee == "unwrap_wrapped__i64"
+    ));
+}
+
+#[test]
 fn monomorphizes_generic_function_from_inferred_payload_constructor_argument() {
     let module = parse_nuis_module(
         r#"

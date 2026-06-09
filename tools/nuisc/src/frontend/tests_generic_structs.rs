@@ -215,6 +215,52 @@ fn lowers_nested_generic_struct_literal_with_inferred_type_args() {
 }
 
 #[test]
+fn lowers_non_transparent_alias_struct_literal_with_inferred_type_args() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type WrappedStructAlias<T> = Wrapper<Boxed<T>>;
+
+          struct Boxed<T> {
+            value: T,
+          }
+
+          struct Wrapper<T> {
+            inner: T,
+            tag: i64,
+          }
+
+          fn main() -> i64 {
+            let wrapped = WrappedStructAlias {
+              inner: Boxed { value: 7 },
+              tag: 1,
+            };
+            return wrapped.inner.value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    match &module.functions[0].body[0] {
+        NirStmt::Let { name, ty, value } => {
+            assert_eq!(name, "wrapped");
+            assert_eq!(ty.as_ref().unwrap().render(), "Wrapper<Boxed<i64>>");
+            assert!(matches!(
+                value,
+                NirExpr::StructLiteral {
+                    type_name,
+                    type_args,
+                    ..
+                } if type_name == "Wrapper"
+                    && matches!(type_args.as_slice(), [ty] if ty.render() == "Boxed<i64>")
+            ));
+        }
+        other => panic!("expected inferred non-transparent alias struct let, found {other:?}"),
+    }
+}
+
+#[test]
 fn lowers_multi_field_generic_struct_literal_with_inferred_type_args() {
     let module = parse_nuis_module(
         r#"
