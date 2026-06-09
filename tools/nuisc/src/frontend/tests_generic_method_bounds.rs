@@ -36,6 +36,85 @@ fn reports_missing_generic_bound_for_method_call_on_type_param() {
 }
 
 #[test]
+fn reports_missing_generic_bound_for_method_call_on_call_inferred_local() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          fn id<T>(value: T) -> T {
+            return value;
+          }
+
+          fn bump<T>(value: T) -> T {
+            let local = id(value);
+            return local.add(value);
+          }
+
+          fn main() -> i64 {
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains(
+            "function `bump` body calls method `add` on generic parameter `T` without required bound `Addable`"
+        ),
+        "{error}"
+    );
+}
+
+#[test]
+fn reports_missing_generic_bound_for_method_call_on_call_receiver() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          fn id<T>(value: T) -> T {
+            return value;
+          }
+
+          fn bump<T>(value: T) -> T {
+            return id(value).add(value);
+          }
+
+          fn main() -> i64 {
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains(
+            "function `bump` body calls method `add` on generic parameter `T` without required bound `Addable`"
+        ),
+        "{error}"
+    );
+}
+
+#[test]
 fn reports_wrong_generic_bound_for_method_call_on_type_param() {
     let error = parse_nuis_module(
         r#"

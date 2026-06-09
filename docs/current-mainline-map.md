@@ -13,10 +13,23 @@ local README for the area you are actively touching.
   [versioning/nuis-0.13.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.13.0-snapshot.md)
 * current phase checklist:
   [versioning/nuis-0.13.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.13.0-release-checklist.md)
+* minor-version snapshot rule:
+  [versioning/nuis-minor-snapshot-rule.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-minor-snapshot-rule.md)
+* current minor-line snapshot:
+  [versioning/nuis-0.16.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-snapshot.md)
+* current minor-line checklist:
+  [versioning/nuis-0.16.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-release-checklist.md)
 * current compile workflow target:
   [versioning/nuis-0.16.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-compile-workflow.md)
 * current binary-compile maturity target:
   [versioning/nuis-0.16.0-binary-compile-maturity.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-binary-compile-maturity.md)
+* current generic-constraint coverage target:
+  [versioning/nuis-0.16.0-generic-constraint-coverage.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-constraint-coverage.md)
+* current generic-constraint follow-up checklist:
+  [versioning/nuis-0.16.0-generic-constraint-gaps.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-constraint-gaps.md)
+  current constructor truth:
+  direct payload inference + transparent alias payload inference are in;
+  non-transparent alias constructor inference is intentionally still narrow
 * implementation-truth docs:
   [reference/README.md](/Users/Shared/chroot/dev/nuislang/docs/reference/README.md)
 * repo structure:

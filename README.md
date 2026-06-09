@@ -23,11 +23,16 @@ The key thing that is already real today is not “all language features are don
 
 That model is increasingly enforced through `YIR` contracts, project validation, per-domain `nustar` manifests, and verifier checks rather than only ad hoc frontend rules.
 
-Current phase snapshot:
+Current phase snapshots and current minor-line anchor:
 
 * [docs/versioning/nuis-0.13.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.13.0-snapshot.md)
+* [docs/versioning/nuis-0.16.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-snapshot.md)
 * [docs/versioning/nuis-0.16.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-compile-workflow.md)
 * [docs/versioning/nuis-0.16.0-binary-compile-maturity.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-binary-compile-maturity.md)
+* [docs/versioning/nuis-0.16.0-generic-constraint-coverage.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-constraint-coverage.md)
+
+If you want the current minor-line history anchor first, start with
+[`0.16.0` snapshot](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-snapshot.md).
 
 ## Toolchain
 

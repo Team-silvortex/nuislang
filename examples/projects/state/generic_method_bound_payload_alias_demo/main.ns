@@ -1,0 +1,32 @@
+mod cpu Main {
+  trait Addable {
+    fn add(lhs: Self, rhs: Self) -> Self;
+  }
+
+  impl Addable for i64 {
+    fn add(lhs: i64, rhs: i64) -> i64 {
+      return lhs + rhs;
+    }
+  }
+
+  type JustAlias<T> = Just<T>;
+
+  struct Just<T> {
+    value: T,
+  }
+
+  fn bump<T: Addable>(value: JustAlias<T>) -> T {
+    match value {
+      JustAlias<T>(payload) => {
+        return payload.add(payload);
+      }
+      _ => {
+        return value.value;
+      }
+    }
+  }
+
+  fn main() -> i64 {
+    return bump(JustAlias<i64>(4));
+  }
+}

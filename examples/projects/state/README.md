@@ -27,6 +27,7 @@ Generic method-bound route:
 * [generic_method_bound_if_binding_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_if_binding_demo)
 * [generic_method_bound_nested_match_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_nested_match_demo)
 * [generic_method_bound_guarded_nested_match_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_guarded_nested_match_demo)
+* [generic_method_bound_payload_alias_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_payload_alias_demo)
 
 This is the shortest user-facing path for:
 
@@ -43,7 +44,9 @@ Pattern / destructuring route:
 * [generic_param_alias_struct_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_param_alias_struct_state_demo)
 * [generic_struct_match_shorthand_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_struct_match_shorthand_state_demo)
 * [generic_nested_shorthand_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_nested_shorthand_state_demo)
+* [generic_nested_alias_shorthand_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_nested_alias_shorthand_state_demo)
 * [generic_payload_struct_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_payload_struct_state_demo)
+* [generic_alias_payload_struct_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_alias_payload_struct_state_demo)
 * [destructure_let_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/destructure_let_state_demo)
 * [destructure_nested_shorthand_let_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/destructure_nested_shorthand_let_state_demo)
 * [match_payload_struct_state_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_payload_struct_state_demo)
@@ -56,6 +59,10 @@ Recursion / higher-order route:
 * [ordinary_recursive_composed_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_composed_call_graph_demo)
 * [ordinary_recursive_generic_alias_fn3_higher_order_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_generic_alias_fn3_higher_order_call_graph_demo)
 * [lambda_alias_fn3_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/lambda_alias_fn3_demo)
+* [generic_payload_alias_higher_order_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_payload_alias_higher_order_demo)
+* [generic_payload_alias_method_hof_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_payload_alias_method_hof_demo)
+* [generic_lambda_method_bound_hof_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_lambda_method_bound_hof_demo)
+* [generic_lambda_method_bound_fn3_hof_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_lambda_method_bound_fn3_hof_demo)
 
 Loop / lowering route:
 

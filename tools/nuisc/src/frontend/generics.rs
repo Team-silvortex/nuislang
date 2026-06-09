@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{
-    AstExpr, AstFunction, AstImplDef, AstMatchArm, AstParam, AstStmt, AstStructDef, AstTypeAlias,
-    AstTypeRef, NirTypeRef,
+    AstExpr, AstFunction, AstImplDef, AstMatchArm, AstMatchPattern, AstParam, AstStmt,
+    AstStructDef, AstTypeAlias, AstTypeRef, NirTypeRef,
 };
 
 use super::types::{ast_type_from_nir, infer_ast_expr_type};
@@ -223,7 +223,7 @@ pub(crate) fn specialize_stmt_types(
                         .iter()
                         .map(|arm| {
                             Ok(AstMatchArm {
-                                pattern: arm.pattern.clone(),
+                                pattern: specialize_match_pattern(&arm.pattern, substitutions)?,
                                 guard: arm.guard.clone(),
                                 body: specialize_stmt_types(&arm.body, substitutions)?,
                             })
@@ -258,5 +258,39 @@ pub(crate) fn specialize_ast_type_ref(
             .collect::<Result<Vec<_>, _>>()?,
         is_optional: ty.is_optional,
         is_ref: ty.is_ref,
+    })
+}
+
+fn specialize_match_pattern(
+    pattern: &AstMatchPattern,
+    substitutions: &BTreeMap<String, NirTypeRef>,
+) -> Result<AstMatchPattern, String> {
+    Ok(match pattern {
+        AstMatchPattern::Or(patterns) => AstMatchPattern::Or(
+            patterns
+                .iter()
+                .map(|pattern| specialize_match_pattern(pattern, substitutions))
+                .collect::<Result<Vec<_>, _>>()?,
+        ),
+        AstMatchPattern::PayloadStruct { type_ref, payload } => AstMatchPattern::PayloadStruct {
+            type_ref: specialize_ast_type_ref(type_ref, substitutions)?,
+            payload: Box::new(specialize_match_pattern(payload, substitutions)?),
+        },
+        AstMatchPattern::StructFields { type_ref, fields } => AstMatchPattern::StructFields {
+            type_ref: type_ref
+                .as_ref()
+                .map(|type_ref| specialize_ast_type_ref(type_ref, substitutions))
+                .transpose()?,
+            fields: fields
+                .iter()
+                .map(|(field, pattern)| {
+                    Ok((
+                        field.clone(),
+                        specialize_match_pattern(pattern, substitutions)?,
+                    ))
+                })
+                .collect::<Result<Vec<_>, String>>()?,
+        },
+        other => other.clone(),
     })
 }

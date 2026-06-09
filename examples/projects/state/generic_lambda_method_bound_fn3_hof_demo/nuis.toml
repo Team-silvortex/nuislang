@@ -1,0 +1,2 @@
+name = "generic_lambda_method_bound_fn3_hof_demo"
+entry = "main.ns"

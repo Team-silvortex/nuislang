@@ -96,26 +96,28 @@ pub(super) fn build_lowered_functions_and_impls(
         for method in &definition.methods {
             let symbol_name =
                 impl_method_symbol_name(&definition.trait_name, &lowered_for_type, &method.name);
+            let signature = FunctionSignature {
+                abi: "nuis".to_owned(),
+                interface: None,
+                symbol_name: symbol_name.clone(),
+                params: method
+                    .params
+                    .iter()
+                    .map(|param| lower_type_ref_with_aliases(&param.ty, visible_type_aliases))
+                    .collect::<Result<Vec<_>, _>>()?,
+                return_type: method
+                    .return_type
+                    .as_ref()
+                    .map(|ty| lower_type_ref_with_aliases(ty, visible_type_aliases))
+                    .transpose()?,
+                is_extern: false,
+                is_async: false,
+            };
             signatures.insert(
                 impl_method_lookup_key(&lowered_for_type, &method.name),
-                FunctionSignature {
-                    abi: "nuis".to_owned(),
-                    interface: None,
-                    symbol_name: symbol_name.clone(),
-                    params: method
-                        .params
-                        .iter()
-                        .map(|param| lower_type_ref_with_aliases(&param.ty, visible_type_aliases))
-                        .collect::<Result<Vec<_>, _>>()?,
-                    return_type: method
-                        .return_type
-                        .as_ref()
-                        .map(|ty| lower_type_ref_with_aliases(ty, visible_type_aliases))
-                        .transpose()?,
-                    is_extern: false,
-                    is_async: false,
-                },
+                signature.clone(),
             );
+            signatures.insert(symbol_name.clone(), signature);
             rewritten_module_functions.push(build_impl_method_function(
                 definition,
                 method,

@@ -256,6 +256,142 @@ fn monomorphizes_zero_arg_generic_from_struct_field_expectation() {
 }
 
 #[test]
+fn monomorphizes_generic_function_from_inferred_struct_literal_argument() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          struct Boxed<T> {
+            value: T,
+          }
+
+          fn unwrap_box<T>(boxed: Boxed<T>) -> T {
+            return boxed.value;
+          }
+
+          fn main() -> i64 {
+            return unwrap_box(Boxed { value: 7 });
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
+            if callee == "unwrap_box__i64"
+    ));
+}
+
+#[test]
+fn monomorphizes_generic_function_from_inferred_alias_struct_literal_argument() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type BoxAlias<T> = Boxed<T>;
+
+          struct Boxed<T> {
+            value: T,
+          }
+
+          fn unwrap_box<T>(boxed: Boxed<T>) -> T {
+            return boxed.value;
+          }
+
+          fn main() -> i64 {
+            return unwrap_box(BoxAlias { value: 7 });
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
+            if callee == "unwrap_box__i64"
+    ));
+}
+
+#[test]
+fn monomorphizes_generic_function_from_inferred_payload_constructor_argument() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          struct Just<T> {
+            value: T,
+          }
+
+          fn unwrap_just<T>(value: Just<T>) -> T {
+            return value.value;
+          }
+
+          fn main() -> i64 {
+            return unwrap_just(Just(7));
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
+            if callee == "unwrap_just__i64"
+    ));
+}
+
+#[test]
+fn monomorphizes_generic_function_from_inferred_alias_payload_constructor_argument() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type JustAlias<T> = Just<T>;
+
+          struct Just<T> {
+            value: T,
+          }
+
+          fn unwrap_just<T>(value: Just<T>) -> T {
+            return value.value;
+          }
+
+          fn main() -> i64 {
+            return unwrap_just(JustAlias(7));
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
+            if callee == "unwrap_just__i64"
+    ));
+}
+
+#[test]
 fn monomorphizes_generic_function_from_pipe_shaped_argument() {
     let module = parse_nuis_module(
         r#"

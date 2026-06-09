@@ -1,0 +1,28 @@
+mod cpu Main {
+  type BoxAlias<T> = Boxed<T>;
+  type OuterAlias<T> = Outer<T>;
+
+  struct Boxed<T> {
+    value: T,
+  }
+
+  struct Outer<T> {
+    inner: BoxAlias<T>,
+    code: T,
+  }
+
+  fn main() -> i64 {
+    let value: OuterAlias<i64> = Outer<i64> {
+      inner: Boxed<i64> { value: 7 },
+      code: 5,
+    };
+    match value {
+      OuterAlias<i64> { inner: { value: payload }, code: 5 } if payload == 7 => {
+        return payload;
+      }
+      _ => {
+        return 9;
+      }
+    }
+  }
+}

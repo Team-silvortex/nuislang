@@ -86,6 +86,9 @@ Current stable surfaces:
 * alias-aware generic constraint validation
 * generic method-bound diagnostics through nested alias chains and control-flow
   scopes
+* lambda / higher-order helper context restoration for generic diagnostics
+* call-inferred local / receiver method-bound validation
+* call-root destructure binding validation
 * struct destructuring and structured `match` bindings
 * generic struct MVP
 * generic payload-style constructor/pattern sugar under expected type

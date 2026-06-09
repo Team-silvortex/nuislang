@@ -106,7 +106,15 @@ pub(crate) fn infer_ast_expr_type_inner(
                 .is_some_and(|definition| definition.fields.len() == 1 && args.len() == 1) =>
             {
                 if generic_args.is_empty() {
-                    Some(ast_named_type(callee))
+                    infer_payload_constructor_ast_type(
+                        callee,
+                        args,
+                        env,
+                        impl_lookup,
+                        struct_table,
+                        function_return_types,
+                        active_exprs,
+                    )
                 } else {
                     Some(ast_generic_named_type(callee, generic_args.clone()))
                 }
@@ -373,7 +381,7 @@ pub(crate) fn infer_ast_expr_type_inner(
         AstExpr::StructLiteral {
             type_name,
             type_args,
-            ..
+            fields,
         } => {
             let definition = struct_table.get(type_name)?;
             if definition.generic_params.is_empty() {
@@ -381,7 +389,15 @@ pub(crate) fn infer_ast_expr_type_inner(
             } else if type_args.len() == definition.generic_params.len() {
                 Some(ast_generic_named_type(type_name, type_args.clone()))
             } else {
-                None
+                infer_struct_literal_ast_type(
+                    type_name,
+                    fields,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )
             }
         }
         AstExpr::FieldAccess { base, field } => {
@@ -461,4 +477,112 @@ pub(crate) fn infer_ast_expr_type_inner(
     };
     active_exprs.remove(&expr_key);
     inferred
+}
+
+fn infer_payload_constructor_ast_type(
+    callee: &str,
+    args: &[AstExpr],
+    env: &BTreeMap<String, AstTypeRef>,
+    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
+    struct_table: &BTreeMap<String, AstStructDef>,
+    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
+    active_exprs: &mut BTreeSet<usize>,
+) -> Option<AstTypeRef> {
+    let definition = struct_table.get(callee)?;
+    if definition.generic_params.is_empty() || definition.fields.len() != 1 || args.len() != 1 {
+        return Some(ast_named_type(callee));
+    }
+    let arg_ty = infer_ast_expr_type_inner(
+        &args[0],
+        env,
+        impl_lookup,
+        struct_table,
+        function_return_types,
+        active_exprs,
+    )?;
+    let mut substitutions = BTreeMap::<String, AstTypeRef>::new();
+    let generic_names = definition
+        .generic_params
+        .iter()
+        .map(|param| param.name.clone())
+        .collect::<BTreeSet<_>>();
+    unify_ast_generic_type_pattern(
+        &definition.fields[0].ty,
+        &arg_ty,
+        &generic_names,
+        &mut substitutions,
+    )
+    .ok()?;
+    let generic_args = definition
+        .generic_params
+        .iter()
+        .map(|param| substitutions.get(&param.name).cloned())
+        .collect::<Option<Vec<_>>>()?;
+    Some(ast_generic_named_type(callee, generic_args))
+}
+
+fn infer_struct_literal_ast_type(
+    type_name: &str,
+    fields: &[(String, AstExpr)],
+    env: &BTreeMap<String, AstTypeRef>,
+    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
+    struct_table: &BTreeMap<String, AstStructDef>,
+    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
+    active_exprs: &mut BTreeSet<usize>,
+) -> Option<AstTypeRef> {
+    let definition = struct_table.get(type_name)?;
+    let mut substitutions = BTreeMap::<String, AstTypeRef>::new();
+    let generic_names = definition
+        .generic_params
+        .iter()
+        .map(|param| param.name.clone())
+        .collect::<BTreeSet<_>>();
+    for (name, value) in fields {
+        let field = definition.fields.iter().find(|field| field.name == *name)?;
+        let value_ty = infer_ast_expr_type_inner(
+            value,
+            env,
+            impl_lookup,
+            struct_table,
+            function_return_types,
+            active_exprs,
+        )?;
+        unify_ast_generic_type_pattern(&field.ty, &value_ty, &generic_names, &mut substitutions)
+            .ok()?;
+    }
+    let generic_args = definition
+        .generic_params
+        .iter()
+        .map(|param| substitutions.get(&param.name).cloned())
+        .collect::<Option<Vec<_>>>()?;
+    Some(ast_generic_named_type(type_name, generic_args))
+}
+
+fn unify_ast_generic_type_pattern(
+    pattern: &AstTypeRef,
+    concrete: &AstTypeRef,
+    generic_names: &BTreeSet<String>,
+    substitutions: &mut BTreeMap<String, AstTypeRef>,
+) -> Result<(), ()> {
+    if generic_names.contains(&pattern.name) && pattern.generic_args.is_empty() {
+        if let Some(existing) = substitutions.get(&pattern.name) {
+            if lower_type_ref(existing).render() != lower_type_ref(concrete).render() {
+                return Err(());
+            }
+        } else {
+            substitutions.insert(pattern.name.clone(), concrete.clone());
+        }
+        return Ok(());
+    }
+    if pattern.name != concrete.name
+        || pattern.generic_args.len() != concrete.generic_args.len()
+        || pattern.is_optional != concrete.is_optional
+        || pattern.is_ref != concrete.is_ref
+    {
+        return Err(());
+    }
+    for (pattern_arg, concrete_arg) in pattern.generic_args.iter().zip(&concrete.generic_args) {
+        unify_ast_generic_type_pattern(pattern_arg, concrete_arg, generic_names, substitutions)?;
+    }
+    Ok(())
 }

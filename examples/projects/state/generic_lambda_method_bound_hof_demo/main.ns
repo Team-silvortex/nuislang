@@ -1,0 +1,23 @@
+mod cpu Main {
+  trait Addable {
+    fn add(lhs: Self, rhs: Self) -> Self;
+  }
+
+  impl Addable for i64 {
+    fn add(lhs: i64, rhs: i64) -> i64 {
+      return lhs + rhs;
+    }
+  }
+
+  fn apply<T: Addable>(x: T, f: Fn1<T, T>) -> T {
+    return f(x);
+  }
+
+  fn bump<T: Addable>(value: T) -> T {
+    return apply(value, |x: T| -> T { return x.add(x); });
+  }
+
+  fn main() -> i64 {
+    return bump(2);
+  }
+}

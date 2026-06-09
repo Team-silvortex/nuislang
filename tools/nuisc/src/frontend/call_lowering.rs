@@ -152,6 +152,7 @@ fn lower_payload_struct_constructor_sugar(
             "payload-style struct constructor `{callee}(...)` expects exactly 1 arg"
         ));
     }
+    let field = &definition.fields[0];
     let constructor_ty = if definition.generic_params.is_empty() {
         if !generic_args.is_empty() {
             return Err(format!(
@@ -178,12 +179,7 @@ fn lower_payload_struct_constructor_sugar(
             is_optional: false,
             is_ref: false,
         }
-    } else {
-        let Some(expected) = expected else {
-            return Err(format!(
-                "cannot infer generic arguments for payload-style struct constructor `{callee}(...)`; add an explicit expected type"
-            ));
-        };
+    } else if let Some(expected) = expected {
         if expected.name != callee {
             return Err(format!(
                 "payload-style struct constructor `{callee}(...)` requires expected type `{callee}<...>`, found `{}`",
@@ -200,8 +196,27 @@ fn lower_payload_struct_constructor_sugar(
             ));
         }
         expected.clone()
+    } else {
+        let lowered_arg = lower_expr_with_async(
+            &args[0],
+            current_domain,
+            current_function_is_async,
+            bindings,
+            module_consts,
+            signatures,
+            struct_table,
+            None,
+            allow_async_calls,
+        )?;
+        let Some(inferred_arg_ty) =
+            infer_nir_expr_type(&lowered_arg, bindings, signatures, struct_table)
+        else {
+            return Err(format!(
+                "cannot infer generic arguments for payload-style struct constructor `{callee}(...)`; add an explicit expected type"
+            ));
+        };
+        infer_payload_constructor_type_from_arg(callee, definition, &field.ty, &inferred_arg_ty)?
     };
-    let field = &definition.fields[0];
     let field_ty = if definition.generic_params.is_empty() {
         field.ty.clone()
     } else {
@@ -225,4 +240,88 @@ fn lower_payload_struct_constructor_sugar(
         type_args: constructor_ty.generic_args,
         fields: vec![(field.name.clone(), lowered)],
     }))
+}
+
+fn infer_payload_constructor_type_from_arg(
+    callee: &str,
+    definition: &NirStructDef,
+    field_ty: &NirTypeRef,
+    arg_ty: &NirTypeRef,
+) -> Result<NirTypeRef, String> {
+    let mut substitutions = BTreeMap::<String, NirTypeRef>::new();
+    unify_payload_constructor_type_pattern(
+        field_ty,
+        arg_ty,
+        &definition
+            .generic_params
+            .iter()
+            .map(|param| param.name.as_str())
+            .collect::<Vec<_>>(),
+        &mut substitutions,
+        callee,
+    )?;
+    let generic_args = definition
+        .generic_params
+        .iter()
+        .map(|param| {
+            substitutions.get(&param.name).cloned().ok_or_else(|| {
+                format!(
+                    "cannot infer generic arguments for payload-style struct constructor `{callee}(...)`; add an explicit expected type"
+                )
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(NirTypeRef {
+        name: callee.to_owned(),
+        generic_args,
+        is_optional: false,
+        is_ref: false,
+    })
+}
+
+fn unify_payload_constructor_type_pattern(
+    pattern: &NirTypeRef,
+    concrete: &NirTypeRef,
+    generic_names: &[&str],
+    substitutions: &mut BTreeMap<String, NirTypeRef>,
+    callee: &str,
+) -> Result<(), String> {
+    if pattern.generic_args.is_empty()
+        && !pattern.is_optional
+        && !pattern.is_ref
+        && generic_names.contains(&pattern.name.as_str())
+    {
+        if let Some(existing) = substitutions.get(&pattern.name) {
+            if existing.render() != concrete.render() {
+                return Err(format!(
+                    "payload-style struct constructor `{callee}(...)` inferred conflicting types `{}` and `{}` for generic parameter `{}`",
+                    existing.render(),
+                    concrete.render(),
+                    pattern.name
+                ));
+            }
+        } else {
+            substitutions.insert(pattern.name.clone(), concrete.clone());
+        }
+        return Ok(());
+    }
+    if pattern.name != concrete.name
+        || pattern.generic_args.len() != concrete.generic_args.len()
+        || pattern.is_optional != concrete.is_optional
+        || pattern.is_ref != concrete.is_ref
+    {
+        return Err(format!(
+            "cannot infer generic arguments for payload-style struct constructor `{callee}(...)`; add an explicit expected type"
+        ));
+    }
+    for (pattern_arg, concrete_arg) in pattern.generic_args.iter().zip(&concrete.generic_args) {
+        unify_payload_constructor_type_pattern(
+            pattern_arg,
+            concrete_arg,
+            generic_names,
+            substitutions,
+            callee,
+        )?;
+    }
+    Ok(())
 }

@@ -9,18 +9,33 @@ Start with:
 
 * [nuis-0.13.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.13.0-snapshot.md)
 * [nuis-0.13.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.13.0-release-checklist.md)
+* [nuis-minor-snapshot-rule.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-minor-snapshot-rule.md)
+* [nuis-0.16.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-snapshot.md)
+* [nuis-0.16.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-release-checklist.md)
 * [nuis-0.16.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-compile-workflow.md)
 * [nuis-0.16.0-binary-compile-maturity.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-binary-compile-maturity.md)
+* [nuis-0.16.0-generic-constraint-coverage.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-constraint-coverage.md)
+* [nuis-0.16.0-generic-constraint-gaps.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-constraint-gaps.md)
 
-Those files are the shortest current “what is real enough to stand on” summary
-for the `0.13.0` phase.
+Those files are the shortest current “what is real enough to stand on” anchors
+for the active version lines.
 
-The `0.16.0` workflow file is the current operational target for a cleaner,
+The `0.16.0` snapshot is the first minor-line history anchor under the new
+minor-version recording rule.
+
+The `0.16.0` workflow file is the current operational target for a cleaner and
 more teachable `nuis` compile route.
 
 The `0.16.0` binary-compile maturity file is the current target for deciding
 when that route is strong enough to call a genuinely mature binary compile
 story.
+
+The `0.16.0` generic-constraint coverage file is the current short map for
+which generic method-bound routes are already trustworthy and which are still
+intentionally narrower.
+
+The `0.16.0` generic-constraint gaps file is the small working checklist for
+what still looks worth tightening after that coverage map.
 
 ## Expected Broader Scope Later
 

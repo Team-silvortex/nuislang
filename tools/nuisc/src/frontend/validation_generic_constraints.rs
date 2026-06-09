@@ -10,14 +10,46 @@ use super::validation_binding_env::{
     simple_match_value_type,
 };
 use super::validation_method_bounds::{
-    collect_visible_trait_methods, simple_local_expr_type, simple_local_stmt_type,
-    validate_expr_generic_method_bounds,
+    collect_visible_trait_methods, validate_expr_generic_method_bounds,
 };
 use super::validation_trait_bounds::{
     alias_param_context, alias_target_context, build_generic_bound_env,
     collect_visible_trait_names, validate_generic_bound_satisfaction, validate_generic_bound_type,
 };
-use super::{lower_type_ref, substitute_ast_type_alias_target};
+use super::{
+    build_function_return_type_table, infer_ast_expr_type, lower_type_ref,
+    substitute_ast_type_alias_target,
+};
+
+fn render_validation_function_context(function_name: &str) -> String {
+    if let Some(owner) = lambda_owner_name(function_name) {
+        format!("function `{owner}` body lambda")
+    } else if let Some(template) = higher_order_template_name(function_name) {
+        format!("function `{template}` body higher-order specialization")
+    } else {
+        format!("function `{function_name}`")
+    }
+}
+
+fn lambda_owner_name(function_name: &str) -> Option<&str> {
+    let remainder = function_name.strip_prefix("__lambda_")?;
+    let unspecialized = remainder
+        .split_once("__")
+        .map(|(base, _)| base)
+        .unwrap_or(remainder);
+    let (owner, counter) = unspecialized.rsplit_once('_')?;
+    counter
+        .chars()
+        .all(|ch| ch.is_ascii_digit())
+        .then_some(owner)
+}
+
+fn higher_order_template_name(function_name: &str) -> Option<&str> {
+    let remainder = function_name.strip_prefix("__hof_")?;
+    remainder
+        .split_once("___lambda_")
+        .map(|(template, _)| template)
+}
 
 pub(super) fn validate_ast_generic_constraints(
     module: &AstModule,
@@ -28,6 +60,25 @@ pub(super) fn validate_ast_generic_constraints(
     let visible_trait_names = collect_visible_trait_names(module, local_cpu_helpers);
     let visible_trait_methods = collect_visible_trait_methods(module, local_cpu_helpers);
     let visible_structs = collect_visible_structs(module, local_cpu_helpers);
+    let concrete_module_functions = module
+        .functions
+        .iter()
+        .filter(|function| function.generic_params.is_empty())
+        .cloned()
+        .collect::<Vec<_>>();
+    let generic_templates = module
+        .functions
+        .iter()
+        .filter(|function| !function.generic_params.is_empty())
+        .map(|function| (function.name.clone(), function.clone()))
+        .collect::<BTreeMap<_, _>>();
+    let function_return_types = build_function_return_type_table(
+        module,
+        &concrete_module_functions,
+        &generic_templates,
+        local_cpu_helpers,
+        visible_type_aliases,
+    );
 
     for alias in &module.type_aliases {
         let generic_bounds = build_generic_bound_env(
@@ -207,6 +258,7 @@ pub(super) fn validate_ast_generic_constraints(
             &visible_trait_names,
             &visible_trait_methods,
             &visible_structs,
+            &function_return_types,
         )?;
     }
 
@@ -220,11 +272,13 @@ fn validate_function_generic_constraints(
     visible_trait_names: &BTreeSet<String>,
     visible_trait_methods: &BTreeMap<String, BTreeSet<String>>,
     visible_structs: &BTreeMap<String, AstStructDef>,
+    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
 ) -> Result<(), String> {
+    let function_context = render_validation_function_context(&function.name);
     let generic_bounds = build_generic_bound_env(
         &function.generic_params,
         visible_trait_names,
-        &format!("function `{}`", function.name),
+        &function_context,
     )?;
     let generic_param_names = function
         .generic_params
@@ -243,7 +297,7 @@ fn validate_function_generic_constraints(
             impl_lookup,
             visible_trait_names,
             &generic_bounds,
-            &format!("function `{}` parameter `{}`", function.name, param.name),
+            &format!("{function_context} parameter `{}`", param.name),
         )?;
     }
     if let Some(return_type) = &function.return_type {
@@ -253,7 +307,7 @@ fn validate_function_generic_constraints(
             impl_lookup,
             visible_trait_names,
             &generic_bounds,
-            &format!("function `{}` return type", function.name),
+            &format!("{function_context} return type"),
         )?;
     }
     for stmt in &function.body {
@@ -264,10 +318,11 @@ fn validate_function_generic_constraints(
             visible_trait_names,
             visible_trait_methods,
             visible_structs,
+            function_return_types,
             &generic_param_names,
             &generic_bounds,
             &mut local_type_env,
-            &format!("function `{}` body", function.name),
+            &format!("{function_context} body"),
         )?;
     }
     Ok(())
@@ -280,6 +335,7 @@ fn validate_stmt_generic_constraints(
     visible_trait_names: &BTreeSet<String>,
     visible_trait_methods: &BTreeMap<String, BTreeSet<String>>,
     visible_structs: &BTreeMap<String, AstStructDef>,
+    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
     generic_param_names: &BTreeSet<String>,
     generic_bounds: &BTreeMap<String, String>,
     local_type_env: &mut BTreeMap<String, AstTypeRef>,
@@ -294,6 +350,9 @@ fn validate_stmt_generic_constraints(
             validate_expr_generic_method_bounds(
                 value,
                 visible_type_aliases,
+                impl_lookup,
+                visible_structs,
+                function_return_types,
                 visible_trait_methods,
                 generic_param_names,
                 generic_bounds,
@@ -310,8 +369,20 @@ fn validate_stmt_generic_constraints(
                     &format!("{context} local `{name}`"),
                 )?;
             }
-            if let Some((name, ty)) = simple_local_stmt_type(stmt, local_type_env) {
-                local_type_env.insert(name, ty);
+            if let Some(inferred_ty) = ty.clone().or_else(|| {
+                infer_ast_expr_type(
+                    value,
+                    local_type_env,
+                    impl_lookup,
+                    visible_structs,
+                    function_return_types,
+                )
+            }) {
+                let name = match stmt {
+                    AstStmt::Let { name, .. } | AstStmt::Const { name, .. } => name.clone(),
+                    _ => unreachable!(),
+                };
+                local_type_env.insert(name, inferred_ty);
             }
         }
         AstStmt::DestructureLet { type_ref, .. } => {
@@ -322,6 +393,9 @@ fn validate_stmt_generic_constraints(
             validate_expr_generic_method_bounds(
                 value,
                 visible_type_aliases,
+                impl_lookup,
+                visible_structs,
+                function_return_types,
                 visible_trait_methods,
                 generic_param_names,
                 generic_bounds,
@@ -342,9 +416,15 @@ fn validate_stmt_generic_constraints(
                 AstStmt::DestructureLet { fields, .. } => fields,
                 _ => unreachable!(),
             };
-            let root_type = type_ref
-                .clone()
-                .or_else(|| simple_local_expr_type(value, local_type_env));
+            let root_type = type_ref.clone().or_else(|| {
+                infer_ast_expr_type(
+                    value,
+                    local_type_env,
+                    impl_lookup,
+                    visible_structs,
+                    function_return_types,
+                )
+            });
             if let Some(root_type) = root_type.as_ref() {
                 bind_destructure_fields_for_type(
                     root_type,
@@ -364,6 +444,9 @@ fn validate_stmt_generic_constraints(
             validate_expr_generic_method_bounds(
                 condition,
                 visible_type_aliases,
+                impl_lookup,
+                visible_structs,
+                function_return_types,
                 visible_trait_methods,
                 generic_param_names,
                 generic_bounds,
@@ -379,6 +462,7 @@ fn validate_stmt_generic_constraints(
                     visible_trait_names,
                     visible_trait_methods,
                     visible_structs,
+                    function_return_types,
                     generic_param_names,
                     generic_bounds,
                     &mut then_env,
@@ -394,6 +478,7 @@ fn validate_stmt_generic_constraints(
                     visible_trait_names,
                     visible_trait_methods,
                     visible_structs,
+                    function_return_types,
                     generic_param_names,
                     generic_bounds,
                     &mut else_env,
@@ -405,6 +490,9 @@ fn validate_stmt_generic_constraints(
             validate_expr_generic_method_bounds(
                 value,
                 visible_type_aliases,
+                impl_lookup,
+                visible_structs,
+                function_return_types,
                 visible_trait_methods,
                 generic_param_names,
                 generic_bounds,
@@ -430,6 +518,7 @@ fn validate_stmt_generic_constraints(
                         visible_trait_names,
                         visible_trait_methods,
                         visible_structs,
+                        function_return_types,
                         generic_param_names,
                         generic_bounds,
                         &mut arm_env,
@@ -442,6 +531,9 @@ fn validate_stmt_generic_constraints(
             validate_expr_generic_method_bounds(
                 condition,
                 visible_type_aliases,
+                impl_lookup,
+                visible_structs,
+                function_return_types,
                 visible_trait_methods,
                 generic_param_names,
                 generic_bounds,
@@ -457,6 +549,7 @@ fn validate_stmt_generic_constraints(
                     visible_trait_names,
                     visible_trait_methods,
                     visible_structs,
+                    function_return_types,
                     generic_param_names,
                     generic_bounds,
                     &mut loop_env,
@@ -468,6 +561,9 @@ fn validate_stmt_generic_constraints(
             validate_expr_generic_method_bounds(
                 value,
                 visible_type_aliases,
+                impl_lookup,
+                visible_structs,
+                function_return_types,
                 visible_trait_methods,
                 generic_param_names,
                 generic_bounds,
@@ -479,6 +575,9 @@ fn validate_stmt_generic_constraints(
             validate_expr_generic_method_bounds(
                 value,
                 visible_type_aliases,
+                impl_lookup,
+                visible_structs,
+                function_return_types,
                 visible_trait_methods,
                 generic_param_names,
                 generic_bounds,

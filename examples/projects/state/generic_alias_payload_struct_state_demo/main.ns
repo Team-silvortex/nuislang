@@ -1,0 +1,19 @@
+mod cpu Main {
+  type JustAlias<T> = Just<T>;
+
+  struct Just<T> {
+    value: T,
+  }
+
+  fn main() -> i64 {
+    let value = JustAlias<i64>(7);
+    match value {
+      JustAlias<i64>(payload) if payload == 7 => {
+        return payload;
+      }
+      _ => {
+        return 9;
+      }
+    }
+  }
+}

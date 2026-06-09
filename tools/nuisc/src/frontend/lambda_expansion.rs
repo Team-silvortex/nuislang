@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{
-    AstDestructureBinding, AstDestructureField, AstExpr, AstFunction, AstMatchArm, AstModule,
-    AstParam, AstStmt, AstTypeRef, AstVisibility,
+    AstDestructureBinding, AstDestructureField, AstExpr, AstFunction, AstGenericParam, AstMatchArm,
+    AstModule, AstParam, AstStmt, AstTypeRef, AstVisibility,
 };
 
 use super::lambda_validation::validate_lambda_block_no_capture;
@@ -36,6 +36,7 @@ fn expand_function_lambdas(
         .collect::<BTreeSet<_>>();
     let body = expand_lambda_block(
         &function.body,
+        &function.generic_params,
         &BTreeMap::new(),
         &visible_locals,
         module_const_names,
@@ -52,6 +53,7 @@ fn synthesize_lambda_function(
     params: &[AstParam],
     return_type: &Option<AstTypeRef>,
     body: &[AstStmt],
+    inherited_generic_params: &[AstGenericParam],
     lambda_aliases: &BTreeMap<String, String>,
     outer_locals: &BTreeSet<String>,
     module_const_names: &BTreeSet<String>,
@@ -71,6 +73,7 @@ fn synthesize_lambda_function(
     *counter += 1;
     let lambda_body = expand_lambda_block(
         body,
+        inherited_generic_params,
         lambda_aliases,
         &params
             .iter()
@@ -93,7 +96,7 @@ fn synthesize_lambda_function(
         test_clock_domain: None,
         test_clock_policy: None,
         is_async: false,
-        generic_params: Vec::new(),
+        generic_params: inherited_generic_params.to_vec(),
         params: params.to_vec(),
         return_type: Some(lambda_return_type),
         body: lambda_body,
@@ -104,6 +107,7 @@ fn synthesize_lambda_function(
 #[allow(clippy::too_many_arguments)]
 fn expand_lambda_block(
     body: &[AstStmt],
+    inherited_generic_params: &[AstGenericParam],
     lambda_aliases: &BTreeMap<String, String>,
     visible_locals: &BTreeSet<String>,
     module_const_names: &BTreeSet<String>,
@@ -135,6 +139,7 @@ fn expand_lambda_block(
                     params,
                     return_type,
                     body,
+                    inherited_generic_params,
                     &aliases,
                     &locals,
                     module_const_names,
@@ -157,6 +162,7 @@ fn expand_lambda_block(
             AstStmt::Let { name, ty, value } => {
                 let rewritten_value = rewrite_lambda_expr(
                     value,
+                    inherited_generic_params,
                     &aliases,
                     &locals,
                     module_const_names,
@@ -179,6 +185,7 @@ fn expand_lambda_block(
             } => {
                 let rewritten_value = rewrite_lambda_expr(
                     value,
+                    inherited_generic_params,
                     &aliases,
                     &locals,
                     module_const_names,
@@ -201,6 +208,7 @@ fn expand_lambda_block(
             AstStmt::Const { name, ty, value } => {
                 let rewritten_value = rewrite_lambda_expr(
                     value,
+                    inherited_generic_params,
                     &aliases,
                     &locals,
                     module_const_names,
@@ -218,6 +226,7 @@ fn expand_lambda_block(
             }
             AstStmt::Print(value) => rewritten.push(AstStmt::Print(rewrite_lambda_expr(
                 value,
+                inherited_generic_params,
                 &aliases,
                 &locals,
                 module_const_names,
@@ -227,6 +236,7 @@ fn expand_lambda_block(
             )?)),
             AstStmt::Await(value) => rewritten.push(AstStmt::Await(rewrite_lambda_expr(
                 value,
+                inherited_generic_params,
                 &aliases,
                 &locals,
                 module_const_names,
@@ -241,6 +251,7 @@ fn expand_lambda_block(
             } => rewritten.push(AstStmt::If {
                 condition: rewrite_lambda_expr(
                     condition,
+                    inherited_generic_params,
                     &aliases,
                     &locals,
                     module_const_names,
@@ -250,6 +261,7 @@ fn expand_lambda_block(
                 )?,
                 then_body: expand_lambda_block(
                     then_body,
+                    inherited_generic_params,
                     &aliases,
                     &locals,
                     module_const_names,
@@ -259,6 +271,7 @@ fn expand_lambda_block(
                 )?,
                 else_body: expand_lambda_block(
                     else_body,
+                    inherited_generic_params,
                     &aliases,
                     &locals,
                     module_const_names,
@@ -270,6 +283,7 @@ fn expand_lambda_block(
             AstStmt::Match { value, arms } => rewritten.push(AstStmt::Match {
                 value: rewrite_lambda_expr(
                     value,
+                    inherited_generic_params,
                     &aliases,
                     &locals,
                     module_const_names,
@@ -288,6 +302,7 @@ fn expand_lambda_block(
                                 .map(|guard| {
                                     rewrite_lambda_expr(
                                         &guard,
+                                        inherited_generic_params,
                                         &aliases,
                                         &locals,
                                         module_const_names,
@@ -299,6 +314,7 @@ fn expand_lambda_block(
                                 .transpose()?,
                             body: expand_lambda_block(
                                 &arm.body,
+                                inherited_generic_params,
                                 &aliases,
                                 &locals,
                                 module_const_names,
@@ -313,6 +329,7 @@ fn expand_lambda_block(
             AstStmt::While { condition, body } => rewritten.push(AstStmt::While {
                 condition: rewrite_lambda_expr(
                     condition,
+                    inherited_generic_params,
                     &aliases,
                     &locals,
                     module_const_names,
@@ -322,6 +339,7 @@ fn expand_lambda_block(
                 )?,
                 body: expand_lambda_block(
                     body,
+                    inherited_generic_params,
                     &aliases,
                     &locals,
                     module_const_names,
@@ -332,6 +350,7 @@ fn expand_lambda_block(
             }),
             AstStmt::Expr(expr) => rewritten.push(AstStmt::Expr(rewrite_lambda_expr(
                 expr,
+                inherited_generic_params,
                 &aliases,
                 &locals,
                 module_const_names,
@@ -342,6 +361,7 @@ fn expand_lambda_block(
             AstStmt::Return(value) => rewritten.push(AstStmt::Return(match value {
                 Some(value) => Some(rewrite_lambda_expr(
                     value,
+                    inherited_generic_params,
                     &aliases,
                     &locals,
                     module_const_names,
@@ -372,6 +392,7 @@ fn collect_destructure_binding_names(fields: &[AstDestructureField], names: &mut
 
 fn rewrite_lambda_expr(
     expr: &AstExpr,
+    inherited_generic_params: &[AstGenericParam],
     lambda_aliases: &BTreeMap<String, String>,
     visible_locals: &BTreeSet<String>,
     module_const_names: &BTreeSet<String>,
@@ -403,6 +424,7 @@ fn rewrite_lambda_expr(
                 params,
                 return_type,
                 body,
+                inherited_generic_params,
                 lambda_aliases,
                 visible_locals,
                 module_const_names,
@@ -414,6 +436,7 @@ fn rewrite_lambda_expr(
         }
         AstExpr::Await(value) => AstExpr::Await(Box::new(rewrite_lambda_expr(
             value,
+            inherited_generic_params,
             lambda_aliases,
             visible_locals,
             module_const_names,
@@ -427,6 +450,7 @@ fn rewrite_lambda_expr(
                 .map(|arg| {
                     rewrite_lambda_expr(
                         arg,
+                        inherited_generic_params,
                         lambda_aliases,
                         visible_locals,
                         module_const_names,
@@ -446,6 +470,7 @@ fn rewrite_lambda_expr(
                         params,
                         return_type,
                         body,
+                        inherited_generic_params,
                         lambda_aliases,
                         visible_locals,
                         module_const_names,
@@ -490,6 +515,7 @@ fn rewrite_lambda_expr(
                 .map(|arg| {
                     rewrite_lambda_expr(
                         arg,
+                        inherited_generic_params,
                         lambda_aliases,
                         visible_locals,
                         module_const_names,
@@ -507,6 +533,7 @@ fn rewrite_lambda_expr(
         } => AstExpr::MethodCall {
             receiver: Box::new(rewrite_lambda_expr(
                 receiver,
+                inherited_generic_params,
                 lambda_aliases,
                 visible_locals,
                 module_const_names,
@@ -520,6 +547,7 @@ fn rewrite_lambda_expr(
                 .map(|arg| {
                     rewrite_lambda_expr(
                         arg,
+                        inherited_generic_params,
                         lambda_aliases,
                         visible_locals,
                         module_const_names,
@@ -544,6 +572,7 @@ fn rewrite_lambda_expr(
                         name.clone(),
                         rewrite_lambda_expr(
                             value,
+                            inherited_generic_params,
                             lambda_aliases,
                             visible_locals,
                             module_const_names,
@@ -558,6 +587,7 @@ fn rewrite_lambda_expr(
         AstExpr::FieldAccess { base, field } => AstExpr::FieldAccess {
             base: Box::new(rewrite_lambda_expr(
                 base,
+                inherited_generic_params,
                 lambda_aliases,
                 visible_locals,
                 module_const_names,
@@ -571,6 +601,7 @@ fn rewrite_lambda_expr(
             op: *op,
             lhs: Box::new(rewrite_lambda_expr(
                 lhs,
+                inherited_generic_params,
                 lambda_aliases,
                 visible_locals,
                 module_const_names,
@@ -580,6 +611,7 @@ fn rewrite_lambda_expr(
             )?),
             rhs: Box::new(rewrite_lambda_expr(
                 rhs,
+                inherited_generic_params,
                 lambda_aliases,
                 visible_locals,
                 module_const_names,

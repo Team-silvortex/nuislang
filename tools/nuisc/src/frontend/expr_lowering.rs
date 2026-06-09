@@ -333,10 +333,17 @@ pub(super) fn lower_expr_with_async(
                 }
                 expected.clone()
             } else {
-                return Err(format!(
-                    "cannot infer generic arguments for struct literal `{}` in the current frontend; add an explicit expected type",
-                    type_name
-                ));
+                infer_generic_struct_literal_type_from_fields(
+                    type_name,
+                    definition,
+                    fields,
+                    current_domain,
+                    current_function_is_async,
+                    bindings,
+                    module_consts,
+                    signatures,
+                    struct_table,
+                )?
             };
             let hidden_private_fields = hidden_private_field_count(definition);
             if hidden_private_fields > 0 {
@@ -425,4 +432,122 @@ pub(super) fn lower_expr_with_async(
             struct_table,
         )?,
     })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn infer_generic_struct_literal_type_from_fields(
+    type_name: &str,
+    definition: &NirStructDef,
+    fields: &[(String, AstExpr)],
+    current_domain: &str,
+    current_function_is_async: bool,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    module_consts: &BTreeMap<String, ModuleConstValue>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> Result<NirTypeRef, String> {
+    let mut substitutions = BTreeMap::<String, NirTypeRef>::new();
+    let generic_names = definition
+        .generic_params
+        .iter()
+        .map(|param| param.name.as_str())
+        .collect::<Vec<_>>();
+    for (name, value) in fields {
+        let field = definition
+            .fields
+            .iter()
+            .find(|field| field.name == *name)
+            .ok_or_else(|| format!("struct `{}` has no field `{}`", type_name, name))?;
+        let lowered = lower_nested_expr_with_async_and_consts(
+            value,
+            current_domain,
+            current_function_is_async,
+            bindings,
+            module_consts,
+            signatures,
+            struct_table,
+            None,
+        )?;
+        let Some(inferred) = infer_nir_expr_type(&lowered, bindings, signatures, struct_table)
+        else {
+            return Err(format!(
+                "cannot infer generic arguments for struct literal `{}` in the current frontend; add an explicit expected type",
+                type_name
+            ));
+        };
+        unify_generic_struct_field_type_pattern(
+            &field.ty,
+            &inferred,
+            &generic_names,
+            &mut substitutions,
+            type_name,
+        )?;
+    }
+    let generic_args = definition
+        .generic_params
+        .iter()
+        .map(|param| {
+            substitutions.get(&param.name).cloned().ok_or_else(|| {
+                format!(
+                    "cannot infer generic arguments for struct literal `{}` in the current frontend; add an explicit expected type",
+                    type_name
+                )
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(NirTypeRef {
+        name: type_name.to_owned(),
+        generic_args,
+        is_optional: false,
+        is_ref: false,
+    })
+}
+
+fn unify_generic_struct_field_type_pattern(
+    pattern: &NirTypeRef,
+    concrete: &NirTypeRef,
+    generic_names: &[&str],
+    substitutions: &mut BTreeMap<String, NirTypeRef>,
+    type_name: &str,
+) -> Result<(), String> {
+    if pattern.generic_args.is_empty()
+        && !pattern.is_optional
+        && !pattern.is_ref
+        && generic_names.contains(&pattern.name.as_str())
+    {
+        if let Some(existing) = substitutions.get(&pattern.name) {
+            if existing.render() != concrete.render() {
+                return Err(format!(
+                    "struct literal `{}` inferred conflicting types `{}` and `{}` for generic parameter `{}`",
+                    type_name,
+                    existing.render(),
+                    concrete.render(),
+                    pattern.name
+                ));
+            }
+        } else {
+            substitutions.insert(pattern.name.clone(), concrete.clone());
+        }
+        return Ok(());
+    }
+    if pattern.name != concrete.name
+        || pattern.generic_args.len() != concrete.generic_args.len()
+        || pattern.is_optional != concrete.is_optional
+        || pattern.is_ref != concrete.is_ref
+    {
+        return Err(format!(
+            "cannot infer generic arguments for struct literal `{}` in the current frontend; add an explicit expected type",
+            type_name
+        ));
+    }
+    for (pattern_arg, concrete_arg) in pattern.generic_args.iter().zip(&concrete.generic_args) {
+        unify_generic_struct_field_type_pattern(
+            pattern_arg,
+            concrete_arg,
+            generic_names,
+            substitutions,
+            type_name,
+        )?;
+    }
+    Ok(())
 }
