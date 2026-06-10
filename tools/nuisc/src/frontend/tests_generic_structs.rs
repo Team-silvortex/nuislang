@@ -315,6 +315,35 @@ fn rejects_generic_struct_literal_when_fields_do_not_fully_determine_type_args()
 }
 
 #[test]
+fn rejects_generic_alias_struct_literal_when_fields_do_not_fully_determine_type_args() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type PhantomAlias<T, U> = Phantom<T, U>;
+
+          struct Phantom<T, U> {
+            value: T,
+            tag: i64,
+          }
+
+          fn main() -> i64 {
+            let phantom = PhantomAlias { value: 7, tag: 1 };
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains(
+            "generic alias constructor `PhantomAlias` could not infer generic parameter `U` for target `Phantom<T, U>`; add explicit type arguments or a stronger expected type"
+        ),
+        "{error}"
+    );
+}
+
+#[test]
 fn lowers_generic_struct_destructuring_let() {
     let module = parse_nuis_module(
         r#"

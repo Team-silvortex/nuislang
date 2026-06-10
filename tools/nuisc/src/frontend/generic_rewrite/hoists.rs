@@ -5,11 +5,14 @@ use nuis_semantics::model::{
 };
 
 use super::super::{infer_ast_expr_type, FunctionSignature};
-use super::exprs::rewrite_generic_calls_in_expr;
+use super::exprs::{call_arg_expected_type, rewrite_generic_calls_in_expr};
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn hoist_direct_result_wrapper_args(
+    callee: &str,
+    generic_args: &[AstTypeRef],
     args: &[AstExpr],
+    expected: Option<&AstTypeRef>,
     temp_prefix: &str,
     env: &mut BTreeMap<String, AstTypeRef>,
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
@@ -21,14 +24,23 @@ pub(super) fn hoist_direct_result_wrapper_args(
     specialization_cache: &mut BTreeSet<String>,
     specialized_functions: &mut Vec<AstFunction>,
     specialized_signatures: &mut Vec<(String, FunctionSignature)>,
-    callee: &str,
 ) -> Result<(Vec<AstStmt>, Vec<AstExpr>), String> {
     let mut hoisted = Vec::new();
     let mut rewritten_args = Vec::new();
     for (index, arg) in args.iter().enumerate() {
+        let arg_expected = call_arg_expected_type(
+            callee,
+            generic_args,
+            index,
+            expected,
+            generic_templates,
+            signatures,
+            visible_type_aliases,
+            struct_table,
+        );
         let rewritten_arg = rewrite_generic_calls_in_expr(
             arg,
-            None,
+            arg_expected.as_ref(),
             env,
             visible_type_aliases,
             generic_templates,

@@ -1,7 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use nuis_semantics::model::{AstExpr, AstFunction, AstMatchArm, AstModule, AstStmt, AstTypeAlias};
+use nuis_semantics::model::{
+    AstExpr, AstFunction, AstMatchArm, AstModule, AstParam, AstStmt, AstTypeAlias, AstTypeRef,
+};
 
+use super::super::generics::{specialize_ast_type_ref, unify_generic_type_pattern};
+use super::super::{lower_type_ref, resolve_ast_type_ref_aliases};
 use super::callables::{
     function_type_matches_callable, is_callable_type_with_aliases, sanitize_symbol_fragment,
 };
@@ -65,6 +69,7 @@ pub(crate) fn rewrite_higher_order_calls_in_function(
 ) -> Result<AstFunction, String> {
     let body = rewrite_higher_order_calls_in_block(
         &function.body,
+        function.return_type.as_ref(),
         templates,
         function_table,
         visible_type_aliases,
@@ -78,6 +83,7 @@ pub(crate) fn rewrite_higher_order_calls_in_function(
 
 pub(crate) fn rewrite_higher_order_calls_in_block(
     body: &[AstStmt],
+    current_return_type: Option<&AstTypeRef>,
     templates: &BTreeMap<String, AstFunction>,
     function_table: &BTreeMap<String, AstFunction>,
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
@@ -88,6 +94,7 @@ pub(crate) fn rewrite_higher_order_calls_in_block(
         .map(|stmt| {
             rewrite_higher_order_calls_in_stmt(
                 stmt,
+                current_return_type,
                 templates,
                 function_table,
                 visible_type_aliases,
@@ -100,6 +107,7 @@ pub(crate) fn rewrite_higher_order_calls_in_block(
 
 pub(crate) fn rewrite_higher_order_calls_in_stmt(
     stmt: &AstStmt,
+    current_return_type: Option<&AstTypeRef>,
     templates: &BTreeMap<String, AstFunction>,
     function_table: &BTreeMap<String, AstFunction>,
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
@@ -112,6 +120,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
             ty: ty.clone(),
             value: rewrite_higher_order_calls_in_expr(
                 value,
+                ty.as_ref(),
                 templates,
                 function_table,
                 visible_type_aliases,
@@ -128,6 +137,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
             fields: fields.clone(),
             value: rewrite_higher_order_calls_in_expr(
                 value,
+                type_ref.as_ref(),
                 templates,
                 function_table,
                 visible_type_aliases,
@@ -140,6 +150,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
             ty: ty.clone(),
             value: rewrite_higher_order_calls_in_expr(
                 value,
+                ty.as_ref(),
                 templates,
                 function_table,
                 visible_type_aliases,
@@ -149,6 +160,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
         },
         AstStmt::Print(value) => AstStmt::Print(rewrite_higher_order_calls_in_expr(
             value,
+            None,
             templates,
             function_table,
             visible_type_aliases,
@@ -157,6 +169,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
         )?),
         AstStmt::Await(value) => AstStmt::Await(rewrite_higher_order_calls_in_expr(
             value,
+            None,
             templates,
             function_table,
             visible_type_aliases,
@@ -170,6 +183,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
         } => AstStmt::If {
             condition: rewrite_higher_order_calls_in_expr(
                 condition,
+                None,
                 templates,
                 function_table,
                 visible_type_aliases,
@@ -178,6 +192,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
             )?,
             then_body: rewrite_higher_order_calls_in_block(
                 then_body,
+                current_return_type,
                 templates,
                 function_table,
                 visible_type_aliases,
@@ -186,6 +201,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
             )?,
             else_body: rewrite_higher_order_calls_in_block(
                 else_body,
+                current_return_type,
                 templates,
                 function_table,
                 visible_type_aliases,
@@ -196,6 +212,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
         AstStmt::Match { value, arms } => AstStmt::Match {
             value: rewrite_higher_order_calls_in_expr(
                 value,
+                None,
                 templates,
                 function_table,
                 visible_type_aliases,
@@ -213,6 +230,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
                             .map(|guard| {
                                 rewrite_higher_order_calls_in_expr(
                                     guard,
+                                    None,
                                     templates,
                                     function_table,
                                     visible_type_aliases,
@@ -223,6 +241,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
                             .transpose()?,
                         body: rewrite_higher_order_calls_in_block(
                             &arm.body,
+                            current_return_type,
                             templates,
                             function_table,
                             visible_type_aliases,
@@ -236,6 +255,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
         AstStmt::While { condition, body } => AstStmt::While {
             condition: rewrite_higher_order_calls_in_expr(
                 condition,
+                None,
                 templates,
                 function_table,
                 visible_type_aliases,
@@ -244,6 +264,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
             )?,
             body: rewrite_higher_order_calls_in_block(
                 body,
+                current_return_type,
                 templates,
                 function_table,
                 visible_type_aliases,
@@ -253,6 +274,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
         },
         AstStmt::Expr(expr) => AstStmt::Expr(rewrite_higher_order_calls_in_expr(
             expr,
+            None,
             templates,
             function_table,
             visible_type_aliases,
@@ -261,6 +283,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
         )?),
         AstStmt::Return(Some(value)) => AstStmt::Return(Some(rewrite_higher_order_calls_in_expr(
             value,
+            current_return_type,
             templates,
             function_table,
             visible_type_aliases,
@@ -275,6 +298,7 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
 
 pub(crate) fn rewrite_higher_order_calls_in_expr(
     expr: &AstExpr,
+    expected: Option<&AstTypeRef>,
     templates: &BTreeMap<String, AstFunction>,
     function_table: &BTreeMap<String, AstFunction>,
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
@@ -295,6 +319,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
             specialize_higher_order_call(
                 callee,
                 args,
+                expected,
                 templates,
                 function_table,
                 visible_type_aliases,
@@ -304,6 +329,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
         }
         AstExpr::Await(value) => AstExpr::Await(Box::new(rewrite_higher_order_calls_in_expr(
             value,
+            expected,
             templates,
             function_table,
             visible_type_aliases,
@@ -322,6 +348,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
                 .map(|arg| {
                     rewrite_higher_order_calls_in_expr(
                         arg,
+                        None,
                         templates,
                         function_table,
                         visible_type_aliases,
@@ -334,6 +361,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
         AstExpr::Invoke { callee, args } => AstExpr::Invoke {
             callee: Box::new(rewrite_higher_order_calls_in_expr(
                 callee,
+                None,
                 templates,
                 function_table,
                 visible_type_aliases,
@@ -345,6 +373,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
                 .map(|arg| {
                     rewrite_higher_order_calls_in_expr(
                         arg,
+                        None,
                         templates,
                         function_table,
                         visible_type_aliases,
@@ -361,6 +390,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
         } => AstExpr::MethodCall {
             receiver: Box::new(rewrite_higher_order_calls_in_expr(
                 receiver,
+                None,
                 templates,
                 function_table,
                 visible_type_aliases,
@@ -373,6 +403,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
                 .map(|arg| {
                     rewrite_higher_order_calls_in_expr(
                         arg,
+                        None,
                         templates,
                         function_table,
                         visible_type_aliases,
@@ -396,6 +427,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
                         name.clone(),
                         rewrite_higher_order_calls_in_expr(
                             value,
+                            None,
                             templates,
                             function_table,
                             visible_type_aliases,
@@ -409,6 +441,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
         AstExpr::FieldAccess { base, field } => AstExpr::FieldAccess {
             base: Box::new(rewrite_higher_order_calls_in_expr(
                 base,
+                None,
                 templates,
                 function_table,
                 visible_type_aliases,
@@ -421,6 +454,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
             op: *op,
             lhs: Box::new(rewrite_higher_order_calls_in_expr(
                 lhs,
+                None,
                 templates,
                 function_table,
                 visible_type_aliases,
@@ -429,6 +463,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
             )?),
             rhs: Box::new(rewrite_higher_order_calls_in_expr(
                 rhs,
+                None,
                 templates,
                 function_table,
                 visible_type_aliases,
@@ -443,6 +478,7 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
 pub(crate) fn specialize_higher_order_call(
     callee: &str,
     args: &[AstExpr],
+    expected: Option<&AstTypeRef>,
     templates: &BTreeMap<String, AstFunction>,
     function_table: &BTreeMap<String, AstFunction>,
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
@@ -471,8 +507,15 @@ pub(crate) fn specialize_higher_order_call(
         .collect::<BTreeSet<_>>();
 
     for (param, arg) in template.params.iter().zip(args) {
+        let ordinary_expected = higher_order_param_expected_type_from_call_expected(
+            template,
+            param,
+            expected,
+            visible_type_aliases,
+        );
         let rewritten_arg = rewrite_higher_order_calls_in_expr(
             arg,
+            ordinary_expected.as_ref(),
             templates,
             function_table,
             visible_type_aliases,
@@ -506,7 +549,10 @@ pub(crate) fn specialize_higher_order_call(
             callable_bindings.insert(param.name.clone(), callable_name.clone());
             callable_fragments.push(sanitize_symbol_fragment(callable_name));
         } else {
-            ordinary_args.push(rewritten_arg);
+            ordinary_args.push(annotate_expr_head_with_expected_type(
+                rewritten_arg,
+                ordinary_expected.as_ref(),
+            ));
         }
     }
 
@@ -530,4 +576,76 @@ pub(crate) fn specialize_higher_order_call(
         generic_args: Vec::new(),
         args: ordinary_args,
     })
+}
+
+fn higher_order_param_expected_type_from_call_expected(
+    template: &AstFunction,
+    param: &AstParam,
+    expected: Option<&AstTypeRef>,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+) -> Option<AstTypeRef> {
+    let expected = expected?;
+    let return_pattern = template.return_type.as_ref()?;
+    let generic_names = template
+        .generic_params
+        .iter()
+        .map(|param| param.name.clone())
+        .collect::<BTreeSet<_>>();
+    if generic_names.is_empty() {
+        return None;
+    }
+    let resolved_return_pattern =
+        resolve_ast_type_ref_aliases(return_pattern, visible_type_aliases).ok()?;
+    let resolved_expected = resolve_ast_type_ref_aliases(expected, visible_type_aliases).ok()?;
+    let mut substitutions = BTreeMap::<String, AstTypeRef>::new();
+    unify_generic_type_pattern(
+        &resolved_return_pattern,
+        &resolved_expected,
+        &generic_names,
+        &mut substitutions,
+        &template.name,
+    )
+    .ok()?;
+    let lowered_substitutions = substitutions
+        .into_iter()
+        .map(|(name, ty)| (name, lower_type_ref(&ty)))
+        .collect::<BTreeMap<_, _>>();
+    specialize_ast_type_ref(&param.ty, &lowered_substitutions).ok()
+}
+
+fn annotate_expr_head_with_expected_type(expr: AstExpr, expected: Option<&AstTypeRef>) -> AstExpr {
+    let Some(expected) = expected else {
+        return expr;
+    };
+    match expr {
+        AstExpr::Call {
+            callee,
+            generic_args,
+            args,
+        } if generic_args.is_empty()
+            && callee == expected.name
+            && !expected.generic_args.is_empty() =>
+        {
+            AstExpr::Call {
+                callee,
+                generic_args: expected.generic_args.clone(),
+                args,
+            }
+        }
+        AstExpr::StructLiteral {
+            type_name,
+            type_args,
+            fields,
+        } if type_args.is_empty()
+            && type_name == expected.name
+            && !expected.generic_args.is_empty() =>
+        {
+            AstExpr::StructLiteral {
+                type_name,
+                type_args: expected.generic_args.clone(),
+                fields,
+            }
+        }
+        other => other,
+    }
 }

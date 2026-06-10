@@ -320,6 +320,7 @@ pub(crate) fn rewrite_higher_order_template_expr(
             specialize_higher_order_call(
                 callee,
                 args,
+                None,
                 templates,
                 function_table,
                 visible_type_aliases,

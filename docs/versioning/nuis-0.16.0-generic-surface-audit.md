@@ -85,6 +85,9 @@ Primary tests:
 * `closed`:
   field-insufficient direct generic struct literal failure
   `Phantom { value: 7, tag: 1 }`
+* `closed`:
+  field-insufficient generic alias struct literal failure with unresolved alias generic
+  `PhantomAlias { value: 7, tag: 1 }`
 
 Primary tests:
 
@@ -111,6 +114,12 @@ Primary tests:
 * `closed`:
   specialization from inferred transparent alias payload constructor arguments
   `unwrap_just(JustAlias(7))`
+* `closed`:
+  zero-arg generic specialization from async return expectation through `await`
+  `return await typed_zero();`
+* `closed`:
+  zero-arg generic async specialization through awaited nested alias wrapper into generic call argument
+  `keep_response(Response(await typed_box()))`
 
 Primary tests:
 
@@ -126,6 +135,9 @@ Primary tests:
 * `closed`:
   generic higher-order specialization through inferred alias payload constructors
   `apply_payload(JustAlias(6), |x| ...)`
+* `closed`:
+  async-awaited zero-arg generic flowing through inferred alias payload constructor into higher-order specialization
+  `apply_payload(JustAlias(await typed_zero()), |x| ...)`
 
 Primary tests:
 

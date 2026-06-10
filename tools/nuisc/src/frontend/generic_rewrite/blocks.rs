@@ -98,7 +98,10 @@ fn rewrite_generic_stmt_with_hoists(
                 )?]);
             }
             let (mut hoisted, rewritten_args) = hoist_direct_result_wrapper_args(
+                callee,
+                generic_args,
                 args,
+                ty.as_ref(),
                 name,
                 env,
                 visible_type_aliases,
@@ -110,7 +113,6 @@ fn rewrite_generic_stmt_with_hoists(
                 specialization_cache,
                 specialized_functions,
                 specialized_signatures,
-                callee,
             )?;
             let rewritten_value = rewrite_generic_calls_in_expr(
                 &AstExpr::Call {
@@ -155,7 +157,10 @@ fn rewrite_generic_stmt_with_hoists(
             args,
         })) if generic_templates.contains_key(callee) => {
             let (mut hoisted, rewritten_args) = hoist_direct_result_wrapper_args(
+                callee,
+                generic_args,
                 args,
+                current_return_type,
                 "__nuis_generic_return_arg",
                 env,
                 visible_type_aliases,
@@ -167,7 +172,6 @@ fn rewrite_generic_stmt_with_hoists(
                 specialization_cache,
                 specialized_functions,
                 specialized_signatures,
-                callee,
             )?;
             let rewritten_value = rewrite_generic_calls_in_expr(
                 &AstExpr::Call {

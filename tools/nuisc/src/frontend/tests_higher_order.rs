@@ -441,6 +441,93 @@ fn lowers_generic_payload_alias_method_bound_and_higher_order_combo() {
 }
 
 #[test]
+fn lowers_async_await_into_inferred_generic_payload_alias_higher_order_family() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type JustAlias<T> = Just<T>;
+          type Mapper<T> = Fn1<T, T>;
+
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          struct Just<T> {
+            value: T,
+          }
+
+          async fn typed_zero<T>() -> T {
+            return 0;
+          }
+
+          fn apply_payload<T: Addable>(value: JustAlias<T>, f: Mapper<T>) -> T {
+            match value {
+              JustAlias<T>(payload) => {
+                return f(payload);
+              }
+              _ => {
+                return value.value;
+              }
+            }
+          }
+
+          async fn main() -> i64 {
+            return apply_payload(JustAlias(await typed_zero()), |x: i64| -> i64 { return x + 1; });
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let higher_order_concrete = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__hof_apply_payload_") && function.name.ends_with("__i64")
+        })
+        .expect("expected async-inferred payload higher-order helper");
+    assert!(higher_order_concrete.generic_params.is_empty());
+
+    let specialized = module
+        .functions
+        .iter()
+        .find(|function| function.name == "typed_zero__i64")
+        .expect("expected async generic specialization through await payload alias path");
+    assert!(specialized.is_async);
+    assert!(specialized.generic_params.is_empty());
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Call { callee, args })))
+            if callee == &higher_order_concrete.name
+                && matches!(
+                    args.as_slice(),
+                    [NirExpr::StructLiteral { fields, .. }]
+                        if matches!(
+                            fields.as_slice(),
+                            [(field, NirExpr::Await(value))]
+                                if field == "value"
+                                    && matches!(
+                                        value.as_ref(),
+                                        NirExpr::Call { callee, .. } if callee == "typed_zero__i64"
+                                    )
+                        )
+                )
+    ));
+}
+
+#[test]
 fn rejects_generic_lambda_method_call_without_required_bound() {
     let error = parse_nuis_module(
         r#"
