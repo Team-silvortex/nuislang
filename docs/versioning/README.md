@@ -20,6 +20,7 @@ Start with:
 * [nuis-0.17.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-snapshot.md)
 * [nuis-0.17.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-release-checklist.md)
 * [nuis-0.17.0-mainline-goals.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-mainline-goals.md)
+* [nuis-0.17.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-compile-workflow.md)
 * [nuis-0.17.0-generic-completion-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-generic-completion-plan.md)
 
 Those files are the shortest current “what is real enough to stand on” anchors
@@ -54,6 +55,9 @@ should prove cross-layer integration, not only accumulate more local features.
 
 The `0.17.0` mainline goals file is the short working map for the current
 active push.
+
+The `0.17.0` compile workflow file is the current compiler-facing explanation
+of how the frontend/generic/higher-order/async pipeline actually composes.
 
 The `0.17.0` generic completion plan is the first detailed execution map under
 that mainline and should be the default entry point for generic-track work.
