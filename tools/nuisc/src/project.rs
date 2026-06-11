@@ -234,6 +234,19 @@ pub fn is_project_input(path: &Path) -> bool {
     path.is_dir() || path.file_name().and_then(|name| name.to_str()) == Some("nuis.toml")
 }
 
+pub(super) fn lower_project_module_to_nir(
+    project: &LoadedProject,
+    project_module: &ProjectModule,
+) -> Result<nuis_semantics::model::NirModule, String> {
+    let sibling_modules = project
+        .modules
+        .iter()
+        .filter(|module| module.path != project_module.path)
+        .map(|module| module.ast.clone())
+        .collect::<Vec<_>>();
+    crate::frontend::lower_project_ast_to_nir(&project_module.ast, &sibling_modules)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -246,6 +259,8 @@ mod tests {
     mod planning_kernel;
     #[path = "shader_nova_contracts.rs"]
     mod shader_nova_contracts;
+    #[path = "multidomain_async.rs"]
+    mod multidomain_async;
 
     fn project_with_modules(modules: Vec<(&str, &str)>) -> LoadedProject {
         LoadedProject {

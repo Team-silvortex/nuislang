@@ -1,0 +1,39 @@
+use network NetworkUnit;
+use kernel KernelUnit;
+
+mod cpu Main {
+  async fn consume_network_result(result: NetworkResult<i64>) -> i64 {
+    if network_config_ready(result) {
+      return network_value(result) + 3;
+    }
+    return 0;
+  }
+
+  async fn consume_kernel_result(result: KernelResult<i64>) -> i64 {
+    if kernel_config_ready(result) {
+      return kernel_value(result) + 5;
+    }
+    return 0;
+  }
+
+  fn main() -> i64 {
+    let network_probe: NetworkResult<i64> =
+      network_result(network_profile_send_window("NetworkUnit"));
+    let kernel_probe: KernelResult<i64> =
+      kernel_result(kernel_profile_batch_lanes("KernelUnit"));
+
+    let network_task: Task<i64> = spawn(consume_network_result(network_probe));
+    let kernel_task: Task<i64> = spawn(consume_kernel_result(kernel_probe));
+
+    let network_joined: TaskResult<i64> = join_result(network_task);
+    let kernel_joined: TaskResult<i64> = join_result(kernel_task);
+
+    if task_completed(network_joined) {
+      return task_value(network_joined);
+    }
+    if task_completed(kernel_joined) {
+      return task_value(kernel_joined);
+    }
+    return 0;
+  }
+}

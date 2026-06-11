@@ -97,20 +97,20 @@ fn parse_loop_flow_condition(
             rhs,
         } => Some(PreparedLoopFlowCondition::Compound {
             op: PreparedLoopLogicOp::And,
-            lhs: parse_loop_flow_condition_atom(
+            lhs: Box::new(parse_loop_flow_condition(
                 lhs,
                 binding_name,
                 carry_binding_names,
                 pure_helpers,
                 inlineable_pure_helpers,
-            )?,
-            rhs: parse_loop_flow_condition_atom(
+            )?),
+            rhs: Box::new(parse_loop_flow_condition(
                 rhs,
                 binding_name,
                 carry_binding_names,
                 pure_helpers,
                 inlineable_pure_helpers,
-            )?,
+            )?),
         }),
         NirExpr::Binary {
             op: NirBinaryOp::Or,
@@ -118,20 +118,20 @@ fn parse_loop_flow_condition(
             rhs,
         } => Some(PreparedLoopFlowCondition::Compound {
             op: PreparedLoopLogicOp::Or,
-            lhs: parse_loop_flow_condition_atom(
+            lhs: Box::new(parse_loop_flow_condition(
                 lhs,
                 binding_name,
                 carry_binding_names,
                 pure_helpers,
                 inlineable_pure_helpers,
-            )?,
-            rhs: parse_loop_flow_condition_atom(
+            )?),
+            rhs: Box::new(parse_loop_flow_condition(
                 rhs,
                 binding_name,
                 carry_binding_names,
                 pure_helpers,
                 inlineable_pure_helpers,
-            )?,
+            )?),
         }),
         _ => Some(PreparedLoopFlowCondition::Simple(
             parse_loop_flow_condition_atom(
@@ -208,12 +208,11 @@ fn combine_loop_flow_conditions(
     op: PreparedLoopLogicOp,
     rhs: PreparedLoopFlowCondition,
 ) -> Option<PreparedLoopFlowCondition> {
-    match (lhs, rhs) {
-        (PreparedLoopFlowCondition::Simple(lhs), PreparedLoopFlowCondition::Simple(rhs)) => {
-            Some(PreparedLoopFlowCondition::Compound { op, lhs, rhs })
-        }
-        _ => None,
-    }
+    Some(PreparedLoopFlowCondition::Compound {
+        op,
+        lhs: Box::new(lhs),
+        rhs: Box::new(rhs),
+    })
 }
 
 fn parse_loop_flow_control(
@@ -312,6 +311,24 @@ fn parse_loop_flow_control(
     })
 }
 
+enum PreparedReturnDecisionTree {
+    Return(NirExpr),
+    Branch {
+        condition: NirExpr,
+        then_tree: Box<PreparedReturnDecisionTree>,
+        else_tree: Box<PreparedReturnDecisionTree>,
+    },
+}
+
+enum PreparedCarryDecisionTree {
+    Leaf(PreparedCarryBranchSource),
+    Branch {
+        condition: PreparedLoopCarryCondition,
+        then_tree: Box<PreparedCarryDecisionTree>,
+        else_tree: Box<PreparedCarryDecisionTree>,
+    },
+}
+
 fn extract_pure_block_return_expr(
     body: &[NirStmt],
     pure_helpers: &BTreeSet<String>,
@@ -380,22 +397,35 @@ fn instantiate_pure_helper_body(
     )
 }
 
-fn parse_helper_conditional_return_shape(
+fn parse_helper_return_tree(
     body: &[NirStmt],
     pure_helpers: &BTreeSet<String>,
     inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
-) -> Option<(NirExpr, NirExpr, NirExpr)> {
+) -> Option<PreparedReturnDecisionTree> {
     let normalized_body = normalize_pure_helper_body(body, pure_helpers, inlineable_pure_helpers)?;
+    if let Some(returned) =
+        extract_pure_block_return_expr(&normalized_body, pure_helpers, inlineable_pure_helpers)
+    {
+        return Some(PreparedReturnDecisionTree::Return(returned));
+    }
     match normalized_body.as_slice() {
         [NirStmt::If {
             condition,
             then_body,
             else_body,
-        }] => Some((
-            condition.clone(),
-            extract_pure_block_return_expr(then_body, pure_helpers, inlineable_pure_helpers)?,
-            extract_pure_block_return_expr(else_body, pure_helpers, inlineable_pure_helpers)?,
-        )),
+        }] => Some(PreparedReturnDecisionTree::Branch {
+            condition: condition.clone(),
+            then_tree: Box::new(parse_helper_return_tree(
+                then_body,
+                pure_helpers,
+                inlineable_pure_helpers,
+            )?),
+            else_tree: Box::new(parse_helper_return_tree(
+                else_body,
+                pure_helpers,
+                inlineable_pure_helpers,
+            )?),
+        }),
         [NirStmt::If {
             condition,
             then_body,
@@ -403,17 +433,143 @@ fn parse_helper_conditional_return_shape(
         }, tail @ NirStmt::Return(Some(_))]
             if else_body.is_empty() =>
         {
-            Some((
-                condition.clone(),
-                extract_pure_block_return_expr(then_body, pure_helpers, inlineable_pure_helpers)?,
-                extract_pure_block_return_expr(
+            Some(PreparedReturnDecisionTree::Branch {
+                condition: condition.clone(),
+                then_tree: Box::new(parse_helper_return_tree(
+                    then_body,
+                    pure_helpers,
+                    inlineable_pure_helpers,
+                )?),
+                else_tree: Box::new(parse_helper_return_tree(
                     std::slice::from_ref(tail),
                     pure_helpers,
                     inlineable_pure_helpers,
-                )?,
-            ))
+                )?),
+            })
         }
         _ => None,
+    }
+}
+
+fn lower_helper_return_tree_to_carry_tree(
+    tree: PreparedReturnDecisionTree,
+    carry_name: &str,
+    binding_name: &str,
+    carries: &[PreparedCarryUpdate],
+    pure_helpers: &BTreeSet<String>,
+    inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
+) -> Option<PreparedCarryDecisionTree> {
+    match tree {
+        PreparedReturnDecisionTree::Return(expr) => Some(PreparedCarryDecisionTree::Leaf(
+            parse_loop_carry_branch_source(
+                carry_name,
+                &expr,
+                binding_name,
+                carries,
+                inlineable_pure_helpers,
+            )?,
+        )),
+        PreparedReturnDecisionTree::Branch {
+            condition,
+            then_tree,
+            else_tree,
+        } => Some(PreparedCarryDecisionTree::Branch {
+            condition: parse_loop_carry_condition(
+                &condition,
+                binding_name,
+                carries,
+                pure_helpers,
+                inlineable_pure_helpers,
+            )?,
+            then_tree: Box::new(lower_helper_return_tree_to_carry_tree(
+                *then_tree,
+                carry_name,
+                binding_name,
+                carries,
+                pure_helpers,
+                inlineable_pure_helpers,
+            )?),
+            else_tree: Box::new(lower_helper_return_tree_to_carry_tree(
+                *else_tree,
+                carry_name,
+                binding_name,
+                carries,
+                pure_helpers,
+                inlineable_pure_helpers,
+            )?),
+        }),
+    }
+}
+
+fn collapse_carry_decision_tree(
+    tree: &PreparedCarryDecisionTree,
+) -> Option<(
+    PreparedLoopFlowCondition,
+    PreparedCarryBranchSource,
+    PreparedCarryBranchSource,
+)> {
+    fn leaf_source(tree: &PreparedCarryDecisionTree) -> Option<PreparedCarryBranchSource> {
+        match tree {
+            PreparedCarryDecisionTree::Leaf(source) => Some(*source),
+            PreparedCarryDecisionTree::Branch { .. } => None,
+        }
+    }
+
+    match tree {
+        PreparedCarryDecisionTree::Leaf(_) => None,
+        PreparedCarryDecisionTree::Branch {
+            condition,
+            then_tree,
+            else_tree,
+        } => {
+            if let (Some(then_source), Some(else_source)) =
+                (leaf_source(then_tree), leaf_source(else_tree))
+            {
+                return Some((
+                    PreparedLoopFlowCondition::Simple(condition.clone()),
+                    then_source,
+                    else_source,
+                ));
+            }
+
+            if let Some(then_source) = leaf_source(then_tree) {
+                if let Some((nested_condition, nested_then, nested_else)) =
+                    collapse_carry_decision_tree(else_tree)
+                {
+                    if nested_then == then_source {
+                        return Some((
+                            PreparedLoopFlowCondition::Compound {
+                                op: PreparedLoopLogicOp::Or,
+                                lhs: Box::new(PreparedLoopFlowCondition::Simple(condition.clone())),
+                                rhs: Box::new(nested_condition),
+                            },
+                            then_source,
+                            nested_else,
+                        ));
+                    }
+                }
+            }
+
+            if let Some(else_source) = leaf_source(else_tree) {
+                if let Some((nested_condition, nested_then, nested_else)) =
+                    collapse_carry_decision_tree(then_tree)
+                {
+                    if nested_else == else_source {
+                        return Some((
+                            PreparedLoopFlowCondition::Compound {
+                                op: PreparedLoopLogicOp::And,
+                                lhs: Box::new(PreparedLoopFlowCondition::Simple(condition.clone())),
+                                rhs: Box::new(nested_condition),
+                            },
+                            nested_then,
+                            else_source,
+                        ));
+                    }
+                }
+            }
+
+            None
+        }
     }
 }
 
@@ -428,32 +584,17 @@ fn parse_helper_conditional_carry_update(
 ) -> Option<PreparedCarryUpdateKind> {
     let instantiated =
         instantiate_pure_helper_body(expr, inlineable_pure_helpers, pure_helper_blocks)?;
-    let (condition_expr, then_expr, else_expr) = parse_helper_conditional_return_shape(
-        &instantiated,
+    let return_tree =
+        parse_helper_return_tree(&instantiated, pure_helpers, inlineable_pure_helpers)?;
+    let carry_tree = lower_helper_return_tree_to_carry_tree(
+        return_tree,
+        carry_name,
+        binding_name,
+        carries,
         pure_helpers,
         inlineable_pure_helpers,
     )?;
-    let condition = parse_loop_carry_condition(
-        &condition_expr,
-        binding_name,
-        carries,
-        pure_helpers,
-        inlineable_pure_helpers,
-    )?;
-    let then_source = parse_loop_carry_branch_source(
-        carry_name,
-        &then_expr,
-        binding_name,
-        carries,
-        inlineable_pure_helpers,
-    )?;
-    let else_source = parse_loop_carry_branch_source(
-        carry_name,
-        &else_expr,
-        binding_name,
-        carries,
-        inlineable_pure_helpers,
-    )?;
+    let (condition, then_source, else_source) = collapse_carry_decision_tree(&carry_tree)?;
     Some(PreparedCarryUpdateKind::Conditional {
         condition,
         then_source,
@@ -542,7 +683,7 @@ fn parse_loop_carry_update(
             Some(PreparedCarryUpdate {
                 binding_name: then_name,
                 kind: PreparedCarryUpdateKind::Conditional {
-                    condition,
+                    condition: PreparedLoopFlowCondition::Simple(condition),
                     then_source,
                     else_source,
                 },

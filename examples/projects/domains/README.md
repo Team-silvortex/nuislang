@@ -14,6 +14,7 @@ policy, fallback, batch, and bridge demos live here:
 * [shader_task_async_shapes.ns](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shared/shader_task_async_shapes.ns)
 * [kernel_task_async_shapes.ns](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shared/kernel_task_async_shapes.ns)
 * [network_task_async_shapes.ns](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shared/network_task_async_shapes.ns)
+* [multidomain_task_async_shapes.ns](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shared/multidomain_task_async_shapes.ns)
 
 If you want the shortest source-level sample that now lines up with the current
 `YIR` scheduler reading order, start with:
@@ -36,6 +37,10 @@ Current async sample ladder:
 * kernel:
   [kernel_async_tensor_policy_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_policy_profile_demo) ->
   [kernel_async_tensor_windowed_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_windowed_batch_profile_demo)
+* multidomain:
+  [multidomain_profile_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/multidomain_profile_probe_demo) ->
+  [multidomain_async_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/multidomain_async_probe_demo) ->
+  [multidomain_async_orchestration_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/multidomain_async_orchestration_demo)
 
 Start here:
 
@@ -43,7 +48,8 @@ Start here:
   [shared](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shared),
   [shader_task_async_shapes.ns](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shared/shader_task_async_shapes.ns),
   [kernel_task_async_shapes.ns](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shared/kernel_task_async_shapes.ns),
-  [network_task_async_shapes.ns](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shared/network_task_async_shapes.ns)
+  [network_task_async_shapes.ns](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shared/network_task_async_shapes.ns),
+  [multidomain_task_async_shapes.ns](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shared/multidomain_task_async_shapes.ns)
 * shader spine:
   [shader_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_profile_demo) ->
   surface branch ->

@@ -54,15 +54,6 @@ pub(crate) fn nir_uses_shader_profile_radius_seed(module: &NirModule, unit: &str
     })
 }
 
-pub(crate) fn nir_uses_data_profile_bind_core(module: &NirModule, unit: &str) -> bool {
-    module.functions.iter().any(|function| {
-        function
-            .body
-            .iter()
-            .any(|stmt| stmt_uses_data_profile_bind_core(stmt, unit))
-    })
-}
-
 pub(crate) fn nir_uses_data_profile_handle_table(module: &NirModule, unit: &str) -> bool {
     module.functions.iter().any(|function| {
         function
@@ -87,6 +78,15 @@ pub(crate) fn nir_uses_data_profile_send_downlink(module: &NirModule, unit: &str
             .body
             .iter()
             .any(|stmt| stmt_uses_data_profile_send_downlink(stmt, unit))
+    })
+}
+
+pub(crate) fn nir_uses_network_profile_bind_core(module: &NirModule, unit: &str) -> bool {
+    module.functions.iter().any(|function| {
+        function
+            .body
+            .iter()
+            .any(|stmt| stmt_uses_network_profile_bind_core(stmt, unit))
     })
 }
 
@@ -122,10 +122,6 @@ fn stmt_uses_shader_profile_radius_seed(stmt: &NirStmt, unit: &str) -> bool {
     })
 }
 
-fn stmt_uses_data_profile_bind_core(stmt: &NirStmt, unit: &str) -> bool {
-    stmt_uses_expr_predicate(stmt, &|value| expr_uses_data_profile_bind_core(value, unit))
-}
-
 fn stmt_uses_data_profile_handle_table(stmt: &NirStmt, unit: &str) -> bool {
     stmt_uses_expr_predicate(stmt, &|value| {
         expr_uses_data_profile_handle_table(value, unit)
@@ -141,6 +137,12 @@ fn stmt_uses_data_profile_send_uplink(stmt: &NirStmt, unit: &str) -> bool {
 fn stmt_uses_data_profile_send_downlink(stmt: &NirStmt, unit: &str) -> bool {
     stmt_uses_expr_predicate(stmt, &|value| {
         expr_uses_data_profile_send_downlink(value, unit)
+    })
+}
+
+fn stmt_uses_network_profile_bind_core(stmt: &NirStmt, unit: &str) -> bool {
+    stmt_uses_expr_predicate(stmt, &|value| {
+        expr_uses_network_profile_bind_core(value, unit)
     })
 }
 
@@ -364,13 +366,6 @@ fn expr_uses_shader_profile_radius_seed(expr: &NirExpr, unit: &str) -> bool {
     }
 }
 
-fn expr_uses_data_profile_bind_core(expr: &NirExpr, unit: &str) -> bool {
-    match expr {
-        NirExpr::DataProfileBindCoreRef { unit: data_unit } => data_unit == unit,
-        _ => expr_walk_any(expr, &|inner| expr_uses_data_profile_bind_core(inner, unit)),
-    }
-}
-
 fn expr_uses_data_profile_handle_table(expr: &NirExpr, unit: &str) -> bool {
     match expr {
         NirExpr::DataProfileHandleTableRef { unit: data_unit } => data_unit == unit,
@@ -398,6 +393,15 @@ fn expr_uses_data_profile_send_downlink(expr: &NirExpr, unit: &str) -> bool {
         } => data_unit == unit,
         _ => expr_walk_any(expr, &|inner| {
             expr_uses_data_profile_send_downlink(inner, unit)
+        }),
+    }
+}
+
+fn expr_uses_network_profile_bind_core(expr: &NirExpr, unit: &str) -> bool {
+    match expr {
+        NirExpr::NetworkProfileBindCoreRef { unit: network_unit } => network_unit == unit,
+        _ => expr_walk_any(expr, &|inner| {
+            expr_uses_network_profile_bind_core(inner, unit)
         }),
     }
 }
@@ -434,7 +438,9 @@ pub(super) fn expr_walk_any(expr: &NirExpr, predicate: &dyn Fn(&NirExpr) -> bool
         | NirExpr::Free(inner)
         | NirExpr::IsNull(inner)
         | NirExpr::FieldAccess { base: inner, .. } => predicate(inner),
-        NirExpr::DataResult { value: inner, .. } | NirExpr::ShaderResult { value: inner, .. } => {
+        NirExpr::DataResult { value: inner, .. }
+        | NirExpr::ShaderResult { value: inner, .. }
+        | NirExpr::NetworkResult { value: inner, .. } => {
             predicate(inner)
         }
         NirExpr::KernelResult { value: inner, .. } => predicate(inner),

@@ -104,7 +104,7 @@ pub(super) struct PreparedCarryUpdate {
 pub(super) const TAIL_RECURSIVE_PREV_CURRENT_BINDING: &str = "__tailrec_prev_current";
 pub(super) const TAIL_RECURSIVE_PREV_CARRY_BINDING_PREFIX: &str = "__tailrec_prev_carry_";
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum PreparedCarrySource {
     Current,
     PreviousCurrent,
@@ -112,7 +112,7 @@ pub(super) enum PreparedCarrySource {
     Carry(usize),
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum PreparedCarryLinearOp {
     Add,
     Mul,
@@ -124,12 +124,13 @@ pub(super) enum PreparedCarryUpdateKind {
         source: PreparedCarrySource,
     },
     Conditional {
-        condition: PreparedLoopCarryCondition,
+        condition: PreparedLoopFlowCondition,
         then_source: PreparedCarryBranchSource,
         else_source: PreparedCarryBranchSource,
     },
 }
 
+#[derive(Clone)]
 pub(super) struct PreparedLoopCarryCondition {
     pub(super) lhs: PreparedCarryCondSource,
     pub(super) compare: PreparedLoopCompare,
@@ -144,7 +145,7 @@ pub(super) enum PreparedCarryCondSource {
     Carry(usize),
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum PreparedCarryBranchSource {
     Keep,
     Source {
@@ -164,12 +165,13 @@ pub(super) struct PreparedLoopFlowControl {
     pub(super) action: PreparedLoopFlowAction,
 }
 
+#[derive(Clone)]
 pub(super) enum PreparedLoopFlowCondition {
     Simple(PreparedLoopCarryCondition),
     Compound {
         op: PreparedLoopLogicOp,
-        lhs: PreparedLoopCarryCondition,
-        rhs: PreparedLoopCarryCondition,
+        lhs: Box<PreparedLoopFlowCondition>,
+        rhs: Box<PreparedLoopFlowCondition>,
     },
 }
 

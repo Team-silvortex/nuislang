@@ -1,0 +1,43 @@
+mod cpu MultiDomainTaskAsyncShapes {
+  pub fn encode_completed(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  pub fn selected_task_value(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return task_value(result);
+    }
+    return 0;
+  }
+
+  pub fn orchestrated_value(
+    base: i64,
+    network_result: TaskResult<i64>,
+    kernel_result: TaskResult<i64>
+  ) -> i64 {
+    if task_completed(network_result) {
+      return base + task_value(network_result);
+    }
+    if task_completed(kernel_result) {
+      return base + task_value(kernel_result);
+    }
+    return base;
+  }
+
+  pub fn summary_value(
+    payload_ready: i64,
+    orchestrated_result: i64,
+    network_result: TaskResult<i64>,
+    kernel_result: TaskResult<i64>
+  ) -> i64 {
+    return payload_ready
+      + orchestrated_result
+      + encode_completed(network_result)
+      + encode_completed(kernel_result)
+      + selected_task_value(network_result)
+      + selected_task_value(kernel_result);
+  }
+}

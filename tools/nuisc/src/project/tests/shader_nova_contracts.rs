@@ -1,4 +1,5 @@
 use super::*;
+use std::path::PathBuf;
 
 #[test]
 fn validates_shader_packet_contract_from_cpu_usage() {
@@ -241,6 +242,18 @@ fn validates_nova_panel_contract_from_struct_literal_usage() {
 }
 
 #[test]
+fn compiles_real_shader_async_policy_project() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../examples/projects/domains/shader_async_policy_profile_demo");
+    let artifacts = crate::pipeline::compile_source_path(&root).unwrap();
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name == "ShaderTaskAsyncShapes.async_policy_summary_completed"));
+}
+
+#[test]
 fn rejects_shader_packet_field_count_mismatch() {
     let project = project_with_modules(vec![
         (
@@ -387,7 +400,194 @@ fn project_link_accepts_draw_only_shader_bridge_at_nir_level() {
         via: Some("data.FabricPlane".to_owned()),
     }];
 
-    let nir = crate::frontend::lower_ast_to_nir(&project.modules[0].ast).unwrap();
+    let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
+    validate_project_links_against_nir(&project, &nir).unwrap();
+}
+
+#[test]
+fn infers_project_route_payload_type_from_entry_with_shared_cpu_helper() {
+    let project = project_with_modules(vec![
+        (
+            "main.ns",
+            r#"
+            use cpu ShaderTaskAsyncShapes;
+            use data FabricPlane;
+            use shader SurfaceShader;
+
+            mod cpu Main {
+              fn main() {
+                let packet: SurfaceShaderPacket =
+                  ShaderTaskAsyncShapes.make_packet();
+                let gpu_packet: Window<SurfaceShaderPacket> =
+                  data_profile_send_uplink("FabricPlane", packet);
+              }
+            }
+            "#,
+        ),
+        (
+            "surface_shader.ns",
+            r#"
+            mod shader SurfaceShader {
+              fn profile() {
+                const vertex_count: i64 = 4;
+                const instance_count: i64 = 1;
+                const packet_color_slot: i64 = 0;
+                const packet_speed_slot: i64 = 1;
+                const packet_radius_slot: i64 = 2;
+                const packet_field_count: i64 = 3;
+                let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
+                let profile_view: Viewport = shader_viewport(160, 120);
+                let profile_pipe: Pipeline = shader_pipeline("lit_sphere", "triangle_strip");
+                let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", "stub");
+              }
+            }
+            "#,
+        ),
+        (
+            "fabric_plane.ns",
+            r#"
+            mod data FabricPlane {
+              fn profile() {
+                let uplink_window: Window<SurfaceShaderPacket> =
+                  data_receive_uplink_window("SurfaceShader");
+              }
+            }
+            "#,
+        ),
+        (
+            "shader_task_async_shapes.ns",
+            r#"
+            mod cpu ShaderTaskAsyncShapes {
+              pub fn make_packet() -> SurfaceShaderPacket {
+                return shader_profile_packet("SurfaceShader", 1, 2, 3);
+              }
+            }
+            "#,
+        ),
+    ]);
+
+    let payload = infer_project_route_payload_type(&project, "cpu.Main", "FabricPlane", true)
+        .unwrap()
+        .expect("expected payload contract");
+    assert_eq!(payload.render(), "Window<SurfaceShaderPacket>");
+}
+
+#[test]
+fn validates_project_links_against_nir_with_shared_cpu_helper_indirection() {
+    let project = project_with_modules(vec![
+        (
+            "main.ns",
+            r#"
+            use cpu ShaderTaskAsyncShapes;
+            use data FabricPlane;
+            use shader SurfaceShader;
+
+            mod cpu Main {
+              fn main() {
+                let packet: SurfaceShaderPacket =
+                  ShaderTaskAsyncShapes.make_packet();
+                let gpu_packet: Window<SurfaceShaderPacket> =
+                  ShaderTaskAsyncShapes.send_packet(packet);
+                let host_frame: Window<Frame> =
+                  ShaderTaskAsyncShapes.render_frame(gpu_packet);
+                cpu_present_frame(host_frame);
+              }
+            }
+            "#,
+        ),
+        (
+            "surface_shader.ns",
+            r#"
+            mod shader SurfaceShader {
+              fn profile() {
+                const vertex_count: i64 = 4;
+                const instance_count: i64 = 1;
+                const packet_color_slot: i64 = 0;
+                const packet_speed_slot: i64 = 1;
+                const packet_radius_slot: i64 = 2;
+                const packet_tag: i64 = 17;
+                const material_mode: i64 = 2;
+                const pass_kind: i64 = 1;
+                const packet_field_count: i64 = 3;
+                let profile_target: Target = shader_target("rgba8_unorm", 160, 120);
+                let profile_view: Viewport = shader_viewport(160, 120);
+                let profile_pipe: Pipeline = shader_pipeline("lit_sphere", "triangle_strip");
+                let profile_wgsl: ShaderModule = shader_inline_wgsl("lit_sphere", "stub");
+              }
+            }
+            "#,
+        ),
+        (
+            "fabric_plane.ns",
+            r#"
+            mod data FabricPlane {
+              fn profile() {
+                const bind_core: i64 = 0;
+                const handle_table: i64 = 1;
+                const window_offset: i64 = 0;
+                const uplink_len: i64 = 1;
+                const downlink_len: i64 = 1;
+                let cpu_to_shader: Marker<CpuToShader> = data_marker("cpu_to_shader");
+                let shader_to_cpu: Marker<ShaderToCpu> = data_marker("shader_to_cpu");
+                let uplink_pipe: Marker<UplinkPipe> = data_marker("uplink_pipe");
+                let downlink_pipe: Marker<DownlinkPipe> = data_marker("downlink_pipe");
+                let uplink_pipe_class: Marker<UplinkPipeClass> = data_marker("uplink_pipe_class");
+                let downlink_pipe_class: Marker<DownlinkPipeClass> = data_marker("downlink_pipe_class");
+                let uplink_payload_class: Marker<PayloadClassWindow> = data_marker("uplink_payload_class");
+                let downlink_payload_class: Marker<PayloadClassWindow> = data_marker("downlink_payload_class");
+                let uplink_payload_shape: Marker<PayloadShapeWindowSurfaceShaderPacket> = data_marker("uplink_payload_shape");
+                let downlink_payload_shape: Marker<PayloadShapeWindowFrame> = data_marker("downlink_payload_shape");
+                let uplink_window_policy: Marker<UplinkWindowPolicy> = data_marker("uplink_window_policy");
+                let downlink_window_policy: Marker<DownlinkWindowPolicy> = data_marker("downlink_window_policy");
+              }
+            }
+            "#,
+        ),
+        (
+            "shader_task_async_shapes.ns",
+            r#"
+            use data FabricPlane;
+            use shader SurfaceShader;
+
+            mod cpu ShaderTaskAsyncShapes {
+              pub fn make_packet() -> SurfaceShaderPacket {
+                let color: i64 = shader_profile_color_seed("SurfaceShader", 10, 0);
+                let speed: i64 = shader_profile_speed_seed("SurfaceShader", 0, 1, 20);
+                let radius: i64 = shader_profile_radius_seed("SurfaceShader", 30, 0);
+                return shader_profile_packet("SurfaceShader", color, speed, radius);
+              }
+
+              pub fn send_packet(packet: SurfaceShaderPacket) -> Window<SurfaceShaderPacket> {
+                data_profile_bind_core("FabricPlane");
+                let handles: HandleTable<FabricPlaneBindings> =
+                  data_profile_handle_table("FabricPlane");
+                return data_profile_send_uplink("FabricPlane", packet);
+              }
+
+              pub fn render_frame(gpu_packet: Window<SurfaceShaderPacket>) -> Window<Frame> {
+                let pass_result: ShaderResult<Pass> =
+                  shader_result(shader_profile_begin_pass("SurfaceShader"));
+                let draw_result: ShaderResult<Frame> = shader_result(
+                  shader_profile_draw_instanced(
+                    "SurfaceShader",
+                    shader_value(pass_result),
+                    gpu_packet
+                  )
+                );
+                return data_profile_send_downlink("FabricPlane", shader_value(draw_result));
+              }
+            }
+            "#,
+        ),
+    ]);
+    let mut project = project;
+    project.manifest.links = vec![ProjectLink {
+        from: "cpu.Main".to_owned(),
+        to: "shader.SurfaceShader".to_owned(),
+        via: Some("data.FabricPlane".to_owned()),
+    }];
+
+    let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
     validate_project_links_against_nir(&project, &nir).unwrap();
 }
 

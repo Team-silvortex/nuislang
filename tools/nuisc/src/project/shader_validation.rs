@@ -53,7 +53,7 @@ pub(super) fn infer_shader_packet_contract(
 ) -> Result<Option<ShaderPacketContract>, String> {
     let mut discovered = Vec::new();
     for project_module in &project.modules {
-        let nir = crate::frontend::lower_ast_to_nir(&project_module.ast)?;
+        let nir = super::lower_project_module_to_nir(project, project_module)?;
         collect_shader_packet_contracts_from_stmts(&nir.functions, unit, &mut discovered);
     }
     if discovered.is_empty() {

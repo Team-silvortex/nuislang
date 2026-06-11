@@ -474,7 +474,7 @@ pub(super) fn stitch_data_profile_edges(module: &mut YirModule) {
             }
         }
     }
-    if !kernel_nodes.is_empty() {
+    if !kernel_nodes.is_empty() && !cpu_to_kernel_markers.is_empty() {
         for pipe in data_pipe_nodes.iter().take(2) {
             for kernel_node in &kernel_nodes {
                 push_project_dependency_edge_if_missing(
@@ -486,6 +486,8 @@ pub(super) fn stitch_data_profile_edges(module: &mut YirModule) {
                 );
             }
         }
+    }
+    if !kernel_nodes.is_empty() && !kernel_to_cpu_markers.is_empty() {
         for pipe in data_pipe_nodes.iter().skip(2).take(2) {
             for kernel_node in &kernel_nodes {
                 push_project_dependency_edge_if_missing(

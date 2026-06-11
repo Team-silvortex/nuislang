@@ -35,6 +35,10 @@ like the integration/completion line it claims to be.
   `scripts/check-0.17-mainline.sh`
 * [ ] focused frontend generic probes still pass
 * [ ] focused lowering/control-flow probes still pass
+* [ ] helper-aware project integration probes still pass:
+  `cargo test -q -p nuisc shader_nova_contracts`
+  and
+  `cargo test -q -p nuisc multidomain_async`
 * [ ] real project compile harnesses still pass
 * [ ] async/task + memory/session integration probes still pass
 * [ ] network-oriented compile harnesses still pass
@@ -56,6 +60,9 @@ like the integration/completion line it claims to be.
 * [ ] lowering completion:
   frontend-validated routes increasingly survive into checked-in lowering and
   verifier-backed compile outputs
+* [ ] project-aware lowering:
+  helper-visible project analysis still prefers project context over isolated
+  module lowering when route truth depends on local helpers
 * [ ] control-flow lowering:
   loop-family, branch-local flow, and generic-heavy branch assembly continue to
   compose instead of regressing in combination
@@ -65,6 +72,10 @@ like the integration/completion line it claims to be.
 * [ ] `std net` bridge:
   network/profile/transport/session/http-facing routes increasingly stand on
   the same async/task/memory/lowering spine
+* [ ] helper-mediated cross-domain closure:
+  `cpu helper -> shader/data`, `cpu helper -> kernel/data`, and
+  `cpu helper -> network` remain test-backed truths instead of undocumented
+  side routes
 * [ ] compile truth vs runtime truth:
   docs and examples still distinguish them honestly
 * [ ] real project anchors:

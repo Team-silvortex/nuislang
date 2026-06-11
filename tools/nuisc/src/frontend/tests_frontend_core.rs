@@ -4,6 +4,8 @@ use super::parse_nuis_module;
 use nuis_semantics::model::{
     AstDestructureBinding, AstDestructureField, AstStmt, AstVisibility, NirExpr, NirStmt,
 };
+use std::fs;
+use std::path::PathBuf;
 
 #[test]
 fn infers_struct_field_type_from_shared_type_helper() {
@@ -180,6 +182,113 @@ fn rejects_private_local_cpu_helper_calls_across_modules() {
         error.contains("unknown function `task_policy_completed`"),
         "unexpected error: {error}"
     );
+}
+
+#[test]
+fn lowers_project_local_cpu_helper_calls_with_shader_and_data_modules_present() {
+    let entry = parse_nuis_ast(
+        r#"
+        use cpu ShaderTaskAsyncShapes;
+        use data FabricPlane;
+        use shader SurfaceShader;
+
+        mod cpu Main {
+          fn main(primary_result: TaskResult<i64>, secondary_result: TaskResult<i64>) -> i64 {
+            return ShaderTaskAsyncShapes.async_policy_summary_completed(
+              primary_result,
+              secondary_result
+            );
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let helper = parse_nuis_ast(
+        r#"
+        mod cpu ShaderTaskAsyncShapes {
+          pub fn encode_completed(result: TaskResult<i64>) -> i64 {
+            if task_completed(result) {
+              return 1;
+            }
+            return 0;
+          }
+
+          pub fn async_policy_summary_completed(
+            primary_result: TaskResult<i64>,
+            secondary_result: TaskResult<i64>
+          ) -> i64 {
+            return encode_completed(primary_result) + encode_completed(secondary_result);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let data_module = parse_nuis_ast(
+        r#"
+        mod data FabricPlane {
+          struct SurfaceShaderPacket {
+            color: i64,
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let shader_module = parse_nuis_ast(
+        r#"
+        mod shader SurfaceShader {
+          struct SurfaceShaderPacket {
+            color: i64,
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let module =
+        super::lower_project_ast_to_nir(&entry, &[helper, data_module, shader_module]).unwrap();
+    let main_function = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main_function.body.first(),
+        Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
+            if callee == "ShaderTaskAsyncShapes.async_policy_summary_completed"
+    ));
+}
+
+#[test]
+fn lowers_real_shader_project_helper_calls_from_disk() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../examples/projects/domains/shader_async_policy_profile_demo");
+    let shared_root = root.join("../shared");
+    let entry = parse_nuis_ast(&fs::read_to_string(root.join("main.ns")).unwrap()).unwrap();
+    let shader_module =
+        parse_nuis_ast(&fs::read_to_string(root.join("surface_shader.ns")).unwrap()).unwrap();
+    let data_module =
+        parse_nuis_ast(&fs::read_to_string(root.join("fabric_plane.ns")).unwrap()).unwrap();
+    let helper = parse_nuis_ast(
+        &fs::read_to_string(shared_root.join("shader_task_async_shapes.ns")).unwrap(),
+    )
+    .unwrap();
+
+    let module =
+        super::lower_project_ast_to_nir(&entry, &[shader_module, data_module, helper]).unwrap();
+    let main_function = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(main_function.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                value: NirExpr::Call { callee, .. },
+                ..
+            } if callee == "ShaderTaskAsyncShapes.async_policy_summary_completed"
+        )
+    }));
 }
 
 #[test]

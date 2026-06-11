@@ -18,8 +18,8 @@ use super::profile_refs::{
 };
 use super::profile_targets::has_xfer_segment;
 use super::profile_usage::{
-    nir_uses_data_profile_bind_core, nir_uses_data_profile_handle_table,
-    nir_uses_data_profile_send_downlink, nir_uses_data_profile_send_uplink,
+    nir_uses_data_profile_handle_table, nir_uses_data_profile_send_downlink,
+    nir_uses_data_profile_send_uplink, nir_uses_network_profile_bind_core,
     nir_uses_shader_profile_color_seed, nir_uses_shader_profile_draw_instanced,
     nir_uses_shader_profile_packet, nir_uses_shader_profile_radius_seed,
     nir_uses_shader_profile_render, nir_uses_shader_profile_speed_seed,
@@ -341,9 +341,9 @@ pub fn validate_project_links_against_nir(
                 &to_unit,
                 "network.profile.bind-core.v1",
             )?;
-            if !nir_uses_data_profile_bind_core(module, &to_unit) {
+            if !nir_uses_network_profile_bind_core(module, &to_unit) {
                 return Err(format!(
-                    "project link `{}` -> `{}` requires CPU entry to use data_bind_core(\"{}\") at NIR level",
+                    "project link `{}` -> `{}` requires CPU entry to use network_profile_bind_core(\"{}\") at NIR level",
                     link.from, link.to, to_unit
                 ));
             }

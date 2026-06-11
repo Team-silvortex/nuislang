@@ -37,7 +37,15 @@ pub fn compile_project_plan(
         .iter()
         .map(|module| (module.ast.domain.clone(), module.ast.unit.clone()))
         .collect::<BTreeSet<_>>();
-    let ast = crate::frontend::parse_nuis_ast(&project.entry_source)?;
+    let ast = if let Some(module) = project
+        .modules
+        .iter()
+        .find(|module| module.path == project.entry_path)
+    {
+        module.ast.clone()
+    } else {
+        crate::frontend::parse_nuis_ast(&project.entry_source)?
+    };
     let helper_modules = project
         .modules
         .iter()

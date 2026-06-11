@@ -113,7 +113,7 @@ pub(super) fn infer_project_route_payload_type(
     else {
         return Ok(None);
     };
-    let nir = crate::frontend::lower_ast_to_nir(&project_module.ast)?;
+    let nir = super::lower_project_module_to_nir(project, project_module)?;
     Ok(find_route_payload_type_in_nir(&nir, data_unit, uplink))
 }
 
@@ -256,15 +256,29 @@ fn find_route_payload_type_in_nir(
     data_unit: &str,
     uplink: bool,
 ) -> Option<NirTypeRef> {
-    let function = module
-        .functions
-        .iter()
-        .find(|function| function.name == "main")?;
-    find_route_payload_type_in_stmts(&function.body, data_unit, uplink)
+    if let Some(function) = module.functions.iter().find(|function| function.name == "main") {
+        if let Some(ty) = find_route_payload_type_in_stmts(
+            &function.body,
+            function.return_type.as_ref(),
+            data_unit,
+            uplink,
+        ) {
+            return Some(ty);
+        }
+    }
+    module.functions.iter().find_map(|function| {
+        find_route_payload_type_in_stmts(
+            &function.body,
+            function.return_type.as_ref(),
+            data_unit,
+            uplink,
+        )
+    })
 }
 
 fn find_route_payload_type_in_stmts(
     body: &[NirStmt],
+    current_return_type: Option<&NirTypeRef>,
     data_unit: &str,
     uplink: bool,
 ) -> Option<NirTypeRef> {
@@ -285,22 +299,35 @@ fn find_route_payload_type_in_stmts(
                 else_body,
                 ..
             } => {
-                if let Some(ty) = find_route_payload_type_in_stmts(then_body, data_unit, uplink) {
+                if let Some(ty) =
+                    find_route_payload_type_in_stmts(then_body, current_return_type, data_unit, uplink)
+                {
                     return Some(ty);
                 }
-                if let Some(ty) = find_route_payload_type_in_stmts(else_body, data_unit, uplink) {
+                if let Some(ty) =
+                    find_route_payload_type_in_stmts(else_body, current_return_type, data_unit, uplink)
+                {
                     return Some(ty);
                 }
             }
             NirStmt::While { body, .. } => {
-                if let Some(ty) = find_route_payload_type_in_stmts(body, data_unit, uplink) {
+                if let Some(ty) =
+                    find_route_payload_type_in_stmts(body, current_return_type, data_unit, uplink)
+                {
                     return Some(ty);
+                }
+            }
+            NirStmt::Return(Some(value)) => {
+                if route_payload_expr_matches(value, data_unit, uplink) {
+                    if let Some(ty) = current_return_type {
+                        return Some(ty.clone());
+                    }
                 }
             }
             NirStmt::Print(_)
             | NirStmt::Await(_)
             | NirStmt::Expr(_)
-            | NirStmt::Return(_)
+            | NirStmt::Return(None)
             | NirStmt::Break
             | NirStmt::Continue => {}
             NirStmt::Let { ty: None, .. } => {}

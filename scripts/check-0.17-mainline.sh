@@ -15,6 +15,8 @@ run cargo test -q -p nuisc tests_higher_order
 run cargo test -q -p nuisc tests_generic_constraints
 run cargo test -q -p nuisc tests_control_flow
 run cargo test -q -p nuisc tests_async_runtime
+run cargo test -q -p nuisc shader_nova_contracts
+run cargo test -q -p nuisc multidomain_async
 run cargo test -q -p nuisc --test task_compile
 run cargo test -q -p nuisc --test network_compile
 run cargo test -q -p nuisc --test state_compile

@@ -39,6 +39,10 @@ Short rule:
 
 `frontend generics + frontend higher-order + control-flow + async lowering + project compile anchors = today’s smallest believable integration gate`
 
+For the current line, that minimum is now best read with one extra truth:
+
+`helper-aware project integration probes are part of the honest gate, not optional side checks`
+
 Expanded command list:
 
 ```bash
@@ -47,6 +51,8 @@ cargo test -q -p nuisc tests_higher_order
 cargo test -q -p nuisc tests_generic_constraints
 cargo test -q -p nuisc tests_control_flow
 cargo test -q -p nuisc tests_async_runtime
+cargo test -q -p nuisc shader_nova_contracts
+cargo test -q -p nuisc multidomain_async
 cargo test -q -p nuisc --test task_compile
 cargo test -q -p nuisc --test network_compile
 cargo test -q -p nuisc --test state_compile
@@ -219,7 +225,44 @@ If this fails, suspect:
 * multi-file specialization closure
 * task-facing example drift relative to compiler truth
 
-### 7. Network Project Anchors
+### 7. Project-Aware Bridge / Helper Integration
+
+Role:
+
+* helper-aware project lowering
+* helper-mediated route payload inference
+* helper-mediated project-link NIR validation
+* cross-domain closure staying truthful outside entry-local direct calls
+
+Primary families:
+
+* `core`:
+  [shader_nova_contracts.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/project/tests/shader_nova_contracts.rs)
+* `core`:
+  [multidomain_async.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/project/tests/multidomain_async.rs)
+
+Recommended commands:
+
+```bash
+cargo test -q -p nuisc shader_nova_contracts
+cargo test -q -p nuisc multidomain_async
+```
+
+This layer currently protects:
+
+* `cpu helper -> shader/data` packet + bridge closure
+* `cpu helper -> kernel/data` bridge payload closure
+* `cpu helper -> network` profile-usage closure
+* project analyses that must not silently fall back to isolated module lowering
+
+If this fails, suspect:
+
+* project-aware lowering drift
+* helper visibility/signature registration drift
+* payload inference only seeing entry-local direct statements
+* bridge/profile validation only seeing shallow expression shapes
+
+### 8. Network Project Anchors
 
 Role:
 
@@ -243,7 +286,7 @@ If this fails, suspect:
 * helper-bridge generic routes
 * network-facing examples drifting away from the shared compiler spine
 
-### 8. State Project Anchors
+### 9. State Project Anchors
 
 Role:
 
@@ -285,6 +328,7 @@ truths:
 * frontend generic/higher-order coherence
 * control-flow composition
 * lowering continuity
+* helper-aware project integration closure
 * task project closure
 * network project closure
 * state/non-network project closure

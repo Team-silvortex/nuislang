@@ -1,5 +1,37 @@
 use super::*;
 
+fn encode_carry_condition_args(
+    condition: &PreparedLoopFlowCondition,
+    state: &mut LoweringState<'_>,
+    bindings: &mut BTreeMap<String, String>,
+) -> Result<(Vec<String>, Vec<String>, Vec<String>), String> {
+    match condition {
+        PreparedLoopFlowCondition::Simple(condition) => {
+            let rhs_name = lower_expr(&condition.rhs, state, bindings)?;
+            Ok((
+                vec![
+                    render_loop_cond_kind(&condition.lhs, condition.compare),
+                    rhs_name.clone(),
+                ],
+                vec![rhs_name.clone()],
+                vec![rhs_name],
+            ))
+        }
+        PreparedLoopFlowCondition::Compound { op, lhs, rhs } => {
+            let (mut lhs_args, mut lhs_dep_inputs, mut lhs_effect_inputs) =
+                encode_carry_condition_args(lhs, state, bindings)?;
+            let (rhs_args, rhs_dep_inputs, rhs_effect_inputs) =
+                encode_carry_condition_args(rhs, state, bindings)?;
+            let mut args = vec![render_loop_logic_op(*op).to_owned()];
+            args.append(&mut lhs_args);
+            args.extend(rhs_args);
+            lhs_dep_inputs.extend(rhs_dep_inputs);
+            lhs_effect_inputs.extend(rhs_effect_inputs);
+            Ok((args, lhs_dep_inputs, lhs_effect_inputs))
+        }
+    }
+}
+
 pub(super) fn lower_counted_while(
     prepared: PreparedCountedWhile,
     state: &mut LoweringState<'_>,
@@ -126,10 +158,9 @@ pub(super) fn lower_chained_while(
                 then_source,
                 else_source,
             } => {
-                let condition_tag = render_loop_cond_kind(&condition.lhs, condition.compare);
-                let rhs_name = lower_expr(&condition.rhs, state, bindings)?;
-                args.push(condition_tag);
-                args.push(rhs_name.clone());
+                let (condition_args, cond_dep_inputs, cond_effect_inputs) =
+                    encode_carry_condition_args(condition, state, bindings)?;
+                args.extend(condition_args);
                 let encode_branch_source = |source: &PreparedCarryBranchSource| match source {
                     PreparedCarryBranchSource::Keep => "keep".to_owned(),
                     PreparedCarryBranchSource::Source { op, source } => {
@@ -138,8 +169,8 @@ pub(super) fn lower_chained_while(
                 };
                 args.push(encode_branch_source(then_source));
                 args.push(encode_branch_source(else_source));
-                extra_dep_inputs.push(rhs_name.clone());
-                extra_effect_inputs.push(rhs_name);
+                extra_dep_inputs.extend(cond_dep_inputs);
+                extra_effect_inputs.extend(cond_effect_inputs);
             }
         }
     }

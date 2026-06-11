@@ -10,6 +10,7 @@ This `0.17.0` file narrows in on something more specific:
 * what the frontend actually does today
 * in what order it does it
 * which crossovers now feel like one compiler story
+* which project-aware helper routes are now part of that story
 * where the current line is still intentionally narrower
 
 Use it when the question is not only “which command do I run?”, but
@@ -37,6 +38,29 @@ surface syntax
 Short rule:
 
 `frontend truth is no longer only parsing + typing; it is now the ordered composition of lambda, higher-order, generic, control-flow, and async-aware rewrite stages`
+
+## Project-Aware Lowering Rule
+
+For the current `0.17.0` line, multi-file project truth should now be read
+with one extra rule:
+
+`a project module is not always meaningful in isolation; helper-visible lowering must preserve project context`
+
+The practical consequence is:
+
+* project analysis should prefer project-aware lowering over isolated
+  `lower_ast_to_nir(...)` when the route can depend on local helper modules
+* visible `cpu` helpers are now part of the truthful compile story for:
+  payload-shape inference, project-link validation, and support/profile
+  contract checks
+* “entry module only” reasoning is now too narrow for some real `0.17.0`
+  project routes
+
+Current anchor surfaces for that rule:
+
+* [project.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/project.rs)
+* [shader_nova_contracts.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/project/tests/shader_nova_contracts.rs)
+* [multidomain_async.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/project/tests/multidomain_async.rs)
 
 ## Canonical Frontend Order
 
@@ -90,6 +114,37 @@ Short rule:
 
 `specialization is no longer a one-pass rename; it is a staged closure process`
 
+## Project Compile Spine
+
+Today the believable project-facing compile spine should be read as:
+
+```text
+parse project modules
+  -> validate module/unit/link/abi declarations
+  -> lower entry with visible local helpers
+  -> lower helper-sensitive project analyses with project context
+  -> validate project links/contracts against NIR
+  -> lower to YIR
+  -> apply support-module profiles
+  -> materialize project bridge/type contracts
+  -> validate project links/contracts against YIR
+```
+
+Short rule:
+
+`project compilation is no longer only “frontend once, then YIR”; helper-aware project validation is now part of the mainline compile truth`
+
+The most important current project-aware crossover is that helper modules can
+now influence:
+
+* route payload inference
+* project-link NIR validation
+* shader packet contract discovery
+* kernel/data bridge contract materialization
+* network profile usage validation
+
+That is the new honest read for checked-in project work.
+
 ## Current Generic Rewrite Truth
 
 The current generic rewrite spine is now carried by:
@@ -136,6 +191,30 @@ For `0.17.0`, these routes are no longer best described as isolated tricks:
 Short rule:
 
 `if a route crosses generic + alias + lambda + async + match, it should increasingly be assumed to belong to the same mainline until a specific missing case proves otherwise`
+
+## Cross-Domain Helper Closure
+
+For `0.17.0`, the project-aware story is now strong enough to describe three
+specific helper-mediated cross-domain closures as checked-in truths:
+
+* `cpu helper -> shader/data`:
+  helper-mediated packet creation, uplink/downlink use, route payload
+  inference, and project-link validation
+* `cpu helper -> kernel/data`:
+  helper-mediated kernel profile reads, fabric roundtrip payload inference,
+  and project-link validation
+* `cpu helper -> network`:
+  helper-mediated network profile reads surviving project-link NIR validation
+
+Current checked-in anchors:
+
+* [shader_nova_contracts.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/project/tests/shader_nova_contracts.rs)
+* [multidomain_async.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/project/tests/multidomain_async.rs)
+
+This does not mean every future bridge pattern is complete.
+
+It does mean the current line should no longer describe helper-mediated project
+validation as an accidental or fragile side route.
 
 ## What Is Still Narrower
 
@@ -207,6 +286,9 @@ Current anchor families:
   [task_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/task_compile.rs),
   [network_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/network_compile.rs),
   [state_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/state_compile.rs)
+* project integration probes:
+  [shader_nova_contracts.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/project/tests/shader_nova_contracts.rs),
+  [multidomain_async.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/project/tests/multidomain_async.rs)
 
 Short rule:
 
@@ -231,6 +313,7 @@ story, especially across:
 * control-flow-local rewrites
 * async recursion
 * project-backed compile closure
+* helper-aware project validation closure
 
 ## Practical Reading Rule
 
