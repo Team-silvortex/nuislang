@@ -1,0 +1,134 @@
+use network NetworkUnit;
+
+mod cpu Main {
+  extern "c" fn host_network_send_probe(
+    stream_window: i64,
+    send_window: i64,
+    remote_port: i64
+  ) -> i64;
+  extern "c" fn host_network_recv_probe(
+    stream_window: i64,
+    recv_window: i64,
+    local_port: i64
+  ) -> i64;
+
+  struct NetLoopControlSummary {
+    flow_value: i64,
+    post_flow_value: i64,
+    selected_value: i64
+  }
+
+  async fn consume_network_result(result: NetworkResult<i64>) -> i64 {
+    if network_send_ready(result) {
+      return network_value(result) + 100;
+    }
+    if network_recv_ready(result) {
+      return network_value(result) + 10;
+    }
+    if network_config_ready(result) {
+      return network_value(result) + 1;
+    }
+    return 0;
+  }
+
+  fn fold_flow(limit: i64) -> i64 {
+    let step: i64 = 0;
+    let acc: i64 = 0;
+    while step < limit {
+      let step: i64 = step + 1;
+      match step {
+        1 => {
+          continue;
+        }
+        _ => {
+          if step > 3 {
+            let acc: i64 = acc + step;
+          } else {
+            let acc: i64 = acc + 0;
+          }
+        }
+      }
+    }
+    return acc;
+  }
+
+  fn fold_post_flow(limit: i64) -> i64 {
+    let step: i64 = 0;
+    let acc: i64 = 0;
+    while step < limit {
+      let step: i64 = step + 1;
+      if step > 2 {
+        let acc: i64 = acc + step;
+      } else {
+        let acc: i64 = acc + 0;
+      }
+      if acc > 2 {
+        if acc > 6 {
+          break;
+        } else {
+        }
+      } else {
+      }
+    }
+    return acc;
+  }
+
+  fn select_value(
+    flow_value: i64,
+    post_flow_value: i64,
+    primary_value: i64,
+    secondary_value: i64,
+    retry_budget: i64
+  ) -> i64 {
+    if post_flow_value > flow_value {
+      return post_flow_value + primary_value + retry_budget;
+    }
+    return flow_value + secondary_value + retry_budget;
+  }
+
+  fn capture_net_loop_control_summary() -> NetLoopControlSummary {
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+    let local_port: i64 = network_profile_local_port("NetworkUnit");
+    let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+
+    let primary_probe: NetworkResult<i64> = network_result(
+      host_network_send_probe(stream_window, send_window, remote_port)
+    );
+    let secondary_probe: NetworkResult<i64> = network_result(
+      host_network_recv_probe(stream_window, recv_window, local_port)
+    );
+
+    let primary_task: Task<i64> = spawn(consume_network_result(primary_probe));
+    let secondary_task: Task<i64> = spawn(consume_network_result(secondary_probe));
+
+    let primary_value: i64 = join(primary_task);
+    let secondary_value: i64 = join(secondary_task);
+
+    let flow_value: i64 = fold_flow(retry_budget);
+    let post_flow_value: i64 = fold_post_flow(retry_budget);
+
+    return NetLoopControlSummary {
+      flow_value: flow_value,
+      post_flow_value: post_flow_value,
+      selected_value: select_value(
+        flow_value,
+        post_flow_value,
+        primary_value,
+        secondary_value,
+        retry_budget
+      )
+    };
+  }
+
+  fn summarize_net_loop_control_recipe() -> i64 {
+    let summary: NetLoopControlSummary = capture_net_loop_control_summary();
+    return summary.flow_value + summary.post_flow_value + summary.selected_value;
+  }
+
+  fn main() {
+    print(summarize_net_loop_control_recipe());
+  }
+}

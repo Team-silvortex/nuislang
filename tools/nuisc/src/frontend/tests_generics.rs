@@ -54,6 +54,346 @@ fn monomorphizes_generic_function_call_into_concrete_nir_function() {
 }
 
 #[test]
+fn monomorphizes_explicit_zero_arg_generic_function_call_into_concrete_nir_function() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn typed_zero<T>() -> T {
+            return 0;
+          }
+
+          fn main() -> i64 {
+            return typed_zero<i64>();
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Call { callee, args })))
+            if callee == "typed_zero__i64" && args.is_empty()
+    ));
+
+    let specialized = module
+        .functions
+        .iter()
+        .find(|function| function.name == "typed_zero__i64")
+        .unwrap();
+    assert!(specialized.generic_params.is_empty());
+    assert!(matches!(
+        specialized.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "i64"
+    ));
+}
+
+#[test]
+fn monomorphizes_explicit_multi_arg_generic_function_call_through_nested_alias_wrappers() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type CellAlias<T> = Cell<T>;
+          type PacketAlias<T> = Packet<T>;
+
+          struct Cell<T> {
+            value: T,
+          }
+
+          struct Packet<T> {
+            payload: T,
+            tag: i64,
+          }
+
+          struct Envelope<T> {
+            packet: T,
+            ready: bool,
+          }
+
+          fn wrap_cell<T>(value: T) -> CellAlias<T> {
+            return CellAlias { value: value };
+          }
+
+          fn wrap_packet<T>(payload: T, tag: i64) -> PacketAlias<T> {
+            return PacketAlias {
+              payload: payload,
+              tag: tag,
+            };
+          }
+
+          fn wrap_envelope<T>(packet: T, ready: bool) -> Envelope<T> {
+            return Envelope {
+              packet: packet,
+              ready: ready,
+            };
+          }
+
+          fn main() -> i64 {
+            let cell: CellAlias<i64> = wrap_cell<i64>(7);
+            let packet: PacketAlias<CellAlias<i64>> =
+              wrap_packet<CellAlias<i64>>(cell, 9);
+            let envelope: Envelope<PacketAlias<CellAlias<i64>>> =
+              wrap_envelope<PacketAlias<CellAlias<i64>>>(packet, true);
+            return envelope.packet.payload.value + envelope.packet.tag;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.first(),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::Call { callee, args },
+        }) if name == "cell"
+            && ty.render() == "Cell<i64>"
+            && callee.starts_with("wrap_cell__")
+            && args.len() == 1
+    ));
+    assert!(matches!(
+        main.body.get(1),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::Call { callee, args },
+        }) if name == "packet"
+            && ty.render() == "Packet<Cell<i64>>"
+            && callee.starts_with("wrap_packet__")
+            && args.len() == 2
+    ));
+    assert!(matches!(
+        main.body.get(2),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::Call { callee, args },
+        }) if name == "envelope"
+            && ty.render() == "Envelope<Packet<Cell<i64>>>"
+            && callee.starts_with("wrap_envelope__")
+            && args.len() == 2
+    ));
+
+    let packet_specialized = module
+        .functions
+        .iter()
+        .find(|function| function.name.starts_with("wrap_packet__"))
+        .unwrap();
+    assert!(packet_specialized.generic_params.is_empty());
+    assert_eq!(
+        packet_specialized
+            .params
+            .first()
+            .map(|param| param.ty.render()),
+        Some("Cell<i64>".to_owned())
+    );
+    assert_eq!(
+        packet_specialized
+            .params
+            .get(1)
+            .map(|param| param.ty.render()),
+        Some("i64".to_owned())
+    );
+    assert!(matches!(
+        packet_specialized.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "Packet<Cell<i64>>"
+    ));
+
+    let envelope_specialized = module
+        .functions
+        .iter()
+        .find(|function| function.name.starts_with("wrap_envelope__"))
+        .unwrap();
+    assert!(envelope_specialized.generic_params.is_empty());
+    assert_eq!(
+        envelope_specialized
+            .params
+            .first()
+            .map(|param| param.ty.render()),
+        Some("Packet<Cell<i64>>".to_owned())
+    );
+    assert_eq!(
+        envelope_specialized
+            .params
+            .get(1)
+            .map(|param| param.ty.render()),
+        Some("bool".to_owned())
+    );
+    assert!(matches!(
+        envelope_specialized.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "Envelope<Packet<Cell<i64>>>"
+    ));
+}
+
+#[test]
+#[ignore = "known limitation: explicit generic helper calls nested under generic return-driven helper specialization still mis-handle Packet<T> -> T expected-type propagation"]
+fn monomorphizes_explicit_generic_wrappers_through_async_if_and_match_control_flow() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type CellAlias<T> = Cell<T>;
+          type PacketAlias<T> = Packet<T>;
+          type EnvelopeAlias<T> = Envelope<T>;
+
+          struct Cell<T> {
+            value: T,
+          }
+
+          struct Packet<T> {
+            payload: T,
+            tag: i64,
+          }
+
+          struct Envelope<T> {
+            packet: T,
+            ready: bool,
+          }
+
+          fn wrap_cell<T>(value: T) -> CellAlias<T> {
+            return CellAlias { value: value };
+          }
+
+          fn wrap_packet<T>(payload: T, tag: i64) -> PacketAlias<T> {
+            return PacketAlias {
+              payload: payload,
+              tag: tag,
+            };
+          }
+
+          fn wrap_envelope<T>(packet: T, ready: bool) -> EnvelopeAlias<T> {
+            return EnvelopeAlias {
+              packet: packet,
+              ready: ready,
+            };
+          }
+
+          async fn produce_cell<T>() -> CellAlias<T> {
+            return CellAlias { value: 7 };
+          }
+
+          fn choose(
+            flag: bool,
+            task: Task<CellAlias<i64>>
+          ) -> EnvelopeAlias<PacketAlias<CellAlias<i64>>> {
+            if flag {
+              return wrap_envelope<PacketAlias<CellAlias<i64>>>(
+                wrap_packet<CellAlias<i64>>(join(task), 9),
+                true
+              );
+            }
+            let seed: CellAlias<i64> = CellAlias { value: 5 };
+            match wrap_envelope<PacketAlias<CellAlias<i64>>>(
+              wrap_packet<CellAlias<i64>>(seed, 4),
+              false
+            ) {
+              EnvelopeAlias<PacketAlias<CellAlias<i64>>> {
+                packet: { payload: cell, tag: tag },
+                ready: false
+              } => {
+                return wrap_envelope<PacketAlias<CellAlias<i64>>>(
+                  wrap_packet<CellAlias<i64>>(cell, tag + 1),
+                  true
+                );
+              }
+              _ => {
+                let zero: CellAlias<i64> = CellAlias { value: 0 };
+                return wrap_envelope<PacketAlias<CellAlias<i64>>>(
+                  wrap_packet<CellAlias<i64>>(zero, 0),
+                  false
+                );
+              }
+            }
+          }
+
+          fn main() -> i64 {
+            let task: Task<CellAlias<i64>> = spawn(produce_cell<i64>());
+            let envelope: EnvelopeAlias<PacketAlias<CellAlias<i64>>> = choose(true, task);
+            return envelope.packet.payload.value + envelope.packet.tag;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let produce = module
+        .functions
+        .iter()
+        .find(|function| function.name == "produce_cell__i64")
+        .unwrap();
+    assert!(produce.is_async);
+    assert!(produce.generic_params.is_empty());
+    assert!(matches!(
+        produce.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "Cell<i64>"
+    ));
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.first(),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::CpuSpawn { .. },
+        }) if name == "task" && ty.render() == "Task<Cell<i64>>"
+    ));
+    assert!(matches!(
+        main.body.get(1),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::Call { callee, .. },
+        }) if name == "envelope"
+            && ty.render() == "Envelope<Packet<Cell<i64>>>"
+            && callee == "choose"
+    ));
+
+    let choose = module
+        .functions
+        .iter()
+        .find(|function| function.name == "choose")
+        .unwrap();
+    assert!(matches!(
+        choose.body.first(),
+        Some(NirStmt::If { then_body, else_body, .. })
+            if matches!(
+                then_body.as_slice(),
+                [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+                    if callee.starts_with("wrap_envelope__")
+                        && matches!(
+                            args.as_slice(),
+                            [NirExpr::Call { callee, args }, NirExpr::Bool(true)]
+                                if callee.starts_with("wrap_packet__")
+                                    && matches!(args.as_slice(), [NirExpr::CpuJoin(_), NirExpr::Int(9)])
+                        )
+            ) && !else_body.is_empty()
+    ));
+    assert!(module.functions.iter().any(|function| {
+        function.name.starts_with("wrap_cell__") && function.generic_params.is_empty()
+    }));
+    assert!(module.functions.iter().any(|function| {
+        function.name.starts_with("wrap_packet__") && function.generic_params.is_empty()
+    }));
+    assert!(module.functions.iter().any(|function| {
+        function.name.starts_with("wrap_envelope__") && function.generic_params.is_empty()
+    }));
+}
+
+#[test]
 fn monomorphizes_multi_generic_function_call_into_concrete_nir_function() {
     let module = parse_nuis_module(
         r#"
@@ -1218,5 +1558,2398 @@ fn monomorphizes_zero_arg_generic_async_function_through_await_into_nested_alias
     assert!(matches!(
         response_specialized.return_type.as_ref().map(|ty| ty.render()),
         Some(rendered) if rendered == "Envelope<Boxed<i64>>"
+    ));
+}
+
+#[test]
+fn monomorphizes_generic_nested_alias_task_join_through_if_branch() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type Response<T> = Envelope<Boxed<T>>;
+
+          struct Boxed<T> {
+            value: T,
+          }
+
+          struct Envelope<T> {
+            payload: T,
+          }
+
+          async fn produce_response<T>() -> Response<T> {
+            return Response(Boxed(7));
+          }
+
+          fn keep_response<T>(response: Response<T>) -> Response<T> {
+            return response;
+          }
+
+          fn choose(flag: bool, task: Task<Response<i64>>) -> Response<i64> {
+            if flag {
+              return keep_response(join(task));
+            } else {
+              return Response(Boxed(9));
+            }
+          }
+
+          fn main() -> i64 {
+            let task: Task<Response<i64>> = spawn(produce_response());
+            let response: Response<i64> = choose(true, task);
+            return response.payload.value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let produce_specialized = module
+        .functions
+        .iter()
+        .find(|function| function.name == "produce_response__i64")
+        .unwrap();
+    assert!(produce_specialized.is_async);
+    assert!(produce_specialized.generic_params.is_empty());
+    assert!(matches!(
+        produce_specialized.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "Envelope<Boxed<i64>>"
+    ));
+
+    let keep_specialized = module
+        .functions
+        .iter()
+        .find(|function| function.name == "keep_response__i64")
+        .unwrap();
+    assert!(keep_specialized.generic_params.is_empty());
+    assert_eq!(
+        keep_specialized
+            .params
+            .first()
+            .map(|param| param.ty.render()),
+        Some("Envelope<Boxed<i64>>".to_owned())
+    );
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.first(),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::CpuSpawn { .. },
+        }) if name == "task" && ty.render() == "Task<Envelope<Boxed<i64>>>"
+    ));
+    assert!(matches!(
+        main.body.get(1),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::Call { callee, .. },
+        }) if name == "response"
+            && ty.render() == "Envelope<Boxed<i64>>"
+            && callee == "choose"
+    ));
+
+    let choose = module
+        .functions
+        .iter()
+        .find(|function| function.name == "choose")
+        .unwrap();
+    assert!(matches!(
+        choose.body.first(),
+        Some(NirStmt::If { then_body, else_body, .. })
+            if matches!(
+                then_body.as_slice(),
+                [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+                    if callee == "keep_response__i64"
+                        && matches!(args.as_slice(), [NirExpr::CpuJoin(_)])
+            ) && matches!(
+                else_body.as_slice(),
+                [NirStmt::Return(Some(NirExpr::StructLiteral { type_name, type_args, .. }))]
+                    if type_name == "Envelope"
+                        && matches!(type_args.as_slice(), [ty] if ty.render() == "Boxed<i64>")
+            )
+    ));
+}
+
+#[test]
+fn monomorphizes_generic_response_unwrap_through_task_join_and_branch_constructors() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type Response<T> = Envelope<Boxed<T>>;
+
+          struct Boxed<T> {
+            value: T,
+          }
+
+          struct Envelope<T> {
+            payload: T,
+            ready: bool,
+          }
+
+          async fn produce_response<T>() -> Response<T> {
+            return Response { payload: Boxed(7), ready: true };
+          }
+
+          fn unwrap_response<T>(response: Response<T>) -> T {
+            match response {
+              Response<T> { payload: { value: body }, ready: true } => {
+                return body;
+              }
+              _ => {
+                return response.payload.value;
+              }
+            }
+          }
+
+          fn consume(flag: bool, task: Task<Response<i64>>) -> i64 {
+            if flag {
+              return unwrap_response(join(task));
+            } else {
+              return unwrap_response(Response { payload: Boxed(9), ready: false });
+            }
+          }
+
+          fn main() -> i64 {
+            let task: Task<Response<i64>> = spawn(produce_response());
+            return consume(true, task);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let produced = module
+        .functions
+        .iter()
+        .find(|function| function.name == "produce_response__i64")
+        .unwrap();
+    assert!(produced.is_async);
+    assert!(produced.generic_params.is_empty());
+    assert!(matches!(
+        produced.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "Envelope<Boxed<i64>>"
+    ));
+
+    let unwrapped = module
+        .functions
+        .iter()
+        .find(|function| function.name == "unwrap_response__i64")
+        .unwrap();
+    assert!(unwrapped.generic_params.is_empty());
+    assert_eq!(
+        unwrapped.params.first().map(|param| param.ty.render()),
+        Some("Envelope<Boxed<i64>>".to_owned())
+    );
+    assert!(matches!(
+        unwrapped.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "i64"
+    ));
+
+    let consume = module
+        .functions
+        .iter()
+        .find(|function| function.name == "consume")
+        .unwrap();
+    assert!(matches!(
+        consume.body.first(),
+        Some(NirStmt::If { then_body, else_body, .. })
+            if matches!(
+                then_body.as_slice(),
+                [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+                    if callee == "unwrap_response__i64"
+                        && matches!(args.as_slice(), [NirExpr::CpuJoin(_)])
+            ) && matches!(
+                else_body.as_slice(),
+                [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+                    if callee == "unwrap_response__i64"
+                        && matches!(
+                            args.as_slice(),
+                            [NirExpr::StructLiteral { type_name, type_args, .. }]
+                                if type_name == "Envelope"
+                                    && matches!(type_args.as_slice(), [ty] if ty.render() == "Boxed<i64>")
+                        )
+            )
+    ));
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.first(),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::CpuSpawn { .. },
+        }) if name == "task" && ty.render() == "Task<Envelope<Boxed<i64>>>"
+    ));
+    assert!(matches!(
+        main.body.get(1),
+        Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
+            if callee == "consume"
+    ));
+}
+
+#[test]
+fn monomorphizes_network_shaped_generic_task_exchange_flow() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type Request<T> = HttpRequest<Boxed<T>>;
+          type Response<T> = HttpResponse<Boxed<T>>;
+          type HttpResult<T> = ResultEnvelope<Response<T>>;
+
+          struct Boxed<T> {
+            value: T,
+          }
+
+          struct HttpRequest<T> {
+            body: T,
+            retry: bool,
+          }
+
+          struct HttpResponse<T> {
+            body: T,
+            status: i64,
+          }
+
+          struct ResultEnvelope<T> {
+            response: T,
+            ok: bool,
+          }
+
+          fn keep_request<T>(request: Request<T>) -> Request<T> {
+            return request;
+          }
+
+          async fn exchange<T>(request: Request<T>) -> HttpResult<T> {
+            return HttpResult {
+              response: Response { body: request.body, status: 200 },
+              ok: true,
+            };
+          }
+
+          fn read_body<T>(result: HttpResult<T>) -> T {
+            match result {
+              HttpResult<T> { response: { body: { value: payload }, status: 200 }, ok: true } => {
+                return payload;
+              }
+              _ => {
+                return result.response.body.value;
+              }
+            }
+          }
+
+          fn serve(flag: bool, task: Task<HttpResult<i64>>) -> i64 {
+            if flag {
+              return read_body(join(task));
+            } else {
+              return read_body(HttpResult {
+                response: Response { body: Boxed(9), status: 503 },
+                ok: false,
+              });
+            }
+          }
+
+          fn main() -> i64 {
+            let request: Request<i64> = keep_request(Request { body: Boxed(7), retry: false });
+            let task: Task<HttpResult<i64>> = spawn(exchange(request));
+            return serve(true, task);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let keep_request = module
+        .functions
+        .iter()
+        .find(|function| function.name == "keep_request__i64")
+        .unwrap();
+    assert!(keep_request.generic_params.is_empty());
+    assert_eq!(
+        keep_request.params.first().map(|param| param.ty.render()),
+        Some("HttpRequest<Boxed<i64>>".to_owned())
+    );
+    assert!(matches!(
+        keep_request.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "HttpRequest<Boxed<i64>>"
+    ));
+
+    let exchange = module
+        .functions
+        .iter()
+        .find(|function| function.name == "exchange__i64")
+        .unwrap();
+    assert!(exchange.is_async);
+    assert!(exchange.generic_params.is_empty());
+    assert_eq!(
+        exchange.params.first().map(|param| param.ty.render()),
+        Some("HttpRequest<Boxed<i64>>".to_owned())
+    );
+    assert!(matches!(
+        exchange.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "ResultEnvelope<HttpResponse<Boxed<i64>>>"
+    ));
+
+    let read_body = module
+        .functions
+        .iter()
+        .find(|function| function.name == "read_body__i64")
+        .unwrap();
+    assert!(read_body.generic_params.is_empty());
+    assert_eq!(
+        read_body.params.first().map(|param| param.ty.render()),
+        Some("ResultEnvelope<HttpResponse<Boxed<i64>>>".to_owned())
+    );
+    assert!(matches!(
+        read_body.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "i64"
+    ));
+
+    let serve = module
+        .functions
+        .iter()
+        .find(|function| function.name == "serve")
+        .unwrap();
+    assert!(matches!(
+        serve.body.first(),
+        Some(NirStmt::If { then_body, else_body, .. })
+            if matches!(
+                then_body.as_slice(),
+                [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+                    if callee == "read_body__i64"
+                        && matches!(args.as_slice(), [NirExpr::CpuJoin(_)])
+            ) && matches!(
+                else_body.as_slice(),
+                [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+                    if callee == "read_body__i64"
+                        && matches!(
+                            args.as_slice(),
+                            [NirExpr::StructLiteral { type_name, type_args, .. }]
+                                if type_name == "ResultEnvelope"
+                                    && matches!(type_args.as_slice(), [ty] if ty.render() == "HttpResponse<Boxed<i64>>")
+                        )
+            )
+    ));
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.first(),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::Call { callee, .. },
+        }) if name == "request"
+            && ty.render() == "HttpRequest<Boxed<i64>>"
+            && callee == "keep_request__i64"
+    ));
+    assert!(matches!(
+        main.body.get(1),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::CpuSpawn { .. },
+        }) if name == "task"
+            && ty.render() == "Task<ResultEnvelope<HttpResponse<Boxed<i64>>>>"
+    ));
+    assert!(matches!(
+        main.body.get(2),
+        Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
+            if callee == "serve"
+    ));
+}
+
+#[test]
+fn monomorphizes_std_net_facade_shaped_http_session_flow() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type NetHttpRequest<T> = HttpRequest<Boxed<T>>;
+          type NetHttpResponse<T> = HttpResponse<Boxed<T>>;
+          type NetResult<T> = ResultEnvelope<NetHttpResponse<T>>;
+          type NetHttpClientExchange<T> = ExchangeLane<NetResult<T>>;
+          type NetSession<T> = SessionLane<NetHttpClientExchange<T>>;
+
+          struct Boxed<T> {
+            value: T,
+          }
+
+          struct HttpRequest<T> {
+            body: T,
+            retry_budget: i64,
+          }
+
+          struct HttpResponse<T> {
+            body: T,
+            status: i64,
+          }
+
+          struct ResultEnvelope<T> {
+            response: T,
+            recv_ready: bool,
+          }
+
+          struct ExchangeLane<T> {
+            result: T,
+            attempts: i64,
+          }
+
+          struct SessionLane<T> {
+            exchange: T,
+            open: bool,
+          }
+
+          fn net_http_request<T>(request: NetHttpRequest<T>) -> NetHttpRequest<T> {
+            return request;
+          }
+
+          async fn net_http_client_exchange<T>(
+            request: NetHttpRequest<T>
+          ) -> NetHttpClientExchange<T> {
+            return NetHttpClientExchange {
+              result: NetResult {
+                response: NetHttpResponse {
+                  body: request.body,
+                  status: 200,
+                },
+                recv_ready: true,
+              },
+              attempts: request.retry_budget,
+            };
+          }
+
+          async fn net_session<T>(request: NetHttpRequest<T>) -> NetSession<T> {
+            return NetSession {
+              exchange: await net_http_client_exchange(request),
+              open: true,
+            };
+          }
+
+          fn net_http_response_value<T>(session: NetSession<T>) -> T {
+            match session {
+              NetSession<T> {
+                exchange: {
+                  result: {
+                    response: { body: { value: payload }, status: 200 },
+                    recv_ready: true,
+                  },
+                  attempts: 2,
+                },
+                open: true,
+              } => {
+                return payload;
+              }
+              _ => {
+                return session.exchange.result.response.body.value;
+              }
+            }
+          }
+
+          fn serve(flag: bool, task: Task<NetSession<i64>>) -> i64 {
+            if flag {
+              return net_http_response_value(join(task));
+            } else {
+              return net_http_response_value(NetSession {
+                exchange: NetHttpClientExchange {
+                  result: NetResult {
+                    response: NetHttpResponse { body: Boxed(9), status: 503 },
+                    recv_ready: false,
+                  },
+                  attempts: 1,
+                },
+                open: false,
+              });
+            }
+          }
+
+          fn main() -> i64 {
+            let request: NetHttpRequest<i64> = net_http_request(NetHttpRequest {
+              body: Boxed(7),
+              retry_budget: 2,
+            });
+            let task: Task<NetSession<i64>> = spawn(net_session(request));
+            return serve(true, task);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let request_specialized = module
+        .functions
+        .iter()
+        .find(|function| function.name == "net_http_request__i64")
+        .unwrap();
+    assert!(request_specialized.generic_params.is_empty());
+    assert_eq!(
+        request_specialized
+            .params
+            .first()
+            .map(|param| param.ty.render()),
+        Some("HttpRequest<Boxed<i64>>".to_owned())
+    );
+    assert!(matches!(
+        request_specialized.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "HttpRequest<Boxed<i64>>"
+    ));
+
+    let exchange_specialized = module
+        .functions
+        .iter()
+        .find(|function| function.name == "net_http_client_exchange__i64")
+        .unwrap();
+    assert!(exchange_specialized.is_async);
+    assert!(exchange_specialized.generic_params.is_empty());
+    assert_eq!(
+        exchange_specialized
+            .params
+            .first()
+            .map(|param| param.ty.render()),
+        Some("HttpRequest<Boxed<i64>>".to_owned())
+    );
+    assert!(matches!(
+        exchange_specialized
+            .return_type
+            .as_ref()
+            .map(|ty| ty.render()),
+        Some(rendered) if rendered == "ExchangeLane<ResultEnvelope<HttpResponse<Boxed<i64>>>>"
+    ));
+
+    let session_specialized = module
+        .functions
+        .iter()
+        .find(|function| function.name == "net_session__i64")
+        .unwrap();
+    assert!(session_specialized.is_async);
+    assert!(session_specialized.generic_params.is_empty());
+    assert_eq!(
+        session_specialized
+            .params
+            .first()
+            .map(|param| param.ty.render()),
+        Some("HttpRequest<Boxed<i64>>".to_owned())
+    );
+    assert!(matches!(
+        session_specialized.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered)
+            if rendered
+                == "SessionLane<ExchangeLane<ResultEnvelope<HttpResponse<Boxed<i64>>>>>"
+    ));
+
+    let value_specialized = module
+        .functions
+        .iter()
+        .find(|function| function.name == "net_http_response_value__i64")
+        .unwrap();
+    assert!(value_specialized.generic_params.is_empty());
+    assert_eq!(
+        value_specialized
+            .params
+            .first()
+            .map(|param| param.ty.render()),
+        Some("SessionLane<ExchangeLane<ResultEnvelope<HttpResponse<Boxed<i64>>>>>".to_owned())
+    );
+    assert!(matches!(
+        value_specialized.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "i64"
+    ));
+
+    let serve = module
+        .functions
+        .iter()
+        .find(|function| function.name == "serve")
+        .unwrap();
+    assert!(matches!(
+        serve.body.first(),
+        Some(NirStmt::If { then_body, else_body, .. })
+            if matches!(
+                then_body.as_slice(),
+                [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+                    if callee == "net_http_response_value__i64"
+                        && matches!(args.as_slice(), [NirExpr::CpuJoin(_)])
+            ) && matches!(
+                else_body.as_slice(),
+                [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+                    if callee == "net_http_response_value__i64"
+                        && matches!(
+                            args.as_slice(),
+                            [NirExpr::StructLiteral { type_name, type_args, .. }]
+                                if type_name == "SessionLane"
+                                    && matches!(
+                                        type_args.as_slice(),
+                                        [ty]
+                                            if ty.render()
+                                                == "ExchangeLane<ResultEnvelope<HttpResponse<Boxed<i64>>>>"
+                                    )
+                        )
+            )
+    ));
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.first(),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::Call { callee, .. },
+        }) if name == "request"
+            && ty.render() == "HttpRequest<Boxed<i64>>"
+            && callee == "net_http_request__i64"
+    ));
+    assert!(matches!(
+        main.body.get(1),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::CpuSpawn { .. },
+        }) if name == "task"
+            && ty.render()
+                == "Task<SessionLane<ExchangeLane<ResultEnvelope<HttpResponse<Boxed<i64>>>>>>"
+    ));
+    assert!(matches!(
+        main.body.get(2),
+        Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
+            if callee == "serve"
+    ));
+}
+
+#[test]
+fn monomorphizes_std_net_demo_shaped_summary_session_flow() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type NetHttpRequest<T> = HttpRequest<Boxed<T>>;
+          type NetHttpResponse<T> = HttpResponse<Boxed<T>>;
+          type NetResult<T> = ResultEnvelope<NetHttpResponse<T>>;
+          type NetHttpClientExchange<T> = ExchangeLane<NetResult<T>>;
+          type NetSession<T> = SessionLane<NetHttpClientExchange<T>>;
+          type NetHttpClientExchangeSummary<T> = ExchangeSummary<NetSession<T>>;
+          type NetSessionSummary<T> = SessionSummary<NetHttpClientExchangeSummary<T>>;
+
+          struct Boxed<T> {
+            value: T,
+          }
+
+          struct HttpRequest<T> {
+            body: T,
+            retry_budget: i64,
+          }
+
+          struct HttpResponse<T> {
+            body: T,
+            status: i64,
+          }
+
+          struct ResultEnvelope<T> {
+            response: T,
+            recv_ready: bool,
+          }
+
+          struct ExchangeLane<T> {
+            result: T,
+            attempts: i64,
+          }
+
+          struct SessionLane<T> {
+            exchange: T,
+            open: bool,
+          }
+
+          struct ExchangeSummary<T> {
+            session: T,
+            exchange_value: i64,
+          }
+
+          struct SessionSummary<T> {
+            summary: T,
+            session_value: i64,
+          }
+
+          async fn net_http_client_exchange<T>(
+            request: NetHttpRequest<T>
+          ) -> NetHttpClientExchange<T> {
+            return NetHttpClientExchange {
+              result: NetResult {
+                response: NetHttpResponse {
+                  body: request.body,
+                  status: 200,
+                },
+                recv_ready: true,
+              },
+              attempts: request.retry_budget,
+            };
+          }
+
+          async fn net_session<T>(request: NetHttpRequest<T>) -> NetSession<T> {
+            return NetSession {
+              exchange: await net_http_client_exchange(request),
+              open: true,
+            };
+          }
+
+          async fn capture_net_http_client_exchange_summary<T>(
+            request: NetHttpRequest<T>
+          ) -> NetHttpClientExchangeSummary<T> {
+            return NetHttpClientExchangeSummary {
+              session: await net_session(request),
+              exchange_value: 41,
+            };
+          }
+
+          async fn capture_net_session_summary<T>(
+            request: NetHttpRequest<T>
+          ) -> NetSessionSummary<T> {
+            return SessionSummary {
+              summary: await capture_net_http_client_exchange_summary(request),
+              session_value: 99,
+            };
+          }
+
+          fn summarize_net_session<T>(summary: NetSessionSummary<T>) -> T {
+            match summary {
+              NetSessionSummary<T> {
+                summary: {
+                  session: {
+                    exchange: {
+                      result: {
+                        response: { body: { value: payload }, status: 200 },
+                        recv_ready: true,
+                      },
+                      attempts: 2,
+                    },
+                    open: true,
+                  },
+                  exchange_value: 41,
+                },
+                session_value: 99,
+              } => {
+                return payload;
+              }
+              _ => {
+                return summary.summary.session.exchange.result.response.body.value;
+              }
+            }
+          }
+
+          fn serve(flag: bool, task: Task<NetSessionSummary<i64>>) -> i64 {
+            if flag {
+              return summarize_net_session(join(task));
+            } else {
+              return summarize_net_session(SessionSummary {
+                summary: ExchangeSummary {
+                  session: SessionLane {
+                    exchange: ExchangeLane {
+                      result: ResultEnvelope {
+                        response: HttpResponse { body: Boxed(9), status: 503 },
+                        recv_ready: false,
+                      },
+                      attempts: 1,
+                    },
+                    open: false,
+                  },
+                  exchange_value: 40,
+                },
+                session_value: 98,
+              });
+            }
+          }
+
+          fn main() -> i64 {
+            let request: NetHttpRequest<i64> = NetHttpRequest {
+              body: Boxed(7),
+              retry_budget: 2,
+            };
+            let task: Task<NetSessionSummary<i64>> = spawn(capture_net_session_summary(request));
+            return serve(true, task);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let exchange_summary = module
+        .functions
+        .iter()
+        .find(|function| function.name == "capture_net_http_client_exchange_summary__i64")
+        .unwrap();
+    assert!(exchange_summary.is_async);
+    assert!(exchange_summary.generic_params.is_empty());
+    assert_eq!(
+        exchange_summary
+            .params
+            .first()
+            .map(|param| param.ty.render()),
+        Some("HttpRequest<Boxed<i64>>".to_owned())
+    );
+    assert!(matches!(
+        exchange_summary.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered)
+            if rendered
+                == "ExchangeSummary<SessionLane<ExchangeLane<ResultEnvelope<HttpResponse<Boxed<i64>>>>>>"
+    ));
+
+    let session_summary = module
+        .functions
+        .iter()
+        .find(|function| function.name == "capture_net_session_summary__i64")
+        .unwrap();
+    assert!(session_summary.is_async);
+    assert!(session_summary.generic_params.is_empty());
+    assert_eq!(
+        session_summary
+            .params
+            .first()
+            .map(|param| param.ty.render()),
+        Some("HttpRequest<Boxed<i64>>".to_owned())
+    );
+    assert!(matches!(
+        session_summary.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered)
+            if rendered
+                == "SessionSummary<ExchangeSummary<SessionLane<ExchangeLane<ResultEnvelope<HttpResponse<Boxed<i64>>>>>>>"
+    ));
+
+    let summarize = module
+        .functions
+        .iter()
+        .find(|function| function.name == "summarize_net_session__i64")
+        .unwrap();
+    assert!(summarize.generic_params.is_empty());
+    assert_eq!(
+        summarize.params.first().map(|param| param.ty.render()),
+        Some(
+            "SessionSummary<ExchangeSummary<SessionLane<ExchangeLane<ResultEnvelope<HttpResponse<Boxed<i64>>>>>>>"
+                .to_owned()
+        )
+    );
+    assert!(matches!(
+        summarize.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "i64"
+    ));
+
+    let serve = module
+        .functions
+        .iter()
+        .find(|function| function.name == "serve")
+        .unwrap();
+    assert!(matches!(
+        serve.body.first(),
+        Some(NirStmt::If { then_body, else_body, .. })
+            if matches!(
+                then_body.as_slice(),
+                [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+                    if callee == "summarize_net_session__i64"
+                        && matches!(args.as_slice(), [NirExpr::CpuJoin(_)])
+            ) && matches!(
+                else_body.as_slice(),
+                [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+                    if callee == "summarize_net_session__i64"
+                        && matches!(
+                            args.as_slice(),
+                            [NirExpr::StructLiteral { type_name, type_args, .. }]
+                                if type_name == "SessionSummary"
+                                    && matches!(
+                                        type_args.as_slice(),
+                                        [ty]
+                                            if ty.render()
+                                                == "ExchangeSummary<SessionLane<ExchangeLane<ResultEnvelope<HttpResponse<Boxed<i64>>>>>>"
+                                    )
+                        )
+            )
+    ));
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.first(),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::StructLiteral { type_name, type_args, .. },
+        }) if name == "request"
+            && ty.render() == "HttpRequest<Boxed<i64>>"
+            && type_name == "HttpRequest"
+            && matches!(type_args.as_slice(), [arg] if arg.render() == "Boxed<i64>")
+    ));
+    assert!(matches!(
+        main.body.get(1),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::CpuSpawn { .. },
+        }) if name == "task"
+            && ty.render()
+                == "Task<SessionSummary<ExchangeSummary<SessionLane<ExchangeLane<ResultEnvelope<HttpResponse<Boxed<i64>>>>>>>>"
+    ));
+}
+
+#[test]
+fn monomorphizes_match_arm_std_net_summary_session_flow() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type NetHttpRequest<T> = HttpRequest<Boxed<T>>;
+          type NetHttpResponse<T> = HttpResponse<Boxed<T>>;
+          type NetResult<T> = ResultEnvelope<NetHttpResponse<T>>;
+          type NetHttpClientExchange<T> = ExchangeLane<NetResult<T>>;
+          type NetSession<T> = SessionLane<NetHttpClientExchange<T>>;
+          type NetHttpClientExchangeSummary<T> = ExchangeSummary<NetSession<T>>;
+          type NetSessionSummary<T> = SessionSummary<NetHttpClientExchangeSummary<T>>;
+
+          struct Boxed<T> {
+            value: T,
+          }
+
+          struct HttpRequest<T> {
+            body: T,
+            retry_budget: i64,
+          }
+
+          struct HttpResponse<T> {
+            body: T,
+            status: i64,
+          }
+
+          struct ResultEnvelope<T> {
+            response: T,
+            recv_ready: bool,
+          }
+
+          struct ExchangeLane<T> {
+            result: T,
+            attempts: i64,
+          }
+
+          struct SessionLane<T> {
+            exchange: T,
+            open: bool,
+          }
+
+          struct ExchangeSummary<T> {
+            session: T,
+            exchange_value: i64,
+          }
+
+          struct SessionSummary<T> {
+            summary: T,
+            session_value: i64,
+          }
+
+          async fn net_http_client_exchange<T>(
+            request: NetHttpRequest<T>
+          ) -> NetHttpClientExchange<T> {
+            return NetHttpClientExchange {
+              result: NetResult {
+                response: NetHttpResponse {
+                  body: request.body,
+                  status: 200,
+                },
+                recv_ready: true,
+              },
+              attempts: request.retry_budget,
+            };
+          }
+
+          async fn net_session<T>(request: NetHttpRequest<T>) -> NetSession<T> {
+            return NetSession {
+              exchange: await net_http_client_exchange(request),
+              open: true,
+            };
+          }
+
+          async fn capture_net_http_client_exchange_summary<T>(
+            request: NetHttpRequest<T>
+          ) -> NetHttpClientExchangeSummary<T> {
+            return NetHttpClientExchangeSummary {
+              session: await net_session(request),
+              exchange_value: 41,
+            };
+          }
+
+          async fn capture_net_session_summary<T>(
+            request: NetHttpRequest<T>
+          ) -> NetSessionSummary<T> {
+            return SessionSummary {
+              summary: await capture_net_http_client_exchange_summary(request),
+              session_value: 99,
+            };
+          }
+
+          fn choose_summary(
+            mode: i64,
+            task: Task<NetSessionSummary<i64>>,
+            summary_task: Task<NetHttpClientExchangeSummary<i64>>
+          ) -> NetSessionSummary<i64> {
+            match mode {
+              0 => {
+                return join(task);
+              }
+              1 => {
+                return SessionSummary {
+                  summary: join(summary_task),
+                  session_value: 99,
+                };
+              }
+              _ => {
+                return SessionSummary {
+                  summary: ExchangeSummary {
+                    session: SessionLane {
+                      exchange: ExchangeLane {
+                        result: ResultEnvelope {
+                          response: HttpResponse { body: Boxed(9), status: 503 },
+                          recv_ready: false,
+                        },
+                        attempts: 1,
+                      },
+                      open: false,
+                    },
+                    exchange_value: 40,
+                  },
+                  session_value: 98,
+                };
+              }
+            }
+          }
+
+          fn summarize_net_session<T>(summary: NetSessionSummary<T>) -> T {
+            return summary.summary.session.exchange.result.response.body.value;
+          }
+
+          fn main() -> i64 {
+            let summary_task: Task<NetHttpClientExchangeSummary<i64>> =
+              spawn(capture_net_http_client_exchange_summary(NetHttpRequest {
+                body: Boxed(7),
+                retry_budget: 2,
+              }));
+            let task: Task<NetSessionSummary<i64>> =
+              spawn(capture_net_session_summary(NetHttpRequest {
+                body: Boxed(7),
+                retry_budget: 2,
+              }));
+            let summary: NetSessionSummary<i64> = choose_summary(1, task, summary_task);
+            return summarize_net_session(summary);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let exchange_summary = module
+        .functions
+        .iter()
+        .find(|function| function.name == "capture_net_http_client_exchange_summary__i64")
+        .unwrap();
+    assert!(exchange_summary.is_async);
+    assert!(exchange_summary.generic_params.is_empty());
+    assert_eq!(
+        exchange_summary
+            .params
+            .first()
+            .map(|param| param.ty.render()),
+        Some("HttpRequest<Boxed<i64>>".to_owned())
+    );
+    assert!(matches!(
+        exchange_summary.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered)
+            if rendered
+                == "ExchangeSummary<SessionLane<ExchangeLane<ResultEnvelope<HttpResponse<Boxed<i64>>>>>>"
+    ));
+
+    let choose = module
+        .functions
+        .iter()
+        .find(|function| function.name == "choose_summary")
+        .unwrap();
+    assert!(matches!(
+        choose.body.first(),
+        Some(NirStmt::If { then_body, else_body, .. })
+            if matches!(
+                then_body.as_slice(),
+                [NirStmt::Return(Some(NirExpr::CpuJoin(_)))]
+            ) && matches!(
+                else_body.as_slice(),
+                [NirStmt::If {
+                    then_body: nested_then,
+                    else_body: nested_else,
+                    ..
+                }] if matches!(
+                    nested_then.as_slice(),
+                    [NirStmt::Return(Some(NirExpr::StructLiteral { type_name, type_args, fields }))]
+                        if type_name == "SessionSummary"
+                            && matches!(
+                                type_args.as_slice(),
+                                [ty]
+                                    if ty.render()
+                                        == "ExchangeSummary<SessionLane<ExchangeLane<ResultEnvelope<HttpResponse<Boxed<i64>>>>>>"
+                            )
+                            && matches!(
+                                fields.as_slice(),
+                                [
+                                    (summary_field, NirExpr::CpuJoin(value)),
+                                    (session_value_field, NirExpr::Int(99))
+                                ]
+                                    if summary_field == "summary"
+                                        && session_value_field == "session_value"
+                                        && matches!(
+                                            value.as_ref(),
+                                            NirExpr::Var(name) if name == "summary_task"
+                                        )
+                            )
+                ) && matches!(
+                    nested_else.as_slice(),
+                    [NirStmt::Return(Some(NirExpr::StructLiteral { type_name, type_args, .. }))]
+                        if type_name == "SessionSummary"
+                            && matches!(
+                                type_args.as_slice(),
+                                [ty]
+                                    if ty.render()
+                                        == "ExchangeSummary<SessionLane<ExchangeLane<ResultEnvelope<HttpResponse<Boxed<i64>>>>>>"
+                            )
+                )
+            )
+    ));
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.first(),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::CpuSpawn { .. },
+        }) if name == "summary_task"
+            && ty.render()
+                == "Task<ExchangeSummary<SessionLane<ExchangeLane<ResultEnvelope<HttpResponse<Boxed<i64>>>>>>>"
+    ));
+    assert!(matches!(
+        main.body.get(1),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::CpuSpawn { .. },
+        }) if name == "task"
+            && ty.render()
+                == "Task<SessionSummary<ExchangeSummary<SessionLane<ExchangeLane<ResultEnvelope<HttpResponse<Boxed<i64>>>>>>>>"
+    ));
+    assert!(matches!(
+        main.body.get(2),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::Call { callee, .. },
+        }) if name == "summary"
+            && ty.render()
+                == "SessionSummary<ExchangeSummary<SessionLane<ExchangeLane<ResultEnvelope<HttpResponse<Boxed<i64>>>>>>>"
+            && callee == "choose_summary"
+    ));
+}
+
+#[test]
+fn monomorphizes_while_body_std_net_summary_session_flow() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type NetHttpRequest<T> = HttpRequest<Boxed<T>>;
+          type NetHttpResponse<T> = HttpResponse<Boxed<T>>;
+          type NetResult<T> = ResultEnvelope<NetHttpResponse<T>>;
+          type NetHttpClientExchange<T> = ExchangeLane<NetResult<T>>;
+          type NetSession<T> = SessionLane<NetHttpClientExchange<T>>;
+          type NetHttpClientExchangeSummary<T> = ExchangeSummary<NetSession<T>>;
+          type NetSessionSummary<T> = SessionSummary<NetHttpClientExchangeSummary<T>>;
+
+          struct Boxed<T> {
+            value: T,
+          }
+
+          struct HttpRequest<T> {
+            body: T,
+            retry_budget: i64,
+          }
+
+          struct HttpResponse<T> {
+            body: T,
+            status: i64,
+          }
+
+          struct ResultEnvelope<T> {
+            response: T,
+            recv_ready: bool,
+          }
+
+          struct ExchangeLane<T> {
+            result: T,
+            attempts: i64,
+          }
+
+          struct SessionLane<T> {
+            exchange: T,
+            open: bool,
+          }
+
+          struct ExchangeSummary<T> {
+            session: T,
+            exchange_value: i64,
+          }
+
+          struct SessionSummary<T> {
+            summary: T,
+            session_value: i64,
+          }
+
+          async fn net_http_client_exchange<T>(
+            request: NetHttpRequest<T>
+          ) -> NetHttpClientExchangeSummary<T> {
+            return ExchangeSummary {
+              session: SessionLane {
+                exchange: ExchangeLane {
+                  result: ResultEnvelope {
+                    response: HttpResponse {
+                      body: request.body,
+                      status: 200,
+                    },
+                    recv_ready: true,
+                  },
+                  attempts: request.retry_budget,
+                },
+                open: true,
+              },
+              exchange_value: 41,
+            };
+          }
+
+          fn loop_summary(
+            seed: i64,
+            summary_task: Task<NetHttpClientExchangeSummary<i64>>
+          ) -> NetSessionSummary<i64> {
+            while seed > 0 {
+              return SessionSummary {
+                summary: join(summary_task),
+                session_value: 99,
+              };
+            }
+            return SessionSummary {
+              summary: ExchangeSummary {
+                session: SessionLane {
+                  exchange: ExchangeLane {
+                    result: ResultEnvelope {
+                      response: HttpResponse { body: Boxed(9), status: 503 },
+                      recv_ready: false,
+                    },
+                    attempts: 1,
+                  },
+                  open: false,
+                },
+                exchange_value: 40,
+              },
+              session_value: 98,
+            };
+          }
+
+          fn summarize_net_session<T>(summary: NetSessionSummary<T>) -> T {
+            return summary.summary.session.exchange.result.response.body.value;
+          }
+
+          fn main() -> i64 {
+            let summary_task: Task<NetHttpClientExchangeSummary<i64>> =
+              spawn(net_http_client_exchange(NetHttpRequest {
+                body: Boxed(7),
+                retry_budget: 2,
+              }));
+            let summary: NetSessionSummary<i64> = loop_summary(1, summary_task);
+            return summarize_net_session(summary);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let exchange = module
+        .functions
+        .iter()
+        .find(|function| function.name == "net_http_client_exchange__i64")
+        .unwrap();
+    assert!(exchange.is_async);
+    assert!(exchange.generic_params.is_empty());
+    assert!(matches!(
+        exchange.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered)
+            if rendered
+                == "ExchangeSummary<SessionLane<ExchangeLane<ResultEnvelope<HttpResponse<Boxed<i64>>>>>>"
+    ));
+
+    let loop_summary = module
+        .functions
+        .iter()
+        .find(|function| function.name == "loop_summary")
+        .unwrap();
+    assert!(matches!(
+        loop_summary.body.first(),
+        Some(NirStmt::While { body, .. })
+            if matches!(
+                body.as_slice(),
+                [NirStmt::Return(Some(NirExpr::StructLiteral { type_name, type_args, fields }))]
+                    if type_name == "SessionSummary"
+                        && matches!(
+                            type_args.as_slice(),
+                            [ty]
+                                if ty.render()
+                                    == "ExchangeSummary<SessionLane<ExchangeLane<ResultEnvelope<HttpResponse<Boxed<i64>>>>>>"
+                        )
+                        && matches!(
+                            fields.as_slice(),
+                            [
+                                (summary_field, NirExpr::CpuJoin(value)),
+                                (session_value_field, NirExpr::Int(99))
+                            ]
+                                if summary_field == "summary"
+                                    && session_value_field == "session_value"
+                                    && matches!(
+                                        value.as_ref(),
+                                        NirExpr::Var(name) if name == "summary_task"
+                                    )
+                        )
+            )
+    ));
+    assert!(matches!(
+        loop_summary.body.get(1),
+        Some(NirStmt::Return(Some(NirExpr::StructLiteral { type_name, type_args, .. })))
+            if type_name == "SessionSummary"
+                && matches!(
+                    type_args.as_slice(),
+                    [ty]
+                        if ty.render()
+                            == "ExchangeSummary<SessionLane<ExchangeLane<ResultEnvelope<HttpResponse<Boxed<i64>>>>>>"
+                )
+    ));
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.first(),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::CpuSpawn { .. },
+        }) if name == "summary_task"
+            && ty.render()
+                == "Task<ExchangeSummary<SessionLane<ExchangeLane<ResultEnvelope<HttpResponse<Boxed<i64>>>>>>>"
+    ));
+    assert!(matches!(
+        main.body.get(1),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::Call { callee, .. },
+        }) if name == "summary"
+            && ty.render()
+                == "SessionSummary<ExchangeSummary<SessionLane<ExchangeLane<ResultEnvelope<HttpResponse<Boxed<i64>>>>>>>"
+            && callee == "loop_summary"
+    ));
+}
+
+#[test]
+fn monomorphizes_nested_while_match_std_net_summary_session_flow() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type NetHttpRequest<T> = HttpRequest<Boxed<T>>;
+          type NetHttpResponse<T> = HttpResponse<Boxed<T>>;
+          type NetResult<T> = ResultEnvelope<NetHttpResponse<T>>;
+          type NetHttpClientExchange<T> = ExchangeLane<NetResult<T>>;
+          type NetSession<T> = SessionLane<NetHttpClientExchange<T>>;
+          type NetHttpClientExchangeSummary<T> = ExchangeSummary<NetSession<T>>;
+          type NetSessionSummary<T> = SessionSummary<NetHttpClientExchangeSummary<T>>;
+
+          struct Boxed<T> {
+            value: T,
+          }
+
+          struct HttpRequest<T> {
+            body: T,
+            retry_budget: i64,
+          }
+
+          struct HttpResponse<T> {
+            body: T,
+            status: i64,
+          }
+
+          struct ResultEnvelope<T> {
+            response: T,
+            recv_ready: bool,
+          }
+
+          struct ExchangeLane<T> {
+            result: T,
+            attempts: i64,
+          }
+
+          struct SessionLane<T> {
+            exchange: T,
+            open: bool,
+          }
+
+          struct ExchangeSummary<T> {
+            session: T,
+            exchange_value: i64,
+          }
+
+          struct SessionSummary<T> {
+            summary: T,
+            session_value: i64,
+          }
+
+          async fn net_http_client_exchange<T>(
+            request: NetHttpRequest<T>
+          ) -> NetHttpClientExchangeSummary<T> {
+            return ExchangeSummary {
+              session: SessionLane {
+                exchange: ExchangeLane {
+                  result: ResultEnvelope {
+                    response: HttpResponse {
+                      body: request.body,
+                      status: 200,
+                    },
+                    recv_ready: true,
+                  },
+                  attempts: request.retry_budget,
+                },
+                open: true,
+              },
+              exchange_value: 41,
+            };
+          }
+
+          fn nested_loop_summary(
+            seed: i64,
+            mode: i64,
+            summary_task: Task<NetHttpClientExchangeSummary<i64>>
+          ) -> NetSessionSummary<i64> {
+            while seed > 0 {
+              match mode {
+                1 => {
+                  return SessionSummary {
+                    summary: join(summary_task),
+                    session_value: 99,
+                  };
+                }
+                _ => {
+                  return SessionSummary {
+                    summary: ExchangeSummary {
+                      session: SessionLane {
+                        exchange: ExchangeLane {
+                          result: ResultEnvelope {
+                            response: HttpResponse { body: Boxed(9), status: 503 },
+                            recv_ready: false,
+                          },
+                          attempts: 1,
+                        },
+                        open: false,
+                      },
+                      exchange_value: 40,
+                    },
+                    session_value: 98,
+                  };
+                }
+              }
+            }
+            return SessionSummary {
+              summary: ExchangeSummary {
+                session: SessionLane {
+                  exchange: ExchangeLane {
+                    result: ResultEnvelope {
+                      response: HttpResponse { body: Boxed(8), status: 204 },
+                      recv_ready: true,
+                    },
+                    attempts: 0,
+                  },
+                  open: true,
+                },
+                exchange_value: 39,
+              },
+              session_value: 97,
+            };
+          }
+
+          fn summarize_net_session<T>(summary: NetSessionSummary<T>) -> T {
+            return summary.summary.session.exchange.result.response.body.value;
+          }
+
+          fn main() -> i64 {
+            let summary_task: Task<NetHttpClientExchangeSummary<i64>> =
+              spawn(net_http_client_exchange(NetHttpRequest {
+                body: Boxed(7),
+                retry_budget: 2,
+              }));
+            let summary: NetSessionSummary<i64> = nested_loop_summary(1, 1, summary_task);
+            return summarize_net_session(summary);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let nested = module
+        .functions
+        .iter()
+        .find(|function| function.name == "nested_loop_summary")
+        .unwrap();
+    assert!(matches!(
+        nested.body.first(),
+        Some(NirStmt::While { body, .. })
+            if matches!(
+                body.as_slice(),
+                [NirStmt::If {
+                    then_body,
+                    else_body,
+                    ..
+                }] if matches!(
+                    then_body.as_slice(),
+                    [NirStmt::Return(Some(NirExpr::StructLiteral { type_name, type_args, fields }))]
+                        if type_name == "SessionSummary"
+                            && matches!(
+                                type_args.as_slice(),
+                                [ty]
+                                    if ty.render()
+                                        == "ExchangeSummary<SessionLane<ExchangeLane<ResultEnvelope<HttpResponse<Boxed<i64>>>>>>"
+                            )
+                            && matches!(
+                                fields.as_slice(),
+                                [
+                                    (summary_field, NirExpr::CpuJoin(value)),
+                                    (session_value_field, NirExpr::Int(99))
+                                ]
+                                    if summary_field == "summary"
+                                        && session_value_field == "session_value"
+                                        && matches!(
+                                            value.as_ref(),
+                                            NirExpr::Var(name) if name == "summary_task"
+                                        )
+                            )
+                ) && matches!(
+                    else_body.as_slice(),
+                    [NirStmt::Return(Some(NirExpr::StructLiteral { type_name, type_args, .. }))]
+                        if type_name == "SessionSummary"
+                            && matches!(
+                                type_args.as_slice(),
+                                [ty]
+                                    if ty.render()
+                                        == "ExchangeSummary<SessionLane<ExchangeLane<ResultEnvelope<HttpResponse<Boxed<i64>>>>>>"
+                            )
+                )
+            )
+    ));
+    assert!(matches!(
+        nested.body.get(1),
+        Some(NirStmt::Return(Some(NirExpr::StructLiteral { type_name, type_args, .. })))
+            if type_name == "SessionSummary"
+                && matches!(
+                    type_args.as_slice(),
+                    [ty]
+                        if ty.render()
+                            == "ExchangeSummary<SessionLane<ExchangeLane<ResultEnvelope<HttpResponse<Boxed<i64>>>>>>"
+                )
+    ));
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.first(),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::CpuSpawn { .. },
+        }) if name == "summary_task"
+            && ty.render()
+                == "Task<ExchangeSummary<SessionLane<ExchangeLane<ResultEnvelope<HttpResponse<Boxed<i64>>>>>>>"
+    ));
+    assert!(matches!(
+        main.body.get(1),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::Call { callee, .. },
+        }) if name == "summary"
+            && ty.render()
+                == "SessionSummary<ExchangeSummary<SessionLane<ExchangeLane<ResultEnvelope<HttpResponse<Boxed<i64>>>>>>>"
+            && callee == "nested_loop_summary"
+    ));
+}
+
+#[test]
+fn monomorphizes_higher_order_nested_while_match_std_net_summary_session_flow() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type NetHttpRequest<T> = HttpRequest<Boxed<T>>;
+          type NetHttpResponse<T> = HttpResponse<Boxed<T>>;
+          type NetResult<T> = ResultEnvelope<NetHttpResponse<T>>;
+          type NetHttpClientExchange<T> = ExchangeLane<NetResult<T>>;
+          type NetSession<T> = SessionLane<NetHttpClientExchange<T>>;
+          type NetHttpClientExchangeSummary<T> = ExchangeSummary<NetSession<T>>;
+          type NetSessionSummary<T> = SessionSummary<NetHttpClientExchangeSummary<T>>;
+
+          struct Boxed<T> {
+            value: T,
+          }
+
+          struct HttpRequest<T> {
+            body: T,
+            retry_budget: i64,
+          }
+
+          struct HttpResponse<T> {
+            body: T,
+            status: i64,
+          }
+
+          struct ResultEnvelope<T> {
+            response: T,
+            recv_ready: bool,
+          }
+
+          struct ExchangeLane<T> {
+            result: T,
+            attempts: i64,
+          }
+
+          struct SessionLane<T> {
+            exchange: T,
+            open: bool,
+          }
+
+          struct ExchangeSummary<T> {
+            session: T,
+            exchange_value: i64,
+          }
+
+          struct SessionSummary<T> {
+            summary: T,
+            session_value: i64,
+          }
+
+          fn apply(x: i64, f: Fn1<i64, i64>) -> i64 {
+            return f(x);
+          }
+
+          async fn net_http_client_exchange<T>(
+            request: NetHttpRequest<T>
+          ) -> NetHttpClientExchangeSummary<T> {
+            return ExchangeSummary {
+              session: SessionLane {
+                exchange: ExchangeLane {
+                  result: ResultEnvelope {
+                    response: HttpResponse {
+                      body: request.body,
+                      status: 200,
+                    },
+                    recv_ready: true,
+                  },
+                  attempts: request.retry_budget,
+                },
+                open: true,
+              },
+              exchange_value: 41,
+            };
+          }
+
+          fn nested_loop_summary(
+            seed: i64,
+            mode: i64,
+            summary_task: Task<NetHttpClientExchangeSummary<i64>>
+          ) -> NetSessionSummary<i64> {
+            while seed > 0 {
+              match apply(mode, |x: i64| -> i64 { return x + 1; }) {
+                2 => {
+                  return SessionSummary {
+                    summary: join(summary_task),
+                    session_value: 99,
+                  };
+                }
+                _ => {
+                  return SessionSummary {
+                    summary: ExchangeSummary {
+                      session: SessionLane {
+                        exchange: ExchangeLane {
+                          result: ResultEnvelope {
+                            response: HttpResponse { body: Boxed(9), status: 503 },
+                            recv_ready: false,
+                          },
+                          attempts: 1,
+                        },
+                        open: false,
+                      },
+                      exchange_value: 40,
+                    },
+                    session_value: 98,
+                  };
+                }
+              }
+            }
+            return SessionSummary {
+              summary: ExchangeSummary {
+                session: SessionLane {
+                  exchange: ExchangeLane {
+                    result: ResultEnvelope {
+                      response: HttpResponse { body: Boxed(8), status: 204 },
+                      recv_ready: true,
+                    },
+                    attempts: 0,
+                  },
+                  open: true,
+                },
+                exchange_value: 39,
+              },
+              session_value: 97,
+            };
+          }
+
+          fn summarize_net_session<T>(summary: NetSessionSummary<T>) -> T {
+            return summary.summary.session.exchange.result.response.body.value;
+          }
+
+          fn main() -> i64 {
+            let summary_task: Task<NetHttpClientExchangeSummary<i64>> =
+              spawn(net_http_client_exchange(NetHttpRequest {
+                body: Boxed(7),
+                retry_budget: 2,
+              }));
+            let summary: NetSessionSummary<i64> = nested_loop_summary(1, 1, summary_task);
+            return summarize_net_session(summary);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let nested = module
+        .functions
+        .iter()
+        .find(|function| function.name == "nested_loop_summary")
+        .unwrap();
+    assert!(matches!(
+        nested.body.first(),
+        Some(NirStmt::While { body, .. })
+            if matches!(
+                body.as_slice(),
+                [
+                    NirStmt::Let { name, value: NirExpr::Call { .. }, .. },
+                    NirStmt::If { then_body, else_body, .. }
+                ] if name.starts_with("__match_scrutinee_")
+                    && matches!(
+                        then_body.as_slice(),
+                        [NirStmt::Return(Some(NirExpr::StructLiteral { type_name, type_args, fields }))]
+                            if type_name == "SessionSummary"
+                                && matches!(
+                                    type_args.as_slice(),
+                                    [ty]
+                                        if ty.render()
+                                            == "ExchangeSummary<SessionLane<ExchangeLane<ResultEnvelope<HttpResponse<Boxed<i64>>>>>>"
+                                )
+                                && matches!(
+                                    fields.as_slice(),
+                                    [
+                                        (summary_field, NirExpr::CpuJoin(value)),
+                                        (session_value_field, NirExpr::Int(99))
+                                    ]
+                                        if summary_field == "summary"
+                                            && session_value_field == "session_value"
+                                            && matches!(
+                                                value.as_ref(),
+                                                NirExpr::Var(task_name) if task_name == "summary_task"
+                                            )
+                                )
+                    ) && matches!(
+                        else_body.as_slice(),
+                        [NirStmt::Return(Some(NirExpr::StructLiteral { type_name, type_args, .. }))]
+                            if type_name == "SessionSummary"
+                                && matches!(
+                                    type_args.as_slice(),
+                                    [ty]
+                                        if ty.render()
+                                            == "ExchangeSummary<SessionLane<ExchangeLane<ResultEnvelope<HttpResponse<Boxed<i64>>>>>>"
+                                )
+                    )
+            )
+    ));
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.first(),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::CpuSpawn { .. },
+        }) if name == "summary_task"
+            && ty.render()
+                == "Task<ExchangeSummary<SessionLane<ExchangeLane<ResultEnvelope<HttpResponse<Boxed<i64>>>>>>>"
+    ));
+    assert!(matches!(
+        main.body.get(1),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::Call { callee, .. },
+        }) if name == "summary"
+            && ty.render()
+                == "SessionSummary<ExchangeSummary<SessionLane<ExchangeLane<ResultEnvelope<HttpResponse<Boxed<i64>>>>>>>"
+            && callee == "nested_loop_summary"
+    ));
+}
+
+#[test]
+fn monomorphizes_continue_branch_before_generic_summary_join_in_while() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type Response<T> = Envelope<Boxed<T>>;
+          type Summary<T> = SessionSummary<Response<T>>;
+
+          struct Boxed<T> {
+            value: T,
+          }
+
+          struct Envelope<T> {
+            payload: T,
+            ready: bool,
+          }
+
+          struct SessionSummary<T> {
+            response: T,
+            code: i64,
+          }
+
+          async fn produce_response<T>() -> Response<T> {
+            return Response { payload: Boxed(7), ready: true };
+          }
+
+          fn route(flag: bool, seed: i64, task: Task<Response<i64>>) -> Summary<i64> {
+            while seed > 0 {
+              if flag {
+                continue;
+              } else {
+                return Summary {
+                  response: join(task),
+                  code: 7,
+                };
+              }
+            }
+            return Summary {
+              response: Response { payload: Boxed(9), ready: false },
+              code: 8,
+            };
+          }
+
+          fn main() -> i64 {
+            let task: Task<Response<i64>> = spawn(produce_response());
+            let summary: Summary<i64> = route(true, 1, task);
+            return summary.response.payload.value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let produced = module
+        .functions
+        .iter()
+        .find(|function| function.name == "produce_response__i64")
+        .unwrap();
+    assert!(produced.is_async);
+    assert!(produced.generic_params.is_empty());
+    assert!(matches!(
+        produced.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "Envelope<Boxed<i64>>"
+    ));
+
+    let route = module
+        .functions
+        .iter()
+        .find(|function| function.name == "route")
+        .unwrap();
+    assert!(matches!(
+        route.body.first(),
+        Some(NirStmt::While { body, .. })
+            if matches!(
+                body.as_slice(),
+                [NirStmt::If { then_body, else_body, .. }]
+                    if matches!(then_body.as_slice(), [NirStmt::Continue])
+                        && matches!(
+                            else_body.as_slice(),
+                            [NirStmt::Return(Some(NirExpr::StructLiteral { type_name, type_args, fields }))]
+                                if type_name == "SessionSummary"
+                                    && matches!(
+                                        type_args.as_slice(),
+                                        [ty] if ty.render() == "Envelope<Boxed<i64>>"
+                                    )
+                                    && matches!(
+                                        fields.as_slice(),
+                                        [
+                                            (response_field, NirExpr::CpuJoin(value)),
+                                            (code_field, NirExpr::Int(7))
+                                        ]
+                                            if response_field == "response"
+                                                && code_field == "code"
+                                                && matches!(
+                                                    value.as_ref(),
+                                                    NirExpr::Var(task_name) if task_name == "task"
+                                                )
+                                    )
+                        )
+            )
+    ));
+    assert!(matches!(
+        route.body.get(1),
+        Some(NirStmt::Return(Some(NirExpr::StructLiteral { type_name, type_args, .. })))
+            if type_name == "SessionSummary"
+                && matches!(type_args.as_slice(), [ty] if ty.render() == "Envelope<Boxed<i64>>")
+    ));
+}
+
+#[test]
+fn monomorphizes_break_branch_before_generic_summary_fallback_in_while() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type Response<T> = Envelope<Boxed<T>>;
+          type Summary<T> = SessionSummary<Response<T>>;
+
+          struct Boxed<T> {
+            value: T,
+          }
+
+          struct Envelope<T> {
+            payload: T,
+            ready: bool,
+          }
+
+          struct SessionSummary<T> {
+            response: T,
+            code: i64,
+          }
+
+          async fn produce_response<T>() -> Response<T> {
+            return Response { payload: Boxed(7), ready: true };
+          }
+
+          fn route(flag: bool, seed: i64, task: Task<Response<i64>>) -> Summary<i64> {
+            while seed > 0 {
+              if flag {
+                break;
+              } else {
+                return Summary {
+                  response: join(task),
+                  code: 7,
+                };
+              }
+            }
+            return Summary {
+              response: Response { payload: Boxed(9), ready: false },
+              code: 8,
+            };
+          }
+
+          fn main() -> i64 {
+            let task: Task<Response<i64>> = spawn(produce_response());
+            let summary: Summary<i64> = route(true, 1, task);
+            return summary.response.payload.value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let route = module
+        .functions
+        .iter()
+        .find(|function| function.name == "route")
+        .unwrap();
+    assert!(matches!(
+        route.body.first(),
+        Some(NirStmt::While { body, .. })
+            if matches!(
+                body.as_slice(),
+                [NirStmt::If { then_body, else_body, .. }]
+                    if matches!(then_body.as_slice(), [NirStmt::Break])
+                        && matches!(
+                            else_body.as_slice(),
+                            [NirStmt::Return(Some(NirExpr::StructLiteral { type_name, type_args, fields }))]
+                                if type_name == "SessionSummary"
+                                    && matches!(
+                                        type_args.as_slice(),
+                                        [ty] if ty.render() == "Envelope<Boxed<i64>>"
+                                    )
+                                    && matches!(
+                                        fields.as_slice(),
+                                        [
+                                            (response_field, NirExpr::CpuJoin(value)),
+                                            (code_field, NirExpr::Int(7))
+                                        ]
+                                            if response_field == "response"
+                                                && code_field == "code"
+                                                && matches!(
+                                                    value.as_ref(),
+                                                    NirExpr::Var(task_name) if task_name == "task"
+                                                )
+                                    )
+                        )
+            )
+    ));
+    assert!(matches!(
+        route.body.get(1),
+        Some(NirStmt::Return(Some(NirExpr::StructLiteral { type_name, type_args, fields })))
+            if type_name == "SessionSummary"
+                && matches!(type_args.as_slice(), [ty] if ty.render() == "Envelope<Boxed<i64>>")
+                && matches!(
+                    fields.as_slice(),
+                    [
+                        (response_field, NirExpr::StructLiteral { type_name, type_args, .. }),
+                        (code_field, NirExpr::Int(8))
+                    ]
+                        if response_field == "response"
+                            && code_field == "code"
+                            && type_name == "Envelope"
+                            && matches!(type_args.as_slice(), [ty] if ty.render() == "Boxed<i64>")
+                )
+    ));
+}
+
+#[test]
+fn monomorphizes_guarded_match_before_generic_summary_join_in_while() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type Response<T> = Envelope<Boxed<T>>;
+          type Summary<T> = SessionSummary<Response<T>>;
+
+          struct Boxed<T> {
+            value: T,
+          }
+
+          struct Envelope<T> {
+            payload: T,
+            ready: bool,
+          }
+
+          struct SessionSummary<T> {
+            response: T,
+            code: i64,
+          }
+
+          async fn produce_response<T>() -> Response<T> {
+            return Response { payload: Boxed(7), ready: true };
+          }
+
+          fn route(mode: i64, ready: bool, seed: i64, task: Task<Response<i64>>) -> Summary<i64> {
+            while seed > 0 {
+              match mode {
+                2 if ready => {
+                  return Summary {
+                    response: join(task),
+                    code: 7,
+                  };
+                }
+                _ => {
+                  return Summary {
+                    response: Response { payload: Boxed(9), ready: false },
+                    code: 8,
+                  };
+                }
+              }
+            }
+            return Summary {
+              response: Response { payload: Boxed(10), ready: true },
+              code: 9,
+            };
+          }
+
+          fn main() -> i64 {
+            let task: Task<Response<i64>> = spawn(produce_response());
+            let summary: Summary<i64> = route(2, true, 1, task);
+            return summary.response.payload.value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let route = module
+        .functions
+        .iter()
+        .find(|function| function.name == "route")
+        .unwrap();
+    assert!(matches!(
+        route.body.first(),
+        Some(NirStmt::While { body, .. })
+            if matches!(
+                body.as_slice(),
+                [NirStmt::If { condition, then_body, else_body }]
+                    if matches!(condition, NirExpr::Binary { .. })
+                        && matches!(
+                            then_body.as_slice(),
+                            [NirStmt::Return(Some(NirExpr::StructLiteral { type_name, type_args, fields }))]
+                                if type_name == "SessionSummary"
+                                    && matches!(
+                                        type_args.as_slice(),
+                                        [ty] if ty.render() == "Envelope<Boxed<i64>>"
+                                    )
+                                    && matches!(
+                                        fields.as_slice(),
+                                        [
+                                            (response_field, NirExpr::CpuJoin(value)),
+                                            (code_field, NirExpr::Int(7))
+                                        ]
+                                            if response_field == "response"
+                                                && code_field == "code"
+                                                && matches!(
+                                                    value.as_ref(),
+                                                    NirExpr::Var(task_name) if task_name == "task"
+                                                )
+                                    )
+                        )
+                        && matches!(
+                            else_body.as_slice(),
+                            [NirStmt::Return(Some(NirExpr::StructLiteral { type_name, type_args, .. }))]
+                                if type_name == "SessionSummary"
+                                    && matches!(
+                                        type_args.as_slice(),
+                                        [ty] if ty.render() == "Envelope<Boxed<i64>>"
+                                    )
+                        )
+            )
+    ));
+}
+
+#[test]
+fn monomorphizes_nested_match_continue_before_generic_summary_join_in_while() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type Response<T> = Envelope<Boxed<T>>;
+          type Summary<T> = SessionSummary<Response<T>>;
+
+          struct Boxed<T> {
+            value: T,
+          }
+
+          struct Envelope<T> {
+            payload: T,
+            ready: bool,
+          }
+
+          struct SessionSummary<T> {
+            response: T,
+            code: i64,
+          }
+
+          async fn produce_response<T>() -> Response<T> {
+            return Response { payload: Boxed(7), ready: true };
+          }
+
+          fn route(mode: i64, seed: i64, task: Task<Response<i64>>) -> Summary<i64> {
+            while seed > 0 {
+              match mode {
+                0 => {
+                  continue;
+                }
+                _ => {
+                  return Summary {
+                    response: join(task),
+                    code: 7,
+                  };
+                }
+              }
+            }
+            return Summary {
+              response: Response { payload: Boxed(9), ready: false },
+              code: 8,
+            };
+          }
+
+          fn main() -> i64 {
+            let task: Task<Response<i64>> = spawn(produce_response());
+            let summary: Summary<i64> = route(1, 1, task);
+            return summary.response.payload.value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let route = module
+        .functions
+        .iter()
+        .find(|function| function.name == "route")
+        .unwrap();
+    assert!(matches!(
+        route.body.first(),
+        Some(NirStmt::While { body, .. })
+            if matches!(
+                body.as_slice(),
+                [NirStmt::If { then_body, else_body, .. }]
+                    if matches!(then_body.as_slice(), [NirStmt::Continue])
+                        && matches!(
+                            else_body.as_slice(),
+                            [NirStmt::Return(Some(NirExpr::StructLiteral { type_name, type_args, fields }))]
+                                if type_name == "SessionSummary"
+                                    && matches!(
+                                        type_args.as_slice(),
+                                        [ty] if ty.render() == "Envelope<Boxed<i64>>"
+                                    )
+                                    && matches!(
+                                        fields.as_slice(),
+                                        [
+                                            (response_field, NirExpr::CpuJoin(value)),
+                                            (code_field, NirExpr::Int(7))
+                                        ]
+                                            if response_field == "response"
+                                                && code_field == "code"
+                                                && matches!(
+                                                    value.as_ref(),
+                                                    NirExpr::Var(task_name) if task_name == "task"
+                                                )
+                                    )
+                        )
+            )
+    ));
+}
+
+#[test]
+fn monomorphizes_nested_if_break_before_generic_summary_join_in_while() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type Response<T> = Envelope<Boxed<T>>;
+          type Summary<T> = SessionSummary<Response<T>>;
+
+          struct Boxed<T> {
+            value: T,
+          }
+
+          struct Envelope<T> {
+            payload: T,
+            ready: bool,
+          }
+
+          struct SessionSummary<T> {
+            response: T,
+            code: i64,
+          }
+
+          async fn produce_response<T>() -> Response<T> {
+            return Response { payload: Boxed(7), ready: true };
+          }
+
+          fn route(flag: bool, seed: i64, task: Task<Response<i64>>) -> Summary<i64> {
+            while seed > 0 {
+              if flag {
+                if seed > 1 {
+                  break;
+                } else {
+                  return Summary {
+                    response: join(task),
+                    code: 7,
+                  };
+                }
+              } else {
+                return Summary {
+                  response: Response { payload: Boxed(8), ready: false },
+                  code: 6,
+                };
+              }
+            }
+            return Summary {
+              response: Response { payload: Boxed(9), ready: false },
+              code: 8,
+            };
+          }
+
+          fn main() -> i64 {
+            let task: Task<Response<i64>> = spawn(produce_response());
+            let summary: Summary<i64> = route(true, 1, task);
+            return summary.response.payload.value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let route = module
+        .functions
+        .iter()
+        .find(|function| function.name == "route")
+        .unwrap();
+    assert!(matches!(
+        route.body.first(),
+        Some(NirStmt::While { body, .. })
+            if matches!(
+                body.as_slice(),
+                [NirStmt::If { then_body, else_body, .. }]
+                    if matches!(
+                        then_body.as_slice(),
+                        [NirStmt::If { then_body, else_body, .. }]
+                            if matches!(then_body.as_slice(), [NirStmt::Break])
+                                && matches!(
+                                    else_body.as_slice(),
+                                    [NirStmt::Return(Some(NirExpr::StructLiteral { type_name, type_args, fields }))]
+                                        if type_name == "SessionSummary"
+                                            && matches!(
+                                                type_args.as_slice(),
+                                                [ty] if ty.render() == "Envelope<Boxed<i64>>"
+                                            )
+                                            && matches!(
+                                                fields.as_slice(),
+                                                [
+                                                    (response_field, NirExpr::CpuJoin(value)),
+                                                    (code_field, NirExpr::Int(7))
+                                                ]
+                                                    if response_field == "response"
+                                                        && code_field == "code"
+                                                        && matches!(
+                                                            value.as_ref(),
+                                                            NirExpr::Var(task_name) if task_name == "task"
+                                                        )
+                                            )
+                                )
+                    ) && matches!(
+                        else_body.as_slice(),
+                        [NirStmt::Return(Some(NirExpr::StructLiteral { type_name, type_args, .. }))]
+                            if type_name == "SessionSummary"
+                                && matches!(
+                                    type_args.as_slice(),
+                                    [ty] if ty.render() == "Envelope<Boxed<i64>>"
+                                )
+                    )
+            )
     ));
 }

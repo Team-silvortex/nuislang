@@ -82,6 +82,7 @@ pub(super) fn rewrite_generic_calls_in_expr(
             if let Some(template) = generic_templates.get(callee) {
                 let specialized_name = ensure_generic_specialization(
                     template,
+                    generic_args,
                     &rewritten_args,
                     expected,
                     env,
@@ -97,7 +98,7 @@ pub(super) fn rewrite_generic_calls_in_expr(
                 )?;
                 AstExpr::Call {
                     callee: specialized_name,
-                    generic_args: generic_args.clone(),
+                    generic_args: Vec::new(),
                     args: rewritten_args,
                 }
             } else {
@@ -183,15 +184,18 @@ pub(super) fn rewrite_generic_calls_in_expr(
                 fields: fields
                     .iter()
                     .map(|(name, value)| {
-                        let literal_ty = expected
-                            .filter(|ty| ty.name == rewritten_head.0)
-                            .cloned()
-                            .unwrap_or_else(|| AstTypeRef {
-                                name: rewritten_head.0.clone(),
-                                generic_args: rewritten_head.1.clone(),
-                                is_optional: false,
-                                is_ref: false,
-                            });
+                        let literal_ty = concrete_struct_literal_type(
+                            &rewritten_head.0,
+                            &rewritten_head.1,
+                            expected,
+                            visible_type_aliases,
+                        )
+                        .unwrap_or_else(|| AstTypeRef {
+                            name: rewritten_head.0.clone(),
+                            generic_args: rewritten_head.1.clone(),
+                            is_optional: false,
+                            is_ref: false,
+                        });
                         let field_expected =
                             struct_field_expected_type(&literal_ty, name, struct_table);
                         Ok((
@@ -265,6 +269,31 @@ pub(super) fn rewrite_generic_calls_in_expr(
         },
         other => other.clone(),
     })
+}
+
+fn concrete_struct_literal_type(
+    rewritten_name: &str,
+    rewritten_args: &[AstTypeRef],
+    expected: Option<&AstTypeRef>,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+) -> Option<AstTypeRef> {
+    let expected = expected?;
+    if expected.name == rewritten_name {
+        return Some(expected.clone());
+    }
+    let resolved_expected = resolve_ast_type_ref_aliases(expected, visible_type_aliases).ok()?;
+    if resolved_expected.name == rewritten_name {
+        return Some(resolved_expected);
+    }
+    if !rewritten_args.is_empty() {
+        return Some(AstTypeRef {
+            name: rewritten_name.to_owned(),
+            generic_args: rewritten_args.to_vec(),
+            is_optional: false,
+            is_ref: false,
+        });
+    }
+    None
 }
 
 fn resolved_struct_constructor_alias(
@@ -613,6 +642,7 @@ fn infer_alias_struct_target_from_expected(
 
 pub(super) fn ensure_generic_specialization(
     template: &AstFunction,
+    explicit_generic_args: &[AstTypeRef],
     args: &[AstExpr],
     expected: Option<&AstTypeRef>,
     env: &BTreeMap<String, AstTypeRef>,
@@ -628,6 +658,7 @@ pub(super) fn ensure_generic_specialization(
 ) -> Result<String, String> {
     let substitutions = infer_generic_substitutions(
         template,
+        explicit_generic_args,
         args,
         expected,
         env,
@@ -717,6 +748,9 @@ pub(super) fn call_arg_expected_type(
         struct_table,
     ) {
         return Some(from_signature_expected);
+    }
+    if let Some(from_task_builtin) = task_builtin_arg_expected_type(callee, index, expected) {
+        return Some(from_task_builtin);
     }
     if let Some(from_signature) = signatures
         .get(callee)
@@ -827,6 +861,26 @@ fn generic_signature_arg_expected_type_from_return(
         .map(|(name, ty)| (name, lower_type_ref(&ty)))
         .collect::<BTreeMap<_, _>>();
     specialize_ast_type_ref(&param_ty, &lowered_substitutions).ok()
+}
+
+fn task_builtin_arg_expected_type(
+    callee: &str,
+    index: usize,
+    expected: Option<&AstTypeRef>,
+) -> Option<AstTypeRef> {
+    let expected = expected?;
+    match callee {
+        "spawn" if index == 0 && expected.name == "Task" && expected.generic_args.len() == 1 => {
+            expected.generic_args.first().cloned()
+        }
+        "join" if index == 0 && expected.name != "Task" => Some(AstTypeRef {
+            name: "Task".to_owned(),
+            generic_args: vec![expected.clone()],
+            is_optional: false,
+            is_ref: false,
+        }),
+        _ => None,
+    }
 }
 
 fn collect_signature_generic_placeholders(

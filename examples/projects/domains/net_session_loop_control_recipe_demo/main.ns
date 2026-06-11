@@ -1,0 +1,175 @@
+use network NetworkUnit;
+
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+  extern "c" fn host_network_close(handle: i64) -> i64;
+  extern "c" fn host_network_send_probe(
+    stream_window: i64,
+    send_window: i64,
+    remote_port: i64
+  ) -> i64;
+  extern "c" fn host_network_recv_probe(
+    stream_window: i64,
+    recv_window: i64,
+    local_port: i64
+  ) -> i64;
+
+  struct NetControlSessionSummary {
+    session_value: i64
+  }
+
+  struct NetSessionLoopControlSummary {
+    control_session_value: i64,
+    flow_value: i64,
+    post_flow_value: i64,
+    selected_value: i64
+  }
+
+  async fn consume_network_result(result: NetworkResult<i64>) -> i64 {
+    if network_send_ready(result) {
+      return network_value(result) + 100;
+    }
+    if network_recv_ready(result) {
+      return network_value(result) + 10;
+    }
+    if network_config_ready(result) {
+      return network_value(result) + 1;
+    }
+    return 0;
+  }
+
+  fn encode_value(result: NetworkResult<i64>) -> i64 {
+    return network_value(result);
+  }
+
+  fn capture_net_control_session_summary() -> NetControlSessionSummary {
+    let argv_count: i64 = host_argv_count();
+    let local_port_value: i64 = network_profile_local_port("NetworkUnit");
+    let local_port: NetworkResult<i64> =
+      network_result(network_profile_local_port("NetworkUnit"));
+    let remote_port: NetworkResult<i64> =
+      network_result(network_profile_remote_port("NetworkUnit"));
+    let connect_timeout: NetworkResult<i64> =
+      network_result(network_profile_connect_timeout("NetworkUnit"));
+    let read_timeout: NetworkResult<i64> =
+      network_result(network_profile_read_timeout("NetworkUnit"));
+    let write_timeout: NetworkResult<i64> =
+      network_result(network_profile_write_timeout("NetworkUnit"));
+    let close_result: NetworkResult<i64> = network_result(host_network_close(local_port_value));
+
+    return NetControlSessionSummary {
+      session_value: argv_count
+        + encode_value(local_port)
+        + encode_value(remote_port)
+        + encode_value(connect_timeout)
+        + encode_value(read_timeout)
+        + encode_value(write_timeout)
+        + encode_value(close_result)
+    };
+  }
+
+  fn fold_session_flow(limit: i64) -> i64 {
+    let step: i64 = 0;
+    let acc: i64 = 0;
+    while step < limit {
+      let step: i64 = step + 1;
+      match step {
+        1 => {
+          continue;
+        }
+        _ => {
+          if step > 3 {
+            let acc: i64 = acc + step;
+          } else {
+            let acc: i64 = acc + 0;
+          }
+        }
+      }
+    }
+    return acc;
+  }
+
+  fn fold_session_post_flow(limit: i64) -> i64 {
+    let step: i64 = 0;
+    let acc: i64 = 0;
+    while step < limit {
+      let step: i64 = step + 1;
+      if step > 2 {
+        let acc: i64 = acc + step;
+      } else {
+        let acc: i64 = acc + 0;
+      }
+      if acc > 2 {
+        if acc > 6 {
+          break;
+        } else {
+        }
+      } else {
+      }
+    }
+    return acc;
+  }
+
+  fn select_value(
+    control_session_value: i64,
+    flow_value: i64,
+    post_flow_value: i64,
+    primary_value: i64,
+    secondary_value: i64
+  ) -> i64 {
+    if post_flow_value > flow_value {
+      return control_session_value + post_flow_value + primary_value;
+    }
+    return control_session_value + flow_value + secondary_value;
+  }
+
+  fn capture_net_session_loop_control_summary() -> NetSessionLoopControlSummary {
+    let control_summary: NetControlSessionSummary = capture_net_control_session_summary();
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+    let local_port: i64 = network_profile_local_port("NetworkUnit");
+    let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+
+    let primary_probe: NetworkResult<i64> = network_result(
+      host_network_send_probe(stream_window, send_window, remote_port)
+    );
+    let secondary_probe: NetworkResult<i64> = network_result(
+      host_network_recv_probe(stream_window, recv_window, local_port)
+    );
+
+    let primary_task: Task<i64> = spawn(consume_network_result(primary_probe));
+    let secondary_task: Task<i64> = spawn(consume_network_result(secondary_probe));
+
+    let primary_value: i64 = join(primary_task);
+    let secondary_value: i64 = join(secondary_task);
+    let flow_value: i64 = fold_session_flow(retry_budget);
+    let post_flow_value: i64 = fold_session_post_flow(retry_budget);
+
+    return NetSessionLoopControlSummary {
+      control_session_value: control_summary.session_value,
+      flow_value: flow_value,
+      post_flow_value: post_flow_value,
+      selected_value: select_value(
+        control_summary.session_value,
+        flow_value,
+        post_flow_value,
+        primary_value,
+        secondary_value
+      )
+    };
+  }
+
+  fn summarize_net_session_loop_control_recipe() -> i64 {
+    let summary: NetSessionLoopControlSummary = capture_net_session_loop_control_summary();
+    return summary.control_session_value
+      + summary.flow_value
+      + summary.post_flow_value
+      + summary.selected_value;
+  }
+
+  fn main() {
+    print(summarize_net_session_loop_control_recipe());
+  }
+}

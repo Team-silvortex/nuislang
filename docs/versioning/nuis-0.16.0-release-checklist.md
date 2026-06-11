@@ -33,6 +33,10 @@ looks like the `0.16.0` line it claims to describe.
 
 * [ ] `cargo fmt --all`
 * [ ] `cargo test -q -p nuisc -p nuis`
+* [ ] focused frontend crossover probes still pass:
+  `tests_generics`, `tests_higher_order`, and the closest generic diagnostic probes
+* [ ] real project compile harnesses still pass:
+  especially `network_compile` and `task_compile`
 * [ ] spot-check `nuis help`
 * [ ] spot-check `nuis project-status <project-dir>`
 * [ ] spot-check `nuis project-doctor <project-dir>`
@@ -44,6 +48,8 @@ looks like the `0.16.0` line it claims to describe.
 
 * [ ] canonical route:
   `project-doctor -> check -> test -> build -> release-check`
+* [ ] validation spine:
+  frontend probes -> real project compile harnesses -> diagnostic guardrails -> CLI workflow
 * [ ] manifest verification:
   `verify-build-manifest` and build output contract still line up
 * [ ] generic struct route:
@@ -62,6 +68,16 @@ looks like the `0.16.0` line it claims to describe.
 * [ ] generic surface audit matrix:
   constructor / literal / specialization / pattern / destructure / method-bound crossover rows
   still match the checked-in tests
+* [ ] std-net-shaped generic async/task/session routes:
+  facade-shaped and demo-shaped summary/session flows still match the checked-in tests
+* [ ] real network project compile entrypoints:
+  `net_http_client_exchange_recipe_demo` and `net_session_recipe_demo`
+  still compile through `compile_project(...)`
+* [ ] loop-family lowering matrix:
+  counted / carry / flow / post-flow subsets still match the checked-in docs
+* [ ] nested loop control lowering:
+  `if -> break` and `match` / branch-local `continue` still lower into checked-in
+  `and` / `or` loop predicates
 * [ ] async ownership:
   `join`, `join_result`, `cancel`, and `timeout` stay aligned with verifier
   truth
@@ -73,6 +89,8 @@ looks like the `0.16.0` line it claims to describe.
   network compile examples still hold
 * [ ] network runtime notes:
   compile truth vs runtime truth language is still honest
+* [ ] diagnostic guardrails:
+  network-style sync/async misuse routes still fail with stable, specific messages
 
 ## Version Number Decision
 

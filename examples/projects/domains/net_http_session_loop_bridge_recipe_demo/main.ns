@@ -1,0 +1,290 @@
+use network NetworkUnit;
+
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+  extern "c" fn host_monotonic_time_ns() -> i64;
+  extern "c" fn host_network_open_tcp_stream(
+    remote_port: i64,
+    connect_timeout_ms: i64
+  ) -> i64;
+  extern "c" fn host_network_send_owned(
+    handle: i64,
+    stream_window: i64,
+    send_window: i64
+  ) -> i64;
+  extern "c" fn host_network_recv_owned(
+    handle: i64,
+    stream_window: i64,
+    recv_window: i64
+  ) -> i64;
+  extern "c" fn host_network_recv_http_status_owned(
+    handle: i64,
+    stream_window: i64,
+    recv_window: i64
+  ) -> i64;
+  extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+  struct NetHttpClientSessionSummary {
+    session_value: i64,
+    status_code: i64,
+    tick_ns: i64
+  }
+
+  struct NetLoopWindowSummary {
+    flow_value: i64,
+    post_flow_value: i64
+  }
+
+  struct NetBridgeCell<T> {
+    value: T
+  }
+
+  struct NetBridgePacket<T> {
+    payload: T,
+    packet_value: i64
+  }
+
+  struct NetBridgeEnvelope<T> {
+    packet: T,
+    envelope_value: i64
+  }
+
+  type NetHttpSession = NetHttpClientSessionSummary;
+  type NetLoopWindow = NetLoopWindowSummary;
+  type NetHttpSessionCell = NetBridgeCell<NetHttpSession>;
+  type NetLoopWindowCell = NetBridgeCell<NetLoopWindow>;
+
+  struct NetSessionLoopBridgeSummary {
+    http_session: NetHttpSessionCell,
+    loop_window: NetLoopWindowCell,
+    selected_value: i64
+  }
+  type NetSessionBridge = NetSessionLoopBridgeSummary;
+  type NetSessionBridgeCell = NetBridgeCell<NetSessionBridge>;
+  type NetSessionBridgePacket = NetBridgePacket<NetSessionBridgeCell>;
+  type NetSessionBridgeEnvelope = NetBridgeEnvelope<NetSessionBridgePacket>;
+
+  async fn consume_network_result(result: NetworkResult<i64>) -> i64 {
+    if network_send_ready(result) {
+      return network_value(result) + 100;
+    }
+    if network_recv_ready(result) {
+      return network_value(result) + 10;
+    }
+    if network_config_ready(result) {
+      return network_value(result) + 1;
+    }
+    return 0;
+  }
+
+  fn encode_value(result: NetworkResult<i64>) -> i64 {
+    return network_value(result);
+  }
+
+  fn wrap_bridge_cell<T>(value: T) -> NetBridgeCell<T> {
+    return NetBridgeCell { value: value };
+  }
+
+  fn wrap_bridge_packet<T>(payload: T, packet_value: i64) -> NetBridgePacket<T> {
+    return NetBridgePacket {
+      payload: payload,
+      packet_value: packet_value
+    };
+  }
+
+  fn wrap_bridge_envelope<T>(packet: T, envelope_value: i64) -> NetBridgeEnvelope<T> {
+    return NetBridgeEnvelope {
+      packet: packet,
+      envelope_value: envelope_value
+    };
+  }
+
+  fn capture_net_http_client_session_summary() -> NetHttpSession {
+    let argv_count: i64 = host_argv_count();
+    let transport_family: i64 = network_profile_transport_family("NetworkUnit");
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+    let protocol_kind: i64 = network_profile_protocol_kind("NetworkUnit");
+    let protocol_version: i64 = network_profile_protocol_version("NetworkUnit");
+    let protocol_header_bytes: i64 =
+      network_profile_protocol_header_bytes("NetworkUnit");
+    let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+    let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+    let method_code: i64 = 64 + protocol_kind;
+    let request_bytes: i64 =
+      protocol_header_bytes + protocol_version + 16 + protocol_header_bytes + send_window;
+    let response_bytes: i64 =
+      protocol_header_bytes + 12 + protocol_header_bytes + recv_window;
+    let open_handle: i64 = host_network_open_tcp_stream(
+      remote_port,
+      connect_timeout_ms
+    );
+    let send_result: NetworkResult<i64> = network_result(
+      host_network_send_owned(open_handle, stream_window, send_window)
+    );
+    let status_result: NetworkResult<i64> = network_result(
+      host_network_recv_http_status_owned(open_handle, stream_window, recv_window)
+    );
+    let recv_result: NetworkResult<i64> = network_result(
+      host_network_recv_owned(open_handle, stream_window, recv_window)
+    );
+    let status_code: i64 = encode_value(status_result);
+    let close_value: i64 = host_network_close_owned(open_handle);
+    let tick_ns: i64 = host_monotonic_time_ns();
+
+    return NetHttpSession {
+      session_value: argv_count
+        + transport_family
+        + retry_budget
+        + method_code
+        + status_code
+        + request_bytes
+        + response_bytes
+        + open_handle
+        + encode_value(send_result)
+        + encode_value(recv_result)
+        + close_value,
+      status_code: status_code,
+      tick_ns: tick_ns
+    };
+  }
+
+  fn fold_bridge_flow(limit: i64) -> i64 {
+    let step: i64 = 0;
+    let acc: i64 = 0;
+    while step < limit {
+      let step: i64 = step + 1;
+      match step {
+        1 => {
+          continue;
+        }
+        _ => {
+          if step > 3 {
+            let acc: i64 = acc + step;
+          } else {
+            let acc: i64 = acc + 0;
+          }
+        }
+      }
+    }
+    return acc;
+  }
+
+  fn fold_bridge_post_flow(limit: i64) -> i64 {
+    let step: i64 = 0;
+    let acc: i64 = 0;
+    while step < limit {
+      let step: i64 = step + 1;
+      if step > 2 {
+        let acc: i64 = acc + step;
+      } else {
+        let acc: i64 = acc + 0;
+      }
+      if acc > 2 {
+        if acc > 6 {
+          break;
+        } else {
+        }
+      } else {
+      }
+    }
+    return acc;
+  }
+
+  fn capture_loop_window(limit: i64) -> NetLoopWindow {
+    return NetLoopWindow {
+      flow_value: fold_bridge_flow(limit),
+      post_flow_value: fold_bridge_post_flow(limit)
+    };
+  }
+
+  fn select_bridge_value(
+    http_session: NetHttpSessionCell,
+    loop_window: NetLoopWindowCell,
+    primary_value: i64,
+    secondary_value: i64
+  ) -> i64 {
+    if loop_window.value.post_flow_value > loop_window.value.flow_value {
+      return http_session.value.session_value + loop_window.value.post_flow_value + primary_value;
+    }
+    return http_session.value.session_value + loop_window.value.flow_value + secondary_value;
+  }
+
+  fn capture_net_session_loop_bridge_packet() -> NetSessionBridgePacket {
+    let http_session: NetHttpSession = capture_net_http_client_session_summary();
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+    let local_port: i64 = network_profile_local_port("NetworkUnit");
+    let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+
+    let primary_probe: NetworkResult<i64> = network_result(
+      host_network_send_owned(http_session.status_code, stream_window, send_window)
+    );
+    let secondary_probe: NetworkResult<i64> = network_result(
+      host_network_recv_owned(http_session.status_code, stream_window, recv_window)
+    );
+    let fallback_probe: NetworkResult<i64> =
+      network_result(network_profile_bind_core("NetworkUnit"));
+
+    let primary_task: Task<i64> = spawn(consume_network_result(primary_probe));
+    let secondary_task: Task<i64> = spawn(consume_network_result(secondary_probe));
+    let fallback_task: Task<i64> = spawn(consume_network_result(fallback_probe));
+
+    let primary_value: i64 = join(primary_task);
+    let secondary_value: i64 = join(secondary_task);
+    let fallback_value: i64 = join(fallback_task);
+    let loop_window: NetLoopWindow = capture_loop_window(retry_budget);
+    let http_session_cell: NetHttpSessionCell =
+      wrap_bridge_cell<NetHttpSession>(http_session);
+    let loop_window_cell: NetLoopWindowCell =
+      wrap_bridge_cell<NetLoopWindow>(loop_window);
+    let bridge: NetSessionBridge = NetSessionBridge {
+      http_session: http_session_cell,
+      loop_window: loop_window_cell,
+      selected_value: select_bridge_value(
+        http_session_cell,
+        loop_window_cell,
+        primary_value + fallback_value,
+        secondary_value
+      )
+    };
+    let bridge_cell: NetSessionBridgeCell =
+      wrap_bridge_cell<NetSessionBridge>(bridge);
+
+    return wrap_bridge_packet<NetSessionBridgeCell>(
+      bridge_cell,
+      bridge_cell.value.http_session.value.session_value
+        + bridge_cell.value.loop_window.value.flow_value
+        + bridge_cell.value.loop_window.value.post_flow_value
+        + bridge_cell.value.selected_value
+    );
+  }
+
+  fn capture_net_session_loop_bridge_summary() -> NetSessionBridgeEnvelope {
+    let packet: NetSessionBridgePacket = capture_net_session_loop_bridge_packet();
+    return wrap_bridge_envelope<NetSessionBridgePacket>(
+      packet,
+      packet.packet_value + packet.payload.value.http_session.value.status_code
+    );
+  }
+
+  fn summarize_net_http_session_loop_bridge_recipe() -> i64 {
+    let summary: NetSessionBridgeEnvelope = capture_net_session_loop_bridge_summary();
+    return summary.packet.payload.value.http_session.value.session_value
+      + summary.packet.payload.value.http_session.value.status_code
+      + summary.packet.payload.value.http_session.value.tick_ns
+      + summary.packet.payload.value.loop_window.value.flow_value
+      + summary.packet.payload.value.loop_window.value.post_flow_value
+      + summary.packet.payload.value.selected_value
+      + summary.packet.packet_value
+      + summary.envelope_value;
+  }
+
+  fn main() {
+    print(summarize_net_http_session_loop_bridge_recipe());
+  }
+}

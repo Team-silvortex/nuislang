@@ -12,6 +12,83 @@ The goal is simple:
 
 Use this file as the shortest operational route for day-to-day project work.
 
+## Current `0.16.0` Validation Spine
+
+The compile workflow is no longer just “CLI commands exist”.
+
+For the current `0.16.0` line, the practical confidence stack is:
+
+```text
+frontend generic + async/task rewrite probes
+  -> real project compile harnesses
+  -> targeted diagnostic guardrails
+  -> project-doctor / check / test / build / release-check
+```
+
+That means the current workflow is backed by three distinct validation layers:
+
+* frontend crossover probes:
+  generic expected-type propagation, alias-aware struct/payload inference,
+  async/task `spawn` / `join` / `join_result`, higher-order specialization,
+  and `if` / `match` control-flow routes
+* real project compile harnesses:
+  checked-in `examples/projects/...` compile through the actual project
+  pipeline, not only through single-file frontend parsing
+* diagnostic guardrails:
+  common misuse routes such as sync code directly calling async helpers or
+  `spawn(...)` being fed a sync builder now have explicit regression coverage
+
+There is now a fourth practical truth worth saying out loud:
+
+* loop-family lowering closure:
+  executable counted/carry/flow/post-flow `while` lowering is no longer limited
+  to straight-line branch shells; nested control predicates from lowered `if`
+  and `match` routes now participate in the checked-in loop node families too
+
+Use this as the current rule of thumb:
+
+* if a route only works in a toy snippet, it is not enough
+* if a route works in frontend probes and real project compile harnesses, it
+  is part of the `0.16.0` story
+* if a common misuse has no regression test, the workflow is not mature enough
+
+## Lowering Support Matrix
+
+For the current `0.16.0` line, the checked-in executable `while` lowering
+truth is:
+
+* `closed`:
+  counted `while` loops
+* `closed`:
+  chained carry `while` loops
+* `closed`:
+  pre-carry flow control with `break` / `continue`
+  via `loop_while_i64_flow_chain`
+* `closed`:
+  pre-carry flow control with branching carry updates
+  via `loop_while_i64_flow_cond_chain`
+* `closed`:
+  post-carry flow control with `break` / `continue`
+  via `loop_while_i64_post_flow_chain`
+* `closed`:
+  post-carry flow control with branching carry updates
+  via `loop_while_i64_post_flow_cond_chain`
+* `closed`:
+  `match`-prefixed control-flow temps feeding loop control lowering
+* `closed`:
+  nested `if -> break/continue` folded into `and` control conditions
+* `closed`:
+  nested `match` / branch-local `continue` folded into `or` control conditions
+* `partial`:
+  general iterative/backedge `while` lowering outside the counted/carry/flow/post-flow subset
+
+Read that matrix conservatively:
+
+* when a loop shape maps onto the counted/carry/flow/post-flow families, we
+  should test and lean on it
+* when a loop shape escapes those families, the honest current answer is still
+  “general iterative loop/backedge lowering is not implemented”
+
 ## Canonical Stages
 
 ```text
@@ -37,6 +114,14 @@ In practice:
 * `release-check` is the canonical final gate because it runs `check`, `build`,
   and manifest verification together.
 
+The operational intent is:
+
+* `doctor` catches project-shape and link-surface problems early
+* `check` is the canonical compiler truth gate
+* `test` confirms language/runtime-facing routes
+* `build` proves the AOT bundle path
+* `release-check` is the smallest honest “ready enough to cut” answer
+
 ## Default Project Workflow
 
 For a normal multi-file project:
@@ -47,6 +132,11 @@ cargo run -p nuis -- check <project-dir|nuis.toml>
 cargo run -p nuis -- test <project-dir|nuis.toml>
 cargo run -p nuis -- build <project-dir|nuis.toml> <output-dir>
 ```
+
+For `0.16.0`, this route is the one we should keep teaching by default.
+
+If a feature requires a different everyday ritual, prefer fixing the toolchain
+or narrowing the claim instead of teaching a more fragile route.
 
 Then verify the emitted manifest if you want the build artifact checked as a
 standalone package description:
@@ -97,6 +187,22 @@ If the problem looks scheduling-specific, add:
 ```bash
 cargo run -p nuis -- scheduler-view <input.ns|project-dir|nuis.toml>
 ```
+
+When debugging compiler regressions, the shortest current drill is:
+
+1. reproduce with the smallest project or source input
+2. inspect `dump-nir`
+3. check whether the failure belongs to:
+   generic rewrite / expected-type propagation,
+   async/task lowering,
+   project validation,
+   or later `YIR` / verifier stages
+4. confirm the route against the closest checked-in probe before widening any fix
+
+For generic-heavy routes, the best current anchors are:
+
+* [nuis-0.16.0-generic-surface-audit.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-surface-audit.md)
+* [nuis-0.16.0-generic-constraint-coverage.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-constraint-coverage.md)
 
 ## Project Triage Workflow
 
@@ -178,6 +284,39 @@ Use them when:
 * build reuse looks suspicious
 * you want to confirm cache hits/misses while iterating
 * you want to keep the compile surface reproducible during release prep
+
+## Compiler Maintenance Workflow
+
+When the task is “stabilize the compiler” rather than “compile one project”,
+the current `0.16.0` maintenance loop should be:
+
+```text
+add or tighten frontend probe
+  -> run focused `cargo test -q -p nuisc ...`
+  -> run relevant real-project compile harness
+  -> update the versioning docs that describe the route
+```
+
+In concrete terms:
+
+* use [tests_generics.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generics.rs)
+  when the route is about generic propagation, alias-aware expectation, async/task crossover,
+  or control-flow-local specialization
+* use [tests_loop_flow.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_loop_flow.rs)
+  and [tests_loop_post_flow.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_loop_post_flow.rs)
+  when the route is about executable loop-family lowering truth
+* use [tests_higher_order.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_higher_order.rs)
+  when the route includes lambda or higher-order specialization
+* use [network_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/network_compile.rs)
+  when the route should survive real `examples/projects/domains` compile entrypoints
+* use [tools/nuisc/src/frontend/mod.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/mod.rs)
+  diagnostic tests when the goal is stable misuse reporting rather than successful lowering
+
+The shortest honest success criterion for a compiler change is now:
+
+* the focused probe passes
+* the closest real project compile harness still passes
+* the versioning docs still describe reality
 
 ## Recommended `0.16.0` Reading Rule
 

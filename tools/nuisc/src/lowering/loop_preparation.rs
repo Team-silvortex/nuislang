@@ -129,6 +129,23 @@ fn parse_loop_flow_condition(
     }
 }
 
+fn combine_loop_flow_conditions(
+    lhs: PreparedLoopFlowCondition,
+    op: PreparedLoopLogicOp,
+    rhs: PreparedLoopFlowCondition,
+) -> Option<PreparedLoopFlowCondition> {
+    match (lhs, rhs) {
+        (PreparedLoopFlowCondition::Simple(lhs), PreparedLoopFlowCondition::Simple(rhs)) => {
+            Some(PreparedLoopFlowCondition::Compound {
+                op,
+                lhs,
+                rhs,
+            })
+        }
+        _ => None,
+    }
+}
+
 fn parse_loop_flow_control(
     stmt: &NirStmt,
     binding_name: &str,
@@ -143,20 +160,78 @@ fn parse_loop_flow_control(
     else {
         return None;
     };
-    if !else_body.is_empty() {
+    let outer_condition =
+        parse_loop_flow_condition(condition, binding_name, carry_binding_names, pure_helpers)?;
+    if else_body.is_empty() {
+        let [action_stmt] = then_body.as_slice() else {
+            return None;
+        };
+        match action_stmt {
+            NirStmt::Break => {
+                return Some(PreparedLoopFlowControl {
+                    condition: outer_condition,
+                    action: PreparedLoopFlowAction::Break,
+                });
+            }
+            NirStmt::Continue => {
+                return Some(PreparedLoopFlowControl {
+                    condition: outer_condition,
+                    action: PreparedLoopFlowAction::Continue,
+                });
+            }
+            NirStmt::If { .. } => {
+                let nested = parse_loop_flow_control(
+                    action_stmt,
+                    binding_name,
+                    carry_binding_names,
+                    pure_helpers,
+                )?;
+                let condition = combine_loop_flow_conditions(
+                    outer_condition,
+                    PreparedLoopLogicOp::And,
+                    nested.condition,
+                )?;
+                return Some(PreparedLoopFlowControl {
+                    condition,
+                    action: nested.action,
+                });
+            }
+            _ => return None,
+        }
+    }
+    let [then_stmt] = then_body.as_slice() else {
+        return None;
+    };
+    let then_action = match then_stmt {
+        NirStmt::Break => Some(PreparedLoopFlowAction::Break),
+        NirStmt::Continue => Some(PreparedLoopFlowAction::Continue),
+        _ => None,
+    }?;
+    let [else_stmt] = else_body.as_slice() else {
+        return None;
+    };
+    let nested = parse_loop_flow_control(
+        else_stmt,
+        binding_name,
+        carry_binding_names,
+        pure_helpers,
+    )?;
+    if !matches!(
+        (then_action, nested.action),
+        (PreparedLoopFlowAction::Break, PreparedLoopFlowAction::Break)
+            | (PreparedLoopFlowAction::Continue, PreparedLoopFlowAction::Continue)
+    ) {
         return None;
     }
-    let [action_stmt] = then_body.as_slice() else {
-        return None;
-    };
-    let action = match action_stmt {
-        NirStmt::Break => PreparedLoopFlowAction::Break,
-        NirStmt::Continue => PreparedLoopFlowAction::Continue,
-        _ => return None,
-    };
-    let condition =
-        parse_loop_flow_condition(condition, binding_name, carry_binding_names, pure_helpers)?;
-    Some(PreparedLoopFlowControl { condition, action })
+    let condition = combine_loop_flow_conditions(
+        outer_condition,
+        PreparedLoopLogicOp::Or,
+        nested.condition,
+    )?;
+    Some(PreparedLoopFlowControl {
+        condition,
+        action: then_action,
+    })
 }
 
 fn parse_loop_carry_update(
@@ -464,20 +539,87 @@ pub(super) fn prepare_flow_while(
     };
     let (control_temp_bindings, raw_control_stmt, carry_bindings) =
         split_temp_prefixed_loop_flow_control(rest, pure_helpers)?;
-    let prepared_carries =
-        prepare_loop_carry_sequence(carry_bindings, &binding_name, pure_helpers)?;
-    let carry_binding_names = prepared_carries
-        .iter()
-        .map(|carry| carry.binding_name.clone())
-        .collect::<Vec<_>>();
     let substituted_control_stmt =
         substitute_stmt_bindings(raw_control_stmt, &control_temp_bindings);
-    let control = parse_loop_flow_control(
-        &substituted_control_stmt,
-        &binding_name,
-        &carry_binding_names,
-        pure_helpers,
-    )?;
+    let (control, prepared_carries) = if let NirStmt::If {
+        condition,
+        then_body,
+        else_body,
+    } = &substituted_control_stmt
+    {
+        if carry_bindings.is_empty() && !else_body.is_empty() {
+            let [action_stmt] = then_body.as_slice() else {
+                return None;
+            };
+            if let Some(action) = match action_stmt {
+                NirStmt::Break => Some(PreparedLoopFlowAction::Break),
+                NirStmt::Continue => Some(PreparedLoopFlowAction::Continue),
+                _ => None,
+            } {
+                let prepared_carries =
+                    prepare_loop_carry_sequence(else_body, &binding_name, pure_helpers)?;
+                let carry_binding_names = prepared_carries
+                    .iter()
+                    .map(|carry| carry.binding_name.clone())
+                    .collect::<Vec<_>>();
+                let control_condition = parse_loop_flow_condition(
+                    condition,
+                    &binding_name,
+                    &carry_binding_names,
+                    pure_helpers,
+                )?;
+                (
+                    PreparedLoopFlowControl {
+                        condition: control_condition,
+                        action,
+                    },
+                    prepared_carries,
+                )
+            } else {
+                let prepared_carries =
+                    prepare_loop_carry_sequence(carry_bindings, &binding_name, pure_helpers)?;
+                let carry_binding_names = prepared_carries
+                    .iter()
+                    .map(|carry| carry.binding_name.clone())
+                    .collect::<Vec<_>>();
+                let control = parse_loop_flow_control(
+                    &substituted_control_stmt,
+                    &binding_name,
+                    &carry_binding_names,
+                    pure_helpers,
+                )?;
+                (control, prepared_carries)
+            }
+        } else {
+            let prepared_carries =
+                prepare_loop_carry_sequence(carry_bindings, &binding_name, pure_helpers)?;
+            let carry_binding_names = prepared_carries
+                .iter()
+                .map(|carry| carry.binding_name.clone())
+                .collect::<Vec<_>>();
+            let control = parse_loop_flow_control(
+                &substituted_control_stmt,
+                &binding_name,
+                &carry_binding_names,
+                pure_helpers,
+            )?;
+            (control, prepared_carries)
+        }
+    } else {
+        let prepared_carries =
+            prepare_loop_carry_sequence(carry_bindings, &binding_name, pure_helpers)?;
+        let carry_binding_names = prepared_carries
+            .iter()
+            .map(|carry| carry.binding_name.clone())
+            .collect::<Vec<_>>();
+        let control = parse_loop_flow_control(
+            &substituted_control_stmt,
+            &binding_name,
+            &carry_binding_names,
+            pure_helpers,
+        )?;
+        (control, prepared_carries)
+    };
     Some(PreparedFlowWhile {
         binding_name,
         limit,

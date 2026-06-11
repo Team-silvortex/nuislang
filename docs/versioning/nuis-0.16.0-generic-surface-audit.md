@@ -120,10 +120,99 @@ Primary tests:
 * `closed`:
   zero-arg generic async specialization through awaited nested alias wrapper into generic call argument
   `keep_response(Response(await typed_box()))`
+* `closed`:
+  generic nested alias task payload through `spawn` / `join` and branch return
+  `keep_response(join(task))` where `task: Task<Response<i64>>`
+* `closed`:
+  generic response unwrap through `Task<Response<T>>`, `join(task)`, and branch-local constructors
+  `unwrap_response(join(task))` and `unwrap_response(Response { ... })`
+* `closed`:
+  network-shaped request/exchange/result flow through aliases, `spawn` / `join`, and branch-local result construction
+  `let task: Task<HttpResult<i64>> = spawn(exchange(request));`
+  `read_body(join(task))` and `read_body(HttpResult { ... })`
+* `closed`:
+  `std net` facade-shaped HTTP session flow through `net_http_request`, `net_http_client_exchange`, `net_result`, and `net_session`
+  `let task: Task<NetSession<i64>> = spawn(net_session(request));`
+  `net_http_response_value(join(task))` and `net_http_response_value(NetSession { ... })`
+* `closed`:
+  `std net` demo-shaped summary/session flow through exchange summary, session summary, and `spawn` / `join`
+  `let task: Task<NetSessionSummary<i64>> = spawn(capture_net_session_summary(request));`
+  `summarize_net_session(join(task))` and `summarize_net_session(SessionSummary { ... })`
+* `closed`:
+  nested generic async summary helpers through alias-heavy struct literals with expected-type-driven field propagation
+  `summary: await capture_net_http_client_exchange_summary(request)` inside `capture_net_session_summary<T>`
+* `closed`:
+  `match`-lowered control flow over std-net-shaped summary/session tasks with alias-heavy branch-local reconstruction
+  `return SessionSummary { summary: join(summary_task), session_value: 99 };`
+  inside `match mode { ... }`
+* `closed`:
+  `while`-body control flow over std-net-shaped summary/session tasks with alias-heavy branch-local reconstruction
+  `while seed > 0 { return SessionSummary { summary: join(summary_task), session_value: 99 }; }`
+* `closed`:
+  nested `while -> match` control flow over std-net-shaped summary/session tasks with alias-heavy branch-local reconstruction
+  `while seed > 0 { match mode { 1 => return SessionSummary { summary: join(summary_task), ... }, _ => ... } }`
+* `closed`:
+  higher-order scrutinee control flow over std-net-shaped summary/session tasks with hoisted `match` input
+  `match apply(mode, |x| x + 1) { 2 => return SessionSummary { summary: join(summary_task), ... }, _ => ... }`
 
 Primary tests:
 
 * [tests_generics.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generics.rs)
+* [network_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/network_compile.rs)
+* [mod.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/mod.rs)
+
+### Control-Flow Closure
+
+Current practical closure for the `std net`-shaped generic/task/session route:
+
+* `closed`:
+  straight-line expected-type propagation through alias-heavy summary/session reconstruction
+* `closed`:
+  `if` branch-local reconstruction with `spawn` / `join`
+* `closed`:
+  `match`-lowered branch-local reconstruction with `spawn` / `join`
+* `closed`:
+  `while`-body reconstruction with `spawn` / `join`
+* `closed`:
+  nested `while -> match` reconstruction with `spawn` / `join`
+* `closed`:
+  higher-order scrutinee hoisting feeding nested control-flow reconstruction
+
+Practical reading rule:
+
+* the current `0.16.0` compiler truth is no longer “control flow works in simple scalar examples”
+* the stronger claim we can now lean on is:
+  alias-heavy summary/session reconstruction remains stable across `if`, `match`, `while`,
+  nested `while -> match`, and hoisted higher-order scrutinee routes
+
+### Lowering Closure Companion
+
+The rows above are frontend-facing generic closure.
+
+The current backend-facing companion truth is now stronger than it was earlier
+in the `0.16.0` line:
+
+* `closed`:
+  loop-family lowering accepts branch-local `break` / `continue` before carry updates
+* `closed`:
+  loop-family lowering accepts branch-local `break` / `continue` after carry updates
+* `closed`:
+  match-hoisted control temps still feed loop-family lowering correctly
+* `closed`:
+  nested `if -> break` loop control lowers into `and` compound loop predicates
+* `closed`:
+  nested `match` / branch-local `continue` loop control lowers into `or` compound loop predicates
+* `partial`:
+  generic/front-end control-flow closure is broader than executable loop lowering in one important way:
+  arbitrary iterative/backedge loops that do not fit the counted/carry/flow/post-flow families are still out of scope
+
+Practical reading rule:
+
+* frontend generic closure should not be confused with “all loops lower”
+* the honest current claim is narrower and better:
+  control-flow-heavy generic routes are strong,
+  and the executable lowering subset underneath them is now explicitly wider across
+  counted/carry/flow/post-flow families, including nested `and` / `or` loop predicates
 
 ### Higher-Order Specialization
 
@@ -241,6 +330,17 @@ partial in `0.16.0`.
   richer source-location diagnostics beyond current function-context restoration
 * `partial`:
   broader lambda surface such as captures and nested inline forms
+
+## Diagnostic Guardrails
+
+* `closed`:
+  network-style sync summary builders reject direct async helper calls with stable async-context diagnostics
+* `closed`:
+  network-style task staging rejects `spawn(...)` on sync summary builders with stable task-entry diagnostics
+* `closed`:
+  nested control-flow higher-order scrutinees reject lambda capture misuse with stable lambda-capture diagnostics
+* `closed`:
+  nested control-flow higher-order specialization still reports missing generic method bounds through source-facing specialization context
 
 ## Working Audit Rule
 

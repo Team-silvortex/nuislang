@@ -1,0 +1,10 @@
+mod network NetworkUnit {
+  fn profile() {
+    const retry_budget: i64 = 5;
+    const stream_window: i64 = 64;
+    const recv_window: i64 = 32;
+    const send_window: i64 = 32;
+    const local_port: i64 = 9000;
+    const remote_port: i64 = 443;
+  }
+}

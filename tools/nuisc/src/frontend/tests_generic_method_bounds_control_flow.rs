@@ -686,3 +686,130 @@ fn reports_guarded_match_bind_pattern_context_for_ambiguous_wrong_bound_method_c
         "{error}"
     );
 }
+
+#[test]
+fn reports_nested_match_continue_context_for_missing_generic_method_bound() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          type Alias<T> = T;
+          type Outer<T> = Alias<T>;
+
+          fn bump<T>(value: Outer<T>, mode: i64) -> T {
+            while true {
+              match mode {
+                0 => {
+                  continue;
+                }
+                _ => {
+                  let local: Outer<T> = value;
+                  return local.add(local);
+                }
+              }
+            }
+            return value;
+          }
+
+          fn main() -> i64 {
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains(
+            "function `bump` body via type alias `Alias` target via type alias `Outer` target"
+        ),
+        "{error}"
+    );
+    assert!(
+        error.contains(
+            "calls method `add` on generic parameter `T` without required bound `Addable`"
+        ),
+        "{error}"
+    );
+}
+
+#[test]
+fn reports_nested_if_break_context_for_ambiguous_wrong_bound_method_call() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          trait Mergeable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          trait Showable {
+            fn show(value: Self) -> i64;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          impl Mergeable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          impl Showable for i64 {
+            fn show(value: i64) -> i64 {
+              return value;
+            }
+          }
+
+          type Alias<T> = T;
+          type Outer<T> = Alias<T>;
+
+          fn bump<T: Showable>(value: Outer<T>, flag: bool) -> T {
+            while true {
+              if flag {
+                break;
+              } else {
+                let local: Outer<T> = value;
+                return local.add(local);
+              }
+            }
+            return value;
+          }
+
+          fn main() -> i64 {
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains(
+            "function `bump` body via type alias `Alias` target via type alias `Outer` target"
+        ),
+        "{error}"
+    );
+    assert!(
+        error.contains(
+            "calls method `add` on generic parameter `T` but bound `Showable` does not define that method; candidate bounds: Addable, Mergeable"
+        ),
+        "{error}"
+    );
+}

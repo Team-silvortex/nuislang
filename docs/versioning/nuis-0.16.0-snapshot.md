@@ -61,6 +61,10 @@ The most important current truths for `0.16.0` are:
   - lambda / higher-order helper context restoration
   - call-inferred locals and call receivers
   - call-root destructuring validation
+* control-flow-heavy generic/task/session routes are now much more convincing:
+  - `if`, `match`, and `while` all carry alias-heavy summary/session reconstruction
+  - nested `while -> match` routes now hold
+  - higher-order scrutinee hoisting now composes with those control-flow routes
 * async/task ownership rules are much tighter:
   - `join(...)`
   - `join_result(...)`

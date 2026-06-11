@@ -10,6 +10,7 @@ use super::{lower_type_ref, resolve_ast_type_ref_aliases};
 
 pub(crate) fn infer_generic_substitutions(
     template: &AstFunction,
+    explicit_generic_args: &[AstTypeRef],
     args: &[AstExpr],
     expected: Option<&AstTypeRef>,
     env: &BTreeMap<String, AstTypeRef>,
@@ -31,8 +32,20 @@ pub(crate) fn infer_generic_substitutions(
         .iter()
         .map(|param| param.name.clone())
         .collect::<BTreeSet<_>>();
-    let mut substitutions = BTreeMap::<String, AstTypeRef>::new();
+    let mut substitutions = explicit_generic_substitutions(
+        template,
+        explicit_generic_args,
+        visible_type_aliases,
+    )?;
     for (param, arg) in template.params.iter().zip(args) {
+        let resolved_param_ty = resolve_ast_type_ref_aliases(&param.ty, visible_type_aliases)?;
+        if !contains_unresolved_generic_placeholders(
+            &resolved_param_ty,
+            &generic_names,
+            &substitutions,
+        ) {
+            continue;
+        }
         let Some(arg_ty) =
             infer_ast_expr_type(arg, env, impl_lookup, struct_table, function_return_types)
         else {
@@ -41,7 +54,6 @@ pub(crate) fn infer_generic_substitutions(
                 param.name, template.name
             ));
         };
-        let resolved_param_ty = resolve_ast_type_ref_aliases(&param.ty, visible_type_aliases)?;
         let resolved_arg_ty = resolve_ast_type_ref_aliases(&arg_ty, visible_type_aliases)?;
         unify_generic_type_pattern(
             &resolved_param_ty,
@@ -87,6 +99,49 @@ pub(crate) fn infer_generic_substitutions(
         }
     }
     Ok(lowered_substitutions)
+}
+
+fn explicit_generic_substitutions(
+    template: &AstFunction,
+    explicit_generic_args: &[AstTypeRef],
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+) -> Result<BTreeMap<String, AstTypeRef>, String> {
+    if explicit_generic_args.is_empty() {
+        return Ok(BTreeMap::new());
+    }
+    if explicit_generic_args.len() != template.generic_params.len() {
+        return Err(format!(
+            "generic function `{}` expects {} explicit generic argument(s), found {}",
+            template.name,
+            template.generic_params.len(),
+            explicit_generic_args.len()
+        ));
+    }
+    template
+        .generic_params
+        .iter()
+        .zip(explicit_generic_args.iter())
+        .map(|(param, arg)| {
+            Ok((
+                param.name.clone(),
+                resolve_ast_type_ref_aliases(arg, visible_type_aliases)?,
+            ))
+        })
+        .collect()
+}
+
+fn contains_unresolved_generic_placeholders(
+    ty: &AstTypeRef,
+    generic_names: &BTreeSet<String>,
+    substitutions: &BTreeMap<String, AstTypeRef>,
+) -> bool {
+    if generic_names.contains(&ty.name) && ty.generic_args.is_empty() && !substitutions.contains_key(&ty.name)
+    {
+        return true;
+    }
+    ty.generic_args
+        .iter()
+        .any(|arg| contains_unresolved_generic_placeholders(arg, generic_names, substitutions))
 }
 
 pub(crate) fn unify_generic_type_pattern(

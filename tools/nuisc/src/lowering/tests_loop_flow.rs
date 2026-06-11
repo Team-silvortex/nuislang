@@ -544,3 +544,97 @@ fn lowers_bool_or_helper_match_flow_control_then_branching_carry_into_loop_while
     assert_eq!(loop_node.op.args[14], "add_current");
     assert_eq!(loop_node.op.args[15], "keep");
 }
+
+#[test]
+fn lowers_nested_if_break_then_branching_carry_into_loop_while_i64_flow_cond_chain() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            while value < 6 {
+              let value: i64 = value + 1;
+              if value > 1 {
+                if value > 4 {
+                  break;
+                } else {
+                }
+              } else {
+              }
+              if value > 2 {
+                let acc: i64 = acc + value;
+              } else {
+                let acc: i64 = acc + 0;
+              }
+            }
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_flow_cond_chain"
+        })
+        .expect("expected loop_while_i64_flow_cond_chain node");
+    assert_eq!(loop_node.op.args[5], "and");
+    assert_eq!(loop_node.op.args[6], "current_gt");
+    assert_eq!(loop_node.op.args[8], "current_gt");
+    assert_eq!(loop_node.op.args[10], "break");
+    assert_eq!(loop_node.op.args[12], "current_gt");
+    assert_eq!(loop_node.op.args[14], "add_current");
+    assert_eq!(loop_node.op.args[15], "keep");
+}
+
+#[test]
+fn lowers_nested_match_continue_then_branching_carry_into_loop_while_i64_flow_cond_chain() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            while value < 6 {
+              let value: i64 = value + 1;
+              match value {
+                1 => {
+                  continue;
+                }
+                _ => {
+                  if value > 4 {
+                    let acc: i64 = acc + value;
+                  } else {
+                    let acc: i64 = acc + 0;
+                  }
+                }
+              }
+            }
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_flow_cond_chain"
+        })
+        .expect("expected loop_while_i64_flow_cond_chain node");
+    assert_eq!(loop_node.op.args[5], "current_eq");
+    assert_eq!(loop_node.op.args[7], "continue");
+    assert_eq!(loop_node.op.args[9], "current_gt");
+    assert_eq!(loop_node.op.args[11], "add_current");
+    assert_eq!(loop_node.op.args[12], "keep");
+}

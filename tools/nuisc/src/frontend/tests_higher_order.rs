@@ -607,6 +607,56 @@ fn rejects_generic_higher_order_specialization_method_call_without_required_boun
 }
 
 #[test]
+fn rejects_generic_higher_order_specialization_without_required_bound_inside_nested_while_match() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          fn apply<T>(x: T, f: Fn1<T, T>) -> T {
+            let local = f(x);
+            return local.add(x);
+          }
+
+          fn choose<T>(value: T, mode: i64) -> T {
+            while mode > 0 {
+              match mode {
+                1 => {
+                  return apply(value, |x: T| -> T { return x; });
+                }
+                _ => {
+                  return value;
+                }
+              }
+            }
+            return value;
+          }
+
+          fn main() -> i64 {
+            return choose(0, 1);
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains(
+            "function `apply` body higher-order specialization body calls method `add` on generic parameter `T` without required bound `Addable`"
+        ),
+        "{error}"
+    );
+}
+
+#[test]
 fn lowers_generic_lambda_method_call_with_present_bound() {
     let module = parse_nuis_module(
         r#"

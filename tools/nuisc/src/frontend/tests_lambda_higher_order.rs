@@ -133,6 +133,36 @@ fn rejects_lambda_capture_of_outer_local() {
 }
 
 #[test]
+fn rejects_lambda_capture_inside_nested_while_match_higher_order_scrutinee() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn apply(x: i64, f: Fn1<i64, i64>) -> i64 {
+            return f(x);
+          }
+
+          fn main() -> i64 {
+            let seed: i64 = 6;
+            while seed > 0 {
+              match apply(seed, |x: i64| -> i64 { return x + seed; }) {
+                7 => { return 1; }
+                _ => { return 0; }
+              }
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains("lambda currently does not support capturing outer local `seed`"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
 fn rejects_calling_non_lambda_expression_value_in_invoke_form() {
     let error = parse_nuis_module(
         r#"

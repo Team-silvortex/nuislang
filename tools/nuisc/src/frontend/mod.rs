@@ -450,6 +450,65 @@ mod tests {
     }
 
     #[test]
+    fn rejects_network_style_sync_summary_calling_async_helper_directly() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              struct NetHttpClientExchangeSummary {
+                exchange_value: i64,
+              }
+
+              struct NetSessionSummary {
+                summary: NetHttpClientExchangeSummary,
+                session_value: i64,
+              }
+
+              async fn capture_net_http_client_exchange_summary() -> NetHttpClientExchangeSummary {
+                return NetHttpClientExchangeSummary { exchange_value: 41 };
+              }
+
+              fn capture_net_session_summary() -> NetSessionSummary {
+                return NetSessionSummary {
+                  summary: capture_net_http_client_exchange_summary(),
+                  session_value: 99,
+                };
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("can only be called inside `async fn`"));
+        assert!(error.contains("capture_net_http_client_exchange_summary"));
+    }
+
+    #[test]
+    fn rejects_network_style_spawn_of_sync_summary_builder() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              struct NetSessionSummary {
+                session_value: i64,
+              }
+
+              fn capture_net_session_summary() -> NetSessionSummary {
+                return NetSessionSummary { session_value: 99 };
+              }
+
+              fn main() -> i64 {
+                let task: Task<NetSessionSummary> = spawn(capture_net_session_summary());
+                return join(task).session_value;
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("spawn(...) expects async function call"));
+        assert!(error.contains("found sync function `capture_net_session_summary`"));
+    }
+
+    #[test]
     fn lowers_explicit_data_result_helpers() {
         let module = parse_nuis_module(
             r#"
