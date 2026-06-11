@@ -1,4 +1,5 @@
 use super::*;
+use crate::lowering::loop_purity::normalize_pure_bool_test_expr;
 
 pub(super) fn loop_compare_from_binary_op(op: NirBinaryOp) -> Option<PreparedLoopCompare> {
     match op {
@@ -139,8 +140,10 @@ pub(super) fn parse_loop_carry_linear(
     expr: &NirExpr,
     binding_name: &str,
     carries: &[PreparedCarryUpdate],
+    inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
 ) -> Option<(PreparedCarryLinearOp, PreparedCarrySource)> {
-    match expr {
+    let normalized = inline_pure_helper_calls(expr, inlineable_pure_helpers);
+    match &normalized {
         NirExpr::Binary {
             op: NirBinaryOp::Add,
             lhs,
@@ -208,8 +211,10 @@ pub(super) fn parse_loop_carry_branch_source(
     expr: &NirExpr,
     binding_name: &str,
     carries: &[PreparedCarryUpdate],
+    inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
 ) -> Option<PreparedCarryBranchSource> {
-    match expr {
+    let normalized = inline_pure_helper_calls(expr, inlineable_pure_helpers);
+    match &normalized {
         NirExpr::Var(name) if name == carry_name => Some(PreparedCarryBranchSource::Keep),
         NirExpr::Binary {
             op: NirBinaryOp::Add,
@@ -219,11 +224,23 @@ pub(super) fn parse_loop_carry_branch_source(
             (NirExpr::Var(lhs_name), NirExpr::Int(0)) if lhs_name == carry_name => {
                 Some(PreparedCarryBranchSource::Keep)
             }
-            _ => parse_loop_carry_linear(carry_name, expr, binding_name, carries)
-                .map(|(op, source)| PreparedCarryBranchSource::Source { op, source }),
-        },
-        _ => parse_loop_carry_linear(carry_name, expr, binding_name, carries)
+            _ => parse_loop_carry_linear(
+                carry_name,
+                &normalized,
+                binding_name,
+                carries,
+                inlineable_pure_helpers,
+            )
             .map(|(op, source)| PreparedCarryBranchSource::Source { op, source }),
+        },
+        _ => parse_loop_carry_linear(
+            carry_name,
+            &normalized,
+            binding_name,
+            carries,
+            inlineable_pure_helpers,
+        )
+        .map(|(op, source)| PreparedCarryBranchSource::Source { op, source }),
     }
 }
 
@@ -232,8 +249,11 @@ pub(super) fn parse_loop_carry_condition(
     binding_name: &str,
     carries: &[PreparedCarryUpdate],
     pure_helpers: &BTreeSet<String>,
+    inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
 ) -> Option<PreparedLoopCarryCondition> {
-    let (lhs, compare, rhs) = match expr {
+    let normalized =
+        normalize_pure_bool_test_expr(inline_pure_helper_calls(expr, inlineable_pure_helpers));
+    let (lhs, compare, rhs) = match &normalized {
         NirExpr::Binary {
             op: NirBinaryOp::Eq,
             lhs,

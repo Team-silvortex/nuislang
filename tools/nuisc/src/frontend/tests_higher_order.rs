@@ -591,7 +591,9 @@ fn lowers_specialized_generic_recursive_async_body_into_payload_alias_higher_ord
         .functions
         .iter()
         .find(|function| function.name == "climb__i64")
-        .expect("expected recursive async generic specialization through higher-order payload body");
+        .expect(
+            "expected recursive async generic specialization through higher-order payload body",
+        );
     assert!(specialized.is_async);
     assert!(specialized.generic_params.is_empty());
 

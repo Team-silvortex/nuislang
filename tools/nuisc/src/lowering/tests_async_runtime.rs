@@ -589,11 +589,7 @@ fn lowers_recursive_async_with_generic_payload_alias_higher_order_body_into_spec
         .filter(|node| {
             node.op.module == "cpu"
                 && node.op.instruction == "call_i64"
-                && node
-                    .op
-                    .args
-                    .first()
-                    .is_some_and(|name| name == "climb")
+                && node.op.args.first().is_some_and(|name| name == "climb")
         })
         .count();
     assert!(
@@ -604,10 +600,7 @@ fn lowers_recursive_async_with_generic_payload_alias_higher_order_body_into_spec
         recursive_call_count >= 2,
         "expected async recursive higher-order lowering to emit recursive helper calls, found {recursive_call_count}"
     );
-    assert!(yir
-        .node_lanes
-        .values()
-        .any(|lane| lane == "fn:climb"));
+    assert!(yir.node_lanes.values().any(|lane| lane == "fn:climb"));
 }
 
 #[test]

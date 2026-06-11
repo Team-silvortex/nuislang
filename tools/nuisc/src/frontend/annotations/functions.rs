@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use nuis_semantics::model::{
-    AstAttributeArg, AstAttributeValue, AstConstItem, AstExpr, AstFunction,
+    AstAttributeArg, AstAttributeValue, AstConstItem, AstExpr, AstFunction, AstStmt,
 };
 
 pub(crate) fn validate_function_annotations(function: &AstFunction) -> Result<(), String> {
@@ -60,6 +60,25 @@ pub(crate) fn validate_const_item(constant: &AstConstItem) -> Result<(), String>
 fn validate_const_safe_expr(expr: &AstExpr) -> Result<(), &'static str> {
     match expr {
         AstExpr::Bool(_) | AstExpr::Text(_) | AstExpr::Int(_) | AstExpr::Var(_) => Ok(()),
+        AstExpr::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            validate_const_safe_expr(condition)?;
+            validate_const_safe_block(then_body)?;
+            validate_const_safe_block(else_body)
+        }
+        AstExpr::Match { value, arms } => {
+            validate_const_safe_expr(value)?;
+            for arm in arms {
+                if let Some(guard) = &arm.guard {
+                    validate_const_safe_expr(guard)?;
+                }
+                validate_const_safe_block(&arm.body)?;
+            }
+            Ok(())
+        }
         AstExpr::Lambda { .. } => Err("lambda expressions are not const-safe"),
         AstExpr::Binary { lhs, rhs, .. } => {
             validate_const_safe_expr(lhs)?;
@@ -78,6 +97,33 @@ fn validate_const_safe_expr(expr: &AstExpr) -> Result<(), &'static str> {
             Err("calls are not const-safe in the current MVP")
         }
     }
+}
+
+fn validate_const_safe_block(body: &[AstStmt]) -> Result<(), &'static str> {
+    for stmt in body {
+        match stmt {
+            AstStmt::Let { value, .. }
+            | AstStmt::Const { value, .. }
+            | AstStmt::Print(value)
+            | AstStmt::Expr(value)
+            | AstStmt::Await(value)
+            | AstStmt::Return(Some(value)) => validate_const_safe_expr(value)?,
+            AstStmt::If {
+                condition,
+                then_body,
+                else_body,
+            } => {
+                validate_const_safe_expr(condition)?;
+                validate_const_safe_block(then_body)?;
+                validate_const_safe_block(else_body)?;
+            }
+            AstStmt::Return(None) | AstStmt::Break | AstStmt::Continue => {}
+            AstStmt::DestructureLet { .. } | AstStmt::Match { .. } | AstStmt::While { .. } => {
+                return Err("control-flow blocks are not const-safe")
+            }
+        }
+    }
+    Ok(())
 }
 
 fn validate_zero_arg_function_annotation(

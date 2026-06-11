@@ -1,13 +1,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{
-    AstExpr, AstFunction, AstImplDef, AstStructDef, AstTypeAlias, AstTypeRef,
+    AstExpr, AstFunction, AstImplDef, AstMatchArm, AstStructDef, AstTypeAlias, AstTypeRef,
 };
 
 use super::super::generics::{
     infer_alias_aware_ast_expr_type, infer_generic_substitutions, specialize_ast_type_ref,
-    specialize_function_template,
-    unify_generic_type_pattern,
+    specialize_function_template, unify_generic_type_pattern,
 };
 use super::super::types::ast_type_from_nir;
 use super::super::{
@@ -34,6 +33,126 @@ pub(super) fn rewrite_generic_calls_in_expr(
     specialized_signatures: &mut Vec<(String, FunctionSignature)>,
 ) -> Result<AstExpr, String> {
     Ok(match expr {
+        AstExpr::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            let mut then_env = env.clone();
+            let mut else_env = env.clone();
+            AstExpr::If {
+                condition: Box::new(rewrite_generic_calls_in_expr(
+                    condition,
+                    Some(&super::super::ast_named_type("bool")),
+                    env,
+                    visible_type_aliases,
+                    generic_templates,
+                    higher_order_templates,
+                    function_table,
+                    signatures,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    specialization_cache,
+                    specialized_functions,
+                    specialized_signatures,
+                )?),
+                then_body: super::blocks::rewrite_generic_calls_in_block(
+                    then_body,
+                    expected,
+                    &mut then_env,
+                    visible_type_aliases,
+                    generic_templates,
+                    higher_order_templates,
+                    function_table,
+                    signatures,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    specialization_cache,
+                    specialized_functions,
+                    specialized_signatures,
+                )?,
+                else_body: super::blocks::rewrite_generic_calls_in_block(
+                    else_body,
+                    expected,
+                    &mut else_env,
+                    visible_type_aliases,
+                    generic_templates,
+                    higher_order_templates,
+                    function_table,
+                    signatures,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    specialization_cache,
+                    specialized_functions,
+                    specialized_signatures,
+                )?,
+            }
+        }
+        AstExpr::Match { value, arms } => AstExpr::Match {
+            value: Box::new(rewrite_generic_calls_in_expr(
+                value,
+                None,
+                env,
+                visible_type_aliases,
+                generic_templates,
+                higher_order_templates,
+                function_table,
+                signatures,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                specialization_cache,
+                specialized_functions,
+                specialized_signatures,
+            )?),
+            arms: arms
+                .iter()
+                .map(|arm| {
+                    let mut arm_env = env.clone();
+                    Ok(AstMatchArm {
+                        pattern: arm.pattern.clone(),
+                        guard: match &arm.guard {
+                            Some(guard) => Some(rewrite_generic_calls_in_expr(
+                                guard,
+                                Some(&super::super::ast_named_type("bool")),
+                                &arm_env,
+                                visible_type_aliases,
+                                generic_templates,
+                                higher_order_templates,
+                                function_table,
+                                signatures,
+                                impl_lookup,
+                                struct_table,
+                                function_return_types,
+                                specialization_cache,
+                                specialized_functions,
+                                specialized_signatures,
+                            )?),
+                            None => None,
+                        },
+                        body: super::blocks::rewrite_generic_calls_in_block(
+                            &arm.body,
+                            expected,
+                            &mut arm_env,
+                            visible_type_aliases,
+                            generic_templates,
+                            higher_order_templates,
+                            function_table,
+                            signatures,
+                            impl_lookup,
+                            struct_table,
+                            function_return_types,
+                            specialization_cache,
+                            specialized_functions,
+                            specialized_signatures,
+                        )?,
+                    })
+                })
+                .collect::<Result<Vec<_>, String>>()?,
+        },
         AstExpr::Await(value) => AstExpr::Await(Box::new(rewrite_generic_calls_in_expr(
             value,
             expected,
@@ -183,7 +302,7 @@ pub(super) fn rewrite_generic_calls_in_expr(
                     specialized_functions,
                     specialized_signatures,
                 )?),
-            method: method.clone(),
+                method: method.clone(),
                 args: rewritten_args,
             }
         }
@@ -462,26 +581,30 @@ fn method_call_receiver_expected_type(
         })
         .collect::<Option<Vec<_>>>()?;
 
-    let mut candidates = impl_lookup
-        .values()
-        .filter_map(|definition| {
-            let method_def = definition.methods.iter().find(|item| item.name == *method)?;
-            if method_def.params.len() != arg_types.len() + 1 {
-                return None;
-            }
-            let params_match = method_def
-                .params
-                .iter()
-                .skip(1)
-                .zip(arg_types.iter())
-                .all(|(param, arg_ty)| {
-                    resolve_ast_type_ref_aliases(&param.ty, visible_type_aliases)
-                        .ok()
-                        .is_some_and(|resolved| lower_type_ref(&resolved).render() == lower_type_ref(arg_ty).render())
-                });
-            params_match.then(|| definition.for_type.clone())
-        })
-        .collect::<Vec<_>>();
+    let mut candidates =
+        impl_lookup
+            .values()
+            .filter_map(|definition| {
+                let method_def = definition
+                    .methods
+                    .iter()
+                    .find(|item| item.name == *method)?;
+                if method_def.params.len() != arg_types.len() + 1 {
+                    return None;
+                }
+                let params_match = method_def.params.iter().skip(1).zip(arg_types.iter()).all(
+                    |(param, arg_ty)| {
+                        resolve_ast_type_ref_aliases(&param.ty, visible_type_aliases)
+                            .ok()
+                            .is_some_and(|resolved| {
+                                lower_type_ref(&resolved).render()
+                                    == lower_type_ref(arg_ty).render()
+                            })
+                    },
+                );
+                params_match.then(|| definition.for_type.clone())
+            })
+            .collect::<Vec<_>>();
     if candidates.len() == 1 {
         return candidates.pop();
     }
@@ -589,8 +712,7 @@ fn infer_alias_struct_literal_type_from_fields(
             impl_lookup,
             struct_table,
             function_return_types,
-        )
-        else {
+        ) else {
             return Err(format!(
                 "struct literal alias `{alias_name}` is not yet supported for generic alias target `{}`; current frontend could not infer field `{name}` strongly enough",
                 lower_type_ref(&alias_definition.target).render()

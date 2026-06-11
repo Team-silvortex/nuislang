@@ -1,11 +1,21 @@
 use super::*;
 use crate::lowering::loop_carries::tail_recursive_prev_carry_binding;
+use crate::lowering::loop_purity::{
+    collect_inlineable_pure_helper_exprs, extract_pure_branch_binding, substitute_branch_binding,
+};
 
 pub(super) fn rewrite_self_tail_recursive_functions(module: &NirModule) -> NirModule {
     let pure_helpers = collect_pure_helper_functions(module);
+    let inlineable_pure_helpers = collect_inlineable_pure_helper_exprs(module);
+    let pure_helper_blocks = collect_pure_helper_blocks(module);
     let mut rewritten = module.clone();
     for function in &mut rewritten.functions {
-        if let Some(body) = rewrite_self_tail_recursive_function(function, &pure_helpers) {
+        if let Some(body) = rewrite_self_tail_recursive_function(
+            function,
+            &pure_helpers,
+            &inlineable_pure_helpers,
+            &pure_helper_blocks,
+        ) {
             function.body = body;
         }
     }
@@ -15,16 +25,24 @@ pub(super) fn rewrite_self_tail_recursive_functions(module: &NirModule) -> NirMo
 fn rewrite_self_tail_recursive_function(
     function: &NirFunction,
     pure_helpers: &BTreeSet<String>,
+    inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
+    pure_helper_blocks: &BTreeMap<String, PureHelperBlock>,
 ) -> Option<Vec<NirStmt>> {
     if function.is_async || function.params.is_empty() {
         return None;
     }
 
     let (recurse_condition, base_return, recursive_step) =
-        extract_self_tail_recursive_shape(function)?;
+        extract_self_tail_recursive_shape(function, pure_helpers)?;
     let loop_body = rewrite_self_tail_recursive_loop_body(function, recursive_step)?;
 
-    if !is_self_tail_recursive_loop_shape(&recurse_condition, &loop_body, pure_helpers) {
+    if !is_self_tail_recursive_loop_shape(
+        &recurse_condition,
+        &loop_body,
+        pure_helpers,
+        inlineable_pure_helpers,
+        pure_helper_blocks,
+    ) {
         return None;
     }
 
@@ -48,6 +66,7 @@ enum SelfTailRecursiveStep {
 
 fn extract_self_tail_recursive_shape(
     function: &NirFunction,
+    pure_helpers: &BTreeSet<String>,
 ) -> Option<(NirExpr, NirExpr, SelfTailRecursiveStep)> {
     match function.body.as_slice() {
         [NirStmt::If {
@@ -57,7 +76,7 @@ fn extract_self_tail_recursive_shape(
         }, NirStmt::Return(Some(recursive_return))]
             if else_body.is_empty() =>
         {
-            let base_return = extract_terminal_return_expr(then_body)?;
+            let base_return = extract_terminal_return_expr(then_body, pure_helpers)?;
             let recursive_args = extract_self_tail_recursive_call(function, recursive_return)?;
             Some((
                 invert_self_tail_recursive_condition(condition, &function.params[0].name)?,
@@ -70,8 +89,8 @@ fn extract_self_tail_recursive_shape(
             then_body,
             else_body,
         }] => {
-            if let Some(base_return) = extract_terminal_return_expr(then_body) {
-                let recursive_return = extract_terminal_return_expr(else_body)?;
+            if let Some(base_return) = extract_terminal_return_expr(then_body, pure_helpers) {
+                let recursive_return = extract_terminal_return_expr(else_body, pure_helpers)?;
                 let recursive_args = extract_self_tail_recursive_call(function, &recursive_return)?;
                 return Some((
                     invert_self_tail_recursive_condition(condition, &function.params[0].name)?,
@@ -79,9 +98,9 @@ fn extract_self_tail_recursive_shape(
                     SelfTailRecursiveStep::Linear(recursive_args),
                 ));
             }
-            let recursive_return = extract_terminal_return_expr(then_body)?;
+            let recursive_return = extract_terminal_return_expr(then_body, pure_helpers)?;
             let recursive_args = extract_self_tail_recursive_call(function, &recursive_return)?;
-            let base_return = extract_terminal_return_expr(else_body)?;
+            let base_return = extract_terminal_return_expr(else_body, pure_helpers)?;
             Some((
                 condition.clone(),
                 base_return,
@@ -95,9 +114,9 @@ fn extract_self_tail_recursive_shape(
         }, recursive_branch]
             if base_else.is_empty() =>
         {
-            let base_return = extract_terminal_return_expr(base_then)?;
+            let base_return = extract_terminal_return_expr(base_then, pure_helpers)?;
             let recursive_step =
-                extract_self_tail_recursive_branch_step(function, recursive_branch)?;
+                extract_self_tail_recursive_branch_step(function, recursive_branch, pure_helpers)?;
             Some((
                 invert_self_tail_recursive_condition(base_condition, &function.params[0].name)?,
                 base_return,
@@ -111,6 +130,7 @@ fn extract_self_tail_recursive_shape(
 fn extract_self_tail_recursive_branch_step(
     function: &NirFunction,
     stmt: &NirStmt,
+    pure_helpers: &BTreeSet<String>,
 ) -> Option<SelfTailRecursiveStep> {
     match stmt {
         NirStmt::If {
@@ -118,9 +138,9 @@ fn extract_self_tail_recursive_branch_step(
             then_body,
             else_body,
         } => {
-            let then_return = extract_terminal_return_expr(then_body)?;
+            let then_return = extract_terminal_return_expr(then_body, pure_helpers)?;
             let then_args = extract_self_tail_recursive_call(function, &then_return)?;
-            let else_return = extract_terminal_return_expr(else_body)?;
+            let else_return = extract_terminal_return_expr(else_body, pure_helpers)?;
             let else_args = extract_self_tail_recursive_call(function, &else_return)?;
             Some(SelfTailRecursiveStep::Branch {
                 condition: condition.clone(),
@@ -237,11 +257,19 @@ fn rewrite_self_tail_recursive_loop_body(
     }
 }
 
-fn extract_terminal_return_expr(stmts: &[NirStmt]) -> Option<NirExpr> {
-    match stmts {
-        [NirStmt::Return(Some(expr))] => Some(expr.clone()),
-        _ => None,
+fn extract_terminal_return_expr(
+    stmts: &[NirStmt],
+    pure_helpers: &BTreeSet<String>,
+) -> Option<NirExpr> {
+    let (NirStmt::Return(Some(expr)), prefix) = stmts.split_last()? else {
+        return None;
+    };
+    let mut substituted = expr.clone();
+    for stmt in prefix.iter().rev() {
+        let (binding_name, binding_value) = extract_pure_branch_binding(stmt, pure_helpers)?;
+        substituted = substitute_branch_binding(&substituted, &binding_name, &binding_value);
     }
+    Some(substituted)
 }
 
 fn extract_self_tail_recursive_call(
@@ -287,11 +315,41 @@ fn is_self_tail_recursive_loop_shape(
     condition: &NirExpr,
     body: &[NirStmt],
     pure_helpers: &BTreeSet<String>,
+    inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
+    pure_helper_blocks: &BTreeMap<String, PureHelperBlock>,
 ) -> bool {
-    prepare_post_flow_while(condition, body, pure_helpers).is_some()
-        || prepare_flow_while(condition, body, pure_helpers).is_some()
-        || prepare_chained_while(condition, body, pure_helpers).is_some()
-        || prepare_counted_while(condition, body, pure_helpers).is_some()
+    prepare_post_flow_while(
+        condition,
+        body,
+        pure_helpers,
+        inlineable_pure_helpers,
+        pure_helper_blocks,
+    )
+    .is_some()
+        || prepare_flow_while(
+            condition,
+            body,
+            pure_helpers,
+            inlineable_pure_helpers,
+            pure_helper_blocks,
+        )
+        .is_some()
+        || prepare_chained_while(
+            condition,
+            body,
+            pure_helpers,
+            inlineable_pure_helpers,
+            pure_helper_blocks,
+        )
+        .is_some()
+        || prepare_counted_while(
+            condition,
+            body,
+            pure_helpers,
+            inlineable_pure_helpers,
+            pure_helper_blocks,
+        )
+        .is_some()
 }
 
 fn canonicalize_tail_recursive_loop_arg(

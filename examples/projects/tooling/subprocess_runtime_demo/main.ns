@@ -4,6 +4,20 @@ mod cpu Main {
   extern "c" fn host_subprocess_join(process_handle: i64) -> i64;
   extern "c" fn host_subprocess_join_exit(process_handle: i64) -> i64;
 
+  struct SubprocessRequest {
+    program_handle: i64,
+    argv_handle: i64,
+    env_handle: i64
+  }
+
+  struct SubprocessResult {
+    handle: i64,
+    signal_result: i64,
+    join_code: i64,
+    join_exit: i64,
+    succeeded: bool
+  }
+
   struct SubprocessRuntimeProjectSummary {
     primary_handle: i64,
     primary_signal: i64,
@@ -15,18 +29,50 @@ mod cpu Main {
     secondary_join_exit: i64
   }
 
+  fn build_subprocess_request(
+    program_handle: i64,
+    argv_handle: i64,
+    env_handle: i64
+  ) -> SubprocessRequest {
+    return SubprocessRequest {
+      program_handle: program_handle,
+      argv_handle: argv_handle,
+      env_handle: env_handle
+    };
+  }
+
+  fn run_subprocess(request: SubprocessRequest) -> SubprocessResult {
+    let handle: i64 = host_subprocess_spawn(
+      request.program_handle,
+      request.argv_handle,
+      request.env_handle
+    );
+    let join_exit: i64 = host_subprocess_join_exit(handle);
+    return SubprocessResult {
+      handle: handle,
+      signal_result: host_subprocess_signal(handle, 0),
+      join_code: host_subprocess_join(handle),
+      join_exit: join_exit,
+      succeeded: join_exit == 0
+    };
+  }
+
   fn capture_subprocess_runtime_project() -> SubprocessRuntimeProjectSummary {
-    let primary_handle: i64 = host_subprocess_spawn(503, 29, 7);
-    let secondary_handle: i64 = host_subprocess_spawn(601, 31, 9);
+    let primary: SubprocessResult = run_subprocess(
+      build_subprocess_request(503, 29, 7)
+    );
+    let secondary: SubprocessResult = run_subprocess(
+      build_subprocess_request(601, 31, 9)
+    );
     return SubprocessRuntimeProjectSummary {
-      primary_handle: primary_handle,
-      primary_signal: host_subprocess_signal(primary_handle, 0),
-      primary_join: host_subprocess_join(primary_handle),
-      primary_join_exit: host_subprocess_join_exit(primary_handle),
-      secondary_handle: secondary_handle,
-      secondary_signal: host_subprocess_signal(secondary_handle, 0),
-      secondary_join: host_subprocess_join(secondary_handle),
-      secondary_join_exit: host_subprocess_join_exit(secondary_handle)
+      primary_handle: primary.handle,
+      primary_signal: primary.signal_result,
+      primary_join: primary.join_code,
+      primary_join_exit: primary.join_exit,
+      secondary_handle: secondary.handle,
+      secondary_signal: secondary.signal_result,
+      secondary_join: secondary.join_code,
+      secondary_join_exit: secondary.join_exit
     };
   }
 

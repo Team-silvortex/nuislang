@@ -4,8 +4,8 @@ use nuis_semantics::model::{
     AstExpr, AstFunction, AstImplDef, AstMatchArm, AstStmt, AstStructDef, AstTypeAlias, AstTypeRef,
 };
 
-use super::super::{ast_named_type, infer_ast_expr_type, FunctionSignature};
 use super::super::validation_binding_env::bind_match_pattern_for_type;
+use super::super::{ast_named_type, infer_ast_expr_type, FunctionSignature};
 use super::exprs::rewrite_generic_calls_in_expr;
 use super::hoists::hoist_direct_result_wrapper_args;
 
@@ -483,21 +483,21 @@ fn rewrite_generic_calls_in_stmt(
             AstStmt::Match {
                 value: rewritten_value,
                 arms: rewrite_generic_calls_in_match_arms(
-                arms,
-                scrutinee_type.as_ref(),
-                current_return_type,
-                env,
-                visible_type_aliases,
-                generic_templates,
-                higher_order_templates,
-                function_table,
-                signatures,
-                impl_lookup,
-                struct_table,
-                function_return_types,
-                specialization_cache,
-                specialized_functions,
-                specialized_signatures,
+                    arms,
+                    scrutinee_type.as_ref(),
+                    current_return_type,
+                    env,
+                    visible_type_aliases,
+                    generic_templates,
+                    higher_order_templates,
+                    function_table,
+                    signatures,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    specialization_cache,
+                    specialized_functions,
+                    specialized_signatures,
                 )?,
             }
         }

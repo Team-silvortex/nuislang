@@ -28,8 +28,7 @@ fn compiles_http_client_exchange_recipe_project() {
     let project = Path::new(
         "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_exchange_recipe_demo",
     );
-    nuisc::pipeline::compile_project(project)
-        .expect("http client exchange project should compile");
+    nuisc::pipeline::compile_project(project).expect("http client exchange project should compile");
 }
 
 #[test]
@@ -365,7 +364,12 @@ fn lowers_net_loop_control_recipe_project_with_expected_loop_nodes() {
         .unwrap();
     assert!(matches!(
         flow.body.as_slice(),
-        [NirStmt::Let { .. }, NirStmt::Let { .. }, NirStmt::While { .. }, NirStmt::Return(Some(_))]
+        [
+            NirStmt::Let { .. },
+            NirStmt::Let { .. },
+            NirStmt::While { .. },
+            NirStmt::Return(Some(_))
+        ]
     ));
 
     let post_flow = artifacts
@@ -376,7 +380,12 @@ fn lowers_net_loop_control_recipe_project_with_expected_loop_nodes() {
         .unwrap();
     assert!(matches!(
         post_flow.body.as_slice(),
-        [NirStmt::Let { .. }, NirStmt::Let { .. }, NirStmt::While { .. }, NirStmt::Return(Some(_))]
+        [
+            NirStmt::Let { .. },
+            NirStmt::Let { .. },
+            NirStmt::While { .. },
+            NirStmt::Return(Some(_))
+        ]
     ));
 
     let flow_node = artifacts
@@ -399,8 +408,7 @@ fn lowers_net_loop_control_recipe_project_with_expected_loop_nodes() {
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu"
-                && node.op.instruction == "loop_while_i64_post_flow_cond_chain"
+            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_post_flow_cond_chain"
         })
         .expect("expected loop_while_i64_post_flow_cond_chain node");
     assert_eq!(post_flow_node.op.args[3], "lt");
@@ -469,8 +477,7 @@ fn lowers_net_session_loop_control_recipe_project_with_expected_summary_and_loop
         node.op.module == "cpu" && node.op.instruction == "loop_while_i64_flow_cond_chain"
     }));
     assert!(artifacts.yir.nodes.iter().any(|node| {
-        node.op.module == "cpu"
-            && node.op.instruction == "loop_while_i64_post_flow_cond_chain"
+        node.op.module == "cpu" && node.op.instruction == "loop_while_i64_post_flow_cond_chain"
     }));
 }
 
@@ -549,7 +556,9 @@ fn lowers_net_http_session_loop_bridge_recipe_project_with_expected_bridge_shape
             && function.generic_params.is_empty()
     }));
     assert!(artifacts.nir.functions.iter().any(|function| {
-        function.name.starts_with("__lambda_capture_net_session_loop_bridge_summary_")
+        function
+            .name
+            .starts_with("__lambda_capture_net_session_loop_bridge_summary_")
             && function.generic_params.is_empty()
     }));
 
@@ -572,7 +581,6 @@ fn lowers_net_http_session_loop_bridge_recipe_project_with_expected_bridge_shape
         node.op.module == "cpu" && node.op.instruction == "loop_while_i64_flow_cond_chain"
     }));
     assert!(artifacts.yir.nodes.iter().any(|node| {
-        node.op.module == "cpu"
-            && node.op.instruction == "loop_while_i64_post_flow_cond_chain"
+        node.op.module == "cpu" && node.op.instruction == "loop_while_i64_post_flow_cond_chain"
     }));
 }

@@ -1,3 +1,4 @@
+use super::loop_purity::collect_pure_helper_functions;
 use super::lower_nir_to_yir_builtin_cpu;
 use crate::frontend::parse_nuis_module;
 
@@ -284,4 +285,69 @@ fn lowers_branching_cross_prev_carry_self_tail_recursive_function_into_loop_whil
     assert_eq!(loop_node.op.args[11], "prev_current_gt");
     assert_eq!(loop_node.op.args[13], "add_prev_current");
     assert_eq!(loop_node.op.args[14], "add_prev_carry0");
+}
+
+#[test]
+fn lowers_tail_recursive_function_with_prelude_bindings_into_loop_while_i64_cond_chain() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn accumulate(current: i64, acc: i64) -> i64 {
+            if current <= 1 {
+              let done: i64 = acc;
+              return done;
+            }
+            if current > 2 {
+              let bonus: i64 = current - 1;
+              return accumulate(current - 1, acc + bonus);
+            } else {
+              let bonus: i64 = 0;
+              return accumulate(current - 1, acc + bonus);
+            }
+          }
+
+          fn main() -> i64 {
+            return accumulate(4, 0);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_cond_chain")
+        .expect("expected loop_while_i64_cond_chain node");
+    assert_eq!(loop_node.op.args[3], "gt");
+    assert_eq!(loop_node.op.args[4], "sub");
+    assert_eq!(loop_node.op.args[6], "prev_current_gt");
+    assert_eq!(loop_node.op.args[8], "add_current");
+    assert_eq!(loop_node.op.args[9], "keep");
+}
+
+#[test]
+fn recognizes_pure_helper_with_prelude_and_if_control_flow() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn bonus(current: i64) -> i64 {
+            let down: i64 = current - 1;
+            if current > 2 {
+              return down;
+            }
+            return 0;
+          }
+
+          fn main() -> i64 {
+            return bonus(4);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let pure_helpers = collect_pure_helper_functions(&module);
+    assert!(pure_helpers.contains("bonus"));
 }

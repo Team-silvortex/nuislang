@@ -43,12 +43,16 @@ fn lowers_generic_payload_alias_method_hof_state_project_with_hof_and_lambda_sha
             if callee.starts_with("__hof_apply_payload")
     ));
 
-    assert!(artifacts.nir.functions.iter().any(|function| {
-        function.name.starts_with("__hof_apply_payload")
-    }));
-    assert!(artifacts.nir.functions.iter().any(|function| {
-        function.name.starts_with("__lambda_main_")
-    }));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| { function.name.starts_with("__hof_apply_payload") }));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| { function.name.starts_with("__lambda_main_") }));
 
     let hof = artifacts
         .nir
@@ -131,8 +135,8 @@ fn compiles_ordinary_recursive_generic_alias_fn3_higher_order_state_project() {
 }
 
 #[test]
-fn lowers_ordinary_recursive_generic_alias_fn3_higher_order_state_project_with_recursive_hof_shape(
-) {
+fn lowers_ordinary_recursive_generic_alias_fn3_higher_order_state_project_with_recursive_hof_shape()
+{
     let artifacts = compiled_project(
         "/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_generic_alias_fn3_higher_order_call_graph_demo",
     );
@@ -140,12 +144,16 @@ fn lowers_ordinary_recursive_generic_alias_fn3_higher_order_state_project_with_r
     assert!(artifacts.nir.functions.iter().any(|function| {
         function.name.starts_with("__hof_apply3_") && function.name.ends_with("__i64")
     }));
-    assert!(artifacts.nir.functions.iter().any(|function| {
-        function.name.starts_with("__lambda_odd_")
-    }));
-    assert!(artifacts.nir.functions.iter().any(|function| {
-        function.name.starts_with("__lambda_even_")
-    }));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| { function.name.starts_with("__lambda_odd_") }));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| { function.name.starts_with("__lambda_even_") }));
 
     let hof_calls = artifacts
         .yir
@@ -200,9 +208,7 @@ fn lowers_tail_recursive_branching_cross_carry_state_project_with_cond_loop_shap
         .yir
         .nodes
         .iter()
-        .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_cond_chain"
-        })
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_cond_chain")
         .expect("expected loop_while_i64_cond_chain node");
     assert_eq!(loop_node.op.args[3], "gt");
     assert_eq!(loop_node.op.args[4], "sub");

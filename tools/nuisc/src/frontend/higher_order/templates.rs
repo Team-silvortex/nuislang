@@ -282,6 +282,79 @@ pub(crate) fn rewrite_higher_order_template_expr(
                 "higher-order function parameter `{name}` can currently only be used in direct call position"
             ))
         }
+        AstExpr::If {
+            condition,
+            then_body,
+            else_body,
+        } => AstExpr::If {
+            condition: Box::new(rewrite_higher_order_template_expr(
+                condition,
+                callable_bindings,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?),
+            then_body: rewrite_higher_order_template_block(
+                then_body,
+                callable_bindings,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?,
+            else_body: rewrite_higher_order_template_block(
+                else_body,
+                callable_bindings,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?,
+        },
+        AstExpr::Match { value, arms } => AstExpr::Match {
+            value: Box::new(rewrite_higher_order_template_expr(
+                value,
+                callable_bindings,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?),
+            arms: arms
+                .iter()
+                .map(|arm| {
+                    Ok(AstMatchArm {
+                        pattern: arm.pattern.clone(),
+                        guard: match &arm.guard {
+                            Some(guard) => Some(rewrite_higher_order_template_expr(
+                                guard,
+                                callable_bindings,
+                                templates,
+                                function_table,
+                                visible_type_aliases,
+                                specialized_cache,
+                                specialized_functions,
+                            )?),
+                            None => None,
+                        },
+                        body: rewrite_higher_order_template_block(
+                            &arm.body,
+                            callable_bindings,
+                            templates,
+                            function_table,
+                            visible_type_aliases,
+                            specialized_cache,
+                            specialized_functions,
+                        )?,
+                    })
+                })
+                .collect::<Result<Vec<_>, String>>()?,
+        },
         AstExpr::Call {
             callee,
             generic_args,

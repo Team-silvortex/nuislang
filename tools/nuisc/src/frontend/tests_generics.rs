@@ -67,9 +67,7 @@ where
         NirExpr::CpuExternCall { args, .. } => {
             args.iter().any(|arg| expr_contains_call(arg, predicate))
         }
-        NirExpr::CpuSpawn { args, .. } => {
-            args.iter().any(|arg| expr_contains_call(arg, predicate))
-        }
+        NirExpr::CpuSpawn { args, .. } => args.iter().any(|arg| expr_contains_call(arg, predicate)),
         _ => false,
     }
 }
@@ -744,7 +742,10 @@ fn monomorphizes_explicit_generic_wrappers_through_async_if_and_match_control_fl
         .iter()
         .find(|function| function.name == "choose")
         .unwrap();
-    assert!(choose.body.iter().any(|stmt| matches!(stmt, NirStmt::If { .. })));
+    assert!(choose
+        .body
+        .iter()
+        .any(|stmt| matches!(stmt, NirStmt::If { .. })));
     assert!(stmt_tree_contains_call(&choose.body, &|callee, args| {
         callee.starts_with("wrap_packet__")
             && matches!(args, [NirExpr::CpuJoin(_), NirExpr::Int(9)])
@@ -866,7 +867,10 @@ fn monomorphizes_generic_function_body_internal_explicit_helpers_through_branch_
         choose.return_type.as_ref().map(|ty| ty.render()),
         Some(rendered) if rendered == "Envelope<Packet<Cell<i64>>>"
     ));
-    assert!(choose.body.iter().any(|stmt| matches!(stmt, NirStmt::If { .. })));
+    assert!(choose
+        .body
+        .iter()
+        .any(|stmt| matches!(stmt, NirStmt::If { .. })));
     assert!(stmt_tree_contains_call(&choose.body, &|callee, _| {
         callee.starts_with("wrap_packet__")
     }));

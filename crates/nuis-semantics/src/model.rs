@@ -292,6 +292,15 @@ pub enum AstExpr {
     Text(String),
     Int(i64),
     Var(String),
+    If {
+        condition: Box<AstExpr>,
+        then_body: Vec<AstStmt>,
+        else_body: Vec<AstStmt>,
+    },
+    Match {
+        value: Box<AstExpr>,
+        arms: Vec<AstMatchArm>,
+    },
     Lambda {
         params: Vec<AstParam>,
         return_type: Option<AstTypeRef>,

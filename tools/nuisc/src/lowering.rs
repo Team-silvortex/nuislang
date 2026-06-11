@@ -102,8 +102,9 @@ use loop_preparation::{
     prepare_chained_while, prepare_counted_while, prepare_flow_while, prepare_post_flow_while,
 };
 use loop_purity::{
-    collect_pure_helper_functions, extract_pure_branch_binding, is_terminal_branch_pure_expr,
-    prepare_terminal_branch, substitute_prepared_loop_body,
+    collect_inlineable_pure_helper_exprs, collect_pure_helper_blocks,
+    collect_pure_helper_functions, extract_pure_branch_binding, inline_pure_helper_calls,
+    is_terminal_branch_pure_expr, prepare_terminal_branch, substitute_prepared_loop_body,
 };
 use loop_types::*;
 use network_exprs::lower_network_expr;

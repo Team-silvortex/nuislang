@@ -5,8 +5,7 @@ fn compiles_task_recursive_async_project() {
     let project = Path::new(
         "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_recursive_async_demo",
     );
-    nuisc::pipeline::compile_project(project)
-        .expect("task recursive async project should compile");
+    nuisc::pipeline::compile_project(project).expect("task recursive async project should compile");
 }
 
 #[test]

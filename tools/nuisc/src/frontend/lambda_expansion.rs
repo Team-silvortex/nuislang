@@ -411,6 +411,85 @@ fn rewrite_lambda_expr(
                     .unwrap_or_else(|| name.clone()),
             )
         }
+        AstExpr::If {
+            condition,
+            then_body,
+            else_body,
+        } => AstExpr::If {
+            condition: Box::new(rewrite_lambda_expr(
+                condition,
+                inherited_generic_params,
+                lambda_aliases,
+                visible_locals,
+                module_const_names,
+                owning_function_name,
+                counter,
+                synthesized,
+            )?),
+            then_body: expand_lambda_block(
+                then_body,
+                inherited_generic_params,
+                lambda_aliases,
+                visible_locals,
+                module_const_names,
+                owning_function_name,
+                counter,
+                synthesized,
+            )?,
+            else_body: expand_lambda_block(
+                else_body,
+                inherited_generic_params,
+                lambda_aliases,
+                visible_locals,
+                module_const_names,
+                owning_function_name,
+                counter,
+                synthesized,
+            )?,
+        },
+        AstExpr::Match { value, arms } => AstExpr::Match {
+            value: Box::new(rewrite_lambda_expr(
+                value,
+                inherited_generic_params,
+                lambda_aliases,
+                visible_locals,
+                module_const_names,
+                owning_function_name,
+                counter,
+                synthesized,
+            )?),
+            arms: arms
+                .iter()
+                .map(|arm| {
+                    Ok(AstMatchArm {
+                        pattern: arm.pattern.clone(),
+                        guard: match &arm.guard {
+                            Some(guard) => Some(rewrite_lambda_expr(
+                                guard,
+                                inherited_generic_params,
+                                lambda_aliases,
+                                visible_locals,
+                                module_const_names,
+                                owning_function_name,
+                                counter,
+                                synthesized,
+                            )?),
+                            None => None,
+                        },
+                        body: expand_lambda_block(
+                            &arm.body,
+                            inherited_generic_params,
+                            lambda_aliases,
+                            visible_locals,
+                            module_const_names,
+                            owning_function_name,
+                            counter,
+                            synthesized,
+                        )?,
+                    })
+                })
+                .collect::<Result<Vec<_>, String>>()?,
+        },
         AstExpr::Lambda { .. } => {
             let AstExpr::Lambda {
                 params,

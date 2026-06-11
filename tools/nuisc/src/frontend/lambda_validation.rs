@@ -84,6 +84,29 @@ pub(super) fn validate_lambda_expr_no_capture(
                 "lambda currently does not support capturing outer local `{name}`"
             ))
         }
+        AstExpr::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            validate_lambda_expr_no_capture(condition, visible_locals, outer_locals)?;
+            let mut then_locals = visible_locals.clone();
+            let mut else_locals = visible_locals.clone();
+            validate_lambda_block_no_capture(then_body, &mut then_locals, outer_locals)?;
+            validate_lambda_block_no_capture(else_body, &mut else_locals, outer_locals)?;
+            Ok(())
+        }
+        AstExpr::Match { value, arms } => {
+            validate_lambda_expr_no_capture(value, visible_locals, outer_locals)?;
+            for arm in arms {
+                if let Some(guard) = &arm.guard {
+                    validate_lambda_expr_no_capture(guard, visible_locals, outer_locals)?;
+                }
+                let mut arm_locals = visible_locals.clone();
+                validate_lambda_block_no_capture(&arm.body, &mut arm_locals, outer_locals)?;
+            }
+            Ok(())
+        }
         AstExpr::Lambda { .. } => Err(
             "nested or inline lambdas are not supported in the current MVP; bind lambdas with `let name = |...| -> ... { ... };` only"
                 .to_owned(),

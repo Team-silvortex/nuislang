@@ -185,22 +185,46 @@ pub(super) fn lower_while_stmt(
     state: &mut LoweringState<'_>,
     bindings: &mut BTreeMap<String, String>,
 ) -> Result<Option<String>, String> {
-    if let Some(prepared) = prepare_post_flow_while(condition, body, &state.pure_helpers) {
+    if let Some(prepared) = prepare_post_flow_while(
+        condition,
+        body,
+        &state.pure_helpers,
+        &state.inlineable_pure_helpers,
+        &state.pure_helper_blocks,
+    ) {
         lower_post_flow_while(prepared, state, bindings)?;
         return Ok(None);
     }
 
-    if let Some(prepared) = prepare_flow_while(condition, body, &state.pure_helpers) {
+    if let Some(prepared) = prepare_flow_while(
+        condition,
+        body,
+        &state.pure_helpers,
+        &state.inlineable_pure_helpers,
+        &state.pure_helper_blocks,
+    ) {
         lower_flow_while(prepared, state, bindings)?;
         return Ok(None);
     }
 
-    if let Some(prepared) = prepare_chained_while(condition, body, &state.pure_helpers) {
+    if let Some(prepared) = prepare_chained_while(
+        condition,
+        body,
+        &state.pure_helpers,
+        &state.inlineable_pure_helpers,
+        &state.pure_helper_blocks,
+    ) {
         lower_chained_while(prepared, state, bindings)?;
         return Ok(None);
     }
 
-    if let Some(prepared) = prepare_counted_while(condition, body, &state.pure_helpers) {
+    if let Some(prepared) = prepare_counted_while(
+        condition,
+        body,
+        &state.pure_helpers,
+        &state.inlineable_pure_helpers,
+        &state.pure_helper_blocks,
+    ) {
         lower_counted_while(prepared, state, bindings)?;
         return Ok(None);
     }

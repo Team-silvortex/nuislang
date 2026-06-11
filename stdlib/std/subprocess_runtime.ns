@@ -4,26 +4,69 @@ mod cpu Main {
   extern "c" fn host_subprocess_join(process_handle: i64) -> i64;
   extern "c" fn host_subprocess_join_exit(process_handle: i64) -> i64;
 
-  struct SubprocessHandle {
+  struct SubprocessRequest {
+    program_handle: i64,
+    argv_handle: i64,
+    env_handle: i64
+  }
+
+  struct SubprocessResult {
     handle: i64,
     signal_result: i64,
     join_code: i64,
-    join_exit: i64
+    join_exit: i64,
+    succeeded: bool
   }
 
-  fn launch_subprocess(program_handle: i64, argv_handle: i64, env_handle: i64) -> SubprocessHandle {
-    let handle: i64 = host_subprocess_spawn(program_handle, argv_handle, env_handle);
-    return SubprocessHandle {
-      handle: handle,
-      signal_result: host_subprocess_signal(handle, 0),
-      join_code: host_subprocess_join(handle),
-      join_exit: host_subprocess_join_exit(handle)
+  fn build_subprocess_request(
+    program_handle: i64,
+    argv_handle: i64,
+    env_handle: i64
+  ) -> SubprocessRequest {
+    return SubprocessRequest {
+      program_handle: program_handle,
+      argv_handle: argv_handle,
+      env_handle: env_handle
     };
   }
 
+  fn run_subprocess(request: SubprocessRequest) -> SubprocessResult {
+    let handle: i64 = host_subprocess_spawn(
+      request.program_handle,
+      request.argv_handle,
+      request.env_handle
+    );
+    let join_exit: i64 = host_subprocess_join_exit(handle);
+    return SubprocessResult {
+      handle: handle,
+      signal_result: host_subprocess_signal(handle, 0),
+      join_code: host_subprocess_join(handle),
+      join_exit: join_exit,
+      succeeded: join_exit == 0
+    };
+  }
+
+  fn summarize_subprocess_result(result: SubprocessResult) -> i64 {
+    let success_bonus: i64 = if result.succeeded {
+      1
+    } else {
+      0
+    };
+    return result.handle
+      + result.signal_result
+      + result.join_code
+      + result.join_exit
+      + success_bonus;
+  }
+
   fn summarize_subprocess(program_handle: i64, argv_handle: i64, env_handle: i64) -> i64 {
-    let process: SubprocessHandle = launch_subprocess(program_handle, argv_handle, env_handle);
-    return process.handle + process.signal_result + process.join_code + process.join_exit;
+    let request: SubprocessRequest = build_subprocess_request(
+      program_handle,
+      argv_handle,
+      env_handle
+    );
+    let result: SubprocessResult = run_subprocess(request);
+    return summarize_subprocess_result(result);
   }
 
   fn main() {

@@ -294,6 +294,7 @@ Core companion routes:
   [input_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/input_runtime_demo),
   [io_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/io_runtime_demo),
   [command_shell_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/command_shell_demo),
+  [workflow_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/workflow_runtime_demo),
   [cli_session_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_session_demo),
   [cli_shell_session_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_shell_session_demo),
   [cli_report_session_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_report_session_demo),
@@ -361,6 +362,8 @@ cargo run -p nuis -- check examples/projects/kernel_tensor_demo
 cargo run -p nuis -- build examples/projects/kernel_tensor_demo examples/bins/kernel_tensor_demo_project
 cargo run -p nuis -- check examples/projects/tooling/command_shell_demo
 cargo run -p nuis -- build examples/projects/tooling/command_shell_demo /private/tmp/command_shell_demo_out
+cargo run -p nuis -- check examples/projects/tooling/workflow_runtime_demo
+cargo run -p nuis -- build examples/projects/tooling/workflow_runtime_demo /private/tmp/workflow_runtime_demo_out
 cargo run -p nuis -- check examples/projects/tooling/cli_session_demo
 cargo run -p nuis -- build examples/projects/tooling/cli_session_demo /private/tmp/cli_session_demo_out
 cargo run -p nuis -- check examples/projects/tooling/cli_shell_session_demo

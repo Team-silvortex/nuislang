@@ -505,8 +505,7 @@ fn lowers_nested_if_breaking_after_branching_carry_into_loop_while_i64_post_flow
 }
 
 #[test]
-fn lowers_nested_match_continuing_after_branching_carry_into_loop_while_i64_post_flow_cond_chain()
-{
+fn lowers_nested_match_continuing_after_branching_carry_into_loop_while_i64_post_flow_cond_chain() {
     let mut module = parse_nuis_module(
         r#"
         mod cpu Main {

@@ -4,8 +4,8 @@ use nuis_semantics::model::{
     AstFunction, AstImplDef, AstModule, AstTypeAlias, AstTypeRef, NirFunction, NirStructDef,
 };
 
-use super::stmt_lowering::lower_stmt_sequence_with_async;
 use super::higher_order::{is_callable_type_with_aliases, rewrite_higher_order_calls_in_function};
+use super::stmt_lowering::lower_stmt_sequence_with_async;
 use super::{
     build_function_return_type_table, build_impl_method_function, impl_method_lookup_key,
     impl_method_symbol_name, infer_missing_function_return_type, is_public_visibility,

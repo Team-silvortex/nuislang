@@ -4,6 +4,19 @@ mod cpu Main {
   extern "c" fn host_command_wait(command_handle: i64) -> i64;
   extern "c" fn host_command_wait_exit(command_handle: i64) -> i64;
 
+  struct CommandRequest {
+    program_handle: i64,
+    argv_handle: i64
+  }
+
+  struct CommandResult {
+    handle: i64,
+    status: i64,
+    wait_code: i64,
+    wait_exit: i64,
+    succeeded: bool
+  }
+
   struct CommandRuntimeProjectSummary {
     primary_handle: i64,
     primary_status: i64,
@@ -15,18 +28,37 @@ mod cpu Main {
     secondary_wait_exit: i64
   }
 
+  fn build_command_request(program_handle: i64, argv_handle: i64) -> CommandRequest {
+    return CommandRequest {
+      program_handle: program_handle,
+      argv_handle: argv_handle
+    };
+  }
+
+  fn run_command(request: CommandRequest) -> CommandResult {
+    let handle: i64 = host_command_spawn(request.program_handle, request.argv_handle);
+    let wait_exit: i64 = host_command_wait_exit(handle);
+    return CommandResult {
+      handle: handle,
+      status: host_command_status(handle),
+      wait_code: host_command_wait(handle),
+      wait_exit: wait_exit,
+      succeeded: wait_exit == 0
+    };
+  }
+
   fn capture_command_runtime_project() -> CommandRuntimeProjectSummary {
-    let primary_handle: i64 = host_command_spawn(401, 17);
-    let secondary_handle: i64 = host_command_spawn(503, 29);
+    let primary: CommandResult = run_command(build_command_request(401, 17));
+    let secondary: CommandResult = run_command(build_command_request(503, 29));
     return CommandRuntimeProjectSummary {
-      primary_handle: primary_handle,
-      primary_status: host_command_status(primary_handle),
-      primary_wait: host_command_wait(primary_handle),
-      primary_wait_exit: host_command_wait_exit(primary_handle),
-      secondary_handle: secondary_handle,
-      secondary_status: host_command_status(secondary_handle),
-      secondary_wait: host_command_wait(secondary_handle),
-      secondary_wait_exit: host_command_wait_exit(secondary_handle)
+      primary_handle: primary.handle,
+      primary_status: primary.status,
+      primary_wait: primary.wait_code,
+      primary_wait_exit: primary.wait_exit,
+      secondary_handle: secondary.handle,
+      secondary_status: secondary.status,
+      secondary_wait: secondary.wait_code,
+      secondary_wait_exit: secondary.wait_exit
     };
   }
 

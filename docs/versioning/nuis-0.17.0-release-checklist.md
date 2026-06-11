@@ -16,6 +16,10 @@ like the integration/completion line it claims to be.
   still matches the checked-in mainline
 * [ ] confirm [nuis-0.17.0-mainline-goals.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-mainline-goals.md)
   still describes the actual current push
+* [ ] confirm [nuis-0.17.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-compile-workflow.md)
+  still matches the real frontend/lowering story
+* [ ] confirm [nuis-0.17.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-mainline-regression-matrix.md)
+  still matches the real test-backed release gate
 * [ ] confirm [nuis-0.17.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-release-checklist.md)
   still reflects real release gates instead of wishful thinking
 * [ ] confirm [README.md](/Users/Shared/chroot/dev/nuislang/README.md),
@@ -27,6 +31,8 @@ like the integration/completion line it claims to be.
 
 * [ ] `cargo fmt --all`
 * [ ] `cargo test -q -p nuisc -p nuis`
+* [ ] minimal mainline matrix still passes:
+  `scripts/check-0.17-mainline.sh`
 * [ ] focused frontend generic probes still pass
 * [ ] focused lowering/control-flow probes still pass
 * [ ] real project compile harnesses still pass

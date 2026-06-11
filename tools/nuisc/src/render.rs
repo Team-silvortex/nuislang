@@ -383,6 +383,46 @@ fn render_ast_expr(value: &AstExpr) -> String {
         AstExpr::Text(text) => format!("\"{}\"", escape_debug(text)),
         AstExpr::Int(value) => value.to_string(),
         AstExpr::Var(name) => name.clone(),
+        AstExpr::If {
+            condition,
+            then_body,
+            else_body,
+        } => format!(
+            "if {} {{ {} }} else {{ {} }}",
+            render_ast_expr(condition),
+            then_body
+                .iter()
+                .map(render_ast_stmt_inline)
+                .collect::<Vec<_>>()
+                .join(" "),
+            else_body
+                .iter()
+                .map(render_ast_stmt_inline)
+                .collect::<Vec<_>>()
+                .join(" ")
+        ),
+        AstExpr::Match { value, arms } => format!(
+            "match {} {{ {} }}",
+            render_ast_expr(value),
+            arms.iter()
+                .map(|arm| {
+                    let pattern = render_ast_match_pattern(&arm.pattern);
+                    let guard = arm
+                        .guard
+                        .as_ref()
+                        .map(|guard| format!(" if {}", render_ast_expr(guard)))
+                        .unwrap_or_default();
+                    let body = arm
+                        .body
+                        .iter()
+                        .map(render_ast_stmt_inline)
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    format!("{pattern}{guard} => {{ {body} }}")
+                })
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
         AstExpr::Lambda {
             params,
             return_type,

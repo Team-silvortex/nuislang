@@ -93,6 +93,275 @@ pub(super) fn collect_pure_helper_functions(module: &NirModule) -> BTreeSet<Stri
         .collect()
 }
 
+pub(super) fn collect_inlineable_pure_helper_exprs(
+    module: &NirModule,
+) -> BTreeMap<String, InlineablePureHelper> {
+    let function_map = module
+        .functions
+        .iter()
+        .map(|function| (function.name.as_str(), function))
+        .collect::<BTreeMap<_, _>>();
+    let mut memo = BTreeMap::<String, Option<InlineablePureHelper>>::new();
+    let mut visiting = BTreeSet::<String>::new();
+    module
+        .functions
+        .iter()
+        .filter_map(|function| {
+            extract_inlineable_pure_helper(function, &function_map, &mut memo, &mut visiting)
+                .map(|helper| (function.name.clone(), helper))
+        })
+        .collect()
+}
+
+pub(super) fn collect_pure_helper_blocks(module: &NirModule) -> BTreeMap<String, PureHelperBlock> {
+    let function_map = module
+        .functions
+        .iter()
+        .map(|function| (function.name.as_str(), function))
+        .collect::<BTreeMap<_, _>>();
+    let mut memo = BTreeMap::<String, bool>::new();
+    let mut visiting = BTreeSet::<String>::new();
+    module
+        .functions
+        .iter()
+        .filter(|function| {
+            is_pure_helper_function(function, &function_map, &mut memo, &mut visiting)
+        })
+        .map(|function| {
+            (
+                function.name.clone(),
+                PureHelperBlock {
+                    params: function
+                        .params
+                        .iter()
+                        .map(|param| param.name.clone())
+                        .collect(),
+                    body: function.body.clone(),
+                },
+            )
+        })
+        .collect()
+}
+
+fn extract_inlineable_pure_helper(
+    function: &NirFunction,
+    function_map: &BTreeMap<&str, &NirFunction>,
+    memo: &mut BTreeMap<String, Option<InlineablePureHelper>>,
+    visiting: &mut BTreeSet<String>,
+) -> Option<InlineablePureHelper> {
+    if let Some(cached) = memo.get(&function.name) {
+        return cached.clone();
+    }
+    if !visiting.insert(function.name.clone()) {
+        return None;
+    }
+    let result = if function.is_async {
+        None
+    } else {
+        extract_inlineable_pure_expr_from_block(&function.body, function_map, memo, visiting).map(
+            |expr| InlineablePureHelper {
+                params: function
+                    .params
+                    .iter()
+                    .map(|param| param.name.clone())
+                    .collect(),
+                expr,
+            },
+        )
+    };
+    visiting.remove(&function.name);
+    memo.insert(function.name.clone(), result.clone());
+    result
+}
+
+fn extract_inlineable_pure_expr_from_block(
+    body: &[NirStmt],
+    function_map: &BTreeMap<&str, &NirFunction>,
+    _memo: &mut BTreeMap<String, Option<InlineablePureHelper>>,
+    visiting: &mut BTreeSet<String>,
+) -> Option<NirExpr> {
+    let (NirStmt::Return(Some(expr)), prefix) = body.split_last()? else {
+        return None;
+    };
+    let mut substituted = expr.clone();
+    let mut pure_memo = BTreeMap::<String, bool>::new();
+    for stmt in prefix.iter().rev() {
+        let (binding_name, binding_value) = match stmt {
+            NirStmt::Let { name, value, .. } | NirStmt::Const { name, value, .. } => {
+                (name.clone(), value.clone())
+            }
+            _ => return None,
+        };
+        if !is_pure_helper_expr(&binding_value, function_map, &mut pure_memo, visiting) {
+            return None;
+        }
+        substituted = substitute_branch_binding(&substituted, &binding_name, &binding_value);
+    }
+    Some(substituted)
+}
+
+pub(super) fn inline_pure_helper_calls(
+    expr: &NirExpr,
+    inlineable_helpers: &BTreeMap<String, InlineablePureHelper>,
+) -> NirExpr {
+    fn inline_expr(
+        expr: &NirExpr,
+        inlineable_helpers: &BTreeMap<String, InlineablePureHelper>,
+        visiting: &mut BTreeSet<String>,
+    ) -> NirExpr {
+        match expr {
+            NirExpr::Call { callee, args } => {
+                let rewritten_args = args
+                    .iter()
+                    .map(|arg| inline_expr(arg, inlineable_helpers, visiting))
+                    .collect::<Vec<_>>();
+                if let Some(helper) = inlineable_helpers.get(callee) {
+                    if helper.params.len() == rewritten_args.len()
+                        && visiting.insert(callee.clone())
+                    {
+                        let mut expanded = helper.expr.clone();
+                        for (param, arg) in helper.params.iter().zip(rewritten_args.iter()) {
+                            expanded = substitute_branch_binding(&expanded, param, arg);
+                        }
+                        let rewritten = inline_expr(&expanded, inlineable_helpers, visiting);
+                        visiting.remove(callee);
+                        return rewritten;
+                    }
+                }
+                NirExpr::Call {
+                    callee: callee.clone(),
+                    args: rewritten_args,
+                }
+            }
+            NirExpr::Await(inner) => {
+                NirExpr::Await(Box::new(inline_expr(inner, inlineable_helpers, visiting)))
+            }
+            NirExpr::CastI64ToI32(inner) => {
+                NirExpr::CastI64ToI32(Box::new(inline_expr(inner, inlineable_helpers, visiting)))
+            }
+            NirExpr::MethodCall {
+                receiver,
+                method,
+                args,
+            } => NirExpr::MethodCall {
+                receiver: Box::new(inline_expr(receiver, inlineable_helpers, visiting)),
+                method: method.clone(),
+                args: args
+                    .iter()
+                    .map(|arg| inline_expr(arg, inlineable_helpers, visiting))
+                    .collect(),
+            },
+            NirExpr::StructLiteral {
+                type_name,
+                type_args,
+                fields,
+            } => NirExpr::StructLiteral {
+                type_name: type_name.clone(),
+                type_args: type_args.clone(),
+                fields: fields
+                    .iter()
+                    .map(|(field, value)| {
+                        (
+                            field.clone(),
+                            inline_expr(value, inlineable_helpers, visiting),
+                        )
+                    })
+                    .collect(),
+            },
+            NirExpr::FieldAccess { base, field } => NirExpr::FieldAccess {
+                base: Box::new(inline_expr(base, inlineable_helpers, visiting)),
+                field: field.clone(),
+            },
+            NirExpr::Binary { op, lhs, rhs } => NirExpr::Binary {
+                op: *op,
+                lhs: Box::new(inline_expr(lhs, inlineable_helpers, visiting)),
+                rhs: Box::new(inline_expr(rhs, inlineable_helpers, visiting)),
+            },
+            _ => expr.clone(),
+        }
+    }
+
+    inline_expr(expr, inlineable_helpers, &mut BTreeSet::new())
+}
+
+fn invert_compare(op: NirBinaryOp) -> Option<NirBinaryOp> {
+    match op {
+        NirBinaryOp::Eq => Some(NirBinaryOp::Ne),
+        NirBinaryOp::Ne => Some(NirBinaryOp::Eq),
+        NirBinaryOp::Lt => Some(NirBinaryOp::Ge),
+        NirBinaryOp::Le => Some(NirBinaryOp::Gt),
+        NirBinaryOp::Gt => Some(NirBinaryOp::Le),
+        NirBinaryOp::Ge => Some(NirBinaryOp::Lt),
+        _ => None,
+    }
+}
+
+pub(super) fn normalize_pure_bool_test_expr(expr: NirExpr) -> NirExpr {
+    match expr {
+        NirExpr::Binary {
+            op: NirBinaryOp::Eq,
+            lhs,
+            rhs,
+        } => match rhs.as_ref() {
+            NirExpr::Bool(true) => *lhs,
+            NirExpr::Bool(false) => match lhs.as_ref() {
+                NirExpr::Binary { op, lhs, rhs } => invert_compare(*op)
+                    .map(|inverted| NirExpr::Binary {
+                        op: inverted,
+                        lhs: lhs.clone(),
+                        rhs: rhs.clone(),
+                    })
+                    .unwrap_or(NirExpr::Binary {
+                        op: NirBinaryOp::Eq,
+                        lhs: lhs.clone(),
+                        rhs: rhs.clone(),
+                    }),
+                _ => NirExpr::Binary {
+                    op: NirBinaryOp::Eq,
+                    lhs,
+                    rhs,
+                },
+            },
+            _ => NirExpr::Binary {
+                op: NirBinaryOp::Eq,
+                lhs,
+                rhs,
+            },
+        },
+        NirExpr::Binary {
+            op: NirBinaryOp::Ne,
+            lhs,
+            rhs,
+        } => match rhs.as_ref() {
+            NirExpr::Bool(false) => *lhs,
+            NirExpr::Bool(true) => match lhs.as_ref() {
+                NirExpr::Binary { op, lhs, rhs } => invert_compare(*op)
+                    .map(|inverted| NirExpr::Binary {
+                        op: inverted,
+                        lhs: lhs.clone(),
+                        rhs: rhs.clone(),
+                    })
+                    .unwrap_or(NirExpr::Binary {
+                        op: NirBinaryOp::Ne,
+                        lhs: lhs.clone(),
+                        rhs: rhs.clone(),
+                    }),
+                _ => NirExpr::Binary {
+                    op: NirBinaryOp::Ne,
+                    lhs,
+                    rhs,
+                },
+            },
+            _ => NirExpr::Binary {
+                op: NirBinaryOp::Ne,
+                lhs,
+                rhs,
+            },
+        },
+        other => other,
+    }
+}
+
 fn is_pure_helper_function(
     function: &NirFunction,
     function_map: &BTreeMap<&str, &NirFunction>,
@@ -105,15 +374,45 @@ fn is_pure_helper_function(
     if !visiting.insert(function.name.clone()) {
         return false;
     }
-    let result = !function.is_async
-        && matches!(
-            function.body.as_slice(),
-            [NirStmt::Return(Some(expr))]
-                if is_pure_helper_expr(expr, function_map, memo, visiting)
-        );
+    let result =
+        !function.is_async && is_pure_helper_block(&function.body, function_map, memo, visiting);
     visiting.remove(&function.name);
     memo.insert(function.name.clone(), result);
     result
+}
+
+fn is_pure_helper_block(
+    body: &[NirStmt],
+    function_map: &BTreeMap<&str, &NirFunction>,
+    memo: &mut BTreeMap<String, bool>,
+    visiting: &mut BTreeSet<String>,
+) -> bool {
+    let Some((first, tail)) = body.split_first() else {
+        return false;
+    };
+    match first {
+        NirStmt::Let { value, .. } | NirStmt::Const { value, .. } => {
+            is_pure_helper_expr(value, function_map, memo, visiting)
+                && is_pure_helper_block(tail, function_map, memo, visiting)
+        }
+        NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            is_pure_helper_expr(condition, function_map, memo, visiting)
+                && is_pure_helper_block(then_body, function_map, memo, visiting)
+                && if else_body.is_empty() {
+                    is_pure_helper_block(tail, function_map, memo, visiting)
+                } else {
+                    tail.is_empty() && is_pure_helper_block(else_body, function_map, memo, visiting)
+                }
+        }
+        NirStmt::Return(Some(expr)) => {
+            tail.is_empty() && is_pure_helper_expr(expr, function_map, memo, visiting)
+        }
+        _ => false,
+    }
 }
 
 fn is_pure_helper_expr(

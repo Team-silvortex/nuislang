@@ -867,8 +867,15 @@ fn literal_binding_value(value: &NirExpr) -> Option<NirExpr> {
 }
 
 fn prune_dead_scalar_bindings(stmts: &mut Vec<NirStmt>) -> bool {
+    prune_dead_scalar_bindings_with_live_after(stmts, &BTreeSet::new())
+}
+
+fn prune_dead_scalar_bindings_with_live_after(
+    stmts: &mut Vec<NirStmt>,
+    initial_live_after: &BTreeSet<String>,
+) -> bool {
     let mut changed = false;
-    let mut live_after = BTreeSet::new();
+    let mut live_after = initial_live_after.clone();
     let mut kept = Vec::with_capacity(stmts.len());
 
     for stmt in stmts.drain(..).rev() {
@@ -938,8 +945,8 @@ fn prune_stmt(
             mut else_body,
         } => {
             let mut changed = false;
-            changed |= prune_dead_scalar_bindings(&mut then_body);
-            changed |= prune_dead_scalar_bindings(&mut else_body);
+            changed |= prune_dead_scalar_bindings_with_live_after(&mut then_body, live_after);
+            changed |= prune_dead_scalar_bindings_with_live_after(&mut else_body, live_after);
 
             let then_live = live_before_block(&then_body, live_after);
             let else_live = live_before_block(&else_body, live_after);
@@ -1642,6 +1649,52 @@ mod tests {
         };
         assert!(matches!(then_body.first(), Some(NirStmt::Let { name, .. }) if name == "acc"));
         assert!(matches!(else_body.first(), Some(NirStmt::Let { name, .. }) if name == "acc"));
+    }
+
+    #[test]
+    fn preserves_if_branch_bindings_used_after_statement() {
+        let mut module = sample_module(vec![
+            NirStmt::Let {
+                name: "flag".to_owned(),
+                ty: None,
+                value: NirExpr::Var("input_flag".to_owned()),
+            },
+            NirStmt::If {
+                condition: NirExpr::Var("flag".to_owned()),
+                then_body: vec![NirStmt::Let {
+                    name: "overall_bonus".to_owned(),
+                    ty: None,
+                    value: NirExpr::Int(1),
+                }],
+                else_body: vec![NirStmt::Let {
+                    name: "overall_bonus".to_owned(),
+                    ty: None,
+                    value: NirExpr::Int(0),
+                }],
+            },
+            NirStmt::Return(Some(NirExpr::Var("overall_bonus".to_owned()))),
+        ]);
+        let _changed = simplify_nir_module(&mut module);
+        assert!(matches!(
+            module.functions[0].body.first(),
+            Some(NirStmt::Let { name, .. }) if name == "flag"
+        ));
+        let NirStmt::If {
+            then_body,
+            else_body,
+            ..
+        } = &module.functions[0].body[1]
+        else {
+            panic!("expected top-level if statement to remain in place");
+        };
+        assert!(matches!(
+            then_body.first(),
+            Some(NirStmt::Let { name, .. }) if name == "overall_bonus"
+        ));
+        assert!(matches!(
+            else_body.first(),
+            Some(NirStmt::Let { name, .. }) if name == "overall_bonus"
+        ));
     }
 
     #[test]

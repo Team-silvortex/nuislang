@@ -1244,6 +1244,11 @@ impl Parser {
     }
 
     fn parse_match_stmt(&mut self) -> Result<AstStmt, String> {
+        let (value, arms) = self.parse_match_expr_parts()?;
+        Ok(AstStmt::Match { value, arms })
+    }
+
+    fn parse_match_expr_parts(&mut self) -> Result<(AstExpr, Vec<AstMatchArm>), String> {
         self.expect_word("match")?;
         let value = self.parse_match_scrutinee_expr()?;
         self.expect_symbol('{')?;
@@ -1269,7 +1274,7 @@ impl Parser {
             }
         }
         self.expect_symbol('}')?;
-        Ok(AstStmt::Match { value, arms })
+        Ok((value, arms))
     }
 
     fn parse_match_scrutinee_expr(&mut self) -> Result<AstExpr, String> {
@@ -1525,6 +1530,28 @@ impl Parser {
                     params,
                     return_type,
                     body,
+                })
+            }
+            Some(Token::Word(word)) if word == "if" => {
+                let condition = self.parse_condition_expr()?;
+                let then_body = self.parse_block()?;
+                if !self.peek_word("else") {
+                    return Err("`if` expression currently requires `else`".to_owned());
+                }
+                self.expect_word("else")?;
+                let else_body = self.parse_block()?;
+                Ok(AstExpr::If {
+                    condition: Box::new(condition),
+                    then_body,
+                    else_body,
+                })
+            }
+            Some(Token::Word(word)) if word == "match" => {
+                self.cursor = self.cursor.saturating_sub(1);
+                let (value, arms) = self.parse_match_expr_parts()?;
+                Ok(AstExpr::Match {
+                    value: Box::new(value),
+                    arms,
                 })
             }
             Some(Token::Word(word)) if word == "instantiate" => {

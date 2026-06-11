@@ -1,0 +1,169 @@
+mod cpu Main {
+  extern "c" fn host_command_spawn(program_handle: i64, argv_handle: i64) -> i64;
+  extern "c" fn host_command_status(command_handle: i64) -> i64;
+  extern "c" fn host_command_wait(command_handle: i64) -> i64;
+  extern "c" fn host_command_wait_exit(command_handle: i64) -> i64;
+
+  struct CommandRequest {
+    program_handle: i64,
+    argv_handle: i64
+  }
+
+  struct CommandResult {
+    handle: i64,
+    status: i64,
+    wait_code: i64,
+    wait_exit: i64,
+    succeeded: bool
+  }
+
+  struct WorkflowStep {
+    name_handle: i64,
+    request: CommandRequest,
+    fail_fast: bool
+  }
+
+  struct WorkflowStepReport {
+    name_handle: i64,
+    result: CommandResult,
+    executed: bool
+  }
+
+  struct WorkflowReport {
+    first: WorkflowStepReport,
+    second: WorkflowStepReport,
+    first_failure_handle: i64,
+    overall_success: bool
+  }
+
+  fn build_command_request(program_handle: i64, argv_handle: i64) -> CommandRequest {
+    return CommandRequest {
+      program_handle: program_handle,
+      argv_handle: argv_handle
+    };
+  }
+
+  fn run_command(request: CommandRequest) -> CommandResult {
+    let handle: i64 = host_command_spawn(request.program_handle, request.argv_handle);
+    let wait_exit: i64 = host_command_wait_exit(handle);
+    return CommandResult {
+      handle: handle,
+      status: host_command_status(handle),
+      wait_code: host_command_wait(handle),
+      wait_exit: wait_exit,
+      succeeded: wait_exit == 0
+    };
+  }
+
+  fn build_workflow_step(
+    name_handle: i64,
+    program_handle: i64,
+    argv_handle: i64,
+    fail_fast: bool
+  ) -> WorkflowStep {
+    return WorkflowStep {
+      name_handle: name_handle,
+      request: build_command_request(program_handle, argv_handle),
+      fail_fast: fail_fast
+    };
+  }
+
+  fn run_workflow_step(step: WorkflowStep) -> WorkflowStepReport {
+    return WorkflowStepReport {
+      name_handle: step.name_handle,
+      result: run_command(step.request),
+      executed: true
+    };
+  }
+
+  fn skipped_workflow_step(step: WorkflowStep) -> WorkflowStepReport {
+    return WorkflowStepReport {
+      name_handle: step.name_handle,
+      result: CommandResult {
+        handle: 0,
+        status: 0,
+        wait_code: 0,
+        wait_exit: 1,
+        succeeded: false
+      },
+      executed: false
+    };
+  }
+
+  fn build_workflow_report(
+    first: WorkflowStepReport,
+    second: WorkflowStepReport
+  ) -> WorkflowReport {
+    if first.result.succeeded == false {
+      return WorkflowReport {
+        first: first,
+        second: second,
+        first_failure_handle: first.name_handle,
+        overall_success: false
+      };
+    }
+    if second.result.succeeded == false {
+      return WorkflowReport {
+        first: first,
+        second: second,
+        first_failure_handle: second.name_handle,
+        overall_success: false
+      };
+    }
+    return WorkflowReport {
+      first: first,
+      second: second,
+      first_failure_handle: 0,
+      overall_success: true
+    };
+  }
+
+  fn capture_workflow_runtime_project() -> WorkflowReport {
+    let first_step: WorkflowStep = build_workflow_step(3001, 401, 17, true);
+    let second_step: WorkflowStep = build_workflow_step(3002, 503, 29, false);
+    let first_report: WorkflowStepReport = run_workflow_step(first_step);
+
+    if first_step.fail_fast && first_report.result.succeeded == false {
+      return build_workflow_report(
+        first_report,
+        skipped_workflow_step(second_step)
+      );
+    }
+
+    return build_workflow_report(
+      first_report,
+      run_workflow_step(second_step)
+    );
+  }
+
+  fn main() -> i64 {
+    let report: WorkflowReport = capture_workflow_runtime_project();
+    let overall_bonus: i64 = if report.overall_success {
+      1
+    } else {
+      0
+    };
+    let first_executed_bonus: i64 = if report.first.executed {
+      1
+    } else {
+      0
+    };
+    let second_executed_bonus: i64 = if report.second.executed {
+      1
+    } else {
+      0
+    };
+    return report.first.result.handle
+      + report.first.result.status
+      + report.first.result.wait_code
+      + report.first.result.wait_exit
+      + report.second.result.handle
+      + report.second.result.status
+      + report.second.result.wait_code
+      + report.second.result.wait_exit
+      + report.first_failure_handle
+      + overall_bonus
+      + first_executed_bonus
+      + second_executed_bonus;
+  }
+}

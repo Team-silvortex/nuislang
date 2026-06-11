@@ -12,6 +12,18 @@ pub(super) enum PreparedTerminalBranch {
     PrintReturn { print: NirExpr, returned: NirExpr },
 }
 
+#[derive(Clone)]
+pub(super) struct InlineablePureHelper {
+    pub(super) params: Vec<String>,
+    pub(super) expr: NirExpr,
+}
+
+#[derive(Clone)]
+pub(super) struct PureHelperBlock {
+    pub(super) params: Vec<String>,
+    pub(super) body: Vec<NirStmt>,
+}
+
 pub(super) enum PreparedLoopBody {
     ExitOnly,
     PrintExit {

@@ -107,6 +107,135 @@ fn lowers_match_branching_while_into_loop_while_i64_cond_chain() {
 }
 
 #[test]
+fn lowers_chained_while_with_inlineable_pure_helper_wrapped_step_and_carry_into_loop_chain() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn step_value(value: i64) -> i64 {
+            let one: i64 = 1;
+            return value + one;
+          }
+
+          fn add_value(acc: i64, value: i64) -> i64 {
+            let delta: i64 = value;
+            return acc + delta;
+          }
+
+          fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            while value < 4 {
+              let value: i64 = step_value(value);
+              let acc: i64 = add_value(acc, value);
+            }
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_chain")
+        .expect("expected loop_while_i64_chain node");
+    assert_eq!(loop_node.op.args[4], "add");
+    assert_eq!(loop_node.op.args[6], "add_current");
+}
+
+#[test]
+fn lowers_chained_while_with_conditional_pure_helper_wrapped_carry_into_cond_chain() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn step_value(value: i64) -> i64 {
+            return value + 1;
+          }
+
+          fn update_acc(acc: i64, value: i64) -> i64 {
+            if value > 2 {
+              return acc + value;
+            } else {
+              return acc + 0;
+            }
+          }
+
+          fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            while value < 5 {
+              let value: i64 = step_value(value);
+              let acc: i64 = update_acc(acc, value);
+            }
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_cond_chain")
+        .expect("expected loop_while_i64_cond_chain node");
+    assert_eq!(loop_node.op.args[4], "add");
+    assert_eq!(loop_node.op.args[6], "current_gt");
+    assert_eq!(loop_node.op.args[8], "add_current");
+    assert_eq!(loop_node.op.args[9], "keep");
+}
+
+#[test]
+fn lowers_chained_while_with_prelude_conditional_pure_helper_wrapped_carry_into_cond_chain() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn step_value(value: i64) -> i64 {
+            return value + 1;
+          }
+
+          fn update_acc(acc: i64, value: i64) -> i64 {
+            let high: bool = value > 2;
+            if high == true {
+              return acc + value;
+            } else {
+              return acc + 0;
+            }
+          }
+
+          fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            while value < 5 {
+              let value: i64 = step_value(value);
+              let acc: i64 = update_acc(acc, value);
+            }
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_cond_chain")
+        .expect("expected loop_while_i64_cond_chain node");
+    assert_eq!(loop_node.op.args[4], "add");
+    assert_eq!(loop_node.op.args[6], "current_gt");
+    assert_eq!(loop_node.op.args[8], "add_current");
+    assert_eq!(loop_node.op.args[9], "keep");
+}
+
+#[test]
 fn lowers_multi_arm_match_inside_guarded_while_into_guard_return() {
     let mut module = parse_nuis_module(
         r#"

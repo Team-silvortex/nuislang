@@ -7,6 +7,24 @@ fn ast_expr_requires_match_hoist(expr: &AstExpr) -> bool {
         | AstExpr::MethodCall { .. }
         | AstExpr::Await(_)
         | AstExpr::Instantiate { .. } => true,
+        AstExpr::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            ast_expr_requires_match_hoist(condition)
+                || then_body.iter().any(ast_stmt_requires_match_hoist)
+                || else_body.iter().any(ast_stmt_requires_match_hoist)
+        }
+        AstExpr::Match { value, arms } => {
+            ast_expr_requires_match_hoist(value)
+                || arms.iter().any(|arm| {
+                    arm.guard
+                        .as_ref()
+                        .is_some_and(ast_expr_requires_match_hoist)
+                        || arm.body.iter().any(ast_stmt_requires_match_hoist)
+                })
+        }
         AstExpr::FieldAccess { base, .. } => ast_expr_requires_match_hoist(base),
         AstExpr::Binary { lhs, rhs, .. } => {
             ast_expr_requires_match_hoist(lhs) || ast_expr_requires_match_hoist(rhs)
@@ -19,6 +37,38 @@ fn ast_expr_requires_match_hoist(expr: &AstExpr) -> bool {
         | AstExpr::Int(_)
         | AstExpr::Var(_)
         | AstExpr::Lambda { .. } => false,
+    }
+}
+
+fn ast_stmt_requires_match_hoist(stmt: &AstStmt) -> bool {
+    match stmt {
+        AstStmt::Let { value, .. }
+        | AstStmt::Const { value, .. }
+        | AstStmt::Print(value)
+        | AstStmt::Await(value)
+        | AstStmt::Expr(value)
+        | AstStmt::Return(Some(value)) => ast_expr_requires_match_hoist(value),
+        AstStmt::DestructureLet { value, .. } => ast_expr_requires_match_hoist(value),
+        AstStmt::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            ast_expr_requires_match_hoist(condition)
+                || then_body.iter().any(ast_stmt_requires_match_hoist)
+                || else_body.iter().any(ast_stmt_requires_match_hoist)
+        }
+        AstStmt::Match { value, arms } => {
+            ast_expr_requires_match_hoist(value)
+                || arms
+                    .iter()
+                    .any(|arm| arm.body.iter().any(ast_stmt_requires_match_hoist))
+        }
+        AstStmt::While { condition, body } => {
+            ast_expr_requires_match_hoist(condition)
+                || body.iter().any(ast_stmt_requires_match_hoist)
+        }
+        AstStmt::Break | AstStmt::Continue | AstStmt::Return(None) => false,
     }
 }
 

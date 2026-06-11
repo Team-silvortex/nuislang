@@ -1,7 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{
-    AstBinaryOp, AstExpr, AstImplDef, AstStructDef, AstTypeRef, NirResultFamily, NirTypeRef,
+    AstBinaryOp, AstExpr, AstImplDef, AstStmt, AstStructDef, AstTypeRef, NirResultFamily,
+    NirTypeRef,
 };
 
 use super::super::lower_type_ref;
@@ -79,6 +80,52 @@ pub(crate) fn infer_ast_expr_type_inner(
         AstExpr::Text(_) => Some(ast_named_type("Text")),
         AstExpr::Int(_) => Some(ast_named_type("i64")),
         AstExpr::Var(name) => env.get(name).cloned(),
+        AstExpr::If {
+            condition: _,
+            then_body,
+            else_body,
+        } => {
+            let then_ty = infer_ast_block_result_type(
+                then_body,
+                env,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                active_exprs,
+            )?;
+            let else_ty = infer_ast_block_result_type(
+                else_body,
+                env,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                active_exprs,
+            )?;
+            if then_ty == else_ty {
+                Some(then_ty)
+            } else {
+                None
+            }
+        }
+        AstExpr::Match { value: _, arms } => {
+            let mut arm_ty = None;
+            for arm in arms {
+                let current = infer_ast_block_result_type(
+                    &arm.body,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                match &arm_ty {
+                    Some(existing) if *existing != current => return None,
+                    None => arm_ty = Some(current),
+                    _ => {}
+                }
+            }
+            arm_ty
+        }
         AstExpr::Lambda { .. } => None,
         AstExpr::Invoke { .. } => None,
         AstExpr::Await(value) => infer_ast_expr_type_inner(
@@ -477,6 +524,27 @@ pub(crate) fn infer_ast_expr_type_inner(
     };
     active_exprs.remove(&expr_key);
     inferred
+}
+
+fn infer_ast_block_result_type(
+    body: &[AstStmt],
+    env: &BTreeMap<String, AstTypeRef>,
+    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
+    struct_table: &BTreeMap<String, AstStructDef>,
+    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
+    active_exprs: &mut BTreeSet<usize>,
+) -> Option<AstTypeRef> {
+    match body.last() {
+        Some(AstStmt::Return(Some(expr))) => infer_ast_expr_type_inner(
+            expr,
+            env,
+            impl_lookup,
+            struct_table,
+            function_return_types,
+            active_exprs,
+        ),
+        _ => None,
+    }
 }
 
 fn infer_payload_constructor_ast_type(

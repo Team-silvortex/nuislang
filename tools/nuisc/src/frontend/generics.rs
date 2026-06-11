@@ -33,11 +33,8 @@ pub(crate) fn infer_generic_substitutions(
         .iter()
         .map(|param| param.name.clone())
         .collect::<BTreeSet<_>>();
-    let mut substitutions = explicit_generic_substitutions(
-        template,
-        explicit_generic_args,
-        visible_type_aliases,
-    )?;
+    let mut substitutions =
+        explicit_generic_substitutions(template, explicit_generic_args, visible_type_aliases)?;
     for (param, arg) in template.params.iter().zip(args) {
         let resolved_param_ty = resolve_ast_type_ref_aliases(&param.ty, visible_type_aliases)?;
         if !contains_unresolved_generic_placeholders(
@@ -115,8 +112,8 @@ pub(crate) fn infer_alias_aware_ast_expr_type(
     struct_table: &BTreeMap<String, AstStructDef>,
     function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
 ) -> Option<AstTypeRef> {
-    infer_ast_expr_type(expr, env, impl_lookup, struct_table, function_return_types).or_else(
-        || match expr {
+    infer_ast_expr_type(expr, env, impl_lookup, struct_table, function_return_types).or_else(|| {
+        match expr {
             AstExpr::FieldAccess { base, field } => {
                 let base_ty = infer_alias_aware_ast_expr_type(
                     base,
@@ -142,8 +139,8 @@ pub(crate) fn infer_alias_aware_ast_expr_type(
                     })
             }
             _ => None,
-        },
-    )
+        }
+    })
 }
 
 fn explicit_generic_substitutions(
@@ -180,7 +177,9 @@ fn contains_unresolved_generic_placeholders(
     generic_names: &BTreeSet<String>,
     substitutions: &BTreeMap<String, AstTypeRef>,
 ) -> bool {
-    if generic_names.contains(&ty.name) && ty.generic_args.is_empty() && !substitutions.contains_key(&ty.name)
+    if generic_names.contains(&ty.name)
+        && ty.generic_args.is_empty()
+        && !substitutions.contains_key(&ty.name)
     {
         return true;
     }
@@ -363,6 +362,32 @@ fn specialize_expr_types(
     substitutions: &BTreeMap<String, NirTypeRef>,
 ) -> Result<AstExpr, String> {
     Ok(match expr {
+        AstExpr::If {
+            condition,
+            then_body,
+            else_body,
+        } => AstExpr::If {
+            condition: Box::new(specialize_expr_types(condition, substitutions)?),
+            then_body: specialize_stmt_types(then_body, substitutions)?,
+            else_body: specialize_stmt_types(else_body, substitutions)?,
+        },
+        AstExpr::Match { value, arms } => AstExpr::Match {
+            value: Box::new(specialize_expr_types(value, substitutions)?),
+            arms: arms
+                .iter()
+                .map(|arm| {
+                    Ok(AstMatchArm {
+                        pattern: specialize_match_pattern(&arm.pattern, substitutions)?,
+                        guard: arm
+                            .guard
+                            .as_ref()
+                            .map(|guard| specialize_expr_types(guard, substitutions))
+                            .transpose()?,
+                        body: specialize_stmt_types(&arm.body, substitutions)?,
+                    })
+                })
+                .collect::<Result<Vec<_>, String>>()?,
+        },
         AstExpr::Await(value) => {
             AstExpr::Await(Box::new(specialize_expr_types(value, substitutions)?))
         }

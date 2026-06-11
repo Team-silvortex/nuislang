@@ -49,6 +49,93 @@ pub(super) fn validate_expr_generic_method_bounds(
 ) -> Result<(), String> {
     match expr {
         AstExpr::Bool(_) | AstExpr::Text(_) | AstExpr::Int(_) | AstExpr::Var(_) => {}
+        AstExpr::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            validate_expr_generic_method_bounds(
+                condition,
+                visible_type_aliases,
+                impl_lookup,
+                visible_structs,
+                function_return_types,
+                trait_methods,
+                generic_param_names,
+                generic_bounds,
+                local_type_env,
+                context,
+            )?;
+            let mut then_env = local_type_env.clone();
+            let mut else_env = local_type_env.clone();
+            validate_stmt_generic_method_bounds_block(
+                then_body,
+                visible_type_aliases,
+                impl_lookup,
+                visible_structs,
+                function_return_types,
+                trait_methods,
+                generic_param_names,
+                generic_bounds,
+                &mut then_env,
+                &format!("{context} if-then"),
+            )?;
+            validate_stmt_generic_method_bounds_block(
+                else_body,
+                visible_type_aliases,
+                impl_lookup,
+                visible_structs,
+                function_return_types,
+                trait_methods,
+                generic_param_names,
+                generic_bounds,
+                &mut else_env,
+                &format!("{context} if-else"),
+            )?;
+        }
+        AstExpr::Match { value, arms } => {
+            validate_expr_generic_method_bounds(
+                value,
+                visible_type_aliases,
+                impl_lookup,
+                visible_structs,
+                function_return_types,
+                trait_methods,
+                generic_param_names,
+                generic_bounds,
+                local_type_env,
+                context,
+            )?;
+            for arm in arms {
+                if let Some(guard) = &arm.guard {
+                    validate_expr_generic_method_bounds(
+                        guard,
+                        visible_type_aliases,
+                        impl_lookup,
+                        visible_structs,
+                        function_return_types,
+                        trait_methods,
+                        generic_param_names,
+                        generic_bounds,
+                        local_type_env,
+                        context,
+                    )?;
+                }
+                let mut arm_env = local_type_env.clone();
+                validate_stmt_generic_method_bounds_block(
+                    &arm.body,
+                    visible_type_aliases,
+                    impl_lookup,
+                    visible_structs,
+                    function_return_types,
+                    trait_methods,
+                    generic_param_names,
+                    generic_bounds,
+                    &mut arm_env,
+                    &format!("{context} match-arm"),
+                )?;
+            }
+        }
         AstExpr::Lambda {
             params,
             body,

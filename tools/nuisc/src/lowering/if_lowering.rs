@@ -7,6 +7,10 @@ pub(super) fn lower_if_pair(
     state: &mut LoweringState<'_>,
     bindings: &BTreeMap<String, String>,
 ) -> Result<LoweredIfOutcome, String> {
+    if then_body.is_empty() && else_body.is_empty() {
+        return Ok(LoweredIfOutcome::Continued);
+    }
+
     if then_body.len() != 1 || else_body.len() != 1 {
         if else_body.is_empty() {
             if let Some(then_branch) = prepare_terminal_branch(then_body, &state.pure_helpers) {

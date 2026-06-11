@@ -94,6 +94,18 @@ pub(super) fn lower_expr_with_async(
         AstExpr::Bool(value) => NirExpr::Bool(*value),
         AstExpr::Text(text) => NirExpr::Text(text.clone()),
         AstExpr::Int(value) => NirExpr::Int(*value),
+        AstExpr::If { .. } => {
+            return Err(
+                "`if` expression is currently only supported as the direct value of `let`, `const`, `print`, or `return`"
+                    .to_owned(),
+            )
+        }
+        AstExpr::Match { .. } => {
+            return Err(
+                "`match` expression is currently only supported as the direct value of `let`, `const`, `print`, or `return`"
+                    .to_owned(),
+            )
+        }
         AstExpr::Lambda { .. } => {
             return Err(
                 "internal frontend error: lambda expression should have been expanded before NIR lowering"

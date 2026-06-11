@@ -21,6 +21,8 @@ Start with:
 * [nuis-0.17.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-release-checklist.md)
 * [nuis-0.17.0-mainline-goals.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-mainline-goals.md)
 * [nuis-0.17.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-compile-workflow.md)
+* [nuis-0.17.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-mainline-regression-matrix.md)
+* [nuis-0.17.0-self-hosted-mainline-gate-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-self-hosted-mainline-gate-plan.md)
 * [nuis-0.17.0-generic-completion-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-generic-completion-plan.md)
 
 Those files are the shortest current “what is real enough to stand on” anchors
@@ -58,6 +60,13 @@ active push.
 
 The `0.17.0` compile workflow file is the current compiler-facing explanation
 of how the frontend/generic/higher-order/async pipeline actually composes.
+
+The `0.17.0` mainline regression matrix is the small execution map for which
+test families now defend that story.
+
+The `0.17.0` self-hosted mainline gate plan records the current answer to
+whether that gate can already be written in `nuis` itself, and what must be
+true before the answer becomes yes.
 
 The `0.17.0` generic completion plan is the first detailed execution map under
 that mainline and should be the default entry point for generic-track work.
