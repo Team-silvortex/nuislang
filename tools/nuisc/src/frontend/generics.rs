@@ -241,7 +241,7 @@ pub(crate) fn specialize_stmt_types(
                         .as_ref()
                         .map(|ty| specialize_ast_type_ref(ty, substitutions))
                         .transpose()?,
-                    value: value.clone(),
+                    value: specialize_expr_types(value, substitutions)?,
                 },
                 AstStmt::DestructureLet {
                     type_ref,
@@ -253,7 +253,7 @@ pub(crate) fn specialize_stmt_types(
                         .map(|type_ref| specialize_ast_type_ref(type_ref, substitutions))
                         .transpose()?,
                     fields: fields.clone(),
-                    value: value.clone(),
+                    value: specialize_expr_types(value, substitutions)?,
                 },
                 AstStmt::Const { name, ty, value } => AstStmt::Const {
                     name: name.clone(),
@@ -261,38 +261,152 @@ pub(crate) fn specialize_stmt_types(
                         .as_ref()
                         .map(|ty| specialize_ast_type_ref(ty, substitutions))
                         .transpose()?,
-                    value: value.clone(),
+                    value: specialize_expr_types(value, substitutions)?,
                 },
                 AstStmt::If {
                     condition,
                     then_body,
                     else_body,
                 } => AstStmt::If {
-                    condition: condition.clone(),
+                    condition: specialize_expr_types(condition, substitutions)?,
                     then_body: specialize_stmt_types(then_body, substitutions)?,
                     else_body: specialize_stmt_types(else_body, substitutions)?,
                 },
                 AstStmt::Match { value, arms } => AstStmt::Match {
-                    value: value.clone(),
+                    value: specialize_expr_types(value, substitutions)?,
                     arms: arms
                         .iter()
                         .map(|arm| {
                             Ok(AstMatchArm {
                                 pattern: specialize_match_pattern(&arm.pattern, substitutions)?,
-                                guard: arm.guard.clone(),
+                                guard: arm
+                                    .guard
+                                    .as_ref()
+                                    .map(|guard| specialize_expr_types(guard, substitutions))
+                                    .transpose()?,
                                 body: specialize_stmt_types(&arm.body, substitutions)?,
                             })
                         })
                         .collect::<Result<Vec<_>, String>>()?,
                 },
                 AstStmt::While { condition, body } => AstStmt::While {
-                    condition: condition.clone(),
+                    condition: specialize_expr_types(condition, substitutions)?,
                     body: specialize_stmt_types(body, substitutions)?,
                 },
-                other => other.clone(),
+                AstStmt::Print(value) => {
+                    AstStmt::Print(specialize_expr_types(value, substitutions)?)
+                }
+                AstStmt::Await(value) => {
+                    AstStmt::Await(specialize_expr_types(value, substitutions)?)
+                }
+                AstStmt::Expr(value) => AstStmt::Expr(specialize_expr_types(value, substitutions)?),
+                AstStmt::Return(value) => AstStmt::Return(
+                    value
+                        .as_ref()
+                        .map(|value| specialize_expr_types(value, substitutions))
+                        .transpose()?,
+                ),
+                AstStmt::Break => AstStmt::Break,
+                AstStmt::Continue => AstStmt::Continue,
             })
         })
         .collect()
+}
+
+fn specialize_expr_types(
+    expr: &AstExpr,
+    substitutions: &BTreeMap<String, NirTypeRef>,
+) -> Result<AstExpr, String> {
+    Ok(match expr {
+        AstExpr::Await(value) => {
+            AstExpr::Await(Box::new(specialize_expr_types(value, substitutions)?))
+        }
+        AstExpr::Instantiate { domain, unit } => AstExpr::Instantiate {
+            domain: domain.clone(),
+            unit: unit.clone(),
+        },
+        AstExpr::Call {
+            callee,
+            generic_args,
+            args,
+        } => AstExpr::Call {
+            callee: callee.clone(),
+            generic_args: generic_args
+                .iter()
+                .map(|arg| specialize_ast_type_ref(arg, substitutions))
+                .collect::<Result<Vec<_>, _>>()?,
+            args: args
+                .iter()
+                .map(|arg| specialize_expr_types(arg, substitutions))
+                .collect::<Result<Vec<_>, _>>()?,
+        },
+        AstExpr::Invoke { callee, args } => AstExpr::Invoke {
+            callee: Box::new(specialize_expr_types(callee, substitutions)?),
+            args: args
+                .iter()
+                .map(|arg| specialize_expr_types(arg, substitutions))
+                .collect::<Result<Vec<_>, _>>()?,
+        },
+        AstExpr::MethodCall {
+            receiver,
+            method,
+            args,
+        } => AstExpr::MethodCall {
+            receiver: Box::new(specialize_expr_types(receiver, substitutions)?),
+            method: method.clone(),
+            args: args
+                .iter()
+                .map(|arg| specialize_expr_types(arg, substitutions))
+                .collect::<Result<Vec<_>, _>>()?,
+        },
+        AstExpr::StructLiteral {
+            type_name,
+            type_args,
+            fields,
+        } => AstExpr::StructLiteral {
+            type_name: type_name.clone(),
+            type_args: type_args
+                .iter()
+                .map(|arg| specialize_ast_type_ref(arg, substitutions))
+                .collect::<Result<Vec<_>, _>>()?,
+            fields: fields
+                .iter()
+                .map(|(field, value)| {
+                    Ok((field.clone(), specialize_expr_types(value, substitutions)?))
+                })
+                .collect::<Result<Vec<_>, String>>()?,
+        },
+        AstExpr::FieldAccess { base, field } => AstExpr::FieldAccess {
+            base: Box::new(specialize_expr_types(base, substitutions)?),
+            field: field.clone(),
+        },
+        AstExpr::Binary { op, lhs, rhs } => AstExpr::Binary {
+            op: *op,
+            lhs: Box::new(specialize_expr_types(lhs, substitutions)?),
+            rhs: Box::new(specialize_expr_types(rhs, substitutions)?),
+        },
+        AstExpr::Lambda {
+            params,
+            return_type,
+            body,
+        } => AstExpr::Lambda {
+            params: params
+                .iter()
+                .map(|param| {
+                    Ok(AstParam {
+                        name: param.name.clone(),
+                        ty: specialize_ast_type_ref(&param.ty, substitutions)?,
+                    })
+                })
+                .collect::<Result<Vec<_>, String>>()?,
+            return_type: return_type
+                .as_ref()
+                .map(|ty| specialize_ast_type_ref(ty, substitutions))
+                .transpose()?,
+            body: specialize_stmt_types(body, substitutions)?,
+        },
+        other => other.clone(),
+    })
 }
 
 pub(crate) fn specialize_ast_type_ref(

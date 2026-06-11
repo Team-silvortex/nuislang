@@ -730,6 +730,15 @@ pub(super) fn call_arg_expected_type(
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
     struct_table: &BTreeMap<String, AstStructDef>,
 ) -> Option<AstTypeRef> {
+    if let Some(from_explicit_generics) = generic_template_arg_expected_type_from_explicit_args(
+        callee,
+        generic_args,
+        index,
+        generic_templates,
+        visible_type_aliases,
+    ) {
+        return Some(from_explicit_generics);
+    }
     if let Some(from_template_expected) = generic_template_arg_expected_type_from_return(
         callee,
         index,
@@ -767,6 +776,35 @@ pub(super) fn call_arg_expected_type(
         visible_type_aliases,
         struct_table,
     )
+}
+
+fn generic_template_arg_expected_type_from_explicit_args(
+    callee: &str,
+    generic_args: &[AstTypeRef],
+    index: usize,
+    generic_templates: &BTreeMap<String, AstFunction>,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+) -> Option<AstTypeRef> {
+    if generic_args.is_empty() {
+        return None;
+    }
+    let template = generic_templates.get(callee)?;
+    if generic_args.len() != template.generic_params.len() {
+        return None;
+    }
+    let param = template.params.get(index)?;
+    let substitutions = template
+        .generic_params
+        .iter()
+        .zip(generic_args.iter())
+        .map(|(generic, arg)| {
+            Some((
+                generic.name.clone(),
+                lower_type_ref(&resolve_ast_type_ref_aliases(arg, visible_type_aliases).ok()?),
+            ))
+        })
+        .collect::<Option<BTreeMap<_, _>>>()?;
+    specialize_ast_type_ref(&param.ty, &substitutions).ok()
 }
 
 fn generic_template_arg_expected_type_from_return(

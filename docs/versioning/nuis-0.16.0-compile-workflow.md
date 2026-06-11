@@ -30,6 +30,7 @@ That means the current workflow is backed by three distinct validation layers:
 * frontend crossover probes:
   generic expected-type propagation, alias-aware struct/payload inference,
   async/task `spawn` / `join` / `join_result`, higher-order specialization,
+  expression-level generic specialization through helper call chains,
   and `if` / `match` control-flow routes
 * real project compile harnesses:
   checked-in `examples/projects/...` compile through the actual project
@@ -44,6 +45,13 @@ There is now a fourth practical truth worth saying out loud:
   executable counted/carry/flow/post-flow `while` lowering is no longer limited
   to straight-line branch shells; nested control predicates from lowered `if`
   and `match` routes now participate in the checked-in loop node families too
+
+And there is now a fifth one that matters for the project-facing generic story:
+
+* generic helper + higher-order bridge closure:
+  explicit generic helper chains no longer stop at frontend-only probes;
+  they now survive lambda lifting, higher-order specialization, async/task
+  routes, and checked-in real project compile harnesses too
 
 Use this as the current rule of thumb:
 
@@ -203,6 +211,11 @@ For generic-heavy routes, the best current anchors are:
 
 * [nuis-0.16.0-generic-surface-audit.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-surface-audit.md)
 * [nuis-0.16.0-generic-constraint-coverage.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-constraint-coverage.md)
+
+For real project generic/higher-order bridge routes, the best current anchor is:
+
+* `examples/projects/domains/net_http_session_loop_bridge_recipe_demo`
+  through [network_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/network_compile.rs)
 
 ## Project Triage Workflow
 

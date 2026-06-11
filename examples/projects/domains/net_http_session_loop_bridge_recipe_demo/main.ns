@@ -63,6 +63,7 @@ mod cpu Main {
   type NetSessionBridgeCell = NetBridgeCell<NetSessionBridge>;
   type NetSessionBridgePacket = NetBridgePacket<NetSessionBridgeCell>;
   type NetSessionBridgeEnvelope = NetBridgeEnvelope<NetSessionBridgePacket>;
+  type NetBridgePacketEnvelopeMapper<T> = Fn2<T, i64, NetBridgeEnvelope<NetBridgePacket<T>>>;
 
   async fn consume_network_result(result: NetworkResult<i64>) -> i64 {
     if network_send_ready(result) {
@@ -97,6 +98,14 @@ mod cpu Main {
       packet: packet,
       envelope_value: envelope_value
     };
+  }
+
+  fn apply_bridge_packetized<T>(
+    payload: T,
+    packet_value: i64,
+    mapper: NetBridgePacketEnvelopeMapper<T>
+  ) -> NetBridgeEnvelope<NetBridgePacket<T>> {
+    return mapper(payload, packet_value);
   }
 
   fn capture_net_http_client_session_summary() -> NetHttpSession {
@@ -266,10 +275,28 @@ mod cpu Main {
 
   fn capture_net_session_loop_bridge_summary() -> NetSessionBridgeEnvelope {
     let packet: NetSessionBridgePacket = capture_net_session_loop_bridge_packet();
-    return wrap_bridge_envelope<NetSessionBridgePacket>(
-      packet,
-      packet.packet_value + packet.payload.value.http_session.value.status_code
+    let payload: NetSessionBridgeCell = packet.payload;
+    let packet_value: i64 = packet.packet_value;
+    let summary: NetSessionBridgeEnvelope = apply_bridge_packetized(
+      payload,
+      packet_value,
+      |payload: NetSessionBridgeCell, packet_value: i64| -> NetSessionBridgeEnvelope {
+        let packet: NetSessionBridgePacket =
+          wrap_bridge_packet<NetSessionBridgeCell>(payload, packet_value);
+        if packet.packet_value > packet.payload.value.selected_value {
+          return wrap_bridge_envelope<NetSessionBridgePacket>(
+            packet,
+            packet.packet_value + packet.payload.value.http_session.value.status_code
+          );
+        }
+        return wrap_bridge_envelope<NetSessionBridgePacket>(
+          packet,
+          packet.payload.value.loop_window.value.post_flow_value
+            + packet.payload.value.http_session.value.status_code
+        );
+      }
     );
+    return summary;
   }
 
   fn summarize_net_http_session_loop_bridge_recipe() -> i64 {

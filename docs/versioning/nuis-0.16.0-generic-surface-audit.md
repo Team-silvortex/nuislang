@@ -154,6 +154,18 @@ Primary tests:
 * `closed`:
   higher-order scrutinee control flow over std-net-shaped summary/session tasks with hoisted `match` input
   `match apply(mode, |x| x + 1) { 2 => return SessionSummary { summary: join(summary_task), ... }, _ => ... }`
+* `closed`:
+  explicit generic helper chains through async/task bridge summaries in real project compile harnesses
+  `wrap_bridge_packet<...>(...)`, `wrap_bridge_envelope<...>(...)`,
+  and higher-order `apply_bridge_packetized(...)` inside
+  `net_http_session_loop_bridge_recipe_demo`
+* `closed`:
+  generic function body internal explicit helper self-use through outer specialization
+  `produce_packetized<T>(...)` and `choose_packetized<T>(...)`
+  shaping `Envelope<Packet<Cell<i64>>>`
+* `closed`:
+  higher-order generic mapper route where lambda-lifted bodies keep explicit generic helper chains
+  `apply_packetized(seed, |x| { wrap_packet<...>(...); wrap_envelope<...>(...); })`
 
 Primary tests:
 
@@ -177,6 +189,8 @@ Current practical closure for the `std net`-shaped generic/task/session route:
   nested `while -> match` reconstruction with `spawn` / `join`
 * `closed`:
   higher-order scrutinee hoisting feeding nested control-flow reconstruction
+* `closed`:
+  higher-order bridge assembly feeding real project compile routes with lambda-lifted explicit helper chains
 
 Practical reading rule:
 
@@ -227,10 +241,18 @@ Practical reading rule:
 * `closed`:
   async-awaited zero-arg generic flowing through inferred alias payload constructor into higher-order specialization
   `apply_payload(JustAlias(await typed_zero()), |x| ...)`
+* `closed`:
+  generic higher-order mapper route with explicit helper chains inside lambda-lifted bodies
+  `apply_packetized(seed, |x| -> Envelope<Packet<Cell<i64>>> { ... })`
+* `closed`:
+  real project higher-order bridge route through generic helper assembly
+  `apply_bridge_packetized(payload, packet_value, |payload, packet_value| -> NetBridgeEnvelope<...> { ... })`
 
 Primary tests:
 
 * [tests_higher_order.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_higher_order.rs)
+* [tests_generics.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generics.rs)
+* [network_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/network_compile.rs)
 
 ## Pattern And Binding Matrix
 

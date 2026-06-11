@@ -17,6 +17,9 @@ Start with:
 * [nuis-0.16.0-generic-constraint-coverage.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-constraint-coverage.md)
 * [nuis-0.16.0-generic-constraint-gaps.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-constraint-gaps.md)
 * [nuis-0.16.0-generic-surface-audit.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-surface-audit.md)
+* [nuis-0.17.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-snapshot.md)
+* [nuis-0.17.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-release-checklist.md)
+* [nuis-0.17.0-mainline-goals.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-mainline-goals.md)
 
 Those files are the shortest current “what is real enough to stand on” anchors
 for the active version lines.
@@ -41,6 +44,15 @@ what still looks worth tightening after that coverage map.
 The `0.16.0` generic-surface audit file is the compiler-facing closure matrix
 for which generic constructor / specialization / pattern / method-bound
 crossovers already have test-backed coverage.
+
+The `0.17.0` snapshot is the next minor-line history anchor and marks the move
+from compile-workflow cleanup toward broader completion/integration work.
+
+The `0.17.0` release checklist is the operational reminder that the next line
+should prove cross-layer integration, not only accumulate more local features.
+
+The `0.17.0` mainline goals file is the short working map for the current
+active push.
 
 ## Expected Broader Scope Later
 

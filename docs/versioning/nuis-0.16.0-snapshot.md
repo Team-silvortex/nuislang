@@ -52,6 +52,9 @@ The most important current truths for `0.16.0` are:
   - shorthand `match`
   - nested shorthand
   - alias-aware generic struct patterns
+  - expression-level generic specialization across nested helper calls
+  - explicit generic helper self-use inside monomorphized generic bodies
+  - higher-order generic helper chains that survive lambda lifting
 * generic constraint validation and generic method-bound diagnostics now behave
   like real user-facing compiler surfaces, including:
   - alias-chain validation
@@ -65,6 +68,8 @@ The most important current truths for `0.16.0` are:
   - `if`, `match`, and `while` all carry alias-heavy summary/session reconstruction
   - nested `while -> match` routes now hold
   - higher-order scrutinee hoisting now composes with those control-flow routes
+  - explicit generic helper chains now survive async `if` / `match` crossover
+    paths instead of only trivial direct-call routes
 * async/task ownership rules are much tighter:
   - `join(...)`
   - `join_result(...)`
@@ -83,6 +88,8 @@ The most important current truths for `0.16.0` are:
   - service/session packet recipes
   - exchange contract demos
   - request/response line-block demos
+  - higher-order session/packet bridge assembly in a real project compile
+    harness
 
 ## What Is Still Intentionally Narrow
 
@@ -93,6 +100,9 @@ The most important current truths for `0.16.0` are:
 * generic payload constructors are much better, including direct and
   transparent-alias single-field inference, but they still stop short of full
   unconstrained inference across arbitrary constructor/alias shapes.
+* generic specialization is now much more believable at expression depth, but
+  full unconstrained inference across arbitrary field-access-driven higher-order
+  call sites is still intentionally narrower than a final HM-style system.
 * async/task verification is much stronger, but the runtime story is still
   narrower than the compile story.
 * network compile truth is ahead of network runtime truth:
@@ -111,9 +121,10 @@ For `0.16.0`, the shortest practical route is:
 3. [nuis-0.16.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-compile-workflow.md)
 4. [nuis-0.16.0-binary-compile-maturity.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-binary-compile-maturity.md)
 5. [nuis-0.16.0-generic-constraint-coverage.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-constraint-coverage.md)
-6. [docs/reference/README.md](/Users/Shared/chroot/dev/nuislang/docs/reference/README.md)
-7. [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
-8. [stdlib/std/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
+6. [nuis-0.16.0-generic-surface-audit.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.16.0-generic-surface-audit.md)
+7. [docs/reference/README.md](/Users/Shared/chroot/dev/nuislang/docs/reference/README.md)
+8. [examples/projects/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/README.md)
+9. [stdlib/std/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
 
 ## `0.16.0` Focus Areas
 
@@ -124,13 +135,31 @@ If you want the shortest thematic picture of this line:
 * binary maturity:
   `frontend -> project plan -> YIR verify -> AOT -> manifest -> release-check`
 * generics:
-  `practical generic structs + stronger alias-aware validation`
+  `practical generic structs + stronger alias-aware validation + helper/lambda specialization that now reaches real project compile truth`
 * async truth:
   `task ownership tightened enough to treat async verification as real compiler truth`
 * protocol groundwork:
   `task + memory + packet/session shapes that higher network/http layers can stand on`
 * network truth:
   `compile ladders are real; runtime must still be probed honestly per host`
+
+## Concrete Anchor Cases
+
+If you need the shortest "show me the real thing" anchors for this snapshot,
+start with these:
+
+* frontend crossover probe:
+  [tests_generics.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/tests_generics.rs)
+  proves explicit generic helper chains, control-flow specialization, and
+  higher-order mapper/lambda routes together.
+* real project compile anchor:
+  [net_http_session_loop_bridge_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_session_loop_bridge_recipe_demo)
+  carries generic bridge cell/packet/envelope assembly through helper calls,
+  lambda lifting, async/session summary shaping, and project compilation.
+* compile-harness truth:
+  [network_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/network_compile.rs)
+  checks that the real project route monomorphizes into the expected bridge
+  shapes, including `__hof_...` and lifted `__lambda_...` functions.
 
 ## Recommended Practical Commands
 

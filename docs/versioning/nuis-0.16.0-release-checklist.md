@@ -37,6 +37,8 @@ looks like the `0.16.0` line it claims to describe.
   `tests_generics`, `tests_higher_order`, and the closest generic diagnostic probes
 * [ ] real project compile harnesses still pass:
   especially `network_compile` and `task_compile`
+* [ ] generic helper / higher-order bridge crossover still passes in both layers:
+  frontend probes and real project compile harnesses
 * [ ] spot-check `nuis help`
 * [ ] spot-check `nuis project-status <project-dir>`
 * [ ] spot-check `nuis project-doctor <project-dir>`
@@ -70,9 +72,17 @@ looks like the `0.16.0` line it claims to describe.
   still match the checked-in tests
 * [ ] std-net-shaped generic async/task/session routes:
   facade-shaped and demo-shaped summary/session flows still match the checked-in tests
+* [ ] generic helper bridge routes:
+  explicit helper chains, expression-level specialization, and generic-body self-use
+  still match the checked-in tests
+* [ ] higher-order generic helper bridge routes:
+  lambda-lifted / `Fn1` / `Fn2` helper assembly still matches the checked-in tests
 * [ ] real network project compile entrypoints:
   `net_http_client_exchange_recipe_demo` and `net_session_recipe_demo`
   still compile through `compile_project(...)`
+* [ ] real network higher-order bridge entrypoint:
+  `net_http_session_loop_bridge_recipe_demo` still compiles through `compile_project(...)`
+  and still emits `__hof_...` / `__lambda_...` bridge helpers in compile harness checks
 * [ ] loop-family lowering matrix:
   counted / carry / flow / post-flow subsets still match the checked-in docs
 * [ ] nested loop control lowering:

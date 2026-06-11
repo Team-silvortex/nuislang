@@ -544,6 +544,14 @@ fn lowers_net_http_session_loop_bridge_recipe_project_with_expected_bridge_shape
     assert!(artifacts.nir.functions.iter().any(|function| {
         function.name.starts_with("wrap_bridge_envelope__") && function.generic_params.is_empty()
     }));
+    assert!(artifacts.nir.functions.iter().any(|function| {
+        function.name.starts_with("__hof_apply_bridge_packetized")
+            && function.generic_params.is_empty()
+    }));
+    assert!(artifacts.nir.functions.iter().any(|function| {
+        function.name.starts_with("__lambda_capture_net_session_loop_bridge_summary_")
+            && function.generic_params.is_empty()
+    }));
 
     let summarize = artifacts
         .nir
