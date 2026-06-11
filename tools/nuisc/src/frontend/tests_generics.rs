@@ -125,6 +125,313 @@ fn monomorphizes_generic_function_call_into_concrete_nir_function() {
 }
 
 #[test]
+fn monomorphizes_zero_arg_generic_call_used_as_method_receiver() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          fn typed_zero<T: Addable>() -> T {
+            return 0;
+          }
+
+          fn main() -> i64 {
+            return typed_zero().add(1);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Call { callee, args })))
+            if callee == "impl.Addable.for.i64.add"
+                && matches!(
+                    args.as_slice(),
+                    [NirExpr::Call { callee: receiver_callee, args: receiver_args }, NirExpr::Int(1)]
+                        if receiver_callee == "typed_zero__i64" && receiver_args.is_empty()
+                )
+    ));
+}
+
+#[test]
+fn monomorphizes_branch_local_payload_reconstruction_before_generic_call() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type JustAlias<T> = Just<T>;
+
+          struct Just<T> {
+            value: T,
+          }
+
+          fn typed_zero<T>() -> T {
+            return 0;
+          }
+
+          fn takes_payload<T>(value: JustAlias<T>) -> T {
+            return value.value;
+          }
+
+          fn choose(flag: bool) -> i64 {
+            if flag {
+              let payload = JustAlias(typed_zero());
+              return takes_payload(payload);
+            }
+            let payload = JustAlias(typed_zero());
+            return takes_payload(payload);
+          }
+
+          fn main() -> i64 {
+            return choose(true);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let choose = module
+        .functions
+        .iter()
+        .find(|function| function.name == "choose")
+        .unwrap();
+    assert!(matches!(
+        choose.body.first(),
+        Some(NirStmt::If { then_body, else_body, .. })
+            if matches!(
+                then_body.as_slice(),
+                [
+                    NirStmt::Let {
+                        name,
+                        ty: Some(ty),
+                        value: NirExpr::StructLiteral { type_name, type_args, .. },
+                    },
+                    NirStmt::Return(Some(NirExpr::Call { callee, .. }))
+                ] if name == "payload"
+                    && ty.render() == "Just<i64>"
+                    && type_name == "Just"
+                    && matches!(type_args.as_slice(), [arg] if arg.render() == "i64")
+                    && callee == "takes_payload__i64"
+            )
+                && else_body.is_empty()
+    ));
+    assert!(matches!(
+        choose.body.get(1),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::StructLiteral { type_name, type_args, .. },
+        }) if name == "payload"
+            && ty.render() == "Just<i64>"
+            && type_name == "Just"
+            && matches!(type_args.as_slice(), [arg] if arg.render() == "i64")
+    ));
+    assert!(matches!(
+        choose.body.get(2),
+        Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
+            if callee == "takes_payload__i64"
+    ));
+}
+
+#[test]
+fn monomorphizes_branch_local_payload_reconstruction_through_forwarded_local() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type JustAlias<T> = Just<T>;
+
+          struct Just<T> {
+            value: T,
+          }
+
+          fn typed_zero<T>() -> T {
+            return 0;
+          }
+
+          fn takes_payload<T>(value: JustAlias<T>) -> T {
+            return value.value;
+          }
+
+          fn choose(flag: bool) -> i64 {
+            if flag {
+              let payload = JustAlias(typed_zero());
+              let selected = payload;
+              return takes_payload(selected);
+            }
+            let payload = JustAlias(typed_zero());
+            let selected = payload;
+            return takes_payload(selected);
+          }
+
+          fn main() -> i64 {
+            return choose(true);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let choose = module
+        .functions
+        .iter()
+        .find(|function| function.name == "choose")
+        .unwrap();
+    assert!(matches!(
+        choose.body.first(),
+        Some(NirStmt::If { then_body, else_body, .. })
+            if matches!(
+                then_body.as_slice(),
+                [
+                    NirStmt::Let {
+                        name: payload_name,
+                        ty: Some(payload_ty),
+                        value: NirExpr::StructLiteral { type_name, type_args, .. },
+                    },
+                    NirStmt::Let {
+                        name: selected_name,
+                        ty: Some(selected_ty),
+                        value: NirExpr::Var(source_name),
+                    },
+                    NirStmt::Return(Some(NirExpr::Call { callee, .. }))
+                ] if payload_name == "payload"
+                    && payload_ty.render() == "Just<i64>"
+                    && type_name == "Just"
+                    && matches!(type_args.as_slice(), [arg] if arg.render() == "i64")
+                    && selected_name == "selected"
+                    && selected_ty.render() == "Just<i64>"
+                    && source_name == "payload"
+                    && callee == "takes_payload__i64"
+            )
+                && else_body.is_empty()
+    ));
+    assert!(matches!(
+        choose.body.get(1),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::StructLiteral { type_name, type_args, .. },
+        }) if name == "payload"
+            && ty.render() == "Just<i64>"
+            && type_name == "Just"
+            && matches!(type_args.as_slice(), [arg] if arg.render() == "i64")
+    ));
+    assert!(matches!(
+        choose.body.get(2),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::Var(source),
+        }) if name == "selected" && ty.render() == "Just<i64>" && source == "payload"
+    ));
+    assert!(matches!(
+        choose.body.get(3),
+        Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
+            if callee == "takes_payload__i64"
+    ));
+}
+
+#[test]
+fn monomorphizes_branch_local_payload_reconstruction_through_forwarded_helper_call() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type JustAlias<T> = Just<T>;
+
+          struct Just<T> {
+            value: T,
+          }
+
+          fn typed_zero<T>() -> T {
+            return 0;
+          }
+
+          fn forward<T>(value: JustAlias<T>) -> JustAlias<T> {
+            return value;
+          }
+
+          fn takes_payload<T>(value: JustAlias<T>) -> T {
+            return value.value;
+          }
+
+          fn choose(flag: bool) -> i64 {
+            if flag {
+              let payload = JustAlias(typed_zero());
+              let selected = payload;
+              let echoed = forward(selected);
+              return takes_payload(echoed);
+            }
+            let payload = JustAlias(typed_zero());
+            let selected = payload;
+            let echoed = forward(selected);
+            return takes_payload(echoed);
+          }
+
+          fn main() -> i64 {
+            return choose(true);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let choose = module
+        .functions
+        .iter()
+        .find(|function| function.name == "choose")
+        .unwrap();
+    assert!(matches!(
+        choose.body.first(),
+        Some(NirStmt::If { then_body, else_body, .. })
+            if matches!(
+                then_body.as_slice(),
+                [
+                    NirStmt::Let {
+                        name: payload_name,
+                        ty: Some(payload_ty),
+                        value: NirExpr::StructLiteral { type_name, type_args, .. },
+                    },
+                    NirStmt::Let {
+                        name: selected_name,
+                        ty: Some(selected_ty),
+                        value: NirExpr::Var(source_name),
+                    },
+                    NirStmt::Let {
+                        name: echoed_name,
+                        ty: Some(echoed_ty),
+                        value: NirExpr::Call { callee: echoed_callee, .. },
+                    },
+                    NirStmt::Return(Some(NirExpr::Call { callee, .. }))
+                ] if payload_name == "payload"
+                    && payload_ty.render() == "Just<i64>"
+                    && type_name == "Just"
+                    && matches!(type_args.as_slice(), [arg] if arg.render() == "i64")
+                    && selected_name == "selected"
+                    && selected_ty.render() == "Just<i64>"
+                    && source_name == "payload"
+                    && echoed_name == "echoed"
+                    && echoed_ty.render() == "Just<i64>"
+                    && echoed_callee == "forward__i64"
+                    && callee == "takes_payload__i64"
+            )
+                && else_body.is_empty()
+    ));
+}
+
+#[test]
 fn monomorphizes_explicit_zero_arg_generic_function_call_into_concrete_nir_function() {
     let module = parse_nuis_module(
         r#"
@@ -3756,6 +4063,112 @@ fn monomorphizes_higher_order_generic_mapper_with_explicit_helper_chain() {
         lambda.return_type.as_ref().map(|ty| ty.render()),
         Some(rendered) if rendered == "Envelope<Packet<Cell<i64>>>"
     ));
+    assert!(stmt_tree_contains_call(&lambda.body, &|callee, _| {
+        callee.starts_with("wrap_packet__")
+    }));
+    assert!(stmt_tree_contains_call(&lambda.body, &|callee, _| {
+        callee.starts_with("wrap_envelope__")
+    }));
+}
+
+#[test]
+fn monomorphizes_higher_order_generic_mapper_from_field_access_arguments_without_typed_locals() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type CellAlias<T> = Cell<T>;
+          type PacketAlias<T> = Packet<T>;
+          type EnvelopeAlias<T> = Envelope<T>;
+
+          struct Cell<T> {
+            value: T,
+          }
+
+          struct Packet<T> {
+            payload: T,
+            tag: i64,
+          }
+
+          struct Envelope<T> {
+            packet: T,
+            ready: bool,
+          }
+
+          fn wrap_cell<T>(value: T) -> CellAlias<T> {
+            return CellAlias { value: value };
+          }
+
+          fn wrap_packet<T>(payload: T, tag: i64) -> PacketAlias<T> {
+            return PacketAlias {
+              payload: payload,
+              tag: tag,
+            };
+          }
+
+          fn wrap_envelope<T>(packet: T, ready: bool) -> EnvelopeAlias<T> {
+            return EnvelopeAlias {
+              packet: packet,
+              ready: ready,
+            };
+          }
+
+          fn apply_packetized<T>(
+            payload: T,
+            tag: i64,
+            mapper: Fn2<T, i64, EnvelopeAlias<PacketAlias<T>>>
+          ) -> EnvelopeAlias<PacketAlias<T>> {
+            return mapper(payload, tag);
+          }
+
+          fn main() -> i64 {
+            let packet: PacketAlias<CellAlias<i64>> =
+              wrap_packet<CellAlias<i64>>(wrap_cell<i64>(7), 9);
+            let selected: EnvelopeAlias<PacketAlias<CellAlias<i64>>> =
+              apply_packetized(
+                packet.payload,
+                packet.tag,
+                |payload: CellAlias<i64>, tag: i64| -> EnvelopeAlias<PacketAlias<CellAlias<i64>>> {
+                  if tag > 0 {
+                    return wrap_envelope<PacketAlias<CellAlias<i64>>>(
+                      wrap_packet<CellAlias<i64>>(payload, tag),
+                      true
+                    );
+                  }
+                  return wrap_envelope<PacketAlias<CellAlias<i64>>>(
+                    wrap_packet<CellAlias<i64>>(payload, 0),
+                    false
+                  );
+                }
+              );
+            return selected.packet.payload.value + selected.packet.tag;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.get(1),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::Call { callee, .. },
+        }) if name == "selected"
+            && ty.render() == "Envelope<Packet<Cell<i64>>>"
+            && callee.starts_with("__hof_apply_packetized")
+    ));
+
+    let lambda = module
+        .functions
+        .iter()
+        .find(|function| function.name.starts_with("__lambda_main_"))
+        .unwrap();
+    assert!(lambda.generic_params.is_empty());
     assert!(stmt_tree_contains_call(&lambda.body, &|callee, _| {
         callee.starts_with("wrap_packet__")
     }));

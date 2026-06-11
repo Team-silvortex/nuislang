@@ -275,11 +275,9 @@ mod cpu Main {
 
   fn capture_net_session_loop_bridge_summary() -> NetSessionBridgeEnvelope {
     let packet: NetSessionBridgePacket = capture_net_session_loop_bridge_packet();
-    let payload: NetSessionBridgeCell = packet.payload;
-    let packet_value: i64 = packet.packet_value;
     let summary: NetSessionBridgeEnvelope = apply_bridge_packetized(
-      payload,
-      packet_value,
+      packet.payload,
+      packet.packet_value,
       |payload: NetSessionBridgeCell, packet_value: i64| -> NetSessionBridgeEnvelope {
         let packet: NetSessionBridgePacket =
           wrap_bridge_packet<NetSessionBridgeCell>(payload, packet_value);

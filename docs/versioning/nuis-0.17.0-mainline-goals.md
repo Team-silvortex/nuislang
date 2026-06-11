@@ -31,6 +31,10 @@ Short rule:
 
 `if a generic route feels valid at the source level, the compiler should either support it through the current stack or reject it clearly and locally`
 
+Working anchor:
+
+* [nuis-0.17.0-generic-completion-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-generic-completion-plan.md)
+
 ### 2. Lowering Completion
 
 The goal is to reduce the front/back split.

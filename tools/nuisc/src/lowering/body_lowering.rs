@@ -304,12 +304,40 @@ pub(super) fn lower_async_call_boundary(
         ));
     }
 
+    let lowered_args = args
+        .iter()
+        .map(|arg| lower_expr(arg, state, bindings))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    if state.async_helper_functions.contains(callee) {
+        let call_name = next_name(state, "async_call");
+        let mut op_args = vec![callee.to_owned()];
+        op_args.extend(lowered_args.clone());
+        state.yir.nodes.push(Node {
+            name: call_name.clone(),
+            resource: "cpu0".to_owned(),
+            op: Operation {
+                module: "cpu".to_owned(),
+                instruction: "async_call".to_owned(),
+                args: op_args,
+            },
+        });
+        for arg in &lowered_args {
+            push_dep_edges(state, arg, &call_name);
+        }
+
+        let returned = push_direct_call_node(function, &lowered_args, state)?;
+        state.yir.edges.push(Edge {
+            kind: EdgeKind::Effect,
+            from: call_name,
+            to: returned.clone(),
+        });
+        return Ok(returned);
+    }
+
     let mut local_bindings = BTreeMap::new();
-    let mut lowered_args = Vec::new();
-    for (param, arg) in function.params.iter().zip(args.iter()) {
-        let lowered = lower_expr(arg, state, bindings)?;
-        lowered_args.push(lowered.clone());
-        local_bindings.insert(param.name.clone(), lowered);
+    for (param, lowered) in function.params.iter().zip(lowered_args.iter()) {
+        local_bindings.insert(param.name.clone(), lowered.clone());
     }
 
     let call_name = next_name(state, "async_call");

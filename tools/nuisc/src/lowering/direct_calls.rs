@@ -8,10 +8,18 @@ enum DirectCallScalarKind {
 }
 
 pub(super) fn collect_recursive_direct_call_functions(module: &NirModule) -> BTreeSet<String> {
+    collect_recursive_helper_functions(module, false)
+}
+
+pub(super) fn collect_recursive_async_helper_functions(module: &NirModule) -> BTreeSet<String> {
+    collect_recursive_helper_functions(module, true)
+}
+
+fn collect_recursive_helper_functions(module: &NirModule, is_async: bool) -> BTreeSet<String> {
     let eligible = module
         .functions
         .iter()
-        .filter(|function| !function.is_async)
+        .filter(|function| function.is_async == is_async)
         .filter(|function| direct_call_signature_kind(function).is_some())
         .collect::<Vec<_>>();
     let eligible_names = eligible

@@ -41,6 +41,7 @@ pub(super) struct LoweringState<'a> {
     pub(super) yir: &'a mut YirModule,
     pub(super) function_map: BTreeMap<&'a str, &'a NirFunction>,
     pub(super) direct_call_functions: BTreeSet<String>,
+    pub(super) async_helper_functions: BTreeSet<String>,
     pub(super) pure_helpers: BTreeSet<String>,
     pub(super) value_counter: usize,
     pub(super) print_counter: usize,

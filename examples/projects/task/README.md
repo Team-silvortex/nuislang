@@ -6,6 +6,12 @@ This folder contains narrow project-form companions for the current task-facing
 Start here:
 
 * [task_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_runtime_demo)
+* [task_recursive_async_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_recursive_async_demo)
+* [task_mutual_recursive_async_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_mutual_recursive_async_demo)
+* [task_generic_recursive_async_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_generic_recursive_async_demo)
+* [task_generic_mutual_recursive_async_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_generic_mutual_recursive_async_demo)
+* [task_recursive_async_result_family_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_recursive_async_result_family_demo)
+* [task_recursive_async_payload_alias_hof_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_recursive_async_payload_alias_hof_demo)
 * [task_memory_roundtrip_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_memory_roundtrip_demo)
 * [task_memory_result_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_memory_result_branch_demo)
 * [task_memory_result_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_memory_result_batch_demo)
@@ -35,6 +41,12 @@ Short reading rule:
 
 * semantic core:
   [task_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_runtime_demo) ->
+  [task_recursive_async_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_recursive_async_demo) ->
+  [task_mutual_recursive_async_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_mutual_recursive_async_demo) ->
+  [task_generic_recursive_async_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_generic_recursive_async_demo) ->
+  [task_generic_mutual_recursive_async_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_generic_mutual_recursive_async_demo) ->
+  [task_recursive_async_result_family_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_recursive_async_result_family_demo) ->
+  [task_recursive_async_payload_alias_hof_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_recursive_async_payload_alias_hof_demo) ->
   [task_memory_roundtrip_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_memory_roundtrip_demo) ->
   [task_memory_result_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_memory_result_branch_demo) ->
   [task_memory_result_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_memory_result_batch_demo) ->

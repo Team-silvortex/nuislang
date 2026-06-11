@@ -5,6 +5,7 @@ use nuis_semantics::model::{
 };
 
 use super::stmt_lowering::lower_stmt_sequence_with_async;
+use super::higher_order::{is_callable_type_with_aliases, rewrite_higher_order_calls_in_function};
 use super::{
     build_function_return_type_table, build_impl_method_function, impl_method_lookup_key,
     impl_method_symbol_name, infer_missing_function_return_type, is_public_visibility,
@@ -29,6 +30,21 @@ pub(super) fn build_lowered_functions_and_impls(
     generic_templates: &BTreeMap<String, AstFunction>,
     concrete_module_functions: &[AstFunction],
 ) -> Result<(Vec<NirFunction>, Vec<NirTraitDef>, Vec<NirImplDef>), String> {
+    let higher_order_templates = module
+        .functions
+        .iter()
+        .filter(|function| {
+            function.params.iter().any(|param| {
+                is_callable_type_with_aliases(&param.ty, visible_type_aliases).unwrap_or(false)
+            })
+        })
+        .map(|function| (function.name.clone(), function.clone()))
+        .collect::<BTreeMap<_, _>>();
+    let higher_order_function_table = module
+        .functions
+        .iter()
+        .map(|function| (function.name.clone(), function.clone()))
+        .collect::<BTreeMap<_, _>>();
     let function_return_types = build_function_return_type_table(
         module,
         concrete_module_functions,
@@ -48,6 +64,8 @@ pub(super) fn build_lowered_functions_and_impls(
                 module_const_env,
                 visible_type_aliases,
                 generic_templates,
+                &higher_order_templates,
+                &higher_order_function_table,
                 signatures,
                 impl_lookup,
                 module_struct_table,
@@ -90,6 +108,49 @@ pub(super) fn build_lowered_functions_and_impls(
     for (name, signature) in specialized_signatures {
         signatures.insert(name, signature);
     }
+
+    let original_specialized_functions = std::mem::take(&mut specialized_functions);
+    let mut postprocessed_specialized_functions = Vec::new();
+    let mut postprocessed_specialized_signatures = Vec::new();
+    let mut higher_order_specialization_cache = BTreeSet::new();
+    for function in original_specialized_functions {
+        let mut higher_order_specialized_templates = Vec::new();
+        let higher_order_rewritten = rewrite_higher_order_calls_in_function(
+            &function,
+            &higher_order_templates,
+            &higher_order_function_table,
+            visible_type_aliases,
+            &mut higher_order_specialization_cache,
+            &mut higher_order_specialized_templates,
+        )?;
+        let mut extended_generic_templates = generic_templates.clone();
+        for template in higher_order_specialized_templates {
+            if !template.generic_params.is_empty() {
+                extended_generic_templates.insert(template.name.clone(), template);
+            }
+        }
+        let rewritten = rewrite_generic_calls_in_function(
+            &higher_order_rewritten,
+            &BTreeMap::new(),
+            visible_type_aliases,
+            &extended_generic_templates,
+            &higher_order_templates,
+            &higher_order_function_table,
+            signatures,
+            impl_lookup,
+            module_struct_table,
+            &inferred_function_return_types,
+            &mut specialization_cache,
+            &mut postprocessed_specialized_functions,
+            &mut postprocessed_specialized_signatures,
+        )?;
+        postprocessed_specialized_functions.push(rewritten);
+    }
+    specialized_functions = postprocessed_specialized_functions;
+    for (name, signature) in postprocessed_specialized_signatures {
+        signatures.insert(name, signature);
+    }
+
     for definition in &module.impls {
         let lowered_for_type =
             lower_type_ref_with_aliases(&definition.for_type, visible_type_aliases)?;

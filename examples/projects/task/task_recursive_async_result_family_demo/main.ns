@@ -1,0 +1,63 @@
+mod cpu Main {
+  struct TaskResultFamilySummary {
+    completed: i64,
+    timed_out: i64,
+    cancelled: i64,
+    value: i64
+  }
+
+  async fn sum_down(seed: i64, remaining: i64) -> i64 {
+    if remaining == 0 {
+      return seed;
+    }
+    return await sum_down(seed + 1, remaining - 1);
+  }
+
+  fn encode_completed(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_timed_out(result: TaskResult<i64>) -> i64 {
+    if task_timed_out(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_cancelled(result: TaskResult<i64>) -> i64 {
+    if task_cancelled(result) {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn encode_value(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return task_value(result);
+    }
+    return 0;
+  }
+
+  fn capture_task_result_family(seed: i64, remaining: i64, limit: i64) -> TaskResultFamilySummary {
+    let completed_result: TaskResult<i64> = join_result(spawn(sum_down(seed, remaining)));
+    let timed_result: TaskResult<i64> =
+      join_result(timeout(spawn(sum_down(seed, remaining)), limit));
+    let cancelled_result: TaskResult<i64> =
+      join_result(cancel(spawn(sum_down(seed, remaining))));
+
+    return TaskResultFamilySummary {
+      completed: encode_completed(completed_result),
+      timed_out: encode_timed_out(timed_result),
+      cancelled: encode_cancelled(cancelled_result),
+      value: encode_value(completed_result)
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: TaskResultFamilySummary = capture_task_result_family(7, 4, 0);
+    return summary.completed + summary.timed_out + summary.cancelled + summary.value;
+  }
+}

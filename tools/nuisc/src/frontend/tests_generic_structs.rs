@@ -690,6 +690,58 @@ fn lowers_generic_payload_struct_constructor_with_inferred_generic_alias_type_ar
 }
 
 #[test]
+fn lowers_generic_alias_payload_constructor_from_alias_field_access() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type JustAlias<T> = Just<T>;
+          type PacketAlias<T> = Packet<T>;
+
+          struct Just<T> {
+            value: T,
+          }
+
+          struct Packet<T> {
+            payload: T,
+            tag: i64,
+          }
+
+          fn main() -> i64 {
+            let packet: PacketAlias<i64> = PacketAlias { payload: 7, tag: 1 };
+            let payload = JustAlias(packet.payload);
+            return payload.value + packet.tag;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    match &module.functions[0].body[1] {
+        NirStmt::Let { name, ty, value } => {
+            assert_eq!(name, "payload");
+            assert_eq!(ty.as_ref().unwrap().render(), "Just<i64>");
+            assert!(matches!(
+                value,
+                NirExpr::StructLiteral {
+                    type_name,
+                    type_args,
+                    fields,
+                } if type_name == "Just"
+                    && matches!(type_args.as_slice(), [ty] if ty.render() == "i64")
+                    && matches!(
+                        fields.as_slice(),
+                        [(field, NirExpr::FieldAccess { field: payload_field, .. })]
+                            if field == "value" && payload_field == "payload"
+                    )
+            ));
+        }
+        other => panic!(
+            "expected alias-field-access generic-alias payload constructor let, found {other:?}"
+        ),
+    }
+}
+
+#[test]
 fn rejects_payload_style_constructor_with_wrong_generic_alias_arity() {
     let error = parse_nuis_module(
         r#"

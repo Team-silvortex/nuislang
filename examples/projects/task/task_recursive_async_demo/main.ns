@@ -1,0 +1,18 @@
+mod cpu Main {
+  async fn sum_down(current: i64) -> i64 {
+    if current == 0 {
+      return 0;
+    }
+    let tail: i64 = await sum_down(current - 1);
+    return current + tail;
+  }
+
+  fn main() -> i64 {
+    let task: Task<i64> = spawn(sum_down(4));
+    let observed_result: TaskResult<i64> = join_result(task);
+    if task_completed(observed_result) {
+      return task_value(observed_result);
+    }
+    return 0;
+  }
+}

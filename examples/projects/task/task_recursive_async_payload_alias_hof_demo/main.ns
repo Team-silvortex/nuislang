@@ -1,0 +1,48 @@
+mod cpu Main {
+  type JustAlias<T> = Just<T>;
+  type Mapper<T> = Fn1<T, T>;
+
+  trait Addable {
+    fn add(lhs: Self, rhs: Self) -> Self;
+  }
+
+  impl Addable for i64 {
+    fn add(lhs: i64, rhs: i64) -> i64 {
+      return lhs + rhs;
+    }
+  }
+
+  struct Just<T> {
+    value: T,
+  }
+
+  fn apply_payload<T: Addable>(value: JustAlias<T>, f: Mapper<T>) -> T {
+    match value {
+      JustAlias<T>(payload) => {
+        return f(payload);
+      }
+      _ => {
+        return value.value;
+      }
+    }
+  }
+
+  async fn climb(value: i64, remaining: i64) -> i64 {
+    if remaining == 0 {
+      return apply_payload(
+        JustAlias<i64>(value),
+        |x: i64| -> i64 { return x.add(1); }
+      );
+    }
+    return await climb(value, remaining - 1);
+  }
+
+  fn main() -> i64 {
+    let task: Task<i64> = spawn(climb(7, 4));
+    let observed_result: TaskResult<i64> = join_result(task);
+    if task_completed(observed_result) {
+      return task_value(observed_result);
+    }
+    return 0;
+  }
+}

@@ -528,6 +528,89 @@ fn lowers_async_await_into_inferred_generic_payload_alias_higher_order_family() 
 }
 
 #[test]
+fn lowers_specialized_generic_recursive_async_body_into_payload_alias_higher_order_family() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type JustAlias<T> = Just<T>;
+          type Mapper<T> = Fn1<T, T>;
+
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          struct Just<T> {
+            value: T,
+          }
+
+          fn apply_payload<T: Addable>(value: JustAlias<T>, f: Mapper<T>) -> T {
+            match value {
+              JustAlias<T>(payload) => {
+                return f(payload);
+              }
+              _ => {
+                return value.value;
+              }
+            }
+          }
+
+          async fn climb<T: Addable>(value: T, remaining: i64) -> T {
+            if remaining == 0 {
+              return apply_payload(
+                JustAlias<T>(value),
+                |x: T| -> T { return x.add(1); }
+              );
+            }
+            return await climb(value, remaining - 1);
+          }
+
+          async fn main() -> i64 {
+            return await climb(7, 4);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let higher_order_concrete = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__hof_apply_payload_") && function.name.ends_with("__i64")
+        })
+        .expect("expected recursive async payload higher-order helper");
+    assert!(higher_order_concrete.generic_params.is_empty());
+
+    let specialized = module
+        .functions
+        .iter()
+        .find(|function| function.name == "climb__i64")
+        .expect("expected recursive async generic specialization through higher-order payload body");
+    assert!(specialized.is_async);
+    assert!(specialized.generic_params.is_empty());
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Await(value))))
+            if matches!(
+                value.as_ref(),
+                NirExpr::Call { callee, .. } if callee == "climb__i64"
+            )
+    ));
+}
+
+#[test]
 fn rejects_generic_lambda_method_call_without_required_bound() {
     let error = parse_nuis_module(
         r#"

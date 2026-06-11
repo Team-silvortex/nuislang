@@ -1,5 +1,6 @@
 use super::*;
 use crate::lowering::direct_calls::collect_recursive_direct_call_functions;
+use crate::lowering::direct_calls::collect_recursive_async_helper_functions;
 
 pub(super) trait BootstrapLoweringProvider {
     fn lowering_entry(&self) -> &'static str;
@@ -56,6 +57,7 @@ pub(super) fn lower_nir_to_yir_builtin_cpu(module: &NirModule) -> Result<YirModu
     let rewritten_module = rewrite_self_tail_recursive_functions(module);
     let module = &rewritten_module;
     let direct_call_functions = collect_recursive_direct_call_functions(module);
+    let async_helper_functions = collect_recursive_async_helper_functions(module);
 
     let main = module
         .functions
@@ -79,6 +81,7 @@ pub(super) fn lower_nir_to_yir_builtin_cpu(module: &NirModule) -> Result<YirModu
         yir: &mut yir,
         function_map,
         direct_call_functions: direct_call_functions.clone(),
+        async_helper_functions: async_helper_functions.clone(),
         pure_helpers: collect_pure_helper_functions(module),
         value_counter: 0,
         print_counter: 0,
@@ -90,7 +93,10 @@ pub(super) fn lower_nir_to_yir_builtin_cpu(module: &NirModule) -> Result<YirModu
     for function in module
         .functions
         .iter()
-        .filter(|function| direct_call_functions.contains(&function.name))
+        .filter(|function| {
+            direct_call_functions.contains(&function.name)
+                || async_helper_functions.contains(&function.name)
+        })
     {
         lower_direct_call_helper_function(function, &mut state)?;
     }

@@ -1,0 +1,24 @@
+mod cpu Main {
+  async fn odd(value: i64) -> i64 {
+    if value == 0 {
+      return 0;
+    }
+    return await even(value - 1);
+  }
+
+  async fn even(value: i64) -> i64 {
+    if value == 0 {
+      return 1;
+    }
+    return await odd(value - 1);
+  }
+
+  fn main() -> i64 {
+    let task: Task<i64> = spawn(even(4));
+    let observed_result: TaskResult<i64> = join_result(task);
+    if task_completed(observed_result) {
+      return task_value(observed_result);
+    }
+    return 0;
+  }
+}

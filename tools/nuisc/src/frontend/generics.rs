@@ -6,6 +6,7 @@ use nuis_semantics::model::{
 };
 
 use super::types::{ast_type_from_nir, infer_ast_expr_type};
+use super::validation_binding_env::instantiate_ast_struct_field_type;
 use super::{lower_type_ref, resolve_ast_type_ref_aliases};
 
 pub(crate) fn infer_generic_substitutions(
@@ -46,9 +47,14 @@ pub(crate) fn infer_generic_substitutions(
         ) {
             continue;
         }
-        let Some(arg_ty) =
-            infer_ast_expr_type(arg, env, impl_lookup, struct_table, function_return_types)
-        else {
+        let Some(arg_ty) = infer_alias_aware_ast_expr_type(
+            arg,
+            env,
+            visible_type_aliases,
+            impl_lookup,
+            struct_table,
+            function_return_types,
+        ) else {
             return Err(format!(
                 "cannot infer concrete type for generic arg `{}` in call to `{}`",
                 param.name, template.name
@@ -99,6 +105,45 @@ pub(crate) fn infer_generic_substitutions(
         }
     }
     Ok(lowered_substitutions)
+}
+
+pub(crate) fn infer_alias_aware_ast_expr_type(
+    expr: &AstExpr,
+    env: &BTreeMap<String, AstTypeRef>,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
+    struct_table: &BTreeMap<String, AstStructDef>,
+    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
+) -> Option<AstTypeRef> {
+    infer_ast_expr_type(expr, env, impl_lookup, struct_table, function_return_types).or_else(
+        || match expr {
+            AstExpr::FieldAccess { base, field } => {
+                let base_ty = infer_alias_aware_ast_expr_type(
+                    base,
+                    env,
+                    visible_type_aliases,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                )?;
+                let resolved_base_ty =
+                    resolve_ast_type_ref_aliases(&base_ty, visible_type_aliases).ok()?;
+                let definition = struct_table.get(&resolved_base_ty.name)?;
+                definition
+                    .fields
+                    .iter()
+                    .find(|item| item.name == *field)
+                    .map(|field_def| {
+                        instantiate_ast_struct_field_type(
+                            &resolved_base_ty,
+                            definition,
+                            &field_def.ty,
+                        )
+                    })
+            }
+            _ => None,
+        },
+    )
 }
 
 fn explicit_generic_substitutions(

@@ -1,0 +1,17 @@
+mod cpu Main {
+  async fn bounce<T>(value: T, remaining: i64) -> T {
+    if remaining == 0 {
+      return value;
+    }
+    return await bounce(value, remaining - 1);
+  }
+
+  fn main() -> i64 {
+    let task: Task<i64> = spawn(bounce(7, 4));
+    let observed_result: TaskResult<i64> = join_result(task);
+    if task_completed(observed_result) {
+      return task_value(observed_result);
+    }
+    return 0;
+  }
+}
