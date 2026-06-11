@@ -610,6 +610,19 @@ enum NetworkOwnedHandleKind {
     DatagramTransport,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum NetworkOwnedHandleRequirement {
+    OwnedAny,
+    Listener,
+    Transport,
+    StreamTransport,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct NetworkParamHandleOrigin {
+    param_index: usize,
+}
+
 fn validate_network_owned_handle_shape(
     module: &NirModule,
     from: &str,
@@ -670,13 +683,19 @@ fn validate_network_owned_handle_provenance(
     from: &str,
     to: &str,
 ) -> Result<(), String> {
+    let function_requirements = infer_network_function_handle_requirements(module)?;
+    let function_return_kinds =
+        infer_network_function_return_kinds(module, &function_requirements)?;
     for function in &module.functions {
         let mut bindings = BTreeMap::new();
+        seed_network_param_bindings(function, &function_requirements, &mut bindings);
         validate_network_owned_handle_provenance_in_body(
             &function.body,
             from,
             to,
             &mut bindings,
+            &function_requirements,
+            &function_return_kinds,
         )?;
     }
     Ok(())
@@ -687,39 +706,79 @@ fn validate_network_owned_handle_provenance_in_body(
     from: &str,
     to: &str,
     bindings: &mut BTreeMap<String, NetworkOwnedHandleKind>,
+    function_requirements: &BTreeMap<String, Vec<Option<NetworkOwnedHandleRequirement>>>,
+    function_return_kinds: &BTreeMap<String, Option<NetworkOwnedHandleKind>>,
 ) -> Result<(), String> {
     for stmt in body {
         match stmt {
             NirStmt::Let { name, value, .. } => {
-                if let Some(kind) = infer_network_owned_handle_kind(value, bindings) {
+                if let Some(kind) =
+                    infer_network_owned_handle_kind(value, bindings, function_return_kinds)
+                {
                     bindings.insert(name.clone(), kind);
+                } else {
+                    bindings.remove(name);
                 }
-                validate_network_owned_handle_provenance_in_expr(value, from, to, bindings)?;
+                validate_network_owned_handle_provenance_in_expr(
+                    value,
+                    from,
+                    to,
+                    bindings,
+                    function_requirements,
+                    function_return_kinds,
+                )?;
             }
             NirStmt::Const { name, value, .. } => {
-                if let Some(kind) = infer_network_owned_handle_kind(value, bindings) {
+                if let Some(kind) =
+                    infer_network_owned_handle_kind(value, bindings, function_return_kinds)
+                {
                     bindings.insert(name.clone(), kind);
+                } else {
+                    bindings.remove(name);
                 }
-                validate_network_owned_handle_provenance_in_expr(value, from, to, bindings)?;
+                validate_network_owned_handle_provenance_in_expr(
+                    value,
+                    from,
+                    to,
+                    bindings,
+                    function_requirements,
+                    function_return_kinds,
+                )?;
             }
             NirStmt::Print(value)
             | NirStmt::Await(value)
             | NirStmt::Expr(value)
             | NirStmt::Return(Some(value)) => {
-                validate_network_owned_handle_provenance_in_expr(value, from, to, bindings)?;
+                validate_network_owned_handle_provenance_in_expr(
+                    value,
+                    from,
+                    to,
+                    bindings,
+                    function_requirements,
+                    function_return_kinds,
+                )?;
             }
             NirStmt::If {
                 condition,
                 then_body,
                 else_body,
             } => {
-                validate_network_owned_handle_provenance_in_expr(condition, from, to, bindings)?;
+                validate_network_owned_handle_provenance_in_expr(
+                    condition,
+                    from,
+                    to,
+                    bindings,
+                    function_requirements,
+                    function_return_kinds,
+                )?;
                 let mut then_bindings = bindings.clone();
                 validate_network_owned_handle_provenance_in_body(
                     then_body,
                     from,
                     to,
                     &mut then_bindings,
+                    function_requirements,
+                    function_return_kinds,
                 )?;
                 let mut else_bindings = bindings.clone();
                 validate_network_owned_handle_provenance_in_body(
@@ -727,17 +786,31 @@ fn validate_network_owned_handle_provenance_in_body(
                     from,
                     to,
                     &mut else_bindings,
+                    function_requirements,
+                    function_return_kinds,
                 )?;
+                merge_network_owned_handle_bindings(bindings, &then_bindings, &else_bindings);
             }
             NirStmt::While { condition, body } => {
-                validate_network_owned_handle_provenance_in_expr(condition, from, to, bindings)?;
+                validate_network_owned_handle_provenance_in_expr(
+                    condition,
+                    from,
+                    to,
+                    bindings,
+                    function_requirements,
+                    function_return_kinds,
+                )?;
+                let entry_bindings = bindings.clone();
                 let mut loop_bindings = bindings.clone();
                 validate_network_owned_handle_provenance_in_body(
                     body,
                     from,
                     to,
                     &mut loop_bindings,
+                    function_requirements,
+                    function_return_kinds,
                 )?;
+                merge_network_owned_handle_bindings(bindings, &entry_bindings, &loop_bindings);
             }
             NirStmt::Return(None) | NirStmt::Break | NirStmt::Continue => {}
         }
@@ -745,17 +818,52 @@ fn validate_network_owned_handle_provenance_in_body(
     Ok(())
 }
 
+fn merge_network_owned_handle_bindings(
+    bindings: &mut BTreeMap<String, NetworkOwnedHandleKind>,
+    then_bindings: &BTreeMap<String, NetworkOwnedHandleKind>,
+    else_bindings: &BTreeMap<String, NetworkOwnedHandleKind>,
+) {
+    let merged = bindings
+        .keys()
+        .chain(then_bindings.keys())
+        .chain(else_bindings.keys())
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    for name in merged {
+        match (
+            then_bindings.get(&name).copied(),
+            else_bindings.get(&name).copied(),
+        ) {
+            (Some(lhs), Some(rhs)) if lhs == rhs => {
+                bindings.insert(name, lhs);
+            }
+            _ => {
+                bindings.remove(&name);
+            }
+        }
+    }
+}
+
 fn validate_network_owned_handle_provenance_in_expr(
     expr: &NirExpr,
     from: &str,
     to: &str,
     bindings: &BTreeMap<String, NetworkOwnedHandleKind>,
+    function_requirements: &BTreeMap<String, Vec<Option<NetworkOwnedHandleRequirement>>>,
+    function_return_kinds: &BTreeMap<String, Option<NetworkOwnedHandleKind>>,
 ) -> Result<(), String> {
     match expr {
         NirExpr::CpuExternCall { callee, args, .. } => {
             validate_network_owned_handle_call(callee, args, from, to, bindings)?;
             for arg in args {
-                validate_network_owned_handle_provenance_in_expr(arg, from, to, bindings)?;
+                validate_network_owned_handle_provenance_in_expr(
+                    arg,
+                    from,
+                    to,
+                    bindings,
+                    function_requirements,
+                    function_return_kinds,
+                )?;
             }
         }
         NirExpr::Await(inner)
@@ -792,77 +900,280 @@ fn validate_network_owned_handle_provenance_in_expr(
         | NirExpr::CpuPresentFrame(inner)
         | NirExpr::Free(inner)
         | NirExpr::IsNull(inner) => {
-            validate_network_owned_handle_provenance_in_expr(inner, from, to, bindings)?;
+            validate_network_owned_handle_provenance_in_expr(
+                inner,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
         }
         NirExpr::DataResult { value, .. }
         | NirExpr::ShaderResult { value, .. }
         | NirExpr::NetworkResult { value, .. }
         | NirExpr::KernelResult { value, .. } => {
-            validate_network_owned_handle_provenance_in_expr(value, from, to, bindings)?;
+            validate_network_owned_handle_provenance_in_expr(
+                value,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
         }
         NirExpr::AllocNode { value, next } => {
-            validate_network_owned_handle_provenance_in_expr(value, from, to, bindings)?;
-            validate_network_owned_handle_provenance_in_expr(next, from, to, bindings)?;
+            validate_network_owned_handle_provenance_in_expr(
+                value,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
+            validate_network_owned_handle_provenance_in_expr(
+                next,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
         }
         NirExpr::AllocBuffer { len, fill } => {
-            validate_network_owned_handle_provenance_in_expr(len, from, to, bindings)?;
-            validate_network_owned_handle_provenance_in_expr(fill, from, to, bindings)?;
+            validate_network_owned_handle_provenance_in_expr(
+                len,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
+            validate_network_owned_handle_provenance_in_expr(
+                fill,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
         }
         NirExpr::LoadAt { buffer, index } => {
-            validate_network_owned_handle_provenance_in_expr(buffer, from, to, bindings)?;
-            validate_network_owned_handle_provenance_in_expr(index, from, to, bindings)?;
+            validate_network_owned_handle_provenance_in_expr(
+                buffer,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
+            validate_network_owned_handle_provenance_in_expr(
+                index,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
         }
         NirExpr::DataReadWindow { window, index } => {
-            validate_network_owned_handle_provenance_in_expr(window, from, to, bindings)?;
-            validate_network_owned_handle_provenance_in_expr(index, from, to, bindings)?;
+            validate_network_owned_handle_provenance_in_expr(
+                window,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
+            validate_network_owned_handle_provenance_in_expr(
+                index,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
         }
         NirExpr::DataWriteWindow {
             window,
             index,
             value,
         } => {
-            validate_network_owned_handle_provenance_in_expr(window, from, to, bindings)?;
-            validate_network_owned_handle_provenance_in_expr(index, from, to, bindings)?;
-            validate_network_owned_handle_provenance_in_expr(value, from, to, bindings)?;
+            validate_network_owned_handle_provenance_in_expr(
+                window,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
+            validate_network_owned_handle_provenance_in_expr(
+                index,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
+            validate_network_owned_handle_provenance_in_expr(
+                value,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
         }
         NirExpr::StoreValue { target, value } => {
-            validate_network_owned_handle_provenance_in_expr(target, from, to, bindings)?;
-            validate_network_owned_handle_provenance_in_expr(value, from, to, bindings)?;
+            validate_network_owned_handle_provenance_in_expr(
+                target,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
+            validate_network_owned_handle_provenance_in_expr(
+                value,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
         }
         NirExpr::StoreNext { target, next } => {
-            validate_network_owned_handle_provenance_in_expr(target, from, to, bindings)?;
-            validate_network_owned_handle_provenance_in_expr(next, from, to, bindings)?;
+            validate_network_owned_handle_provenance_in_expr(
+                target,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
+            validate_network_owned_handle_provenance_in_expr(
+                next,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
         }
         NirExpr::StoreAt {
             buffer,
             index,
             value,
         } => {
-            validate_network_owned_handle_provenance_in_expr(buffer, from, to, bindings)?;
-            validate_network_owned_handle_provenance_in_expr(index, from, to, bindings)?;
-            validate_network_owned_handle_provenance_in_expr(value, from, to, bindings)?;
+            validate_network_owned_handle_provenance_in_expr(
+                buffer,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
+            validate_network_owned_handle_provenance_in_expr(
+                index,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
+            validate_network_owned_handle_provenance_in_expr(
+                value,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
         }
         NirExpr::DataCopyWindow { input, offset, len }
         | NirExpr::DataImmutableWindow { input, offset, len } => {
-            validate_network_owned_handle_provenance_in_expr(input, from, to, bindings)?;
-            validate_network_owned_handle_provenance_in_expr(offset, from, to, bindings)?;
-            validate_network_owned_handle_provenance_in_expr(len, from, to, bindings)?;
+            validate_network_owned_handle_provenance_in_expr(
+                input,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
+            validate_network_owned_handle_provenance_in_expr(
+                offset,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
+            validate_network_owned_handle_provenance_in_expr(
+                len,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
         }
         NirExpr::DataProfileSendUplink { input, .. }
         | NirExpr::DataProfileSendDownlink { input, .. } => {
-            validate_network_owned_handle_provenance_in_expr(input, from, to, bindings)?;
+            validate_network_owned_handle_provenance_in_expr(
+                input,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
         }
         NirExpr::ShaderProfileColorSeed { base, delta, .. }
         | NirExpr::ShaderProfileRadiusSeed { base, delta, .. } => {
-            validate_network_owned_handle_provenance_in_expr(base, from, to, bindings)?;
-            validate_network_owned_handle_provenance_in_expr(delta, from, to, bindings)?;
+            validate_network_owned_handle_provenance_in_expr(
+                base,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
+            validate_network_owned_handle_provenance_in_expr(
+                delta,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
         }
         NirExpr::ShaderProfileSpeedSeed {
             delta, scale, base, ..
         } => {
-            validate_network_owned_handle_provenance_in_expr(delta, from, to, bindings)?;
-            validate_network_owned_handle_provenance_in_expr(scale, from, to, bindings)?;
-            validate_network_owned_handle_provenance_in_expr(base, from, to, bindings)?;
+            validate_network_owned_handle_provenance_in_expr(
+                delta,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
+            validate_network_owned_handle_provenance_in_expr(
+                scale,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
+            validate_network_owned_handle_provenance_in_expr(
+                base,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
         }
         NirExpr::ShaderProfilePacket {
             color,
@@ -870,45 +1181,158 @@ fn validate_network_owned_handle_provenance_in_expr(
             radius,
             ..
         } => {
-            validate_network_owned_handle_provenance_in_expr(color, from, to, bindings)?;
-            validate_network_owned_handle_provenance_in_expr(speed, from, to, bindings)?;
-            validate_network_owned_handle_provenance_in_expr(radius, from, to, bindings)?;
+            validate_network_owned_handle_provenance_in_expr(
+                color,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
+            validate_network_owned_handle_provenance_in_expr(
+                speed,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
+            validate_network_owned_handle_provenance_in_expr(
+                radius,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
         }
-        NirExpr::CpuSpawn { args, .. } | NirExpr::Call { args, .. } => {
+        NirExpr::CpuSpawn { callee, args } | NirExpr::Call { callee, args } => {
+            validate_network_function_call_requirements(
+                callee,
+                args,
+                from,
+                to,
+                bindings,
+                function_requirements,
+            )?;
             for arg in args {
-                validate_network_owned_handle_provenance_in_expr(arg, from, to, bindings)?;
+                validate_network_owned_handle_provenance_in_expr(
+                    arg,
+                    from,
+                    to,
+                    bindings,
+                    function_requirements,
+                    function_return_kinds,
+                )?;
             }
         }
         NirExpr::CpuTimeout { task, limit } => {
-            validate_network_owned_handle_provenance_in_expr(task, from, to, bindings)?;
-            validate_network_owned_handle_provenance_in_expr(limit, from, to, bindings)?;
+            validate_network_owned_handle_provenance_in_expr(
+                task,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
+            validate_network_owned_handle_provenance_in_expr(
+                limit,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
         }
         NirExpr::MethodCall { receiver, args, .. } => {
-            validate_network_owned_handle_provenance_in_expr(receiver, from, to, bindings)?;
+            validate_network_owned_handle_provenance_in_expr(
+                receiver,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
             for arg in args {
-                validate_network_owned_handle_provenance_in_expr(arg, from, to, bindings)?;
+                validate_network_owned_handle_provenance_in_expr(
+                    arg,
+                    from,
+                    to,
+                    bindings,
+                    function_requirements,
+                    function_return_kinds,
+                )?;
             }
         }
         NirExpr::StructLiteral { fields, .. } => {
             for (_, value) in fields {
-                validate_network_owned_handle_provenance_in_expr(value, from, to, bindings)?;
+                validate_network_owned_handle_provenance_in_expr(
+                    value,
+                    from,
+                    to,
+                    bindings,
+                    function_requirements,
+                    function_return_kinds,
+                )?;
             }
         }
         NirExpr::FieldAccess { base, .. } => {
-            validate_network_owned_handle_provenance_in_expr(base, from, to, bindings)?;
+            validate_network_owned_handle_provenance_in_expr(
+                base,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
         }
         NirExpr::Binary { lhs, rhs, .. } => {
-            validate_network_owned_handle_provenance_in_expr(lhs, from, to, bindings)?;
-            validate_network_owned_handle_provenance_in_expr(rhs, from, to, bindings)?;
+            validate_network_owned_handle_provenance_in_expr(
+                lhs,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
+            validate_network_owned_handle_provenance_in_expr(
+                rhs,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
         }
         NirExpr::ShaderBeginPass {
             target,
             pipeline,
             viewport,
         } => {
-            validate_network_owned_handle_provenance_in_expr(target, from, to, bindings)?;
-            validate_network_owned_handle_provenance_in_expr(pipeline, from, to, bindings)?;
-            validate_network_owned_handle_provenance_in_expr(viewport, from, to, bindings)?;
+            validate_network_owned_handle_provenance_in_expr(
+                target,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
+            validate_network_owned_handle_provenance_in_expr(
+                pipeline,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
+            validate_network_owned_handle_provenance_in_expr(
+                viewport,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
         }
         NirExpr::ShaderDrawInstanced {
             pass,
@@ -916,17 +1340,131 @@ fn validate_network_owned_handle_provenance_in_expr(
             vertex_count,
             instance_count,
         } => {
-            validate_network_owned_handle_provenance_in_expr(pass, from, to, bindings)?;
-            validate_network_owned_handle_provenance_in_expr(packet, from, to, bindings)?;
-            validate_network_owned_handle_provenance_in_expr(vertex_count, from, to, bindings)?;
-            validate_network_owned_handle_provenance_in_expr(instance_count, from, to, bindings)?;
+            validate_network_owned_handle_provenance_in_expr(
+                pass,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
+            validate_network_owned_handle_provenance_in_expr(
+                packet,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
+            validate_network_owned_handle_provenance_in_expr(
+                vertex_count,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
+            validate_network_owned_handle_provenance_in_expr(
+                instance_count,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
         }
         NirExpr::ShaderProfileRender { packet, .. } => {
-            validate_network_owned_handle_provenance_in_expr(packet, from, to, bindings)?;
+            validate_network_owned_handle_provenance_in_expr(
+                packet,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
         }
         _ => {}
     }
     Ok(())
+}
+
+fn validate_network_function_call_requirements(
+    callee: &str,
+    args: &[NirExpr],
+    from: &str,
+    to: &str,
+    bindings: &BTreeMap<String, NetworkOwnedHandleKind>,
+    function_requirements: &BTreeMap<String, Vec<Option<NetworkOwnedHandleRequirement>>>,
+) -> Result<(), String> {
+    let Some(requirements) = function_requirements.get(callee) else {
+        return Ok(());
+    };
+    for (index, requirement) in requirements.iter().enumerate() {
+        let Some(requirement) = requirement else {
+            continue;
+        };
+        let arg = args.get(index);
+        validate_network_call_arg_requirement(
+            callee,
+            index,
+            arg,
+            *requirement,
+            from,
+            to,
+            bindings,
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_network_call_arg_requirement(
+    callee: &str,
+    index: usize,
+    arg: Option<&NirExpr>,
+    requirement: NetworkOwnedHandleRequirement,
+    from: &str,
+    to: &str,
+    bindings: &BTreeMap<String, NetworkOwnedHandleKind>,
+) -> Result<(), String> {
+    match requirement {
+        NetworkOwnedHandleRequirement::OwnedAny => {
+            let Some(arg) = arg else {
+                return Ok(());
+            };
+            match arg {
+                NirExpr::Var(name) if bindings.contains_key(name) => Ok(()),
+                NirExpr::Var(name) => Err(format!(
+                    "project link `{}` -> `{}` requires call `{}` arg {} to be an owned network handle variable, but `{}` does not come from an owned network open/accept path",
+                    from, to, callee, index, name
+                )),
+                _ => Err(format!(
+                    "project link `{}` -> `{}` requires call `{}` arg {} to be an owned network handle variable produced by an open/accept path",
+                    from, to, callee, index
+                )),
+            }
+        }
+        NetworkOwnedHandleRequirement::Listener => validate_network_owned_handle_arg(
+            callee,
+            arg,
+            NetworkOwnedHandleKind::Listener,
+            from,
+            to,
+            bindings,
+            "listener",
+        ),
+        NetworkOwnedHandleRequirement::Transport => {
+            validate_network_transport_handle_arg(callee, arg, from, to, bindings)
+        }
+        NetworkOwnedHandleRequirement::StreamTransport => validate_network_owned_handle_arg(
+            callee,
+            arg,
+            NetworkOwnedHandleKind::StreamTransport,
+            from,
+            to,
+            bindings,
+            "stream transport",
+        ),
+    }
 }
 
 fn validate_network_owned_handle_call(
@@ -1068,6 +1606,7 @@ fn validate_network_transport_handle_arg(
 fn infer_network_owned_handle_kind(
     expr: &NirExpr,
     bindings: &BTreeMap<String, NetworkOwnedHandleKind>,
+    function_return_kinds: &BTreeMap<String, Option<NetworkOwnedHandleKind>>,
 ) -> Option<NetworkOwnedHandleKind> {
     match expr {
         NirExpr::CpuExternCall { callee, .. } => match callee.as_str() {
@@ -1079,10 +1618,773 @@ fn infer_network_owned_handle_kind(
             "host_network_accept_owned" => Some(NetworkOwnedHandleKind::StreamTransport),
             _ => None,
         },
-        NirExpr::NetworkValue(inner) => infer_network_owned_handle_kind(inner, bindings),
-        NirExpr::NetworkResult { value, .. } => infer_network_owned_handle_kind(value, bindings),
+        NirExpr::Call { callee, .. } => function_return_kinds.get(callee).copied().flatten(),
+        NirExpr::NetworkValue(inner) => {
+            infer_network_owned_handle_kind(inner, bindings, function_return_kinds)
+        }
+        NirExpr::NetworkResult { value, .. } => {
+            infer_network_owned_handle_kind(value, bindings, function_return_kinds)
+        }
         NirExpr::Var(name) => bindings.get(name).copied(),
         _ => None,
+    }
+}
+
+fn infer_network_function_handle_requirements(
+    module: &NirModule,
+) -> Result<BTreeMap<String, Vec<Option<NetworkOwnedHandleRequirement>>>, String> {
+    let mut requirements = module
+        .functions
+        .iter()
+        .map(|function| (function.name.clone(), vec![None; function.params.len()]))
+        .collect::<BTreeMap<_, _>>();
+    let mut changed = true;
+    while changed {
+        changed = false;
+        for function in &module.functions {
+            let mut next = requirements
+                .get(&function.name)
+                .cloned()
+                .unwrap_or_else(|| vec![None; function.params.len()]);
+            infer_network_param_requirements_in_body(
+                &function.body,
+                &function.params,
+                &mut next,
+                &requirements,
+            )?;
+            if requirements.get(&function.name) != Some(&next) {
+                requirements.insert(function.name.clone(), next);
+                changed = true;
+            }
+        }
+    }
+    Ok(requirements)
+}
+
+fn infer_network_function_return_kinds(
+    module: &NirModule,
+    function_requirements: &BTreeMap<String, Vec<Option<NetworkOwnedHandleRequirement>>>,
+) -> Result<BTreeMap<String, Option<NetworkOwnedHandleKind>>, String> {
+    let mut return_kinds = module
+        .functions
+        .iter()
+        .map(|function| (function.name.clone(), None))
+        .collect::<BTreeMap<_, _>>();
+    let mut changed = true;
+    while changed {
+        changed = false;
+        for function in &module.functions {
+            let mut bindings = BTreeMap::new();
+            seed_network_param_bindings(function, function_requirements, &mut bindings);
+            let next = infer_network_return_kind_in_body(
+                &function.body,
+                &mut bindings,
+                function_requirements,
+                &return_kinds,
+            )?;
+            if return_kinds.get(&function.name) != Some(&next) {
+                return_kinds.insert(function.name.clone(), next);
+                changed = true;
+            }
+        }
+    }
+    Ok(return_kinds)
+}
+
+fn infer_network_return_kind_in_body(
+    body: &[NirStmt],
+    bindings: &mut BTreeMap<String, NetworkOwnedHandleKind>,
+    function_requirements: &BTreeMap<String, Vec<Option<NetworkOwnedHandleRequirement>>>,
+    function_return_kinds: &BTreeMap<String, Option<NetworkOwnedHandleKind>>,
+) -> Result<Option<NetworkOwnedHandleKind>, String> {
+    let mut return_kind = None;
+    for stmt in body {
+        match stmt {
+            NirStmt::Let { name, value, .. } | NirStmt::Const { name, value, .. } => {
+                if let Some(kind) =
+                    infer_network_owned_handle_kind(value, bindings, function_return_kinds)
+                {
+                    bindings.insert(name.clone(), kind);
+                } else {
+                    bindings.remove(name);
+                }
+            }
+            NirStmt::Return(Some(value)) => {
+                let current =
+                    infer_network_owned_handle_kind(value, bindings, function_return_kinds);
+                return_kind = merge_optional_network_owned_handle_kind(return_kind, current);
+            }
+            NirStmt::If {
+                then_body,
+                else_body,
+                ..
+            } => {
+                let mut then_bindings = bindings.clone();
+                let then_kind = infer_network_return_kind_in_body(
+                    then_body,
+                    &mut then_bindings,
+                    function_requirements,
+                    function_return_kinds,
+                )?;
+                let mut else_bindings = bindings.clone();
+                let else_kind = infer_network_return_kind_in_body(
+                    else_body,
+                    &mut else_bindings,
+                    function_requirements,
+                    function_return_kinds,
+                )?;
+                return_kind = merge_optional_network_owned_handle_kind(return_kind, then_kind);
+                return_kind = merge_optional_network_owned_handle_kind(return_kind, else_kind);
+                merge_network_owned_handle_bindings(bindings, &then_bindings, &else_bindings);
+            }
+            NirStmt::While { body, .. } => {
+                let entry_bindings = bindings.clone();
+                let mut loop_bindings = bindings.clone();
+                let loop_kind = infer_network_return_kind_in_body(
+                    body,
+                    &mut loop_bindings,
+                    function_requirements,
+                    function_return_kinds,
+                )?;
+                return_kind = merge_optional_network_owned_handle_kind(return_kind, loop_kind);
+                merge_network_owned_handle_bindings(bindings, &entry_bindings, &loop_bindings);
+            }
+            NirStmt::Print(_)
+            | NirStmt::Await(_)
+            | NirStmt::Expr(_)
+            | NirStmt::Return(None)
+            | NirStmt::Break
+            | NirStmt::Continue => {}
+        }
+    }
+    Ok(return_kind)
+}
+
+fn merge_optional_network_owned_handle_kind(
+    lhs: Option<NetworkOwnedHandleKind>,
+    rhs: Option<NetworkOwnedHandleKind>,
+) -> Option<NetworkOwnedHandleKind> {
+    match (lhs, rhs) {
+        (Some(lhs), Some(rhs)) if lhs == rhs => Some(lhs),
+        (Some(_), Some(_)) => None,
+        (Some(lhs), None) => Some(lhs),
+        (None, Some(rhs)) => Some(rhs),
+        (None, None) => None,
+    }
+}
+
+fn infer_network_param_requirements_in_body(
+    body: &[NirStmt],
+    params: &[nuis_semantics::model::NirParam],
+    requirements: &mut [Option<NetworkOwnedHandleRequirement>],
+    function_requirements: &BTreeMap<String, Vec<Option<NetworkOwnedHandleRequirement>>>,
+) -> Result<(), String> {
+    let mut bindings = params
+        .iter()
+        .enumerate()
+        .map(|(index, param)| (param.name.clone(), NetworkParamHandleOrigin { param_index: index }))
+        .collect::<BTreeMap<_, _>>();
+    infer_network_param_requirements_with_bindings(
+        body,
+        requirements,
+        function_requirements,
+        &mut bindings,
+    )
+}
+
+fn infer_network_param_requirements_with_bindings(
+    body: &[NirStmt],
+    requirements: &mut [Option<NetworkOwnedHandleRequirement>],
+    function_requirements: &BTreeMap<String, Vec<Option<NetworkOwnedHandleRequirement>>>,
+    bindings: &mut BTreeMap<String, NetworkParamHandleOrigin>,
+) -> Result<(), String> {
+    for stmt in body {
+        match stmt {
+            NirStmt::Let { name, value, .. } | NirStmt::Const { name, value, .. } => {
+                if let Some(origin) = infer_network_param_origin(value, bindings) {
+                    bindings.insert(name.clone(), origin);
+                } else {
+                    bindings.remove(name);
+                }
+                infer_network_param_requirements_in_expr(
+                    value,
+                    requirements,
+                    function_requirements,
+                    bindings,
+                )?;
+            }
+            NirStmt::Print(value)
+            | NirStmt::Await(value)
+            | NirStmt::Expr(value)
+            | NirStmt::Return(Some(value)) => infer_network_param_requirements_in_expr(
+                value,
+                requirements,
+                function_requirements,
+                bindings,
+            )?,
+            NirStmt::If {
+                condition,
+                then_body,
+                else_body,
+            } => {
+                infer_network_param_requirements_in_expr(
+                    condition,
+                    requirements,
+                    function_requirements,
+                    bindings,
+                )?;
+                let mut then_bindings = bindings.clone();
+                infer_network_param_requirements_with_bindings(
+                    then_body,
+                    requirements,
+                    function_requirements,
+                    &mut then_bindings,
+                )?;
+                let mut else_bindings = bindings.clone();
+                infer_network_param_requirements_with_bindings(
+                    else_body,
+                    requirements,
+                    function_requirements,
+                    &mut else_bindings,
+                )?;
+                merge_network_param_origin_bindings(bindings, &then_bindings, &else_bindings);
+            }
+            NirStmt::While { condition, body } => {
+                infer_network_param_requirements_in_expr(
+                    condition,
+                    requirements,
+                    function_requirements,
+                    bindings,
+                )?;
+                let entry_bindings = bindings.clone();
+                let mut loop_bindings = bindings.clone();
+                infer_network_param_requirements_with_bindings(
+                    body,
+                    requirements,
+                    function_requirements,
+                    &mut loop_bindings,
+                )?;
+                merge_network_param_origin_bindings(bindings, &entry_bindings, &loop_bindings);
+            }
+            NirStmt::Return(None) | NirStmt::Break | NirStmt::Continue => {}
+        }
+    }
+    Ok(())
+}
+
+fn infer_network_param_requirements_in_expr(
+    expr: &NirExpr,
+    requirements: &mut [Option<NetworkOwnedHandleRequirement>],
+    function_requirements: &BTreeMap<String, Vec<Option<NetworkOwnedHandleRequirement>>>,
+    bindings: &BTreeMap<String, NetworkParamHandleOrigin>,
+) -> Result<(), String> {
+    match expr {
+        NirExpr::CpuExternCall { callee, args, .. } => {
+            infer_network_param_requirement_from_host_call(callee, args, requirements, bindings)?;
+            for arg in args {
+                infer_network_param_requirements_in_expr(
+                    arg,
+                    requirements,
+                    function_requirements,
+                    bindings,
+                )?;
+            }
+        }
+        NirExpr::CpuSpawn { callee, args } | NirExpr::Call { callee, args } => {
+            if let Some(callee_requirements) = function_requirements.get(callee) {
+                for (index, arg) in args.iter().enumerate() {
+                    let Some(Some(requirement)) = callee_requirements.get(index) else {
+                        continue;
+                    };
+                    if let Some(origin) = infer_network_param_origin(arg, bindings) {
+                        merge_network_param_requirement(
+                            requirements,
+                            origin.param_index,
+                            *requirement,
+                            callee,
+                        )?;
+                    }
+                }
+            }
+            for arg in args {
+                infer_network_param_requirements_in_expr(
+                    arg,
+                    requirements,
+                    function_requirements,
+                    bindings,
+                )?;
+            }
+        }
+        NirExpr::Await(inner)
+        | NirExpr::Borrow(inner)
+        | NirExpr::BorrowEnd(inner)
+        | NirExpr::Move(inner)
+        | NirExpr::LoadValue(inner)
+        | NirExpr::LoadNext(inner)
+        | NirExpr::BufferLen(inner)
+        | NirExpr::CpuJoin(inner)
+        | NirExpr::CpuCancel(inner)
+        | NirExpr::CpuJoinResult(inner)
+        | NirExpr::CpuTaskCompleted(inner)
+        | NirExpr::CpuTaskTimedOut(inner)
+        | NirExpr::CpuTaskCancelled(inner)
+        | NirExpr::CpuTaskValue(inner)
+        | NirExpr::DataReady(inner)
+        | NirExpr::DataMoved(inner)
+        | NirExpr::DataWindowed(inner)
+        | NirExpr::DataValue(inner)
+        | NirExpr::DataFreezeWindow(inner)
+        | NirExpr::ShaderPassReady(inner)
+        | NirExpr::ShaderFrameReady(inner)
+        | NirExpr::ShaderValue(inner)
+        | NirExpr::NetworkConfigReady(inner)
+        | NirExpr::NetworkSendReady(inner)
+        | NirExpr::NetworkRecvReady(inner)
+        | NirExpr::NetworkAcceptReady(inner)
+        | NirExpr::NetworkValue(inner)
+        | NirExpr::KernelConfigReady(inner)
+        | NirExpr::KernelValue(inner)
+        | NirExpr::DataOutputPipe(inner)
+        | NirExpr::DataInputPipe(inner)
+        | NirExpr::CpuPresentFrame(inner)
+        | NirExpr::Free(inner)
+        | NirExpr::IsNull(inner) => infer_network_param_requirements_in_expr(
+            inner,
+            requirements,
+            function_requirements,
+            bindings,
+        )?,
+        NirExpr::DataResult { value, .. }
+        | NirExpr::ShaderResult { value, .. }
+        | NirExpr::NetworkResult { value, .. }
+        | NirExpr::KernelResult { value, .. } => infer_network_param_requirements_in_expr(
+            value,
+            requirements,
+            function_requirements,
+            bindings,
+        )?,
+        NirExpr::AllocNode { value, next } => {
+            infer_network_param_requirements_in_expr(
+                value,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+            infer_network_param_requirements_in_expr(
+                next,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+        }
+        NirExpr::AllocBuffer { len, fill } => {
+            infer_network_param_requirements_in_expr(
+                len,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+            infer_network_param_requirements_in_expr(
+                fill,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+        }
+        NirExpr::LoadAt { buffer, index }
+        | NirExpr::DataReadWindow {
+            window: buffer,
+            index,
+        } => {
+            infer_network_param_requirements_in_expr(
+                buffer,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+            infer_network_param_requirements_in_expr(
+                index,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+        }
+        NirExpr::DataWriteWindow { window, index, value }
+        | NirExpr::StoreAt {
+            buffer: window,
+            index,
+            value,
+        } => {
+            infer_network_param_requirements_in_expr(
+                window,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+            infer_network_param_requirements_in_expr(
+                index,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+            infer_network_param_requirements_in_expr(
+                value,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+        }
+        NirExpr::StoreValue { target, value }
+        | NirExpr::StoreNext {
+            target,
+            next: value,
+        } => {
+            infer_network_param_requirements_in_expr(
+                target,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+            infer_network_param_requirements_in_expr(
+                value,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+        }
+        NirExpr::DataCopyWindow { input, offset, len }
+        | NirExpr::DataImmutableWindow { input, offset, len } => {
+            infer_network_param_requirements_in_expr(
+                input,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+            infer_network_param_requirements_in_expr(
+                offset,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+            infer_network_param_requirements_in_expr(
+                len,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+        }
+        NirExpr::DataProfileSendUplink { input, .. }
+        | NirExpr::DataProfileSendDownlink { input, .. }
+        | NirExpr::FieldAccess { base: input, .. }
+        | NirExpr::ShaderProfileRender { packet: input, .. } => infer_network_param_requirements_in_expr(
+            input,
+            requirements,
+            function_requirements,
+            bindings,
+        )?,
+        NirExpr::ShaderProfileColorSeed { base, delta, .. }
+        | NirExpr::ShaderProfileRadiusSeed { base, delta, .. } => {
+            infer_network_param_requirements_in_expr(
+                base,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+            infer_network_param_requirements_in_expr(
+                delta,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+        }
+        NirExpr::ShaderProfileSpeedSeed {
+            delta,
+            scale,
+            base,
+            ..
+        } => {
+            infer_network_param_requirements_in_expr(
+                delta,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+            infer_network_param_requirements_in_expr(
+                scale,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+            infer_network_param_requirements_in_expr(
+                base,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+        }
+        NirExpr::ShaderProfilePacket {
+            color,
+            speed,
+            radius,
+            ..
+        } => {
+            infer_network_param_requirements_in_expr(
+                color,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+            infer_network_param_requirements_in_expr(
+                speed,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+            infer_network_param_requirements_in_expr(
+                radius,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+        }
+        NirExpr::CpuTimeout { task, limit } => {
+            infer_network_param_requirements_in_expr(
+                task,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+            infer_network_param_requirements_in_expr(
+                limit,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+        }
+        NirExpr::MethodCall { receiver, args, .. } => {
+            infer_network_param_requirements_in_expr(
+                receiver,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+            for arg in args {
+                infer_network_param_requirements_in_expr(
+                    arg,
+                    requirements,
+                    function_requirements,
+                    bindings,
+                )?;
+            }
+        }
+        NirExpr::StructLiteral { fields, .. } => {
+            for (_, value) in fields {
+                infer_network_param_requirements_in_expr(
+                    value,
+                    requirements,
+                    function_requirements,
+                    bindings,
+                )?;
+            }
+        }
+        NirExpr::Binary { lhs, rhs, .. } => {
+            infer_network_param_requirements_in_expr(
+                lhs,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+            infer_network_param_requirements_in_expr(
+                rhs,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+        }
+        NirExpr::ShaderBeginPass {
+            target,
+            pipeline,
+            viewport,
+        } => {
+            infer_network_param_requirements_in_expr(
+                target,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+            infer_network_param_requirements_in_expr(
+                pipeline,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+            infer_network_param_requirements_in_expr(
+                viewport,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+        }
+        NirExpr::ShaderDrawInstanced {
+            pass,
+            packet,
+            vertex_count,
+            instance_count,
+        } => {
+            infer_network_param_requirements_in_expr(
+                pass,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+            infer_network_param_requirements_in_expr(
+                packet,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+            infer_network_param_requirements_in_expr(
+                vertex_count,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+            infer_network_param_requirements_in_expr(
+                instance_count,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+fn infer_network_param_requirement_from_host_call(
+    callee: &str,
+    args: &[NirExpr],
+    requirements: &mut [Option<NetworkOwnedHandleRequirement>],
+    bindings: &BTreeMap<String, NetworkParamHandleOrigin>,
+) -> Result<(), String> {
+    let requirement = match callee {
+        "host_network_accept_owned" => Some(NetworkOwnedHandleRequirement::Listener),
+        "host_network_send_owned" | "host_network_recv_owned" => {
+            Some(NetworkOwnedHandleRequirement::Transport)
+        }
+        "host_network_recv_http_status_owned" => {
+            Some(NetworkOwnedHandleRequirement::StreamTransport)
+        }
+        "host_network_close_owned" => Some(NetworkOwnedHandleRequirement::OwnedAny),
+        _ => None,
+    };
+    let Some(requirement) = requirement else {
+        return Ok(());
+    };
+    let Some(origin) = args
+        .first()
+        .and_then(|arg| infer_network_param_origin(arg, bindings))
+    else {
+        return Ok(());
+    };
+    merge_network_param_requirement(requirements, origin.param_index, requirement, callee)
+}
+
+fn merge_network_param_requirement(
+    requirements: &mut [Option<NetworkOwnedHandleRequirement>],
+    index: usize,
+    incoming: NetworkOwnedHandleRequirement,
+    context: &str,
+) -> Result<(), String> {
+    let slot = requirements
+        .get_mut(index)
+        .ok_or_else(|| format!("network handle requirement index {} out of bounds in {}", index, context))?;
+    *slot = Some(match *slot {
+        None => incoming,
+        Some(existing) => merge_network_owned_handle_requirement(existing, incoming).ok_or_else(
+            || {
+                format!(
+                    "function `{}` uses parameter {} as incompatible network handle kinds",
+                    context, index
+                )
+            },
+        )?,
+    });
+    Ok(())
+}
+
+fn merge_network_owned_handle_requirement(
+    lhs: NetworkOwnedHandleRequirement,
+    rhs: NetworkOwnedHandleRequirement,
+) -> Option<NetworkOwnedHandleRequirement> {
+    use NetworkOwnedHandleRequirement as Req;
+    match (lhs, rhs) {
+        (Req::OwnedAny, other) | (other, Req::OwnedAny) => Some(other),
+        (Req::Transport, Req::StreamTransport) | (Req::StreamTransport, Req::Transport) => {
+            Some(Req::StreamTransport)
+        }
+        (lhs, rhs) if lhs == rhs => Some(lhs),
+        _ => None,
+    }
+}
+
+fn infer_network_param_origin(
+    expr: &NirExpr,
+    bindings: &BTreeMap<String, NetworkParamHandleOrigin>,
+) -> Option<NetworkParamHandleOrigin> {
+    match expr {
+        NirExpr::Var(name) => bindings.get(name).copied(),
+        NirExpr::NetworkValue(inner) => infer_network_param_origin(inner, bindings),
+        NirExpr::NetworkResult { value, .. } => infer_network_param_origin(value, bindings),
+        _ => None,
+    }
+}
+
+fn merge_network_param_origin_bindings(
+    bindings: &mut BTreeMap<String, NetworkParamHandleOrigin>,
+    then_bindings: &BTreeMap<String, NetworkParamHandleOrigin>,
+    else_bindings: &BTreeMap<String, NetworkParamHandleOrigin>,
+) {
+    let merged = bindings
+        .keys()
+        .chain(then_bindings.keys())
+        .chain(else_bindings.keys())
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    for name in merged {
+        match (then_bindings.get(&name).copied(), else_bindings.get(&name).copied()) {
+            (Some(lhs), Some(rhs)) if lhs == rhs => {
+                bindings.insert(name, lhs);
+            }
+            _ => {
+                bindings.remove(&name);
+            }
+        }
+    }
+}
+
+fn seed_network_param_bindings(
+    function: &nuis_semantics::model::NirFunction,
+    function_requirements: &BTreeMap<String, Vec<Option<NetworkOwnedHandleRequirement>>>,
+    bindings: &mut BTreeMap<String, NetworkOwnedHandleKind>,
+) {
+    let Some(requirements) = function_requirements.get(&function.name) else {
+        return;
+    };
+    for (index, param) in function.params.iter().enumerate() {
+        let Some(Some(requirement)) = requirements.get(index) else {
+            continue;
+        };
+        let kind = match requirement {
+            NetworkOwnedHandleRequirement::OwnedAny | NetworkOwnedHandleRequirement::Listener => {
+                NetworkOwnedHandleKind::Listener
+            }
+            NetworkOwnedHandleRequirement::Transport
+            | NetworkOwnedHandleRequirement::StreamTransport => {
+                NetworkOwnedHandleKind::StreamTransport
+            }
+        };
+        bindings.insert(param.name.clone(), kind);
     }
 }
 
@@ -1284,6 +2586,118 @@ fn validate_network_profile_slot_requirements(
         "network_profile_protocol_header_bytes",
     )?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use nuis_semantics::model::{NirFunction, NirTypeRef, NirVisibility};
+
+    fn i64_type() -> NirTypeRef {
+        NirTypeRef {
+            name: "i64".to_owned(),
+            generic_args: vec![],
+            is_optional: false,
+            is_ref: false,
+        }
+    }
+
+    fn test_module(body: Vec<NirStmt>) -> NirModule {
+        NirModule {
+            uses: vec![],
+            domain: "cpu".to_owned(),
+            unit: "Main".to_owned(),
+            externs: vec![],
+            extern_interfaces: vec![],
+            consts: vec![],
+            type_aliases: vec![],
+            structs: vec![],
+            traits: vec![],
+            impls: vec![],
+            functions: vec![NirFunction {
+                visibility: NirVisibility::Private,
+                name: "main".to_owned(),
+                annotations: vec![],
+                test_name: None,
+                test_ignored: false,
+                test_should_fail: false,
+                test_reason: None,
+                test_timeout_ms: None,
+                test_clock_domain: None,
+                test_clock_policy: None,
+                is_async: false,
+                generic_params: vec![],
+                params: vec![],
+                return_type: Some(i64_type()),
+                body,
+            }],
+        }
+    }
+
+    fn open_tcp_stream_expr() -> NirExpr {
+        NirExpr::CpuExternCall {
+            abi: "c".to_owned(),
+            interface: None,
+            callee: "host_network_open_tcp_stream".to_owned(),
+            args: vec![NirExpr::Int(443), NirExpr::Int(250)],
+        }
+    }
+
+    #[test]
+    fn network_owned_handle_provenance_merges_matching_if_branches() {
+        let module = test_module(vec![
+            NirStmt::If {
+                condition: NirExpr::Bool(true),
+                then_body: vec![NirStmt::Let {
+                    name: "handle".to_owned(),
+                    ty: Some(i64_type()),
+                    value: open_tcp_stream_expr(),
+                }],
+                else_body: vec![NirStmt::Let {
+                    name: "handle".to_owned(),
+                    ty: Some(i64_type()),
+                    value: open_tcp_stream_expr(),
+                }],
+            },
+            NirStmt::Expr(NirExpr::CpuExternCall {
+                abi: "c".to_owned(),
+                interface: None,
+                callee: "host_network_close_owned".to_owned(),
+                args: vec![NirExpr::Var("handle".to_owned())],
+            }),
+        ]);
+
+        validate_network_owned_handle_provenance(&module, "cpu.Main", "network.NetworkUnit")
+            .unwrap();
+    }
+
+    #[test]
+    fn network_owned_handle_provenance_merges_matching_while_state() {
+        let module = test_module(vec![
+            NirStmt::Let {
+                name: "handle".to_owned(),
+                ty: Some(i64_type()),
+                value: open_tcp_stream_expr(),
+            },
+            NirStmt::While {
+                condition: NirExpr::Bool(true),
+                body: vec![NirStmt::Let {
+                    name: "handle".to_owned(),
+                    ty: Some(i64_type()),
+                    value: open_tcp_stream_expr(),
+                }],
+            },
+            NirStmt::Expr(NirExpr::CpuExternCall {
+                abi: "c".to_owned(),
+                interface: None,
+                callee: "host_network_close_owned".to_owned(),
+                args: vec![NirExpr::Var("handle".to_owned())],
+            }),
+        ]);
+
+        validate_network_owned_handle_provenance(&module, "cpu.Main", "network.NetworkUnit")
+            .unwrap();
+    }
 }
 
 fn validate_network_slot_usage(
