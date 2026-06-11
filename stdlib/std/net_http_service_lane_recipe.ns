@@ -76,6 +76,79 @@ mod cpu Main {
     return network_value(result);
   }
 
+  fn open_listener(
+    local_port: i64,
+    read_timeout_ms: i64,
+    write_timeout_ms: i64
+  ) -> i64 {
+    return host_network_open_tcp_listener(
+      local_port,
+      read_timeout_ms,
+      write_timeout_ms
+    );
+  }
+
+  fn accept_session(
+    listener_handle: i64,
+    read_timeout_ms: i64,
+    write_timeout_ms: i64
+  ) -> NetworkResult<i64> {
+    return network_result(
+      host_network_accept_owned(listener_handle, read_timeout_ms, write_timeout_ms)
+    );
+  }
+
+  fn recv_request(
+    handle: i64,
+    stream_window: i64,
+    recv_window: i64
+  ) -> NetworkResult<i64> {
+    return network_result(host_network_recv_owned(handle, stream_window, recv_window));
+  }
+
+  fn send_response(
+    handle: i64,
+    stream_window: i64,
+    send_window: i64
+  ) -> NetworkResult<i64> {
+    return network_result(host_network_send_owned(handle, stream_window, send_window));
+  }
+
+  fn close_transport(handle: i64) -> i64 {
+    return host_network_close_owned(handle);
+  }
+
+  fn close_listener(listener_handle: i64) -> i64 {
+    return host_network_close_owned(listener_handle);
+  }
+
+  fn estimate_request_head_bytes(
+    protocol_header_bytes: i64,
+    protocol_version: i64
+  ) -> i64 {
+    return protocol_header_bytes + protocol_version + 16;
+  }
+
+  fn estimate_request_body_bytes(
+    stream_window: i64,
+    recv_window: i64,
+    retry_budget: i64
+  ) -> i64 {
+    return stream_window + recv_window + retry_budget;
+  }
+
+  fn estimate_response_head_bytes(protocol_header_bytes: i64) -> i64 {
+    return protocol_header_bytes + 12;
+  }
+
+  fn estimate_response_body_bytes(
+    stream_window: i64,
+    send_window: i64,
+    protocol_kind: i64
+  ) -> i64 {
+    return stream_window + send_window + protocol_kind;
+  }
+
   fn capture_net_http_service_lane_summary() -> NetHttpServiceLaneSummary {
     let argv_count: i64 = host_argv_count();
     let transport_family: i64 = network_profile_transport_family("NetworkUnit");
@@ -91,29 +164,27 @@ mod cpu Main {
     let stream_window: i64 = network_profile_stream_window("NetworkUnit");
     let recv_window: i64 = network_profile_recv_window("NetworkUnit");
     let send_window: i64 = network_profile_send_window("NetworkUnit");
-    let listener_handle: i64 = host_network_open_tcp_listener(
-      local_port,
-      read_timeout_ms,
-      write_timeout_ms
-    );
-    let accept_result: NetworkResult<i64> = network_result(
-      host_network_accept_owned(listener_handle, read_timeout_ms, write_timeout_ms)
-    );
+    let listener_handle: i64 =
+      open_listener(local_port, read_timeout_ms, write_timeout_ms);
+    let accept_result: NetworkResult<i64> =
+      accept_session(listener_handle, read_timeout_ms, write_timeout_ms);
     let accepted_handle: i64 = encode_value(accept_result);
-    let recv_result: NetworkResult<i64> = network_result(
-      host_network_recv_owned(accepted_handle, stream_window, recv_window)
-    );
-    let send_result: NetworkResult<i64> = network_result(
-      host_network_send_owned(accepted_handle, stream_window, send_window)
-    );
+    let recv_result: NetworkResult<i64> =
+      recv_request(accepted_handle, stream_window, recv_window);
+    let send_result: NetworkResult<i64> =
+      send_response(accepted_handle, stream_window, send_window);
     let recv_value: i64 = encode_value(recv_result);
     let send_value: i64 = encode_value(send_result);
-    let request_head_bytes: i64 = protocol_header_bytes + protocol_version + 16;
-    let request_body_bytes: i64 = stream_window + recv_window + retry_budget;
-    let response_head_bytes: i64 = protocol_header_bytes + 12;
-    let response_body_bytes: i64 = stream_window + send_window + protocol_kind;
-    let accepted_close_value: i64 = host_network_close_owned(accepted_handle);
-    let listener_close_value: i64 = host_network_close_owned(listener_handle);
+    let request_head_bytes: i64 =
+      estimate_request_head_bytes(protocol_header_bytes, protocol_version);
+    let request_body_bytes: i64 =
+      estimate_request_body_bytes(stream_window, recv_window, retry_budget);
+    let response_head_bytes: i64 =
+      estimate_response_head_bytes(protocol_header_bytes);
+    let response_body_bytes: i64 =
+      estimate_response_body_bytes(stream_window, send_window, protocol_kind);
+    let accepted_close_value: i64 = close_transport(accepted_handle);
+    let listener_close_value: i64 = close_listener(listener_handle);
     let tick_ns: i64 = host_monotonic_time_ns();
 
     return NetHttpServiceLaneSummary {

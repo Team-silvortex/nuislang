@@ -305,6 +305,89 @@ fn lowers_await_expression_into_value_producing_boundary() {
 }
 
 #[test]
+fn lowers_await_if_expression_branches_into_cpu_effect_nodes() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn one() -> i64 {
+            return 1;
+          }
+
+          async fn two() -> i64 {
+            return 2;
+          }
+
+          async fn main() -> i64 {
+            let value: i64 = await if true {
+              one()
+            } else {
+              two()
+            };
+            return value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let await_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "await")
+        .count();
+
+    assert_eq!(async_call_count, 2);
+    assert_eq!(await_count, 2);
+}
+
+#[test]
+fn lowers_await_match_expression_branches_into_cpu_effect_nodes() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn one() -> i64 {
+            return 1;
+          }
+
+          async fn two() -> i64 {
+            return 2;
+          }
+
+          async fn main() -> i64 {
+            let value: i64 = await match 1 {
+              1 => { one() },
+              _ => { two() }
+            };
+            return value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let await_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "await")
+        .count();
+
+    assert_eq!(async_call_count, 2);
+    assert_eq!(await_count, 2);
+}
+
+#[test]
 fn lowers_recursive_async_call_into_schedule_boundary_and_helper_lane() {
     let module = parse_nuis_module(
         r#"
@@ -349,6 +432,71 @@ fn lowers_recursive_async_call_into_schedule_boundary_and_helper_lane() {
         "expected recursive async lowering to emit helper-lowered calls, found {call_i64_count}"
     );
     assert!(yir.node_lanes.values().any(|lane| lane == "fn:sum_down"));
+}
+
+#[test]
+fn lowers_async_while_with_await_step_and_pure_carry_into_async_loop_chain() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn step(value: i64) -> i64 {
+            return value + 1;
+          }
+
+          async fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            while value < 3 {
+              let value: i64 = await step(value);
+              let acc: i64 = acc + value;
+            }
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_async_chain")
+        .expect("expected loop_while_i64_async_chain node");
+    assert_eq!(loop_node.op.args[2], "step");
+    assert_eq!(loop_node.op.args[3], "lt");
+    assert_eq!(loop_node.op.args[5], "add_current");
+}
+
+#[test]
+fn rejects_async_while_with_await_step_and_flow_control() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn step(value: i64) -> i64 {
+            return value + 1;
+          }
+
+          async fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            while value < 3 {
+              let value: i64 = await step(value);
+              if value > 1 {
+                break;
+              }
+              let acc: i64 = acc + value;
+            }
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let error = lower_nir_to_yir_builtin_cpu(&module).unwrap_err();
+
+    assert!(error.contains("async/task-driven `while` loops are not supported yet in lowering"));
 }
 
 #[test]
@@ -1018,6 +1166,110 @@ fn lowers_async_network_result_recursive_control_flow_observation_path() {
         .nodes
         .iter()
         .any(|node| node.op.module == "network" && node.op.instruction == "value"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.name == "scheduler_contract_network_lane_policy_type"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.name == "scheduler_contract_network_result_capability_type"));
+}
+
+#[test]
+fn lowers_async_network_result_task_policy_observation_path() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn consume_network_result(result: NetworkResult<i64>) -> i64 {
+            if network_send_ready(result) {
+              return network_value(result) + 1;
+            }
+            if network_recv_ready(result) {
+              return network_value(result) + 2;
+            }
+            if network_config_ready(result) {
+              return network_value(result) + 3;
+            }
+            return 0;
+          }
+
+          fn main() -> i64 {
+            let primary: NetworkResult<i64> =
+              network_result(network_profile_send_window("NetworkUnit"));
+            let fallback: NetworkResult<i64> =
+              network_result(network_profile_recv_window("NetworkUnit"));
+            let config_only: NetworkResult<i64> =
+              network_result(network_profile_bind_core("NetworkUnit"));
+
+            let completed_result: TaskResult<i64> =
+              join_result(spawn(consume_network_result(primary)));
+            let timed_result: TaskResult<i64> =
+              join_result(timeout(spawn(consume_network_result(fallback)), 0));
+            let cancelled_result: TaskResult<i64> =
+              join_result(cancel(spawn(consume_network_result(config_only))));
+
+            if task_completed(completed_result)
+              && task_timed_out(timed_result)
+              && task_cancelled(cancelled_result) {
+              return task_value(completed_result);
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "join_result"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "timeout"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "cancel"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "task_completed"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "task_timed_out"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "task_cancelled"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "task_value"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "network" && node.op.instruction == "observe"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "network" && node.op.instruction == "is_send_ready"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "network" && node.op.instruction == "is_recv_ready"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "network" && node.op.instruction == "is_config_ready"));
     assert!(yir
         .nodes
         .iter()

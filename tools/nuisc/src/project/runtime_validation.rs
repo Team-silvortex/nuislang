@@ -611,6 +611,15 @@ enum NetworkOwnedHandleKind {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
+enum NetworkOwnedHandleBinding {
+    Concrete(NetworkOwnedHandleKind),
+    Param {
+        index: usize,
+        requirement: NetworkOwnedHandleRequirement,
+    },
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum NetworkOwnedHandleRequirement {
     OwnedAny,
     Listener,
@@ -619,8 +628,9 @@ enum NetworkOwnedHandleRequirement {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-struct NetworkParamHandleOrigin {
-    param_index: usize,
+enum NetworkOwnedHandleReturn {
+    Concrete(NetworkOwnedHandleKind),
+    ParamIndex(usize),
 }
 
 fn validate_network_owned_handle_shape(
@@ -705,9 +715,9 @@ fn validate_network_owned_handle_provenance_in_body(
     body: &[NirStmt],
     from: &str,
     to: &str,
-    bindings: &mut BTreeMap<String, NetworkOwnedHandleKind>,
+    bindings: &mut BTreeMap<String, NetworkOwnedHandleBinding>,
     function_requirements: &BTreeMap<String, Vec<Option<NetworkOwnedHandleRequirement>>>,
-    function_return_kinds: &BTreeMap<String, Option<NetworkOwnedHandleKind>>,
+    function_return_kinds: &BTreeMap<String, Option<NetworkOwnedHandleReturn>>,
 ) -> Result<(), String> {
     for stmt in body {
         match stmt {
@@ -819,9 +829,9 @@ fn validate_network_owned_handle_provenance_in_body(
 }
 
 fn merge_network_owned_handle_bindings(
-    bindings: &mut BTreeMap<String, NetworkOwnedHandleKind>,
-    then_bindings: &BTreeMap<String, NetworkOwnedHandleKind>,
-    else_bindings: &BTreeMap<String, NetworkOwnedHandleKind>,
+    bindings: &mut BTreeMap<String, NetworkOwnedHandleBinding>,
+    then_bindings: &BTreeMap<String, NetworkOwnedHandleBinding>,
+    else_bindings: &BTreeMap<String, NetworkOwnedHandleBinding>,
 ) {
     let merged = bindings
         .keys()
@@ -848,9 +858,9 @@ fn validate_network_owned_handle_provenance_in_expr(
     expr: &NirExpr,
     from: &str,
     to: &str,
-    bindings: &BTreeMap<String, NetworkOwnedHandleKind>,
+    bindings: &BTreeMap<String, NetworkOwnedHandleBinding>,
     function_requirements: &BTreeMap<String, Vec<Option<NetworkOwnedHandleRequirement>>>,
-    function_return_kinds: &BTreeMap<String, Option<NetworkOwnedHandleKind>>,
+    function_return_kinds: &BTreeMap<String, Option<NetworkOwnedHandleReturn>>,
 ) -> Result<(), String> {
     match expr {
         NirExpr::CpuExternCall { callee, args, .. } => {
@@ -1393,7 +1403,7 @@ fn validate_network_function_call_requirements(
     args: &[NirExpr],
     from: &str,
     to: &str,
-    bindings: &BTreeMap<String, NetworkOwnedHandleKind>,
+    bindings: &BTreeMap<String, NetworkOwnedHandleBinding>,
     function_requirements: &BTreeMap<String, Vec<Option<NetworkOwnedHandleRequirement>>>,
 ) -> Result<(), String> {
     let Some(requirements) = function_requirements.get(callee) else {
@@ -1424,7 +1434,7 @@ fn validate_network_call_arg_requirement(
     requirement: NetworkOwnedHandleRequirement,
     from: &str,
     to: &str,
-    bindings: &BTreeMap<String, NetworkOwnedHandleKind>,
+    bindings: &BTreeMap<String, NetworkOwnedHandleBinding>,
 ) -> Result<(), String> {
     match requirement {
         NetworkOwnedHandleRequirement::OwnedAny => {
@@ -1472,7 +1482,7 @@ fn validate_network_owned_handle_call(
     args: &[NirExpr],
     from: &str,
     to: &str,
-    bindings: &BTreeMap<String, NetworkOwnedHandleKind>,
+    bindings: &BTreeMap<String, NetworkOwnedHandleBinding>,
 ) -> Result<(), String> {
     match callee {
         "host_network_accept_owned" => {
@@ -1532,7 +1542,7 @@ fn validate_network_owned_handle_arg(
     expected: NetworkOwnedHandleKind,
     from: &str,
     to: &str,
-    bindings: &BTreeMap<String, NetworkOwnedHandleKind>,
+    bindings: &BTreeMap<String, NetworkOwnedHandleBinding>,
     expected_label: &str,
 ) -> Result<(), String> {
     let Some(arg) = arg else {
@@ -1540,8 +1550,16 @@ fn validate_network_owned_handle_arg(
     };
     match arg {
         NirExpr::Var(name) => match bindings.get(name).copied() {
-            Some(kind) if kind == expected => Ok(()),
-            Some(NetworkOwnedHandleKind::DatagramTransport)
+            Some(NetworkOwnedHandleBinding::Concrete(kind)) if kind == expected => Ok(()),
+            Some(NetworkOwnedHandleBinding::Param {
+                requirement: NetworkOwnedHandleRequirement::Listener,
+                ..
+            }) if expected == NetworkOwnedHandleKind::Listener => Ok(()),
+            Some(NetworkOwnedHandleBinding::Param {
+                requirement: NetworkOwnedHandleRequirement::StreamTransport,
+                ..
+            }) if expected == NetworkOwnedHandleKind::StreamTransport => Ok(()),
+            Some(NetworkOwnedHandleBinding::Concrete(NetworkOwnedHandleKind::DatagramTransport))
                 if expected == NetworkOwnedHandleKind::StreamTransport =>
             {
                 Err(format!(
@@ -1549,16 +1567,40 @@ fn validate_network_owned_handle_arg(
                     from, to, callee, expected_label, name
                 ))
             }
-            Some(NetworkOwnedHandleKind::Listener) => Err(format!(
+            Some(NetworkOwnedHandleBinding::Concrete(NetworkOwnedHandleKind::Listener))
+            | Some(NetworkOwnedHandleBinding::Param {
+                requirement: NetworkOwnedHandleRequirement::Listener,
+                ..
+            }) => Err(format!(
                 "project link `{}` -> `{}` requires `{}` to consume a {} handle variable, but `{}` comes from a listener-owned source",
                 from, to, callee, expected_label, name
             )),
-            Some(NetworkOwnedHandleKind::StreamTransport) => Err(format!(
+            Some(NetworkOwnedHandleBinding::Concrete(NetworkOwnedHandleKind::StreamTransport))
+            | Some(NetworkOwnedHandleBinding::Param {
+                requirement: NetworkOwnedHandleRequirement::StreamTransport,
+                ..
+            }) => Err(format!(
                 "project link `{}` -> `{}` requires `{}` to consume a {} handle variable, but `{}` comes from a stream-owned source",
                 from, to, callee, expected_label, name
             )),
-            Some(NetworkOwnedHandleKind::DatagramTransport) => Err(format!(
-                "project link `{}` -> `{}` requires `{}` to consume a {} handle variable, but `{}` comes from a datagram-owned source",
+            Some(NetworkOwnedHandleBinding::Concrete(NetworkOwnedHandleKind::DatagramTransport)) => {
+                Err(format!(
+                    "project link `{}` -> `{}` requires `{}` to consume a {} handle variable, but `{}` comes from a datagram-owned source",
+                    from, to, callee, expected_label, name
+                ))
+            }
+            Some(NetworkOwnedHandleBinding::Param {
+                requirement: NetworkOwnedHandleRequirement::Transport,
+                ..
+            }) => Err(format!(
+                "project link `{}` -> `{}` requires `{}` to consume a {} handle variable, but `{}` only guarantees a generic transport-owned source",
+                from, to, callee, expected_label, name
+            )),
+            Some(NetworkOwnedHandleBinding::Param {
+                requirement: NetworkOwnedHandleRequirement::OwnedAny,
+                ..
+            }) => Err(format!(
+                "project link `{}` -> `{}` requires `{}` to consume a {} handle variable, but `{}` only guarantees an owned network source",
                 from, to, callee, expected_label, name
             )),
             None => Err(format!(
@@ -1578,17 +1620,36 @@ fn validate_network_transport_handle_arg(
     arg: Option<&NirExpr>,
     from: &str,
     to: &str,
-    bindings: &BTreeMap<String, NetworkOwnedHandleKind>,
+    bindings: &BTreeMap<String, NetworkOwnedHandleBinding>,
 ) -> Result<(), String> {
     let Some(arg) = arg else {
         return Ok(());
     };
     match arg {
         NirExpr::Var(name) => match bindings.get(name).copied() {
-            Some(NetworkOwnedHandleKind::StreamTransport)
-            | Some(NetworkOwnedHandleKind::DatagramTransport) => Ok(()),
-            Some(NetworkOwnedHandleKind::Listener) => Err(format!(
+            Some(NetworkOwnedHandleBinding::Concrete(NetworkOwnedHandleKind::StreamTransport))
+            | Some(NetworkOwnedHandleBinding::Concrete(NetworkOwnedHandleKind::DatagramTransport))
+            | Some(NetworkOwnedHandleBinding::Param {
+                requirement: NetworkOwnedHandleRequirement::Transport,
+                ..
+            })
+            | Some(NetworkOwnedHandleBinding::Param {
+                requirement: NetworkOwnedHandleRequirement::StreamTransport,
+                ..
+            }) => Ok(()),
+            Some(NetworkOwnedHandleBinding::Concrete(NetworkOwnedHandleKind::Listener))
+            | Some(NetworkOwnedHandleBinding::Param {
+                requirement: NetworkOwnedHandleRequirement::Listener,
+                ..
+            }) => Err(format!(
                 "project link `{}` -> `{}` requires `{}` to consume a transport handle variable, but `{}` comes from a listener-owned source",
+                from, to, callee, name
+            )),
+            Some(NetworkOwnedHandleBinding::Param {
+                requirement: NetworkOwnedHandleRequirement::OwnedAny,
+                ..
+            }) => Err(format!(
+                "project link `{}` -> `{}` requires `{}` to consume a transport handle variable, but `{}` only guarantees an owned network source",
                 from, to, callee, name
             )),
             None => Err(format!(
@@ -1605,20 +1666,32 @@ fn validate_network_transport_handle_arg(
 
 fn infer_network_owned_handle_kind(
     expr: &NirExpr,
-    bindings: &BTreeMap<String, NetworkOwnedHandleKind>,
-    function_return_kinds: &BTreeMap<String, Option<NetworkOwnedHandleKind>>,
-) -> Option<NetworkOwnedHandleKind> {
+    bindings: &BTreeMap<String, NetworkOwnedHandleBinding>,
+    function_return_kinds: &BTreeMap<String, Option<NetworkOwnedHandleReturn>>,
+) -> Option<NetworkOwnedHandleBinding> {
     match expr {
         NirExpr::CpuExternCall { callee, .. } => match callee.as_str() {
-            "host_network_open_tcp_listener" => Some(NetworkOwnedHandleKind::Listener),
-            "host_network_open_tcp_stream" => Some(NetworkOwnedHandleKind::StreamTransport),
-            "host_network_open_udp_datagram" | "host_network_bind_udp_datagram" => {
-                Some(NetworkOwnedHandleKind::DatagramTransport)
+            "host_network_open_tcp_listener" => {
+                Some(NetworkOwnedHandleBinding::Concrete(NetworkOwnedHandleKind::Listener))
             }
-            "host_network_accept_owned" => Some(NetworkOwnedHandleKind::StreamTransport),
+            "host_network_open_tcp_stream" => Some(NetworkOwnedHandleBinding::Concrete(
+                NetworkOwnedHandleKind::StreamTransport,
+            )),
+            "host_network_open_udp_datagram" | "host_network_bind_udp_datagram" => {
+                Some(NetworkOwnedHandleBinding::Concrete(
+                    NetworkOwnedHandleKind::DatagramTransport,
+                ))
+            }
+            "host_network_accept_owned" => Some(NetworkOwnedHandleBinding::Concrete(
+                NetworkOwnedHandleKind::StreamTransport,
+            )),
             _ => None,
         },
-        NirExpr::Call { callee, .. } => function_return_kinds.get(callee).copied().flatten(),
+        NirExpr::Call { callee, args } => function_return_kinds
+            .get(callee)
+            .copied()
+            .flatten()
+            .and_then(|summary| resolve_network_owned_handle_return(summary, args, bindings, function_return_kinds)),
         NirExpr::NetworkValue(inner) => {
             infer_network_owned_handle_kind(inner, bindings, function_return_kinds)
         }
@@ -1627,6 +1700,20 @@ fn infer_network_owned_handle_kind(
         }
         NirExpr::Var(name) => bindings.get(name).copied(),
         _ => None,
+    }
+}
+
+fn resolve_network_owned_handle_return(
+    summary: NetworkOwnedHandleReturn,
+    args: &[NirExpr],
+    bindings: &BTreeMap<String, NetworkOwnedHandleBinding>,
+    function_return_kinds: &BTreeMap<String, Option<NetworkOwnedHandleReturn>>,
+) -> Option<NetworkOwnedHandleBinding> {
+    match summary {
+        NetworkOwnedHandleReturn::Concrete(kind) => Some(NetworkOwnedHandleBinding::Concrete(kind)),
+        NetworkOwnedHandleReturn::ParamIndex(index) => args
+            .get(index)
+            .and_then(|arg| infer_network_owned_handle_kind(arg, bindings, function_return_kinds)),
     }
 }
 
@@ -1664,7 +1751,7 @@ fn infer_network_function_handle_requirements(
 fn infer_network_function_return_kinds(
     module: &NirModule,
     function_requirements: &BTreeMap<String, Vec<Option<NetworkOwnedHandleRequirement>>>,
-) -> Result<BTreeMap<String, Option<NetworkOwnedHandleKind>>, String> {
+) -> Result<BTreeMap<String, Option<NetworkOwnedHandleReturn>>, String> {
     let mut return_kinds = module
         .functions
         .iter()
@@ -1693,10 +1780,10 @@ fn infer_network_function_return_kinds(
 
 fn infer_network_return_kind_in_body(
     body: &[NirStmt],
-    bindings: &mut BTreeMap<String, NetworkOwnedHandleKind>,
+    bindings: &mut BTreeMap<String, NetworkOwnedHandleBinding>,
     function_requirements: &BTreeMap<String, Vec<Option<NetworkOwnedHandleRequirement>>>,
-    function_return_kinds: &BTreeMap<String, Option<NetworkOwnedHandleKind>>,
-) -> Result<Option<NetworkOwnedHandleKind>, String> {
+    function_return_kinds: &BTreeMap<String, Option<NetworkOwnedHandleReturn>>,
+) -> Result<Option<NetworkOwnedHandleReturn>, String> {
     let mut return_kind = None;
     for stmt in body {
         match stmt {
@@ -1710,8 +1797,8 @@ fn infer_network_return_kind_in_body(
                 }
             }
             NirStmt::Return(Some(value)) => {
-                let current =
-                    infer_network_owned_handle_kind(value, bindings, function_return_kinds);
+                let current = infer_network_owned_handle_kind(value, bindings, function_return_kinds)
+                    .and_then(binding_to_network_owned_handle_return);
                 return_kind = merge_optional_network_owned_handle_kind(return_kind, current);
             }
             NirStmt::If {
@@ -1761,15 +1848,24 @@ fn infer_network_return_kind_in_body(
 }
 
 fn merge_optional_network_owned_handle_kind(
-    lhs: Option<NetworkOwnedHandleKind>,
-    rhs: Option<NetworkOwnedHandleKind>,
-) -> Option<NetworkOwnedHandleKind> {
+    lhs: Option<NetworkOwnedHandleReturn>,
+    rhs: Option<NetworkOwnedHandleReturn>,
+) -> Option<NetworkOwnedHandleReturn> {
     match (lhs, rhs) {
         (Some(lhs), Some(rhs)) if lhs == rhs => Some(lhs),
         (Some(_), Some(_)) => None,
         (Some(lhs), None) => Some(lhs),
         (None, Some(rhs)) => Some(rhs),
         (None, None) => None,
+    }
+}
+
+fn binding_to_network_owned_handle_return(
+    binding: NetworkOwnedHandleBinding,
+) -> Option<NetworkOwnedHandleReturn> {
+    match binding {
+        NetworkOwnedHandleBinding::Concrete(kind) => Some(NetworkOwnedHandleReturn::Concrete(kind)),
+        NetworkOwnedHandleBinding::Param { index, .. } => Some(NetworkOwnedHandleReturn::ParamIndex(index)),
     }
 }
 
@@ -1782,7 +1878,7 @@ fn infer_network_param_requirements_in_body(
     let mut bindings = params
         .iter()
         .enumerate()
-        .map(|(index, param)| (param.name.clone(), NetworkParamHandleOrigin { param_index: index }))
+        .map(|(index, param)| (param.name.clone(), index))
         .collect::<BTreeMap<_, _>>();
     infer_network_param_requirements_with_bindings(
         body,
@@ -1796,7 +1892,7 @@ fn infer_network_param_requirements_with_bindings(
     body: &[NirStmt],
     requirements: &mut [Option<NetworkOwnedHandleRequirement>],
     function_requirements: &BTreeMap<String, Vec<Option<NetworkOwnedHandleRequirement>>>,
-    bindings: &mut BTreeMap<String, NetworkParamHandleOrigin>,
+    bindings: &mut BTreeMap<String, usize>,
 ) -> Result<(), String> {
     for stmt in body {
         match stmt {
@@ -1876,7 +1972,7 @@ fn infer_network_param_requirements_in_expr(
     expr: &NirExpr,
     requirements: &mut [Option<NetworkOwnedHandleRequirement>],
     function_requirements: &BTreeMap<String, Vec<Option<NetworkOwnedHandleRequirement>>>,
-    bindings: &BTreeMap<String, NetworkParamHandleOrigin>,
+    bindings: &BTreeMap<String, usize>,
 ) -> Result<(), String> {
     match expr {
         NirExpr::CpuExternCall { callee, args, .. } => {
@@ -1897,12 +1993,7 @@ fn infer_network_param_requirements_in_expr(
                         continue;
                     };
                     if let Some(origin) = infer_network_param_origin(arg, bindings) {
-                        merge_network_param_requirement(
-                            requirements,
-                            origin.param_index,
-                            *requirement,
-                            callee,
-                        )?;
+                        merge_network_param_requirement(requirements, origin, *requirement, callee)?;
                     }
                 }
             }
@@ -2265,7 +2356,7 @@ fn infer_network_param_requirement_from_host_call(
     callee: &str,
     args: &[NirExpr],
     requirements: &mut [Option<NetworkOwnedHandleRequirement>],
-    bindings: &BTreeMap<String, NetworkParamHandleOrigin>,
+    bindings: &BTreeMap<String, usize>,
 ) -> Result<(), String> {
     let requirement = match callee {
         "host_network_accept_owned" => Some(NetworkOwnedHandleRequirement::Listener),
@@ -2287,7 +2378,7 @@ fn infer_network_param_requirement_from_host_call(
     else {
         return Ok(());
     };
-    merge_network_param_requirement(requirements, origin.param_index, requirement, callee)
+    merge_network_param_requirement(requirements, origin, requirement, callee)
 }
 
 fn merge_network_param_requirement(
@@ -2330,8 +2421,8 @@ fn merge_network_owned_handle_requirement(
 
 fn infer_network_param_origin(
     expr: &NirExpr,
-    bindings: &BTreeMap<String, NetworkParamHandleOrigin>,
-) -> Option<NetworkParamHandleOrigin> {
+    bindings: &BTreeMap<String, usize>,
+) -> Option<usize> {
     match expr {
         NirExpr::Var(name) => bindings.get(name).copied(),
         NirExpr::NetworkValue(inner) => infer_network_param_origin(inner, bindings),
@@ -2341,9 +2432,9 @@ fn infer_network_param_origin(
 }
 
 fn merge_network_param_origin_bindings(
-    bindings: &mut BTreeMap<String, NetworkParamHandleOrigin>,
-    then_bindings: &BTreeMap<String, NetworkParamHandleOrigin>,
-    else_bindings: &BTreeMap<String, NetworkParamHandleOrigin>,
+    bindings: &mut BTreeMap<String, usize>,
+    then_bindings: &BTreeMap<String, usize>,
+    else_bindings: &BTreeMap<String, usize>,
 ) {
     let merged = bindings
         .keys()
@@ -2366,7 +2457,7 @@ fn merge_network_param_origin_bindings(
 fn seed_network_param_bindings(
     function: &nuis_semantics::model::NirFunction,
     function_requirements: &BTreeMap<String, Vec<Option<NetworkOwnedHandleRequirement>>>,
-    bindings: &mut BTreeMap<String, NetworkOwnedHandleKind>,
+    bindings: &mut BTreeMap<String, NetworkOwnedHandleBinding>,
 ) {
     let Some(requirements) = function_requirements.get(&function.name) else {
         return;
@@ -2375,16 +2466,13 @@ fn seed_network_param_bindings(
         let Some(Some(requirement)) = requirements.get(index) else {
             continue;
         };
-        let kind = match requirement {
-            NetworkOwnedHandleRequirement::OwnedAny | NetworkOwnedHandleRequirement::Listener => {
-                NetworkOwnedHandleKind::Listener
-            }
-            NetworkOwnedHandleRequirement::Transport
-            | NetworkOwnedHandleRequirement::StreamTransport => {
-                NetworkOwnedHandleKind::StreamTransport
-            }
-        };
-        bindings.insert(param.name.clone(), kind);
+        bindings.insert(
+            param.name.clone(),
+            NetworkOwnedHandleBinding::Param {
+                index,
+                requirement: *requirement,
+            },
+        );
     }
 }
 
@@ -2591,7 +2679,7 @@ fn validate_network_profile_slot_requirements(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use nuis_semantics::model::{NirFunction, NirTypeRef, NirVisibility};
+    use nuis_semantics::model::{NirFunction, NirNetworkFlowState, NirParam, NirTypeRef, NirVisibility};
 
     fn i64_type() -> NirTypeRef {
         NirTypeRef {
@@ -2603,6 +2691,26 @@ mod tests {
     }
 
     fn test_module(body: Vec<NirStmt>) -> NirModule {
+        test_module_with_functions(vec![NirFunction {
+            visibility: NirVisibility::Private,
+            name: "main".to_owned(),
+            annotations: vec![],
+            test_name: None,
+            test_ignored: false,
+            test_should_fail: false,
+            test_reason: None,
+            test_timeout_ms: None,
+            test_clock_domain: None,
+            test_clock_policy: None,
+            is_async: false,
+            generic_params: vec![],
+            params: vec![],
+            return_type: Some(i64_type()),
+            body,
+        }])
+    }
+
+    fn test_module_with_functions(functions: Vec<NirFunction>) -> NirModule {
         NirModule {
             uses: vec![],
             domain: "cpu".to_owned(),
@@ -2614,23 +2722,41 @@ mod tests {
             structs: vec![],
             traits: vec![],
             impls: vec![],
-            functions: vec![NirFunction {
-                visibility: NirVisibility::Private,
-                name: "main".to_owned(),
-                annotations: vec![],
-                test_name: None,
-                test_ignored: false,
-                test_should_fail: false,
-                test_reason: None,
-                test_timeout_ms: None,
-                test_clock_domain: None,
-                test_clock_policy: None,
-                is_async: false,
-                generic_params: vec![],
-                params: vec![],
-                return_type: Some(i64_type()),
-                body,
-            }],
+            functions,
+        }
+    }
+
+    fn network_result_i64_type() -> NirTypeRef {
+        NirTypeRef {
+            name: "NetworkResult".to_owned(),
+            generic_args: vec![i64_type()],
+            is_optional: false,
+            is_ref: false,
+        }
+    }
+
+    fn private_fn(
+        name: &str,
+        params: Vec<NirParam>,
+        return_type: Option<NirTypeRef>,
+        body: Vec<NirStmt>,
+    ) -> NirFunction {
+        NirFunction {
+            visibility: NirVisibility::Private,
+            name: name.to_owned(),
+            annotations: vec![],
+            test_name: None,
+            test_ignored: false,
+            test_should_fail: false,
+            test_reason: None,
+            test_timeout_ms: None,
+            test_clock_domain: None,
+            test_clock_policy: None,
+            is_async: false,
+            generic_params: vec![],
+            params,
+            return_type,
+            body,
         }
     }
 
@@ -2697,6 +2823,102 @@ mod tests {
 
         validate_network_owned_handle_provenance(&module, "cpu.Main", "network.NetworkUnit")
             .unwrap();
+    }
+
+    #[test]
+    fn network_owned_handle_provenance_accepts_network_result_wrapped_helper_return() {
+        let module = test_module_with_functions(vec![
+            private_fn(
+                "open_handle_result",
+                vec![],
+                Some(network_result_i64_type()),
+                vec![NirStmt::Return(Some(NirExpr::NetworkResult {
+                    value: Box::new(open_tcp_stream_expr()),
+                    state: NirNetworkFlowState::ConfigReady,
+                }))],
+            ),
+            private_fn(
+                "main",
+                vec![],
+                Some(i64_type()),
+                vec![
+                    NirStmt::Let {
+                        name: "opened".to_owned(),
+                        ty: Some(network_result_i64_type()),
+                        value: NirExpr::Call {
+                            callee: "open_handle_result".to_owned(),
+                            args: vec![],
+                        },
+                    },
+                    NirStmt::Let {
+                        name: "handle".to_owned(),
+                        ty: Some(i64_type()),
+                        value: NirExpr::NetworkValue(Box::new(NirExpr::Var("opened".to_owned()))),
+                    },
+                    NirStmt::Expr(NirExpr::CpuExternCall {
+                        abi: "c".to_owned(),
+                        interface: None,
+                        callee: "host_network_close_owned".to_owned(),
+                        args: vec![NirExpr::Var("handle".to_owned())],
+                    }),
+                ],
+            ),
+        ]);
+
+        validate_network_owned_handle_provenance(&module, "cpu.Main", "network.NetworkUnit")
+            .unwrap();
+    }
+
+    #[test]
+    fn network_owned_handle_provenance_rejects_network_result_wrapped_listener_return_for_send() {
+        let module = test_module_with_functions(vec![
+            private_fn(
+                "open_listener_result",
+                vec![],
+                Some(network_result_i64_type()),
+                vec![NirStmt::Return(Some(NirExpr::NetworkResult {
+                    value: Box::new(NirExpr::CpuExternCall {
+                        abi: "c".to_owned(),
+                        interface: None,
+                        callee: "host_network_open_tcp_listener".to_owned(),
+                        args: vec![NirExpr::Int(9000), NirExpr::Int(125), NirExpr::Int(150)],
+                    }),
+                    state: NirNetworkFlowState::ConfigReady,
+                }))],
+            ),
+            private_fn(
+                "main",
+                vec![],
+                Some(i64_type()),
+                vec![
+                    NirStmt::Let {
+                        name: "opened".to_owned(),
+                        ty: Some(network_result_i64_type()),
+                        value: NirExpr::Call {
+                            callee: "open_listener_result".to_owned(),
+                            args: vec![],
+                        },
+                    },
+                    NirStmt::Let {
+                        name: "handle".to_owned(),
+                        ty: Some(i64_type()),
+                        value: NirExpr::NetworkValue(Box::new(NirExpr::Var("opened".to_owned()))),
+                    },
+                    NirStmt::Expr(NirExpr::CpuExternCall {
+                        abi: "c".to_owned(),
+                        interface: None,
+                        callee: "host_network_send_owned".to_owned(),
+                        args: vec![NirExpr::Var("handle".to_owned()), NirExpr::Int(64), NirExpr::Int(32)],
+                    }),
+                ],
+            ),
+        ]);
+
+        let err =
+            validate_network_owned_handle_provenance(&module, "cpu.Main", "network.NetworkUnit")
+                .unwrap_err();
+        assert!(err.contains("host_network_send_owned"), "{err}");
+        assert!(err.contains("listener-owned source"), "{err}");
     }
 }
 

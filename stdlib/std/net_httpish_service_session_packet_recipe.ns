@@ -27,7 +27,7 @@ mod cpu Main {
     status_code: i64,
     body_code: i64,
     staged_total: i64,
-    lane_value: i64,
+    packet_value: i64,
     tick_ns: i64
   }
 
@@ -37,6 +37,27 @@ mod cpu Main {
 
   async fn recv_fallback(seed: i64) -> i64 {
     return seed + 4;
+  }
+
+  fn build_accept_plan(
+    endpoint_kind: i64,
+    protocol_kind: i64,
+    protocol_version: i64,
+    timeout_budget: i64
+  ) -> NetHttpishAcceptPlan {
+    return NetHttpishAcceptPlan {
+      listen_code: 700 + endpoint_kind,
+      route_code: 900 + protocol_kind + protocol_version,
+      timeout_ns: timeout_budget
+    };
+  }
+
+  fn run_primary_recv(plan: NetHttpishAcceptPlan) -> TaskResult<i64> {
+    return join_result(timeout(spawn(recv_primary(plan.route_code)), plan.timeout_ns));
+  }
+
+  fn run_fallback_recv(plan: NetHttpishAcceptPlan) -> TaskResult<i64> {
+    return join_result(spawn(recv_fallback(plan.listen_code)));
   }
 
   fn selected_task_value(result: TaskResult<i64>) -> i64 {
@@ -92,6 +113,28 @@ mod cpu Main {
     };
   }
 
+  fn compute_packet_value(
+    argv_count: i64,
+    endpoint_kind: i64,
+    protocol_kind: i64,
+    protocol_version: i64,
+    protocol_header_bytes: i64,
+    timeout_budget: i64,
+    retry_budget: i64,
+    packet: NetHttpishServicePacket
+  ) -> i64 {
+    return argv_count
+      + endpoint_kind
+      + protocol_kind
+      + protocol_version
+      + protocol_header_bytes
+      + timeout_budget
+      + retry_budget
+      + packet.status_code
+      + packet.body_code
+      + packet.staged_total;
+  }
+
   fn capture_net_httpish_service_session_packet_summary()
     -> NetHttpishServiceSessionPacketSummary {
     let argv_count: i64 = host_argv_count();
@@ -103,16 +146,14 @@ mod cpu Main {
     let timeout_budget: i64 = network_profile_timeout_budget("NetworkUnit");
     let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
     let tick_ns: i64 = host_monotonic_time_ns();
-    let accept_plan: NetHttpishAcceptPlan = NetHttpishAcceptPlan {
-      listen_code: 700 + endpoint_kind,
-      route_code: 900 + protocol_kind + protocol_version,
-      timeout_ns: timeout_budget
-    };
-    let primary_result: TaskResult<i64> = join_result(
-      timeout(spawn(recv_primary(accept_plan.route_code)), accept_plan.timeout_ns)
+    let accept_plan: NetHttpishAcceptPlan = build_accept_plan(
+      endpoint_kind,
+      protocol_kind,
+      protocol_version,
+      timeout_budget
     );
-    let fallback_result: TaskResult<i64> =
-      join_result(spawn(recv_fallback(accept_plan.listen_code)));
+    let primary_result: TaskResult<i64> = run_primary_recv(accept_plan);
+    let fallback_result: TaskResult<i64> = run_fallback_recv(accept_plan);
     let packet: NetHttpishServicePacket = stage_service_packet(
       accept_plan,
       service_status_code(primary_result, fallback_result),
@@ -130,16 +171,16 @@ mod cpu Main {
       status_code: packet.status_code,
       body_code: packet.body_code,
       staged_total: packet.staged_total,
-      lane_value: argv_count
-        + endpoint_kind
-        + protocol_kind
-        + protocol_version
-        + protocol_header_bytes
-        + timeout_budget
-        + retry_budget
-        + packet.status_code
-        + packet.body_code
-        + packet.staged_total,
+      packet_value: compute_packet_value(
+        argv_count,
+        endpoint_kind,
+        protocol_kind,
+        protocol_version,
+        protocol_header_bytes,
+        timeout_budget,
+        retry_budget,
+        packet
+      ),
       tick_ns: tick_ns
     };
   }
@@ -157,7 +198,7 @@ mod cpu Main {
       + summary.status_code
       + summary.body_code
       + summary.staged_total
-      + summary.lane_value
+      + summary.packet_value
       + summary.tick_ns;
   }
 

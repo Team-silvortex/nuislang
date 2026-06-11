@@ -1214,6 +1214,68 @@ fn validates_close_owned_through_spawned_helper_parameter() {
 }
 
 #[test]
+fn validates_network_result_timeout_and_cancel_async_policy_workflow() {
+    let project = multidomain_project_with_entry(
+        r#"
+        use network NetworkUnit;
+
+        mod cpu Main {
+          async fn consume_network_result(result: NetworkResult<i64>) -> i64 {
+            if network_send_ready(result) {
+              return network_value(result) + 1;
+            }
+            if network_recv_ready(result) {
+              return network_value(result) + 2;
+            }
+            if network_config_ready(result) {
+              return network_value(result) + 3;
+            }
+            return 0;
+          }
+
+          fn main() -> i64 {
+            let bind_core: NetworkResult<i64> =
+              network_result(network_profile_bind_core("NetworkUnit"));
+            let endpoint_kind: NetworkResult<i64> =
+              network_result(network_profile_endpoint_kind("NetworkUnit"));
+            let send_probe: NetworkResult<i64> =
+              network_result(network_profile_send_window("NetworkUnit"));
+            let recv_probe: NetworkResult<i64> =
+              network_result(network_profile_recv_window("NetworkUnit"));
+            let timeout_budget: i64 = network_profile_connect_timeout("NetworkUnit");
+
+            let completed_result: TaskResult<i64> =
+              join_result(spawn(consume_network_result(send_probe)));
+            let timed_result: TaskResult<i64> =
+              join_result(timeout(spawn(consume_network_result(recv_probe)), timeout_budget));
+            let cancelled_result: TaskResult<i64> =
+              join_result(cancel(spawn(consume_network_result(bind_core))));
+
+            if task_completed(completed_result)
+              && task_timed_out(timed_result)
+              && task_cancelled(cancelled_result) {
+              return task_value(completed_result)
+                + network_value(bind_core)
+                + network_value(endpoint_kind);
+            }
+            return 0;
+          }
+        }
+        "#,
+        multidomain_support_modules(),
+    );
+    let mut project = project;
+    project.manifest.links = vec![ProjectLink {
+        from: "cpu.Main".to_owned(),
+        to: "network.NetworkUnit".to_owned(),
+        via: None,
+    }];
+
+    let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
+    validate_project_links_against_nir(&project, &nir).unwrap();
+}
+
+#[test]
 fn validates_close_owned_through_helper_returned_handle() {
     let project = multidomain_project_with_entry(
         r#"
@@ -1241,6 +1303,57 @@ fn validates_close_owned_through_helper_returned_handle() {
             let close_value: i64 = host_network_close_owned(handle);
             if network_config_ready(bind_core) {
               return network_value(bind_core) + network_value(endpoint_kind) + close_value;
+            }
+            return 0;
+          }
+        }
+        "#,
+        multidomain_support_modules(),
+    );
+    let mut project = project;
+    project.manifest.links = vec![ProjectLink {
+        from: "cpu.Main".to_owned(),
+        to: "network.NetworkUnit".to_owned(),
+        via: None,
+    }];
+
+    let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
+    validate_project_links_against_nir(&project, &nir).unwrap();
+}
+
+#[test]
+fn validates_close_owned_through_timed_and_cancelled_spawned_helper_parameter() {
+    let project = multidomain_project_with_entry(
+        r#"
+        use network NetworkUnit;
+
+        mod cpu Main {
+          extern "c" fn host_network_open_tcp_stream(
+            remote_port: i64,
+            connect_timeout_ms: i64
+          ) -> i64;
+          extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+          async fn close_handle(handle: i64) -> i64 {
+            return host_network_close_owned(handle);
+          }
+
+          fn main() -> i64 {
+            let bind_core: NetworkResult<i64> =
+              network_result(network_profile_bind_core("NetworkUnit"));
+            let endpoint_kind: NetworkResult<i64> =
+              network_result(network_profile_endpoint_kind("NetworkUnit"));
+            let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+            let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
+            let handle: i64 = host_network_open_tcp_stream(remote_port, connect_timeout_ms);
+            let timed_close: TaskResult<i64> =
+              join_result(timeout(spawn(close_handle(handle)), connect_timeout_ms));
+            let cancelled_close: TaskResult<i64> =
+              join_result(cancel(spawn(close_handle(handle))));
+            if network_config_ready(bind_core)
+              && task_timed_out(timed_close)
+              && task_cancelled(cancelled_close) {
+              return network_value(bind_core) + network_value(endpoint_kind);
             }
             return 0;
           }
@@ -1307,6 +1420,220 @@ fn validates_close_owned_through_nested_helper_returned_handle() {
 
     let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
     validate_project_links_against_nir(&project, &nir).unwrap();
+}
+
+#[test]
+fn validates_close_owned_through_network_result_helper_returned_handle() {
+    let project = multidomain_project_with_entry(
+        r#"
+        use network NetworkUnit;
+
+        mod cpu Main {
+          extern "c" fn host_network_open_tcp_stream(
+            remote_port: i64,
+            connect_timeout_ms: i64
+          ) -> i64;
+          extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+          fn open_handle_result(
+            remote_port: i64,
+            connect_timeout_ms: i64
+          ) -> NetworkResult<i64> {
+            return network_result(host_network_open_tcp_stream(remote_port, connect_timeout_ms));
+          }
+
+          fn main() -> i64 {
+            let bind_core: NetworkResult<i64> =
+              network_result(network_profile_bind_core("NetworkUnit"));
+            let endpoint_kind: NetworkResult<i64> =
+              network_result(network_profile_endpoint_kind("NetworkUnit"));
+            let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+            let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
+            let opened: NetworkResult<i64> = open_handle_result(remote_port, connect_timeout_ms);
+            let handle: i64 = network_value(opened);
+            let close_value: i64 = host_network_close_owned(handle);
+            if network_config_ready(bind_core) {
+              return network_value(bind_core) + network_value(endpoint_kind) + close_value;
+            }
+            return 0;
+          }
+        }
+        "#,
+        multidomain_support_modules(),
+    );
+    let mut project = project;
+    project.manifest.links = vec![ProjectLink {
+        from: "cpu.Main".to_owned(),
+        to: "network.NetworkUnit".to_owned(),
+        via: None,
+    }];
+
+    let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
+    validate_project_links_against_nir(&project, &nir).unwrap();
+}
+
+#[test]
+fn validates_close_owned_through_recursive_helper_returned_handle() {
+    let project = multidomain_project_with_entry(
+        r#"
+        use network NetworkUnit;
+
+        mod cpu Main {
+          extern "c" fn host_network_open_tcp_stream(
+            remote_port: i64,
+            connect_timeout_ms: i64
+          ) -> i64;
+          extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+          fn open_handle_recursive(step: i64, remote_port: i64, connect_timeout_ms: i64) -> i64 {
+            if step < 1 {
+              return host_network_open_tcp_stream(remote_port, connect_timeout_ms);
+            }
+            return open_handle_recursive(0, remote_port, connect_timeout_ms);
+          }
+
+          fn main() -> i64 {
+            let bind_core: NetworkResult<i64> =
+              network_result(network_profile_bind_core("NetworkUnit"));
+            let endpoint_kind: NetworkResult<i64> =
+              network_result(network_profile_endpoint_kind("NetworkUnit"));
+            let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+            let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
+            let handle: i64 = open_handle_recursive(1, remote_port, connect_timeout_ms);
+            let close_value: i64 = host_network_close_owned(handle);
+            if network_config_ready(bind_core) {
+              return network_value(bind_core) + network_value(endpoint_kind) + close_value;
+            }
+            return 0;
+          }
+        }
+        "#,
+        multidomain_support_modules(),
+    );
+    let mut project = project;
+    project.manifest.links = vec![ProjectLink {
+        from: "cpu.Main".to_owned(),
+        to: "network.NetworkUnit".to_owned(),
+        via: None,
+    }];
+
+    let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
+    validate_project_links_against_nir(&project, &nir).unwrap();
+}
+
+#[test]
+fn validates_close_owned_through_datagram_helper_returned_handle() {
+    let project = multidomain_project_with_entry(
+        r#"
+        use network NetworkUnit;
+
+        mod cpu Main {
+          extern "c" fn host_network_open_udp_datagram(
+            local_port: i64,
+            remote_port: i64
+          ) -> i64;
+          extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+          fn open_handle(local_port: i64, remote_port: i64) -> i64 {
+            return host_network_open_udp_datagram(local_port, remote_port);
+          }
+
+          fn main() -> i64 {
+            let bind_core: NetworkResult<i64> =
+              network_result(network_profile_bind_core("NetworkUnit"));
+            let endpoint_kind: NetworkResult<i64> =
+              network_result(network_profile_endpoint_kind("NetworkUnit"));
+            let local_port: i64 = network_profile_local_port("NetworkUnit");
+            let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+            let handle: i64 = open_handle(local_port, remote_port);
+            let close_value: i64 = host_network_close_owned(handle);
+            if network_config_ready(bind_core) {
+              return network_value(bind_core) + network_value(endpoint_kind) + close_value;
+            }
+            return 0;
+          }
+        }
+        "#,
+        multidomain_support_modules(),
+    );
+    let mut project = project;
+    project.manifest.links = vec![ProjectLink {
+        from: "cpu.Main".to_owned(),
+        to: "network.NetworkUnit".to_owned(),
+        via: None,
+    }];
+
+    let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
+    validate_project_links_against_nir(&project, &nir).unwrap();
+}
+
+#[test]
+fn rejects_http_status_recv_through_datagram_helper_returned_handle() {
+    let project = multidomain_project_with_entry(
+        r#"
+        use network NetworkUnit;
+
+        mod cpu Main {
+          extern "c" fn host_network_open_udp_datagram(
+            local_port: i64,
+            remote_port: i64
+          ) -> i64;
+          extern "c" fn host_network_recv_http_status_owned(
+            handle: i64,
+            stream_window: i64,
+            recv_window: i64
+          ) -> i64;
+
+          fn open_handle(local_port: i64, remote_port: i64) -> i64 {
+            return host_network_open_udp_datagram(local_port, remote_port);
+          }
+
+          fn forward_handle(local_port: i64, remote_port: i64) -> i64 {
+            return open_handle(local_port, remote_port);
+          }
+
+          fn main() -> i64 {
+            let bind_core: NetworkResult<i64> =
+              network_result(network_profile_bind_core("NetworkUnit"));
+            let endpoint_kind: NetworkResult<i64> =
+              network_result(network_profile_endpoint_kind("NetworkUnit"));
+            let local_port: i64 = network_profile_local_port("NetworkUnit");
+            let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+            let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+            let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+            let protocol_kind: i64 = network_profile_protocol_kind("NetworkUnit");
+            let protocol_version: i64 = network_profile_protocol_version("NetworkUnit");
+            let protocol_header_bytes: i64 =
+              network_profile_protocol_header_bytes("NetworkUnit");
+            let handle: i64 = forward_handle(local_port, remote_port);
+            let recv_result: NetworkResult<i64> = network_result(
+              host_network_recv_http_status_owned(handle, stream_window, recv_window)
+            );
+            if network_config_ready(bind_core) {
+              return network_value(bind_core)
+                + network_value(endpoint_kind)
+                + protocol_kind
+                + protocol_version
+                + protocol_header_bytes
+                + network_value(recv_result);
+            }
+            return 0;
+          }
+        }
+        "#,
+        multidomain_support_modules(),
+    );
+    let mut project = project;
+    project.manifest.links = vec![ProjectLink {
+        from: "cpu.Main".to_owned(),
+        to: "network.NetworkUnit".to_owned(),
+        via: None,
+    }];
+
+    let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
+    let err = validate_project_links_against_nir(&project, &nir).unwrap_err();
+    assert!(err.contains("host_network_recv_http_status_owned"), "{err}");
+    assert!(err.contains("datagram-owned source"), "{err}");
 }
 
 #[test]
@@ -1380,6 +1707,93 @@ fn rejects_send_owned_through_helper_parameter_with_listener_argument() {
 }
 
 #[test]
+fn rejects_send_owned_through_mutual_recursive_helper_parameter_with_listener_argument() {
+    let project = multidomain_project_with_entry(
+        r#"
+        use network NetworkUnit;
+
+        mod cpu Main {
+          extern "c" fn host_network_open_tcp_listener(
+            local_port: i64,
+            read_timeout_ms: i64,
+            write_timeout_ms: i64
+          ) -> i64;
+          extern "c" fn host_network_open_udp_datagram(
+            local_port: i64,
+            remote_port: i64
+          ) -> i64;
+          extern "c" fn host_network_send_owned(
+            handle: i64,
+            stream_window: i64,
+            send_window: i64
+          ) -> i64;
+
+          fn send_chain_a(
+            step: i64,
+            handle: i64,
+            stream_window: i64,
+            send_window: i64
+          ) -> i64 {
+            if step < 1 {
+              return host_network_send_owned(handle, stream_window, send_window);
+            }
+            return send_chain_b(0, handle, stream_window, send_window);
+          }
+
+          fn send_chain_b(
+            step: i64,
+            handle: i64,
+            stream_window: i64,
+            send_window: i64
+          ) -> i64 {
+            return send_chain_a(step, handle, stream_window, send_window);
+          }
+
+          fn main() -> i64 {
+            let bind_core: NetworkResult<i64> =
+              network_result(network_profile_bind_core("NetworkUnit"));
+            let endpoint_kind: NetworkResult<i64> =
+              network_result(network_profile_endpoint_kind("NetworkUnit"));
+            let local_port: i64 = network_profile_local_port("NetworkUnit");
+            let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+            let read_timeout_ms: i64 = network_profile_read_timeout("NetworkUnit");
+            let write_timeout_ms: i64 = network_profile_write_timeout("NetworkUnit");
+            let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+            let send_window: i64 = network_profile_send_window("NetworkUnit");
+            let datagram_handle: i64 =
+              host_network_open_udp_datagram(local_port, remote_port);
+            let handle: i64 = host_network_open_tcp_listener(
+              local_port,
+              read_timeout_ms,
+              write_timeout_ms
+            );
+            let send_value: i64 = send_chain_a(1, handle, stream_window, send_window);
+            if network_config_ready(bind_core) {
+              return network_value(bind_core)
+                + network_value(endpoint_kind)
+                + datagram_handle
+                + send_value;
+            }
+            return 0;
+          }
+        }
+        "#,
+        multidomain_support_modules(),
+    );
+    let mut project = project;
+    project.manifest.links = vec![ProjectLink {
+        from: "cpu.Main".to_owned(),
+        to: "network.NetworkUnit".to_owned(),
+        via: None,
+    }];
+
+    let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
+    let err = validate_project_links_against_nir(&project, &nir).unwrap_err();
+    assert!(err.contains("send_chain_a"), "{err}");
+    assert!(err.contains("listener-owned source"), "{err}");
+}
+
+#[test]
 fn rejects_send_owned_with_listener_helper_returned_handle() {
     let project = multidomain_project_with_entry(
         r#"
@@ -1423,6 +1837,80 @@ fn rejects_send_owned_with_listener_helper_returned_handle() {
             let datagram_handle: i64 =
               host_network_open_udp_datagram(local_port, remote_port);
             let handle: i64 = open_listener(local_port, read_timeout_ms, write_timeout_ms);
+            let send_value: i64 = host_network_send_owned(handle, stream_window, send_window);
+            if network_config_ready(bind_core) {
+              return network_value(bind_core)
+                + network_value(endpoint_kind)
+                + datagram_handle
+                + send_value;
+            }
+            return 0;
+          }
+        }
+        "#,
+        multidomain_support_modules(),
+    );
+    let mut project = project;
+    project.manifest.links = vec![ProjectLink {
+        from: "cpu.Main".to_owned(),
+        to: "network.NetworkUnit".to_owned(),
+        via: None,
+    }];
+
+    let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
+    let err = validate_project_links_against_nir(&project, &nir).unwrap_err();
+    assert!(err.contains("host_network_send_owned"), "{err}");
+    assert!(err.contains("listener-owned source"), "{err}");
+}
+
+#[test]
+fn rejects_send_owned_with_listener_network_result_helper_returned_handle() {
+    let project = multidomain_project_with_entry(
+        r#"
+        use network NetworkUnit;
+
+        mod cpu Main {
+          extern "c" fn host_network_open_tcp_listener(
+            local_port: i64,
+            read_timeout_ms: i64,
+            write_timeout_ms: i64
+          ) -> i64;
+          extern "c" fn host_network_open_udp_datagram(
+            local_port: i64,
+            remote_port: i64
+          ) -> i64;
+          extern "c" fn host_network_send_owned(
+            handle: i64,
+            stream_window: i64,
+            send_window: i64
+          ) -> i64;
+
+          fn open_listener_result(
+            local_port: i64,
+            read_timeout_ms: i64,
+            write_timeout_ms: i64
+          ) -> NetworkResult<i64> {
+            return network_result(
+              host_network_open_tcp_listener(local_port, read_timeout_ms, write_timeout_ms)
+            );
+          }
+
+          fn main() -> i64 {
+            let bind_core: NetworkResult<i64> =
+              network_result(network_profile_bind_core("NetworkUnit"));
+            let endpoint_kind: NetworkResult<i64> =
+              network_result(network_profile_endpoint_kind("NetworkUnit"));
+            let local_port: i64 = network_profile_local_port("NetworkUnit");
+            let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+            let read_timeout_ms: i64 = network_profile_read_timeout("NetworkUnit");
+            let write_timeout_ms: i64 = network_profile_write_timeout("NetworkUnit");
+            let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+            let send_window: i64 = network_profile_send_window("NetworkUnit");
+            let datagram_handle: i64 =
+              host_network_open_udp_datagram(local_port, remote_port);
+            let opened: NetworkResult<i64> =
+              open_listener_result(local_port, read_timeout_ms, write_timeout_ms);
+            let handle: i64 = network_value(opened);
             let send_value: i64 = host_network_send_owned(handle, stream_window, send_window);
             if network_config_ready(bind_core) {
               return network_value(bind_core)
@@ -1757,6 +2245,376 @@ fn validates_http_status_recv_with_stream_handle_variable() {
                 + protocol_kind
                 + protocol_version
                 + protocol_header_bytes
+                + network_value(recv_result)
+                + close_value;
+            }
+            return 0;
+          }
+        }
+        "#,
+        multidomain_support_modules(),
+    );
+    let mut project = project;
+    project.manifest.links = vec![ProjectLink {
+        from: "cpu.Main".to_owned(),
+        to: "network.NetworkUnit".to_owned(),
+        via: None,
+    }];
+
+    let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
+    validate_project_links_against_nir(&project, &nir).unwrap();
+}
+
+#[test]
+fn validates_http_status_recv_through_stream_helper_workflow() {
+    let project = multidomain_project_with_entry(
+        r#"
+        use network NetworkUnit;
+
+        mod cpu Main {
+          extern "c" fn host_network_open_tcp_stream(
+            remote_port: i64,
+            connect_timeout_ms: i64
+          ) -> i64;
+          extern "c" fn host_network_send_owned(
+            handle: i64,
+            stream_window: i64,
+            send_window: i64
+          ) -> i64;
+          extern "c" fn host_network_recv_http_status_owned(
+            handle: i64,
+            stream_window: i64,
+            recv_window: i64
+          ) -> i64;
+          extern "c" fn host_network_recv_owned(
+            handle: i64,
+            stream_window: i64,
+            recv_window: i64
+          ) -> i64;
+          extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+          fn open_handle(remote_port: i64, connect_timeout_ms: i64) -> i64 {
+            return host_network_open_tcp_stream(remote_port, connect_timeout_ms);
+          }
+
+          fn send_request(
+            handle: i64,
+            stream_window: i64,
+            send_window: i64
+          ) -> NetworkResult<i64> {
+            return network_result(host_network_send_owned(handle, stream_window, send_window));
+          }
+
+          fn recv_status(
+            handle: i64,
+            stream_window: i64,
+            recv_window: i64
+          ) -> NetworkResult<i64> {
+            return network_result(
+              host_network_recv_http_status_owned(handle, stream_window, recv_window)
+            );
+          }
+
+          fn recv_body(
+            handle: i64,
+            stream_window: i64,
+            recv_window: i64
+          ) -> NetworkResult<i64> {
+            return network_result(host_network_recv_owned(handle, stream_window, recv_window));
+          }
+
+          fn close_handle(handle: i64) -> i64 {
+            return host_network_close_owned(handle);
+          }
+
+          fn main() -> i64 {
+            let bind_core: NetworkResult<i64> =
+              network_result(network_profile_bind_core("NetworkUnit"));
+            let endpoint_kind: NetworkResult<i64> =
+              network_result(network_profile_endpoint_kind("NetworkUnit"));
+            let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+            let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
+            let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+            let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+            let send_window: i64 = network_profile_send_window("NetworkUnit");
+            let protocol_kind: i64 = network_profile_protocol_kind("NetworkUnit");
+            let protocol_version: i64 = network_profile_protocol_version("NetworkUnit");
+            let protocol_header_bytes: i64 =
+              network_profile_protocol_header_bytes("NetworkUnit");
+            let handle: i64 = open_handle(remote_port, connect_timeout_ms);
+            let send_result: NetworkResult<i64> =
+              send_request(handle, stream_window, send_window);
+            let status_result: NetworkResult<i64> =
+              recv_status(handle, stream_window, recv_window);
+            let recv_result: NetworkResult<i64> =
+              recv_body(handle, stream_window, recv_window);
+            let close_value: i64 = close_handle(handle);
+            if network_config_ready(bind_core) {
+              return network_value(bind_core)
+                + network_value(endpoint_kind)
+                + protocol_kind
+                + protocol_version
+                + protocol_header_bytes
+                + network_value(send_result)
+                + network_value(status_result)
+                + network_value(recv_result)
+                + close_value;
+            }
+            return 0;
+          }
+        }
+        "#,
+        multidomain_support_modules(),
+    );
+    let mut project = project;
+    project.manifest.links = vec![ProjectLink {
+        from: "cpu.Main".to_owned(),
+        to: "network.NetworkUnit".to_owned(),
+        via: None,
+    }];
+
+    let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
+    validate_project_links_against_nir(&project, &nir).unwrap();
+}
+
+#[test]
+fn validates_service_lane_helper_workflow() {
+    let project = multidomain_project_with_entry(
+        r#"
+        use network NetworkUnit;
+
+        mod cpu Main {
+          extern "c" fn host_network_open_tcp_listener(
+            local_port: i64,
+            read_timeout_ms: i64,
+            write_timeout_ms: i64
+          ) -> i64;
+          extern "c" fn host_network_accept_owned(
+            listener_handle: i64,
+            read_timeout_ms: i64,
+            write_timeout_ms: i64
+          ) -> i64;
+          extern "c" fn host_network_recv_owned(
+            handle: i64,
+            stream_window: i64,
+            recv_window: i64
+          ) -> i64;
+          extern "c" fn host_network_send_owned(
+            handle: i64,
+            stream_window: i64,
+            send_window: i64
+          ) -> i64;
+          extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+          fn open_listener(
+            local_port: i64,
+            read_timeout_ms: i64,
+            write_timeout_ms: i64
+          ) -> i64 {
+            return host_network_open_tcp_listener(
+              local_port,
+              read_timeout_ms,
+              write_timeout_ms
+            );
+          }
+
+          fn accept_session(
+            listener_handle: i64,
+            read_timeout_ms: i64,
+            write_timeout_ms: i64
+          ) -> NetworkResult<i64> {
+            return network_result(
+              host_network_accept_owned(listener_handle, read_timeout_ms, write_timeout_ms)
+            );
+          }
+
+          fn recv_request(
+            handle: i64,
+            stream_window: i64,
+            recv_window: i64
+          ) -> NetworkResult<i64> {
+            return network_result(host_network_recv_owned(handle, stream_window, recv_window));
+          }
+
+          fn send_response(
+            handle: i64,
+            stream_window: i64,
+            send_window: i64
+          ) -> NetworkResult<i64> {
+            return network_result(host_network_send_owned(handle, stream_window, send_window));
+          }
+
+          fn close_transport(handle: i64) -> i64 {
+            return host_network_close_owned(handle);
+          }
+
+          fn close_listener(listener_handle: i64) -> i64 {
+            return host_network_close_owned(listener_handle);
+          }
+
+          fn main() -> i64 {
+            let bind_core: NetworkResult<i64> =
+              network_result(network_profile_bind_core("NetworkUnit"));
+            let endpoint_kind: NetworkResult<i64> =
+              network_result(network_profile_endpoint_kind("NetworkUnit"));
+            let local_port: i64 = network_profile_local_port("NetworkUnit");
+            let read_timeout_ms: i64 = network_profile_read_timeout("NetworkUnit");
+            let write_timeout_ms: i64 = network_profile_write_timeout("NetworkUnit");
+            let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+            let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+            let send_window: i64 = network_profile_send_window("NetworkUnit");
+            let protocol_kind: i64 = network_profile_protocol_kind("NetworkUnit");
+            let protocol_version: i64 = network_profile_protocol_version("NetworkUnit");
+            let protocol_header_bytes: i64 =
+              network_profile_protocol_header_bytes("NetworkUnit");
+            let listener_handle: i64 =
+              open_listener(local_port, read_timeout_ms, write_timeout_ms);
+            let accepted: NetworkResult<i64> =
+              accept_session(listener_handle, read_timeout_ms, write_timeout_ms);
+            let handle: i64 = network_value(accepted);
+            let recv_result: NetworkResult<i64> =
+              recv_request(handle, stream_window, recv_window);
+            let send_result: NetworkResult<i64> =
+              send_response(handle, stream_window, send_window);
+            let transport_close_value: i64 = close_transport(handle);
+            let listener_close_value: i64 = close_listener(listener_handle);
+            if network_config_ready(bind_core) {
+              return network_value(bind_core)
+                + network_value(endpoint_kind)
+                + protocol_kind
+                + protocol_version
+                + protocol_header_bytes
+                + network_value(recv_result)
+                + network_value(send_result)
+                + transport_close_value
+                + listener_close_value;
+            }
+            return 0;
+          }
+        }
+        "#,
+        multidomain_support_modules(),
+    );
+    let mut project = project;
+    project.manifest.links = vec![ProjectLink {
+        from: "cpu.Main".to_owned(),
+        to: "network.NetworkUnit".to_owned(),
+        via: None,
+    }];
+
+    let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
+    validate_project_links_against_nir(&project, &nir).unwrap();
+}
+
+#[test]
+fn validates_httpish_header_session_helper_workflow() {
+    let project = multidomain_project_with_entry(
+        r#"
+        use network NetworkUnit;
+
+        mod cpu Main {
+          extern "c" fn host_network_open_tcp_stream(
+            remote_port: i64,
+            connect_timeout_ms: i64
+          ) -> i64;
+          extern "c" fn host_network_send_owned(
+            handle: i64,
+            stream_window: i64,
+            send_window: i64
+          ) -> i64;
+          extern "c" fn host_network_recv_http_status_owned(
+            handle: i64,
+            stream_window: i64,
+            recv_window: i64
+          ) -> i64;
+          extern "c" fn host_network_recv_owned(
+            handle: i64,
+            stream_window: i64,
+            recv_window: i64
+          ) -> i64;
+          extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+          struct RequestHeaders {
+            auth_code: i64,
+            trace_code: i64
+          }
+
+          fn open_session_handle(remote_port: i64, connect_timeout_ms: i64) -> i64 {
+            return host_network_open_tcp_stream(remote_port, connect_timeout_ms);
+          }
+
+          fn send_session_headers(
+            handle: i64,
+            stream_window: i64,
+            send_window: i64
+          ) -> NetworkResult<i64> {
+            return network_result(host_network_send_owned(handle, stream_window, send_window));
+          }
+
+          fn recv_session_status(
+            handle: i64,
+            stream_window: i64,
+            recv_window: i64
+          ) -> NetworkResult<i64> {
+            return network_result(
+              host_network_recv_http_status_owned(handle, stream_window, recv_window)
+            );
+          }
+
+          fn recv_session_body(
+            handle: i64,
+            stream_window: i64,
+            recv_window: i64
+          ) -> NetworkResult<i64> {
+            return network_result(host_network_recv_owned(handle, stream_window, recv_window));
+          }
+
+          fn close_session_handle(handle: i64) -> i64 {
+            return host_network_close_owned(handle);
+          }
+
+          fn build_headers(
+            protocol_kind: i64,
+            protocol_version: i64,
+            protocol_header_bytes: i64
+          ) -> RequestHeaders {
+            return RequestHeaders {
+              auth_code: 64 + protocol_kind + protocol_header_bytes,
+              trace_code: 1000 + protocol_version + protocol_header_bytes
+            };
+          }
+
+          fn main() -> i64 {
+            let bind_core: NetworkResult<i64> =
+              network_result(network_profile_bind_core("NetworkUnit"));
+            let endpoint_kind: NetworkResult<i64> =
+              network_result(network_profile_endpoint_kind("NetworkUnit"));
+            let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+            let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
+            let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+            let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+            let send_window: i64 = network_profile_send_window("NetworkUnit");
+            let protocol_kind: i64 = network_profile_protocol_kind("NetworkUnit");
+            let protocol_version: i64 = network_profile_protocol_version("NetworkUnit");
+            let protocol_header_bytes: i64 =
+              network_profile_protocol_header_bytes("NetworkUnit");
+            let headers: RequestHeaders =
+              build_headers(protocol_kind, protocol_version, protocol_header_bytes);
+            let handle: i64 = open_session_handle(remote_port, connect_timeout_ms);
+            let send_result: NetworkResult<i64> =
+              send_session_headers(handle, stream_window, send_window);
+            let status_result: NetworkResult<i64> =
+              recv_session_status(handle, stream_window, recv_window);
+            let recv_result: NetworkResult<i64> =
+              recv_session_body(handle, stream_window, recv_window);
+            let close_value: i64 = close_session_handle(handle);
+            if network_config_ready(bind_core) {
+              return network_value(bind_core)
+                + network_value(endpoint_kind)
+                + headers.auth_code
+                + headers.trace_code
+                + network_value(send_result)
+                + network_value(status_result)
                 + network_value(recv_result)
                 + close_value;
             }

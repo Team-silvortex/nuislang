@@ -127,6 +127,10 @@ mod cpu Main {
     session_value: i64
   }
 
+  struct NetHttpishHeaderServiceSessionSummary {
+    session_value: i64
+  }
+
   struct NetSessionSummary {
     argv_count: i64,
     bind_core: i64,
@@ -150,6 +154,7 @@ mod cpu Main {
     http_client_session_value: i64,
     httpish_session_value: i64,
     exchange_session_value: i64,
+    httpish_header_service_session_value: i64,
     result_preview_value: i64,
     result_final_value: i64,
     task_preview_value: i64,
@@ -895,6 +900,111 @@ mod cpu Main {
     };
   }
 
+  fn capture_net_httpish_header_service_session_summary()
+    -> NetHttpishHeaderServiceSessionSummary {
+    let argv_count: i64 = host_argv_count();
+    let endpoint_kind: i64 = network_profile_endpoint_kind("NetworkUnit");
+    let transport_family: i64 = network_profile_transport_family("NetworkUnit");
+    let protocol_kind: i64 = network_profile_protocol_kind("NetworkUnit");
+    let protocol_version: i64 = network_profile_protocol_version("NetworkUnit");
+    let protocol_header_bytes: i64 =
+      network_profile_protocol_header_bytes("NetworkUnit");
+    let timeout_budget: i64 = network_profile_timeout_budget("NetworkUnit");
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+    let read_timeout_ms: i64 = network_profile_read_timeout("NetworkUnit");
+    let write_timeout_ms: i64 = network_profile_write_timeout("NetworkUnit");
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+    let local_port: i64 = network_profile_local_port("NetworkUnit");
+    let listen_code: i64 = 700 + endpoint_kind;
+    let route_code: i64 = 900 + protocol_kind + protocol_version;
+    let auth_code: i64 = listen_code + protocol_header_bytes;
+    let trace_code: i64 = route_code + protocol_header_bytes;
+    let request_bytes: i64 =
+      protocol_header_bytes + protocol_version + auth_code + trace_code + recv_window;
+    let response_bytes: i64 = protocol_header_bytes + send_window + trace_code;
+    let listener_handle: i64 = host_network_open_tcp_listener(
+      local_port,
+      read_timeout_ms,
+      write_timeout_ms
+    );
+    let accept_result: NetworkResult<i64> = network_result(
+      host_network_accept_owned(listener_handle, read_timeout_ms, write_timeout_ms)
+    );
+    let accepted_handle: i64 = encode_result_value(accept_result);
+    let recv_result: NetworkResult<i64> = network_result(
+      host_network_recv_owned(accepted_handle, stream_window, recv_window)
+    );
+    let send_result: NetworkResult<i64> = network_result(
+      host_network_send_owned(accepted_handle, stream_window, send_window)
+    );
+    let accept_code: i64 = if network_accept_ready(accept_result) {
+      200 + timeout_budget
+    } else if network_recv_ready(recv_result) {
+      202 + retry_budget
+    } else {
+      504
+    };
+    let request_header_code: i64 = if network_recv_ready(recv_result) {
+      auth_code
+    } else if network_send_ready(send_result) {
+      trace_code
+    } else {
+      auth_code + trace_code
+    };
+    let response_header_code: i64 = if network_send_ready(send_result) {
+      route_code + recv_window
+    } else {
+      listen_code + recv_window
+    };
+    let body_code: i64 = if network_recv_ready(recv_result) {
+      encode_result_value(recv_result)
+    } else if network_send_ready(send_result) {
+      encode_result_value(send_result) + retry_budget
+    } else {
+      retry_budget
+    };
+    let retry_code: i64 = if network_send_ready(send_result) {
+      0
+    } else if network_recv_ready(recv_result) {
+      retry_budget
+    } else {
+      retry_budget + 1
+    };
+    let staged_total: i64 =
+      auth_code
+      + trace_code
+      + accept_code
+      + request_header_code
+      + response_header_code
+      + body_code
+      + retry_code;
+    let close_value: i64 = host_network_close_owned(accepted_handle);
+
+    return NetHttpishHeaderServiceSessionSummary {
+      session_value: argv_count
+        + endpoint_kind
+        + transport_family
+        + protocol_kind
+        + protocol_version
+        + protocol_header_bytes
+        + timeout_budget
+        + retry_budget
+        + request_bytes
+        + response_bytes
+        + listener_handle
+        + accepted_handle
+        + accept_code
+        + request_header_code
+        + response_header_code
+        + body_code
+        + retry_code
+        + staged_total
+        + close_value
+    };
+  }
+
   fn capture_net_result_windowed_summary() -> NetResultWindowedSummary {
     let stream_window: i64 = network_profile_stream_window("NetworkUnit");
     let recv_window: i64 = network_profile_recv_window("NetworkUnit");
@@ -998,6 +1108,8 @@ mod cpu Main {
       capture_net_httpish_session_summary();
     let exchange_session_summary: NetHttpishExchangeSessionSummary =
       capture_net_httpish_exchange_session_summary();
+    let httpish_header_service_session_summary: NetHttpishHeaderServiceSessionSummary =
+      capture_net_httpish_header_service_session_summary();
     let result_summary: NetResultWindowedSummary = capture_net_result_windowed_summary();
     let task_summary: NetTaskWindowedSummary = capture_net_task_windowed_summary();
     let session_task: Task<i64> = timeout(
@@ -1024,6 +1136,7 @@ mod cpu Main {
             + http_client_session_summary.session_value
             + httpish_session_summary.session_value
             + exchange_session_summary.session_value
+            + httpish_header_service_session_summary.session_value
             + result_summary.preview_value
             + result_summary.final_value
             + task_summary.preview_value
@@ -1059,6 +1172,8 @@ mod cpu Main {
       http_client_session_value: http_client_session_summary.session_value,
       httpish_session_value: httpish_session_summary.session_value,
       exchange_session_value: exchange_session_summary.session_value,
+      httpish_header_service_session_value:
+        httpish_header_service_session_summary.session_value,
       result_preview_value: result_summary.preview_value,
       result_final_value: result_summary.final_value,
       task_preview_value: task_summary.preview_value,
@@ -1092,6 +1207,7 @@ mod cpu Main {
       + summary.http_client_session_value
       + summary.httpish_session_value
       + summary.exchange_session_value
+      + summary.httpish_header_service_session_value
       + summary.result_preview_value
       + summary.result_final_value
       + summary.task_preview_value

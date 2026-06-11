@@ -255,3 +255,178 @@ pub(super) fn lower_chained_while(
     }
     Ok(())
 }
+
+pub(super) fn lower_async_chained_while(
+    prepared: PreparedAsyncChainedWhile,
+    state: &mut LoweringState<'_>,
+    bindings: &mut BTreeMap<String, String>,
+) -> Result<(), String> {
+    let Some(function) = state.function_map.get(prepared.step_callee.as_str()).copied() else {
+        return Err(format!(
+            "async chained `while` references unknown step helper `{}`",
+            prepared.step_callee
+        ));
+    };
+    if !function.is_async {
+        return Err(format!(
+            "async chained `while` step helper `{}` must be `async fn`",
+            prepared.step_callee
+        ));
+    }
+    if function.params.len() != 1 {
+        return Err(format!(
+            "async chained `while` step helper `{}` must take exactly one parameter",
+            prepared.step_callee
+        ));
+    }
+
+    let Some(initial_name) = bindings.get(&prepared.binding_name).cloned() else {
+        return Err(format!(
+            "async chained `while` expected an existing binding for `{}` before the loop",
+            prepared.binding_name
+        ));
+    };
+    let mut carry_initial_names = Vec::with_capacity(prepared.carries.len());
+    for carry in &prepared.carries {
+        let Some(carry_initial_name) = bindings.get(&carry.binding_name).cloned() else {
+            return Err(format!(
+                "async chained `while` expected an existing binding for `{}` before the loop",
+                carry.binding_name
+            ));
+        };
+        carry_initial_names.push(carry_initial_name);
+    }
+    let limit_name = lower_expr(&prepared.limit, state, bindings)?;
+    let has_conditional = prepared
+        .carries
+        .iter()
+        .any(|carry| matches!(carry.kind, PreparedCarryUpdateKind::Conditional { .. }));
+    let name = next_name(
+        state,
+        if has_conditional {
+            "loop_while_i64_async_cond_chain"
+        } else {
+            "loop_while_i64_async_chain"
+        },
+    );
+    let compare = render_loop_compare(prepared.compare);
+    let mut args = vec![
+        initial_name.clone(),
+        limit_name.clone(),
+        prepared.step_callee.clone(),
+        compare.to_owned(),
+    ];
+    let mut extra_dep_inputs: Vec<String> = Vec::new();
+    let mut extra_effect_inputs: Vec<String> = Vec::new();
+    for (index, carry_initial_name) in carry_initial_names.iter().enumerate() {
+        args.push(carry_initial_name.clone());
+        match &prepared.carries[index].kind {
+            PreparedCarryUpdateKind::Linear { op, source } => {
+                if has_conditional {
+                    args.push("always".to_owned());
+                    args.push(initial_name.clone());
+                    let carry_kind = render_loop_carry_kind(*op, *source);
+                    args.push(carry_kind.clone());
+                    args.push(carry_kind);
+                    extra_dep_inputs.push(initial_name.clone());
+                    extra_effect_inputs.push(initial_name.clone());
+                } else {
+                    args.push(render_loop_carry_kind(*op, *source));
+                }
+            }
+            PreparedCarryUpdateKind::Conditional {
+                condition,
+                then_source,
+                else_source,
+            } => {
+                let (condition_args, cond_dep_inputs, cond_effect_inputs) =
+                    encode_carry_condition_args(condition, state, bindings)?;
+                args.extend(condition_args);
+                let encode_branch_source = |source: &PreparedCarryBranchSource| match source {
+                    PreparedCarryBranchSource::Keep => "keep".to_owned(),
+                    PreparedCarryBranchSource::Source { op, source } => {
+                        render_loop_carry_kind(*op, *source)
+                    }
+                };
+                args.push(encode_branch_source(then_source));
+                args.push(encode_branch_source(else_source));
+                extra_dep_inputs.extend(cond_dep_inputs);
+                extra_effect_inputs.extend(cond_effect_inputs);
+            }
+        }
+    }
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: if has_conditional {
+                "loop_while_i64_async_cond_chain".to_owned()
+            } else {
+                "loop_while_i64_async_chain".to_owned()
+            },
+            args,
+        },
+    });
+    push_dep_edges(state, &initial_name, &name);
+    push_dep_edges(state, &limit_name, &name);
+    for carry_initial_name in &carry_initial_names {
+        push_dep_edges(state, carry_initial_name, &name);
+    }
+    for extra_dep_input in &extra_dep_inputs {
+        push_dep_edges(state, extra_dep_input, &name);
+    }
+    state.yir.edges.push(Edge {
+        kind: EdgeKind::Effect,
+        from: initial_name.clone(),
+        to: name.clone(),
+    });
+    state.yir.edges.push(Edge {
+        kind: EdgeKind::Effect,
+        from: limit_name.clone(),
+        to: name.clone(),
+    });
+    for carry_initial_name in &carry_initial_names {
+        state.yir.edges.push(Edge {
+            kind: EdgeKind::Effect,
+            from: carry_initial_name.clone(),
+            to: name.clone(),
+        });
+    }
+    for extra_effect_input in &extra_effect_inputs {
+        state.yir.edges.push(Edge {
+            kind: EdgeKind::Effect,
+            from: extra_effect_input.clone(),
+            to: name.clone(),
+        });
+    }
+
+    let current_name = next_name(state, "loop_current");
+    state.yir.nodes.push(Node {
+        name: current_name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "field".to_owned(),
+            args: vec![name.clone(), "current".to_owned()],
+        },
+    });
+    push_dep_edges(state, &name, &current_name);
+
+    bindings.insert(prepared.binding_name, current_name);
+    for (index, carry) in prepared.carries.iter().enumerate() {
+        let carry_name = next_name(state, "loop_carry");
+        state.yir.nodes.push(Node {
+            name: carry_name.clone(),
+            resource: "cpu0".to_owned(),
+            op: Operation {
+                module: "cpu".to_owned(),
+                instruction: "field".to_owned(),
+                args: vec![name.clone(), format!("carry{index}")],
+            },
+        });
+        push_dep_edges(state, &name, &carry_name);
+        bindings.insert(carry.binding_name.clone(), carry_name);
+    }
+    Ok(())
+}

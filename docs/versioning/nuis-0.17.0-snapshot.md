@@ -50,6 +50,38 @@ The highest-signal targets for `0.17.0` are:
   stand on the same async/task/memory story instead of feeling like separate
   islands
 
+## Current `std net` Shape Win
+
+One concrete `0.17.0` mainline gain is that the network-facing `std` recipes
+have started converging on a repeatable workflow shape instead of drifting as
+isolated demos.
+
+The current rule of thumb is:
+
+* explicit workflow helpers first:
+  `open_*`, `accept_*`, `send_*`, `recv_*`, `close_*`
+* then a plan layer:
+  `build_*_plan(...)`
+* then a packet layer:
+  `stage_*_packet(...)`, `compute_packet_value(...)`
+* then a wider summary layer:
+  `compute_session_value(...)` when the recipe truly spans a session lifecycle
+* then the normal capture/summarize pair:
+  `capture_*_summary(...)`, `summarize_*_recipe(...)`
+
+This is already visible in the current `std` surface:
+
+* [net_http_client_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_session_recipe.ns)
+* [net_http_service_lane_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_service_lane_recipe.ns)
+* [net_httpish_client_session_packet_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_client_session_packet_recipe.ns)
+* [net_httpish_service_session_packet_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_service_session_packet_recipe.ns)
+* [net_httpish_header_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_header_session_recipe.ns)
+
+That is still not a final public API story, but it is a real mainline
+stabilization step: new network examples now have a clearer default shape to
+copy, and the async/task/memory-aware recipe layer is starting to read like one
+system.
+
 ## What `0.17.0` Should Not Overclaim
 
 Even if `0.17.0` goes well, it should still avoid claiming more than is true:

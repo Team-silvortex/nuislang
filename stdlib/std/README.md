@@ -188,6 +188,44 @@ Use [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/curren
 for the shortest route. Use this section only when you want the local shape of
 `std` itself.
 
+### Current Workflow Shape
+
+For the current `std net` and `httpish` recipes, prefer one repeated shape
+instead of inventing a new layout every time.
+
+The working rule is:
+
+* workflow helper stage first
+  - `open_*`, `accept_*`, `send_*`, `recv_*`, `close_*`
+* plan stage next
+  - `build_*_plan(...)`
+* packet stage after that
+  - `stage_*_packet(...)`
+  - `compute_packet_value(...)`
+* summary stage last
+  - `capture_*_summary(...)`
+  - `compute_*_value(...)` when a packet value and a higher-level session value
+    both exist
+  - `summarize_*_recipe(...)`
+
+Use the smaller value names according to layer:
+
+* `packet_value` when the aggregate only describes the packet staging layer
+* `session_value` when the aggregate includes transport/session lifecycle data
+* avoid mixing `lane_value` into packet-shaped recipes
+
+Current network-facing examples of this rule:
+
+* client/service workflow helpers
+  - [net_http_client_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_session_recipe.ns)
+  - [net_http_service_lane_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_service_lane_recipe.ns)
+* packet-shaped async/httpish summaries
+  - [net_httpish_client_session_packet_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_client_session_packet_recipe.ns)
+  - [net_httpish_service_session_packet_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_service_session_packet_recipe.ns)
+* packet plus session layering
+  - [net_httpish_header_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_header_session_recipe.ns)
+  - [net_httpish_header_service_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_header_service_session_recipe.ns)
+
 ### First File Per Main Cluster
 
 * task-facing async/task

@@ -33,6 +33,41 @@ profile core
 -> session
 ```
 
+## Current Workflow Convention
+
+Within the current `http` / `httpish` session recipes, the preferred internal
+shape is now:
+
+```text
+workflow helpers
+-> build_*_plan
+-> run / send / recv step helpers
+-> stage_*_packet
+-> compute_packet_value
+-> compute_session_value (only when a wider session layer exists)
+-> capture_*_summary
+-> summarize_*_recipe
+```
+
+Value naming rule:
+
+* use `packet_value` for packet-shaped summaries
+* use `session_value` for summaries that include transport/session lifecycle
+* keep helper names explicit about the transport phase:
+  `open_*`, `accept_*`, `send_*`, `recv_*`, `close_*`
+
+Current anchor files for this convention:
+
+* packet-first async/httpish
+  - [net_httpish_client_session_packet_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_client_session_packet_recipe.ns)
+  - [net_httpish_service_session_packet_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_service_session_packet_recipe.ns)
+* packet plus session aggregation
+  - [net_httpish_header_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_header_session_recipe.ns)
+  - [net_httpish_header_service_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_header_service_session_recipe.ns)
+* host-owned transport workflow helpers
+  - [net_http_client_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_client_session_recipe.ns)
+  - [net_http_service_lane_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_http_service_lane_recipe.ns)
+
 ## Source Router
 
 ### Profile Core
@@ -136,6 +171,7 @@ profile core
 * [net_dnsish_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_dnsish_pipeline_recipe.ns)
 * [net_owned_dnsish_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_owned_dnsish_pipeline_recipe.ns)
 * [net_httpish_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_session_recipe.ns)
+* [net_httpish_header_service_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_header_service_session_recipe.ns)
 * [net_httpish_client_session_packet_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_client_session_packet_recipe.ns)
 * [net_httpish_service_session_packet_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_service_session_packet_recipe.ns)
 * [net_httpish_exchange_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/net_httpish_exchange_session_recipe.ns)

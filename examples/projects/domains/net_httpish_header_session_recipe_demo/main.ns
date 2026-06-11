@@ -86,6 +86,40 @@ mod cpu Main {
     return network_value(result);
   }
 
+  fn open_session_handle(remote_port: i64, connect_timeout_ms: i64) -> i64 {
+    return host_network_open_tcp_stream(remote_port, connect_timeout_ms);
+  }
+
+  fn send_session_headers(
+    handle: i64,
+    stream_window: i64,
+    send_window: i64
+  ) -> NetworkResult<i64> {
+    return network_result(host_network_send_owned(handle, stream_window, send_window));
+  }
+
+  fn recv_session_status(
+    handle: i64,
+    stream_window: i64,
+    recv_window: i64
+  ) -> NetworkResult<i64> {
+    return network_result(
+      host_network_recv_http_status_owned(handle, stream_window, recv_window)
+    );
+  }
+
+  fn recv_session_body(
+    handle: i64,
+    stream_window: i64,
+    recv_window: i64
+  ) -> NetworkResult<i64> {
+    return network_result(host_network_recv_owned(handle, stream_window, recv_window));
+  }
+
+  fn close_session_handle(handle: i64) -> i64 {
+    return host_network_close_owned(handle);
+  }
+
   fn build_request_plan(
     protocol_kind: i64,
     protocol_version: i64,
@@ -109,6 +143,28 @@ mod cpu Main {
       auth_code: plan.method_code + protocol_header_bytes,
       trace_code: plan.path_code + protocol_header_bytes
     };
+  }
+
+  fn estimate_request_bytes(
+    protocol_header_bytes: i64,
+    protocol_version: i64,
+    headers: NetHttpishRequestHeaders,
+    send_window: i64
+  ) -> i64 {
+    return protocol_header_bytes
+      + protocol_version
+      + 16
+      + headers.auth_code
+      + headers.trace_code
+      + send_window;
+  }
+
+  fn estimate_response_bytes(
+    protocol_header_bytes: i64,
+    recv_window: i64,
+    headers: NetHttpishRequestHeaders
+  ) -> i64 {
+    return protocol_header_bytes + recv_window + headers.trace_code;
   }
 
   fn select_request_header_code(
@@ -204,6 +260,39 @@ mod cpu Main {
     };
   }
 
+  fn compute_packet_value(packet: NetHttpishHeaderSessionPacket) -> i64 {
+    return packet.status_code
+      + packet.request_header_code
+      + packet.response_header_code
+      + packet.body_code
+      + packet.retry_code
+      + packet.staged_total;
+  }
+
+  fn compute_session_value(
+    argv_count: i64,
+    transport_family: i64,
+    protocol_kind: i64,
+    protocol_version: i64,
+    protocol_header_bytes: i64,
+    request_bytes: i64,
+    response_bytes: i64,
+    open_handle: i64,
+    packet: NetHttpishHeaderSessionPacket,
+    close_value: i64
+  ) -> i64 {
+    return argv_count
+      + transport_family
+      + protocol_kind
+      + protocol_version
+      + protocol_header_bytes
+      + request_bytes
+      + response_bytes
+      + open_handle
+      + compute_packet_value(packet)
+      + close_value;
+  }
+
   fn capture_net_httpish_header_session_summary() -> NetHttpishHeaderSessionSummary {
     let argv_count: i64 = host_argv_count();
     let transport_family: i64 = network_profile_transport_family("NetworkUnit");
@@ -228,27 +317,21 @@ mod cpu Main {
     let request_headers: NetHttpishRequestHeaders =
       build_request_headers(request_plan, protocol_header_bytes);
     let request_bytes: i64 =
-      protocol_header_bytes
-      + protocol_version
-      + 16
-      + request_headers.auth_code
-      + request_headers.trace_code
-      + send_window;
+      estimate_request_bytes(
+        protocol_header_bytes,
+        protocol_version,
+        request_headers,
+        send_window
+      );
     let response_bytes: i64 =
-      protocol_header_bytes + recv_window + request_headers.trace_code;
-    let open_handle: i64 = host_network_open_tcp_stream(
-      remote_port,
-      connect_timeout_ms
-    );
-    let send_result: NetworkResult<i64> = network_result(
-      host_network_send_owned(open_handle, stream_window, send_window)
-    );
-    let status_result: NetworkResult<i64> = network_result(
-      host_network_recv_http_status_owned(open_handle, stream_window, recv_window)
-    );
-    let recv_result: NetworkResult<i64> = network_result(
-      host_network_recv_owned(open_handle, stream_window, recv_window)
-    );
+      estimate_response_bytes(protocol_header_bytes, recv_window, request_headers);
+    let open_handle: i64 = open_session_handle(remote_port, connect_timeout_ms);
+    let send_result: NetworkResult<i64> =
+      send_session_headers(open_handle, stream_window, send_window);
+    let status_result: NetworkResult<i64> =
+      recv_session_status(open_handle, stream_window, recv_window);
+    let recv_result: NetworkResult<i64> =
+      recv_session_body(open_handle, stream_window, recv_window);
     let status_code: i64 = encode_value(status_result);
     let request_header_code: i64 =
       select_request_header_code(request_headers, send_result, status_result);
@@ -264,7 +347,7 @@ mod cpu Main {
       body_code,
       retry_code
     );
-    let close_value: i64 = host_network_close_owned(open_handle);
+    let close_value: i64 = close_session_handle(open_handle);
     let tick_ns: i64 = host_monotonic_time_ns();
 
     return NetHttpishHeaderSessionSummary {
@@ -286,21 +369,18 @@ mod cpu Main {
       body_code: packet.body_code,
       retry_code: packet.retry_code,
       staged_total: packet.staged_total,
-      session_value: argv_count
-        + transport_family
-        + protocol_kind
-        + protocol_version
-        + protocol_header_bytes
-        + request_bytes
-        + response_bytes
-        + open_handle
-        + packet.status_code
-        + packet.request_header_code
-        + packet.response_header_code
-        + packet.body_code
-        + packet.retry_code
-        + packet.staged_total
-        + close_value,
+      session_value: compute_session_value(
+        argv_count,
+        transport_family,
+        protocol_kind,
+        protocol_version,
+        protocol_header_bytes,
+        request_bytes,
+        response_bytes,
+        open_handle,
+        packet,
+        close_value
+      ),
       tick_ns: tick_ns
     };
   }

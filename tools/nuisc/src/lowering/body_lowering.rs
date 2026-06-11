@@ -218,6 +218,17 @@ pub(super) fn lower_while_stmt(
         return Ok(None);
     }
 
+    if let Some(prepared) = prepare_async_chained_while(
+        condition,
+        body,
+        &state.pure_helpers,
+        &state.inlineable_pure_helpers,
+        &state.pure_helper_blocks,
+    ) {
+        lower_async_chained_while(prepared, state, bindings)?;
+        return Ok(None);
+    }
+
     if let Some(prepared) = prepare_counted_while(
         condition,
         body,
@@ -234,17 +245,179 @@ pub(super) fn lower_while_stmt(
         return lower_prepared_loop_body(condition_name, &prepared, state, bindings);
     }
 
-    match lower_if_stmt(condition, body, &[], state, bindings) {
-        Ok(Some(returned)) => return Ok(Some(returned)),
-        Ok(None) => return Ok(None),
-        Err(error) if error.contains("minimal nuisc lowering currently only supports `if`") => {}
-        Err(error) => return Err(error),
+    if expr_contains_async_loop_primitive(condition) || stmts_contain_async_loop_primitive(body) {
+        return Err(
+            "async/task-driven `while` loops are not supported yet in lowering; iterative backedge lowering for `await`, `spawn`, `join`, `timeout`, and related task primitives inside loop conditions/bodies is still not implemented"
+                .to_owned(),
+        );
     }
 
     Err(
         "minimal nuisc lowering can currently execute only guard-style `while` loops or simple counted `while` loops like `let i = 0; while i < limit { let i = i + 1; }`; general iterative loop/backedge lowering is still not implemented"
             .to_owned(),
     )
+}
+
+fn stmts_contain_async_loop_primitive(stmts: &[NirStmt]) -> bool {
+    stmts.iter().any(stmt_contains_async_loop_primitive)
+}
+
+fn stmt_contains_async_loop_primitive(stmt: &NirStmt) -> bool {
+    match stmt {
+        NirStmt::Let { value, .. }
+        | NirStmt::Const { value, .. }
+        | NirStmt::Print(value)
+        | NirStmt::Expr(value)
+        | NirStmt::Await(value) => expr_contains_async_loop_primitive(value),
+        NirStmt::Return(Some(value)) => expr_contains_async_loop_primitive(value),
+        NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            expr_contains_async_loop_primitive(condition)
+                || stmts_contain_async_loop_primitive(then_body)
+                || stmts_contain_async_loop_primitive(else_body)
+        }
+        NirStmt::While { condition, body } => {
+            expr_contains_async_loop_primitive(condition)
+                || stmts_contain_async_loop_primitive(body)
+        }
+        NirStmt::Return(None) | NirStmt::Break | NirStmt::Continue => false,
+    }
+}
+
+fn expr_contains_async_loop_primitive(expr: &NirExpr) -> bool {
+    match expr {
+        NirExpr::Await(_)
+        | NirExpr::CpuSpawn { .. }
+        | NirExpr::CpuJoin(_)
+        | NirExpr::CpuCancel(_)
+        | NirExpr::CpuJoinResult(_)
+        | NirExpr::CpuTaskCompleted(_)
+        | NirExpr::CpuTaskTimedOut(_)
+        | NirExpr::CpuTaskCancelled(_)
+        | NirExpr::CpuTaskValue(_)
+        | NirExpr::CpuTimeout { .. } => true,
+        NirExpr::Borrow(inner)
+        | NirExpr::BorrowEnd(inner)
+        | NirExpr::Move(inner)
+        | NirExpr::LoadValue(inner)
+        | NirExpr::LoadNext(inner)
+        | NirExpr::BufferLen(inner)
+        | NirExpr::DataReady(inner)
+        | NirExpr::DataMoved(inner)
+        | NirExpr::DataWindowed(inner)
+        | NirExpr::DataValue(inner)
+        | NirExpr::DataFreezeWindow(inner)
+        | NirExpr::ShaderPassReady(inner)
+        | NirExpr::ShaderFrameReady(inner)
+        | NirExpr::ShaderValue(inner)
+        | NirExpr::NetworkConfigReady(inner)
+        | NirExpr::NetworkSendReady(inner)
+        | NirExpr::NetworkRecvReady(inner)
+        | NirExpr::NetworkAcceptReady(inner)
+        | NirExpr::NetworkValue(inner)
+        | NirExpr::KernelConfigReady(inner)
+        | NirExpr::KernelValue(inner)
+        | NirExpr::DataOutputPipe(inner)
+        | NirExpr::DataInputPipe(inner)
+        | NirExpr::CpuPresentFrame(inner)
+        | NirExpr::Free(inner)
+        | NirExpr::IsNull(inner)
+        | NirExpr::CastI64ToI32(inner) => expr_contains_async_loop_primitive(inner),
+        NirExpr::DataResult { value, .. }
+        | NirExpr::ShaderResult { value, .. }
+        | NirExpr::NetworkResult { value, .. }
+        | NirExpr::KernelResult { value, .. } => expr_contains_async_loop_primitive(value),
+        NirExpr::AllocNode { value, next } => {
+            expr_contains_async_loop_primitive(value) || expr_contains_async_loop_primitive(next)
+        }
+        NirExpr::AllocBuffer { len, fill } => {
+            expr_contains_async_loop_primitive(len) || expr_contains_async_loop_primitive(fill)
+        }
+        NirExpr::LoadAt { buffer, index }
+        | NirExpr::DataReadWindow {
+            window: buffer,
+            index,
+        } => {
+            expr_contains_async_loop_primitive(buffer)
+                || expr_contains_async_loop_primitive(index)
+        }
+        NirExpr::DataWriteWindow { window, index, value }
+        | NirExpr::StoreAt {
+            buffer: window,
+            index,
+            value,
+        } => {
+            expr_contains_async_loop_primitive(window)
+                || expr_contains_async_loop_primitive(index)
+                || expr_contains_async_loop_primitive(value)
+        }
+        NirExpr::StoreValue { target, value }
+        | NirExpr::StoreNext {
+            target,
+            next: value,
+        } => {
+            expr_contains_async_loop_primitive(target)
+                || expr_contains_async_loop_primitive(value)
+        }
+        NirExpr::DataCopyWindow { input, offset, len }
+        | NirExpr::DataImmutableWindow { input, offset, len } => {
+            expr_contains_async_loop_primitive(input)
+                || expr_contains_async_loop_primitive(offset)
+                || expr_contains_async_loop_primitive(len)
+        }
+        NirExpr::DataProfileSendUplink { input, .. }
+        | NirExpr::DataProfileSendDownlink { input, .. }
+        | NirExpr::FieldAccess { base: input, .. }
+        | NirExpr::ShaderProfileRender { packet: input, .. } => {
+            expr_contains_async_loop_primitive(input)
+        }
+        NirExpr::ShaderProfileColorSeed { base, delta, .. }
+        | NirExpr::ShaderProfileRadiusSeed { base, delta, .. } => {
+            expr_contains_async_loop_primitive(base) || expr_contains_async_loop_primitive(delta)
+        }
+        NirExpr::ShaderProfileSpeedSeed {
+            delta,
+            scale,
+            base,
+            ..
+        } => {
+            expr_contains_async_loop_primitive(delta)
+                || expr_contains_async_loop_primitive(scale)
+                || expr_contains_async_loop_primitive(base)
+        }
+        NirExpr::ShaderProfilePacket {
+            color,
+            speed,
+            radius,
+            ..
+        } => {
+            expr_contains_async_loop_primitive(color)
+                || expr_contains_async_loop_primitive(speed)
+                || expr_contains_async_loop_primitive(radius)
+        }
+        NirExpr::Call { args, .. } => args.iter().any(expr_contains_async_loop_primitive),
+        NirExpr::MethodCall { receiver, args, .. } => {
+            expr_contains_async_loop_primitive(receiver)
+                || args.iter().any(expr_contains_async_loop_primitive)
+        }
+        NirExpr::CpuExternCall { args, .. } => args.iter().any(expr_contains_async_loop_primitive),
+        NirExpr::StructLiteral { fields, .. } => fields
+            .iter()
+            .any(|(_, value)| expr_contains_async_loop_primitive(value)),
+        NirExpr::Binary { lhs, rhs, .. } => {
+            expr_contains_async_loop_primitive(lhs) || expr_contains_async_loop_primitive(rhs)
+        }
+        NirExpr::Instantiate { .. }
+        | NirExpr::Null
+        | NirExpr::Bool(_)
+        | NirExpr::Text(_)
+        | NirExpr::Int(_)
+        | NirExpr::Var(_) => false,
+        _ => false,
+    }
 }
 
 pub(super) fn lower_call_expr(

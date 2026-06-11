@@ -61,6 +61,59 @@ mod cpu Main {
     return network_value(result);
   }
 
+  fn open_session_handle(remote_port: i64, connect_timeout_ms: i64) -> i64 {
+    return host_network_open_tcp_stream(remote_port, connect_timeout_ms);
+  }
+
+  fn send_session_request(
+    handle: i64,
+    stream_window: i64,
+    send_window: i64
+  ) -> NetworkResult<i64> {
+    return network_result(host_network_send_owned(handle, stream_window, send_window));
+  }
+
+  fn recv_session_status(
+    handle: i64,
+    stream_window: i64,
+    recv_window: i64
+  ) -> NetworkResult<i64> {
+    return network_result(
+      host_network_recv_http_status_owned(handle, stream_window, recv_window)
+    );
+  }
+
+  fn recv_session_body(
+    handle: i64,
+    stream_window: i64,
+    recv_window: i64
+  ) -> NetworkResult<i64> {
+    return network_result(host_network_recv_owned(handle, stream_window, recv_window));
+  }
+
+  fn close_session_handle(handle: i64) -> i64 {
+    return host_network_close_owned(handle);
+  }
+
+  fn estimate_request_bytes(
+    protocol_header_bytes: i64,
+    protocol_version: i64,
+    send_window: i64
+  ) -> i64 {
+    return protocol_header_bytes
+      + protocol_version
+      + 16
+      + protocol_header_bytes
+      + send_window;
+  }
+
+  fn estimate_response_bytes(
+    protocol_header_bytes: i64,
+    recv_window: i64
+  ) -> i64 {
+    return protocol_header_bytes + 12 + protocol_header_bytes + recv_window;
+  }
+
   fn capture_net_http_client_session_summary() -> NetHttpClientSessionSummary {
     let argv_count: i64 = host_argv_count();
     let transport_family: i64 = network_profile_transport_family("NetworkUnit");
@@ -77,24 +130,18 @@ mod cpu Main {
     let remote_port: i64 = network_profile_remote_port("NetworkUnit");
     let method_code: i64 = 64 + protocol_kind;
     let request_bytes: i64 =
-      protocol_header_bytes + protocol_version + 16 + protocol_header_bytes + send_window;
+      estimate_request_bytes(protocol_header_bytes, protocol_version, send_window);
     let response_bytes: i64 =
-      protocol_header_bytes + 12 + protocol_header_bytes + recv_window;
-    let open_handle: i64 = host_network_open_tcp_stream(
-      remote_port,
-      connect_timeout_ms
-    );
-    let send_result: NetworkResult<i64> = network_result(
-      host_network_send_owned(open_handle, stream_window, send_window)
-    );
-    let status_result: NetworkResult<i64> = network_result(
-      host_network_recv_http_status_owned(open_handle, stream_window, recv_window)
-    );
-    let recv_result: NetworkResult<i64> = network_result(
-      host_network_recv_owned(open_handle, stream_window, recv_window)
-    );
+      estimate_response_bytes(protocol_header_bytes, recv_window);
+    let open_handle: i64 = open_session_handle(remote_port, connect_timeout_ms);
+    let send_result: NetworkResult<i64> =
+      send_session_request(open_handle, stream_window, send_window);
+    let status_result: NetworkResult<i64> =
+      recv_session_status(open_handle, stream_window, recv_window);
+    let recv_result: NetworkResult<i64> =
+      recv_session_body(open_handle, stream_window, recv_window);
     let status_code: i64 = encode_value(status_result);
-    let close_value: i64 = host_network_close_owned(open_handle);
+    let close_value: i64 = close_session_handle(open_handle);
     let tick_ns: i64 = host_monotonic_time_ns();
 
     return NetHttpClientSessionSummary {

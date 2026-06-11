@@ -76,6 +76,14 @@ pub(super) struct PreparedChainedWhile {
     pub(super) carries: Vec<PreparedCarryUpdate>,
 }
 
+pub(super) struct PreparedAsyncChainedWhile {
+    pub(super) binding_name: String,
+    pub(super) limit: NirExpr,
+    pub(super) compare: PreparedLoopCompare,
+    pub(super) step_callee: String,
+    pub(super) carries: Vec<PreparedCarryUpdate>,
+}
+
 pub(super) struct PreparedFlowWhile {
     pub(super) binding_name: String,
     pub(super) limit: NirExpr,

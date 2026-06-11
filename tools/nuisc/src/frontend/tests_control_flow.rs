@@ -450,6 +450,63 @@ fn lowers_if_expression_inside_await_operand() {
 }
 
 #[test]
+fn lowers_match_expression_inside_await_operand() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn one() -> i64 {
+            return 1;
+          }
+
+          async fn two() -> i64 {
+            return 2;
+          }
+
+          async fn main() -> i64 {
+            let value: i64 = await match 1 {
+              1 => { one() },
+              _ => { two() }
+            };
+            return value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let function = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    match &function.body[0] {
+        NirStmt::If {
+            then_body,
+            else_body,
+            ..
+        } => {
+            assert!(matches!(
+                then_body.as_slice(),
+                [NirStmt::Let {
+                    name,
+                    value: NirExpr::Await(_),
+                    ..
+                }] if name == "value"
+            ));
+            assert!(matches!(
+                else_body.as_slice(),
+                [NirStmt::Let {
+                    name,
+                    value: NirExpr::Await(_),
+                    ..
+                }] if name == "value"
+            ));
+        }
+        other => panic!("expected lowered match-expression around await operand, found {other:?}"),
+    }
+}
+
+#[test]
 fn lowers_if_expression_with_branch_prelude_statements() {
     let module = parse_nuis_module(
         r#"
@@ -997,5 +1054,65 @@ fn lowers_multi_arm_match_inside_while_into_nested_if_chain() {
             }
         },
         other => panic!("expected while statement, found {other:?}"),
+    }
+}
+
+#[test]
+fn lowers_await_expression_inside_while_body() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn step(value: i64) -> i64 {
+            return value + 1;
+          }
+
+          async fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            while value < 3 {
+              let value: i64 = await step(value);
+              let acc: i64 = acc + value;
+            }
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let function = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    match &function.body[2] {
+        NirStmt::While { condition, body } => {
+            assert!(matches!(
+                condition,
+                NirExpr::Binary {
+                    op: NirBinaryOp::Lt,
+                    ..
+                }
+            ));
+            assert!(matches!(
+                body.as_slice(),
+                [
+                    NirStmt::Let {
+                        name: value_name,
+                        value: NirExpr::Await(_),
+                        ..
+                    },
+                    NirStmt::Let {
+                        name: acc_name,
+                        value: NirExpr::Binary {
+                            op: NirBinaryOp::Add,
+                            ..
+                        },
+                        ..
+                    }
+                ] if value_name == "value" && acc_name == "acc"
+            ));
+        }
+        other => panic!("expected while statement with await body, found {other:?}"),
     }
 }

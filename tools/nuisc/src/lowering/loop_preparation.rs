@@ -203,6 +203,29 @@ fn parse_prepared_loop_step(
     }
 }
 
+fn parse_prepared_async_loop_step(stmt: &NirStmt, binding_name: &str) -> Option<String> {
+    let (step_name, step_expr) = match stmt {
+        NirStmt::Let { name, value, .. } | NirStmt::Const { name, value, .. } => {
+            (name.as_str(), value)
+        }
+        _ => return None,
+    };
+    if step_name != binding_name {
+        return None;
+    }
+    match step_expr {
+        NirExpr::Await(inner) => match inner.as_ref() {
+            NirExpr::Call { callee, args }
+                if matches!(args.as_slice(), [NirExpr::Var(arg_name)] if arg_name == binding_name) =>
+            {
+                Some(callee.clone())
+            }
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
 fn combine_loop_flow_conditions(
     lhs: PreparedLoopFlowCondition,
     op: PreparedLoopLogicOp,
@@ -828,6 +851,45 @@ pub(super) fn prepare_chained_while(
         step,
         compare,
         step_kind,
+        carries,
+    })
+}
+
+pub(super) fn prepare_async_chained_while(
+    condition: &NirExpr,
+    body: &[NirStmt],
+    pure_helpers: &BTreeSet<String>,
+    inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
+    pure_helper_blocks: &BTreeMap<String, PureHelperBlock>,
+) -> Option<PreparedAsyncChainedWhile> {
+    let (binding_name, limit, compare) =
+        parse_prepared_loop_header(condition, pure_helpers, inlineable_pure_helpers)?;
+
+    let [step_binding @ (NirStmt::Let { .. } | NirStmt::Const { .. }), carry_bindings @ ..] = body
+    else {
+        return None;
+    };
+    if carry_bindings.is_empty() {
+        return None;
+    }
+    let step_callee = parse_prepared_async_loop_step(step_binding, &binding_name)?;
+
+    let carries = prepare_loop_carry_sequence(
+        carry_bindings,
+        &binding_name,
+        pure_helpers,
+        inlineable_pure_helpers,
+        pure_helper_blocks,
+    )?;
+    if carries.is_empty() {
+        return None;
+    }
+
+    Some(PreparedAsyncChainedWhile {
+        binding_name,
+        limit,
+        compare,
+        step_callee,
         carries,
     })
 }

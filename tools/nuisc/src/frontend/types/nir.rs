@@ -44,6 +44,14 @@ pub(crate) fn infer_result_stage(expr: &NirExpr) -> Option<NirResultStage> {
         | NirExpr::NetworkProfileProtocolHeaderBytesRef { .. } => {
             Some(NirNetworkFlowState::ConfigReady.into())
         }
+        NirExpr::CpuExternCall { callee, .. }
+            if callee == "host_network_open_tcp_stream"
+                || callee == "host_network_open_udp_datagram"
+                || callee == "host_network_open_tcp_listener"
+                || callee == "host_network_bind_udp_datagram" =>
+        {
+            Some(NirNetworkFlowState::ConfigReady.into())
+        }
         NirExpr::CpuExternCall { callee, .. } if callee == "host_network_send_probe" => {
             Some(NirNetworkFlowState::SendReady.into())
         }
