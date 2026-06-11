@@ -1,0 +1,139 @@
+use network NetworkUnit;
+
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+  extern "c" fn host_monotonic_time_ns() -> i64;
+  extern "c" fn host_network_open_tcp_stream(
+    remote_port: i64,
+    connect_timeout_ms: i64
+  ) -> i64;
+  extern "c" fn host_network_send_owned(
+    handle: i64,
+    stream_window: i64,
+    send_window: i64
+  ) -> i64;
+  extern "c" fn host_network_recv_owned(
+    handle: i64,
+    stream_window: i64,
+    recv_window: i64
+  ) -> i64;
+  extern "c" fn host_network_recv_http_status_owned(
+    handle: i64,
+    stream_window: i64,
+    recv_window: i64
+  ) -> i64;
+  extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+  struct NetHttpClientSessionAsyncLoopSummary {
+    argv_count: i64,
+    timeout_budget: i64,
+    retry_budget: i64,
+    protocol_kind: i64,
+    protocol_version: i64,
+    protocol_header_bytes: i64,
+    break_budget: i64,
+    loop_value: i64,
+    final_value: i64,
+    tick_ns: i64
+  }
+
+  fn encode_value(result: NetworkResult<i64>) -> i64 {
+    return network_value(result);
+  }
+
+  async fn step_session_value(value: i64) -> i64 {
+    let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+    let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
+    let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+    let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+    let send_window: i64 = network_profile_send_window("NetworkUnit");
+    let handle: i64 = host_network_open_tcp_stream(remote_port, connect_timeout_ms);
+    let send_result: NetworkResult<i64> =
+      network_result(host_network_send_owned(handle, stream_window, send_window));
+    let status_result: NetworkResult<i64> =
+      network_result(host_network_recv_http_status_owned(handle, stream_window, recv_window));
+    let recv_result: NetworkResult<i64> =
+      network_result(host_network_recv_owned(handle, stream_window, recv_window));
+    let close_value: i64 = host_network_close_owned(handle);
+
+    if network_send_ready(send_result) || network_recv_ready(recv_result) {
+      return value
+        + encode_value(send_result)
+        + encode_value(status_result)
+        + encode_value(recv_result)
+        + close_value;
+    }
+    if network_config_ready(status_result) {
+      return value + encode_value(status_result) + close_value;
+    }
+    return value + close_value;
+  }
+
+  async fn fold_session_loop(limit: i64, break_budget: i64) -> i64 {
+    let value: i64 = 0;
+    let acc: i64 = 0;
+    while value < limit {
+      let value: i64 = await step_session_value(value);
+      let acc: i64 = acc + value;
+      if acc > break_budget {
+        break;
+      }
+    }
+    return acc;
+  }
+
+  async fn capture_net_http_client_session_async_loop_summary(
+  ) -> NetHttpClientSessionAsyncLoopSummary {
+    let argv_count: i64 = host_argv_count();
+    let timeout_budget: i64 = network_profile_timeout_budget("NetworkUnit");
+    let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
+    let protocol_kind: i64 = network_profile_protocol_kind("NetworkUnit");
+    let protocol_version: i64 = network_profile_protocol_version("NetworkUnit");
+    let protocol_header_bytes: i64 =
+      network_profile_protocol_header_bytes("NetworkUnit");
+    let break_budget: i64 =
+      timeout_budget + retry_budget + protocol_kind + protocol_version;
+    let loop_value: i64 = await fold_session_loop(retry_budget, break_budget);
+    let tick_ns: i64 = host_monotonic_time_ns();
+
+    return NetHttpClientSessionAsyncLoopSummary {
+      argv_count: argv_count,
+      timeout_budget: timeout_budget,
+      retry_budget: retry_budget,
+      protocol_kind: protocol_kind,
+      protocol_version: protocol_version,
+      protocol_header_bytes: protocol_header_bytes,
+      break_budget: break_budget,
+      loop_value: loop_value,
+      final_value: argv_count
+        + timeout_budget
+        + retry_budget
+        + protocol_kind
+        + protocol_version
+        + protocol_header_bytes
+        + break_budget
+        + loop_value,
+      tick_ns: tick_ns
+    };
+  }
+
+  async fn summarize_net_http_client_session_async_loop_recipe() -> i64 {
+    let summary: NetHttpClientSessionAsyncLoopSummary =
+      await capture_net_http_client_session_async_loop_summary();
+    return summary.argv_count
+      + summary.timeout_budget
+      + summary.retry_budget
+      + summary.protocol_kind
+      + summary.protocol_version
+      + summary.protocol_header_bytes
+      + summary.break_budget
+      + summary.loop_value
+      + summary.final_value
+      + summary.tick_ns;
+  }
+
+  async fn main() {
+    let summary_value: i64 = await summarize_net_http_client_session_async_loop_recipe();
+    print(summary_value);
+  }
+}

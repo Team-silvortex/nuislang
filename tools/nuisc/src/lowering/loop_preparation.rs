@@ -894,6 +894,141 @@ pub(super) fn prepare_async_chained_while(
     })
 }
 
+pub(super) fn prepare_async_flow_while(
+    condition: &NirExpr,
+    body: &[NirStmt],
+    pure_helpers: &BTreeSet<String>,
+    inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
+    pure_helper_blocks: &BTreeMap<String, PureHelperBlock>,
+) -> Option<PreparedAsyncFlowWhile> {
+    let (binding_name, limit, compare) =
+        parse_prepared_loop_header(condition, pure_helpers, inlineable_pure_helpers)?;
+
+    let [step_binding @ (NirStmt::Let { .. } | NirStmt::Const { .. }), rest @ ..] = body else {
+        return None;
+    };
+    if rest.is_empty() {
+        return None;
+    }
+    let step_callee = parse_prepared_async_loop_step(step_binding, &binding_name)?;
+    let (control_temp_bindings, raw_control_stmt, carry_bindings) =
+        split_temp_prefixed_loop_flow_control(rest, pure_helpers)?;
+    let substituted_control_stmt =
+        substitute_stmt_bindings(raw_control_stmt, &control_temp_bindings);
+    let (control, prepared_carries) = if let NirStmt::If {
+        condition,
+        then_body,
+        else_body,
+    } = &substituted_control_stmt
+    {
+        if carry_bindings.is_empty() && !else_body.is_empty() {
+            let [action_stmt] = then_body.as_slice() else {
+                return None;
+            };
+            if let Some(action) = match action_stmt {
+                NirStmt::Break => Some(PreparedLoopFlowAction::Break),
+                NirStmt::Continue => Some(PreparedLoopFlowAction::Continue),
+                _ => None,
+            } {
+                let prepared_carries = prepare_loop_carry_sequence(
+                    else_body,
+                    &binding_name,
+                    pure_helpers,
+                    inlineable_pure_helpers,
+                    pure_helper_blocks,
+                )?;
+                let carry_binding_names = prepared_carries
+                    .iter()
+                    .map(|carry| carry.binding_name.clone())
+                    .collect::<Vec<_>>();
+                let control_condition = parse_loop_flow_condition(
+                    condition,
+                    &binding_name,
+                    &carry_binding_names,
+                    pure_helpers,
+                    inlineable_pure_helpers,
+                )?;
+                (
+                    PreparedLoopFlowControl {
+                        condition: control_condition,
+                        action,
+                    },
+                    prepared_carries,
+                )
+            } else {
+                let prepared_carries = prepare_loop_carry_sequence(
+                    carry_bindings,
+                    &binding_name,
+                    pure_helpers,
+                    inlineable_pure_helpers,
+                    pure_helper_blocks,
+                )?;
+                let carry_binding_names = prepared_carries
+                    .iter()
+                    .map(|carry| carry.binding_name.clone())
+                    .collect::<Vec<_>>();
+                let control = parse_loop_flow_control(
+                    &substituted_control_stmt,
+                    &binding_name,
+                    &carry_binding_names,
+                    pure_helpers,
+                    inlineable_pure_helpers,
+                )?;
+                (control, prepared_carries)
+            }
+        } else {
+            let prepared_carries = prepare_loop_carry_sequence(
+                carry_bindings,
+                &binding_name,
+                pure_helpers,
+                inlineable_pure_helpers,
+                pure_helper_blocks,
+            )?;
+            let carry_binding_names = prepared_carries
+                .iter()
+                .map(|carry| carry.binding_name.clone())
+                .collect::<Vec<_>>();
+            let control = parse_loop_flow_control(
+                &substituted_control_stmt,
+                &binding_name,
+                &carry_binding_names,
+                pure_helpers,
+                inlineable_pure_helpers,
+            )?;
+            (control, prepared_carries)
+        }
+    } else {
+        let prepared_carries = prepare_loop_carry_sequence(
+            carry_bindings,
+            &binding_name,
+            pure_helpers,
+            inlineable_pure_helpers,
+            pure_helper_blocks,
+        )?;
+        let carry_binding_names = prepared_carries
+            .iter()
+            .map(|carry| carry.binding_name.clone())
+            .collect::<Vec<_>>();
+        let control = parse_loop_flow_control(
+            &substituted_control_stmt,
+            &binding_name,
+            &carry_binding_names,
+            pure_helpers,
+            inlineable_pure_helpers,
+        )?;
+        (control, prepared_carries)
+    };
+
+    Some(PreparedAsyncFlowWhile {
+        binding_name,
+        limit,
+        compare,
+        step_callee,
+        control,
+        carries: prepared_carries,
+    })
+}
+
 pub(super) fn prepare_flow_while(
     condition: &NirExpr,
     body: &[NirStmt],
@@ -1095,6 +1230,66 @@ pub(super) fn prepare_post_flow_while(
         step,
         compare,
         step_kind,
+        carries: prepared_carries,
+        control,
+    })
+}
+
+pub(super) fn prepare_async_post_flow_while(
+    condition: &NirExpr,
+    body: &[NirStmt],
+    pure_helpers: &BTreeSet<String>,
+    inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
+    pure_helper_blocks: &BTreeMap<String, PureHelperBlock>,
+) -> Option<PreparedAsyncPostFlowWhile> {
+    let (binding_name, limit, compare) =
+        parse_prepared_loop_header(condition, pure_helpers, inlineable_pure_helpers)?;
+
+    let [step_binding @ (NirStmt::Let { .. } | NirStmt::Const { .. }), middle @ .., control_stmt] =
+        body
+    else {
+        return None;
+    };
+    if middle.is_empty() {
+        return None;
+    }
+    let step_callee = parse_prepared_async_loop_step(step_binding, &binding_name)?;
+
+    let trailing_temp_count = middle
+        .iter()
+        .rev()
+        .take_while(|stmt| extract_loop_match_scrutinee_temp_binding(stmt, pure_helpers).is_some())
+        .count();
+    let split_index = middle.len().saturating_sub(trailing_temp_count);
+    let (carry_bindings, control_temp_stmts) = middle.split_at(split_index);
+    let prepared_carries = prepare_loop_carry_sequence(
+        carry_bindings,
+        &binding_name,
+        pure_helpers,
+        inlineable_pure_helpers,
+        pure_helper_blocks,
+    )?;
+    let carry_binding_names = prepared_carries
+        .iter()
+        .map(|carry| carry.binding_name.clone())
+        .collect::<Vec<_>>();
+    let control_temp_bindings = control_temp_stmts
+        .iter()
+        .map(|stmt| extract_loop_match_scrutinee_temp_binding(stmt, pure_helpers))
+        .collect::<Option<Vec<_>>>()?;
+    let substituted_control_stmt = substitute_stmt_bindings(control_stmt, &control_temp_bindings);
+    let control = parse_loop_flow_control(
+        &substituted_control_stmt,
+        &binding_name,
+        &carry_binding_names,
+        pure_helpers,
+        inlineable_pure_helpers,
+    )?;
+    Some(PreparedAsyncPostFlowWhile {
+        binding_name,
+        limit,
+        compare,
+        step_callee,
         carries: prepared_carries,
         control,
     })

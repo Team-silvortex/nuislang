@@ -15,6 +15,21 @@ pub(super) fn collect_recursive_async_helper_functions(module: &NirModule) -> BT
     collect_recursive_helper_functions(module, true)
 }
 
+pub(super) fn collect_async_loop_step_functions(module: &NirModule) -> BTreeSet<String> {
+    let eligible = module
+        .functions
+        .iter()
+        .filter(|function| function.is_async)
+        .filter(|function| direct_call_signature_kind(function).is_some())
+        .map(|function| function.name.as_str())
+        .collect::<BTreeSet<_>>();
+    let mut collected = BTreeSet::new();
+    for function in &module.functions {
+        collect_async_loop_step_functions_in_stmts(&function.body, &eligible, &mut collected);
+    }
+    collected
+}
+
 fn collect_recursive_helper_functions(module: &NirModule, is_async: bool) -> BTreeSet<String> {
     let eligible = module
         .functions
@@ -55,6 +70,55 @@ fn collect_recursive_helper_functions(module: &NirModule, is_async: bool) -> BTr
         }
     }
     closure
+}
+
+fn collect_async_loop_step_functions_in_stmts(
+    body: &[NirStmt],
+    eligible_names: &BTreeSet<&str>,
+    collected: &mut BTreeSet<String>,
+) {
+    for stmt in body {
+        match stmt {
+            NirStmt::If {
+                then_body,
+                else_body,
+                ..
+            } => {
+                collect_async_loop_step_functions_in_stmts(then_body, eligible_names, collected);
+                collect_async_loop_step_functions_in_stmts(else_body, eligible_names, collected);
+            }
+            NirStmt::While { body, .. } => {
+                collect_async_loop_step_function_in_while(body, eligible_names, collected);
+                collect_async_loop_step_functions_in_stmts(body, eligible_names, collected);
+            }
+            _ => {}
+        }
+    }
+}
+
+fn collect_async_loop_step_function_in_while(
+    body: &[NirStmt],
+    eligible_names: &BTreeSet<&str>,
+    collected: &mut BTreeSet<String>,
+) {
+    let Some(step_stmt) = body.first() else {
+        return;
+    };
+    let value = match step_stmt {
+        NirStmt::Let { value, .. } | NirStmt::Const { value, .. } => value,
+        _ => return,
+    };
+    let NirExpr::Await(inner) = value else {
+        return;
+    };
+    let NirExpr::Call { callee, args } = inner.as_ref() else {
+        return;
+    };
+    if eligible_names.contains(callee.as_str())
+        && matches!(args.as_slice(), [NirExpr::Var(_)])
+    {
+        collected.insert(callee.clone());
+    }
 }
 
 fn direct_call_scalar_kind(ty: &nuis_semantics::model::NirTypeRef) -> Option<DirectCallScalarKind> {

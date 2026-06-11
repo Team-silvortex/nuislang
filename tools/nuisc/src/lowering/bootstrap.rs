@@ -1,4 +1,5 @@
 use super::*;
+use crate::lowering::direct_calls::collect_async_loop_step_functions;
 use crate::lowering::direct_calls::collect_recursive_async_helper_functions;
 use crate::lowering::direct_calls::collect_recursive_direct_call_functions;
 
@@ -58,6 +59,7 @@ pub(super) fn lower_nir_to_yir_builtin_cpu(module: &NirModule) -> Result<YirModu
     let module = &rewritten_module;
     let direct_call_functions = collect_recursive_direct_call_functions(module);
     let async_helper_functions = collect_recursive_async_helper_functions(module);
+    let async_loop_step_functions = collect_async_loop_step_functions(module);
 
     let main = module
         .functions
@@ -81,7 +83,10 @@ pub(super) fn lower_nir_to_yir_builtin_cpu(module: &NirModule) -> Result<YirModu
         yir: &mut yir,
         function_map,
         direct_call_functions: direct_call_functions.clone(),
-        async_helper_functions: async_helper_functions.clone(),
+        async_helper_functions: async_helper_functions
+            .union(&async_loop_step_functions)
+            .cloned()
+            .collect(),
         pure_helpers: collect_pure_helper_functions(module),
         inlineable_pure_helpers: collect_inlineable_pure_helper_exprs(module),
         pure_helper_blocks: collect_pure_helper_blocks(module),
@@ -95,6 +100,7 @@ pub(super) fn lower_nir_to_yir_builtin_cpu(module: &NirModule) -> Result<YirModu
     for function in module.functions.iter().filter(|function| {
         direct_call_functions.contains(&function.name)
             || async_helper_functions.contains(&function.name)
+            || async_loop_step_functions.contains(&function.name)
     }) {
         lower_direct_call_helper_function(function, &mut state)?;
     }

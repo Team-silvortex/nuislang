@@ -96,11 +96,13 @@ use loop_carries::{
     render_loop_carry_kind, render_loop_compare, render_loop_cond_kind, render_loop_logic_op,
 };
 use loop_execution::{lower_prepared_loop_body, prepare_guarded_loop_body};
-use loop_flow_nodes::{lower_flow_while, lower_post_flow_while};
+use loop_flow_nodes::{
+    lower_async_flow_while, lower_async_post_flow_while, lower_flow_while, lower_post_flow_while,
+};
 use loop_nodes::{lower_async_chained_while, lower_chained_while, lower_counted_while};
 use loop_preparation::{
-    prepare_async_chained_while, prepare_chained_while, prepare_counted_while,
-    prepare_flow_while, prepare_post_flow_while,
+    prepare_async_chained_while, prepare_async_flow_while, prepare_async_post_flow_while,
+    prepare_chained_while, prepare_counted_while, prepare_flow_while, prepare_post_flow_while,
 };
 use loop_purity::{
     collect_inlineable_pure_helper_exprs, collect_pure_helper_blocks,

@@ -196,6 +196,17 @@ pub(super) fn lower_while_stmt(
         return Ok(None);
     }
 
+    if let Some(prepared) = prepare_async_post_flow_while(
+        condition,
+        body,
+        &state.pure_helpers,
+        &state.inlineable_pure_helpers,
+        &state.pure_helper_blocks,
+    ) {
+        lower_async_post_flow_while(prepared, state, bindings)?;
+        return Ok(None);
+    }
+
     if let Some(prepared) = prepare_flow_while(
         condition,
         body,
@@ -204,6 +215,17 @@ pub(super) fn lower_while_stmt(
         &state.pure_helper_blocks,
     ) {
         lower_flow_while(prepared, state, bindings)?;
+        return Ok(None);
+    }
+
+    if let Some(prepared) = prepare_async_flow_while(
+        condition,
+        body,
+        &state.pure_helpers,
+        &state.inlineable_pure_helpers,
+        &state.pure_helper_blocks,
+    ) {
+        lower_async_flow_while(prepared, state, bindings)?;
         return Ok(None);
     }
 

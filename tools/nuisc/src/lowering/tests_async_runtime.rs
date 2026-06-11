@@ -470,8 +470,8 @@ fn lowers_async_while_with_await_step_and_pure_carry_into_async_loop_chain() {
 }
 
 #[test]
-fn rejects_async_while_with_await_step_and_flow_control() {
-    let module = parse_nuis_module(
+fn lowers_async_while_with_await_step_and_break_flow_control() {
+    let mut module = parse_nuis_module(
         r#"
         mod cpu Main {
           async fn step(value: i64) -> i64 {
@@ -484,6 +484,423 @@ fn rejects_async_while_with_await_step_and_flow_control() {
             while value < 3 {
               let value: i64 = await step(value);
               if value > 1 {
+                break;
+              }
+              let acc: i64 = acc + value;
+            }
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let loop_node = yir
+        .nodes
+        .iter()
+    .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_async_flow_chain"
+        })
+        .expect("expected loop_while_i64_async_flow_chain node");
+    assert_eq!(loop_node.op.args[2], "step");
+    assert_eq!(loop_node.op.args[3], "lt");
+    assert_eq!(loop_node.op.args[4], "current_gt");
+    assert_eq!(loop_node.op.args[6], "break");
+    assert_eq!(loop_node.op.args[8], "add_current");
+}
+
+#[test]
+fn lowers_async_while_with_await_step_and_continue_flow_control() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn step(value: i64) -> i64 {
+            return value + 1;
+          }
+
+          async fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            while value < 4 {
+              let value: i64 = await step(value);
+              if value == 2 {
+                continue;
+              }
+              let acc: i64 = acc + value;
+            }
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let loop_node = yir
+        .nodes
+        .iter()
+    .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_async_flow_chain"
+        })
+        .expect("expected loop_while_i64_async_flow_chain node");
+    assert_eq!(loop_node.op.args[2], "step");
+    assert_eq!(loop_node.op.args[3], "lt");
+    assert_eq!(loop_node.op.args[4], "current_eq");
+    assert_eq!(loop_node.op.args[6], "continue");
+    assert_eq!(loop_node.op.args[8], "add_current");
+}
+
+#[test]
+fn lowers_async_while_with_await_step_and_conditional_carry_flow_control() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn step(value: i64) -> i64 {
+            return value + 1;
+          }
+
+          async fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            while value < 5 {
+              let value: i64 = await step(value);
+              if value > 3 {
+                continue;
+              }
+              if value > 2 {
+                let acc: i64 = acc + value;
+              } else {
+                let acc: i64 = acc + 0;
+              }
+            }
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "loop_while_i64_async_flow_cond_chain"
+        })
+        .expect("expected loop_while_i64_async_flow_cond_chain node");
+    assert_eq!(loop_node.op.args[2], "step");
+    assert_eq!(loop_node.op.args[3], "lt");
+    assert_eq!(loop_node.op.args[4], "current_gt");
+    assert_eq!(loop_node.op.args[6], "continue");
+    assert_eq!(loop_node.op.args[8], "current_gt");
+    assert_eq!(loop_node.op.args[10], "add_current");
+    assert_eq!(loop_node.op.args[11], "keep");
+}
+
+#[test]
+fn lowers_async_while_with_await_step_and_post_flow_break() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn step(value: i64) -> i64 {
+            return value + 1;
+          }
+
+          async fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            while value < 8 {
+              let value: i64 = await step(value);
+              let acc: i64 = acc + value;
+              if acc > 6 {
+                break;
+              }
+            }
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "loop_while_i64_async_post_flow_chain"
+        })
+        .expect("expected loop_while_i64_async_post_flow_chain node");
+    assert_eq!(loop_node.op.args[2], "step");
+    assert_eq!(loop_node.op.args[3], "lt");
+    assert_eq!(loop_node.op.args[4], "carry0_gt");
+    assert_eq!(loop_node.op.args[6], "break");
+    assert_eq!(loop_node.op.args[8], "add_current");
+}
+
+#[test]
+fn lowers_async_while_with_await_step_and_post_flow_conditional_break() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn step(value: i64) -> i64 {
+            return value + 1;
+          }
+
+          async fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            while value < 7 {
+              let value: i64 = await step(value);
+              if value > 2 {
+                let acc: i64 = acc + value;
+              } else {
+                let acc: i64 = acc + 0;
+              }
+              if acc > 5 {
+                break;
+              }
+            }
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "loop_while_i64_async_post_flow_cond_chain"
+        })
+        .expect("expected loop_while_i64_async_post_flow_cond_chain node");
+    assert_eq!(loop_node.op.args[2], "step");
+    assert_eq!(loop_node.op.args[3], "lt");
+    assert_eq!(loop_node.op.args[4], "carry0_gt");
+    assert_eq!(loop_node.op.args[6], "break");
+    assert_eq!(loop_node.op.args[8], "current_gt");
+    assert_eq!(loop_node.op.args[10], "add_current");
+    assert_eq!(loop_node.op.args[11], "keep");
+}
+
+#[test]
+fn lowers_async_network_observer_step_into_async_loop_carry_chain() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn step(value: i64) -> i64 {
+            let probe: NetworkResult<i64> =
+              network_result(network_profile_send_window("NetworkUnit"));
+            if network_send_ready(probe) || network_recv_ready(probe) {
+              return value + network_value(probe);
+            }
+            if network_config_ready(probe) {
+              return value + network_value(probe);
+            }
+            return value + 1;
+          }
+
+          async fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            while value < 5 {
+              let value: i64 = await step(value);
+              let acc: i64 = acc + value;
+            }
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_async_chain")
+        .expect("expected loop_while_i64_async_chain node");
+    assert_eq!(loop_node.op.args[2], "step");
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "network" && node.op.instruction == "observe"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "network" && node.op.instruction == "is_send_ready"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "network" && node.op.instruction == "value"));
+}
+
+#[test]
+fn lowers_async_kernel_observer_step_into_async_post_flow_break_chain() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn step(value: i64) -> i64 {
+            let probe: KernelResult<i64> =
+              kernel_result(kernel_profile_queue_depth("KernelUnit"));
+            if kernel_config_ready(probe) {
+              return value + kernel_value(probe);
+            }
+            return value + 1;
+          }
+
+          async fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            while value < 6 {
+              let value: i64 = await step(value);
+              let acc: i64 = acc + value;
+              if acc > 8 {
+                break;
+              }
+            }
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "loop_while_i64_async_post_flow_chain"
+        })
+        .expect("expected loop_while_i64_async_post_flow_chain node");
+    assert_eq!(loop_node.op.args[2], "step");
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "kernel" && node.op.instruction == "observe"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "kernel" && node.op.instruction == "is_config_ready"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "kernel" && node.op.instruction == "value"));
+}
+
+#[test]
+fn lowers_async_owned_network_session_step_into_async_post_flow_break_chain() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          extern "c" fn host_network_open_tcp_stream(
+            remote_port: i64,
+            connect_timeout_ms: i64
+          ) -> i64;
+          extern "c" fn host_network_send_owned(
+            handle: i64,
+            stream_window: i64,
+            send_window: i64
+          ) -> i64;
+          extern "c" fn host_network_recv_owned(
+            handle: i64,
+            stream_window: i64,
+            recv_window: i64
+          ) -> i64;
+          extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+          async fn step(value: i64) -> i64 {
+            let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+            let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
+            let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+            let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+            let send_window: i64 = network_profile_send_window("NetworkUnit");
+            let handle: i64 = host_network_open_tcp_stream(remote_port, connect_timeout_ms);
+            let send_result: NetworkResult<i64> =
+              network_result(host_network_send_owned(handle, stream_window, send_window));
+            let recv_result: NetworkResult<i64> =
+              network_result(host_network_recv_owned(handle, stream_window, recv_window));
+            let close_value: i64 = host_network_close_owned(handle);
+            if network_send_ready(send_result) || network_recv_ready(recv_result) {
+              return value + network_value(send_result) + network_value(recv_result) + close_value;
+            }
+            return value + close_value;
+          }
+
+          async fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            while value < 6 {
+              let value: i64 = await step(value);
+              let acc: i64 = acc + value;
+              if acc > 9 {
+                break;
+              }
+            }
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "loop_while_i64_async_post_flow_chain"
+        })
+        .expect("expected loop_while_i64_async_post_flow_chain node");
+    assert_eq!(loop_node.op.args[2], "step");
+    assert!(yir.node_lanes.values().any(|lane| lane == "fn:step"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "network" && node.op.instruction == "observe"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "network" && node.op.instruction == "is_send_ready"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "network" && node.op.instruction == "is_recv_ready"));
+}
+
+#[test]
+fn rejects_async_while_with_await_step_and_task_observer_flow_control() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn step(value: i64) -> i64 {
+            return value + 1;
+          }
+
+          async fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            while value < 3 {
+              let value: i64 = await step(value);
+              let result: TaskResult<i64> = join_result(spawn(step(value)));
+              if task_completed(result) {
                 break;
               }
               let acc: i64 = acc + value;
