@@ -83,7 +83,17 @@ pub(super) fn kernel_support_surface_contract() -> &'static [&'static str] {
 pub(super) fn network_support_surface_contract() -> &'static [&'static str] {
     &[
         "network.profile.bind-core.v1",
+        "network.profile.connect.v1",
+        "network.profile.accept.v1",
+        "network.profile.send.v1",
+        "network.profile.recv.v1",
+        "network.profile.close.v1",
+        "network.profile.timeout.v1",
+        "network.profile.retry.v1",
         "network.profile.endpoint-kind.v1",
+        "network.profile.stream-window.v1",
+        "network.profile.transport.v1",
+        "network.profile.protocol.v1",
     ]
 }
 
@@ -205,6 +215,131 @@ pub(super) fn kernel_profile_slot_targets(unit: &str) -> Vec<(&'static str, Stri
                 "kernel",
                 unit,
                 "batch_lanes",
+            ),
+        ),
+    ]
+}
+
+pub(super) fn network_profile_slot_targets(unit: &str) -> Vec<(&'static str, String)> {
+    vec![
+        (
+            "bind_core",
+            super::profile_targets::resolve_project_profile_target_name(
+                "network",
+                unit,
+                "bind_core",
+            ),
+        ),
+        (
+            "endpoint_kind",
+            super::profile_targets::resolve_project_profile_target_name(
+                "network",
+                unit,
+                "endpoint_kind",
+            ),
+        ),
+        (
+            "transport_family",
+            super::profile_targets::resolve_project_profile_target_name(
+                "network",
+                unit,
+                "transport_family",
+            ),
+        ),
+        (
+            "local_port",
+            super::profile_targets::resolve_project_profile_target_name(
+                "network",
+                unit,
+                "local_port",
+            ),
+        ),
+        (
+            "remote_port",
+            super::profile_targets::resolve_project_profile_target_name(
+                "network",
+                unit,
+                "remote_port",
+            ),
+        ),
+        (
+            "connect_timeout_ms",
+            super::profile_targets::resolve_project_profile_target_name(
+                "network",
+                unit,
+                "connect_timeout_ms",
+            ),
+        ),
+        (
+            "read_timeout_ms",
+            super::profile_targets::resolve_project_profile_target_name(
+                "network",
+                unit,
+                "read_timeout_ms",
+            ),
+        ),
+        (
+            "write_timeout_ms",
+            super::profile_targets::resolve_project_profile_target_name(
+                "network",
+                unit,
+                "write_timeout_ms",
+            ),
+        ),
+        (
+            "retry_budget",
+            super::profile_targets::resolve_project_profile_target_name(
+                "network",
+                unit,
+                "retry_budget",
+            ),
+        ),
+        (
+            "stream_window",
+            super::profile_targets::resolve_project_profile_target_name(
+                "network",
+                unit,
+                "stream_window",
+            ),
+        ),
+        (
+            "recv_window",
+            super::profile_targets::resolve_project_profile_target_name(
+                "network",
+                unit,
+                "recv_window",
+            ),
+        ),
+        (
+            "send_window",
+            super::profile_targets::resolve_project_profile_target_name(
+                "network",
+                unit,
+                "send_window",
+            ),
+        ),
+        (
+            "protocol_kind",
+            super::profile_targets::resolve_project_profile_target_name(
+                "network",
+                unit,
+                "protocol_kind",
+            ),
+        ),
+        (
+            "protocol_version",
+            super::profile_targets::resolve_project_profile_target_name(
+                "network",
+                unit,
+                "protocol_version",
+            ),
+        ),
+        (
+            "protocol_header_bytes",
+            super::profile_targets::resolve_project_profile_target_name(
+                "network",
+                unit,
+                "protocol_header_bytes",
             ),
         ),
     ]

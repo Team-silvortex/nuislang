@@ -12,6 +12,7 @@ mod data_contract_types;
 mod data_validation;
 mod kernel_validation;
 mod manifest;
+mod network_validation;
 mod packet;
 mod planning;
 mod profile_apply;

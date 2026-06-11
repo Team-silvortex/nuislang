@@ -90,6 +90,33 @@ pub(crate) fn nir_uses_network_profile_bind_core(module: &NirModule, unit: &str)
     })
 }
 
+pub(crate) fn nir_uses_network_profile_endpoint_kind(module: &NirModule, unit: &str) -> bool {
+    module.functions.iter().any(|function| {
+        function
+            .body
+            .iter()
+            .any(|stmt| stmt_uses_network_profile_endpoint_kind(stmt, unit))
+    })
+}
+
+pub(crate) fn nir_uses_network_profile_slot(module: &NirModule, unit: &str, slot: &str) -> bool {
+    module.functions.iter().any(|function| {
+        function
+            .body
+            .iter()
+            .any(|stmt| stmt_uses_network_profile_slot(stmt, unit, slot))
+    })
+}
+
+pub(crate) fn nir_uses_cpu_extern_call(module: &NirModule, callee: &str) -> bool {
+    module.functions.iter().any(|function| {
+        function
+            .body
+            .iter()
+            .any(|stmt| stmt_uses_cpu_extern_call(stmt, callee))
+    })
+}
+
 fn stmt_uses_shader_profile_render(stmt: &NirStmt, unit: &str) -> bool {
     stmt_uses_expr_predicate(stmt, &|value| expr_uses_shader_profile_render(value, unit))
 }
@@ -144,6 +171,20 @@ fn stmt_uses_network_profile_bind_core(stmt: &NirStmt, unit: &str) -> bool {
     stmt_uses_expr_predicate(stmt, &|value| {
         expr_uses_network_profile_bind_core(value, unit)
     })
+}
+
+fn stmt_uses_network_profile_endpoint_kind(stmt: &NirStmt, unit: &str) -> bool {
+    stmt_uses_expr_predicate(stmt, &|value| {
+        expr_uses_network_profile_endpoint_kind(value, unit)
+    })
+}
+
+fn stmt_uses_network_profile_slot(stmt: &NirStmt, unit: &str, slot: &str) -> bool {
+    stmt_uses_expr_predicate(stmt, &|value| expr_uses_network_profile_slot(value, unit, slot))
+}
+
+fn stmt_uses_cpu_extern_call(stmt: &NirStmt, callee: &str) -> bool {
+    stmt_uses_expr_predicate(stmt, &|value| expr_uses_cpu_extern_call(value, callee))
 }
 
 pub(super) fn stmt_uses_expr_predicate<F>(stmt: &NirStmt, predicate: &F) -> bool
@@ -403,6 +444,108 @@ fn expr_uses_network_profile_bind_core(expr: &NirExpr, unit: &str) -> bool {
         _ => expr_walk_any(expr, &|inner| {
             expr_uses_network_profile_bind_core(inner, unit)
         }),
+    }
+}
+
+fn expr_uses_network_profile_endpoint_kind(expr: &NirExpr, unit: &str) -> bool {
+    match expr {
+        NirExpr::NetworkProfileEndpointKindRef { unit: network_unit } => network_unit == unit,
+        _ => expr_walk_any(expr, &|inner| {
+            expr_uses_network_profile_endpoint_kind(inner, unit)
+        }),
+    }
+}
+
+fn expr_uses_network_profile_slot(expr: &NirExpr, unit: &str, slot: &str) -> bool {
+    match expr {
+        NirExpr::NetworkProfileBindCoreRef { unit: network_unit }
+            if slot == "bind_core" && network_unit == unit =>
+        {
+            true
+        }
+        NirExpr::NetworkProfileEndpointKindRef { unit: network_unit }
+            if slot == "endpoint_kind" && network_unit == unit =>
+        {
+            true
+        }
+        NirExpr::NetworkProfileTransportFamilyRef { unit: network_unit }
+            if slot == "transport_family" && network_unit == unit =>
+        {
+            true
+        }
+        NirExpr::NetworkProfileLocalPortRef { unit: network_unit }
+            if slot == "local_port" && network_unit == unit =>
+        {
+            true
+        }
+        NirExpr::NetworkProfileRemotePortRef { unit: network_unit }
+            if slot == "remote_port" && network_unit == unit =>
+        {
+            true
+        }
+        NirExpr::NetworkProfileConnectTimeoutRef { unit: network_unit }
+            if slot == "connect_timeout_ms" && network_unit == unit =>
+        {
+            true
+        }
+        NirExpr::NetworkProfileReadTimeoutRef { unit: network_unit }
+            if slot == "read_timeout_ms" && network_unit == unit =>
+        {
+            true
+        }
+        NirExpr::NetworkProfileWriteTimeoutRef { unit: network_unit }
+            if slot == "write_timeout_ms" && network_unit == unit =>
+        {
+            true
+        }
+        NirExpr::NetworkProfileRetryBudgetRef { unit: network_unit }
+            if slot == "retry_budget" && network_unit == unit =>
+        {
+            true
+        }
+        NirExpr::NetworkProfileStreamWindowRef { unit: network_unit }
+            if slot == "stream_window" && network_unit == unit =>
+        {
+            true
+        }
+        NirExpr::NetworkProfileRecvWindowRef { unit: network_unit }
+            if slot == "recv_window" && network_unit == unit =>
+        {
+            true
+        }
+        NirExpr::NetworkProfileSendWindowRef { unit: network_unit }
+            if slot == "send_window" && network_unit == unit =>
+        {
+            true
+        }
+        NirExpr::NetworkProfileProtocolKindRef { unit: network_unit }
+            if slot == "protocol_kind" && network_unit == unit =>
+        {
+            true
+        }
+        NirExpr::NetworkProfileProtocolVersionRef { unit: network_unit }
+            if slot == "protocol_version" && network_unit == unit =>
+        {
+            true
+        }
+        NirExpr::NetworkProfileProtocolHeaderBytesRef { unit: network_unit }
+            if slot == "protocol_header_bytes" && network_unit == unit =>
+        {
+            true
+        }
+        _ => expr_walk_any(expr, &|inner| {
+            expr_uses_network_profile_slot(inner, unit, slot)
+        }),
+    }
+}
+
+fn expr_uses_cpu_extern_call(expr: &NirExpr, callee: &str) -> bool {
+    match expr {
+        NirExpr::CpuExternCall {
+            callee: extern_callee,
+            ..
+        } => extern_callee == callee,
+        _ => expr_walk_any(expr, &|inner| expr_uses_cpu_extern_call(inner, callee)),
     }
 }
 

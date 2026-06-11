@@ -61,13 +61,19 @@ fn multidomain_support_modules() -> Vec<(&'static str, &'static str)> {
               fn profile() {
                 const bind_core: i64 = 2;
                 const endpoint_kind: i64 = 1;
+                const transport_family: i64 = 6;
                 const local_port: i64 = 9000;
                 const remote_port: i64 = 443;
                 const connect_timeout_ms: i64 = 250;
+                const read_timeout_ms: i64 = 125;
+                const write_timeout_ms: i64 = 150;
                 const retry_budget: i64 = 3;
                 const stream_window: i64 = 64;
                 const recv_window: i64 = 32;
                 const send_window: i64 = 32;
+                const protocol_kind: i64 = 101;
+                const protocol_version: i64 = 2;
+                const protocol_header_bytes: i64 = 24;
               }
             }
             "#,
@@ -550,10 +556,14 @@ fn validates_network_project_links_against_nir_with_shared_cpu_helper_indirectio
                   pub fn probe() -> i64 {
                     let bind_core: NetworkResult<i64> =
                       network_result(network_profile_bind_core("NetworkUnit"));
+                    let endpoint_kind: NetworkResult<i64> =
+                      network_result(network_profile_endpoint_kind("NetworkUnit"));
                     let send_window: NetworkResult<i64> =
                       network_result(network_profile_send_window("NetworkUnit"));
                     if network_config_ready(bind_core) {
-                      return network_value(bind_core) + network_value(send_window);
+                      return network_value(bind_core)
+                        + network_value(endpoint_kind)
+                        + network_value(send_window);
                     }
                     return 0;
                   }
@@ -562,6 +572,693 @@ fn validates_network_project_links_against_nir_with_shared_cpu_helper_indirectio
             ));
             modules
         },
+    );
+    let mut project = project;
+    project.manifest.links = vec![ProjectLink {
+        from: "cpu.Main".to_owned(),
+        to: "network.NetworkUnit".to_owned(),
+        via: None,
+    }];
+
+    let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
+    validate_project_links_against_nir(&project, &nir).unwrap();
+}
+
+#[test]
+fn rejects_network_project_links_missing_endpoint_kind_usage() {
+    let project = multidomain_project_with_entry(
+        r#"
+        use network NetworkUnit;
+
+        mod cpu Main {
+          fn main() -> i64 {
+            let bind_core: NetworkResult<i64> =
+              network_result(network_profile_bind_core("NetworkUnit"));
+            if network_config_ready(bind_core) {
+              return network_value(bind_core);
+            }
+            return 0;
+          }
+        }
+        "#,
+        multidomain_support_modules(),
+    );
+    let mut project = project;
+    project.manifest.links = vec![ProjectLink {
+        from: "cpu.Main".to_owned(),
+        to: "network.NetworkUnit".to_owned(),
+        via: None,
+    }];
+
+    let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
+    let err = validate_project_links_against_nir(&project, &nir).unwrap_err();
+    assert!(err.contains("network_profile_endpoint_kind(\"NetworkUnit\")"));
+}
+
+#[test]
+fn validates_network_project_links_for_transport_and_protocol_profile_usage() {
+    let project = multidomain_project_with_entry(
+        r#"
+        use cpu NetworkTaskAsyncShapes;
+        use network NetworkUnit;
+
+        mod cpu Main {
+          fn main() -> i64 {
+            return NetworkTaskAsyncShapes.transport_probe();
+          }
+        }
+        "#,
+        {
+            let mut modules = multidomain_support_modules();
+            modules.push((
+                "network_task_async_shapes.ns",
+                r#"
+                use network NetworkUnit;
+
+                mod cpu NetworkTaskAsyncShapes {
+                  pub fn transport_probe() -> i64 {
+                    let bind_core: NetworkResult<i64> =
+                      network_result(network_profile_bind_core("NetworkUnit"));
+                    let endpoint_kind: NetworkResult<i64> =
+                      network_result(network_profile_endpoint_kind("NetworkUnit"));
+                    let transport_family: NetworkResult<i64> =
+                      network_result(network_profile_transport_family("NetworkUnit"));
+                    let protocol_kind: NetworkResult<i64> =
+                      network_result(network_profile_protocol_kind("NetworkUnit"));
+                    let protocol_version: NetworkResult<i64> =
+                      network_result(network_profile_protocol_version("NetworkUnit"));
+                    if network_config_ready(bind_core) {
+                      return network_value(bind_core)
+                        + network_value(endpoint_kind)
+                        + network_value(transport_family)
+                        + network_value(protocol_kind)
+                        + network_value(protocol_version);
+                    }
+                    return 0;
+                  }
+                }
+                "#,
+            ));
+            modules
+        },
+    );
+    let mut project = project;
+    project.manifest.links = vec![ProjectLink {
+        from: "cpu.Main".to_owned(),
+        to: "network.NetworkUnit".to_owned(),
+        via: None,
+    }];
+
+    let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
+    validate_project_links_against_nir(&project, &nir).unwrap();
+}
+
+#[test]
+fn rejects_network_project_links_when_protocol_profile_const_is_missing() {
+    let project = multidomain_project_with_entry(
+        r#"
+        use network NetworkUnit;
+
+        mod cpu Main {
+          fn main() -> i64 {
+            let bind_core: NetworkResult<i64> =
+              network_result(network_profile_bind_core("NetworkUnit"));
+            let endpoint_kind: NetworkResult<i64> =
+              network_result(network_profile_endpoint_kind("NetworkUnit"));
+            let protocol_kind: NetworkResult<i64> =
+              network_result(network_profile_protocol_kind("NetworkUnit"));
+            if network_config_ready(bind_core) {
+              return network_value(bind_core)
+                + network_value(endpoint_kind)
+                + network_value(protocol_kind);
+            }
+            return 0;
+          }
+        }
+        "#,
+        vec![(
+            "network_unit.ns",
+            r#"
+            mod network NetworkUnit {
+              fn profile() {
+                const bind_core: i64 = 2;
+                const endpoint_kind: i64 = 1;
+                const transport_family: i64 = 6;
+                const local_port: i64 = 9000;
+                const remote_port: i64 = 443;
+                const connect_timeout_ms: i64 = 250;
+                const read_timeout_ms: i64 = 125;
+                const write_timeout_ms: i64 = 150;
+                const retry_budget: i64 = 3;
+                const stream_window: i64 = 64;
+                const recv_window: i64 = 32;
+                const send_window: i64 = 32;
+              }
+            }
+            "#,
+        )],
+    );
+    let mut project = project;
+    project.manifest.links = vec![ProjectLink {
+        from: "cpu.Main".to_owned(),
+        to: "network.NetworkUnit".to_owned(),
+        via: None,
+    }];
+
+    let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
+    let err = validate_project_links_against_nir(&project, &nir).unwrap_err();
+    assert!(err.contains("requires `protocol_kind` profile const"));
+}
+
+#[test]
+fn validates_network_project_links_for_host_transport_calls() {
+    let project = multidomain_project_with_entry(
+        r#"
+        use network NetworkUnit;
+
+        mod cpu Main {
+          extern "c" fn host_network_send_probe(
+            stream_window: i64,
+            send_window: i64,
+            remote_port: i64
+          ) -> i64;
+          extern "c" fn host_network_recv_probe(
+            stream_window: i64,
+            recv_window: i64,
+            local_port: i64
+          ) -> i64;
+          extern "c" fn host_network_close(handle: i64) -> i64;
+
+          fn main() -> i64 {
+            let local_port: i64 = network_profile_local_port("NetworkUnit");
+            let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+            let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+            let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+            let send_window: i64 = network_profile_send_window("NetworkUnit");
+            let bind_core: NetworkResult<i64> =
+              network_result(network_profile_bind_core("NetworkUnit"));
+            let endpoint_kind: NetworkResult<i64> =
+              network_result(network_profile_endpoint_kind("NetworkUnit"));
+            let send_result: NetworkResult<i64> = network_result(
+              host_network_send_probe(stream_window, send_window, remote_port)
+            );
+            let recv_result: NetworkResult<i64> = network_result(
+              host_network_recv_probe(stream_window, recv_window, local_port)
+            );
+            let close_result: NetworkResult<i64> =
+              network_result(host_network_close(local_port));
+            if network_config_ready(bind_core) {
+              return network_value(bind_core)
+                + network_value(endpoint_kind)
+                + network_value(send_result)
+                + network_value(recv_result)
+                + network_value(close_result);
+            }
+            return 0;
+          }
+        }
+        "#,
+        multidomain_support_modules(),
+    );
+    let mut project = project;
+    project.manifest.links = vec![ProjectLink {
+        from: "cpu.Main".to_owned(),
+        to: "network.NetworkUnit".to_owned(),
+        via: None,
+    }];
+
+    let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
+    validate_project_links_against_nir(&project, &nir).unwrap();
+}
+
+#[test]
+fn rejects_network_host_transport_calls_without_profile_routing() {
+    let project = multidomain_project_with_entry(
+        r#"
+        use network NetworkUnit;
+
+        mod cpu Main {
+          extern "c" fn host_network_send_probe(
+            stream_window: i64,
+            send_window: i64,
+            remote_port: i64
+          ) -> i64;
+
+          fn main() -> i64 {
+            let bind_core: NetworkResult<i64> =
+              network_result(network_profile_bind_core("NetworkUnit"));
+            let endpoint_kind: NetworkResult<i64> =
+              network_result(network_profile_endpoint_kind("NetworkUnit"));
+            let send_result: NetworkResult<i64> =
+              network_result(host_network_send_probe(64, 32, 443));
+            if network_config_ready(bind_core) {
+              return network_value(bind_core)
+                + network_value(endpoint_kind)
+                + network_value(send_result);
+            }
+            return 0;
+          }
+        }
+        "#,
+        multidomain_support_modules(),
+    );
+    let mut project = project;
+    project.manifest.links = vec![ProjectLink {
+        from: "cpu.Main".to_owned(),
+        to: "network.NetworkUnit".to_owned(),
+        via: None,
+    }];
+
+    let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
+    let err = validate_project_links_against_nir(&project, &nir).unwrap_err();
+    assert!(err.contains("host_network_send_probe"));
+    assert!(err.contains("network_profile_stream_window(\"NetworkUnit\")"));
+}
+
+#[test]
+fn validates_network_project_links_for_owned_udp_open_calls() {
+    let project = multidomain_project_with_entry(
+        r#"
+        use network NetworkUnit;
+
+        mod cpu Main {
+          extern "c" fn host_network_open_udp_datagram(
+            local_port: i64,
+            remote_port: i64
+          ) -> i64;
+          extern "c" fn host_network_send_owned(
+            handle: i64,
+            stream_window: i64,
+            send_window: i64
+          ) -> i64;
+          extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+          fn main() -> i64 {
+            let local_port: i64 = network_profile_local_port("NetworkUnit");
+            let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+            let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+            let send_window: i64 = network_profile_send_window("NetworkUnit");
+            let bind_core: NetworkResult<i64> =
+              network_result(network_profile_bind_core("NetworkUnit"));
+            let endpoint_kind: NetworkResult<i64> =
+              network_result(network_profile_endpoint_kind("NetworkUnit"));
+            let handle: i64 = host_network_open_udp_datagram(local_port, remote_port);
+            let send_result: NetworkResult<i64> =
+              network_result(host_network_send_owned(handle, stream_window, send_window));
+            let close_value: i64 = host_network_close_owned(handle);
+            if network_config_ready(bind_core) {
+              return network_value(bind_core)
+                + network_value(endpoint_kind)
+                + network_value(send_result)
+                + close_value;
+            }
+            return 0;
+          }
+        }
+        "#,
+        multidomain_support_modules(),
+    );
+    let mut project = project;
+    project.manifest.links = vec![ProjectLink {
+        from: "cpu.Main".to_owned(),
+        to: "network.NetworkUnit".to_owned(),
+        via: None,
+    }];
+
+    let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
+    validate_project_links_against_nir(&project, &nir).unwrap();
+}
+
+#[test]
+fn rejects_owned_udp_open_calls_without_profile_routing() {
+    let project = multidomain_project_with_entry(
+        r#"
+        use network NetworkUnit;
+
+        mod cpu Main {
+          extern "c" fn host_network_open_udp_datagram(
+            local_port: i64,
+            remote_port: i64
+          ) -> i64;
+
+          fn main() -> i64 {
+            let bind_core: NetworkResult<i64> =
+              network_result(network_profile_bind_core("NetworkUnit"));
+            let endpoint_kind: NetworkResult<i64> =
+              network_result(network_profile_endpoint_kind("NetworkUnit"));
+            let handle: i64 = host_network_open_udp_datagram(9000, 443);
+            if network_config_ready(bind_core) {
+              return network_value(bind_core)
+                + network_value(endpoint_kind)
+                + handle;
+            }
+            return 0;
+          }
+        }
+        "#,
+        multidomain_support_modules(),
+    );
+    let mut project = project;
+    project.manifest.links = vec![ProjectLink {
+        from: "cpu.Main".to_owned(),
+        to: "network.NetworkUnit".to_owned(),
+        via: None,
+    }];
+
+    let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
+    let err = validate_project_links_against_nir(&project, &nir).unwrap_err();
+    assert!(err.contains("host_network_open_udp_datagram"));
+    assert!(err.contains("network_profile_local_port(\"NetworkUnit\")"));
+}
+
+#[test]
+fn rejects_accept_owned_without_listener_source() {
+    let project = multidomain_project_with_entry(
+        r#"
+        use network NetworkUnit;
+
+        mod cpu Main {
+          extern "c" fn host_network_accept_owned(
+            listener_handle: i64,
+            read_timeout_ms: i64,
+            write_timeout_ms: i64
+          ) -> i64;
+
+          fn main() -> i64 {
+            let bind_core: NetworkResult<i64> =
+              network_result(network_profile_bind_core("NetworkUnit"));
+            let endpoint_kind: NetworkResult<i64> =
+              network_result(network_profile_endpoint_kind("NetworkUnit"));
+            let read_timeout_ms: i64 = network_profile_read_timeout("NetworkUnit");
+            let write_timeout_ms: i64 = network_profile_write_timeout("NetworkUnit");
+            let accept_result: NetworkResult<i64> = network_result(
+              host_network_accept_owned(7, read_timeout_ms, write_timeout_ms)
+            );
+            if network_config_ready(bind_core) {
+              return network_value(bind_core)
+                + network_value(endpoint_kind)
+                + network_value(accept_result);
+            }
+            return 0;
+          }
+        }
+        "#,
+        multidomain_support_modules(),
+    );
+    let mut project = project;
+    project.manifest.links = vec![ProjectLink {
+        from: "cpu.Main".to_owned(),
+        to: "network.NetworkUnit".to_owned(),
+        via: None,
+    }];
+
+    let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
+    let err = validate_project_links_against_nir(&project, &nir).unwrap_err();
+    assert!(err.contains("host_network_open_tcp_listener"));
+    assert!(err.contains("host_network_accept_owned"));
+}
+
+#[test]
+fn rejects_close_owned_without_owned_handle_source() {
+    let project = multidomain_project_with_entry(
+        r#"
+        use network NetworkUnit;
+
+        mod cpu Main {
+          extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+          fn main() -> i64 {
+            let bind_core: NetworkResult<i64> =
+              network_result(network_profile_bind_core("NetworkUnit"));
+            let endpoint_kind: NetworkResult<i64> =
+              network_result(network_profile_endpoint_kind("NetworkUnit"));
+            let close_value: i64 = host_network_close_owned(9);
+            if network_config_ready(bind_core) {
+              return network_value(bind_core)
+                + network_value(endpoint_kind)
+                + close_value;
+            }
+            return 0;
+          }
+        }
+        "#,
+        multidomain_support_modules(),
+    );
+    let mut project = project;
+    project.manifest.links = vec![ProjectLink {
+        from: "cpu.Main".to_owned(),
+        to: "network.NetworkUnit".to_owned(),
+        via: None,
+    }];
+
+    let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
+    let err = validate_project_links_against_nir(&project, &nir).unwrap_err();
+    assert!(err.contains("owned network handle"));
+    assert!(err.contains("host_network_close_owned"));
+}
+
+#[test]
+fn rejects_send_owned_with_listener_handle_variable() {
+    let project = multidomain_project_with_entry(
+        r#"
+        use network NetworkUnit;
+
+        mod cpu Main {
+          extern "c" fn host_network_open_tcp_listener(
+            local_port: i64,
+            read_timeout_ms: i64,
+            write_timeout_ms: i64
+          ) -> i64;
+          extern "c" fn host_network_open_udp_datagram(
+            local_port: i64,
+            remote_port: i64
+          ) -> i64;
+          extern "c" fn host_network_send_owned(
+            handle: i64,
+            stream_window: i64,
+            send_window: i64
+          ) -> i64;
+
+          fn main() -> i64 {
+            let bind_core: NetworkResult<i64> =
+              network_result(network_profile_bind_core("NetworkUnit"));
+            let endpoint_kind: NetworkResult<i64> =
+              network_result(network_profile_endpoint_kind("NetworkUnit"));
+            let local_port: i64 = network_profile_local_port("NetworkUnit");
+            let read_timeout_ms: i64 = network_profile_read_timeout("NetworkUnit");
+            let write_timeout_ms: i64 = network_profile_write_timeout("NetworkUnit");
+            let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+            let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+            let send_window: i64 = network_profile_send_window("NetworkUnit");
+            let listener_handle: i64 = host_network_open_tcp_listener(
+              local_port,
+              read_timeout_ms,
+              write_timeout_ms
+            );
+            let transport_handle: i64 =
+              host_network_open_udp_datagram(local_port, remote_port);
+            let send_result: NetworkResult<i64> =
+              network_result(host_network_send_owned(listener_handle, stream_window, send_window));
+            if network_config_ready(bind_core) {
+              return network_value(bind_core)
+                + network_value(endpoint_kind)
+                + transport_handle
+                + network_value(send_result);
+            }
+            return 0;
+          }
+        }
+        "#,
+        multidomain_support_modules(),
+    );
+    let mut project = project;
+    project.manifest.links = vec![ProjectLink {
+        from: "cpu.Main".to_owned(),
+        to: "network.NetworkUnit".to_owned(),
+        via: None,
+    }];
+
+    let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
+    let err = validate_project_links_against_nir(&project, &nir).unwrap_err();
+    assert!(err.contains("host_network_send_owned"), "{err}");
+    assert!(err.contains("listener-owned source"), "{err}");
+}
+
+#[test]
+fn rejects_accept_owned_with_transport_handle_variable() {
+    let project = multidomain_project_with_entry(
+        r#"
+        use network NetworkUnit;
+
+        mod cpu Main {
+          extern "c" fn host_network_open_tcp_listener(
+            local_port: i64,
+            read_timeout_ms: i64,
+            write_timeout_ms: i64
+          ) -> i64;
+          extern "c" fn host_network_open_udp_datagram(
+            local_port: i64,
+            remote_port: i64
+          ) -> i64;
+          extern "c" fn host_network_accept_owned(
+            listener_handle: i64,
+            read_timeout_ms: i64,
+            write_timeout_ms: i64
+          ) -> i64;
+
+          fn main() -> i64 {
+            let bind_core: NetworkResult<i64> =
+              network_result(network_profile_bind_core("NetworkUnit"));
+            let endpoint_kind: NetworkResult<i64> =
+              network_result(network_profile_endpoint_kind("NetworkUnit"));
+            let local_port: i64 = network_profile_local_port("NetworkUnit");
+            let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+            let read_timeout_ms: i64 = network_profile_read_timeout("NetworkUnit");
+            let write_timeout_ms: i64 = network_profile_write_timeout("NetworkUnit");
+            let listener_handle: i64 = host_network_open_tcp_listener(
+              local_port,
+              read_timeout_ms,
+              write_timeout_ms
+            );
+            let handle: i64 = host_network_open_udp_datagram(local_port, remote_port);
+            let accept_result: NetworkResult<i64> =
+              network_result(host_network_accept_owned(handle, read_timeout_ms, write_timeout_ms));
+            if network_config_ready(bind_core) {
+              return network_value(bind_core)
+                + network_value(endpoint_kind)
+                + listener_handle
+                + network_value(accept_result);
+            }
+            return 0;
+          }
+        }
+        "#,
+        multidomain_support_modules(),
+    );
+    let mut project = project;
+    project.manifest.links = vec![ProjectLink {
+        from: "cpu.Main".to_owned(),
+        to: "network.NetworkUnit".to_owned(),
+        via: None,
+    }];
+
+    let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
+    let err = validate_project_links_against_nir(&project, &nir).unwrap_err();
+    assert!(err.contains("host_network_accept_owned"), "{err}");
+    assert!(err.contains("datagram-owned source"), "{err}");
+}
+
+#[test]
+fn rejects_http_status_recv_with_datagram_handle_variable() {
+    let project = multidomain_project_with_entry(
+        r#"
+        use network NetworkUnit;
+
+        mod cpu Main {
+          extern "c" fn host_network_open_udp_datagram(
+            local_port: i64,
+            remote_port: i64
+          ) -> i64;
+          extern "c" fn host_network_recv_http_status_owned(
+            handle: i64,
+            stream_window: i64,
+            recv_window: i64
+          ) -> i64;
+
+          fn main() -> i64 {
+            let bind_core: NetworkResult<i64> =
+              network_result(network_profile_bind_core("NetworkUnit"));
+            let endpoint_kind: NetworkResult<i64> =
+              network_result(network_profile_endpoint_kind("NetworkUnit"));
+            let local_port: i64 = network_profile_local_port("NetworkUnit");
+            let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+            let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+            let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+            let protocol_kind: i64 = network_profile_protocol_kind("NetworkUnit");
+            let protocol_version: i64 = network_profile_protocol_version("NetworkUnit");
+            let protocol_header_bytes: i64 =
+              network_profile_protocol_header_bytes("NetworkUnit");
+            let handle: i64 = host_network_open_udp_datagram(local_port, remote_port);
+            let recv_result: NetworkResult<i64> = network_result(
+              host_network_recv_http_status_owned(handle, stream_window, recv_window)
+            );
+            if network_config_ready(bind_core) {
+              return network_value(bind_core)
+                + network_value(endpoint_kind)
+                + protocol_kind
+                + protocol_version
+                + protocol_header_bytes
+                + network_value(recv_result);
+            }
+            return 0;
+          }
+        }
+        "#,
+        multidomain_support_modules(),
+    );
+    let mut project = project;
+    project.manifest.links = vec![ProjectLink {
+        from: "cpu.Main".to_owned(),
+        to: "network.NetworkUnit".to_owned(),
+        via: None,
+    }];
+
+    let nir = lower_project_module_to_nir(&project, &project.modules[0]).unwrap();
+    let err = validate_project_links_against_nir(&project, &nir).unwrap_err();
+    assert!(err.contains("host_network_recv_http_status_owned"), "{err}");
+    assert!(err.contains("datagram-owned source"), "{err}");
+}
+
+#[test]
+fn validates_http_status_recv_with_stream_handle_variable() {
+    let project = multidomain_project_with_entry(
+        r#"
+        use network NetworkUnit;
+
+        mod cpu Main {
+          extern "c" fn host_network_open_tcp_stream(
+            remote_port: i64,
+            connect_timeout_ms: i64
+          ) -> i64;
+          extern "c" fn host_network_recv_http_status_owned(
+            handle: i64,
+            stream_window: i64,
+            recv_window: i64
+          ) -> i64;
+          extern "c" fn host_network_close_owned(handle: i64) -> i64;
+
+          fn main() -> i64 {
+            let bind_core: NetworkResult<i64> =
+              network_result(network_profile_bind_core("NetworkUnit"));
+            let endpoint_kind: NetworkResult<i64> =
+              network_result(network_profile_endpoint_kind("NetworkUnit"));
+            let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+            let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
+            let stream_window: i64 = network_profile_stream_window("NetworkUnit");
+            let recv_window: i64 = network_profile_recv_window("NetworkUnit");
+            let protocol_kind: i64 = network_profile_protocol_kind("NetworkUnit");
+            let protocol_version: i64 = network_profile_protocol_version("NetworkUnit");
+            let protocol_header_bytes: i64 =
+              network_profile_protocol_header_bytes("NetworkUnit");
+            let handle: i64 = host_network_open_tcp_stream(remote_port, connect_timeout_ms);
+            let recv_result: NetworkResult<i64> = network_result(
+              host_network_recv_http_status_owned(handle, stream_window, recv_window)
+            );
+            let close_value: i64 = host_network_close_owned(handle);
+            if network_config_ready(bind_core) {
+              return network_value(bind_core)
+                + network_value(endpoint_kind)
+                + protocol_kind
+                + protocol_version
+                + protocol_header_bytes
+                + network_value(recv_result)
+                + close_value;
+            }
+            return 0;
+          }
+        }
+        "#,
+        multidomain_support_modules(),
     );
     let mut project = project;
     project.manifest.links = vec![ProjectLink {
