@@ -1,4 +1,4 @@
-use super::verify_nir_module;
+use super::{expr_is_fixed_readable_carry_source, verify_nir_module};
 use nuis_semantics::model::{
     NirDataFlowState, NirExpr, NirFunction, NirModule, NirStmt, NirVisibility,
 };
@@ -64,6 +64,70 @@ fn explicit_borrow_end_allows_owner_write() {
 }
 
 #[test]
+fn fixed_readable_carry_source_helper_accepts_load_value_and_load_at() {
+    assert!(expr_is_fixed_readable_carry_source(&NirExpr::LoadValue(
+        Box::new(NirExpr::Var("head".to_owned()),)
+    )));
+    assert!(expr_is_fixed_readable_carry_source(&NirExpr::LoadAt {
+        buffer: Box::new(NirExpr::Var("buffer".to_owned())),
+        index: Box::new(NirExpr::Int(0)),
+    }));
+}
+
+#[test]
+fn fixed_readable_carry_source_helper_rejects_non_read_memory_shapes() {
+    assert!(!expr_is_fixed_readable_carry_source(&NirExpr::LoadNext(
+        Box::new(NirExpr::Var("head".to_owned()),)
+    )));
+    assert!(!expr_is_fixed_readable_carry_source(&NirExpr::StoreAt {
+        buffer: Box::new(NirExpr::Var("buffer".to_owned())),
+        index: Box::new(NirExpr::Int(0)),
+        value: Box::new(NirExpr::Int(9)),
+    }));
+}
+
+#[test]
+fn borrowed_load_value_and_load_at_remain_verifier_valid() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "head".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::Let {
+            name: "head_ref".to_owned(),
+            ty: None,
+            value: NirExpr::Borrow(Box::new(NirExpr::Var("head".to_owned()))),
+        },
+        NirStmt::Expr(NirExpr::LoadValue(Box::new(NirExpr::Var(
+            "head_ref".to_owned(),
+        )))),
+        NirStmt::Let {
+            name: "buffer".to_owned(),
+            ty: None,
+            value: NirExpr::AllocBuffer {
+                len: Box::new(NirExpr::Int(4)),
+                fill: Box::new(NirExpr::Int(0)),
+            },
+        },
+        NirStmt::Let {
+            name: "buffer_ref".to_owned(),
+            ty: None,
+            value: NirExpr::Borrow(Box::new(NirExpr::Var("buffer".to_owned()))),
+        },
+        NirStmt::Expr(NirExpr::LoadAt {
+            buffer: Box::new(NirExpr::Var("buffer_ref".to_owned())),
+            index: Box::new(NirExpr::Int(1)),
+        }),
+    ]);
+
+    verify_nir_module(&module).unwrap();
+}
+
+#[test]
 fn owner_write_while_borrowed_is_rejected() {
     let module = module_with_body(vec![
         NirStmt::Let {
@@ -87,6 +151,33 @@ fn owner_write_while_borrowed_is_rejected() {
 
     let error = verify_nir_module(&module).unwrap_err();
     assert!(error.contains("cannot write `head` while borrow(s) are active"));
+}
+
+#[test]
+fn store_value_with_borrowed_target_is_rejected() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "head".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::Let {
+            name: "head_ref".to_owned(),
+            ty: None,
+            value: NirExpr::Borrow(Box::new(NirExpr::Var("head".to_owned()))),
+        },
+        NirStmt::Expr(NirExpr::StoreValue {
+            target: Box::new(NirExpr::Var("head_ref".to_owned())),
+            value: Box::new(NirExpr::Int(77)),
+        }),
+    ]);
+
+    let error = verify_nir_module(&module).unwrap_err();
+    assert!(error.contains("store_value(..., target) expects owned address"));
+    assert!(error.contains("borrowed address alias"));
 }
 
 #[test]
@@ -198,6 +289,229 @@ fn owner_write_after_branch_ended_borrow_is_allowed() {
 }
 
 #[test]
+fn owner_write_after_loop_local_borrow_is_rejected() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "cond".to_owned(),
+            ty: None,
+            value: NirExpr::Bool(true),
+        },
+        NirStmt::Let {
+            name: "head".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::While {
+            condition: NirExpr::Var("cond".to_owned()),
+            body: vec![NirStmt::Let {
+                name: "head_ref".to_owned(),
+                ty: None,
+                value: NirExpr::Borrow(Box::new(NirExpr::Var("head".to_owned()))),
+            }],
+        },
+        NirStmt::Expr(NirExpr::StoreValue {
+            target: Box::new(NirExpr::Var("head".to_owned())),
+            value: Box::new(NirExpr::Int(77)),
+        }),
+    ]);
+
+    let error = verify_nir_module(&module).unwrap_err();
+    assert!(error.contains("cannot write `head` while borrow(s) are active"));
+}
+
+#[test]
+fn owner_write_after_preloop_borrow_and_loop_borrow_end_is_rejected() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "cond".to_owned(),
+            ty: None,
+            value: NirExpr::Bool(true),
+        },
+        NirStmt::Let {
+            name: "head".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::Let {
+            name: "head_ref".to_owned(),
+            ty: None,
+            value: NirExpr::Borrow(Box::new(NirExpr::Var("head".to_owned()))),
+        },
+        NirStmt::While {
+            condition: NirExpr::Var("cond".to_owned()),
+            body: vec![NirStmt::Expr(NirExpr::BorrowEnd(Box::new(NirExpr::Var(
+                "head_ref".to_owned(),
+            ))))],
+        },
+        NirStmt::Expr(NirExpr::StoreValue {
+            target: Box::new(NirExpr::Var("head".to_owned())),
+            value: Box::new(NirExpr::Int(77)),
+        }),
+    ]);
+
+    let error = verify_nir_module(&module).unwrap_err();
+    assert!(error.contains("cannot write `head` while borrow(s) are active"));
+}
+
+#[test]
+fn owner_write_after_balanced_loop_local_borrow_is_allowed() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "cond".to_owned(),
+            ty: None,
+            value: NirExpr::Bool(true),
+        },
+        NirStmt::Let {
+            name: "head".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::While {
+            condition: NirExpr::Var("cond".to_owned()),
+            body: vec![
+                NirStmt::Let {
+                    name: "head_ref".to_owned(),
+                    ty: None,
+                    value: NirExpr::Borrow(Box::new(NirExpr::Var("head".to_owned()))),
+                },
+                NirStmt::Expr(NirExpr::BorrowEnd(Box::new(NirExpr::Var(
+                    "head_ref".to_owned(),
+                )))),
+            ],
+        },
+        NirStmt::Expr(NirExpr::StoreValue {
+            target: Box::new(NirExpr::Var("head".to_owned())),
+            value: Box::new(NirExpr::Int(77)),
+        }),
+    ]);
+
+    verify_nir_module(&module).unwrap();
+}
+
+#[test]
+fn owner_use_after_while_body_move_is_rejected() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "cond".to_owned(),
+            ty: None,
+            value: NirExpr::Bool(true),
+        },
+        NirStmt::Let {
+            name: "head".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::While {
+            condition: NirExpr::Var("cond".to_owned()),
+            body: vec![NirStmt::Let {
+                name: "taken".to_owned(),
+                ty: None,
+                value: NirExpr::Move(Box::new(NirExpr::Var("head".to_owned()))),
+            }],
+        },
+        NirStmt::Expr(NirExpr::LoadValue(Box::new(NirExpr::Var(
+            "head".to_owned(),
+        )))),
+    ]);
+
+    let error = verify_nir_module(&module).unwrap_err();
+    assert!(error.contains("use of moved value `head`"));
+}
+
+#[test]
+fn load_value_from_borrowed_target_is_allowed() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "head".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::Let {
+            name: "head_ref".to_owned(),
+            ty: None,
+            value: NirExpr::Borrow(Box::new(NirExpr::Var("head".to_owned()))),
+        },
+        NirStmt::Let {
+            name: "value".to_owned(),
+            ty: None,
+            value: NirExpr::LoadValue(Box::new(NirExpr::Var("head_ref".to_owned()))),
+        },
+    ]);
+
+    verify_nir_module(&module).unwrap();
+}
+
+#[test]
+fn load_at_from_borrowed_buffer_is_allowed() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "scratch".to_owned(),
+            ty: None,
+            value: NirExpr::AllocBuffer {
+                len: Box::new(NirExpr::Int(4)),
+                fill: Box::new(NirExpr::Int(0)),
+            },
+        },
+        NirStmt::Let {
+            name: "scratch_ref".to_owned(),
+            ty: None,
+            value: NirExpr::Borrow(Box::new(NirExpr::Var("scratch".to_owned()))),
+        },
+        NirStmt::Let {
+            name: "value".to_owned(),
+            ty: None,
+            value: NirExpr::LoadAt {
+                buffer: Box::new(NirExpr::Var("scratch_ref".to_owned())),
+                index: Box::new(NirExpr::Int(0)),
+            },
+        },
+    ]);
+
+    verify_nir_module(&module).unwrap();
+}
+
+#[test]
+fn buffer_len_from_borrowed_buffer_is_allowed() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "scratch".to_owned(),
+            ty: None,
+            value: NirExpr::AllocBuffer {
+                len: Box::new(NirExpr::Int(4)),
+                fill: Box::new(NirExpr::Int(0)),
+            },
+        },
+        NirStmt::Let {
+            name: "scratch_ref".to_owned(),
+            ty: None,
+            value: NirExpr::Borrow(Box::new(NirExpr::Var("scratch".to_owned()))),
+        },
+        NirStmt::Let {
+            name: "len".to_owned(),
+            ty: None,
+            value: NirExpr::BufferLen(Box::new(NirExpr::Var("scratch_ref".to_owned()))),
+        },
+    ]);
+
+    verify_nir_module(&module).unwrap();
+}
+
+#[test]
 fn move_of_borrowed_pointer_is_rejected() {
     let module = module_with_body(vec![
         NirStmt::Let {
@@ -221,7 +535,73 @@ fn move_of_borrowed_pointer_is_rejected() {
     ]);
 
     let error = verify_nir_module(&module).unwrap_err();
-    assert!(error.contains("cannot move borrowed pointer"));
+    assert!(error.contains("move(...) expects owned address"));
+    assert!(error.contains("borrowed address alias"));
+}
+
+#[test]
+fn move_of_loaded_next_from_borrowed_source_is_rejected() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "tail".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(30)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::Let {
+            name: "head".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Var("tail".to_owned())),
+            })),
+        },
+        NirStmt::Let {
+            name: "head_ref".to_owned(),
+            ty: None,
+            value: NirExpr::Borrow(Box::new(NirExpr::Var("head".to_owned()))),
+        },
+        NirStmt::Let {
+            name: "next_ptr".to_owned(),
+            ty: None,
+            value: NirExpr::LoadNext(Box::new(NirExpr::Var("head_ref".to_owned()))),
+        },
+        NirStmt::Let {
+            name: "taken".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::Var("next_ptr".to_owned()))),
+        },
+    ]);
+
+    let error = verify_nir_module(&module).unwrap_err();
+    assert!(error.contains("move(...) expects owned address"));
+    assert!(error.contains("borrowed traversal alias"));
+}
+
+#[test]
+fn free_of_borrowed_pointer_is_rejected() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "head".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::Let {
+            name: "head_ref".to_owned(),
+            ty: None,
+            value: NirExpr::Borrow(Box::new(NirExpr::Var("head".to_owned()))),
+        },
+        NirStmt::Expr(NirExpr::Free(Box::new(NirExpr::Var("head_ref".to_owned())))),
+    ]);
+
+    let error = verify_nir_module(&module).unwrap_err();
+    assert!(error.contains("free(...) expects owned address"));
+    assert!(error.contains("borrowed address alias"));
 }
 
 #[test]
@@ -251,7 +631,8 @@ fn alloc_node_with_borrowed_next_is_rejected() {
     ]);
 
     let error = verify_nir_module(&module).unwrap_err();
-    assert!(error.contains("alloc_node cannot capture borrowed pointer"));
+    assert!(error.contains("alloc_node(..., next) requires owned structural address"));
+    assert!(error.contains("borrowed address alias"));
 }
 
 #[test]
@@ -285,7 +666,119 @@ fn store_next_with_borrowed_pointer_is_rejected() {
     ]);
 
     let error = verify_nir_module(&module).unwrap_err();
-    assert!(error.contains("store_next cannot write borrowed pointer"));
+    assert!(error.contains("store_next(..., next) requires owned structural address"));
+    assert!(error.contains("borrowed address alias"));
+}
+
+#[test]
+fn store_next_with_loaded_next_from_borrowed_source_mentions_traversal_alias() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "tail".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(30)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::Let {
+            name: "head".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Var("tail".to_owned())),
+            })),
+        },
+        NirStmt::Let {
+            name: "other".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(99)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::Let {
+            name: "head_ref".to_owned(),
+            ty: None,
+            value: NirExpr::Borrow(Box::new(NirExpr::Var("head".to_owned()))),
+        },
+        NirStmt::Let {
+            name: "next_ptr".to_owned(),
+            ty: None,
+            value: NirExpr::LoadNext(Box::new(NirExpr::Var("head_ref".to_owned()))),
+        },
+        NirStmt::Expr(NirExpr::StoreNext {
+            target: Box::new(NirExpr::Var("other".to_owned())),
+            next: Box::new(NirExpr::Var("next_ptr".to_owned())),
+        }),
+    ]);
+
+    let error = verify_nir_module(&module).unwrap_err();
+    assert!(error.contains("store_next(..., next) requires owned structural address"));
+    assert!(error.contains("borrowed traversal alias"));
+}
+
+#[test]
+fn store_next_with_borrowed_target_is_rejected() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "tail".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(30)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::Let {
+            name: "head".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::Let {
+            name: "head_ref".to_owned(),
+            ty: None,
+            value: NirExpr::Borrow(Box::new(NirExpr::Var("head".to_owned()))),
+        },
+        NirStmt::Expr(NirExpr::StoreNext {
+            target: Box::new(NirExpr::Var("head_ref".to_owned())),
+            next: Box::new(NirExpr::Var("tail".to_owned())),
+        }),
+    ]);
+
+    let error = verify_nir_module(&module).unwrap_err();
+    assert!(error.contains("store_next(..., target) expects owned address"));
+    assert!(error.contains("borrowed address alias"));
+}
+
+#[test]
+fn store_at_with_borrowed_buffer_is_rejected() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "scratch".to_owned(),
+            ty: None,
+            value: NirExpr::AllocBuffer {
+                len: Box::new(NirExpr::Int(4)),
+                fill: Box::new(NirExpr::Int(0)),
+            },
+        },
+        NirStmt::Let {
+            name: "scratch_ref".to_owned(),
+            ty: None,
+            value: NirExpr::Borrow(Box::new(NirExpr::Var("scratch".to_owned()))),
+        },
+        NirStmt::Expr(NirExpr::StoreAt {
+            buffer: Box::new(NirExpr::Var("scratch_ref".to_owned())),
+            index: Box::new(NirExpr::Int(0)),
+            value: Box::new(NirExpr::Int(7)),
+        }),
+    ]);
+
+    let error = verify_nir_module(&module).unwrap_err();
+    assert!(error.contains("store_at(..., buffer) expects owned address"));
+    assert!(error.contains("borrowed address alias"));
 }
 
 #[test]

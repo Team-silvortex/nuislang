@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use nuis_semantics::model::{NirModule, NirStmt, NirStructDef};
+use nuis_semantics::model::{NirExternFunction, NirModule, NirStmt, NirStructDef, NirTypeRef};
 
 use super::{
     async_boundary_violation_detail, async_parameter_violation_detail,
@@ -14,6 +14,7 @@ pub(super) fn validate_declared_nir_types(module: &NirModule) -> Result<(), Stri
         .map(|definition| (definition.name.clone(), definition.clone()))
         .collect::<BTreeMap<String, NirStructDef>>();
     for function in &module.externs {
+        validate_extern_abi_surface(function, None)?;
         for param in &function.params {
             validate_type_ref(&param.ty)?;
         }
@@ -21,6 +22,7 @@ pub(super) fn validate_declared_nir_types(module: &NirModule) -> Result<(), Stri
     }
     for interface in &module.extern_interfaces {
         for method in &interface.methods {
+            validate_extern_abi_surface(method, Some(interface.name.as_str()))?;
             for param in &method.params {
                 validate_type_ref(&param.ty)?;
             }
@@ -92,6 +94,39 @@ pub(super) fn validate_declared_nir_types(module: &NirModule) -> Result<(), Stri
                 | NirStmt::Continue => {}
             }
         }
+    }
+    Ok(())
+}
+
+fn validate_extern_abi_surface(
+    function: &NirExternFunction,
+    interface: Option<&str>,
+) -> Result<(), String> {
+    let callee_label = interface
+        .map(|interface_name| format!("extern method `{}.{}`", interface_name, function.name))
+        .unwrap_or_else(|| format!("extern function `{}`", function.name));
+    for param in &function.params {
+        reject_extern_ref_abi_type(
+            &param.ty,
+            &format!("{callee_label} parameter `{}`", param.name),
+        )?;
+    }
+    reject_extern_ref_abi_type(
+        &function.return_type,
+        &format!("{callee_label} return type"),
+    )?;
+    Ok(())
+}
+
+fn reject_extern_ref_abi_type(ty: &NirTypeRef, context: &str) -> Result<(), String> {
+    if ty.is_ref {
+        return Err(format!(
+            "{context} cannot use `{}` in the current extern ABI; host-boundary pointer parameters and returns are not stabilized yet, so keep `extern` surfaces value-only for now",
+            ty.render()
+        ));
+    }
+    for arg in &ty.generic_args {
+        reject_extern_ref_abi_type(arg, context)?;
     }
     Ok(())
 }

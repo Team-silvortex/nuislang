@@ -1,5 +1,6 @@
 use super::parse_nuis_module;
-use nuis_semantics::model::{NirExpr, NirStmt, NirTypeShape};
+use nuis_semantics::model::{NirAddressClass, NirExpr, NirStmt, NirTypeShape};
+use std::collections::BTreeMap;
 
 #[test]
 fn rejects_non_numeric_binary_operands() {
@@ -202,6 +203,166 @@ fn infers_alloc_buffer_binding_as_ref_buffer_address_type() {
     assert_eq!(ty.shape(), NirTypeShape::Ref);
     assert_eq!(ty.container_kind(), None);
     assert!(!ty.is_async_boundary_safe());
+}
+
+#[test]
+fn infers_borrow_expr_as_same_ref_address_surface_type() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() {
+            let head: ref Node = alloc_node(7, null());
+            let head_ref: ref Node = borrow(head);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let NirStmt::Let { ty: Some(ty), .. } = &module.functions[0].body[1] else {
+        panic!("expected typed borrow binding");
+    };
+    assert_eq!(ty.render(), "ref Node");
+    assert_eq!(ty.shape(), NirTypeShape::Ref);
+    assert!(ty.is_address_type());
+    assert_eq!(ty.address_target_name(), Some("Node"));
+}
+
+#[test]
+fn infers_borrow_end_expr_as_unit_not_new_address_surface() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() {
+            let head: ref Node = alloc_node(7, null());
+            let head_ref: ref Node = borrow(head);
+            let closed: Unit = borrow_end(head_ref);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let NirStmt::Let { ty: Some(ty), .. } = &module.functions[0].body[2] else {
+        panic!("expected typed borrow_end binding");
+    };
+    assert_eq!(ty.render(), "Unit");
+    assert!(!ty.is_address_type());
+}
+
+#[test]
+fn classifies_address_expression_authority_for_alloc_borrow_move_and_next_load() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() {
+            let nil: ref Node? = null();
+            let tail: ref Node = move(alloc_node(30, nil));
+            let head: ref Node = alloc_node(10, tail);
+            let head_ref: ref Node = borrow(head);
+            let moved_head: ref Node = move(head);
+            let next_ptr: ref Node = load_next(moved_head);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let function = &module.functions[0];
+    let mut type_bindings = BTreeMap::new();
+    let mut address_classes = BTreeMap::new();
+    let empty_signatures = BTreeMap::new();
+    let empty_structs = BTreeMap::new();
+
+    for stmt in &function.body {
+        let NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value,
+        } = stmt
+        else {
+            continue;
+        };
+        type_bindings.insert(name.clone(), ty.clone());
+        if let Some(class) = super::types::infer_nir_expr_address_class(
+            value,
+            &type_bindings,
+            &address_classes,
+            &empty_signatures,
+            &empty_structs,
+        ) {
+            address_classes.insert(name.clone(), class);
+        }
+    }
+
+    assert_eq!(address_classes.get("tail"), Some(&NirAddressClass::Owned));
+    assert_eq!(address_classes.get("head"), Some(&NirAddressClass::Owned));
+    assert_eq!(
+        address_classes.get("head_ref"),
+        Some(&NirAddressClass::Borrowed)
+    );
+    assert_eq!(
+        address_classes.get("moved_head"),
+        Some(&NirAddressClass::Owned)
+    );
+    assert_eq!(
+        address_classes.get("next_ptr"),
+        Some(&NirAddressClass::Owned)
+    );
+}
+
+#[test]
+fn classifies_load_next_from_borrowed_source_as_borrowed_address() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() {
+            let nil: ref Node? = null();
+            let tail: ref Node = move(alloc_node(30, nil));
+            let head: ref Node = alloc_node(10, tail);
+            let head_ref: ref Node = borrow(head);
+            let next_ptr: ref Node = load_next(head_ref);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let function = &module.functions[0];
+    let mut type_bindings = BTreeMap::new();
+    let mut address_classes = BTreeMap::new();
+    let empty_signatures = BTreeMap::new();
+    let empty_structs = BTreeMap::new();
+
+    for stmt in &function.body {
+        let NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value,
+        } = stmt
+        else {
+            continue;
+        };
+        type_bindings.insert(name.clone(), ty.clone());
+        if let Some(class) = super::types::infer_nir_expr_address_class(
+            value,
+            &type_bindings,
+            &address_classes,
+            &empty_signatures,
+            &empty_structs,
+        ) {
+            address_classes.insert(name.clone(), class);
+        }
+    }
+
+    assert_eq!(
+        address_classes.get("head_ref"),
+        Some(&NirAddressClass::Borrowed)
+    );
+    assert_eq!(
+        address_classes.get("next_ptr"),
+        Some(&NirAddressClass::Borrowed)
+    );
 }
 
 #[test]

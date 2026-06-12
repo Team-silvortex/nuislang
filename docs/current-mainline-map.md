@@ -23,6 +23,8 @@ local README for the area you are actively touching.
   [versioning/nuis-0.18.0-mainline-goals.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-mainline-goals.md)
 * current control-flow completion plan:
   [versioning/nuis-0.18.0-control-flow-completion-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-control-flow-completion-plan.md)
+* current loop-memory read extension sketch:
+  [versioning/nuis-0.18.0-loop-memory-read-contract-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-loop-memory-read-contract-sketch.md)
 * current compile workflow anchor:
   [versioning/nuis-0.18.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-compile-workflow.md)
 * current lowering capability anchor:
@@ -95,6 +97,20 @@ local README for the area you are actively touching.
   [versioning/nuis-0.18.0-address-pointer-mainline.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-address-pointer-mainline.md)
   shortest rule:
   `current pointer core = ref Node + ref Buffer + borrow/borrow_end + structural and indexed loads/stores`
+  current host-boundary ABI rule:
+  [versioning/nuis-0.18.0-host-boundary-address-abi.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-host-boundary-address-abi.md)
+  shortest rule:
+  `internal ref is real; ordinary extern ABI is still value-only`
+  current verifier/runtime contract:
+  [reference/nir-memory-model.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nir-memory-model.md)
+  shortest rule:
+  `read through borrowed aliases is allowed; write/move/free authority remains owned-only`
+  current surface-design comparison:
+  [versioning/nuis-0.18.0-address-surface-options.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-address-surface-options.md)
+  current owner/borrow split draft:
+  [versioning/nuis-0.18.0-owned-borrowed-address-draft.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-owned-borrowed-address-draft.md)
+  current internal implementation plan:
+  [versioning/nuis-0.18.0-internal-address-class-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-internal-address-class-plan.md)
 
 ## Pure-To-Composite Clusters
 

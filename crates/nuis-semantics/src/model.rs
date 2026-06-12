@@ -544,6 +544,12 @@ pub enum NirTypeShape {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NirAddressClass {
+    Owned,
+    Borrowed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NirContainerKind {
     Window,
     Pipe,
@@ -558,6 +564,19 @@ pub enum NirWindowMode {
 }
 
 impl NirTypeRef {
+    pub fn is_address_type(&self) -> bool {
+        self.is_ref
+    }
+
+    pub fn address_target_name(&self) -> Option<&str> {
+        self.is_address_type().then_some(self.name.as_str())
+    }
+
+    pub fn supports_address_class(&self, class: NirAddressClass) -> bool {
+        self.is_address_type()
+            && matches!(class, NirAddressClass::Owned | NirAddressClass::Borrowed)
+    }
+
     pub fn scalar_kind(&self) -> Option<NirScalarKind> {
         if self.is_ref || !self.generic_args.is_empty() {
             return None;
@@ -2014,10 +2033,11 @@ pub struct NustarPackage {
 #[cfg(test)]
 mod tests {
     use super::{
-        nir_expr_effect_class, nir_host_read_surface, nir_host_scheduler_bridge, NirContainerKind,
-        NirDataFlowState, NirExpr, NirExprEffectClass, NirHostReadSurface, NirHostSchedulerBridge,
-        NirHostSchedulerBridgeKind, NirHostTimingBridge, NirKernelFlowState, NirResultFamily,
-        NirResultStage, NirShaderFlowState, NirTypeRef, NirWindowMode, TestClockDomain,
+        nir_expr_effect_class, nir_host_read_surface, nir_host_scheduler_bridge, NirAddressClass,
+        NirContainerKind, NirDataFlowState, NirExpr, NirExprEffectClass, NirHostReadSurface,
+        NirHostSchedulerBridge, NirHostSchedulerBridgeKind, NirHostTimingBridge,
+        NirKernelFlowState, NirResultFamily, NirResultStage, NirShaderFlowState, NirTypeRef,
+        NirTypeShape, NirWindowMode, TestClockDomain,
     };
 
     fn named(name: &str) -> NirTypeRef {
@@ -2035,6 +2055,15 @@ mod tests {
             generic_args: vec![arg],
             is_optional: false,
             is_ref: false,
+        }
+    }
+
+    fn address(name: &str) -> NirTypeRef {
+        NirTypeRef {
+            name: name.to_owned(),
+            generic_args: Vec::new(),
+            is_optional: false,
+            is_ref: true,
         }
     }
 
@@ -2085,6 +2114,22 @@ mod tests {
         assert_eq!(mutable.container_kind(), Some(NirContainerKind::Window));
         immutable.validate_container_contract().unwrap();
         mutable.validate_container_contract().unwrap();
+    }
+
+    #[test]
+    fn classifies_ref_types_as_address_shape() {
+        let node = address("Node");
+        let buffer = address("Buffer");
+
+        assert!(node.is_address_type());
+        assert!(buffer.is_address_type());
+        assert_eq!(node.address_target_name(), Some("Node"));
+        assert_eq!(buffer.address_target_name(), Some("Buffer"));
+        assert!(node.supports_address_class(NirAddressClass::Owned));
+        assert!(node.supports_address_class(NirAddressClass::Borrowed));
+        assert_eq!(node.shape(), NirTypeShape::Ref);
+        assert_eq!(buffer.shape(), NirTypeShape::Ref);
+        assert_eq!(buffer.container_kind(), None);
     }
 
     #[test]

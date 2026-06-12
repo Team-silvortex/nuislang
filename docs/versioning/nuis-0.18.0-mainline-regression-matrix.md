@@ -11,6 +11,9 @@ Use it together with:
 * [nuis-0.18.0-mainline-goals.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-mainline-goals.md)
 * [nuis-0.18.0-control-flow-completion-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-control-flow-completion-plan.md)
 * [nuis-0.18.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-compile-workflow.md)
+* [nuis-0.18.0-loop-memory-read-contract-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-loop-memory-read-contract-sketch.md)
+* [nuis-0.18.0-loop-memory-carry-blockers.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-loop-memory-carry-blockers.md)
+* [nuis-0.18.0-host-boundary-address-abi.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-host-boundary-address-abi.md)
 
 ## Reading Rule
 
@@ -38,13 +41,14 @@ cargo test -q -p nuisc tests_loop_flow
 cargo test -q -p nuisc tests_loop_post_flow
 cargo test -q -p nuisc --test state_compile
 cargo test -q -p nuisc --test task_compile
+cargo test -q -p nuisc --test memory_compile
 cargo test -q -p nuisc shader_nova_contracts
 cargo test -q -p nuisc --test network_compile
 ```
 
 Short rule:
 
-`frontend control flow + lowering loop families + state/task/shader/network project gates = today’s smallest believable 0.18 mainline check`
+`frontend control flow + lowering loop families + state/task/memory/shader/network project gates = today’s smallest believable 0.18 mainline check`
 
 ## Matrix
 
@@ -188,6 +192,9 @@ This family now protects:
 * `ref Buffer` indexed address staging routes
 * ref-carrying struct field truth
 * direct source-level address examples used by the current front door
+* current source-level owned-vs-borrowed address contract closure
+* current promise boundary that internal pointer semantics exist before host
+  pointer ABI is opened up
 
 Recommended command:
 
@@ -220,6 +227,7 @@ Role:
 
 * helper-aware multidomain project closure beyond the main control-flow gate
 * async network lowering closure beyond the state/task project anchor layer
+* memory ordering truth below verifier-only ownership checks
 
 Primary families:
 
@@ -229,6 +237,29 @@ Primary families:
   [tests_async_runtime.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_async_runtime.rs)
 * `core`:
   [tests_async_network_runtime.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_async_network_runtime.rs)
+
+These families now also cover:
+
+* `borrow_end -> free` ordering
+* `store_at -> free` ordering
+* borrowed `load_next` traversal ordering before `borrow_end` / `free`
+* current loop-lowering boundary for memory/address backedge `while` bodies
+
+Current truth:
+
+* verifier now tracks conservative post-loop borrow/move state for `while`
+* minimal lowering still rejects general memory/address iterative backedge loops
+  outside the existing guarded/counted loop families
+* guarded `while` lowering already accepts small read-only address payloads
+  inside terminal guarded bodies
+* chained/counting loop-node contracts now encode fixed read carry sources for
+  loop-invariant `load_value(...)` and `load_at(buffer, index)` updates
+* verifier now recognizes the same `load_value(...)` / `load_at(...)` shapes as
+  fixed readable carry-source candidates, while still leaving loop-invariance
+  gating to prepare/lowering
+* broader memory-read carry expressions are still intentionally rejected,
+  including loop-variant indices, structural traversal carries, and write-like
+  backedge memory effects
 
 Short rule:
 

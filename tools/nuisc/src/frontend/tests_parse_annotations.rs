@@ -500,6 +500,44 @@ fn lowers_pub_extern_items_into_nir() {
 }
 
 #[test]
+fn rejects_ref_parameter_in_extern_function_signature() {
+    let error = parse_nuis_module(
+        r#"
+        extern "c" fn host_take_ptr(head: ref Node) -> i64;
+        mod cpu Main {
+          fn main() -> i64 {
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(error.contains("extern function `host_take_ptr` parameter `head`"));
+    assert!(error.contains("host-boundary pointer parameters and returns are not stabilized yet"));
+}
+
+#[test]
+fn rejects_ref_return_in_extern_interface_signature() {
+    let error = parse_nuis_module(
+        r#"
+        extern "c" interface Nodes {
+          fn head() -> ref Node;
+        }
+        mod cpu Main {
+          fn main() -> i64 {
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(error.contains("extern method `Nodes.head` return type"));
+    assert!(error.contains("host-boundary pointer parameters and returns are not stabilized yet"));
+}
+
+#[test]
 fn helper_pub_externs_can_cross_module_but_private_ones_cannot() {
     let main_ast = parse_nuis_ast(
         r#"

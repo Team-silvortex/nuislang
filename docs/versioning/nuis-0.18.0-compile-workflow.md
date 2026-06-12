@@ -23,6 +23,7 @@ Use it together with:
 * [nuis-0.18.0-mainline-goals.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-mainline-goals.md)
 * [nuis-0.18.0-control-flow-completion-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-control-flow-completion-plan.md)
 * [nuis-0.17.0-lowering-capability-map.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-lowering-capability-map.md)
+* [nuis-0.18.0-host-boundary-address-abi.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-host-boundary-address-abi.md)
 
 ## Core Rule
 
@@ -92,6 +93,13 @@ The checked-in order still matters:
 Short rule:
 
 `control flow is now part of the same ordered frontend story as lambda, higher-order, generic, and async rewrite closure`
+
+One extra `0.18.0` boundary rule now matters here:
+
+* internal `ref` / address semantics are real inside the frontend and verifier
+* ordinary `extern` ABI surfaces are still value-only
+* so host-boundary pointer shapes are intentionally rejected during declared
+  NIR type validation instead of being allowed to drift into misleading lowering
 
 ## Project Compile Spine
 

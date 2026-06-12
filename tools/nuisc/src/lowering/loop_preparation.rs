@@ -531,7 +531,7 @@ fn collapse_carry_decision_tree(
 )> {
     fn leaf_source(tree: &PreparedCarryDecisionTree) -> Option<PreparedCarryBranchSource> {
         match tree {
-            PreparedCarryDecisionTree::Leaf(source) => Some(*source),
+            PreparedCarryDecisionTree::Leaf(source) => Some(source.clone()),
             PreparedCarryDecisionTree::Branch { .. } => None,
         }
     }
@@ -631,91 +631,126 @@ fn parse_loop_carry_update(
     inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
     pure_helper_blocks: &BTreeMap<String, PureHelperBlock>,
 ) -> Option<PreparedCarryUpdate> {
-    match stmt {
-        carry_stmt @ (NirStmt::Let { .. } | NirStmt::Const { .. }) => {
-            let (carry_name, carry_expr) = extract_pure_branch_binding(carry_stmt, pure_helpers)?;
-            if let Some((op, source)) = parse_loop_carry_linear(
+    parse_linear_loop_carry_update_stmt(
+        stmt,
+        binding_name,
+        carries,
+        pure_helpers,
+        inlineable_pure_helpers,
+        pure_helper_blocks,
+    )
+    .or_else(|| {
+        parse_conditional_loop_carry_update_stmt(
+            stmt,
+            binding_name,
+            carries,
+            pure_helpers,
+            inlineable_pure_helpers,
+        )
+    })
+}
+
+fn parse_linear_loop_carry_update_stmt(
+    stmt: &NirStmt,
+    binding_name: &str,
+    carries: &[PreparedCarryUpdate],
+    pure_helpers: &BTreeSet<String>,
+    inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
+    pure_helper_blocks: &BTreeMap<String, PureHelperBlock>,
+) -> Option<PreparedCarryUpdate> {
+    let carry_stmt = match stmt {
+        NirStmt::Let { .. } | NirStmt::Const { .. } => stmt,
+        _ => return None,
+    };
+    let (carry_name, carry_expr) = extract_pure_branch_binding(carry_stmt, pure_helpers)?;
+    if let Some((op, source)) = parse_loop_carry_linear(
+        &carry_name,
+        &carry_expr,
+        binding_name,
+        carries,
+        inlineable_pure_helpers,
+    ) {
+        Some(PreparedCarryUpdate {
+            binding_name: carry_name,
+            kind: PreparedCarryUpdateKind::Linear { op, source },
+        })
+    } else {
+        Some(PreparedCarryUpdate {
+            binding_name: carry_name.clone(),
+            kind: parse_helper_conditional_carry_update(
                 &carry_name,
                 &carry_expr,
                 binding_name,
                 carries,
-                inlineable_pure_helpers,
-            ) {
-                Some(PreparedCarryUpdate {
-                    binding_name: carry_name,
-                    kind: PreparedCarryUpdateKind::Linear { op, source },
-                })
-            } else {
-                Some(PreparedCarryUpdate {
-                    binding_name: carry_name.clone(),
-                    kind: parse_helper_conditional_carry_update(
-                        &carry_name,
-                        &carry_expr,
-                        binding_name,
-                        carries,
-                        pure_helpers,
-                        inlineable_pure_helpers,
-                        pure_helper_blocks,
-                    )?,
-                })
-            }
-        }
-        NirStmt::If {
-            condition,
-            then_body,
-            else_body,
-        } => {
-            let [then_binding @ (NirStmt::Let { .. } | NirStmt::Const { .. })] =
-                then_body.as_slice()
-            else {
-                return None;
-            };
-            let [else_binding @ (NirStmt::Let { .. } | NirStmt::Const { .. })] =
-                else_body.as_slice()
-            else {
-                return None;
-            };
-            let (then_name, then_expr) = extract_pure_branch_binding(then_binding, pure_helpers)?;
-            let (else_name, else_expr) = extract_pure_branch_binding(else_binding, pure_helpers)?;
-            if then_name != else_name {
-                return None;
-            }
-            let carry_binding_names = carries
-                .iter()
-                .map(|carry| carry.binding_name.clone())
-                .collect::<Vec<_>>();
-            let condition = parse_loop_flow_condition(
-                condition,
-                binding_name,
-                &carry_binding_names,
                 pure_helpers,
                 inlineable_pure_helpers,
-            )?;
-            let then_source = parse_loop_carry_branch_source(
-                &then_name,
-                &then_expr,
-                binding_name,
-                carries,
-                inlineable_pure_helpers,
-            )?;
-            let else_source = parse_loop_carry_branch_source(
-                &else_name,
-                &else_expr,
-                binding_name,
-                carries,
-                inlineable_pure_helpers,
-            )?;
-            Some(PreparedCarryUpdate {
-                binding_name: then_name,
-                kind: PreparedCarryUpdateKind::Conditional {
-                    condition,
-                    then_source,
-                    else_source,
-                },
-            })
-        }
-        _ => None,
+                pure_helper_blocks,
+            )?,
+        })
     }
+}
+
+fn parse_conditional_loop_carry_update_stmt(
+    stmt: &NirStmt,
+    binding_name: &str,
+    carries: &[PreparedCarryUpdate],
+    pure_helpers: &BTreeSet<String>,
+    inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
+) -> Option<PreparedCarryUpdate> {
+    let NirStmt::If {
+        condition,
+        then_body,
+        else_body,
+    } = stmt
+    else {
+        return None;
+    };
+    let [then_binding @ (NirStmt::Let { .. } | NirStmt::Const { .. })] = then_body.as_slice()
+    else {
+        return None;
+    };
+    let [else_binding @ (NirStmt::Let { .. } | NirStmt::Const { .. })] = else_body.as_slice()
+    else {
+        return None;
+    };
+    let (then_name, then_expr) = extract_pure_branch_binding(then_binding, pure_helpers)?;
+    let (else_name, else_expr) = extract_pure_branch_binding(else_binding, pure_helpers)?;
+    if then_name != else_name {
+        return None;
+    }
+    let carry_binding_names = carries
+        .iter()
+        .map(|carry| carry.binding_name.clone())
+        .collect::<Vec<_>>();
+    let condition = parse_loop_flow_condition(
+        condition,
+        binding_name,
+        &carry_binding_names,
+        pure_helpers,
+        inlineable_pure_helpers,
+    )?;
+    let then_source = parse_loop_carry_branch_source(
+        &then_name,
+        &then_expr,
+        binding_name,
+        carries,
+        inlineable_pure_helpers,
+    )?;
+    let else_source = parse_loop_carry_branch_source(
+        &else_name,
+        &else_expr,
+        binding_name,
+        carries,
+        inlineable_pure_helpers,
+    )?;
+    Some(PreparedCarryUpdate {
+        binding_name: then_name,
+        kind: PreparedCarryUpdateKind::Conditional {
+            condition,
+            then_source,
+            else_source,
+        },
+    })
 }
 
 fn is_loop_match_scrutinee_temp_binding(name: &str) -> bool {

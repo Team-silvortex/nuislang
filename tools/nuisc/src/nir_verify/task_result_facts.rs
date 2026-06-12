@@ -9,6 +9,30 @@ pub(super) enum TaskResultStateFact {
     Cancelled,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct BorrowedAddressBinding {
+    pub(super) source: String,
+    pub(super) via_traversal: bool,
+}
+
+impl BorrowedAddressBinding {
+    pub(super) fn direct(source: String) -> Self {
+        Self {
+            source,
+            via_traversal: false,
+        }
+    }
+
+    pub(super) fn traversed(source: String) -> Self {
+        Self {
+            source,
+            via_traversal: true,
+        }
+    }
+}
+
+pub(super) type BorrowBindings = BTreeMap<String, BorrowedAddressBinding>;
+
 fn task_result_condition_fact(expr: &NirExpr) -> Option<(String, TaskResultStateFact)> {
     let (inner, fact) = match expr {
         NirExpr::CpuTaskCompleted(inner) => (inner.as_ref(), TaskResultStateFact::Completed),
@@ -35,14 +59,60 @@ pub(super) fn apply_task_result_condition_facts(
     }
 }
 
-pub(super) fn expr_is_borrowed_pointer(
+pub(super) fn borrowed_address_binding(
     expr: &NirExpr,
-    borrow_bindings: &BTreeMap<String, String>,
-) -> bool {
+    borrow_bindings: &BorrowBindings,
+) -> Option<BorrowedAddressBinding> {
     match expr {
-        NirExpr::Borrow(_) => true,
-        NirExpr::Var(name) => borrow_bindings.contains_key(name),
-        NirExpr::Await(inner) => expr_is_borrowed_pointer(inner, borrow_bindings),
-        _ => false,
+        NirExpr::Borrow(inner) => {
+            super::expr_resource_key(inner).map(BorrowedAddressBinding::direct)
+        }
+        NirExpr::Var(name) => borrow_bindings.get(name).cloned(),
+        NirExpr::LoadNext(inner) => borrowed_address_binding(inner, borrow_bindings)
+            .map(|binding| BorrowedAddressBinding::traversed(binding.source)),
+        NirExpr::Await(inner) => borrowed_address_binding(inner, borrow_bindings),
+        _ => None,
+    }
+}
+
+pub(super) fn borrowed_address_alias_source(
+    expr: &NirExpr,
+    borrow_bindings: &BorrowBindings,
+) -> Option<String> {
+    borrowed_address_binding(expr, borrow_bindings).map(|binding| binding.source)
+}
+
+pub(super) fn expr_is_borrowed_pointer(expr: &NirExpr, borrow_bindings: &BorrowBindings) -> bool {
+    borrowed_address_alias_source(expr, borrow_bindings).is_some()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn load_next_from_borrow_alias_is_classified_as_traversal_binding() {
+        let mut borrow_bindings = BorrowBindings::new();
+        borrow_bindings.insert(
+            "head_ref".to_owned(),
+            BorrowedAddressBinding::direct("head".to_owned()),
+        );
+        let binding = borrowed_address_binding(
+            &NirExpr::LoadNext(Box::new(NirExpr::Var("head_ref".to_owned()))),
+            &borrow_bindings,
+        )
+        .expect("expected borrowed traversal binding");
+        assert_eq!(binding.source, "head");
+        assert!(binding.via_traversal);
+    }
+
+    #[test]
+    fn load_next_from_owned_source_is_not_classified_as_borrowed_binding() {
+        let borrow_bindings = BorrowBindings::new();
+        assert!(borrowed_address_binding(
+            &NirExpr::LoadNext(Box::new(NirExpr::Var("head".to_owned()))),
+            &borrow_bindings,
+        )
+        .is_none());
     }
 }

@@ -1,13 +1,13 @@
 use std::collections::BTreeMap;
 
 use nuis_semantics::model::{
-    AstExpr, NirExpr, NirResultFamily, NirResultStage, NirStructDef, NirTypeRef,
+    AstExpr, NirAddressClass, NirExpr, NirResultFamily, NirResultStage, NirStructDef, NirTypeRef,
 };
 
 use super::{
-    async_parameter_violation_detail, ensure_result_like, expr_type, infer_nir_expr_type,
-    infer_result_stage, lower_nested_expr_with_async_and_consts, render_type_name,
-    FunctionSignature, ModuleConstValue,
+    async_parameter_violation_detail, ensure_result_like, expr_type, infer_nir_expr_address_class,
+    infer_nir_expr_type, infer_result_stage, lower_nested_expr_with_async_and_consts,
+    render_type_name, FunctionSignature, ModuleConstValue,
 };
 
 pub(super) fn ensure_ref_like(
@@ -61,15 +61,89 @@ pub(super) fn ensure_spawn_input_safe(
         ));
     }
     match infer_nir_expr_type(expr, bindings, signatures, struct_table) {
-        Some(ty) if ty.is_ref => Err(format!(
-            "{name}(...) does not currently allow `ref` task inputs, found `{}`",
-            render_type_name(&ty)
-        )),
+        Some(ty) if ty.is_ref => {
+            let detail = match infer_boundary_address_class(expr, bindings, signatures, struct_table)
+            {
+                Some(NirAddressClass::Borrowed) => {
+                    "borrowed `ref` task inputs, including traversal-derived borrowed refs"
+                }
+                Some(NirAddressClass::Owned) => {
+                    "owned `ref` task inputs yet; pointer ownership transfer across async boundaries is not stabilized"
+                }
+                None => "`ref` task inputs",
+            };
+            Err(format!(
+                "{name}(...) does not currently allow {detail}, found `{}`",
+                render_type_name(&ty)
+            ))
+        }
         Some(ty) if async_parameter_violation_detail(&ty, struct_table).is_some() => Err(format!(
             "{name}(...) does not currently allow task inputs whose nested payloads cross the async boundary, found `{}`",
             render_type_name(&ty)
         )),
         _ => Ok(()),
+    }
+}
+
+fn infer_boundary_address_class(
+    expr: &NirExpr,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> Option<NirAddressClass> {
+    infer_nir_expr_address_class(expr, bindings, &BTreeMap::new(), signatures, struct_table)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ref_node() -> NirTypeRef {
+        NirTypeRef {
+            name: "Node".to_owned(),
+            generic_args: vec![],
+            is_optional: false,
+            is_ref: true,
+        }
+    }
+
+    #[test]
+    fn spawn_input_error_mentions_owned_ref_boundary_for_owned_pointer_expr() {
+        let expr = NirExpr::AllocNode {
+            value: Box::new(NirExpr::Int(1)),
+            next: Box::new(NirExpr::Null),
+        };
+        let error = ensure_spawn_input_safe(
+            "spawn",
+            &expr,
+            &BTreeMap::new(),
+            &BTreeMap::new(),
+            &BTreeMap::new(),
+        )
+        .unwrap_err();
+        assert!(error.contains("owned `ref` task inputs yet"));
+        assert!(
+            error.contains("pointer ownership transfer across async boundaries is not stabilized")
+        );
+    }
+
+    #[test]
+    fn spawn_input_error_mentions_borrowed_ref_boundary_for_traversal_pointer_expr() {
+        let mut bindings = BTreeMap::new();
+        bindings.insert("head".to_owned(), ref_node());
+        let expr = NirExpr::LoadNext(Box::new(NirExpr::Borrow(Box::new(NirExpr::Var(
+            "head".to_owned(),
+        )))));
+        let error = ensure_spawn_input_safe(
+            "spawn",
+            &expr,
+            &bindings,
+            &BTreeMap::new(),
+            &BTreeMap::new(),
+        )
+        .unwrap_err();
+        assert!(error.contains("borrowed `ref` task inputs"));
+        assert!(error.contains("traversal-derived borrowed refs"));
     }
 }
 

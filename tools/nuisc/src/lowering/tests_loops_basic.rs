@@ -131,6 +131,64 @@ fn lowers_guarded_while_return_body_into_guard_return() {
 }
 
 #[test]
+fn lowers_guarded_while_with_structural_load_value_into_guard_return() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let head: ref Node = move(alloc_node(17, null()));
+            while true {
+              let current: i64 = load_value(head);
+              return current;
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "load_value"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "guard_return"));
+}
+
+#[test]
+fn lowers_guarded_while_with_buffer_load_at_into_guard_return() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let buffer: ref Buffer = alloc_buffer(2, 9);
+            while true {
+              let current: i64 = load_at(buffer, 0);
+              return current;
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "load_at"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "guard_return"));
+}
+
+#[test]
 fn lowers_guarded_branching_while_into_select_plus_guard_return() {
     let module = parse_nuis_module(
         r#"

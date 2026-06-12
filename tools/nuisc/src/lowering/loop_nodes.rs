@@ -144,13 +144,20 @@ pub(super) fn lower_chained_while(
                 if has_conditional {
                     args.push("always".to_owned());
                     args.push(initial_name.clone());
-                    let carry_kind = render_loop_carry_kind(*op, *source);
-                    args.push(carry_kind.clone());
-                    args.push(carry_kind);
+                    let (carry_args, carry_dep_inputs, carry_effect_inputs) =
+                        encode_loop_carry_source_args(*op, source, state, bindings)?;
+                    args.extend(carry_args.clone());
+                    args.extend(carry_args);
                     extra_dep_inputs.push(initial_name.clone());
                     extra_effect_inputs.push(initial_name.clone());
+                    extra_dep_inputs.extend(carry_dep_inputs);
+                    extra_effect_inputs.extend(carry_effect_inputs);
                 } else {
-                    args.push(render_loop_carry_kind(*op, *source));
+                    let (carry_args, carry_dep_inputs, carry_effect_inputs) =
+                        encode_loop_carry_source_args(*op, source, state, bindings)?;
+                    args.extend(carry_args);
+                    extra_dep_inputs.extend(carry_dep_inputs);
+                    extra_effect_inputs.extend(carry_effect_inputs);
                 }
             }
             PreparedCarryUpdateKind::Conditional {
@@ -161,16 +168,18 @@ pub(super) fn lower_chained_while(
                 let (condition_args, cond_dep_inputs, cond_effect_inputs) =
                     encode_carry_condition_args(condition, state, bindings)?;
                 args.extend(condition_args);
-                let encode_branch_source = |source: &PreparedCarryBranchSource| match source {
-                    PreparedCarryBranchSource::Keep => "keep".to_owned(),
-                    PreparedCarryBranchSource::Source { op, source } => {
-                        render_loop_carry_kind(*op, *source)
-                    }
-                };
-                args.push(encode_branch_source(then_source));
-                args.push(encode_branch_source(else_source));
+                let (then_args, then_dep_inputs, then_effect_inputs) =
+                    encode_loop_carry_branch_source_args(then_source, state, bindings)?;
+                let (else_args, else_dep_inputs, else_effect_inputs) =
+                    encode_loop_carry_branch_source_args(else_source, state, bindings)?;
+                args.extend(then_args);
+                args.extend(else_args);
                 extra_dep_inputs.extend(cond_dep_inputs);
                 extra_effect_inputs.extend(cond_effect_inputs);
+                extra_dep_inputs.extend(then_dep_inputs);
+                extra_dep_inputs.extend(else_dep_inputs);
+                extra_effect_inputs.extend(then_effect_inputs);
+                extra_effect_inputs.extend(else_effect_inputs);
             }
         }
     }
@@ -329,13 +338,20 @@ pub(super) fn lower_async_chained_while(
                 if has_conditional {
                     args.push("always".to_owned());
                     args.push(initial_name.clone());
-                    let carry_kind = render_loop_carry_kind(*op, *source);
-                    args.push(carry_kind.clone());
-                    args.push(carry_kind);
+                    let (carry_args, carry_dep_inputs, carry_effect_inputs) =
+                        encode_loop_carry_source_args(*op, source, state, bindings)?;
+                    args.extend(carry_args.clone());
+                    args.extend(carry_args);
                     extra_dep_inputs.push(initial_name.clone());
                     extra_effect_inputs.push(initial_name.clone());
+                    extra_dep_inputs.extend(carry_dep_inputs);
+                    extra_effect_inputs.extend(carry_effect_inputs);
                 } else {
-                    args.push(render_loop_carry_kind(*op, *source));
+                    let (carry_args, carry_dep_inputs, carry_effect_inputs) =
+                        encode_loop_carry_source_args(*op, source, state, bindings)?;
+                    args.extend(carry_args);
+                    extra_dep_inputs.extend(carry_dep_inputs);
+                    extra_effect_inputs.extend(carry_effect_inputs);
                 }
             }
             PreparedCarryUpdateKind::Conditional {
@@ -346,16 +362,18 @@ pub(super) fn lower_async_chained_while(
                 let (condition_args, cond_dep_inputs, cond_effect_inputs) =
                     encode_carry_condition_args(condition, state, bindings)?;
                 args.extend(condition_args);
-                let encode_branch_source = |source: &PreparedCarryBranchSource| match source {
-                    PreparedCarryBranchSource::Keep => "keep".to_owned(),
-                    PreparedCarryBranchSource::Source { op, source } => {
-                        render_loop_carry_kind(*op, *source)
-                    }
-                };
-                args.push(encode_branch_source(then_source));
-                args.push(encode_branch_source(else_source));
+                let (then_args, then_dep_inputs, then_effect_inputs) =
+                    encode_loop_carry_branch_source_args(then_source, state, bindings)?;
+                let (else_args, else_dep_inputs, else_effect_inputs) =
+                    encode_loop_carry_branch_source_args(else_source, state, bindings)?;
+                args.extend(then_args);
+                args.extend(else_args);
                 extra_dep_inputs.extend(cond_dep_inputs);
                 extra_effect_inputs.extend(cond_effect_inputs);
+                extra_dep_inputs.extend(then_dep_inputs);
+                extra_dep_inputs.extend(else_dep_inputs);
+                extra_effect_inputs.extend(then_effect_inputs);
+                extra_effect_inputs.extend(else_effect_inputs);
             }
         }
     }

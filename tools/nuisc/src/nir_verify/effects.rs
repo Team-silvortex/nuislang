@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use nuis_semantics::model::NirExpr;
 
 use super::expr_resource_key;
+use super::task_result_facts::{borrowed_address_binding, BorrowBindings, BorrowedAddressBinding};
 
 pub(super) fn merge_branch_state(
     moved: &mut BTreeSet<String>,
@@ -31,7 +32,7 @@ pub(super) fn merge_branch_state(
 pub(super) fn ensure_binding_can_be_rebound(
     name: &str,
     borrows: &BTreeMap<String, usize>,
-    borrow_bindings: &BTreeMap<String, String>,
+    borrow_bindings: &BorrowBindings,
 ) -> Result<(), String> {
     if borrows.get(name).copied().unwrap_or(0) > 0 {
         return Err(format!(
@@ -39,11 +40,11 @@ pub(super) fn ensure_binding_can_be_rebound(
             name
         ));
     }
-    if let Some(source) = borrow_bindings.get(name) {
-        if borrows.get(source).copied().unwrap_or(0) > 0 {
+    if let Some(binding) = borrow_bindings.get(name) {
+        if borrows.get(&binding.source).copied().unwrap_or(0) > 0 {
             return Err(format!(
                 "nir verify: cannot rebind borrow alias `{}` while borrow of `{}` is active",
-                name, source
+                name, binding.source
             ));
         }
     }
@@ -55,7 +56,7 @@ pub(super) fn note_binding_effects(
     binding_name: &str,
     moved: &mut BTreeSet<String>,
     borrows: &mut BTreeMap<String, usize>,
-    borrow_bindings: &mut BTreeMap<String, String>,
+    borrow_bindings: &mut BorrowBindings,
 ) {
     match expr {
         NirExpr::Move(inner)
@@ -78,13 +79,30 @@ pub(super) fn note_binding_effects(
             if let Some(source) = expr_resource_key(inner) {
                 *borrows.entry(source.clone()).or_insert(0) += 1;
                 if binding_name != "_" {
-                    borrow_bindings.insert(binding_name.to_owned(), source);
+                    borrow_bindings.insert(
+                        binding_name.to_owned(),
+                        BorrowedAddressBinding::direct(source),
+                    );
+                }
+            }
+        }
+        NirExpr::LoadNext(inner) => {
+            if let Some(binding) = borrowed_address_binding(inner, borrow_bindings) {
+                if binding_name != "_" {
+                    borrow_bindings.insert(
+                        binding_name.to_owned(),
+                        BorrowedAddressBinding::traversed(binding.source),
+                    );
                 }
             }
         }
         NirExpr::BorrowEnd(inner) => {
-            let source = expr_resource_key(inner)
-                .and_then(|name| borrow_bindings.get(&name).cloned().or(Some(name)));
+            let source = expr_resource_key(inner).and_then(|name| {
+                borrow_bindings
+                    .get(&name)
+                    .map(|binding| binding.source.clone())
+                    .or(Some(name))
+            });
             if let Some(source) = source {
                 let next = borrows.get(&source).copied().unwrap_or(0).saturating_sub(1);
                 if next == 0 {

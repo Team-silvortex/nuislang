@@ -144,6 +144,13 @@ Current line note:
 
 `this has already started: the first 0.18.0 work landed as real state/task project anchors, not only lowering-local snippet probes`
 
+Memory/carry companion note:
+
+* the current loop-memory carry boundary and next blocker breakdown now live in
+  [nuis-0.18.0-loop-memory-read-contract-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-loop-memory-read-contract-sketch.md)
+  and
+  [nuis-0.18.0-loop-memory-carry-blockers.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-loop-memory-carry-blockers.md)
+
 ## Practical 0.18.0 Work Order
 
 The most useful order for the line is:

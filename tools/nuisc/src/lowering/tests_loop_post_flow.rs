@@ -722,3 +722,36 @@ fn rejects_general_iterative_while_until_loop_lowering_exists() {
     let error = lower_nir_to_yir_builtin_cpu(&module).unwrap_err();
     assert!(error.contains("guard-style `while` loops or simple counted `while` loops"));
 }
+
+#[test]
+fn rejects_memory_address_backedge_while_until_general_loop_lowering_exists() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let step: i64 = 0;
+            let total: i64 = 0;
+            let tail: ref Node = move(alloc_node(30, null()));
+            let head: ref Node = alloc_node(10, tail);
+            while step < 2 {
+              let head_ref: ref Node = borrow(head);
+              let next_ptr: ref Node = load_next(head_ref);
+              let tail_ref: ref Node = borrow(next_ptr);
+              let total: i64 = total + load_value(head_ref) + load_value(tail_ref);
+              borrow_end(tail_ref);
+              borrow_end(head_ref);
+              let step: i64 = step + 1;
+            }
+            store_value(head, total + step);
+            let final_value: i64 = load_value(head);
+            free(head);
+            return final_value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let error = lower_nir_to_yir_builtin_cpu(&module).unwrap_err();
+    assert!(error.contains("guard-style `while` loops or simple counted `while` loops"));
+}

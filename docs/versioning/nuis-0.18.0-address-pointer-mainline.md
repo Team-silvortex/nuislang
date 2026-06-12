@@ -3,6 +3,11 @@
 This file is the short implementation-facing map for the current address-type
 story.
 
+For the design comparison behind this current choice, also see:
+
+* [nuis-0.18.0-address-surface-options.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-address-surface-options.md)
+* [nuis-0.18.0-owned-borrowed-address-draft.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-owned-borrowed-address-draft.md)
+
 The key rule is simple:
 
 * current nuis already has a pointer core
@@ -47,12 +52,28 @@ Current verifier truth is:
 
 * owner values can be moved
 * borrowed aliases cannot be moved
+* `load_next(...)` inherits address authority from its input
+* read-only address access remains available through borrowed aliases
 * owner writes during active borrows are rejected
 * borrowed pointers cannot be written into structural `next` links
+
+Current surface-syntax rule is still intentionally narrow:
+
+* owner pointers and borrow aliases both appear as `ref T`
+* the distinction is currently verifier/state driven, not surface-type driven
+* `borrow(ptr)` keeps the same `ref T` surface type
+* `borrow_end(alias)` returns `Unit`, not a new pointer wrapper type
 
 This is the current pointer-safety contract:
 
 * [docs/reference/nir-memory-model.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nir-memory-model.md)
+
+More concretely, current read/write policy is:
+
+* `load_value(ptr)` may read from owned or borrowed structural addresses
+* `load_next(ptr)` may read from owned or borrowed structural addresses
+* `load_at(buffer, index)` and `buffer_len(buffer)` may read from owned or borrowed buffer addresses
+* `store_value`, `store_next`, `store_at`, `move`, and `free` require owner authority
 
 ## Current Front-Door Examples
 

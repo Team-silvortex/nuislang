@@ -9,7 +9,8 @@ use nuis_semantics::model::{
 
 use self::effects::{ensure_binding_can_be_rebound, merge_branch_state, note_binding_effects};
 use self::task_result_facts::{
-    apply_task_result_condition_facts, expr_is_borrowed_pointer, TaskResultStateFact,
+    apply_task_result_condition_facts, borrowed_address_alias_source, borrowed_address_binding,
+    expr_is_borrowed_pointer, BorrowBindings, TaskResultStateFact,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -95,10 +96,96 @@ fn verify_type_ref(ty: &NirTypeRef) -> Result<(), String> {
         .map_err(|error| format!("nir verify: invalid type `{}`: {error}", ty.render()))
 }
 
+fn borrowed_address_kind_label(expr: &NirExpr, borrow_bindings: &BorrowBindings) -> &'static str {
+    match borrowed_address_binding(expr, borrow_bindings) {
+        Some(binding) if binding.via_traversal => "borrowed traversal alias",
+        Some(_) => "borrowed address alias",
+        None => "borrowed address alias",
+    }
+}
+
+fn owned_address_error(
+    operation: &str,
+    expr: &NirExpr,
+    borrow_bindings: &BorrowBindings,
+) -> String {
+    format!(
+        "nir verify: {operation} expects owned address, found {} `{}`",
+        borrowed_address_kind_label(expr, borrow_bindings),
+        render_data_expr_name(expr),
+    )
+}
+
+fn owned_structural_address_error(
+    operation: &str,
+    expr: &NirExpr,
+    borrow_bindings: &BorrowBindings,
+) -> String {
+    format!(
+        "nir verify: {operation} requires owned structural address, found {} `{}`",
+        borrowed_address_kind_label(expr, borrow_bindings),
+        render_data_expr_name(expr),
+    )
+}
+
+fn ensure_owned_address_target(
+    operation: &str,
+    expr: &NirExpr,
+    borrow_bindings: &BorrowBindings,
+) -> Result<(), String> {
+    if borrowed_address_alias_source(expr, borrow_bindings).is_some() {
+        return Err(owned_address_error(operation, expr, borrow_bindings));
+    }
+    Ok(())
+}
+
+fn expr_is_fixed_readable_carry_source(expr: &NirExpr) -> bool {
+    matches!(expr, NirExpr::LoadValue(_) | NirExpr::LoadAt { .. })
+}
+
+fn verify_fixed_readable_carry_source_expr(
+    expr: &NirExpr,
+    moved: &BTreeSet<String>,
+    borrows: &BTreeMap<String, usize>,
+    borrow_bindings: &BorrowBindings,
+    data_bindings: &BTreeMap<String, NirDataKind>,
+    task_result_facts: &BTreeMap<String, TaskResultStateFact>,
+) -> Result<(), String> {
+    match expr {
+        NirExpr::LoadValue(inner) => verify_expr(
+            inner,
+            moved,
+            borrows,
+            borrow_bindings,
+            data_bindings,
+            task_result_facts,
+        ),
+        NirExpr::LoadAt { buffer, index } => {
+            verify_expr(
+                buffer,
+                moved,
+                borrows,
+                borrow_bindings,
+                data_bindings,
+                task_result_facts,
+            )?;
+            verify_expr(
+                index,
+                moved,
+                borrows,
+                borrow_bindings,
+                data_bindings,
+                task_result_facts,
+            )
+        }
+        _ => Err("nir verify: expected fixed readable carry source candidate".to_owned()),
+    }
+}
+
 fn verify_function(function: &NirFunction) -> Result<(), String> {
     let mut moved = BTreeSet::<String>::new();
     let mut borrows = BTreeMap::<String, usize>::new();
-    let mut borrow_bindings = BTreeMap::<String, String>::new();
+    let mut borrow_bindings = BorrowBindings::new();
     let mut data_bindings = BTreeMap::<String, NirDataKind>::new();
     let mut task_result_facts = BTreeMap::<String, TaskResultStateFact>::new();
 
@@ -120,7 +207,7 @@ fn verify_stmt(
     stmt: &NirStmt,
     moved: &mut BTreeSet<String>,
     borrows: &mut BTreeMap<String, usize>,
-    borrow_bindings: &mut BTreeMap<String, String>,
+    borrow_bindings: &mut BorrowBindings,
     data_bindings: &mut BTreeMap<String, NirDataKind>,
     task_result_facts: &mut BTreeMap<String, TaskResultStateFact>,
 ) -> Result<(), String> {
@@ -244,6 +331,8 @@ fn verify_stmt(
                 data_bindings,
                 task_result_facts,
             )?;
+            let pre_loop_moved = moved.clone();
+            let pre_loop_borrows = borrows.clone();
             let mut loop_moved = moved.clone();
             let mut loop_borrows = borrows.clone();
             let mut loop_borrow_bindings = borrow_bindings.clone();
@@ -259,6 +348,14 @@ fn verify_stmt(
                     &mut loop_task_result_facts,
                 )?;
             }
+            merge_branch_state(
+                moved,
+                borrows,
+                &loop_moved,
+                &loop_borrows,
+                &pre_loop_moved,
+                &pre_loop_borrows,
+            );
         }
         NirStmt::Break | NirStmt::Continue => {}
         NirStmt::Return(value) => {
@@ -281,11 +378,22 @@ fn verify_expr(
     expr: &NirExpr,
     moved: &BTreeSet<String>,
     borrows: &BTreeMap<String, usize>,
-    borrow_bindings: &BTreeMap<String, String>,
+    borrow_bindings: &BorrowBindings,
     data_bindings: &BTreeMap<String, NirDataKind>,
     task_result_facts: &BTreeMap<String, TaskResultStateFact>,
 ) -> Result<(), String> {
     verify_expr_uses(expr, moved)?;
+
+    if expr_is_fixed_readable_carry_source(expr) {
+        return verify_fixed_readable_carry_source_expr(
+            expr,
+            moved,
+            borrows,
+            borrow_bindings,
+            data_bindings,
+            task_result_facts,
+        );
+    }
 
     if let NirExpr::CpuTaskValue(inner) = expr {
         if let Some(source) = expr_resource_key(inner) {
@@ -416,13 +524,14 @@ fn verify_expr(
                 | NirExpr::CpuJoin(inner)
                 | NirExpr::CpuCancel(inner)
                 | NirExpr::CpuJoinResult(inner) => {
-                    if matches!(expr, NirExpr::Move(_))
-                        && expr_is_borrowed_pointer(inner, borrow_bindings)
-                    {
-                        return Err(format!(
-                            "nir verify: cannot move borrowed pointer `{}`",
-                            render_data_expr_name(inner)
-                        ));
+                    if let Some(operation) = match expr {
+                        NirExpr::Move(_) => Some("move(...)"),
+                        NirExpr::Free(_) => Some("free(...)"),
+                        _ => None,
+                    } {
+                        if expr_is_borrowed_pointer(inner, borrow_bindings) {
+                            return Err(owned_address_error(operation, inner, borrow_bindings));
+                        }
                     }
                     if matches!(first_access.mode, NirGlmUseMode::Own) {
                         if let Some(source) = expr_resource_key(inner) {
@@ -476,8 +585,12 @@ fn verify_expr(
                     }
                 }
                 NirExpr::BorrowEnd(inner) => {
-                    let source = expr_resource_key(inner)
-                        .and_then(|name| borrow_bindings.get(&name).cloned().or(Some(name)));
+                    let source = expr_resource_key(inner).and_then(|name| {
+                        borrow_bindings
+                            .get(&name)
+                            .map(|binding| binding.source.clone())
+                            .or(Some(name))
+                    });
                     if let Some(source) = source {
                         if borrows.get(&source).copied().unwrap_or(0) == 0 {
                             return Err(format!(
@@ -1184,10 +1297,11 @@ fn verify_expr(
                 data_bindings,
                 task_result_facts,
             )?;
-            if expr_is_borrowed_pointer(next, borrow_bindings) {
-                return Err(format!(
-                    "nir verify: alloc_node cannot capture borrowed pointer `{}` as structural next link",
-                    render_data_expr_name(next)
+            if borrowed_address_alias_source(next, borrow_bindings).is_some() {
+                return Err(owned_structural_address_error(
+                    "alloc_node(..., next)",
+                    next,
+                    borrow_bindings,
                 ));
             }
         }
@@ -1244,6 +1358,7 @@ fn verify_expr(
                 data_bindings,
                 task_result_facts,
             )?;
+            ensure_owned_address_target("store_value(..., target)", target, borrow_bindings)?;
         }
         NirExpr::StoreNext { target, next } => {
             verify_expr(
@@ -1262,10 +1377,12 @@ fn verify_expr(
                 data_bindings,
                 task_result_facts,
             )?;
-            if expr_is_borrowed_pointer(next, borrow_bindings) {
-                return Err(format!(
-                    "nir verify: store_next cannot write borrowed pointer `{}` into structural next link",
-                    render_data_expr_name(next)
+            ensure_owned_address_target("store_next(..., target)", target, borrow_bindings)?;
+            if borrowed_address_alias_source(next, borrow_bindings).is_some() {
+                return Err(owned_structural_address_error(
+                    "store_next(..., next)",
+                    next,
+                    borrow_bindings,
                 ));
             }
         }
@@ -1298,6 +1415,7 @@ fn verify_expr(
                 data_bindings,
                 task_result_facts,
             )?;
+            ensure_owned_address_target("store_at(..., buffer)", buffer, borrow_bindings)?;
         }
         NirExpr::Call { args, .. } => {
             for arg in args {

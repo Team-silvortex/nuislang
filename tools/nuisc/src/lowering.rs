@@ -93,7 +93,8 @@ use guard_ops::{
 use if_lowering::lower_if_pair;
 use kernel_exprs::lower_kernel_expr;
 use loop_carries::{
-    render_loop_carry_kind, render_loop_compare, render_loop_cond_kind, render_loop_logic_op,
+    encode_loop_carry_branch_source_args, encode_loop_carry_source_args, render_loop_compare,
+    render_loop_cond_kind, render_loop_logic_op,
 };
 use loop_execution::{lower_prepared_loop_body, prepare_guarded_loop_body};
 use loop_flow_nodes::{
