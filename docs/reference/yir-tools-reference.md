@@ -59,6 +59,7 @@ Current reference commands:
 * `cache-status [--all] [--verbose-cache] [--json] [input]`
 * `clean-cache [--all] [--json] [input]`
 * `cache-prune [--all] [--keep N] [--json] [input]`
+* `workflow [--json] [input.ns|project-dir|nuis.toml]`
 * `project-status [--json] <input.ns|project-dir|nuis.toml>`
 * `project-doctor [--json] <project-dir|nuis.toml>`
 * `project-lock-abi <project-dir|nuis.toml>`
@@ -81,6 +82,22 @@ user-facing toolchain surface while reusing `nuisc` as the compiler core.
 ### Default compile workflow
 
 For `0.16.0`, the default command order should be read as:
+
+```text
+workflow -> project-doctor -> check -> test -> build -> release-check
+```
+
+Use `workflow` when you want the tool itself to restate the shortest route for
+the current input before you start deeper compile work. It also emits a
+`recommended_next_step` and `recommended_command` surface that can be consumed
+by scripts or editor helpers:
+
+```bash
+cargo run -p nuis -- workflow <project-dir|nuis.toml>
+cargo run -p nuis -- workflow <input.ns> --json
+```
+
+The stable compile order remains:
 
 ```text
 project-doctor -> check -> test -> build -> release-check

@@ -39,6 +39,7 @@ be read as:
 cargo test -q -p nuisc tests_control_flow
 cargo test -q -p nuisc tests_loop_flow
 cargo test -q -p nuisc tests_loop_post_flow
+cargo test -q -p nuisc generic_method_bounds
 cargo test -q -p nuisc --test state_compile
 cargo test -q -p nuisc --test task_compile
 cargo test -q -p nuisc --test memory_compile
@@ -46,9 +47,27 @@ cargo test -q -p nuisc shader_nova_contracts
 cargo test -q -p nuisc --test network_compile
 ```
 
+Equivalent checked-in script:
+
+```bash
+scripts/check-0.18-mainline.sh
+```
+
 Short rule:
 
-`frontend control flow + lowering loop families + state/task/memory/shader/network project gates = today’s smallest believable 0.18 mainline check`
+`frontend control flow + generic-bound diagnostics + lowering loop families + state/task/memory/shader/network project gates = today’s smallest believable 0.18 mainline check`
+
+For a heavier pre-release pass, use:
+
+```bash
+scripts/check-0.18-release.sh
+```
+
+That script is intentionally the current compiler-facing release gate.
+
+The wider repo-level `cargo test -q -p nuis -p nuisc` smoke is still a broader
+closure check and may surface stdlib/project issues outside this narrower
+compiler gate.
 
 ## Matrix
 

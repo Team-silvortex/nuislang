@@ -55,6 +55,11 @@ Facade modules:
   - [task_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/task_runtime.ns)
   - [command_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_runtime.ns)
   - [subprocess_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/subprocess_runtime.ns)
+  - [workflow_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/workflow_runtime.ns)
+  - current focus:
+    command/subprocess/workflow now share a context-aware execution shape with
+    launch metadata, cwd routing, timeout routing, and fail-fast workflow
+    composition
 * terminal and output
   - [io_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/io_runtime.ns)
   - [stdin_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/stdin_runtime.ns)
@@ -95,6 +100,9 @@ Recipe modules:
   - [cli_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_session_recipe.ns)
   - [cli_shell_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_shell_session_recipe.ns)
   - [cli_report_session_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_report_session_recipe.ns)
+  - [cli_workflow_automation_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_workflow_automation_recipe.ns)
+  - [cli_build_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_build_pipeline_recipe.ns)
+  - [cli_project_build_report_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_project_build_report_recipe.ns)
 * net/runtime staging
   - grouped rule:
     `profile core -> transport edge -> syscall edge -> socket edge -> control edge -> protocol edge -> http edge -> result spine -> task spine -> session`
@@ -136,6 +144,25 @@ Recipe modules:
   - [directory_create_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/directory_create_recipe.ns)
 * automation/workflow tooling
   - [automation_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/automation_runtime_recipe.ns)
+  - [workflow_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/workflow_runtime_recipe.ns)
+  - [cli_workflow_automation_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_workflow_automation_recipe.ns)
+  - [cli_build_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_build_pipeline_recipe.ns)
+  - [cli_project_build_report_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_project_build_report_recipe.ns)
+  - current recipe shape:
+    the checked-in workflow example is now a four-step gate with executed-step
+    counting, blocked-step reporting, and per-step launch/cwd/timeout summary
+  - integration example:
+    `cli_workflow_automation_recipe` is the current smallest checked-in sample
+    that ties CLI session, async gate, report emission, automation staging, and
+    four-step workflow execution into one toolchain-shaped entry
+  - concrete tool example:
+    `cli_build_pipeline_recipe` is the current build-oriented sample with
+    `prepare/check/compile/package` stage naming, artifact staging, and
+    pipeline-specific plan summary
+  - project-facing report example:
+    `cli_project_build_report_recipe` is the current most concrete sample with
+    `project/artifact/manifest/build_report` vocabulary and
+    `configure/verify/emit/report` stage naming
 * location/runtime staging
   - [location_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/location_runtime_recipe.ns)
 * kv/runtime staging
@@ -189,6 +216,31 @@ for the shortest route. Use this section only when you want the local shape of
 `std` itself.
 
 ### Current Workflow Shape
+
+For shell-oriented workflow orchestration, the current reusable shape is:
+
+* execution context first
+  - each command request can carry env/cwd/timeout intent plus inherit flags
+* per-step report next
+  - each workflow step reports launched/executed/blocked state, not just exit
+    success
+* fail-fast gate after that
+  - later steps can be skipped explicitly while still preserving summary data
+* batch summary last
+  - the checked-in runtime example currently demonstrates a four-step gate
+    shape
+
+Read these together when working on host command/workflow plumbing:
+
+* [command_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_runtime.ns)
+* [subprocess_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/subprocess_runtime.ns)
+* [workflow_runtime.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/workflow_runtime.ns)
+* [command_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/command_runtime_recipe.ns)
+* [subprocess_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/subprocess_runtime_recipe.ns)
+* [workflow_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/workflow_runtime_recipe.ns)
+* [cli_workflow_automation_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_workflow_automation_recipe.ns)
+* [cli_build_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_build_pipeline_recipe.ns)
+* [cli_project_build_report_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_project_build_report_recipe.ns)
 
 For the current `std net` and `httpish` recipes, prefer one repeated shape
 instead of inventing a new layout every time.

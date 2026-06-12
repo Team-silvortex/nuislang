@@ -1646,9 +1646,9 @@ fn lowers_flow_branching_while_state_project_with_flow_cond_loop_shape() {
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_flow_cond_chain"
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_flow_cond_chain"
         })
-        .expect("expected loop_while_i64_flow_cond_chain node");
+        .expect("expected loop_while_scalar_flow_cond_chain node");
     assert_eq!(loop_node.op.args[5], "current_gt");
     assert_eq!(loop_node.op.args[7], "break");
     assert_eq!(loop_node.op.args[9], "current_gt");
@@ -1676,9 +1676,9 @@ fn lowers_equality_branching_while_state_project_with_equality_flow_cond_loop_sh
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_flow_cond_chain"
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_flow_cond_chain"
         })
-        .expect("expected loop_while_i64_flow_cond_chain node");
+        .expect("expected loop_while_scalar_flow_cond_chain node");
     assert_eq!(loop_node.op.args[5], "current_ne");
     expect_const_i64_value(&artifacts, &loop_node.op.args[6], "3");
     assert_eq!(loop_node.op.args[7], "continue");
@@ -1708,9 +1708,9 @@ fn lowers_lambda_match_flow_continuing_while_state_project_with_lambda_flow_cond
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_flow_cond_chain"
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_flow_cond_chain"
         })
-        .expect("expected loop_while_i64_flow_cond_chain node");
+        .expect("expected loop_while_scalar_flow_cond_chain node");
     assert_eq!(loop_node.op.args[5], "current_lt");
     expect_const_i64_value(&artifacts, &loop_node.op.args[6], "3");
     assert_eq!(loop_node.op.args[7], "continue");
@@ -1740,9 +1740,9 @@ fn lowers_lambda_match_or_flow_continuing_while_state_project_with_or_flow_cond_
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_flow_cond_chain"
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_flow_cond_chain"
         })
-        .expect("expected loop_while_i64_flow_cond_chain node");
+        .expect("expected loop_while_scalar_flow_cond_chain node");
     assert_eq!(loop_node.op.args[5], "or");
     assert_eq!(loop_node.op.args[6], "current_eq");
     expect_const_i64_value(&artifacts, &loop_node.op.args[7], "1");
@@ -1816,9 +1816,9 @@ fn lowers_flow_continuing_while_state_project_with_continue_flow_cond_loop_shape
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_flow_cond_chain"
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_flow_cond_chain"
         })
-        .expect("expected loop_while_i64_flow_cond_chain node");
+        .expect("expected loop_while_scalar_flow_cond_chain node");
     assert_eq!(loop_node.op.args[5], "current_lt");
     expect_const_i64_value(&artifacts, &loop_node.op.args[6], "3");
     assert_eq!(loop_node.op.args[7], "continue");
@@ -1848,9 +1848,10 @@ fn lowers_post_flow_branching_while_state_project_with_post_flow_cond_loop_shape
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_post_flow_cond_chain"
+            node.op.module == "cpu"
+                && node.op.instruction == "loop_while_scalar_post_flow_cond_chain"
         })
-        .expect("expected loop_while_i64_post_flow_cond_chain node");
+        .expect("expected loop_while_scalar_post_flow_cond_chain node");
     assert_eq!(loop_node.op.args[5], "carry0_gt");
     assert_eq!(loop_node.op.args[7], "break");
     assert_eq!(loop_node.op.args[9], "current_gt");
@@ -1878,9 +1879,9 @@ fn lowers_post_flow_breaking_while_state_project_with_post_flow_break_loop_shape
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_post_flow_chain"
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_post_flow_chain"
         })
-        .expect("expected loop_while_i64_post_flow_chain node");
+        .expect("expected loop_while_scalar_post_flow_chain node");
     assert_eq!(loop_node.op.args[5], "carry0_gt");
     expect_const_i64_value(&artifacts, &loop_node.op.args[6], "6");
     assert_eq!(loop_node.op.args[7], "break");
@@ -1905,9 +1906,9 @@ fn lowers_bounded_while_state_project_with_bounded_post_flow_shape() {
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_post_flow_chain"
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_post_flow_chain"
         })
-        .expect("expected loop_while_i64_post_flow_chain node");
+        .expect("expected loop_while_scalar_post_flow_chain node");
     assert_eq!(loop_node.op.args[3], "le");
     assert_eq!(loop_node.op.args[4], "add");
     assert_eq!(loop_node.op.args[5], "carry0_ge");
@@ -1934,9 +1935,9 @@ fn lowers_equality_while_state_project_with_equality_post_flow_shape() {
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_post_flow_chain"
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_post_flow_chain"
         })
-        .expect("expected loop_while_i64_post_flow_chain node");
+        .expect("expected loop_while_scalar_post_flow_chain node");
     assert_eq!(loop_node.op.args[5], "carry0_eq");
     expect_const_i64_value(&artifacts, &loop_node.op.args[6], "6");
     assert_eq!(loop_node.op.args[7], "break");
@@ -1988,9 +1989,9 @@ fn lowers_post_flow_continuing_while_state_project_with_post_flow_continue_loop_
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_post_flow_chain"
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_post_flow_chain"
         })
-        .expect("expected loop_while_i64_post_flow_chain node");
+        .expect("expected loop_while_scalar_post_flow_chain node");
     assert_eq!(loop_node.op.args[5], "carry0_lt");
     expect_const_i64_value(&artifacts, &loop_node.op.args[6], "6");
     assert_eq!(loop_node.op.args[7], "continue");
@@ -2016,8 +2017,10 @@ fn lowers_carried_breaking_while_state_project_with_carried_break_flow_loop_shap
         .yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_flow_chain")
-        .expect("expected loop_while_i64_flow_chain node");
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_flow_chain"
+        })
+        .expect("expected loop_while_scalar_flow_chain node");
     assert_eq!(loop_node.op.args[5], "carry0_gt");
     expect_const_i64_value(&artifacts, &loop_node.op.args[6], "6");
     assert_eq!(loop_node.op.args[7], "break");
@@ -2078,9 +2081,10 @@ fn lowers_post_flow_branching_continuing_while_state_project_with_post_flow_cont
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_post_flow_cond_chain"
+            node.op.module == "cpu"
+                && node.op.instruction == "loop_while_scalar_post_flow_cond_chain"
         })
-        .expect("expected loop_while_i64_post_flow_cond_chain node");
+        .expect("expected loop_while_scalar_post_flow_cond_chain node");
     assert_eq!(loop_node.op.args[5], "carry0_lt");
     assert_eq!(loop_node.op.args[7], "continue");
     assert_eq!(loop_node.op.args[9], "current_gt");

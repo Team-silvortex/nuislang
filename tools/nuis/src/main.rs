@@ -121,6 +121,7 @@ fn run() -> Result<(), String> {
         cli::CommandKind::DumpAst { input } => handle_dump_ast(input)?,
         cli::CommandKind::DumpNir { input } => handle_dump_nir(input)?,
         cli::CommandKind::DumpYir { input } => handle_dump_yir(input)?,
+        cli::CommandKind::Workflow { input, json } => handle_workflow(input, json)?,
         cli::CommandKind::SchedulerView { input, json } => handle_scheduler_view(input, json)?,
         cli::CommandKind::Rc { args } => {
             run_nuis_rc(&args)?;
@@ -744,6 +745,26 @@ fn sanitize_test_label(label: &str) -> String {
     }
 }
 
+fn sanitize_workflow_path_label(label: &str) -> String {
+    let mut out = String::new();
+    let mut previous_was_sep = false;
+    for ch in label.chars() {
+        if ch.is_ascii_alphanumeric() {
+            out.push(ch.to_ascii_lowercase());
+            previous_was_sep = false;
+        } else if !previous_was_sep {
+            out.push('-');
+            previous_was_sep = true;
+        }
+    }
+    let trimmed = out.trim_matches('-');
+    if trimmed.is_empty() {
+        "input".to_owned()
+    } else {
+        trimmed.to_owned()
+    }
+}
+
 fn handle_build(
     input: std::path::PathBuf,
     output_dir: std::path::PathBuf,
@@ -773,6 +794,311 @@ fn handle_dump_nir(input: std::path::PathBuf) -> Result<(), String> {
 
 fn handle_dump_yir(input: std::path::PathBuf) -> Result<(), String> {
     nuisc::run(nuisc::CommandKind::DumpYir { input })?;
+    Ok(())
+}
+
+fn debug_workflow_brief() -> &'static str {
+    "dump-ast -> dump-nir -> dump-yir -> scheduler-view"
+}
+
+fn debug_workflow_samples_brief() -> &'static str {
+    "ast=nuis dump-ast <input>; nir=nuis dump-nir <input>; yir=nuis dump-yir <input>; scheduler=nuis scheduler-view <input>"
+}
+
+fn single_source_compile_workflow_brief() -> &'static str {
+    "check -> test -> build -> release_check"
+}
+
+fn single_source_compile_samples_brief() -> &'static str {
+    "check=nuis check <input.ns>; test=nuis test <input.ns>; build=nuis build <input.ns> <output-dir>; release=nuis release-check <input.ns> <output-dir>"
+}
+
+fn single_source_workflow_next_step_label() -> &'static str {
+    "check"
+}
+
+fn recommended_single_source_workflow_command() -> &'static str {
+    "nuis check <input.ns>"
+}
+
+struct WorkflowRecommendation {
+    label: &'static str,
+    command: &'static str,
+    reason: &'static str,
+}
+
+fn recommend_project_workflow_step(
+    plan: &nuisc::project::ProjectCompilationPlan,
+    declared_tests: &[PathBuf],
+    missing_tests: &[PathBuf],
+    galaxy_doctor: &galaxy::GalaxyDoctorReport,
+    galaxy_check_invalid: bool,
+) -> WorkflowRecommendation {
+    let deps_len = galaxy_doctor.dependencies.len();
+    let any_lock_missing = galaxy_doctor
+        .dependencies
+        .iter()
+        .any(|dependency| !dependency.locked);
+    let any_install_missing = galaxy_doctor
+        .dependencies
+        .iter()
+        .any(|dependency| !dependency.installed);
+    if galaxy_check_invalid {
+        return WorkflowRecommendation {
+            label: "galaxy_check",
+            command: "nuis galaxy check <project-dir|nuis.toml>",
+            reason: "project packaging metadata is currently invalid, so the next step should re-check and fix the galaxy-side project contract first",
+        };
+    }
+    match galaxy_doctor.lock_status.as_str() {
+        "missing" if deps_len > 0 => {
+            return WorkflowRecommendation {
+                label: "galaxy_lock_deps",
+                command: "nuis galaxy lock-deps <project-dir|nuis.toml>",
+                reason: "the project already declares galaxy dependencies but does not yet have a lockfile",
+            };
+        }
+        "invalid" => {
+            return WorkflowRecommendation {
+                label: "galaxy_verify_lock",
+                command: "nuis galaxy verify-lock <project-dir|nuis.toml>",
+                reason: "the current galaxy lockfile is invalid and should be repaired or regenerated before deeper compile work",
+            };
+        }
+        _ => {}
+    }
+    if any_lock_missing && deps_len > 0 && galaxy_doctor.lock_status == "ok" {
+        return WorkflowRecommendation {
+            label: "galaxy_lock_refresh",
+            command: "nuis galaxy lock-deps <project-dir|nuis.toml>",
+            reason: "the lockfile exists, but some declared galaxy dependencies are not represented in it yet",
+        };
+    }
+    if any_install_missing && galaxy_doctor.lock_status == "ok" {
+        return WorkflowRecommendation {
+            label: "galaxy_sync_deps",
+            command: "nuis galaxy sync-deps <project-dir|nuis.toml>",
+            reason: "the dependency lock is valid, but some locked galaxy packages are not materialized locally yet",
+        };
+    }
+    if !plan.abi_resolution.explicit {
+        return WorkflowRecommendation {
+            label: "project_lock_abi",
+            command: "nuis project-lock-abi <project-dir|nuis.toml>",
+            reason: "the project is still using auto-recommended ABI selection, so freezing the current ABI choice is the highest-value stabilizing step",
+        };
+    }
+    if !missing_tests.is_empty() {
+        return WorkflowRecommendation {
+            label: "project_status",
+            command: "nuis project-status <project-dir|nuis.toml>",
+            reason: "some declared project tests are missing on disk, so the next step should inspect and fix the declared test surface",
+        };
+    }
+    if declared_tests.is_empty() {
+        return WorkflowRecommendation {
+            label: "test",
+            command: "nuis test <project-dir|nuis.toml>",
+            reason: "the project has no explicit declared tests yet, so the next useful step is to run the current language-level test sweep and then decide whether to add dedicated project tests",
+        };
+    }
+    WorkflowRecommendation {
+        label: "check",
+        command: "nuis check <project-dir|nuis.toml>",
+        reason: "the obvious project-shape blockers are already under control, so the next step is to re-check compile truth directly",
+    }
+}
+
+fn default_build_output_dir(input: &Path) -> PathBuf {
+    PathBuf::from(format!(
+        "target/nuis-build/{}",
+        sanitize_workflow_path_label(
+            input
+                .file_stem()
+                .or_else(|| input.file_name())
+                .and_then(|item| item.to_str())
+                .unwrap_or("input")
+        )
+    ))
+}
+
+fn default_release_check_output_dir(input: &Path) -> PathBuf {
+    PathBuf::from(format!(
+        "target/nuis-release-check/{}",
+        sanitize_workflow_path_label(
+            input
+                .file_stem()
+                .or_else(|| input.file_name())
+                .and_then(|item| item.to_str())
+                .unwrap_or("input")
+        )
+    ))
+}
+
+fn handle_workflow(input: std::path::PathBuf, json: bool) -> Result<(), String> {
+    if nuisc::project::is_project_input(&input) {
+        let project = nuisc::project::load_project(&input)?;
+        let plan = nuisc::project::build_project_compilation_plan(&project)?;
+        let galaxy_manifest_path = project.root.join("galaxy.toml");
+        let declared_tests = project
+            .manifest
+            .tests
+            .iter()
+            .map(|relative| project.root.join(relative))
+            .collect::<Vec<_>>();
+        let missing_tests = declared_tests
+            .iter()
+            .filter(|path| !path.exists())
+            .cloned()
+            .collect::<Vec<_>>();
+        let galaxy_check = if galaxy_manifest_path.exists() {
+            Some(galaxy::check(&project.root))
+        } else {
+            None
+        };
+        let galaxy_check_invalid = matches!(galaxy_check.as_ref(), Some(Err(_)));
+        let galaxy_doctor = galaxy::doctor_project(&project.root)?;
+        let recommendation = recommend_project_workflow_step(
+            &plan,
+            &declared_tests,
+            &missing_tests,
+            &galaxy_doctor,
+            galaxy_check_invalid,
+        );
+        let include_galaxy_flow =
+            galaxy_manifest_path.exists() || !project.manifest.galaxy_dependencies.is_empty();
+        if json {
+            let mut fields = vec![
+                json_field("source_kind", "project"),
+                json_field("input", &input.display().to_string()),
+                json_field("project", &project.manifest.name),
+                json_field("root", &project.root.display().to_string()),
+                json_field("entry", &project.manifest.entry),
+                json_field(
+                    "project_compile_workflow",
+                    nuisc::project_compile_workflow_brief(),
+                ),
+                json_field(
+                    "project_compile_samples",
+                    nuisc::project_compile_samples_brief(),
+                ),
+                json_field(
+                    "project_test_workflow",
+                    nuisc::project_test_workflow_brief(),
+                ),
+                json_field("recommended_next_step", recommendation.label),
+                json_field("recommended_command", recommendation.command),
+                json_field("recommended_reason", recommendation.reason),
+                json_field("debug_workflow", debug_workflow_brief()),
+                json_field("debug_samples", debug_workflow_samples_brief()),
+                json_field(
+                    "default_release_output_dir",
+                    &default_release_check_output_dir(&input)
+                        .display()
+                        .to_string(),
+                ),
+            ];
+            if include_galaxy_flow {
+                fields.push(json_field(
+                    "project_galaxy_workflow",
+                    nuisc::project_galaxy_workflow_brief(),
+                ));
+            }
+            println!("{{{}}}", fields.join(","));
+            return Ok(());
+        }
+
+        println!("workflow: project");
+        println!("  input: {}", input.display());
+        println!("  project: {}", project.manifest.name);
+        println!("  root: {}", project.root.display());
+        println!("  entry: {}", project.manifest.entry);
+        println!("  recommended_next_step: {}", recommendation.label);
+        println!("  recommended_command: {}", recommendation.command);
+        println!("  recommended_reason: {}", recommendation.reason);
+        print_project_management_hints(include_galaxy_flow);
+        println!("  debug_workflow: {}", debug_workflow_brief());
+        print_scheduler_sample_field("debug_samples", debug_workflow_samples_brief());
+        println!(
+            "  default_release_output_dir: {}",
+            default_release_check_output_dir(&input).display()
+        );
+        return Ok(());
+    }
+
+    if json {
+        let fields = vec![
+            json_field("source_kind", "single-file"),
+            json_field("input", &input.display().to_string()),
+            json_field(
+                "single_source_compile_workflow",
+                single_source_compile_workflow_brief(),
+            ),
+            json_field(
+                "single_source_compile_samples",
+                single_source_compile_samples_brief(),
+            ),
+            json_field(
+                "recommended_next_step",
+                single_source_workflow_next_step_label(),
+            ),
+            json_field(
+                "recommended_command",
+                recommended_single_source_workflow_command(),
+            ),
+            json_field(
+                "recommended_reason",
+                "single-file inputs usually want direct compile truth first, so `check` stays the best default front-door step",
+            ),
+            json_field("debug_workflow", debug_workflow_brief()),
+            json_field("debug_samples", debug_workflow_samples_brief()),
+            json_field(
+                "default_build_output_dir",
+                &default_build_output_dir(&input).display().to_string(),
+            ),
+            json_field(
+                "default_release_output_dir",
+                &default_release_check_output_dir(&input)
+                    .display()
+                    .to_string(),
+            ),
+        ];
+        println!("{{{}}}", fields.join(","));
+        return Ok(());
+    }
+
+    println!("workflow: single-file");
+    println!("  input: {}", input.display());
+    println!(
+        "  recommended_next_step: {}",
+        single_source_workflow_next_step_label()
+    );
+    println!(
+        "  recommended_command: {}",
+        recommended_single_source_workflow_command()
+    );
+    println!(
+        "  recommended_reason: {}",
+        "single-file inputs usually want direct compile truth first, so `check` stays the best default front-door step"
+    );
+    println!(
+        "  single_source_compile_workflow: {}",
+        single_source_compile_workflow_brief()
+    );
+    print_scheduler_sample_field(
+        "single_source_compile_samples",
+        single_source_compile_samples_brief(),
+    );
+    println!("  debug_workflow: {}", debug_workflow_brief());
+    print_scheduler_sample_field("debug_samples", debug_workflow_samples_brief());
+    println!(
+        "  default_build_output_dir: {}",
+        default_build_output_dir(&input).display()
+    );
+    println!(
+        "  default_release_output_dir: {}",
+        default_release_check_output_dir(&input).display()
+    );
     Ok(())
 }
 
@@ -2754,6 +3080,7 @@ fn print_help() {
     println!("usage:");
     println!();
     println!("  default compile workflow:");
+    println!("    nuis workflow [--json] [input.ns|project-dir|nuis.toml]");
     println!("    nuis project-doctor [project-dir|nuis.toml]");
     println!("    nuis check [input.ns|project-dir|nuis.toml]");
     println!(
@@ -2774,6 +3101,7 @@ fn print_help() {
     println!("    nuis dump-ast [input.ns|project-dir|nuis.toml]");
     println!("    nuis dump-nir [input.ns|project-dir|nuis.toml]");
     println!("    nuis dump-yir [input.ns|project-dir|nuis.toml]");
+    println!("    nuis workflow [--json] [input.ns|project-dir|nuis.toml]");
     println!("    nuis scheduler-view [--json] [input.ns|project-dir|nuis.toml]");
     println!("    nuis verify-build-manifest <nuis.build.manifest.toml>");
     println!();

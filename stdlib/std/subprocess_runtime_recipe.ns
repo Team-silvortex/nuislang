@@ -1,13 +1,29 @@
 mod cpu Main {
   extern "c" fn host_subprocess_spawn(program_handle: i64, argv_handle: i64, env_handle: i64) -> i64;
+  extern "c" fn host_subprocess_spawn_in(
+    program_handle: i64,
+    argv_handle: i64,
+    env_handle: i64,
+    cwd_handle: i64,
+    timeout_ms: i64
+  ) -> i64;
   extern "c" fn host_subprocess_signal(process_handle: i64, signal: i64) -> i64;
   extern "c" fn host_subprocess_join(process_handle: i64) -> i64;
   extern "c" fn host_subprocess_join_exit(process_handle: i64) -> i64;
 
+  struct SubprocessContext {
+    env_handle: i64,
+    cwd_handle: i64,
+    timeout_ms: i64,
+    inherit_env: bool,
+    inherit_cwd: bool,
+    has_timeout: bool
+  }
+
   struct SubprocessRequest {
     program_handle: i64,
     argv_handle: i64,
-    env_handle: i64
+    context: SubprocessContext
   }
 
   struct SubprocessResult {
@@ -15,6 +31,13 @@ mod cpu Main {
     signal_result: i64,
     join_code: i64,
     join_exit: i64,
+    launched: bool,
+    env_handle: i64,
+    cwd_handle: i64,
+    timeout_ms: i64,
+    inherit_env: bool,
+    inherit_cwd: bool,
+    has_timeout: bool,
     succeeded: bool
   }
 
@@ -22,9 +45,13 @@ mod cpu Main {
     primary_program_handle: i64,
     primary_argv_handle: i64,
     primary_env_handle: i64,
+    primary_cwd_handle: i64,
+    primary_timeout_ms: i64,
     secondary_program_handle: i64,
     secondary_argv_handle: i64,
-    secondary_env_handle: i64
+    secondary_env_handle: i64,
+    secondary_cwd_handle: i64,
+    secondary_timeout_ms: i64
   }
 
   struct SubprocessRuntimeRecipeSummary {
@@ -32,10 +59,50 @@ mod cpu Main {
     primary_signal: i64,
     primary_join: i64,
     primary_join_exit: i64,
+    primary_context_value: i64,
+    primary_launch_bonus: i64,
     secondary_handle: i64,
     secondary_signal: i64,
     secondary_join: i64,
-    secondary_join_exit: i64
+    secondary_join_exit: i64,
+    secondary_context_value: i64,
+    secondary_launch_bonus: i64
+  }
+
+  fn encode_bool(flag: bool) -> i64 {
+    if flag {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn build_default_subprocess_context() -> SubprocessContext {
+    return SubprocessContext {
+      env_handle: 0,
+      cwd_handle: 0,
+      timeout_ms: 0,
+      inherit_env: true,
+      inherit_cwd: true,
+      has_timeout: false
+    };
+  }
+
+  fn build_subprocess_context(
+    env_handle: i64,
+    cwd_handle: i64,
+    timeout_ms: i64,
+    inherit_env: bool,
+    inherit_cwd: bool,
+    has_timeout: bool
+  ) -> SubprocessContext {
+    return SubprocessContext {
+      env_handle: env_handle,
+      cwd_handle: cwd_handle,
+      timeout_ms: timeout_ms,
+      inherit_env: inherit_env,
+      inherit_cwd: inherit_cwd,
+      has_timeout: has_timeout
+    };
   }
 
   fn build_subprocess_request(
@@ -46,32 +113,77 @@ mod cpu Main {
     return SubprocessRequest {
       program_handle: program_handle,
       argv_handle: argv_handle,
-      env_handle: env_handle
+      context: build_subprocess_context(
+        env_handle,
+        0,
+        0,
+        env_handle == 0,
+        true,
+        false
+      )
+    };
+  }
+
+  fn build_subprocess_request_with_context(
+    program_handle: i64,
+    argv_handle: i64,
+    context: SubprocessContext
+  ) -> SubprocessRequest {
+    return SubprocessRequest {
+      program_handle: program_handle,
+      argv_handle: argv_handle,
+      context: context
     };
   }
 
   fn run_subprocess(request: SubprocessRequest) -> SubprocessResult {
-    let handle: i64 = host_subprocess_spawn(
+    let handle: i64 = host_subprocess_spawn_in(
       request.program_handle,
       request.argv_handle,
-      request.env_handle
+      request.context.env_handle,
+      request.context.cwd_handle,
+      request.context.timeout_ms
     );
     let join_exit: i64 = host_subprocess_join_exit(handle);
+    let launched: bool = handle != 0;
     return SubprocessResult {
       handle: handle,
       signal_result: host_subprocess_signal(handle, 0),
       join_code: host_subprocess_join(handle),
       join_exit: join_exit,
-      succeeded: join_exit == 0
+      launched: launched,
+      env_handle: request.context.env_handle,
+      cwd_handle: request.context.cwd_handle,
+      timeout_ms: request.context.timeout_ms,
+      inherit_env: request.context.inherit_env,
+      inherit_cwd: request.context.inherit_cwd,
+      has_timeout: request.context.has_timeout,
+      succeeded: launched && join_exit == 0
     };
+  }
+
+  fn summarize_subprocess_context(context: SubprocessContext) -> i64 {
+    return context.env_handle
+      + context.cwd_handle
+      + context.timeout_ms
+      + encode_bool(context.inherit_env)
+      + encode_bool(context.inherit_cwd)
+      + encode_bool(context.has_timeout);
   }
 
   fn capture_subprocess_runtime_recipe(seed: SubprocessRuntimeRecipeSeed) -> SubprocessRuntimeRecipeSummary {
     let primary: SubprocessResult = run_subprocess(
-      build_subprocess_request(
+      build_subprocess_request_with_context(
         seed.primary_program_handle,
         seed.primary_argv_handle,
-        seed.primary_env_handle
+        build_subprocess_context(
+          seed.primary_env_handle,
+          seed.primary_cwd_handle,
+          seed.primary_timeout_ms,
+          false,
+          false,
+          true
+        )
       )
     );
     let secondary: SubprocessResult = run_subprocess(
@@ -86,10 +198,32 @@ mod cpu Main {
       primary_signal: primary.signal_result,
       primary_join: primary.join_code,
       primary_join_exit: primary.join_exit,
+      primary_context_value: summarize_subprocess_context(
+        build_subprocess_context(
+          seed.primary_env_handle,
+          seed.primary_cwd_handle,
+          seed.primary_timeout_ms,
+          false,
+          false,
+          true
+        )
+      ),
+      primary_launch_bonus: encode_bool(primary.launched),
       secondary_handle: secondary.handle,
       secondary_signal: secondary.signal_result,
       secondary_join: secondary.join_code,
-      secondary_join_exit: secondary.join_exit
+      secondary_join_exit: secondary.join_exit,
+      secondary_context_value: summarize_subprocess_context(
+        build_subprocess_context(
+          seed.secondary_env_handle,
+          seed.secondary_cwd_handle,
+          seed.secondary_timeout_ms,
+          seed.secondary_env_handle == 0,
+          seed.secondary_cwd_handle == 0,
+          seed.secondary_timeout_ms != 0
+        )
+      ),
+      secondary_launch_bonus: encode_bool(secondary.launched)
     };
   }
 
@@ -99,19 +233,27 @@ mod cpu Main {
         primary_program_handle: 503,
         primary_argv_handle: 29,
         primary_env_handle: 7,
+        primary_cwd_handle: 1001,
+        primary_timeout_ms: 500,
         secondary_program_handle: 601,
         secondary_argv_handle: 31,
-        secondary_env_handle: 9
+        secondary_env_handle: 0,
+        secondary_cwd_handle: 0,
+        secondary_timeout_ms: 0
       }
     );
     return summary.primary_handle
       + summary.primary_signal
       + summary.primary_join
       + summary.primary_join_exit
+      + summary.primary_context_value
+      + summary.primary_launch_bonus
       + summary.secondary_handle
       + summary.secondary_signal
       + summary.secondary_join
-      + summary.secondary_join_exit;
+      + summary.secondary_join_exit
+      + summary.secondary_context_value
+      + summary.secondary_launch_bonus;
   }
 
   fn main() {

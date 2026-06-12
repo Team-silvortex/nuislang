@@ -49,6 +49,8 @@ mod tests_generic_method_bounds_control_flow;
 #[cfg(test)]
 mod tests_generic_method_bounds_if_bindings;
 #[cfg(test)]
+mod tests_generic_method_bounds_lambda_bindings;
+#[cfg(test)]
 mod tests_generic_method_bounds_nested_match;
 #[cfg(test)]
 mod tests_generic_structs;

@@ -74,6 +74,10 @@ pub enum CommandKind {
     DumpYir {
         input: PathBuf,
     },
+    Workflow {
+        input: PathBuf,
+        json: bool,
+    },
     SchedulerView {
         input: PathBuf,
         json: bool,
@@ -429,6 +433,26 @@ where
         "dump-yir" => Ok(CommandKind::DumpYir {
             input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
         }),
+        "workflow" => {
+            let mut json = false;
+            let mut input = None;
+            for arg in args.by_ref() {
+                if arg == "--json" {
+                    json = true;
+                } else if input.is_none() {
+                    input = Some(PathBuf::from(arg));
+                } else {
+                    return Err(
+                        "usage: nuis workflow [--json] [input.ns|project-dir|nuis.toml]"
+                            .to_owned(),
+                    );
+                }
+            }
+            Ok(CommandKind::Workflow {
+                input: input.unwrap_or_else(|| PathBuf::from(".")),
+                json,
+            })
+        }
         "scheduler-view" => {
             let mut json = false;
             let mut input = None;
@@ -497,7 +521,7 @@ where
         }),
         "galaxy" => parse_galaxy_args(args),
         other => Err(format!(
-            "unknown nuis command `{other}`; expected `help`, `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `release-check`, `check`, `test`, `build`, `dump-ast`, `dump-nir`, `dump-yir`, `scheduler-view`, `rc`, `project-status`, `project-doctor`, `project-lock-abi`, or `galaxy`"
+            "unknown nuis command `{other}`; expected `help`, `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `release-check`, `check`, `test`, `build`, `dump-ast`, `dump-nir`, `dump-yir`, `workflow`, `scheduler-view`, `rc`, `project-status`, `project-doctor`, `project-lock-abi`, or `galaxy`"
         )),
     }
 }
@@ -614,5 +638,43 @@ fn sanitize_path_label(raw: &str) -> String {
         "input".to_owned()
     } else {
         out
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{parse_args, CommandKind};
+    use std::path::PathBuf;
+
+    #[test]
+    fn parses_workflow_with_default_input() {
+        let command = parse_args(["workflow".to_owned()].into_iter()).expect("workflow parses");
+        assert_eq!(
+            command,
+            CommandKind::Workflow {
+                input: PathBuf::from("."),
+                json: false,
+            }
+        );
+    }
+
+    #[test]
+    fn parses_workflow_json_with_explicit_input() {
+        let command = parse_args(
+            [
+                "workflow".to_owned(),
+                "--json".to_owned(),
+                "examples/demo.ns".to_owned(),
+            ]
+            .into_iter(),
+        )
+        .expect("workflow json parses");
+        assert_eq!(
+            command,
+            CommandKind::Workflow {
+                input: PathBuf::from("examples/demo.ns"),
+                json: true,
+            }
+        );
     }
 }

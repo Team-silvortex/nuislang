@@ -499,15 +499,35 @@ fn validate_stmt_generic_constraints(
                 local_type_env,
                 context,
             )?;
-            for AstMatchArm { pattern, body, .. } in arms {
+            let match_value_ty = simple_match_value_type(value, local_type_env);
+            for AstMatchArm {
+                pattern,
+                guard,
+                body,
+            } in arms
+            {
                 let mut arm_env = local_type_env.clone();
-                if let Some(match_value_ty) = simple_match_value_type(value, local_type_env) {
+                if let Some(match_value_ty) = match_value_ty.as_ref() {
                     bind_match_pattern_for_type(
-                        &match_value_ty,
+                        match_value_ty,
                         pattern,
                         visible_type_aliases,
                         visible_structs,
                         &mut arm_env,
+                    )?;
+                }
+                if let Some(guard) = guard {
+                    validate_expr_generic_method_bounds(
+                        guard,
+                        visible_type_aliases,
+                        impl_lookup,
+                        visible_structs,
+                        function_return_types,
+                        visible_trait_methods,
+                        generic_param_names,
+                        generic_bounds,
+                        &arm_env,
+                        context,
                     )?;
                 }
                 for nested in body {

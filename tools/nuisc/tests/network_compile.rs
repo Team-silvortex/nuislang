@@ -917,9 +917,9 @@ fn lowers_net_loop_control_recipe_project_with_expected_loop_nodes() {
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_flow_cond_chain"
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_flow_cond_chain"
         })
-        .expect("expected loop_while_i64_flow_cond_chain node");
+        .expect("expected loop_while_scalar_flow_cond_chain node");
     assert_eq!(flow_node.op.args[3], "lt");
     assert_eq!(flow_node.op.args[5], "current_eq");
     assert_eq!(flow_node.op.args[7], "continue");
@@ -932,9 +932,10 @@ fn lowers_net_loop_control_recipe_project_with_expected_loop_nodes() {
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_post_flow_cond_chain"
+            node.op.module == "cpu"
+                && node.op.instruction == "loop_while_scalar_post_flow_cond_chain"
         })
-        .expect("expected loop_while_i64_post_flow_cond_chain node");
+        .expect("expected loop_while_scalar_post_flow_cond_chain node");
     assert_eq!(post_flow_node.op.args[3], "lt");
     assert_eq!(post_flow_node.op.args[5], "and");
     assert_eq!(post_flow_node.op.args[6], "carry0_gt");
@@ -998,10 +999,10 @@ fn lowers_net_session_loop_control_recipe_project_with_expected_summary_and_loop
     ));
 
     assert!(artifacts.yir.nodes.iter().any(|node| {
-        node.op.module == "cpu" && node.op.instruction == "loop_while_i64_flow_cond_chain"
+        node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_flow_cond_chain"
     }));
     assert!(artifacts.yir.nodes.iter().any(|node| {
-        node.op.module == "cpu" && node.op.instruction == "loop_while_i64_post_flow_cond_chain"
+        node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_post_flow_cond_chain"
     }));
 }
 
@@ -1102,9 +1103,9 @@ fn lowers_net_http_session_loop_bridge_recipe_project_with_expected_bridge_shape
     ));
 
     assert!(artifacts.yir.nodes.iter().any(|node| {
-        node.op.module == "cpu" && node.op.instruction == "loop_while_i64_flow_cond_chain"
+        node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_flow_cond_chain"
     }));
     assert!(artifacts.yir.nodes.iter().any(|node| {
-        node.op.module == "cpu" && node.op.instruction == "loop_while_i64_post_flow_cond_chain"
+        node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_post_flow_cond_chain"
     }));
 }

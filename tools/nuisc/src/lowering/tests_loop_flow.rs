@@ -283,7 +283,7 @@ fn lowers_match_branching_while_into_loop_while_scalar_cond_chain() {
 }
 
 #[test]
-fn lowers_match_flow_control_then_fixed_buffer_read_carry_into_loop_while_i64_flow_cond_chain() {
+fn lowers_match_flow_control_then_fixed_buffer_read_carry_into_loop_while_scalar_flow_cond_chain() {
     let mut module = parse_nuis_module(
         r#"
         mod cpu Main {
@@ -320,9 +320,9 @@ fn lowers_match_flow_control_then_fixed_buffer_read_carry_into_loop_while_i64_fl
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_flow_cond_chain"
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_flow_cond_chain"
         })
-        .expect("expected loop_while_i64_flow_cond_chain node");
+        .expect("expected loop_while_scalar_flow_cond_chain node");
     assert_eq!(loop_node.op.args[5], "current_eq");
     assert!(loop_node.op.args.iter().any(|arg| arg == "continue"));
     assert!(loop_node
@@ -727,7 +727,7 @@ fn lowers_inline_helper_bool_match_branching_while_into_loop_while_scalar_cond_c
 }
 
 #[test]
-fn lowers_flow_breaking_while_into_loop_while_i64_flow_chain() {
+fn lowers_flow_breaking_while_into_loop_while_scalar_flow_chain() {
     let mut module = parse_nuis_module(
         r#"
         mod cpu Main {
@@ -753,15 +753,17 @@ fn lowers_flow_breaking_while_into_loop_while_i64_flow_chain() {
     let loop_node = yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_flow_chain")
-        .expect("expected loop_while_i64_flow_chain node");
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_flow_chain"
+        })
+        .expect("expected loop_while_scalar_flow_chain node");
     assert_eq!(loop_node.op.args[5], "current_gt");
     assert_eq!(loop_node.op.args[7], "break");
     assert_eq!(loop_node.op.args[9], "add_current");
 }
 
 #[test]
-fn lowers_flow_continuing_while_into_loop_while_i64_flow_chain() {
+fn lowers_flow_continuing_while_into_loop_while_scalar_flow_chain() {
     let mut module = parse_nuis_module(
         r#"
         mod cpu Main {
@@ -787,15 +789,17 @@ fn lowers_flow_continuing_while_into_loop_while_i64_flow_chain() {
     let loop_node = yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_flow_chain")
-        .expect("expected loop_while_i64_flow_chain node");
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_flow_chain"
+        })
+        .expect("expected loop_while_scalar_flow_chain node");
     assert_eq!(loop_node.op.args[5], "current_lt");
     assert_eq!(loop_node.op.args[7], "continue");
     assert_eq!(loop_node.op.args[9], "add_current");
 }
 
 #[test]
-fn lowers_flow_breaking_while_on_carried_state_into_loop_while_i64_flow_chain() {
+fn lowers_flow_breaking_while_on_carried_state_into_loop_while_scalar_flow_chain() {
     let mut module = parse_nuis_module(
         r#"
         mod cpu Main {
@@ -821,15 +825,17 @@ fn lowers_flow_breaking_while_on_carried_state_into_loop_while_i64_flow_chain() 
     let loop_node = yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_flow_chain")
-        .expect("expected loop_while_i64_flow_chain node");
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_flow_chain"
+        })
+        .expect("expected loop_while_scalar_flow_chain node");
     assert_eq!(loop_node.op.args[5], "carry0_gt");
     assert_eq!(loop_node.op.args[7], "break");
     assert_eq!(loop_node.op.args[9], "add_current");
 }
 
 #[test]
-fn lowers_flow_breaking_then_branching_carry_while_into_loop_while_i64_flow_cond_chain() {
+fn lowers_flow_breaking_then_branching_carry_while_into_loop_while_scalar_flow_cond_chain() {
     let mut module = parse_nuis_module(
         r#"
         mod cpu Main {
@@ -860,9 +866,9 @@ fn lowers_flow_breaking_then_branching_carry_while_into_loop_while_i64_flow_cond
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_flow_cond_chain"
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_flow_cond_chain"
         })
-        .expect("expected loop_while_i64_flow_cond_chain node");
+        .expect("expected loop_while_scalar_flow_cond_chain node");
     assert_eq!(loop_node.op.args[5], "current_gt");
     assert_eq!(loop_node.op.args[7], "break");
     assert_eq!(loop_node.op.args[9], "current_gt");
@@ -871,7 +877,7 @@ fn lowers_flow_breaking_then_branching_carry_while_into_loop_while_i64_flow_cond
 }
 
 #[test]
-fn lowers_flow_continuing_then_branching_carry_while_into_loop_while_i64_flow_cond_chain() {
+fn lowers_flow_continuing_then_branching_carry_while_into_loop_while_scalar_flow_cond_chain() {
     let mut module = parse_nuis_module(
         r#"
         mod cpu Main {
@@ -902,9 +908,9 @@ fn lowers_flow_continuing_then_branching_carry_while_into_loop_while_i64_flow_co
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_flow_cond_chain"
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_flow_cond_chain"
         })
-        .expect("expected loop_while_i64_flow_cond_chain node");
+        .expect("expected loop_while_scalar_flow_cond_chain node");
     assert_eq!(loop_node.op.args[5], "current_lt");
     assert_eq!(loop_node.op.args[7], "continue");
     assert_eq!(loop_node.op.args[9], "current_gt");
@@ -913,7 +919,7 @@ fn lowers_flow_continuing_then_branching_carry_while_into_loop_while_i64_flow_co
 }
 
 #[test]
-fn lowers_flow_continuing_then_eq_branching_carry_while_into_loop_while_i64_flow_cond_chain() {
+fn lowers_flow_continuing_then_eq_branching_carry_while_into_loop_while_scalar_flow_cond_chain() {
     let mut module = parse_nuis_module(
         r#"
         mod cpu Main {
@@ -944,9 +950,9 @@ fn lowers_flow_continuing_then_eq_branching_carry_while_into_loop_while_i64_flow
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_flow_cond_chain"
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_flow_cond_chain"
         })
-        .expect("expected loop_while_i64_flow_cond_chain node");
+        .expect("expected loop_while_scalar_flow_cond_chain node");
     assert_eq!(loop_node.op.args[5], "current_ne");
     assert_eq!(loop_node.op.args[7], "continue");
     assert_eq!(loop_node.op.args[9], "current_eq");
@@ -955,7 +961,8 @@ fn lowers_flow_continuing_then_eq_branching_carry_while_into_loop_while_i64_flow
 }
 
 #[test]
-fn lowers_match_prefixed_flow_control_then_branching_carry_into_loop_while_i64_flow_cond_chain() {
+fn lowers_match_prefixed_flow_control_then_branching_carry_into_loop_while_scalar_flow_cond_chain()
+{
     let mut module = parse_nuis_module(
         r#"
         mod cpu Main {
@@ -992,9 +999,9 @@ fn lowers_match_prefixed_flow_control_then_branching_carry_into_loop_while_i64_f
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_flow_cond_chain"
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_flow_cond_chain"
         })
-        .expect("expected loop_while_i64_flow_cond_chain node");
+        .expect("expected loop_while_scalar_flow_cond_chain node");
     assert_eq!(loop_node.op.args[5], "current_lt");
     assert_eq!(loop_node.op.args[7], "continue");
     assert_eq!(loop_node.op.args[9], "current_gt");
@@ -1003,7 +1010,7 @@ fn lowers_match_prefixed_flow_control_then_branching_carry_into_loop_while_i64_f
 }
 
 #[test]
-fn lowers_bool_or_helper_match_flow_control_then_branching_carry_into_loop_while_i64_flow_cond_chain(
+fn lowers_bool_or_helper_match_flow_control_then_branching_carry_into_loop_while_scalar_flow_cond_chain(
 ) {
     let mut module = parse_nuis_module(
         r#"
@@ -1041,9 +1048,9 @@ fn lowers_bool_or_helper_match_flow_control_then_branching_carry_into_loop_while
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_flow_cond_chain"
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_flow_cond_chain"
         })
-        .expect("expected loop_while_i64_flow_cond_chain node");
+        .expect("expected loop_while_scalar_flow_cond_chain node");
     assert_eq!(loop_node.op.args[5], "or");
     assert_eq!(loop_node.op.args[6], "current_eq");
     assert_eq!(loop_node.op.args[8], "current_eq");
@@ -1054,7 +1061,7 @@ fn lowers_bool_or_helper_match_flow_control_then_branching_carry_into_loop_while
 }
 
 #[test]
-fn lowers_nested_if_break_then_branching_carry_into_loop_while_i64_flow_cond_chain() {
+fn lowers_nested_if_break_then_branching_carry_into_loop_while_scalar_flow_cond_chain() {
     let mut module = parse_nuis_module(
         r#"
         mod cpu Main {
@@ -1089,9 +1096,9 @@ fn lowers_nested_if_break_then_branching_carry_into_loop_while_i64_flow_cond_cha
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_flow_cond_chain"
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_flow_cond_chain"
         })
-        .expect("expected loop_while_i64_flow_cond_chain node");
+        .expect("expected loop_while_scalar_flow_cond_chain node");
     assert_eq!(loop_node.op.args[5], "and");
     assert_eq!(loop_node.op.args[6], "current_gt");
     assert_eq!(loop_node.op.args[8], "current_gt");
@@ -1102,7 +1109,7 @@ fn lowers_nested_if_break_then_branching_carry_into_loop_while_i64_flow_cond_cha
 }
 
 #[test]
-fn lowers_nested_match_continue_then_branching_carry_into_loop_while_i64_flow_cond_chain() {
+fn lowers_nested_match_continue_then_branching_carry_into_loop_while_scalar_flow_cond_chain() {
     let mut module = parse_nuis_module(
         r#"
         mod cpu Main {
@@ -1137,9 +1144,9 @@ fn lowers_nested_match_continue_then_branching_carry_into_loop_while_i64_flow_co
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_flow_cond_chain"
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_flow_cond_chain"
         })
-        .expect("expected loop_while_i64_flow_cond_chain node");
+        .expect("expected loop_while_scalar_flow_cond_chain node");
     assert_eq!(loop_node.op.args[5], "current_eq");
     assert_eq!(loop_node.op.args[7], "continue");
     assert_eq!(loop_node.op.args[9], "current_gt");
@@ -1148,7 +1155,7 @@ fn lowers_nested_match_continue_then_branching_carry_into_loop_while_i64_flow_co
 }
 
 #[test]
-fn lowers_flow_continue_then_multi_arm_match_helper_carry_into_loop_while_i64_flow_cond_chain() {
+fn lowers_flow_continue_then_multi_arm_match_helper_carry_into_loop_while_scalar_flow_cond_chain() {
     let mut module = parse_nuis_module(
         r#"
         mod cpu Main {
@@ -1183,9 +1190,9 @@ fn lowers_flow_continue_then_multi_arm_match_helper_carry_into_loop_while_i64_fl
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_flow_cond_chain"
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_flow_cond_chain"
         })
-        .expect("expected loop_while_i64_flow_cond_chain node");
+        .expect("expected loop_while_scalar_flow_cond_chain node");
     assert_eq!(loop_node.op.args[5], "current_lt");
     assert_eq!(loop_node.op.args[7], "continue");
     assert_eq!(loop_node.op.args[9], "or");
@@ -1228,9 +1235,9 @@ fn lowers_recursive_boolean_break_then_branching_carry_into_flow_cond_chain() {
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_flow_cond_chain"
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_flow_cond_chain"
         })
-        .expect("expected loop_while_i64_flow_cond_chain node");
+        .expect("expected loop_while_scalar_flow_cond_chain node");
     assert_eq!(loop_node.op.args[5], "and");
     assert_eq!(loop_node.op.args[6], "and");
     assert_eq!(loop_node.op.args[7], "current_gt");

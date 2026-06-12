@@ -7,6 +7,12 @@ versioning policy documents.
 
 Start with:
 
+* [nuis-0.18.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-snapshot.md)
+* [nuis-0.18.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-release-checklist.md)
+* [nuis-0.18.0-mainline-goals.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-mainline-goals.md)
+* [nuis-0.18.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-compile-workflow.md)
+* [nuis-0.18.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-mainline-regression-matrix.md)
+* [nuis-0.18.0-address-pointer-mainline.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-address-pointer-mainline.md)
 * [nuis-0.13.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.13.0-snapshot.md)
 * [nuis-0.13.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.13.0-release-checklist.md)
 * [nuis-minor-snapshot-rule.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-minor-snapshot-rule.md)
@@ -26,7 +32,6 @@ Start with:
 * [nuis-0.17.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-mainline-regression-matrix.md)
 * [nuis-0.17.0-self-hosted-mainline-gate-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-self-hosted-mainline-gate-plan.md)
 * [nuis-0.17.0-generic-completion-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-generic-completion-plan.md)
-
 Those files are the shortest current “what is real enough to stand on” anchors
 for the active version lines.
 
@@ -79,6 +84,24 @@ true before the answer becomes yes.
 
 The `0.17.0` generic completion plan is the first detailed execution map under
 that mainline and should be the default entry point for generic-track work.
+
+The `0.18.0` snapshot is the next minor-line history anchor and marks the move
+from broader subsystem integration toward a clearer single mainline centered on
+control flow, async/task + memory composition, and project-backed compile
+truth.
+
+The `0.18.0` release checklist is the operational reminder that the new line
+must keep those stories aligned rather than only adding more features.
+
+The `0.18.0` compile workflow file is the current compiler-facing explanation
+of how frontend ordering, project-aware lowering, loop-family truth, and
+address/pointer validation now fit together.
+
+The `0.18.0` mainline regression matrix is the compact answer to which checked
+test families currently defend that story.
+
+The `0.18.0` address/pointer mainline file is the short truth anchor for the
+current `ref`-based address system.
 
 ## Expected Broader Scope Later
 

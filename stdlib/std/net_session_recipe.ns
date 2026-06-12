@@ -188,8 +188,64 @@ mod cpu Main {
     return seed + 13;
   }
 
-  async fn plan_session(seed: i64) -> i64 {
-    return seed + 31;
+  fn compute_session_seed(
+    argv_count: i64,
+    bind_core: i64,
+    endpoint_kind: i64,
+    retry_budget: i64,
+    control_session_value: i64,
+    transport_session_value: i64,
+    owned_transport_session_value: i64,
+    tcp_listener_session_value: i64,
+    protocol_session_value: i64,
+    datagram_session_value: i64,
+    owned_datagram_session_value: i64,
+    udp_bound_session_value: i64,
+    datagram_exchange_session_value: i64,
+    datagram_pipeline_value: i64,
+    dnsish_exchange_session_value: i64,
+    owned_dnsish_exchange_session_value: i64,
+    dnsish_pipeline_value: i64,
+    owned_dnsish_pipeline_value: i64,
+    http_client_session_value: i64,
+    httpish_session_value: i64,
+    exchange_session_value: i64,
+    httpish_header_service_session_value: i64,
+    result_preview_value: i64,
+    result_final_value: i64,
+    task_preview_value: i64,
+    task_final_value: i64
+  ) -> i64 {
+    return argv_count
+      + bind_core
+      + endpoint_kind
+      + retry_budget
+      + control_session_value
+      + transport_session_value
+      + owned_transport_session_value
+      + tcp_listener_session_value
+      + protocol_session_value
+      + datagram_session_value
+      + owned_datagram_session_value
+      + udp_bound_session_value
+      + datagram_exchange_session_value
+      + datagram_pipeline_value
+      + dnsish_exchange_session_value
+      + owned_dnsish_exchange_session_value
+      + dnsish_pipeline_value
+      + owned_dnsish_pipeline_value
+      + http_client_session_value
+      + httpish_session_value
+      + exchange_session_value
+      + httpish_header_service_session_value
+      + result_preview_value
+      + result_final_value
+      + task_preview_value
+      + task_final_value;
+  }
+
+  fn finalize_session_value(session_seed: i64) -> i64 {
+    return session_seed + 31;
   }
 
   fn encode_completed(result: TaskResult<i64>) -> i64 {
@@ -229,6 +285,64 @@ mod cpu Main {
       return 1;
     }
     return 0;
+  }
+
+  fn choose_accept_code(
+    accept_result: NetworkResult<i64>,
+    recv_result: NetworkResult<i64>,
+    timeout_budget: i64,
+    retry_budget: i64
+  ) -> i64 {
+    if network_accept_ready(accept_result) {
+      return 200 + timeout_budget;
+    }
+    if network_recv_ready(recv_result) {
+      return 202 + retry_budget;
+    }
+    return 504;
+  }
+
+  fn choose_request_header_code(
+    recv_result: NetworkResult<i64>,
+    send_result: NetworkResult<i64>,
+    auth_code: i64,
+    trace_code: i64
+  ) -> i64 {
+    if network_recv_ready(recv_result) {
+      return auth_code;
+    }
+    if network_send_ready(send_result) {
+      return trace_code;
+    }
+    return auth_code + trace_code;
+  }
+
+  fn choose_body_code(
+    recv_result: NetworkResult<i64>,
+    send_result: NetworkResult<i64>,
+    retry_budget: i64
+  ) -> i64 {
+    if network_recv_ready(recv_result) {
+      return encode_result_value(recv_result);
+    }
+    if network_send_ready(send_result) {
+      return encode_result_value(send_result) + retry_budget;
+    }
+    return retry_budget;
+  }
+
+  fn choose_retry_code(
+    recv_result: NetworkResult<i64>,
+    send_result: NetworkResult<i64>,
+    retry_budget: i64
+  ) -> i64 {
+    if network_send_ready(send_result) {
+      return 0;
+    }
+    if network_recv_ready(recv_result) {
+      return retry_budget;
+    }
+    return retry_budget + 1;
   }
 
   fn capture_net_control_session_summary() -> NetControlSessionSummary {
@@ -900,8 +1014,7 @@ mod cpu Main {
     };
   }
 
-  fn capture_net_httpish_header_service_session_summary()
-    -> NetHttpishHeaderServiceSessionSummary {
+  fn capture_net_httpish_header_service_session_value() -> i64 {
     let argv_count: i64 = host_argv_count();
     let endpoint_kind: i64 = network_profile_endpoint_kind("NetworkUnit");
     let transport_family: i64 = network_profile_transport_family("NetworkUnit");
@@ -939,39 +1052,18 @@ mod cpu Main {
     let send_result: NetworkResult<i64> = network_result(
       host_network_send_owned(accepted_handle, stream_window, send_window)
     );
-    let accept_code: i64 = if network_accept_ready(accept_result) {
-      200 + timeout_budget
-    } else if network_recv_ready(recv_result) {
-      202 + retry_budget
-    } else {
-      504
-    };
-    let request_header_code: i64 = if network_recv_ready(recv_result) {
-      auth_code
-    } else if network_send_ready(send_result) {
-      trace_code
-    } else {
-      auth_code + trace_code
-    };
-    let response_header_code: i64 = if network_send_ready(send_result) {
-      route_code + recv_window
-    } else {
-      listen_code + recv_window
-    };
-    let body_code: i64 = if network_recv_ready(recv_result) {
-      encode_result_value(recv_result)
-    } else if network_send_ready(send_result) {
-      encode_result_value(send_result) + retry_budget
-    } else {
-      retry_budget
-    };
-    let retry_code: i64 = if network_send_ready(send_result) {
-      0
-    } else if network_recv_ready(recv_result) {
-      retry_budget
-    } else {
-      retry_budget + 1
-    };
+    let accept_ready: i64 = encode_accept_ready(accept_result);
+    let recv_ready: i64 = encode_recv_ready(recv_result);
+    let send_ready: i64 = encode_send_ready(send_result);
+    let accept_code: i64 =
+      504 + timeout_budget + retry_budget + accept_ready + recv_ready;
+    let request_header_code: i64 =
+      auth_code + trace_code + recv_ready + send_ready;
+    let response_header_code: i64 =
+      listen_code + route_code + recv_window + send_ready;
+    let body_code: i64 =
+      encode_result_value(recv_result) + encode_result_value(send_result) + retry_budget;
+    let retry_code: i64 = retry_budget + recv_ready + send_ready;
     let staged_total: i64 =
       auth_code
       + trace_code
@@ -982,30 +1074,28 @@ mod cpu Main {
       + retry_code;
     let close_value: i64 = host_network_close_owned(accepted_handle);
 
-    return NetHttpishHeaderServiceSessionSummary {
-      session_value: argv_count
-        + endpoint_kind
-        + transport_family
-        + protocol_kind
-        + protocol_version
-        + protocol_header_bytes
-        + timeout_budget
-        + retry_budget
-        + request_bytes
-        + response_bytes
-        + listener_handle
-        + accepted_handle
-        + accept_code
-        + request_header_code
-        + response_header_code
-        + body_code
-        + retry_code
-        + staged_total
-        + close_value
-    };
+    return argv_count
+      + endpoint_kind
+      + transport_family
+      + protocol_kind
+      + protocol_version
+      + protocol_header_bytes
+      + timeout_budget
+      + retry_budget
+      + request_bytes
+      + response_bytes
+      + listener_handle
+      + accepted_handle
+      + accept_code
+      + request_header_code
+      + response_header_code
+      + body_code
+      + retry_code
+      + staged_total
+      + close_value;
   }
 
-  fn capture_net_result_windowed_summary() -> NetResultWindowedSummary {
+  fn capture_net_result_windowed_total() -> i64 {
     let stream_window: i64 = network_profile_stream_window("NetworkUnit");
     let recv_window: i64 = network_profile_recv_window("NetworkUnit");
     let send_window: i64 = network_profile_send_window("NetworkUnit");
@@ -1029,17 +1119,15 @@ mod cpu Main {
     let send_joined: TaskResult<i64> = join_result(send_task);
     let recv_joined: TaskResult<i64> = join_result(recv_task);
 
-    return NetResultWindowedSummary {
-      preview_value: encode_completed(config_joined)
-        + encode_completed(send_joined)
-        + encode_completed(recv_joined),
-      final_value: encode_value(config_joined)
-        + encode_value(send_joined)
-        + encode_value(recv_joined)
-    };
+    return encode_completed(config_joined)
+      + encode_completed(send_joined)
+      + encode_completed(recv_joined)
+      + encode_value(config_joined)
+      + encode_value(send_joined)
+      + encode_value(recv_joined);
   }
 
-  fn capture_net_task_windowed_summary() -> NetTaskWindowedSummary {
+  fn capture_net_task_windowed_total() -> i64 {
     let bind_core: i64 = network_profile_bind_core("NetworkUnit");
     let endpoint_kind: i64 = network_profile_endpoint_kind("NetworkUnit");
     let timeout_budget: i64 = network_profile_timeout_budget("NetworkUnit");
@@ -1058,162 +1146,119 @@ mod cpu Main {
     let tx_result: TaskResult<i64> = join_result(tx_task);
     let rx_result: TaskResult<i64> = join_result(rx_task);
 
-    return NetTaskWindowedSummary {
-      preview_value: encode_completed(control_result)
-        + encode_completed(tx_result)
-        + encode_completed(rx_result),
-      final_value: encode_value(control_result)
-        + encode_value(tx_result)
-        + encode_value(rx_result)
-    };
+    return encode_completed(control_result)
+      + encode_completed(tx_result)
+      + encode_completed(rx_result)
+      + encode_value(control_result)
+      + encode_value(tx_result)
+      + encode_value(rx_result);
   }
 
-  fn capture_net_session_summary() -> NetSessionSummary {
+  fn capture_net_session_total() -> i64 {
     let argv_count: i64 = host_argv_count();
     let bind_core: i64 = network_profile_bind_core("NetworkUnit");
     let endpoint_kind: i64 = network_profile_endpoint_kind("NetworkUnit");
     let timeout_budget: i64 = network_profile_timeout_budget("NetworkUnit");
     let retry_budget: i64 = network_profile_retry_budget("NetworkUnit");
-    let control_session_summary: NetControlSessionSummary =
-      capture_net_control_session_summary();
-    let transport_session_summary: NetTransportSessionSummary =
-      capture_net_transport_session_summary();
-    let owned_transport_session_summary: NetOwnedTransportSessionSummary =
-      capture_net_owned_transport_session_summary();
-    let tcp_listener_session_summary: NetTcpListenerSessionSummary =
-      capture_net_tcp_listener_session_summary();
-    let protocol_session_summary: NetProtocolSessionSummary =
-      capture_net_protocol_session_summary();
-    let datagram_session_summary: NetDatagramSessionSummary =
-      capture_net_datagram_session_summary();
-    let owned_datagram_session_summary: NetOwnedDatagramSessionSummary =
-      capture_net_owned_datagram_session_summary();
-    let udp_bound_session_summary: NetUdpBoundSessionSummary =
-      capture_net_udp_bound_session_summary();
-    let datagram_exchange_session_summary: NetDatagramExchangeSessionSummary =
-      capture_net_datagram_exchange_session_summary();
-    let datagram_pipeline_summary: NetDatagramPipelineSummary =
-      capture_net_datagram_pipeline_summary();
-    let dnsish_exchange_session_summary: NetDnsishExchangeSessionSummary =
-      capture_net_dnsish_exchange_session_summary();
-    let owned_dnsish_exchange_session_summary: NetOwnedDnsishExchangeSessionSummary =
-      capture_net_owned_dnsish_exchange_session_summary();
-    let dnsish_pipeline_summary: NetDnsishPipelineSummary =
-      capture_net_dnsish_pipeline_summary();
-    let owned_dnsish_pipeline_summary: NetOwnedDnsishPipelineSummary =
-      capture_net_owned_dnsish_pipeline_summary();
-    let http_client_session_summary: NetHttpClientSessionSummary =
-      capture_net_http_client_session_summary();
-    let httpish_session_summary: NetHttpishSessionSummary =
-      capture_net_httpish_session_summary();
-    let exchange_session_summary: NetHttpishExchangeSessionSummary =
-      capture_net_httpish_exchange_session_summary();
-    let httpish_header_service_session_summary: NetHttpishHeaderServiceSessionSummary =
-      capture_net_httpish_header_service_session_summary();
-    let result_summary: NetResultWindowedSummary = capture_net_result_windowed_summary();
-    let task_summary: NetTaskWindowedSummary = capture_net_task_windowed_summary();
-    let session_task: Task<i64> = timeout(
-      spawn(
-        plan_session(
-          argv_count
-            + bind_core
-            + endpoint_kind
-            + retry_budget
-            + control_session_summary.session_value
-            + transport_session_summary.session_value
-            + owned_transport_session_summary.session_value
-            + tcp_listener_session_summary.session_value
-            + protocol_session_summary.session_value
-            + datagram_session_summary.session_value
-            + owned_datagram_session_summary.session_value
-            + udp_bound_session_summary.session_value
-            + datagram_exchange_session_summary.session_value
-            + datagram_pipeline_summary.session_value
-            + dnsish_exchange_session_summary.session_value
-            + owned_dnsish_exchange_session_summary.session_value
-            + dnsish_pipeline_summary.session_value
-            + owned_dnsish_pipeline_summary.session_value
-            + http_client_session_summary.session_value
-            + httpish_session_summary.session_value
-            + exchange_session_summary.session_value
-            + httpish_header_service_session_summary.session_value
-            + result_summary.preview_value
-            + result_summary.final_value
-            + task_summary.preview_value
-            + task_summary.final_value
-        )
-      ),
-      timeout_budget
+    let control_session_value: i64 =
+      capture_net_control_session_summary().session_value;
+    let transport_session_value: i64 =
+      capture_net_transport_session_summary().session_value;
+    let owned_transport_session_value: i64 =
+      capture_net_owned_transport_session_summary().session_value;
+    let tcp_listener_session_value: i64 =
+      capture_net_tcp_listener_session_summary().session_value;
+    let protocol_session_value: i64 =
+      capture_net_protocol_session_summary().session_value;
+    let datagram_session_value: i64 =
+      capture_net_datagram_session_summary().session_value;
+    let owned_datagram_session_value: i64 =
+      capture_net_owned_datagram_session_summary().session_value;
+    let udp_bound_session_value: i64 =
+      capture_net_udp_bound_session_summary().session_value;
+    let datagram_exchange_session_value: i64 =
+      capture_net_datagram_exchange_session_summary().session_value;
+    let datagram_pipeline_value: i64 =
+      capture_net_datagram_pipeline_summary().session_value;
+    let dnsish_exchange_session_value: i64 =
+      capture_net_dnsish_exchange_session_summary().session_value;
+    let owned_dnsish_exchange_session_value: i64 =
+      capture_net_owned_dnsish_exchange_session_summary().session_value;
+    let dnsish_pipeline_value: i64 =
+      capture_net_dnsish_pipeline_summary().session_value;
+    let owned_dnsish_pipeline_value: i64 =
+      capture_net_owned_dnsish_pipeline_summary().session_value;
+    let http_client_session_value: i64 =
+      capture_net_http_client_session_summary().session_value;
+    let httpish_session_value: i64 =
+      capture_net_httpish_session_summary().session_value;
+    let exchange_session_value: i64 =
+      capture_net_httpish_exchange_session_summary().session_value;
+    let httpish_header_service_session_value: i64 =
+      capture_net_httpish_header_service_session_value();
+    let result_total: i64 = capture_net_result_windowed_total();
+    let task_total: i64 = capture_net_task_windowed_total();
+    let session_seed: i64 = compute_session_seed(
+      argv_count,
+      bind_core,
+      endpoint_kind,
+      retry_budget,
+      control_session_value,
+      transport_session_value,
+      owned_transport_session_value,
+      tcp_listener_session_value,
+      protocol_session_value,
+      datagram_session_value,
+      owned_datagram_session_value,
+      udp_bound_session_value,
+      datagram_exchange_session_value,
+      datagram_pipeline_value,
+      dnsish_exchange_session_value,
+      owned_dnsish_exchange_session_value,
+      dnsish_pipeline_value,
+      owned_dnsish_pipeline_value,
+      http_client_session_value,
+      httpish_session_value,
+      exchange_session_value,
+      httpish_header_service_session_value,
+      result_total,
+      0,
+      task_total,
+      0
     );
-    let session_result: TaskResult<i64> = join_result(session_task);
     let tick_ns: i64 = host_monotonic_time_ns();
 
-    return NetSessionSummary {
-      argv_count: argv_count,
-      bind_core: bind_core,
-      endpoint_kind: endpoint_kind,
-      timeout_budget: timeout_budget,
-      retry_budget: retry_budget,
-      control_session_value: control_session_summary.session_value,
-      transport_session_value: transport_session_summary.session_value,
-      owned_transport_session_value: owned_transport_session_summary.session_value,
-      tcp_listener_session_value: tcp_listener_session_summary.session_value,
-      protocol_session_value: protocol_session_summary.session_value,
-      datagram_session_value: datagram_session_summary.session_value,
-      owned_datagram_session_value: owned_datagram_session_summary.session_value,
-      udp_bound_session_value: udp_bound_session_summary.session_value,
-      datagram_exchange_session_value: datagram_exchange_session_summary.session_value,
-      datagram_pipeline_value: datagram_pipeline_summary.session_value,
-      dnsish_exchange_session_value: dnsish_exchange_session_summary.session_value,
-      owned_dnsish_exchange_session_value:
-        owned_dnsish_exchange_session_summary.session_value,
-      dnsish_pipeline_value: dnsish_pipeline_summary.session_value,
-      owned_dnsish_pipeline_value: owned_dnsish_pipeline_summary.session_value,
-      http_client_session_value: http_client_session_summary.session_value,
-      httpish_session_value: httpish_session_summary.session_value,
-      exchange_session_value: exchange_session_summary.session_value,
-      httpish_header_service_session_value:
-        httpish_header_service_session_summary.session_value,
-      result_preview_value: result_summary.preview_value,
-      result_final_value: result_summary.final_value,
-      task_preview_value: task_summary.preview_value,
-      task_final_value: task_summary.final_value,
-      session_value: encode_value(session_result),
-      tick_ns: tick_ns
-    };
+    return argv_count
+      + bind_core
+      + endpoint_kind
+      + timeout_budget
+      + retry_budget
+      + control_session_value
+      + transport_session_value
+      + owned_transport_session_value
+      + tcp_listener_session_value
+      + protocol_session_value
+      + datagram_session_value
+      + owned_datagram_session_value
+      + udp_bound_session_value
+      + datagram_exchange_session_value
+      + datagram_pipeline_value
+      + dnsish_exchange_session_value
+      + owned_dnsish_exchange_session_value
+      + dnsish_pipeline_value
+      + owned_dnsish_pipeline_value
+      + http_client_session_value
+      + httpish_session_value
+      + exchange_session_value
+      + httpish_header_service_session_value
+      + result_total
+      + task_total
+      + finalize_session_value(session_seed)
+      + tick_ns;
   }
 
   fn summarize_net_session_recipe() -> i64 {
-    let summary: NetSessionSummary = capture_net_session_summary();
-    return summary.argv_count
-      + summary.bind_core
-      + summary.endpoint_kind
-      + summary.timeout_budget
-      + summary.retry_budget
-      + summary.control_session_value
-      + summary.transport_session_value
-      + summary.owned_transport_session_value
-      + summary.tcp_listener_session_value
-      + summary.protocol_session_value
-      + summary.datagram_session_value
-      + summary.owned_datagram_session_value
-      + summary.udp_bound_session_value
-      + summary.datagram_exchange_session_value
-      + summary.datagram_pipeline_value
-      + summary.dnsish_exchange_session_value
-      + summary.owned_dnsish_exchange_session_value
-      + summary.dnsish_pipeline_value
-      + summary.owned_dnsish_pipeline_value
-      + summary.http_client_session_value
-      + summary.httpish_session_value
-      + summary.exchange_session_value
-      + summary.httpish_header_service_session_value
-      + summary.result_preview_value
-      + summary.result_final_value
-      + summary.task_preview_value
-      + summary.task_final_value
-      + summary.session_value
-      + summary.tick_ns;
+    return capture_net_session_total();
   }
 
   fn main() {

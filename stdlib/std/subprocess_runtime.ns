@@ -1,13 +1,29 @@
 mod cpu Main {
   extern "c" fn host_subprocess_spawn(program_handle: i64, argv_handle: i64, env_handle: i64) -> i64;
+  extern "c" fn host_subprocess_spawn_in(
+    program_handle: i64,
+    argv_handle: i64,
+    env_handle: i64,
+    cwd_handle: i64,
+    timeout_ms: i64
+  ) -> i64;
   extern "c" fn host_subprocess_signal(process_handle: i64, signal: i64) -> i64;
   extern "c" fn host_subprocess_join(process_handle: i64) -> i64;
   extern "c" fn host_subprocess_join_exit(process_handle: i64) -> i64;
 
+  struct SubprocessContext {
+    env_handle: i64,
+    cwd_handle: i64,
+    timeout_ms: i64,
+    inherit_env: bool,
+    inherit_cwd: bool,
+    has_timeout: bool
+  }
+
   struct SubprocessRequest {
     program_handle: i64,
     argv_handle: i64,
-    env_handle: i64
+    context: SubprocessContext
   }
 
   struct SubprocessResult {
@@ -15,7 +31,50 @@ mod cpu Main {
     signal_result: i64,
     join_code: i64,
     join_exit: i64,
+    launched: bool,
+    env_handle: i64,
+    cwd_handle: i64,
+    timeout_ms: i64,
+    inherit_env: bool,
+    inherit_cwd: bool,
+    has_timeout: bool,
     succeeded: bool
+  }
+
+  fn encode_bool(flag: bool) -> i64 {
+    if flag {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn build_default_subprocess_context() -> SubprocessContext {
+    return SubprocessContext {
+      env_handle: 0,
+      cwd_handle: 0,
+      timeout_ms: 0,
+      inherit_env: true,
+      inherit_cwd: true,
+      has_timeout: false
+    };
+  }
+
+  fn build_subprocess_context(
+    env_handle: i64,
+    cwd_handle: i64,
+    timeout_ms: i64,
+    inherit_env: bool,
+    inherit_cwd: bool,
+    has_timeout: bool
+  ) -> SubprocessContext {
+    return SubprocessContext {
+      env_handle: env_handle,
+      cwd_handle: cwd_handle,
+      timeout_ms: timeout_ms,
+      inherit_env: inherit_env,
+      inherit_cwd: inherit_cwd,
+      has_timeout: has_timeout
+    };
   }
 
   fn build_subprocess_request(
@@ -26,36 +85,81 @@ mod cpu Main {
     return SubprocessRequest {
       program_handle: program_handle,
       argv_handle: argv_handle,
-      env_handle: env_handle
+      context: build_subprocess_context(
+        env_handle,
+        0,
+        0,
+        env_handle == 0,
+        true,
+        false
+      )
+    };
+  }
+
+  fn build_subprocess_request_with_context(
+    program_handle: i64,
+    argv_handle: i64,
+    context: SubprocessContext
+  ) -> SubprocessRequest {
+    return SubprocessRequest {
+      program_handle: program_handle,
+      argv_handle: argv_handle,
+      context: context
     };
   }
 
   fn run_subprocess(request: SubprocessRequest) -> SubprocessResult {
-    let handle: i64 = host_subprocess_spawn(
+    let handle: i64 = host_subprocess_spawn_in(
       request.program_handle,
       request.argv_handle,
-      request.env_handle
+      request.context.env_handle,
+      request.context.cwd_handle,
+      request.context.timeout_ms
     );
     let join_exit: i64 = host_subprocess_join_exit(handle);
+    let launched: bool = handle != 0;
     return SubprocessResult {
       handle: handle,
       signal_result: host_subprocess_signal(handle, 0),
       join_code: host_subprocess_join(handle),
       join_exit: join_exit,
-      succeeded: join_exit == 0
+      launched: launched,
+      env_handle: request.context.env_handle,
+      cwd_handle: request.context.cwd_handle,
+      timeout_ms: request.context.timeout_ms,
+      inherit_env: request.context.inherit_env,
+      inherit_cwd: request.context.inherit_cwd,
+      has_timeout: request.context.has_timeout,
+      succeeded: launched && join_exit == 0
     };
   }
 
+  fn summarize_subprocess_context(context: SubprocessContext) -> i64 {
+    return context.env_handle
+      + context.cwd_handle
+      + context.timeout_ms
+      + encode_bool(context.inherit_env)
+      + encode_bool(context.inherit_cwd)
+      + encode_bool(context.has_timeout);
+  }
+
   fn summarize_subprocess_result(result: SubprocessResult) -> i64 {
-    let success_bonus: i64 = if result.succeeded {
-      1
-    } else {
-      0
-    };
+    let launch_bonus: i64 = encode_bool(result.launched);
+    let success_bonus: i64 = encode_bool(result.succeeded);
+    let inherit_env_bonus: i64 = encode_bool(result.inherit_env);
+    let inherit_cwd_bonus: i64 = encode_bool(result.inherit_cwd);
+    let timeout_bonus: i64 = encode_bool(result.has_timeout);
     return result.handle
       + result.signal_result
       + result.join_code
       + result.join_exit
+      + result.env_handle
+      + result.cwd_handle
+      + result.timeout_ms
+      + launch_bonus
+      + inherit_env_bonus
+      + inherit_cwd_bonus
+      + timeout_bonus
       + success_bonus;
   }
 

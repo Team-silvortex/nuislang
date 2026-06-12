@@ -2804,7 +2804,7 @@ fn compiles_async_loop_owned_network_http_session_project() {
         .nodes
         .iter()
         .any(|node| node.op.module == "cpu"
-            && node.op.instruction == "loop_while_i64_async_post_flow_chain"));
+            && node.op.instruction == "loop_while_scalar_async_post_flow_chain"));
     assert!(artifacts
         .llvm_ir
         .contains("host_network_recv_http_status_owned"));
@@ -2879,7 +2879,7 @@ fn compiles_async_loop_flow_chain_project() {
         .nodes
         .iter()
         .any(|node| node.op.module == "cpu"
-            && node.op.instruction == "loop_while_i64_async_flow_chain"));
+            && node.op.instruction == "loop_while_scalar_async_flow_chain"));
     assert!(artifacts.llvm_ir.contains("@nuis_fn_step"));
 }
 
@@ -2960,7 +2960,7 @@ fn compiles_async_loop_flow_cond_chain_project() {
         .nodes
         .iter()
         .any(|node| node.op.module == "cpu"
-            && node.op.instruction == "loop_while_i64_async_flow_cond_chain"));
+            && node.op.instruction == "loop_while_scalar_async_flow_cond_chain"));
     assert!(artifacts.llvm_ir.contains("@nuis_fn_step"));
 }
 
@@ -3006,7 +3006,7 @@ fn compiles_async_loop_flow_cond_chain_compound_control_project() {
         .nodes
         .iter()
         .any(|node| node.op.module == "cpu"
-            && node.op.instruction == "loop_while_i64_async_flow_cond_chain"));
+            && node.op.instruction == "loop_while_scalar_async_flow_cond_chain"));
     assert!(artifacts.llvm_ir.contains("@nuis_fn_step"));
 }
 
@@ -3049,7 +3049,7 @@ fn compiles_async_loop_flow_cond_chain_recursive_control_project() {
         .nodes
         .iter()
         .any(|node| node.op.module == "cpu"
-            && node.op.instruction == "loop_while_i64_async_flow_cond_chain"));
+            && node.op.instruction == "loop_while_scalar_async_flow_cond_chain"));
     assert!(artifacts.llvm_ir.contains("@nuis_fn_step"));
 }
 
@@ -3091,7 +3091,7 @@ fn compiles_async_loop_post_flow_cond_chain_project() {
         .nodes
         .iter()
         .any(|node| node.op.module == "cpu"
-            && node.op.instruction == "loop_while_i64_async_post_flow_cond_chain"));
+            && node.op.instruction == "loop_while_scalar_async_post_flow_cond_chain"));
     assert!(artifacts.llvm_ir.contains("@nuis_fn_step"));
 }
 
@@ -3139,7 +3139,7 @@ fn compiles_async_loop_post_flow_cond_chain_compound_control_project() {
         .nodes
         .iter()
         .any(|node| node.op.module == "cpu"
-            && node.op.instruction == "loop_while_i64_async_post_flow_cond_chain"));
+            && node.op.instruction == "loop_while_scalar_async_post_flow_cond_chain"));
     assert!(artifacts.llvm_ir.contains("@nuis_fn_step"));
 }
 
@@ -3182,6 +3182,6 @@ fn compiles_async_loop_post_flow_cond_chain_recursive_control_project() {
         .nodes
         .iter()
         .any(|node| node.op.module == "cpu"
-            && node.op.instruction == "loop_while_i64_async_post_flow_cond_chain"));
+            && node.op.instruction == "loop_while_scalar_async_post_flow_cond_chain"));
     assert!(artifacts.llvm_ir.contains("@nuis_fn_step"));
 }

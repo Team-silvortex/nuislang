@@ -1,0 +1,706 @@
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+  extern "c" fn host_line_read(prompt_handle: i64) -> i64;
+  extern "c" fn host_line_len(line_handle: i64) -> i64;
+  extern "c" fn host_stdout_write(text_handle: i64) -> i64;
+  extern "c" fn host_stderr_write(text_handle: i64) -> i64;
+  extern "c" fn host_stdout_flush() -> i64;
+  extern "c" fn host_stderr_flush() -> i64;
+  extern "c" fn host_diag_label(message_handle: i64) -> i64;
+  extern "c" fn host_diag_span(start: i64, end: i64) -> i64;
+  extern "c" fn host_diag_emit(label_handle: i64, span_handle: i64, severity: i64) -> i64;
+  extern "c" fn host_cwd_handle() -> i64;
+  extern "c" fn host_temp_dir_handle() -> i64;
+  extern "c" fn host_temp_file_handle(prefix_handle: i64) -> i64;
+  extern "c" fn host_cache_open(name_handle: i64) -> i64;
+  extern "c" fn host_cache_lookup(cache_handle: i64, key_handle: i64) -> i64;
+  extern "c" fn host_cache_store(cache_handle: i64, key_handle: i64, value_handle: i64) -> i64;
+  extern "c" fn host_cache_close(cache_handle: i64) -> i64;
+  extern "c" fn host_command_spawn_in(
+    program_handle: i64,
+    argv_handle: i64,
+    cwd_handle: i64,
+    timeout_ms: i64
+  ) -> i64;
+  extern "c" fn host_command_status(command_handle: i64) -> i64;
+  extern "c" fn host_command_wait(command_handle: i64) -> i64;
+  extern "c" fn host_command_wait_exit(command_handle: i64) -> i64;
+  extern "c" fn host_monotonic_time_ns() -> i64;
+
+  struct CliSeed {
+    prompt_handle: i64,
+    ok_text_handle: i64,
+    err_text_handle: i64,
+    timeout_limit: i64,
+    ok_severity: i64,
+    err_severity: i64
+  }
+
+  struct AutomationSeed {
+    prefix_handle: i64,
+    cache_name_handle: i64,
+    cache_key_handle: i64
+  }
+
+  struct CombinedSeed {
+    cli: CliSeed,
+    automation: AutomationSeed
+  }
+
+  struct CliSummary {
+    argv_count: i64,
+    line_handle: i64,
+    line_len: i64,
+    completed: bool,
+    timed_out: bool,
+    selected_value: i64,
+    tick_ns: i64
+  }
+
+  struct AutomationSummary {
+    cwd_handle: i64,
+    temp_dir_handle: i64,
+    temp_file_handle: i64,
+    cache_hit_handle: i64,
+    cache_store_code: i64
+  }
+
+  struct CommandContext {
+    cwd_handle: i64,
+    timeout_ms: i64,
+    inherit_cwd: bool,
+    has_timeout: bool
+  }
+
+  struct CommandRequest {
+    program_handle: i64,
+    argv_handle: i64,
+    context: CommandContext
+  }
+
+  struct CommandResult {
+    handle: i64,
+    status: i64,
+    wait_code: i64,
+    wait_exit: i64,
+    launched: bool,
+    cwd_handle: i64,
+    timeout_ms: i64,
+    inherit_cwd: bool,
+    has_timeout: bool,
+    succeeded: bool
+  }
+
+  struct WorkflowStep {
+    name_handle: i64,
+    request: CommandRequest,
+    fail_fast: bool
+  }
+
+  struct WorkflowStepReport {
+    name_handle: i64,
+    result: CommandResult,
+    executed: bool,
+    blocked_by_failure: bool
+  }
+
+  struct WorkflowQuadReport {
+    first: WorkflowStepReport,
+    second: WorkflowStepReport,
+    third: WorkflowStepReport,
+    fourth: WorkflowStepReport,
+    first_failure_handle: i64,
+    overall_success: bool,
+    executed_steps: i64
+  }
+
+  struct CombinedSummary {
+    cli: CliSummary,
+    automation: AutomationSummary,
+    workflow: WorkflowQuadReport,
+    diag_code: i64,
+    stdout_code: i64,
+    stderr_code: i64,
+    stdout_flushed: i64,
+    stderr_flushed: i64
+  }
+
+  async fn ping(seed: i64) -> i64 {
+    return seed + 13;
+  }
+
+  fn encode_bool(flag: bool) -> i64 {
+    if flag {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn build_cli_seed(
+    prompt_handle: i64,
+    ok_text_handle: i64,
+    err_text_handle: i64,
+    timeout_limit: i64,
+    ok_severity: i64,
+    err_severity: i64
+  ) -> CliSeed {
+    return CliSeed {
+      prompt_handle: prompt_handle,
+      ok_text_handle: ok_text_handle,
+      err_text_handle: err_text_handle,
+      timeout_limit: timeout_limit,
+      ok_severity: ok_severity,
+      err_severity: err_severity
+    };
+  }
+
+  fn build_automation_seed(
+    prefix_handle: i64,
+    cache_name_handle: i64,
+    cache_key_handle: i64
+  ) -> AutomationSeed {
+    return AutomationSeed {
+      prefix_handle: prefix_handle,
+      cache_name_handle: cache_name_handle,
+      cache_key_handle: cache_key_handle
+    };
+  }
+
+  fn build_combined_seed(
+    prompt_handle: i64,
+    ok_text_handle: i64,
+    err_text_handle: i64,
+    timeout_limit: i64,
+    ok_severity: i64,
+    err_severity: i64,
+    prefix_handle: i64,
+    cache_name_handle: i64,
+    cache_key_handle: i64
+  ) -> CombinedSeed {
+    return CombinedSeed {
+      cli: build_cli_seed(
+        prompt_handle,
+        ok_text_handle,
+        err_text_handle,
+        timeout_limit,
+        ok_severity,
+        err_severity
+      ),
+      automation: build_automation_seed(
+        prefix_handle,
+        cache_name_handle,
+        cache_key_handle
+      )
+    };
+  }
+
+  fn capture_cli(seed: CliSeed) -> CliSummary {
+    let argv_count: i64 = host_argv_count();
+    let line_handle: i64 = host_line_read(seed.prompt_handle);
+    let line_len: i64 = host_line_len(line_handle);
+    let result: TaskResult<i64> =
+      join_result(timeout(spawn(ping(argv_count + line_len)), seed.timeout_limit));
+
+    if task_completed(result) {
+      return CliSummary {
+        argv_count: argv_count,
+        line_handle: line_handle,
+        line_len: line_len,
+        completed: true,
+        timed_out: false,
+        selected_value: task_value(result),
+        tick_ns: host_monotonic_time_ns()
+      };
+    }
+
+    return CliSummary {
+      argv_count: argv_count,
+      line_handle: line_handle,
+      line_len: line_len,
+      completed: false,
+      timed_out: true,
+      selected_value: 0,
+      tick_ns: host_monotonic_time_ns()
+    };
+  }
+
+  fn capture_automation(seed: AutomationSeed, cache_value_handle: i64) -> AutomationSummary {
+    let cache_handle: i64 = host_cache_open(seed.cache_name_handle);
+    let cache_hit_handle: i64 = host_cache_lookup(cache_handle, seed.cache_key_handle);
+    let temp_file_handle: i64 = host_temp_file_handle(seed.prefix_handle);
+    let cache_store_code: i64 = host_cache_store(
+      cache_handle,
+      seed.cache_key_handle,
+      cache_value_handle + temp_file_handle
+    );
+    let cache_close_code: i64 = host_cache_close(cache_handle);
+
+    return AutomationSummary {
+      cwd_handle: host_cwd_handle(),
+      temp_dir_handle: host_temp_dir_handle(),
+      temp_file_handle: temp_file_handle,
+      cache_hit_handle: cache_hit_handle + cache_close_code,
+      cache_store_code: cache_store_code
+    };
+  }
+
+  fn build_command_context(
+    cwd_handle: i64,
+    timeout_ms: i64,
+    inherit_cwd: bool,
+    has_timeout: bool
+  ) -> CommandContext {
+    return CommandContext {
+      cwd_handle: cwd_handle,
+      timeout_ms: timeout_ms,
+      inherit_cwd: inherit_cwd,
+      has_timeout: has_timeout
+    };
+  }
+
+  fn build_command_request(
+    program_handle: i64,
+    argv_handle: i64,
+    context: CommandContext
+  ) -> CommandRequest {
+    return CommandRequest {
+      program_handle: program_handle,
+      argv_handle: argv_handle,
+      context: context
+    };
+  }
+
+  fn build_workflow_step(
+    name_handle: i64,
+    program_handle: i64,
+    argv_handle: i64,
+    cwd_handle: i64,
+    timeout_ms: i64,
+    fail_fast: bool
+  ) -> WorkflowStep {
+    return WorkflowStep {
+      name_handle: name_handle,
+      request: build_command_request(
+        program_handle,
+        argv_handle,
+        build_command_context(cwd_handle, timeout_ms, false, true)
+      ),
+      fail_fast: fail_fast
+    };
+  }
+
+  fn run_command(request: CommandRequest) -> CommandResult {
+    let handle: i64 = host_command_spawn_in(
+      request.program_handle,
+      request.argv_handle,
+      request.context.cwd_handle,
+      request.context.timeout_ms
+    );
+    let wait_exit: i64 = host_command_wait_exit(handle);
+    let launched: bool = handle != 0;
+    return CommandResult {
+      handle: handle,
+      status: host_command_status(handle),
+      wait_code: host_command_wait(handle),
+      wait_exit: wait_exit,
+      launched: launched,
+      cwd_handle: request.context.cwd_handle,
+      timeout_ms: request.context.timeout_ms,
+      inherit_cwd: request.context.inherit_cwd,
+      has_timeout: request.context.has_timeout,
+      succeeded: launched && wait_exit == 0
+    };
+  }
+
+  fn run_workflow_step(step: WorkflowStep) -> WorkflowStepReport {
+    return WorkflowStepReport {
+      name_handle: step.name_handle,
+      result: run_command(step.request),
+      executed: true,
+      blocked_by_failure: false
+    };
+  }
+
+  fn skipped_workflow_step(step: WorkflowStep, blocked_by_failure: bool) -> WorkflowStepReport {
+    return WorkflowStepReport {
+      name_handle: step.name_handle,
+      result: CommandResult {
+        handle: 0,
+        status: 0,
+        wait_code: 0,
+        wait_exit: 1,
+        launched: false,
+        cwd_handle: step.request.context.cwd_handle,
+        timeout_ms: step.request.context.timeout_ms,
+        inherit_cwd: step.request.context.inherit_cwd,
+        has_timeout: step.request.context.has_timeout,
+        succeeded: false
+      },
+      executed: false,
+      blocked_by_failure: blocked_by_failure
+    };
+  }
+
+  fn workflow_step_failed(report: WorkflowStepReport) -> bool {
+    if report.executed == false {
+      return false;
+    }
+    return report.result.succeeded == false;
+  }
+
+  fn workflow_should_stop(step: WorkflowStep, report: WorkflowStepReport) -> bool {
+    return step.fail_fast && workflow_step_failed(report);
+  }
+
+  fn count_executed_steps(
+    second: WorkflowStepReport,
+    third: WorkflowStepReport,
+    fourth: WorkflowStepReport
+  ) -> i64 {
+    if second.executed == false {
+      return 1;
+    }
+    if third.executed == false {
+      return 2;
+    }
+    if fourth.executed {
+      return 4;
+    }
+    return 3;
+  }
+
+  fn build_quad_report(
+    first: WorkflowStepReport,
+    second: WorkflowStepReport,
+    third: WorkflowStepReport,
+    fourth: WorkflowStepReport
+  ) -> WorkflowQuadReport {
+    if workflow_step_failed(first) {
+      return WorkflowQuadReport {
+        first: first,
+        second: second,
+        third: third,
+        fourth: fourth,
+        first_failure_handle: first.name_handle,
+        overall_success: false,
+        executed_steps: count_executed_steps(second, third, fourth)
+      };
+    }
+    if workflow_step_failed(second) {
+      return WorkflowQuadReport {
+        first: first,
+        second: second,
+        third: third,
+        fourth: fourth,
+        first_failure_handle: second.name_handle,
+        overall_success: false,
+        executed_steps: count_executed_steps(second, third, fourth)
+      };
+    }
+    if workflow_step_failed(third) {
+      return WorkflowQuadReport {
+        first: first,
+        second: second,
+        third: third,
+        fourth: fourth,
+        first_failure_handle: third.name_handle,
+        overall_success: false,
+        executed_steps: count_executed_steps(second, third, fourth)
+      };
+    }
+    if workflow_step_failed(fourth) {
+      return WorkflowQuadReport {
+        first: first,
+        second: second,
+        third: third,
+        fourth: fourth,
+        first_failure_handle: fourth.name_handle,
+        overall_success: false,
+        executed_steps: 4
+      };
+    }
+    return WorkflowQuadReport {
+      first: first,
+      second: second,
+      third: third,
+      fourth: fourth,
+      first_failure_handle: 0,
+      overall_success: true,
+      executed_steps: 4
+    };
+  }
+
+  fn skipped_quad_report(
+    first: WorkflowStep,
+    second: WorkflowStep,
+    third: WorkflowStep,
+    fourth: WorkflowStep
+  ) -> WorkflowQuadReport {
+    return WorkflowQuadReport {
+      first: skipped_workflow_step(first, true),
+      second: skipped_workflow_step(second, true),
+      third: skipped_workflow_step(third, true),
+      fourth: skipped_workflow_step(fourth, true),
+      first_failure_handle: first.name_handle,
+      overall_success: false,
+      executed_steps: 0
+    };
+  }
+
+  fn run_workflow_quad(
+    first_step: WorkflowStep,
+    second_step: WorkflowStep,
+    third_step: WorkflowStep,
+    fourth_step: WorkflowStep
+  ) -> WorkflowQuadReport {
+    let first_report: WorkflowStepReport = run_workflow_step(first_step);
+    if workflow_should_stop(first_step, first_report) {
+      return build_quad_report(
+        first_report,
+        skipped_workflow_step(second_step, true),
+        skipped_workflow_step(third_step, true),
+        skipped_workflow_step(fourth_step, true)
+      );
+    }
+
+    let second_report: WorkflowStepReport = run_workflow_step(second_step);
+    if workflow_should_stop(second_step, second_report) {
+      return build_quad_report(
+        first_report,
+        second_report,
+        skipped_workflow_step(third_step, true),
+        skipped_workflow_step(fourth_step, true)
+      );
+    }
+
+    let third_report: WorkflowStepReport = run_workflow_step(third_step);
+    if workflow_should_stop(third_step, third_report) {
+      return build_quad_report(
+        first_report,
+        second_report,
+        third_report,
+        skipped_workflow_step(fourth_step, true)
+      );
+    }
+
+    return build_quad_report(
+      first_report,
+      second_report,
+      third_report,
+      run_workflow_step(fourth_step)
+    );
+  }
+
+  fn emit_report(
+    cli: CliSummary,
+    workflow: WorkflowQuadReport,
+    ok_text_handle: i64,
+    err_text_handle: i64,
+    ok_severity: i64,
+    err_severity: i64
+  ) -> i64 {
+    if cli.completed == false {
+      return emit_error_report(cli, workflow, err_text_handle, err_severity);
+    }
+    if workflow.overall_success {
+      return emit_success_report(cli, workflow, ok_text_handle, ok_severity);
+    }
+    return emit_error_report(cli, workflow, err_text_handle, err_severity);
+  }
+
+  fn capture_workflow_from_cli(
+    cli: CliSummary,
+    first_step: WorkflowStep,
+    second_step: WorkflowStep,
+    third_step: WorkflowStep,
+    fourth_step: WorkflowStep
+  ) -> WorkflowQuadReport {
+    if cli.completed {
+      return run_workflow_quad(first_step, second_step, third_step, fourth_step);
+    }
+    return skipped_quad_report(first_step, second_step, third_step, fourth_step);
+  }
+
+  fn emit_success_report(
+    cli: CliSummary,
+    workflow: WorkflowQuadReport,
+    ok_text_handle: i64,
+    ok_severity: i64
+  ) -> i64 {
+    let label_handle: i64 = host_diag_label(ok_text_handle);
+    let span_handle: i64 = host_diag_span(0, cli.line_len + workflow.executed_steps);
+    return host_diag_emit(label_handle, span_handle, ok_severity);
+  }
+
+  fn emit_error_report(
+    cli: CliSummary,
+    workflow: WorkflowQuadReport,
+    err_text_handle: i64,
+    err_severity: i64
+  ) -> i64 {
+    let label_handle: i64 = host_diag_label(err_text_handle);
+    let span_handle: i64 = host_diag_span(0, cli.line_len + workflow.executed_steps);
+    return host_diag_emit(label_handle, span_handle, err_severity);
+  }
+
+  fn build_success_summary(
+    seed: CombinedSeed,
+    cli: CliSummary,
+    automation: AutomationSummary,
+    workflow: WorkflowQuadReport
+  ) -> CombinedSummary {
+    return CombinedSummary {
+      cli: cli,
+      automation: automation,
+      workflow: workflow,
+      diag_code: emit_report(
+        cli,
+        workflow,
+        seed.cli.ok_text_handle,
+        seed.cli.err_text_handle,
+        seed.cli.ok_severity,
+        seed.cli.err_severity
+      ),
+      stdout_code: host_stdout_write(seed.cli.ok_text_handle),
+      stderr_code: 0,
+      stdout_flushed: host_stdout_flush(),
+      stderr_flushed: 0
+    };
+  }
+
+  fn build_error_summary(
+    seed: CombinedSeed,
+    cli: CliSummary,
+    automation: AutomationSummary,
+    workflow: WorkflowQuadReport
+  ) -> CombinedSummary {
+    return CombinedSummary {
+      cli: cli,
+      automation: automation,
+      workflow: workflow,
+      diag_code: emit_report(
+        cli,
+        workflow,
+        seed.cli.ok_text_handle,
+        seed.cli.err_text_handle,
+        seed.cli.ok_severity,
+        seed.cli.err_severity
+      ),
+      stdout_code: 0,
+      stderr_code: host_stderr_write(seed.cli.err_text_handle),
+      stdout_flushed: 0,
+      stderr_flushed: host_stderr_flush()
+    };
+  }
+
+  fn capture_combined(seed: CombinedSeed) -> CombinedSummary {
+    let cli: CliSummary = capture_cli(seed.cli);
+    let automation: AutomationSummary = capture_automation(seed.automation, cli.selected_value);
+    let first_step: WorkflowStep =
+      build_workflow_step(4101, 801, 17, automation.cwd_handle, 250, true);
+    let second_step: WorkflowStep =
+      build_workflow_step(4102, 803, 19, automation.cwd_handle, 500, false);
+    let third_step: WorkflowStep =
+      build_workflow_step(4103, 805, 23, automation.temp_dir_handle, 750, false);
+    let fourth_step: WorkflowStep =
+      build_workflow_step(4104, 807, 29, automation.cwd_handle, 1000, true);
+    let workflow: WorkflowQuadReport = capture_workflow_from_cli(
+      cli,
+      first_step,
+      second_step,
+      third_step,
+      fourth_step
+    );
+
+    if cli.completed == false {
+      return build_error_summary(seed, cli, automation, workflow);
+    }
+    if workflow.overall_success {
+      return build_success_summary(seed, cli, automation, workflow);
+    }
+    return build_error_summary(seed, cli, automation, workflow);
+  }
+
+  fn summarize_workflow_step_report(report: WorkflowStepReport) -> i64 {
+    return report.name_handle
+      + report.result.handle
+      + report.result.status
+      + report.result.wait_code
+      + report.result.wait_exit
+      + report.result.cwd_handle
+      + report.result.timeout_ms
+      + encode_bool(report.result.launched)
+      + encode_bool(report.result.inherit_cwd)
+      + encode_bool(report.result.has_timeout)
+      + encode_bool(report.result.succeeded)
+      + encode_bool(report.executed)
+      + encode_bool(report.blocked_by_failure);
+  }
+
+  fn summarize_quad_report(report: WorkflowQuadReport) -> i64 {
+    return summarize_workflow_step_report(report.first)
+      + summarize_workflow_step_report(report.second)
+      + summarize_workflow_step_report(report.third)
+      + summarize_workflow_step_report(report.fourth)
+      + report.first_failure_handle
+      + encode_bool(report.overall_success)
+      + report.executed_steps;
+  }
+
+  fn summarize_cli_workflow_automation_recipe(
+    prompt_handle: i64,
+    ok_text_handle: i64,
+    err_text_handle: i64,
+    timeout_limit: i64,
+    ok_severity: i64,
+    err_severity: i64,
+    prefix_handle: i64,
+    cache_name_handle: i64,
+    cache_key_handle: i64
+  ) -> i64 {
+    let seed: CombinedSeed = build_combined_seed(
+      prompt_handle,
+      ok_text_handle,
+      err_text_handle,
+      timeout_limit,
+      ok_severity,
+      err_severity,
+      prefix_handle,
+      cache_name_handle,
+      cache_key_handle
+    );
+    let summary: CombinedSummary = capture_combined(seed);
+    return summary.cli.argv_count
+      + summary.cli.line_handle
+      + summary.cli.line_len
+      + encode_bool(summary.cli.completed)
+      + encode_bool(summary.cli.timed_out)
+      + summary.cli.selected_value
+      + summary.cli.tick_ns
+      + summary.automation.cwd_handle
+      + summary.automation.temp_dir_handle
+      + summary.automation.temp_file_handle
+      + summary.automation.cache_hit_handle
+      + summary.automation.cache_store_code
+      + summarize_quad_report(summary.workflow)
+      + summary.diag_code
+      + summary.stdout_code
+      + summary.stderr_code
+      + summary.stdout_flushed
+      + summary.stderr_flushed;
+  }
+
+  fn main() {
+    print(summarize_cli_workflow_automation_recipe(
+      509,
+      1901,
+      1903,
+      0,
+      1,
+      2,
+      2401,
+      1607,
+      41
+    ));
+  }
+}

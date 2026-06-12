@@ -1,0 +1,583 @@
+mod cpu Main {
+  extern "c" fn host_command_spawn(program_handle: i64, argv_handle: i64) -> i64;
+  extern "c" fn host_command_spawn_in(
+    program_handle: i64,
+    argv_handle: i64,
+    cwd_handle: i64,
+    timeout_ms: i64
+  ) -> i64;
+  extern "c" fn host_command_status(command_handle: i64) -> i64;
+  extern "c" fn host_command_wait(command_handle: i64) -> i64;
+  extern "c" fn host_command_wait_exit(command_handle: i64) -> i64;
+
+  struct CommandContext {
+    env_handle: i64,
+    cwd_handle: i64,
+    timeout_ms: i64,
+    inherit_env: bool,
+    inherit_cwd: bool,
+    has_timeout: bool
+  }
+
+  struct CommandRequest {
+    program_handle: i64,
+    argv_handle: i64,
+    context: CommandContext
+  }
+
+  struct CommandResult {
+    handle: i64,
+    status: i64,
+    wait_code: i64,
+    wait_exit: i64,
+    launched: bool,
+    env_handle: i64,
+    cwd_handle: i64,
+    timeout_ms: i64,
+    inherit_env: bool,
+    inherit_cwd: bool,
+    has_timeout: bool,
+    succeeded: bool
+  }
+
+  struct WorkflowStep {
+    name_handle: i64,
+    request: CommandRequest,
+    fail_fast: bool
+  }
+
+  struct WorkflowStepReport {
+    name_handle: i64,
+    result: CommandResult,
+    executed: bool,
+    blocked_by_failure: bool
+  }
+
+  struct WorkflowPairReport {
+    first: WorkflowStepReport,
+    second: WorkflowStepReport,
+    first_failure_handle: i64,
+    overall_success: bool,
+    executed_steps: i64
+  }
+
+  struct WorkflowTripleReport {
+    first: WorkflowStepReport,
+    second: WorkflowStepReport,
+    third: WorkflowStepReport,
+    first_failure_handle: i64,
+    overall_success: bool,
+    executed_steps: i64
+  }
+
+  struct WorkflowQuadReport {
+    first: WorkflowStepReport,
+    second: WorkflowStepReport,
+    third: WorkflowStepReport,
+    fourth: WorkflowStepReport,
+    first_failure_handle: i64,
+    overall_success: bool,
+    executed_steps: i64
+  }
+
+  fn build_default_command_context() -> CommandContext {
+    return CommandContext {
+      env_handle: 0,
+      cwd_handle: 0,
+      timeout_ms: 0,
+      inherit_env: true,
+      inherit_cwd: true,
+      has_timeout: false
+    };
+  }
+
+  fn build_command_context(
+    env_handle: i64,
+    cwd_handle: i64,
+    timeout_ms: i64,
+    inherit_env: bool,
+    inherit_cwd: bool,
+    has_timeout: bool
+  ) -> CommandContext {
+    return CommandContext {
+      env_handle: env_handle,
+      cwd_handle: cwd_handle,
+      timeout_ms: timeout_ms,
+      inherit_env: inherit_env,
+      inherit_cwd: inherit_cwd,
+      has_timeout: has_timeout
+    };
+  }
+
+  fn build_command_request(program_handle: i64, argv_handle: i64) -> CommandRequest {
+    return CommandRequest {
+      program_handle: program_handle,
+      argv_handle: argv_handle,
+      context: build_default_command_context()
+    };
+  }
+
+  fn build_command_request_with_context(
+    program_handle: i64,
+    argv_handle: i64,
+    context: CommandContext
+  ) -> CommandRequest {
+    return CommandRequest {
+      program_handle: program_handle,
+      argv_handle: argv_handle,
+      context: context
+    };
+  }
+
+  fn run_command(request: CommandRequest) -> CommandResult {
+    let handle: i64 = host_command_spawn_in(
+      request.program_handle,
+      request.argv_handle,
+      request.context.cwd_handle,
+      request.context.timeout_ms
+    );
+    let wait_exit: i64 = host_command_wait_exit(handle);
+    let launched: bool = handle != 0;
+    return CommandResult {
+      handle: handle,
+      status: host_command_status(handle),
+      wait_code: host_command_wait(handle),
+      wait_exit: wait_exit,
+      launched: launched,
+      env_handle: request.context.env_handle,
+      cwd_handle: request.context.cwd_handle,
+      timeout_ms: request.context.timeout_ms,
+      inherit_env: request.context.inherit_env,
+      inherit_cwd: request.context.inherit_cwd,
+      has_timeout: request.context.has_timeout,
+      succeeded: launched && wait_exit == 0
+    };
+  }
+
+  fn build_workflow_step(
+    name_handle: i64,
+    request: CommandRequest,
+    fail_fast: bool
+  ) -> WorkflowStep {
+    return WorkflowStep {
+      name_handle: name_handle,
+      request: request,
+      fail_fast: fail_fast
+    };
+  }
+
+  fn build_workflow_step_from_handles(
+    name_handle: i64,
+    program_handle: i64,
+    argv_handle: i64,
+    fail_fast: bool
+  ) -> WorkflowStep {
+    return build_workflow_step(
+      name_handle,
+      build_command_request(program_handle, argv_handle),
+      fail_fast
+    );
+  }
+
+  fn build_workflow_step_with_context(
+    name_handle: i64,
+    program_handle: i64,
+    argv_handle: i64,
+    cwd_handle: i64,
+    timeout_ms: i64,
+    fail_fast: bool
+  ) -> WorkflowStep {
+    return build_workflow_step(
+      name_handle,
+      build_command_request_with_context(
+        program_handle,
+        argv_handle,
+        build_command_context(0, cwd_handle, timeout_ms, true, false, true)
+      ),
+      fail_fast
+    );
+  }
+
+  fn run_workflow_step(step: WorkflowStep) -> WorkflowStepReport {
+    return WorkflowStepReport {
+      name_handle: step.name_handle,
+      result: run_command(step.request),
+      executed: true,
+      blocked_by_failure: false
+    };
+  }
+
+  fn skipped_workflow_step(step: WorkflowStep, blocked_by_failure: bool) -> WorkflowStepReport {
+    return WorkflowStepReport {
+      name_handle: step.name_handle,
+      result: CommandResult {
+        handle: 0,
+        status: 0,
+        wait_code: 0,
+        wait_exit: 1,
+        launched: false,
+        env_handle: step.request.context.env_handle,
+        cwd_handle: step.request.context.cwd_handle,
+        timeout_ms: step.request.context.timeout_ms,
+        inherit_env: step.request.context.inherit_env,
+        inherit_cwd: step.request.context.inherit_cwd,
+        has_timeout: step.request.context.has_timeout,
+        succeeded: false
+      },
+      executed: false,
+      blocked_by_failure: blocked_by_failure
+    };
+  }
+
+  fn workflow_step_failed(report: WorkflowStepReport) -> bool {
+    if report.executed == false {
+      return false;
+    }
+    return report.result.succeeded == false;
+  }
+
+  fn workflow_should_stop(step: WorkflowStep, report: WorkflowStepReport) -> bool {
+    return step.fail_fast && workflow_step_failed(report);
+  }
+
+  fn encode_bool(flag: bool) -> i64 {
+    if flag {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn count_pair_executed_steps(second: WorkflowStepReport) -> i64 {
+    if second.executed {
+      return 2;
+    } else {
+      return 1;
+    }
+  }
+
+  fn count_triple_executed_steps(
+    second: WorkflowStepReport,
+    third: WorkflowStepReport
+  ) -> i64 {
+    if second.executed == false {
+      return 1;
+    }
+    if third.executed {
+      return 3;
+    } else {
+      return 2;
+    }
+  }
+
+  fn count_quad_executed_steps(
+    second: WorkflowStepReport,
+    third: WorkflowStepReport,
+    fourth: WorkflowStepReport
+  ) -> i64 {
+    if second.executed == false {
+      return 1;
+    }
+    if third.executed == false {
+      return 2;
+    }
+    if fourth.executed {
+      return 4;
+    } else {
+      return 3;
+    }
+  }
+
+  fn build_pair_report(
+    first: WorkflowStepReport,
+    second: WorkflowStepReport
+  ) -> WorkflowPairReport {
+    if workflow_step_failed(first) {
+      return WorkflowPairReport {
+        first: first,
+        second: second,
+        first_failure_handle: first.name_handle,
+        overall_success: false,
+        executed_steps: count_pair_executed_steps(second)
+      };
+    }
+    if workflow_step_failed(second) {
+      return WorkflowPairReport {
+        first: first,
+        second: second,
+        first_failure_handle: second.name_handle,
+        overall_success: false,
+        executed_steps: count_pair_executed_steps(second)
+      };
+    }
+    return WorkflowPairReport {
+      first: first,
+      second: second,
+      first_failure_handle: 0,
+      overall_success: true,
+      executed_steps: count_pair_executed_steps(second)
+    };
+  }
+
+  fn build_triple_report(
+    first: WorkflowStepReport,
+    second: WorkflowStepReport,
+    third: WorkflowStepReport
+  ) -> WorkflowTripleReport {
+    if workflow_step_failed(first) {
+      return WorkflowTripleReport {
+        first: first,
+        second: second,
+        third: third,
+        first_failure_handle: first.name_handle,
+        overall_success: false,
+        executed_steps: count_triple_executed_steps(second, third)
+      };
+    }
+    if workflow_step_failed(second) {
+      return WorkflowTripleReport {
+        first: first,
+        second: second,
+        third: third,
+        first_failure_handle: second.name_handle,
+        overall_success: false,
+        executed_steps: count_triple_executed_steps(second, third)
+      };
+    }
+    if workflow_step_failed(third) {
+      return WorkflowTripleReport {
+        first: first,
+        second: second,
+        third: third,
+        first_failure_handle: third.name_handle,
+        overall_success: false,
+        executed_steps: 3
+      };
+    }
+    return WorkflowTripleReport {
+      first: first,
+      second: second,
+      third: third,
+      first_failure_handle: 0,
+      overall_success: true,
+      executed_steps: 3
+    };
+  }
+
+  fn build_quad_report(
+    first: WorkflowStepReport,
+    second: WorkflowStepReport,
+    third: WorkflowStepReport,
+    fourth: WorkflowStepReport
+  ) -> WorkflowQuadReport {
+    if workflow_step_failed(first) {
+      return WorkflowQuadReport {
+        first: first,
+        second: second,
+        third: third,
+        fourth: fourth,
+        first_failure_handle: first.name_handle,
+        overall_success: false,
+        executed_steps: count_quad_executed_steps(second, third, fourth)
+      };
+    }
+    if workflow_step_failed(second) {
+      return WorkflowQuadReport {
+        first: first,
+        second: second,
+        third: third,
+        fourth: fourth,
+        first_failure_handle: second.name_handle,
+        overall_success: false,
+        executed_steps: count_quad_executed_steps(second, third, fourth)
+      };
+    }
+    if workflow_step_failed(third) {
+      return WorkflowQuadReport {
+        first: first,
+        second: second,
+        third: third,
+        fourth: fourth,
+        first_failure_handle: third.name_handle,
+        overall_success: false,
+        executed_steps: count_quad_executed_steps(second, third, fourth)
+      };
+    }
+    if workflow_step_failed(fourth) {
+      return WorkflowQuadReport {
+        first: first,
+        second: second,
+        third: third,
+        fourth: fourth,
+        first_failure_handle: fourth.name_handle,
+        overall_success: false,
+        executed_steps: 4
+      };
+    }
+    return WorkflowQuadReport {
+      first: first,
+      second: second,
+      third: third,
+      fourth: fourth,
+      first_failure_handle: 0,
+      overall_success: true,
+      executed_steps: 4
+    };
+  }
+
+  fn run_workflow_pair(first_step: WorkflowStep, second_step: WorkflowStep) -> WorkflowPairReport {
+    let first_report: WorkflowStepReport = run_workflow_step(first_step);
+    if workflow_should_stop(first_step, first_report) {
+      return build_pair_report(
+        first_report,
+        skipped_workflow_step(second_step, true)
+      );
+    }
+    return build_pair_report(
+      first_report,
+      run_workflow_step(second_step)
+    );
+  }
+
+  fn run_workflow_triple(
+    first_step: WorkflowStep,
+    second_step: WorkflowStep,
+    third_step: WorkflowStep
+  ) -> WorkflowTripleReport {
+    let first_report: WorkflowStepReport = run_workflow_step(first_step);
+    if workflow_should_stop(first_step, first_report) {
+      return build_triple_report(
+        first_report,
+        skipped_workflow_step(second_step, true),
+        skipped_workflow_step(third_step, true)
+      );
+    }
+
+    let second_report: WorkflowStepReport = run_workflow_step(second_step);
+    if workflow_should_stop(second_step, second_report) {
+      return build_triple_report(
+        first_report,
+        second_report,
+        skipped_workflow_step(third_step, true)
+      );
+    }
+
+    return build_triple_report(
+      first_report,
+      second_report,
+      run_workflow_step(third_step)
+    );
+  }
+
+  fn run_workflow_quad(
+    first_step: WorkflowStep,
+    second_step: WorkflowStep,
+    third_step: WorkflowStep,
+    fourth_step: WorkflowStep
+  ) -> WorkflowQuadReport {
+    let first_report: WorkflowStepReport = run_workflow_step(first_step);
+    if workflow_should_stop(first_step, first_report) {
+      return build_quad_report(
+        first_report,
+        skipped_workflow_step(second_step, true),
+        skipped_workflow_step(third_step, true),
+        skipped_workflow_step(fourth_step, true)
+      );
+    }
+
+    let second_report: WorkflowStepReport = run_workflow_step(second_step);
+    if workflow_should_stop(second_step, second_report) {
+      return build_quad_report(
+        first_report,
+        second_report,
+        skipped_workflow_step(third_step, true),
+        skipped_workflow_step(fourth_step, true)
+      );
+    }
+
+    let third_report: WorkflowStepReport = run_workflow_step(third_step);
+    if workflow_should_stop(third_step, third_report) {
+      return build_quad_report(
+        first_report,
+        second_report,
+        third_report,
+        skipped_workflow_step(fourth_step, true)
+      );
+    }
+
+    return build_quad_report(
+      first_report,
+      second_report,
+      third_report,
+      run_workflow_step(fourth_step)
+    );
+  }
+
+  fn summarize_workflow_step_report(report: WorkflowStepReport) -> i64 {
+    let executed_bonus: i64 = encode_bool(report.executed);
+    let blocked_bonus: i64 = encode_bool(report.blocked_by_failure);
+    let launched_bonus: i64 = encode_bool(report.result.launched);
+    let success_bonus: i64 = encode_bool(report.result.succeeded);
+    let inherit_env_bonus: i64 = encode_bool(report.result.inherit_env);
+    let inherit_cwd_bonus: i64 = encode_bool(report.result.inherit_cwd);
+    let timeout_bonus: i64 = encode_bool(report.result.has_timeout);
+    return report.name_handle
+      + report.result.handle
+      + report.result.status
+      + report.result.wait_code
+      + report.result.wait_exit
+      + report.result.env_handle
+      + report.result.cwd_handle
+      + report.result.timeout_ms
+      + executed_bonus
+      + blocked_bonus
+      + launched_bonus
+      + inherit_env_bonus
+      + inherit_cwd_bonus
+      + timeout_bonus
+      + success_bonus;
+  }
+
+  fn summarize_workflow_pair_report(report: WorkflowPairReport) -> i64 {
+    let overall_bonus: i64 = encode_bool(report.overall_success);
+    return summarize_workflow_step_report(report.first)
+      + summarize_workflow_step_report(report.second)
+      + report.first_failure_handle
+      + report.executed_steps
+      + overall_bonus;
+  }
+
+  fn summarize_workflow_triple_report(report: WorkflowTripleReport) -> i64 {
+    let overall_bonus: i64 = encode_bool(report.overall_success);
+    return summarize_workflow_step_report(report.first)
+      + summarize_workflow_step_report(report.second)
+      + summarize_workflow_step_report(report.third)
+      + report.first_failure_handle
+      + report.executed_steps
+      + overall_bonus;
+  }
+
+  fn summarize_workflow_quad_report(report: WorkflowQuadReport) -> i64 {
+    let overall_bonus: i64 = encode_bool(report.overall_success);
+    return summarize_workflow_step_report(report.first)
+      + summarize_workflow_step_report(report.second)
+      + summarize_workflow_step_report(report.third)
+      + summarize_workflow_step_report(report.fourth)
+      + report.first_failure_handle
+      + report.executed_steps
+      + overall_bonus;
+  }
+
+  fn summarize_workflow_runtime() -> i64 {
+    let report: WorkflowQuadReport = run_workflow_quad(
+      build_workflow_step_with_context(3001, 401, 17, 901, 250, true),
+      build_workflow_step_from_handles(3002, 503, 29, false),
+      build_workflow_step_with_context(3003, 601, 31, 1001, 500, false),
+      build_workflow_step_with_context(3004, 701, 37, 1101, 750, true)
+    );
+    return summarize_workflow_quad_report(report);
+  }
+
+  fn main() {
+    print(summarize_workflow_runtime());
+  }
+}

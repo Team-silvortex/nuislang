@@ -1182,10 +1182,10 @@ impl RegisteredMod for CpuMod {
                 }
                 Ok(InstructionSemantics::effect(inputs))
             }
-            "loop_while_i64_flow_chain" => {
+            "loop_while_i64_flow_chain" | "loop_while_scalar_flow_chain" => {
                 if node.op.args.len() < 8 || (node.op.args.len() - 8) % 2 != 0 {
                     return Err(format!(
-                        "node `{}` expects `cpu.loop_while_i64_flow_chain <name> <resource> <initial> <limit> <step> <cmp> <step_kind> <control_kind> <control_rhs> <control_action> (<carry_initial> <carry_kind>)*`",
+                        "node `{}` expects `cpu.loop_while_scalar_flow_chain <name> <resource> <initial> <limit> <step> <cmp> <step_kind> <control_kind> <control_rhs> <control_action> (<carry_initial> <carry_kind>)*`",
                         node.name
                     ));
                 }
@@ -1299,10 +1299,10 @@ impl RegisteredMod for CpuMod {
                 }
                 Ok(InstructionSemantics::effect(inputs))
             }
-            "loop_while_i64_async_flow_chain" => {
+            "loop_while_i64_async_flow_chain" | "loop_while_scalar_async_flow_chain" => {
                 if node.op.args.len() < 7 || (node.op.args.len() - 7) % 2 != 0 {
                     return Err(format!(
-                        "node `{}` expects `cpu.loop_while_i64_async_flow_chain <name> <resource> <initial> <limit> <step_callee> <cmp> <control_kind> <control_rhs> <control_action> (<carry_initial> <carry_kind>)*`",
+                        "node `{}` expects `cpu.loop_while_scalar_async_flow_chain <name> <resource> <initial> <limit> <step_callee> <cmp> <control_kind> <control_rhs> <control_action> (<carry_initial> <carry_kind>)*`",
                         node.name
                     ));
                 }
@@ -1410,7 +1410,7 @@ impl RegisteredMod for CpuMod {
                 }
                 Ok(InstructionSemantics::effect(inputs))
             }
-            "loop_while_i64_async_flow_cond_chain" => {
+            "loop_while_i64_async_flow_cond_chain" | "loop_while_scalar_async_flow_cond_chain" => {
                 let validate_flow_control_kind =
                     |kind: &str, node_name: &str| -> Result<(), String> {
                         match kind {
@@ -1503,7 +1503,7 @@ impl RegisteredMod for CpuMod {
                     || (node.op.args.len() - carry_start_index) % 5 != 0
                 {
                     return Err(format!(
-                        "node `{}` expects `cpu.loop_while_i64_async_flow_cond_chain <name> <resource> <initial> <limit> <step_callee> <cmp> <control_expr> <control_action> (<carry_initial> <cond_kind> <cond_rhs> <then_kind> <else_kind>)+`",
+                        "node `{}` expects `cpu.loop_while_scalar_async_flow_cond_chain <name> <resource> <initial> <limit> <step_callee> <cmp> <control_expr> <control_action> (<carry_initial> <cond_kind> <cond_rhs> <then_kind> <else_kind>)+`",
                         node.name
                     ));
                 }
@@ -1545,10 +1545,10 @@ impl RegisteredMod for CpuMod {
                 }
                 Ok(InstructionSemantics::effect(inputs))
             }
-            "loop_while_i64_post_flow_chain" => {
+            "loop_while_i64_post_flow_chain" | "loop_while_scalar_post_flow_chain" => {
                 if node.op.args.len() < 10 || (node.op.args.len() - 8) % 2 != 0 {
                     return Err(format!(
-                        "node `{}` expects `cpu.loop_while_i64_post_flow_chain <name> <resource> <initial> <limit> <step> <cmp> <step_kind> <control_kind> <control_rhs> <control_action> (<carry_initial> <carry_kind>)+`",
+                        "node `{}` expects `cpu.loop_while_scalar_post_flow_chain <name> <resource> <initial> <limit> <step> <cmp> <step_kind> <control_kind> <control_rhs> <control_action> (<carry_initial> <carry_kind>)+`",
                         node.name
                     ));
                 }
@@ -1662,10 +1662,10 @@ impl RegisteredMod for CpuMod {
                 }
                 Ok(InstructionSemantics::effect(inputs))
             }
-            "loop_while_i64_async_post_flow_chain" => {
+            "loop_while_i64_async_post_flow_chain" | "loop_while_scalar_async_post_flow_chain" => {
                 if node.op.args.len() < 9 || (node.op.args.len() - 7) % 2 != 0 {
                     return Err(format!(
-                        "node `{}` expects `cpu.loop_while_i64_async_post_flow_chain <name> <resource> <initial> <limit> <step_callee> <cmp> <control_kind> <control_rhs> <control_action> (<carry_initial> <carry_kind>)+`",
+                        "node `{}` expects `cpu.loop_while_scalar_async_post_flow_chain <name> <resource> <initial> <limit> <step_callee> <cmp> <control_kind> <control_rhs> <control_action> (<carry_initial> <carry_kind>)+`",
                         node.name
                     ));
                 }
@@ -1770,7 +1770,8 @@ impl RegisteredMod for CpuMod {
                 }
                 Ok(InstructionSemantics::effect(inputs))
             }
-            "loop_while_i64_async_post_flow_cond_chain" => {
+            "loop_while_i64_async_post_flow_cond_chain"
+            | "loop_while_scalar_async_post_flow_cond_chain" => {
                 let validate_flow_control_kind =
                     |kind: &str, node_name: &str| -> Result<(), String> {
                         match kind {
@@ -1863,7 +1864,7 @@ impl RegisteredMod for CpuMod {
                     || (node.op.args.len() - carry_start_index) % 5 != 0
                 {
                     return Err(format!(
-                        "node `{}` expects `cpu.loop_while_i64_async_post_flow_cond_chain <name> <resource> <initial> <limit> <step_callee> <cmp> <control_expr> <control_action> (<carry_initial> <cond_kind> <cond_rhs> <then_kind> <else_kind>)+`",
+                        "node `{}` expects `cpu.loop_while_scalar_async_post_flow_cond_chain <name> <resource> <initial> <limit> <step_callee> <cmp> <control_expr> <control_action> (<carry_initial> <cond_kind> <cond_rhs> <then_kind> <else_kind>)+`",
                         node.name
                     ));
                 }
@@ -1905,7 +1906,7 @@ impl RegisteredMod for CpuMod {
                 }
                 Ok(InstructionSemantics::effect(inputs))
             }
-            "loop_while_i64_post_flow_cond_chain" => {
+            "loop_while_i64_post_flow_cond_chain" | "loop_while_scalar_post_flow_cond_chain" => {
                 let validate_flow_control_kind =
                     |kind: &str, node_name: &str| -> Result<(), String> {
                         match kind {
@@ -1961,7 +1962,7 @@ impl RegisteredMod for CpuMod {
                     Some("and") | Some("or") => {
                         if node.op.args.len() < 16 || (node.op.args.len() - 11) % 5 != 0 {
                             return Err(format!(
-                                "node `{}` expects `cpu.loop_while_i64_post_flow_cond_chain <name> <resource> <initial> <limit> <step> <cmp> <step_kind> (<control_kind> <control_rhs> <control_action> | <and|or> <control_kind> <control_rhs> <control_kind> <control_rhs> <control_action>) (<carry_initial> <cond_kind> <cond_rhs> <then_kind> <else_kind>)+`",
+                                "node `{}` expects `cpu.loop_while_scalar_post_flow_cond_chain <name> <resource> <initial> <limit> <step> <cmp> <step_kind> (<control_kind> <control_rhs> <control_action> | <and|or> <control_kind> <control_rhs> <control_kind> <control_rhs> <control_action>) (<carry_initial> <cond_kind> <cond_rhs> <then_kind> <else_kind>)+`",
                                 node.name
                             ));
                         }
@@ -1976,7 +1977,7 @@ impl RegisteredMod for CpuMod {
                     Some(kind) => {
                         if node.op.args.len() < 13 || (node.op.args.len() - 8) % 5 != 0 {
                             return Err(format!(
-                                "node `{}` expects `cpu.loop_while_i64_post_flow_cond_chain <name> <resource> <initial> <limit> <step> <cmp> <step_kind> (<control_kind> <control_rhs> <control_action> | <and|or> <control_kind> <control_rhs> <control_kind> <control_rhs> <control_action>) (<carry_initial> <cond_kind> <cond_rhs> <then_kind> <else_kind>)+`",
+                                "node `{}` expects `cpu.loop_while_scalar_post_flow_cond_chain <name> <resource> <initial> <limit> <step> <cmp> <step_kind> (<control_kind> <control_rhs> <control_action> | <and|or> <control_kind> <control_rhs> <control_kind> <control_rhs> <control_action>) (<carry_initial> <cond_kind> <cond_rhs> <then_kind> <else_kind>)+`",
                                 node.name
                             ));
                         }
@@ -2092,7 +2093,7 @@ impl RegisteredMod for CpuMod {
                 }
                 Ok(InstructionSemantics::effect(inputs))
             }
-            "loop_while_i64_flow_cond_chain" => {
+            "loop_while_i64_flow_cond_chain" | "loop_while_scalar_flow_cond_chain" => {
                 let validate_flow_control_kind =
                     |kind: &str, node_name: &str| -> Result<(), String> {
                         match kind {
@@ -2148,7 +2149,7 @@ impl RegisteredMod for CpuMod {
                     Some("and") | Some("or") => {
                         if node.op.args.len() < 16 || (node.op.args.len() - 11) % 5 != 0 {
                             return Err(format!(
-                                    "node `{}` expects `cpu.loop_while_i64_flow_cond_chain <name> <resource> <initial> <limit> <step> <cmp> <step_kind> (<control_kind> <control_rhs> <control_action> | <and|or> <control_kind> <control_rhs> <control_kind> <control_rhs> <control_action>) (<carry_initial> <cond_kind> <cond_rhs> <then_kind> <else_kind>)+`",
+                                    "node `{}` expects `cpu.loop_while_scalar_flow_cond_chain <name> <resource> <initial> <limit> <step> <cmp> <step_kind> (<control_kind> <control_rhs> <control_action> | <and|or> <control_kind> <control_rhs> <control_kind> <control_rhs> <control_action>) (<carry_initial> <cond_kind> <cond_rhs> <then_kind> <else_kind>)+`",
                                     node.name
                                 ));
                         }
@@ -2163,7 +2164,7 @@ impl RegisteredMod for CpuMod {
                     Some(kind) => {
                         if node.op.args.len() < 13 || (node.op.args.len() - 8) % 5 != 0 {
                             return Err(format!(
-                                    "node `{}` expects `cpu.loop_while_i64_flow_cond_chain <name> <resource> <initial> <limit> <step> <cmp> <step_kind> (<control_kind> <control_rhs> <control_action> | <and|or> <control_kind> <control_rhs> <control_kind> <control_rhs> <control_action>) (<carry_initial> <cond_kind> <cond_rhs> <then_kind> <else_kind>)+`",
+                                    "node `{}` expects `cpu.loop_while_scalar_flow_cond_chain <name> <resource> <initial> <limit> <step> <cmp> <step_kind> (<control_kind> <control_rhs> <control_action> | <and|or> <control_kind> <control_rhs> <control_kind> <control_rhs> <control_action>) (<carry_initial> <cond_kind> <cond_rhs> <then_kind> <else_kind>)+`",
                                     node.name
                                 ));
                         }
@@ -2504,7 +2505,7 @@ impl RegisteredMod for CpuMod {
                 );
                 Ok(Value::Unit)
             }
-            "loop_while_i64_async_flow_cond_chain" => {
+            "loop_while_i64_async_flow_cond_chain" | "loop_while_scalar_async_flow_cond_chain" => {
                 let initial = state.expect_value(&node.op.args[0])?.clone();
                 let limit = state.expect_value(&node.op.args[1])?.clone();
                 let step_callee = node.op.args.get(2).map_or("<missing>", String::as_str);
@@ -2530,7 +2531,8 @@ impl RegisteredMod for CpuMod {
                 state.push_resource_event(
                     resource,
                     format!(
-                        "effect cpu.loop_while_i64_async_flow_cond_chain @{} [{}]: start {}, loop while current {} {}, step await {}(current), if {} {} then {}, carries {}",
+                        "effect cpu.{} @{} [{}]: start {}, loop while current {} {}, step await {}(current), if {} {} then {}, carries {}",
+                        node.op.instruction,
                         node.resource, resource.kind.raw, initial, cmp, limit, step_callee, control_kind, control_rhs, control_action, carries.join(", ")
                     ),
                 );
@@ -3591,7 +3593,7 @@ impl RegisteredMod for CpuMod {
                 );
                 Ok(Value::Unit)
             }
-            "loop_while_i64_flow_chain" => {
+            "loop_while_i64_flow_chain" | "loop_while_scalar_flow_chain" => {
                 let initial = state.expect_value(&node.op.args[0])?.clone();
                 let limit = state.expect_value(&node.op.args[1])?.clone();
                 let step = state.expect_value(&node.op.args[2])?.clone();
@@ -3610,7 +3612,8 @@ impl RegisteredMod for CpuMod {
                 state.push_resource_event(
                     resource,
                     format!(
-                        "effect cpu.loop_while_i64_flow_chain @{} [{}]: start {}, loop while current {} {}, step {} {}, if {} {} then {}, carries {}",
+                        "effect cpu.{} @{} [{}]: start {}, loop while current {} {}, step {} {}, if {} {} then {}, carries {}",
+                        node.op.instruction,
                         node.resource,
                         resource.kind.raw,
                         initial,
@@ -3626,7 +3629,7 @@ impl RegisteredMod for CpuMod {
                 );
                 Ok(Value::Unit)
             }
-            "loop_while_i64_async_flow_chain" => {
+            "loop_while_i64_async_flow_chain" | "loop_while_scalar_async_flow_chain" => {
                 let initial = state.expect_value(&node.op.args[0])?.clone();
                 let limit = state.expect_value(&node.op.args[1])?.clone();
                 let step_callee = node.op.args.get(2).map_or("<missing>", String::as_str);
@@ -3644,7 +3647,8 @@ impl RegisteredMod for CpuMod {
                 state.push_resource_event(
                     resource,
                     format!(
-                        "effect cpu.loop_while_i64_async_flow_chain @{} [{}]: start {}, loop while current {} {}, step await {}(current), if {} {} then {}, carries {}",
+                        "effect cpu.{} @{} [{}]: start {}, loop while current {} {}, step await {}(current), if {} {} then {}, carries {}",
+                        node.op.instruction,
                         node.resource,
                         resource.kind.raw,
                         initial,
@@ -3659,7 +3663,7 @@ impl RegisteredMod for CpuMod {
                 );
                 Ok(Value::Unit)
             }
-            "loop_while_i64_post_flow_chain" => {
+            "loop_while_i64_post_flow_chain" | "loop_while_scalar_post_flow_chain" => {
                 let initial = state.expect_value(&node.op.args[0])?.clone();
                 let limit = state.expect_value(&node.op.args[1])?.clone();
                 let step = state.expect_value(&node.op.args[2])?.clone();
@@ -3678,7 +3682,8 @@ impl RegisteredMod for CpuMod {
                 state.push_resource_event(
                     resource,
                     format!(
-                        "effect cpu.loop_while_i64_post_flow_chain @{} [{}]: start {}, loop while current {} {}, step {} {}, update carries {}, then if {} {} {},",
+                        "effect cpu.{} @{} [{}]: start {}, loop while current {} {}, step {} {}, update carries {}, then if {} {} {},",
+                        node.op.instruction,
                         node.resource,
                         resource.kind.raw,
                         initial,
@@ -3694,7 +3699,7 @@ impl RegisteredMod for CpuMod {
                 );
                 Ok(Value::Unit)
             }
-            "loop_while_i64_async_post_flow_chain" => {
+            "loop_while_i64_async_post_flow_chain" | "loop_while_scalar_async_post_flow_chain" => {
                 let initial = state.expect_value(&node.op.args[0])?.clone();
                 let limit = state.expect_value(&node.op.args[1])?.clone();
                 let step_callee = node.op.args.get(2).map_or("<missing>", String::as_str);
@@ -3712,7 +3717,8 @@ impl RegisteredMod for CpuMod {
                 state.push_resource_event(
                     resource,
                     format!(
-                        "effect cpu.loop_while_i64_async_post_flow_chain @{} [{}]: start {}, loop while current {} {}, step await {}(current), update carries {}, then if {} {} {},",
+                        "effect cpu.{} @{} [{}]: start {}, loop while current {} {}, step await {}(current), update carries {}, then if {} {} {},",
+                        node.op.instruction,
                         node.resource,
                         resource.kind.raw,
                         initial,
@@ -3727,7 +3733,8 @@ impl RegisteredMod for CpuMod {
                 );
                 Ok(Value::Unit)
             }
-            "loop_while_i64_async_post_flow_cond_chain" => {
+            "loop_while_i64_async_post_flow_cond_chain"
+            | "loop_while_scalar_async_post_flow_cond_chain" => {
                 let initial = state.expect_value(&node.op.args[0])?.clone();
                 let limit = state.expect_value(&node.op.args[1])?.clone();
                 let step_callee = node.op.args.get(2).map_or("<missing>", String::as_str);
@@ -3753,13 +3760,14 @@ impl RegisteredMod for CpuMod {
                 state.push_resource_event(
                     resource,
                     format!(
-                        "effect cpu.loop_while_i64_async_post_flow_cond_chain @{} [{}]: start {}, loop while current {} {}, step await {}(current), update carries {}, then if {} {} {},",
+                        "effect cpu.{} @{} [{}]: start {}, loop while current {} {}, step await {}(current), update carries {}, then if {} {} {},",
+                        node.op.instruction,
                         node.resource, resource.kind.raw, initial, cmp, limit, step_callee, carries.join(", "), control_kind, control_rhs, control_action
                     ),
                 );
                 Ok(Value::Unit)
             }
-            "loop_while_i64_post_flow_cond_chain" => {
+            "loop_while_i64_post_flow_cond_chain" | "loop_while_scalar_post_flow_cond_chain" => {
                 let initial = state.expect_value(&node.op.args[0])?.clone();
                 let limit = state.expect_value(&node.op.args[1])?.clone();
                 let step = state.expect_value(&node.op.args[2])?.clone();
@@ -3786,7 +3794,8 @@ impl RegisteredMod for CpuMod {
                 state.push_resource_event(
                     resource,
                     format!(
-                        "effect cpu.loop_while_i64_post_flow_cond_chain @{} [{}]: start {}, loop while current {} {}, step {} {}, update carries {}, then if {} {} {},",
+                        "effect cpu.{} @{} [{}]: start {}, loop while current {} {}, step {} {}, update carries {}, then if {} {} {},",
+                        node.op.instruction,
                         node.resource,
                         resource.kind.raw,
                         initial,
@@ -3802,7 +3811,7 @@ impl RegisteredMod for CpuMod {
                 );
                 Ok(Value::Unit)
             }
-            "loop_while_i64_flow_cond_chain" => {
+            "loop_while_i64_flow_cond_chain" | "loop_while_scalar_flow_cond_chain" => {
                 let initial = state.expect_value(&node.op.args[0])?.clone();
                 let limit = state.expect_value(&node.op.args[1])?.clone();
                 let step = state.expect_value(&node.op.args[2])?.clone();
@@ -3829,7 +3838,8 @@ impl RegisteredMod for CpuMod {
                 state.push_resource_event(
                     resource,
                     format!(
-                        "effect cpu.loop_while_i64_flow_cond_chain @{} [{}]: start {}, loop while current {} {}, step {} {}, if {} {} then {}, carries {}",
+                        "effect cpu.{} @{} [{}]: start {}, loop while current {} {}, step {} {}, if {} {} then {}, carries {}",
+                        node.op.instruction,
                         node.resource,
                         resource.kind.raw,
                         initial,

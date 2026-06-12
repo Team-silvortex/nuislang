@@ -463,8 +463,8 @@ fn lowers_self_tail_recursive_async_function_into_loop_while_i64_chain() {
     let loop_node = yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_chain")
-        .expect("expected loop_while_i64_chain node");
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_chain")
+        .expect("expected loop_while_scalar_chain node");
     assert_eq!(loop_node.op.args[3], "ne");
     assert_eq!(loop_node.op.args[4], "sub");
     assert_eq!(loop_node.op.args[6], "add_current");
@@ -511,8 +511,10 @@ fn lowers_branching_self_tail_recursive_async_function_into_loop_while_i64_cond_
     let loop_node = yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_cond_chain")
-        .expect("expected loop_while_i64_cond_chain node");
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_cond_chain"
+        })
+        .expect("expected loop_while_scalar_cond_chain node");
     assert_eq!(loop_node.op.args[3], "ne");
     assert_eq!(loop_node.op.args[4], "sub");
     assert_eq!(loop_node.op.args[6], "prev_current_gt");
@@ -561,8 +563,8 @@ fn lowers_multi_carry_prev_current_self_tail_recursive_async_function_into_loop_
     let loop_node = yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_chain")
-        .expect("expected loop_while_i64_chain node");
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_chain")
+        .expect("expected loop_while_scalar_chain node");
     assert_eq!(loop_node.op.args[3], "gt");
     assert_eq!(loop_node.op.args[4], "sub");
     assert_eq!(loop_node.op.args[6], "add_prev_current");
@@ -612,8 +614,10 @@ fn lowers_carry_condition_branching_multi_carry_prev_current_self_tail_recursive
     let loop_node = yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_cond_chain")
-        .expect("expected loop_while_i64_cond_chain node");
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_cond_chain"
+        })
+        .expect("expected loop_while_scalar_cond_chain node");
     assert_eq!(loop_node.op.args[3], "gt");
     assert_eq!(loop_node.op.args[4], "sub");
     assert_eq!(loop_node.op.args[6], "prev_carry0_gt");
@@ -662,8 +666,8 @@ fn lowers_cross_prev_carry_self_tail_recursive_async_function_into_loop_while_i6
     let loop_node = yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_chain")
-        .expect("expected loop_while_i64_chain node");
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_chain")
+        .expect("expected loop_while_scalar_chain node");
     assert_eq!(loop_node.op.args[3], "gt");
     assert_eq!(loop_node.op.args[4], "sub");
     assert_eq!(loop_node.op.args[6], "add_prev_carry1");
@@ -713,8 +717,10 @@ fn lowers_branching_cross_prev_carry_self_tail_recursive_async_function_into_loo
     let loop_node = yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_cond_chain")
-        .expect("expected loop_while_i64_cond_chain node");
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_cond_chain"
+        })
+        .expect("expected loop_while_scalar_cond_chain node");
     assert_eq!(loop_node.op.args[3], "gt");
     assert_eq!(loop_node.op.args[4], "sub");
     assert_eq!(loop_node.op.args[6], "prev_current_gt");
@@ -740,7 +746,7 @@ fn lowers_branching_cross_prev_carry_self_tail_recursive_async_function_into_loo
 }
 
 #[test]
-fn lowers_early_break_self_tail_recursive_async_function_into_loop_while_i64_flow_chain() {
+fn lowers_early_break_self_tail_recursive_async_function_into_loop_while_scalar_flow_chain() {
     let module = parse_nuis_module(
         r#"
         mod cpu Main {
@@ -767,8 +773,10 @@ fn lowers_early_break_self_tail_recursive_async_function_into_loop_while_i64_flo
     let loop_node = yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_flow_chain")
-        .expect("expected loop_while_i64_flow_chain node");
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_flow_chain"
+        })
+        .expect("expected loop_while_scalar_flow_chain node");
     assert_eq!(loop_node.op.args[3], "ne");
     assert_eq!(loop_node.op.args[4], "sub");
     assert_eq!(loop_node.op.args[5], "prev_current_gt");
@@ -787,7 +795,7 @@ fn lowers_early_break_self_tail_recursive_async_function_into_loop_while_i64_flo
 }
 
 #[test]
-fn lowers_early_break_branching_self_tail_recursive_async_function_into_loop_while_i64_flow_cond_chain(
+fn lowers_early_break_branching_self_tail_recursive_async_function_into_loop_while_scalar_flow_cond_chain(
 ) {
     let module = parse_nuis_module(
         r#"
@@ -820,9 +828,9 @@ fn lowers_early_break_branching_self_tail_recursive_async_function_into_loop_whi
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_flow_cond_chain"
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_flow_cond_chain"
         })
-        .expect("expected loop_while_i64_flow_cond_chain node");
+        .expect("expected loop_while_scalar_flow_cond_chain node");
     assert_eq!(loop_node.op.args[3], "ne");
     assert_eq!(loop_node.op.args[4], "sub");
     assert_eq!(loop_node.op.args[5], "prev_current_gt");
@@ -843,7 +851,8 @@ fn lowers_early_break_branching_self_tail_recursive_async_function_into_loop_whi
 }
 
 #[test]
-fn lowers_post_flow_break_self_tail_recursive_async_function_into_loop_while_i64_post_flow_chain() {
+fn lowers_post_flow_break_self_tail_recursive_async_function_into_loop_while_scalar_post_flow_chain(
+) {
     let module = parse_nuis_module(
         r#"
         mod cpu Main {
@@ -870,9 +879,9 @@ fn lowers_post_flow_break_self_tail_recursive_async_function_into_loop_while_i64
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_post_flow_chain"
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_post_flow_chain"
         })
-        .expect("expected loop_while_i64_post_flow_chain node");
+        .expect("expected loop_while_scalar_post_flow_chain node");
     assert_eq!(loop_node.op.args[3], "ne");
     assert_eq!(loop_node.op.args[4], "sub");
     assert_eq!(loop_node.op.args[5], "carry0_gt");
@@ -891,7 +900,7 @@ fn lowers_post_flow_break_self_tail_recursive_async_function_into_loop_while_i64
 }
 
 #[test]
-fn lowers_post_flow_break_branching_aux_carry_self_tail_recursive_async_function_into_loop_while_i64_post_flow_cond_chain(
+fn lowers_post_flow_break_branching_aux_carry_self_tail_recursive_async_function_into_loop_while_scalar_post_flow_cond_chain(
 ) {
     let module = parse_nuis_module(
         r#"
@@ -928,10 +937,11 @@ fn lowers_post_flow_break_branching_aux_carry_self_tail_recursive_async_function
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_post_flow_cond_chain"
+            node.op.module == "cpu"
+                && node.op.instruction == "loop_while_scalar_post_flow_cond_chain"
         })
         .unwrap_or_else(|| {
-            panic!("expected loop_while_i64_post_flow_cond_chain node, got {lowered_ops:?}")
+            panic!("expected loop_while_scalar_post_flow_cond_chain node, got {lowered_ops:?}")
         });
     assert_eq!(loop_node.op.args[3], "ne");
     assert_eq!(loop_node.op.args[4], "sub");
@@ -955,7 +965,7 @@ fn lowers_post_flow_break_branching_aux_carry_self_tail_recursive_async_function
 }
 
 #[test]
-fn lowers_post_flow_break_nested_branching_aux_carry_self_tail_recursive_async_function_into_loop_while_i64_post_flow_cond_chain(
+fn lowers_post_flow_break_nested_branching_aux_carry_self_tail_recursive_async_function_into_loop_while_scalar_post_flow_cond_chain(
 ) {
     let module = parse_nuis_module(
         r#"
@@ -991,9 +1001,10 @@ fn lowers_post_flow_break_nested_branching_aux_carry_self_tail_recursive_async_f
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_post_flow_cond_chain"
+            node.op.module == "cpu"
+                && node.op.instruction == "loop_while_scalar_post_flow_cond_chain"
         })
-        .expect("expected loop_while_i64_post_flow_cond_chain node");
+        .expect("expected loop_while_scalar_post_flow_cond_chain node");
     assert_eq!(loop_node.op.args[3], "ne");
     assert_eq!(loop_node.op.args[4], "sub");
     assert_eq!(loop_node.op.args[5], "carry0_gt");
@@ -1087,9 +1098,9 @@ fn lowers_async_while_with_await_step_and_break_flow_control() {
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_async_flow_chain"
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_async_flow_chain"
         })
-        .expect("expected loop_while_i64_async_flow_chain node");
+        .expect("expected loop_while_scalar_async_flow_chain node");
     assert_eq!(loop_node.op.args[2], "step");
     assert_eq!(loop_node.op.args[3], "lt");
     assert_eq!(loop_node.op.args[4], "current_gt");
@@ -1129,9 +1140,9 @@ fn lowers_async_while_with_await_step_and_continue_flow_control() {
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_async_flow_chain"
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_async_flow_chain"
         })
-        .expect("expected loop_while_i64_async_flow_chain node");
+        .expect("expected loop_while_scalar_async_flow_chain node");
     assert_eq!(loop_node.op.args[2], "step");
     assert_eq!(loop_node.op.args[3], "lt");
     assert_eq!(loop_node.op.args[4], "current_eq");
@@ -1175,9 +1186,10 @@ fn lowers_async_while_with_await_step_and_conditional_carry_flow_control() {
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_async_flow_cond_chain"
+            node.op.module == "cpu"
+                && node.op.instruction == "loop_while_scalar_async_flow_cond_chain"
         })
-        .expect("expected loop_while_i64_async_flow_cond_chain node");
+        .expect("expected loop_while_scalar_async_flow_cond_chain node");
     assert_eq!(loop_node.op.args[2], "step");
     assert_eq!(loop_node.op.args[3], "lt");
     assert_eq!(loop_node.op.args[4], "current_gt");
@@ -1227,9 +1239,10 @@ fn lowers_async_while_with_compound_flow_control_and_conditional_carry() {
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_async_flow_cond_chain"
+            node.op.module == "cpu"
+                && node.op.instruction == "loop_while_scalar_async_flow_cond_chain"
         })
-        .expect("expected loop_while_i64_async_flow_cond_chain node");
+        .expect("expected loop_while_scalar_async_flow_cond_chain node");
     assert_eq!(loop_node.op.args[2], "step");
     assert_eq!(loop_node.op.args[3], "lt");
     assert_eq!(loop_node.op.args[4], "and");
@@ -1278,9 +1291,10 @@ fn lowers_async_recursive_boolean_break_then_branching_carry_into_flow_cond_chai
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_async_flow_cond_chain"
+            node.op.module == "cpu"
+                && node.op.instruction == "loop_while_scalar_async_flow_cond_chain"
         })
-        .expect("expected loop_while_i64_async_flow_cond_chain node");
+        .expect("expected loop_while_scalar_async_flow_cond_chain node");
     assert_eq!(loop_node.op.args[2], "step");
     assert_eq!(loop_node.op.args[3], "lt");
     assert_eq!(loop_node.op.args[4], "and");
@@ -1326,9 +1340,10 @@ fn lowers_async_while_with_await_step_and_post_flow_break() {
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_async_post_flow_chain"
+            node.op.module == "cpu"
+                && node.op.instruction == "loop_while_scalar_async_post_flow_chain"
         })
-        .expect("expected loop_while_i64_async_post_flow_chain node");
+        .expect("expected loop_while_scalar_async_post_flow_chain node");
     assert_eq!(loop_node.op.args[2], "step");
     assert_eq!(loop_node.op.args[3], "lt");
     assert_eq!(loop_node.op.args[4], "carry0_gt");
@@ -1373,9 +1388,9 @@ fn lowers_async_while_with_await_step_and_post_flow_conditional_break() {
         .iter()
         .find(|node| {
             node.op.module == "cpu"
-                && node.op.instruction == "loop_while_i64_async_post_flow_cond_chain"
+                && node.op.instruction == "loop_while_scalar_async_post_flow_cond_chain"
         })
-        .expect("expected loop_while_i64_async_post_flow_cond_chain node");
+        .expect("expected loop_while_scalar_async_post_flow_cond_chain node");
     assert_eq!(loop_node.op.args[2], "step");
     assert_eq!(loop_node.op.args[3], "lt");
     assert_eq!(loop_node.op.args[4], "carry0_gt");
@@ -1428,9 +1443,9 @@ fn lowers_async_while_with_compound_post_flow_control_and_conditional_carry() {
         .iter()
         .find(|node| {
             node.op.module == "cpu"
-                && node.op.instruction == "loop_while_i64_async_post_flow_cond_chain"
+                && node.op.instruction == "loop_while_scalar_async_post_flow_cond_chain"
         })
-        .expect("expected loop_while_i64_async_post_flow_cond_chain node");
+        .expect("expected loop_while_scalar_async_post_flow_cond_chain node");
     assert_eq!(loop_node.op.args[2], "step");
     assert_eq!(loop_node.op.args[3], "lt");
     assert_eq!(loop_node.op.args[4], "or");
@@ -1480,9 +1495,9 @@ fn lowers_async_post_flow_continue_with_recursive_boolean_condition_into_post_fl
         .iter()
         .find(|node| {
             node.op.module == "cpu"
-                && node.op.instruction == "loop_while_i64_async_post_flow_cond_chain"
+                && node.op.instruction == "loop_while_scalar_async_post_flow_cond_chain"
         })
-        .expect("expected loop_while_i64_async_post_flow_cond_chain node");
+        .expect("expected loop_while_scalar_async_post_flow_cond_chain node");
     assert_eq!(loop_node.op.args[2], "step");
     assert_eq!(loop_node.op.args[3], "lt");
     assert_eq!(loop_node.op.args[4], "and");
@@ -1533,9 +1548,10 @@ fn lowers_async_kernel_observer_step_into_async_post_flow_break_chain() {
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_async_post_flow_chain"
+            node.op.module == "cpu"
+                && node.op.instruction == "loop_while_scalar_async_post_flow_chain"
         })
-        .expect("expected loop_while_i64_async_post_flow_chain node");
+        .expect("expected loop_while_scalar_async_post_flow_chain node");
     assert_eq!(loop_node.op.args[2], "step");
     assert!(yir
         .nodes

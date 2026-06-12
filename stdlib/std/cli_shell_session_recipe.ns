@@ -17,6 +17,8 @@ mod cpu Main {
     prompt_handle: i64,
     env_key_handle: i64,
     env_value_handle: i64,
+    equals_handle: i64,
+    interactive_suffix_handle: i64,
     ok_text_handle: i64,
     err_text_handle: i64
   }
@@ -35,8 +37,8 @@ mod cpu Main {
     tick_ns: i64
   }
 
-  fn build_env_prefix(env_key_handle: i64, env_value_handle: i64) -> i64 {
-    let keyed: i64 = host_text_concat(env_key_handle, "=");
+  fn build_env_prefix(env_key_handle: i64, equals_handle: i64, env_value_handle: i64) -> i64 {
+    let keyed: i64 = host_text_concat(env_key_handle, equals_handle);
     return host_text_concat(keyed, env_value_handle);
   }
 
@@ -44,6 +46,8 @@ mod cpu Main {
     prompt_handle: i64,
     env_key_handle: i64,
     env_value_handle: i64,
+    equals_handle: i64,
+    interactive_suffix_handle: i64,
     ok_text_handle: i64,
     err_text_handle: i64
   ) -> CliShellSessionSeed {
@@ -51,6 +55,8 @@ mod cpu Main {
       prompt_handle: prompt_handle,
       env_key_handle: env_key_handle,
       env_value_handle: env_value_handle,
+      equals_handle: equals_handle,
+      interactive_suffix_handle: interactive_suffix_handle,
       ok_text_handle: ok_text_handle,
       err_text_handle: err_text_handle
     };
@@ -60,9 +66,10 @@ mod cpu Main {
     let program_handle: i64 = host_argv_at(1);
     let line_handle: i64 = host_line_read(seed.prompt_handle);
     let line_len: i64 = host_line_len(line_handle);
-    let argv_tail_handle: i64 = host_text_concat(line_handle, " --interactive");
+    let argv_tail_handle: i64 =
+      host_text_concat(line_handle, seed.interactive_suffix_handle);
     let env_prefix_handle: i64 =
-      build_env_prefix(seed.env_key_handle, seed.env_value_handle);
+      build_env_prefix(seed.env_key_handle, seed.equals_handle, seed.env_value_handle);
     let command_handle: i64 = host_command_spawn(program_handle, argv_tail_handle);
     let child_handle: i64 = host_subprocess_spawn(
       program_handle,
@@ -89,6 +96,8 @@ mod cpu Main {
     prompt_handle: i64,
     env_key_handle: i64,
     env_value_handle: i64,
+    equals_handle: i64,
+    interactive_suffix_handle: i64,
     ok_text_handle: i64,
     err_text_handle: i64
   ) -> i64 {
@@ -96,6 +105,8 @@ mod cpu Main {
       prompt_handle,
       env_key_handle,
       env_value_handle,
+      equals_handle,
+      interactive_suffix_handle,
       ok_text_handle,
       err_text_handle
     );
@@ -114,6 +125,6 @@ mod cpu Main {
   }
 
   fn main() {
-    print(summarize_cli_shell_session_recipe(509, 2501, 2502, 1901, 1903));
+    print(summarize_cli_shell_session_recipe(509, 2501, 2502, 61, 2801, 1901, 1903));
   }
 }

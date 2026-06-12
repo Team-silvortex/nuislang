@@ -1,0 +1,728 @@
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+  extern "c" fn host_line_read(prompt_handle: i64) -> i64;
+  extern "c" fn host_line_len(line_handle: i64) -> i64;
+  extern "c" fn host_stdout_write(text_handle: i64) -> i64;
+  extern "c" fn host_stderr_write(text_handle: i64) -> i64;
+  extern "c" fn host_stdout_flush() -> i64;
+  extern "c" fn host_stderr_flush() -> i64;
+  extern "c" fn host_diag_label(message_handle: i64) -> i64;
+  extern "c" fn host_diag_span(start: i64, end: i64) -> i64;
+  extern "c" fn host_diag_emit(label_handle: i64, span_handle: i64, severity: i64) -> i64;
+  extern "c" fn host_cwd_handle() -> i64;
+  extern "c" fn host_temp_dir_handle() -> i64;
+  extern "c" fn host_temp_file_handle(prefix_handle: i64) -> i64;
+  extern "c" fn host_cache_open(name_handle: i64) -> i64;
+  extern "c" fn host_cache_lookup(cache_handle: i64, key_handle: i64) -> i64;
+  extern "c" fn host_cache_store(cache_handle: i64, key_handle: i64, value_handle: i64) -> i64;
+  extern "c" fn host_cache_close(cache_handle: i64) -> i64;
+  extern "c" fn host_command_spawn_in(
+    program_handle: i64,
+    argv_handle: i64,
+    cwd_handle: i64,
+    timeout_ms: i64
+  ) -> i64;
+  extern "c" fn host_command_status(command_handle: i64) -> i64;
+  extern "c" fn host_command_wait(command_handle: i64) -> i64;
+  extern "c" fn host_command_wait_exit(command_handle: i64) -> i64;
+  extern "c" fn host_monotonic_time_ns() -> i64;
+
+  struct ProjectCliSeed {
+    prompt_handle: i64,
+    ready_text_handle: i64,
+    failed_text_handle: i64,
+    timeout_limit: i64,
+    ready_severity: i64,
+    failed_severity: i64
+  }
+
+  struct ProjectBuildSeed {
+    prefix_handle: i64,
+    cache_name_handle: i64,
+    cache_key_handle: i64
+  }
+
+  struct ProjectSeed {
+    cli: ProjectCliSeed,
+    build: ProjectBuildSeed
+  }
+
+  struct ProjectSessionSummary {
+    argv_count: i64,
+    line_handle: i64,
+    line_len: i64,
+    completed: bool,
+    timed_out: bool,
+    target_handle: i64,
+    tick_ns: i64
+  }
+
+  struct ProjectArtifactSummary {
+    project_root_handle: i64,
+    artifact_dir_handle: i64,
+    artifact_file_handle: i64,
+    cache_hit_handle: i64,
+    cache_store_code: i64
+  }
+
+  struct BuildManifest {
+    project_root_handle: i64,
+    artifact_dir_handle: i64,
+    artifact_file_handle: i64,
+    target_handle: i64,
+    manifest_value_handle: i64,
+    timeout_budget: i64
+  }
+
+  struct CommandContext {
+    cwd_handle: i64,
+    timeout_ms: i64,
+    inherit_cwd: bool,
+    has_timeout: bool
+  }
+
+  struct CommandRequest {
+    program_handle: i64,
+    argv_handle: i64,
+    context: CommandContext
+  }
+
+  struct CommandResult {
+    handle: i64,
+    status: i64,
+    wait_code: i64,
+    wait_exit: i64,
+    launched: bool,
+    cwd_handle: i64,
+    timeout_ms: i64,
+    inherit_cwd: bool,
+    has_timeout: bool,
+    succeeded: bool
+  }
+
+  struct ProjectBuildStep {
+    name_handle: i64,
+    request: CommandRequest,
+    fail_fast: bool
+  }
+
+  struct ProjectBuildStepReport {
+    name_handle: i64,
+    result: CommandResult,
+    executed: bool,
+    blocked_by_failure: bool
+  }
+
+  struct ProjectBuildReport {
+    configure: ProjectBuildStepReport,
+    verify: ProjectBuildStepReport,
+    emit: ProjectBuildStepReport,
+    report: ProjectBuildStepReport,
+    first_failure_handle: i64,
+    overall_success: bool,
+    executed_steps: i64
+  }
+
+  struct CliProjectBuildSummary {
+    session: ProjectSessionSummary,
+    artifact: ProjectArtifactSummary,
+    manifest: BuildManifest,
+    build_report: ProjectBuildReport,
+    diag_code: i64,
+    stdout_code: i64,
+    stderr_code: i64,
+    stdout_flushed: i64,
+    stderr_flushed: i64
+  }
+
+  async fn ping(seed: i64) -> i64 {
+    return seed + 19;
+  }
+
+  fn encode_bool(flag: bool) -> i64 {
+    if flag {
+      return 1;
+    }
+    return 0;
+  }
+
+  fn build_cli_seed(
+    prompt_handle: i64,
+    ready_text_handle: i64,
+    failed_text_handle: i64,
+    timeout_limit: i64,
+    ready_severity: i64,
+    failed_severity: i64
+  ) -> ProjectCliSeed {
+    return ProjectCliSeed {
+      prompt_handle: prompt_handle,
+      ready_text_handle: ready_text_handle,
+      failed_text_handle: failed_text_handle,
+      timeout_limit: timeout_limit,
+      ready_severity: ready_severity,
+      failed_severity: failed_severity
+    };
+  }
+
+  fn build_project_build_seed(
+    prefix_handle: i64,
+    cache_name_handle: i64,
+    cache_key_handle: i64
+  ) -> ProjectBuildSeed {
+    return ProjectBuildSeed {
+      prefix_handle: prefix_handle,
+      cache_name_handle: cache_name_handle,
+      cache_key_handle: cache_key_handle
+    };
+  }
+
+  fn build_project_seed(
+    prompt_handle: i64,
+    ready_text_handle: i64,
+    failed_text_handle: i64,
+    timeout_limit: i64,
+    ready_severity: i64,
+    failed_severity: i64,
+    prefix_handle: i64,
+    cache_name_handle: i64,
+    cache_key_handle: i64
+  ) -> ProjectSeed {
+    return ProjectSeed {
+      cli: build_cli_seed(
+        prompt_handle,
+        ready_text_handle,
+        failed_text_handle,
+        timeout_limit,
+        ready_severity,
+        failed_severity
+      ),
+      build: build_project_build_seed(
+        prefix_handle,
+        cache_name_handle,
+        cache_key_handle
+      )
+    };
+  }
+
+  fn capture_project_session(seed: ProjectCliSeed) -> ProjectSessionSummary {
+    let argv_count: i64 = host_argv_count();
+    let line_handle: i64 = host_line_read(seed.prompt_handle);
+    let line_len: i64 = host_line_len(line_handle);
+    let result: TaskResult<i64> =
+      join_result(timeout(spawn(ping(argv_count + line_len)), seed.timeout_limit));
+
+    if task_completed(result) {
+      return ProjectSessionSummary {
+        argv_count: argv_count,
+        line_handle: line_handle,
+        line_len: line_len,
+        completed: true,
+        timed_out: false,
+        target_handle: task_value(result),
+        tick_ns: host_monotonic_time_ns()
+      };
+    }
+
+    return ProjectSessionSummary {
+      argv_count: argv_count,
+      line_handle: line_handle,
+      line_len: line_len,
+      completed: false,
+      timed_out: true,
+      target_handle: 0,
+      tick_ns: host_monotonic_time_ns()
+    };
+  }
+
+  fn capture_project_artifact(
+    seed: ProjectBuildSeed,
+    cache_value_handle: i64
+  ) -> ProjectArtifactSummary {
+    let cache_handle: i64 = host_cache_open(seed.cache_name_handle);
+    let cache_hit_handle: i64 = host_cache_lookup(cache_handle, seed.cache_key_handle);
+    let artifact_file_handle: i64 = host_temp_file_handle(seed.prefix_handle);
+    let cache_store_code: i64 = host_cache_store(
+      cache_handle,
+      seed.cache_key_handle,
+      cache_value_handle + artifact_file_handle
+    );
+    let cache_close_code: i64 = host_cache_close(cache_handle);
+
+    return ProjectArtifactSummary {
+      project_root_handle: host_cwd_handle(),
+      artifact_dir_handle: host_temp_dir_handle(),
+      artifact_file_handle: artifact_file_handle,
+      cache_hit_handle: cache_hit_handle + cache_close_code,
+      cache_store_code: cache_store_code
+    };
+  }
+
+  fn build_manifest(
+    session: ProjectSessionSummary,
+    artifact: ProjectArtifactSummary
+  ) -> BuildManifest {
+    return BuildManifest {
+      project_root_handle: artifact.project_root_handle,
+      artifact_dir_handle: artifact.artifact_dir_handle,
+      artifact_file_handle: artifact.artifact_file_handle,
+      target_handle: session.target_handle,
+      manifest_value_handle: artifact.cache_hit_handle + artifact.cache_store_code,
+      timeout_budget: 1800 + session.argv_count + session.line_len
+    };
+  }
+
+  fn build_command_context(
+    cwd_handle: i64,
+    timeout_ms: i64,
+    inherit_cwd: bool,
+    has_timeout: bool
+  ) -> CommandContext {
+    return CommandContext {
+      cwd_handle: cwd_handle,
+      timeout_ms: timeout_ms,
+      inherit_cwd: inherit_cwd,
+      has_timeout: has_timeout
+    };
+  }
+
+  fn build_command_request(
+    program_handle: i64,
+    argv_handle: i64,
+    context: CommandContext
+  ) -> CommandRequest {
+    return CommandRequest {
+      program_handle: program_handle,
+      argv_handle: argv_handle,
+      context: context
+    };
+  }
+
+  fn build_project_build_step(
+    name_handle: i64,
+    program_handle: i64,
+    argv_handle: i64,
+    cwd_handle: i64,
+    timeout_ms: i64,
+    fail_fast: bool
+  ) -> ProjectBuildStep {
+    return ProjectBuildStep {
+      name_handle: name_handle,
+      request: build_command_request(
+        program_handle,
+        argv_handle,
+        build_command_context(cwd_handle, timeout_ms, false, true)
+      ),
+      fail_fast: fail_fast
+    };
+  }
+
+  fn run_command(request: CommandRequest) -> CommandResult {
+    let handle: i64 = host_command_spawn_in(
+      request.program_handle,
+      request.argv_handle,
+      request.context.cwd_handle,
+      request.context.timeout_ms
+    );
+    let wait_exit: i64 = host_command_wait_exit(handle);
+    let launched: bool = handle != 0;
+    return CommandResult {
+      handle: handle,
+      status: host_command_status(handle),
+      wait_code: host_command_wait(handle),
+      wait_exit: wait_exit,
+      launched: launched,
+      cwd_handle: request.context.cwd_handle,
+      timeout_ms: request.context.timeout_ms,
+      inherit_cwd: request.context.inherit_cwd,
+      has_timeout: request.context.has_timeout,
+      succeeded: launched && wait_exit == 0
+    };
+  }
+
+  fn run_build_step(step: ProjectBuildStep) -> ProjectBuildStepReport {
+    return ProjectBuildStepReport {
+      name_handle: step.name_handle,
+      result: run_command(step.request),
+      executed: true,
+      blocked_by_failure: false
+    };
+  }
+
+  fn skipped_build_step(step: ProjectBuildStep) -> ProjectBuildStepReport {
+    return ProjectBuildStepReport {
+      name_handle: step.name_handle,
+      result: CommandResult {
+        handle: 0,
+        status: 0,
+        wait_code: 0,
+        wait_exit: 1,
+        launched: false,
+        cwd_handle: step.request.context.cwd_handle,
+        timeout_ms: step.request.context.timeout_ms,
+        inherit_cwd: step.request.context.inherit_cwd,
+        has_timeout: step.request.context.has_timeout,
+        succeeded: false
+      },
+      executed: false,
+      blocked_by_failure: true
+    };
+  }
+
+  fn build_step_failed(report: ProjectBuildStepReport) -> bool {
+    if report.executed == false {
+      return false;
+    }
+    return report.result.succeeded == false;
+  }
+
+  fn build_should_stop(step: ProjectBuildStep, report: ProjectBuildStepReport) -> bool {
+    return step.fail_fast && build_step_failed(report);
+  }
+
+  fn count_executed_steps(
+    verify: ProjectBuildStepReport,
+    emit: ProjectBuildStepReport,
+    report: ProjectBuildStepReport
+  ) -> i64 {
+    if verify.executed == false {
+      return 1;
+    }
+    if emit.executed == false {
+      return 2;
+    }
+    if report.executed {
+      return 4;
+    }
+    return 3;
+  }
+
+  fn build_project_report(
+    configure: ProjectBuildStepReport,
+    verify: ProjectBuildStepReport,
+    emit: ProjectBuildStepReport,
+    report: ProjectBuildStepReport
+  ) -> ProjectBuildReport {
+    if build_step_failed(configure) {
+      return ProjectBuildReport {
+        configure: configure,
+        verify: verify,
+        emit: emit,
+        report: report,
+        first_failure_handle: configure.name_handle,
+        overall_success: false,
+        executed_steps: count_executed_steps(verify, emit, report)
+      };
+    }
+    if build_step_failed(verify) {
+      return ProjectBuildReport {
+        configure: configure,
+        verify: verify,
+        emit: emit,
+        report: report,
+        first_failure_handle: verify.name_handle,
+        overall_success: false,
+        executed_steps: count_executed_steps(verify, emit, report)
+      };
+    }
+    if build_step_failed(emit) {
+      return ProjectBuildReport {
+        configure: configure,
+        verify: verify,
+        emit: emit,
+        report: report,
+        first_failure_handle: emit.name_handle,
+        overall_success: false,
+        executed_steps: count_executed_steps(verify, emit, report)
+      };
+    }
+    if build_step_failed(report) {
+      return ProjectBuildReport {
+        configure: configure,
+        verify: verify,
+        emit: emit,
+        report: report,
+        first_failure_handle: report.name_handle,
+        overall_success: false,
+        executed_steps: 4
+      };
+    }
+    return ProjectBuildReport {
+      configure: configure,
+      verify: verify,
+      emit: emit,
+      report: report,
+      first_failure_handle: 0,
+      overall_success: true,
+      executed_steps: 4
+    };
+  }
+
+  fn skipped_project_report(
+    configure: ProjectBuildStep,
+    verify: ProjectBuildStep,
+    emit: ProjectBuildStep,
+    report: ProjectBuildStep
+  ) -> ProjectBuildReport {
+    return ProjectBuildReport {
+      configure: skipped_build_step(configure),
+      verify: skipped_build_step(verify),
+      emit: skipped_build_step(emit),
+      report: skipped_build_step(report),
+      first_failure_handle: configure.name_handle,
+      overall_success: false,
+      executed_steps: 0
+    };
+  }
+
+  fn run_project_report(
+    configure_step: ProjectBuildStep,
+    verify_step: ProjectBuildStep,
+    emit_step: ProjectBuildStep,
+    report_step: ProjectBuildStep
+  ) -> ProjectBuildReport {
+    let configure_report: ProjectBuildStepReport = run_build_step(configure_step);
+    if build_should_stop(configure_step, configure_report) {
+      return build_project_report(
+        configure_report,
+        skipped_build_step(verify_step),
+        skipped_build_step(emit_step),
+        skipped_build_step(report_step)
+      );
+    }
+
+    let verify_report: ProjectBuildStepReport = run_build_step(verify_step);
+    if build_should_stop(verify_step, verify_report) {
+      return build_project_report(
+        configure_report,
+        verify_report,
+        skipped_build_step(emit_step),
+        skipped_build_step(report_step)
+      );
+    }
+
+    let emit_report: ProjectBuildStepReport = run_build_step(emit_step);
+    if build_should_stop(emit_step, emit_report) {
+      return build_project_report(
+        configure_report,
+        verify_report,
+        emit_report,
+        skipped_build_step(report_step)
+      );
+    }
+
+    return build_project_report(
+      configure_report,
+      verify_report,
+      emit_report,
+      run_build_step(report_step)
+    );
+  }
+
+  fn capture_project_build_report(
+    session: ProjectSessionSummary,
+    manifest: BuildManifest
+  ) -> ProjectBuildReport {
+    let configure_step: ProjectBuildStep =
+      build_project_build_step(6101, 1001, 47, manifest.project_root_handle, 250, true);
+    let verify_step: ProjectBuildStep =
+      build_project_build_step(6102, 1003, 53, manifest.project_root_handle, 500, true);
+    let emit_step: ProjectBuildStep =
+      build_project_build_step(6103, 1005, 59, manifest.project_root_handle, manifest.timeout_budget, true);
+    let report_step: ProjectBuildStep =
+      build_project_build_step(6104, 1007, 61, manifest.artifact_dir_handle, 750, true);
+
+    if session.completed == false {
+      return skipped_project_report(
+        configure_step,
+        verify_step,
+        emit_step,
+        report_step
+      );
+    }
+
+    return run_project_report(
+      configure_step,
+      verify_step,
+      emit_step,
+      report_step
+    );
+  }
+
+  fn emit_success_diag(
+    session: ProjectSessionSummary,
+    build_report: ProjectBuildReport,
+    text_handle: i64,
+    severity: i64
+  ) -> i64 {
+    let label_handle: i64 = host_diag_label(text_handle);
+    let span_handle: i64 = host_diag_span(0, session.line_len + build_report.executed_steps);
+    return host_diag_emit(label_handle, span_handle, severity);
+  }
+
+  fn emit_failure_diag(
+    session: ProjectSessionSummary,
+    build_report: ProjectBuildReport,
+    text_handle: i64,
+    severity: i64
+  ) -> i64 {
+    let label_handle: i64 = host_diag_label(text_handle);
+    let span_handle: i64 = host_diag_span(0, session.line_len + build_report.executed_steps);
+    return host_diag_emit(label_handle, span_handle, severity);
+  }
+
+  fn build_success_summary(
+    seed: ProjectSeed,
+    session: ProjectSessionSummary,
+    artifact: ProjectArtifactSummary,
+    manifest: BuildManifest,
+    build_report: ProjectBuildReport
+  ) -> CliProjectBuildSummary {
+    return CliProjectBuildSummary {
+      session: session,
+      artifact: artifact,
+      manifest: manifest,
+      build_report: build_report,
+      diag_code: emit_success_diag(
+        session,
+        build_report,
+        seed.cli.ready_text_handle,
+        seed.cli.ready_severity
+      ),
+      stdout_code: host_stdout_write(seed.cli.ready_text_handle),
+      stderr_code: 0,
+      stdout_flushed: host_stdout_flush(),
+      stderr_flushed: 0
+    };
+  }
+
+  fn build_failure_summary(
+    seed: ProjectSeed,
+    session: ProjectSessionSummary,
+    artifact: ProjectArtifactSummary,
+    manifest: BuildManifest,
+    build_report: ProjectBuildReport
+  ) -> CliProjectBuildSummary {
+    return CliProjectBuildSummary {
+      session: session,
+      artifact: artifact,
+      manifest: manifest,
+      build_report: build_report,
+      diag_code: emit_failure_diag(
+        session,
+        build_report,
+        seed.cli.failed_text_handle,
+        seed.cli.failed_severity
+      ),
+      stdout_code: 0,
+      stderr_code: host_stderr_write(seed.cli.failed_text_handle),
+      stdout_flushed: 0,
+      stderr_flushed: host_stderr_flush()
+    };
+  }
+
+  fn capture_cli_project_build(seed: ProjectSeed) -> CliProjectBuildSummary {
+    let session: ProjectSessionSummary = capture_project_session(seed.cli);
+    let artifact: ProjectArtifactSummary =
+      capture_project_artifact(seed.build, session.target_handle);
+    let manifest: BuildManifest = build_manifest(session, artifact);
+    let build_report: ProjectBuildReport =
+      capture_project_build_report(session, manifest);
+
+    if session.completed == false {
+      return build_failure_summary(seed, session, artifact, manifest, build_report);
+    }
+    if build_report.overall_success {
+      return build_success_summary(seed, session, artifact, manifest, build_report);
+    }
+    return build_failure_summary(seed, session, artifact, manifest, build_report);
+  }
+
+  fn summarize_build_step(report: ProjectBuildStepReport) -> i64 {
+    return report.name_handle
+      + report.result.handle
+      + report.result.status
+      + report.result.wait_code
+      + report.result.wait_exit
+      + report.result.cwd_handle
+      + report.result.timeout_ms
+      + encode_bool(report.result.launched)
+      + encode_bool(report.result.inherit_cwd)
+      + encode_bool(report.result.has_timeout)
+      + encode_bool(report.result.succeeded)
+      + encode_bool(report.executed)
+      + encode_bool(report.blocked_by_failure);
+  }
+
+  fn summarize_project_report(report: ProjectBuildReport) -> i64 {
+    return summarize_build_step(report.configure)
+      + summarize_build_step(report.verify)
+      + summarize_build_step(report.emit)
+      + summarize_build_step(report.report)
+      + report.first_failure_handle
+      + encode_bool(report.overall_success)
+      + report.executed_steps;
+  }
+
+  fn summarize_cli_project_build_report_recipe(
+    prompt_handle: i64,
+    ready_text_handle: i64,
+    failed_text_handle: i64,
+    timeout_limit: i64,
+    ready_severity: i64,
+    failed_severity: i64,
+    prefix_handle: i64,
+    cache_name_handle: i64,
+    cache_key_handle: i64
+  ) -> i64 {
+    let seed: ProjectSeed = build_project_seed(
+      prompt_handle,
+      ready_text_handle,
+      failed_text_handle,
+      timeout_limit,
+      ready_severity,
+      failed_severity,
+      prefix_handle,
+      cache_name_handle,
+      cache_key_handle
+    );
+    let summary: CliProjectBuildSummary = capture_cli_project_build(seed);
+    return summary.session.argv_count
+      + summary.session.line_handle
+      + summary.session.line_len
+      + encode_bool(summary.session.completed)
+      + encode_bool(summary.session.timed_out)
+      + summary.session.target_handle
+      + summary.session.tick_ns
+      + summary.artifact.project_root_handle
+      + summary.artifact.artifact_dir_handle
+      + summary.artifact.artifact_file_handle
+      + summary.artifact.cache_hit_handle
+      + summary.artifact.cache_store_code
+      + summary.manifest.project_root_handle
+      + summary.manifest.artifact_dir_handle
+      + summary.manifest.artifact_file_handle
+      + summary.manifest.target_handle
+      + summary.manifest.manifest_value_handle
+      + summary.manifest.timeout_budget
+      + summarize_project_report(summary.build_report)
+      + summary.diag_code
+      + summary.stdout_code
+      + summary.stderr_code
+      + summary.stdout_flushed
+      + summary.stderr_flushed;
+  }
+
+  fn main() {
+    print(summarize_cli_project_build_report_recipe(
+      701,
+      2701,
+      2703,
+      0,
+      1,
+      2,
+      2401,
+      1607,
+      41
+    ));
+  }
+}

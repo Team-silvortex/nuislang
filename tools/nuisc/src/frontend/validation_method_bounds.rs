@@ -5,6 +5,9 @@ use nuis_semantics::model::{
     AstTypeAlias, AstTypeRef,
 };
 
+use super::validation_binding_env::{
+    bind_destructure_fields_for_type, bind_match_pattern_for_type, simple_match_value_type,
+};
 use super::{
     infer_ast_expr_type, lower_type_ref, resolve_ast_type_ref_aliases,
     substitute_ast_type_alias_target,
@@ -110,7 +113,18 @@ pub(super) fn validate_expr_generic_method_bounds(
                 local_type_env,
                 context,
             )?;
+            let match_value_ty = simple_match_value_type(value, local_type_env);
             for arm in arms {
+                let mut arm_env = local_type_env.clone();
+                if let Some(match_value_ty) = match_value_ty.as_ref() {
+                    bind_match_pattern_for_type(
+                        match_value_ty,
+                        &arm.pattern,
+                        visible_type_aliases,
+                        visible_structs,
+                        &mut arm_env,
+                    )?;
+                }
                 if let Some(guard) = &arm.guard {
                     validate_expr_generic_method_bounds(
                         guard,
@@ -121,11 +135,10 @@ pub(super) fn validate_expr_generic_method_bounds(
                         trait_methods,
                         generic_param_names,
                         generic_bounds,
-                        local_type_env,
+                        &arm_env,
                         context,
                     )?;
                 }
-                let mut arm_env = local_type_env.clone();
                 validate_stmt_generic_method_bounds_block(
                     &arm.body,
                     visible_type_aliases,
@@ -368,6 +381,30 @@ fn validate_stmt_generic_method_bounds(
                 local_type_env,
                 context,
             )?;
+            let AstStmt::DestructureLet {
+                type_ref, fields, ..
+            } = stmt
+            else {
+                unreachable!();
+            };
+            let root_type = type_ref.clone().or_else(|| {
+                infer_ast_expr_type(
+                    value,
+                    local_type_env,
+                    impl_lookup,
+                    visible_structs,
+                    function_return_types,
+                )
+            });
+            if let Some(root_type) = root_type.as_ref() {
+                bind_destructure_fields_for_type(
+                    root_type,
+                    fields,
+                    visible_type_aliases,
+                    visible_structs,
+                    local_type_env,
+                )?;
+            }
         }
         AstStmt::If {
             condition,
@@ -426,7 +463,23 @@ fn validate_stmt_generic_method_bounds(
                 local_type_env,
                 context,
             )?;
-            for AstMatchArm { guard, body, .. } in arms {
+            let match_value_ty = simple_match_value_type(value, local_type_env);
+            for AstMatchArm {
+                pattern,
+                guard,
+                body,
+            } in arms
+            {
+                let mut arm_env = local_type_env.clone();
+                if let Some(match_value_ty) = match_value_ty.as_ref() {
+                    bind_match_pattern_for_type(
+                        match_value_ty,
+                        pattern,
+                        visible_type_aliases,
+                        visible_structs,
+                        &mut arm_env,
+                    )?;
+                }
                 if let Some(guard) = guard {
                     validate_expr_generic_method_bounds(
                         guard,
@@ -437,11 +490,10 @@ fn validate_stmt_generic_method_bounds(
                         trait_methods,
                         generic_param_names,
                         generic_bounds,
-                        local_type_env,
+                        &arm_env,
                         context,
                     )?;
                 }
-                let mut arm_env = local_type_env.clone();
                 validate_stmt_generic_method_bounds_block(
                     body,
                     visible_type_aliases,

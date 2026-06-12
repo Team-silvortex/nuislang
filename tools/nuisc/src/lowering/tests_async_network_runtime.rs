@@ -120,9 +120,10 @@ fn lowers_async_owned_network_session_step_into_async_post_flow_break_chain() {
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_async_post_flow_chain"
+            node.op.module == "cpu"
+                && node.op.instruction == "loop_while_scalar_async_post_flow_chain"
         })
-        .expect("expected loop_while_i64_async_post_flow_chain node");
+        .expect("expected loop_while_scalar_async_post_flow_chain node");
     assert_eq!(loop_node.op.args[2], "step");
     assert!(yir.node_lanes.values().any(|lane| lane == "fn:step"));
     assert!(yir
@@ -186,9 +187,9 @@ fn lowers_async_network_poll_step_with_retry_budget_into_async_post_flow_cond_ch
         .iter()
         .find(|node| {
             node.op.module == "cpu"
-                && node.op.instruction == "loop_while_i64_async_post_flow_cond_chain"
+                && node.op.instruction == "loop_while_scalar_async_post_flow_cond_chain"
         })
-        .expect("expected loop_while_i64_async_post_flow_cond_chain node");
+        .expect("expected loop_while_scalar_async_post_flow_cond_chain node");
     assert_eq!(loop_node.op.args[2], "step");
     assert_eq!(loop_node.op.args[3], "lt");
     assert_eq!(loop_node.op.args[4], "carry1_gt");
@@ -278,9 +279,9 @@ fn lowers_async_owned_network_session_step_with_retry_budget_into_async_post_flo
         .iter()
         .find(|node| {
             node.op.module == "cpu"
-                && node.op.instruction == "loop_while_i64_async_post_flow_cond_chain"
+                && node.op.instruction == "loop_while_scalar_async_post_flow_cond_chain"
         })
-        .expect("expected loop_while_i64_async_post_flow_cond_chain node");
+        .expect("expected loop_while_scalar_async_post_flow_cond_chain node");
     assert_eq!(loop_node.op.args[2], "step");
     assert_eq!(loop_node.op.args[3], "lt");
     assert_eq!(loop_node.op.args[4], "carry1_gt");
@@ -382,9 +383,9 @@ fn lowers_async_owned_network_session_step_with_timeout_budget_into_async_post_f
         .iter()
         .find(|node| {
             node.op.module == "cpu"
-                && node.op.instruction == "loop_while_i64_async_post_flow_cond_chain"
+                && node.op.instruction == "loop_while_scalar_async_post_flow_cond_chain"
         })
-        .expect("expected loop_while_i64_async_post_flow_cond_chain node");
+        .expect("expected loop_while_scalar_async_post_flow_cond_chain node");
     assert_eq!(loop_node.op.args[2], "step");
     assert_eq!(loop_node.op.args[3], "lt");
     assert_eq!(loop_node.op.args[4], "carry1_gt");
@@ -487,9 +488,9 @@ fn lowers_async_http_client_request_session_into_async_post_flow_cond_chain() {
         .iter()
         .find(|node| {
             node.op.module == "cpu"
-                && node.op.instruction == "loop_while_i64_async_post_flow_cond_chain"
+                && node.op.instruction == "loop_while_scalar_async_post_flow_cond_chain"
         })
-        .expect("expected loop_while_i64_async_post_flow_cond_chain node");
+        .expect("expected loop_while_scalar_async_post_flow_cond_chain node");
     assert_eq!(loop_node.op.args[2], "request_step");
     assert_eq!(loop_node.op.args[3], "lt");
     assert_eq!(loop_node.op.args[4], "carry1_gt");
