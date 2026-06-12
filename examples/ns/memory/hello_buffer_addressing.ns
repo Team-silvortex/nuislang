@@ -1,0 +1,12 @@
+mod cpu Main {
+  fn main() {
+    let scratch: ref Buffer = alloc_buffer(4, 0);
+    store_at(scratch, 0, 7);
+    store_at(scratch, 1, 11);
+    store_at(scratch, 2, load_at(scratch, 0) + load_at(scratch, 1));
+    store_at(scratch, 3, load_at(scratch, 2) + 5);
+    let staged_sum: i64 = load_at(scratch, 2);
+    let final_value: i64 = load_at(scratch, 3);
+    print(staged_sum + final_value);
+  }
+}

@@ -1,5 +1,5 @@
 use super::parse_nuis_module;
-use nuis_semantics::model::{NirExpr, NirStmt};
+use nuis_semantics::model::{NirExpr, NirStmt, NirTypeShape};
 
 #[test]
 fn rejects_non_numeric_binary_operands() {
@@ -136,6 +136,72 @@ fn infers_buffer_backed_window_payload_as_i64() {
         panic!("expected typed let binding");
     };
     assert_eq!(ty.render(), "WindowMut<i64>");
+}
+
+#[test]
+fn infers_alloc_node_binding_as_ref_address_type() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() {
+            let head: ref Node = alloc_node(7, null());
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let NirStmt::Let { ty: Some(ty), .. } = &module.functions[0].body[0] else {
+        panic!("expected typed let binding");
+    };
+    assert_eq!(ty.render(), "ref Node");
+    assert_eq!(ty.shape(), NirTypeShape::Ref);
+    assert!(!ty.is_async_boundary_safe());
+}
+
+#[test]
+fn infers_load_next_binding_as_ref_address_type() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() {
+            let nil: ref Node? = null();
+            let tail: ref Node = move(alloc_node(30, nil));
+            let head: ref Node = alloc_node(10, tail);
+            let next_ptr: ref Node = load_next(head);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let NirStmt::Let { ty: Some(ty), .. } = &module.functions[0].body[3] else {
+        panic!("expected typed next-pointer binding");
+    };
+    assert_eq!(ty.render(), "ref Node");
+    assert_eq!(ty.shape(), NirTypeShape::Ref);
+}
+
+#[test]
+fn infers_alloc_buffer_binding_as_ref_buffer_address_type() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() {
+            let scratch: ref Buffer = alloc_buffer(4, 0);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let NirStmt::Let { ty: Some(ty), .. } = &module.functions[0].body[0] else {
+        panic!("expected typed let binding");
+    };
+    assert_eq!(ty.render(), "ref Buffer");
+    assert_eq!(ty.shape(), NirTypeShape::Ref);
+    assert_eq!(ty.container_kind(), None);
+    assert!(!ty.is_async_boundary_safe());
 }
 
 #[test]

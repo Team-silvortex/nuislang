@@ -5,6 +5,7 @@ This folder contains ownership, lifetime, and task-payload front-end examples.
 Use it for:
 
 * local borrow / move / lifetime shape
+* current structural and buffer address shape
 * current task payload and observation boundaries
 * the narrowest single-file companions to task-facing `std` recipes
 
@@ -28,6 +29,8 @@ Start here:
   smallest ownership-oriented baseline
 * [hello_borrow_end.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_borrow_end.ns)
   explicit local borrow/lifetime closure
+* [hello_buffer_addressing.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_buffer_addressing.ns)
+  smallest direct `ref Buffer` indexed-address baseline
 * [hello_task_glm_origin.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_origin.ns)
   smallest direct `spawn -> join` payload path
 * [hello_task_glm_status_path.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_task_glm_status_path.ns)

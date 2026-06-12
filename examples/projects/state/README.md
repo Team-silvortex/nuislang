@@ -56,9 +56,29 @@ Pattern / destructuring route:
 Recursion / higher-order route:
 
 * [ordinary_mutual_recursive_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_mutual_recursive_demo)
+* [ordinary_recursive_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_call_graph_demo)
+* [ordinary_recursive_i32_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_i32_call_graph_demo)
+* [ordinary_recursive_bool_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_bool_call_graph_demo)
 * [ordinary_recursive_match_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_match_call_graph_demo)
+* [ordinary_recursive_higher_order_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_higher_order_call_graph_demo)
+* [ordinary_recursive_fn2_higher_order_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_fn2_higher_order_call_graph_demo)
+* [ordinary_recursive_generic_higher_order_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_generic_higher_order_call_graph_demo)
+* [ordinary_recursive_generic_fn2_higher_order_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_generic_fn2_higher_order_call_graph_demo)
+* [ordinary_recursive_generic_fn3_higher_order_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_generic_fn3_higher_order_call_graph_demo)
+* [ordinary_recursive_generic_alias_higher_order_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_generic_alias_higher_order_call_graph_demo)
 * [ordinary_recursive_composed_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_composed_call_graph_demo)
+* [ordinary_recursive_lambda_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_lambda_call_graph_demo)
+* [ordinary_recursive_mixed_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_mixed_call_graph_demo)
+* [ordinary_recursive_generic_composed_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_generic_composed_call_graph_demo)
 * [ordinary_recursive_generic_alias_fn3_higher_order_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_generic_alias_fn3_higher_order_call_graph_demo)
+* [tail_recursive_sum_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_sum_demo)
+* [tail_recursive_factorial_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_factorial_demo)
+* [tail_recursive_cross_carry_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_cross_carry_demo)
+* [tail_recursive_branching_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_branching_demo)
+* [tail_recursive_multi_carry_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_multi_carry_demo)
+* [tail_recursive_carry_condition_multi_carry_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_carry_condition_multi_carry_demo)
+* [tail_recursive_branching_cross_carry_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_branching_cross_carry_demo)
+* [tail_recursive_branching_multi_carry_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_branching_multi_carry_demo)
 * [generic_callable_forwarding_hof_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_callable_forwarding_hof_demo)
 * [lambda_alias_fn3_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/lambda_alias_fn3_demo)
 * [generic_payload_alias_higher_order_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_payload_alias_higher_order_demo)
@@ -68,22 +88,75 @@ Recursion / higher-order route:
 
 This route now also carries:
 
+* ordinary recursion through composed helper lanes
+* ordinary recursion through lambda-mediated helper lanes
+* ordinary recursion through named higher-order helper lanes
+* ordinary recursion through plain scalar and `i32` helper lanes
+* ordinary recursion through `Fn2` higher-order helper lanes
+* ordinary recursion through pure bool helper lanes
+* mixed scalar/bool recursive helper truth
+* specialized generic `Fn2` / `Fn3` helper truth
+* specialized generic higher-order helper truth for both direct and alias call surfaces
+* specialized generic higher-order recursive helper truth
 * generic callable forwarding through `Fn2` / `Fn3`
 * nested `relay -> chain -> apply` helper specialization
 * explicit generic arguments on project-shaped higher-order calls
+* project-backed tail recursion lowering into `loop_while_i64_chain`
+* project-backed tail recursion lowering into `loop_while_i64_cond_chain`
+* project-backed multi-carry and cross-carry tail recursion truth
+* project-backed branching multi-carry tail recursion truth
 
 Loop / lowering route:
 
 * [counted_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/counted_while_demo)
+* [accumulating_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/accumulating_while_demo)
+* [chained_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/chained_while_demo)
+* [bounded_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/bounded_while_demo)
+* [equality_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/equality_while_demo)
+* [inequality_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/inequality_while_demo)
 * [guarded_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/guarded_while_demo)
+* [match_guarded_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_guarded_while_demo)
+* [branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/branching_while_demo)
+* [match_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_branching_while_demo)
+* [match_expr_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_expr_branching_while_demo)
+* [bool_match_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/bool_match_branching_while_demo)
+* [lambda_match_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/lambda_match_branching_while_demo)
 * [flow_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/flow_branching_while_demo)
+* [equality_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/equality_branching_while_demo)
+* [flow_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/flow_continuing_while_demo)
+* [lambda_match_flow_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/lambda_match_flow_continuing_while_demo)
+* [lambda_match_or_flow_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/lambda_match_or_flow_continuing_while_demo)
 * [post_flow_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_while_demo)
+* [post_flow_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_continuing_while_demo)
+* [post_flow_breaking_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_breaking_while_demo)
 * [post_flow_branching_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_continuing_while_demo)
+* [carried_breaking_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/carried_breaking_while_demo)
+* [double_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/double_branching_while_demo)
 * [tail_recursive_branching_cross_carry_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_branching_cross_carry_demo)
 
 This route now also carries:
 
+* project-backed basic `loop_while_i64` lowering truth
+* project-backed single-carry `loop_while_i64_chain` lowering truth
+* project-backed multi-carry `loop_while_i64_chain` lowering truth
+* project-backed bounded `post_flow_chain` lowering truth
+* project-backed equality-triggered `post_flow_chain` lowering truth
+* project-backed inequality-driven basic loop lowering truth
+* project-backed `match`-driven `cond_chain` lowering truth
+* project-backed guarded `match` inside `while` return-shape truth
+* project-backed plain branching `cond_chain` lowering truth
+* project-backed expression-scrutinee `match` inside `while` lowering truth
+* project-backed bool-scrutinee `match` inside `while` lowering truth
+* project-backed lambda-driven `match` inside `while` `cond_chain` lowering truth
 * project-backed `flow_cond_chain` lowering truth
+* project-backed equality-driven `flow_cond_chain` lowering truth
+* project-backed plain `continue` `flow_cond_chain` lowering truth
+* project-backed lambda-driven `match` + `continue` `flow_cond_chain` lowering truth
+* project-backed lambda `or`-composed `flow_cond_chain` lowering truth
+* project-backed carried `break` `flow_chain` lowering truth
+* project-backed double-branch carried `cond_chain` lowering truth
+* project-backed plain `continue` `post_flow_chain` lowering truth
+* project-backed plain `break` `post_flow_chain` lowering truth
 * project-backed `post_flow_cond_chain` lowering truth for both `break` and
   `continue`
 * one checked-in state compile gate for ordinary structured while loops, not
