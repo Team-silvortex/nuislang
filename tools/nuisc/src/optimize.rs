@@ -237,7 +237,12 @@ fn has_annotation(function: &NirFunction, name: &str) -> bool {
 fn is_inline_safe_expr(expr: &NirExpr, params: &BTreeSet<&str>) -> bool {
     match expr {
         NirExpr::Var(name) => params.contains(name.as_str()),
-        NirExpr::Bool(_) | NirExpr::Text(_) | NirExpr::Int(_) | NirExpr::Null => true,
+        NirExpr::Bool(_)
+        | NirExpr::Text(_)
+        | NirExpr::Int(_)
+        | NirExpr::F32(_)
+        | NirExpr::F64(_)
+        | NirExpr::Null => true,
         NirExpr::StructLiteral { fields, .. } => fields
             .iter()
             .all(|(_, value)| is_inline_safe_expr(value, params)),
@@ -271,6 +276,10 @@ fn simplify_expr(
         NirExpr::BorrowEnd(inner) => {
             let (inner, changed) = simplify_expr(*inner, env, inline_templates, active_inline);
             (NirExpr::BorrowEnd(Box::new(inner)), changed)
+        }
+        NirExpr::HostBufferHandle(inner) => {
+            let (inner, changed) = simplify_expr(*inner, env, inline_templates, active_inline);
+            (NirExpr::HostBufferHandle(Box::new(inner)), changed)
         }
         NirExpr::Move(inner) => {
             let (inner, changed) = simplify_expr(*inner, env, inline_templates, active_inline);
@@ -859,9 +868,12 @@ fn refresh_literal_binding(env: &mut BTreeMap<String, NirExpr>, name: &str, valu
 
 fn literal_binding_value(value: &NirExpr) -> Option<NirExpr> {
     match value {
-        NirExpr::Bool(_) | NirExpr::Text(_) | NirExpr::Int(_) | NirExpr::Null => {
-            Some(value.clone())
-        }
+        NirExpr::Bool(_)
+        | NirExpr::Text(_)
+        | NirExpr::Int(_)
+        | NirExpr::F32(_)
+        | NirExpr::F64(_)
+        | NirExpr::Null => Some(value.clone()),
         _ => None,
     }
 }
@@ -1052,6 +1064,7 @@ fn collect_used_vars_expr(expr: &NirExpr, out: &mut BTreeSet<String>) {
         NirExpr::Await(inner)
         | NirExpr::Borrow(inner)
         | NirExpr::BorrowEnd(inner)
+        | NirExpr::HostBufferHandle(inner)
         | NirExpr::Move(inner)
         | NirExpr::CastI64ToI32(inner)
         | NirExpr::LoadValue(inner)
@@ -1276,6 +1289,8 @@ fn collect_used_vars_expr(expr: &NirExpr, out: &mut BTreeSet<String>) {
         NirExpr::Bool(_)
         | NirExpr::Text(_)
         | NirExpr::Int(_)
+        | NirExpr::F32(_)
+        | NirExpr::F64(_)
         | NirExpr::Instantiate { .. }
         | NirExpr::DataBindCore(_)
         | NirExpr::DataMarker(_)

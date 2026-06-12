@@ -2,7 +2,7 @@ use super::lower_nir_to_yir_builtin_cpu;
 use crate::frontend::parse_nuis_module;
 
 #[test]
-fn lowers_two_branching_carries_into_loop_while_i64_cond_chain() {
+fn lowers_two_branching_carries_into_loop_while_scalar_cond_chain() {
     let mut module = parse_nuis_module(
         r#"
         mod cpu Main {
@@ -35,8 +35,10 @@ fn lowers_two_branching_carries_into_loop_while_i64_cond_chain() {
     let loop_node = yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_cond_chain")
-        .expect("expected loop_while_i64_cond_chain node");
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_cond_chain"
+        })
+        .expect("expected loop_while_scalar_cond_chain node");
     assert_eq!(loop_node.op.args[3], "lt");
     assert_eq!(loop_node.op.args[6], "current_gt");
     assert_eq!(loop_node.op.args[8], "add_current");

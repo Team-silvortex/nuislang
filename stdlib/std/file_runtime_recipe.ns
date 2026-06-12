@@ -22,7 +22,11 @@ mod cpu Main {
   fn read_once(path_handle: i64, flags: i64, read_len: i64) -> FileRuntimeRecipeSummary {
     let handle: i64 = host_file_open(path_handle, flags);
     let backing: ref Buffer = alloc_buffer(read_len, 0);
-    let read_bytes: i64 = host_file_read(handle, backing, read_len);
+    let read_bytes: i64 = host_file_read(
+      handle,
+      host_buffer_handle(backing),
+      read_len
+    );
     let close_code: i64 = host_file_close(handle);
     return FileRuntimeRecipeSummary {
       primary_handle: handle,

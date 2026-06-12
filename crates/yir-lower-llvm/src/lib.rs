@@ -51,6 +51,15 @@ enum CpuCallScalarKind {
     Bool,
     I32,
     I64,
+    F32,
+    F64,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum CpuLoopScalarKind {
+    I64,
+    F32,
+    F64,
 }
 
 struct CpuHelperSignature {
@@ -342,6 +351,8 @@ fn cpu_call_scalar_kind_for_instruction(instruction: &str) -> Option<CpuCallScal
         "param_bool" | "call_bool" | "return_bool" => Some(CpuCallScalarKind::Bool),
         "param_i32" | "call_i32" | "return_i32" => Some(CpuCallScalarKind::I32),
         "param_i64" | "call_i64" | "return_i64" => Some(CpuCallScalarKind::I64),
+        "param_f32" | "call_f32" | "return_f32" => Some(CpuCallScalarKind::F32),
+        "param_f64" | "call_f64" | "return_f64" => Some(CpuCallScalarKind::F64),
         _ => None,
     }
 }
@@ -351,6 +362,8 @@ fn cpu_scalar_kind_llvm_type(kind: CpuCallScalarKind) -> &'static str {
         CpuCallScalarKind::Bool => "i1",
         CpuCallScalarKind::I32 => "i32",
         CpuCallScalarKind::I64 => "i64",
+        CpuCallScalarKind::F32 => "float",
+        CpuCallScalarKind::F64 => "double",
     }
 }
 
@@ -366,6 +379,8 @@ fn cpu_param_binding(kind: CpuCallScalarKind, index: usize) -> LlvmValueRef {
         }
         CpuCallScalarKind::I32 => LlvmValueRef::I32(arg),
         CpuCallScalarKind::I64 => LlvmValueRef::I64(arg),
+        CpuCallScalarKind::F32 => LlvmValueRef::F32(arg),
+        CpuCallScalarKind::F64 => LlvmValueRef::F64(arg),
     }
 }
 
@@ -410,6 +425,72 @@ fn emit_typed_return_from_value(
                 false
             }
         }
+        CpuCallScalarKind::F32 => match return_value {
+            LlvmValueRef::F32(value) => {
+                body.push(format!("  ret float {value}"));
+                true
+            }
+            LlvmValueRef::F64(value) => {
+                let as_f32 = fresh_reg(next_reg);
+                body.push(format!("  {as_f32} = fptrunc double {value} to float"));
+                body.push(format!("  ret float {as_f32}"));
+                true
+            }
+            LlvmValueRef::I64(value) => {
+                let as_f32 = fresh_reg(next_reg);
+                body.push(format!("  {as_f32} = sitofp i64 {value} to float"));
+                body.push(format!("  ret float {as_f32}"));
+                true
+            }
+            LlvmValueRef::I32(value) => {
+                let as_f32 = fresh_reg(next_reg);
+                body.push(format!("  {as_f32} = sitofp i32 {value} to float"));
+                body.push(format!("  ret float {as_f32}"));
+                true
+            }
+            LlvmValueRef::Bool { i1, .. } => {
+                let as_i64 = fresh_reg(next_reg);
+                let as_f32 = fresh_reg(next_reg);
+                body.push(format!("  {as_i64} = zext i1 {i1} to i64"));
+                body.push(format!("  {as_f32} = sitofp i64 {as_i64} to float"));
+                body.push(format!("  ret float {as_f32}"));
+                true
+            }
+            _ => false,
+        },
+        CpuCallScalarKind::F64 => match return_value {
+            LlvmValueRef::F64(value) => {
+                body.push(format!("  ret double {value}"));
+                true
+            }
+            LlvmValueRef::F32(value) => {
+                let as_f64 = fresh_reg(next_reg);
+                body.push(format!("  {as_f64} = fpext float {value} to double"));
+                body.push(format!("  ret double {as_f64}"));
+                true
+            }
+            LlvmValueRef::I64(value) => {
+                let as_f64 = fresh_reg(next_reg);
+                body.push(format!("  {as_f64} = sitofp i64 {value} to double"));
+                body.push(format!("  ret double {as_f64}"));
+                true
+            }
+            LlvmValueRef::I32(value) => {
+                let as_f64 = fresh_reg(next_reg);
+                body.push(format!("  {as_f64} = sitofp i32 {value} to double"));
+                body.push(format!("  ret double {as_f64}"));
+                true
+            }
+            LlvmValueRef::Bool { i1, .. } => {
+                let as_i64 = fresh_reg(next_reg);
+                let as_f64 = fresh_reg(next_reg);
+                body.push(format!("  {as_i64} = zext i1 {i1} to i64"));
+                body.push(format!("  {as_f64} = sitofp i64 {as_i64} to double"));
+                body.push(format!("  ret double {as_f64}"));
+                true
+            }
+            _ => false,
+        },
     }
 }
 
@@ -436,6 +517,22 @@ fn can_emit_typed_return_from_value(
                 | LlvmValueRef::F32(_)
                 | LlvmValueRef::F64(_)
         ),
+        CpuCallScalarKind::F32 => matches!(
+            return_value,
+            LlvmValueRef::F32(_)
+                | LlvmValueRef::F64(_)
+                | LlvmValueRef::I64(_)
+                | LlvmValueRef::I32(_)
+                | LlvmValueRef::Bool { .. }
+        ),
+        CpuCallScalarKind::F64 => matches!(
+            return_value,
+            LlvmValueRef::F64(_)
+                | LlvmValueRef::F32(_)
+                | LlvmValueRef::I64(_)
+                | LlvmValueRef::I32(_)
+                | LlvmValueRef::Bool { .. }
+        ),
     }
 }
 
@@ -458,6 +555,16 @@ fn emit_typed_return_from_last_value(
         }
         CpuCallScalarKind::I64 => {
             body.push(format!("  ret i64 {last_value}"));
+        }
+        CpuCallScalarKind::F32 => {
+            let as_f32 = fresh_reg(next_reg);
+            body.push(format!("  {as_f32} = sitofp i64 {last_value} to float"));
+            body.push(format!("  ret float {as_f32}"));
+        }
+        CpuCallScalarKind::F64 => {
+            let as_f64 = fresh_reg(next_reg);
+            body.push(format!("  {as_f64} = sitofp i64 {last_value} to double"));
+            body.push(format!("  ret double {as_f64}"));
         }
     }
 }
@@ -599,6 +706,26 @@ fn emit_cpu_function(
             }
             ("cpu", "add") => {
                 if let (Some(lhs), Some(rhs)) = (
+                    get_f64(&registers, &node.op.args[0]),
+                    get_f64(&registers, &node.op.args[1]),
+                ) {
+                    let reg = fresh_reg(&mut next_reg);
+                    body.push(format!("  {reg} = fadd double {lhs}, {rhs}"));
+                    registers.insert(node.name.clone(), LlvmValueRef::F64(reg.clone()));
+                    let widened = fresh_reg(&mut next_reg);
+                    body.push(format!("  {widened} = fptosi double {reg} to i64"));
+                    *last_cpu_value = Some(widened);
+                } else if let (Some(lhs), Some(rhs)) = (
+                    get_f32(&registers, &node.op.args[0]),
+                    get_f32(&registers, &node.op.args[1]),
+                ) {
+                    let reg = fresh_reg(&mut next_reg);
+                    body.push(format!("  {reg} = fadd float {lhs}, {rhs}"));
+                    registers.insert(node.name.clone(), LlvmValueRef::F32(reg.clone()));
+                    let widened = fresh_reg(&mut next_reg);
+                    body.push(format!("  {widened} = fptosi float {reg} to i64"));
+                    *last_cpu_value = Some(widened);
+                } else if let (Some(lhs), Some(rhs)) = (
                     get_i64(&registers, &node.op.args[0]),
                     get_i64(&registers, &node.op.args[1]),
                 ) {
@@ -679,28 +806,68 @@ fn emit_cpu_function(
                 *last_cpu_value = Some(widened);
             }
             ("cpu", "eq") => {
-                let lhs_value = registers.get(&node.op.args[0]).cloned();
-                let rhs_value = registers.get(&node.op.args[1]).cloned();
                 if let (Some(lhs), Some(rhs)) = (
-                    lhs_value
-                        .as_ref()
-                        .and_then(|value| coerce_to_i64(value, &mut body, &mut next_reg)),
-                    rhs_value
-                        .as_ref()
-                        .and_then(|value| coerce_to_i64(value, &mut body, &mut next_reg)),
+                    get_f64(&registers, &node.op.args[0]),
+                    get_f64(&registers, &node.op.args[1]),
                 ) {
                     let cmp = fresh_reg(&mut next_reg);
-                    body.push(format!("  {cmp} = icmp eq i64 {lhs}, {rhs}"));
+                    body.push(format!("  {cmp} = fcmp oeq double {lhs}, {rhs}"));
                     let reg = fresh_reg(&mut next_reg);
                     body.push(format!("  {reg} = zext i1 {cmp} to i64"));
-                    registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                    registers.insert(
+                        node.name.clone(),
+                        LlvmValueRef::Bool {
+                            i1: cmp.clone(),
+                            i64: reg.clone(),
+                        },
+                    );
+                    *last_cpu_value = Some(reg);
+                } else if let (Some(lhs), Some(rhs)) = (
+                    get_f32(&registers, &node.op.args[0]),
+                    get_f32(&registers, &node.op.args[1]),
+                ) {
+                    let cmp = fresh_reg(&mut next_reg);
+                    body.push(format!("  {cmp} = fcmp oeq float {lhs}, {rhs}"));
+                    let reg = fresh_reg(&mut next_reg);
+                    body.push(format!("  {reg} = zext i1 {cmp} to i64"));
+                    registers.insert(
+                        node.name.clone(),
+                        LlvmValueRef::Bool {
+                            i1: cmp.clone(),
+                            i64: reg.clone(),
+                        },
+                    );
                     *last_cpu_value = Some(reg);
                 } else {
-                    body.push(format!(
+                    let lhs_value = registers.get(&node.op.args[0]).cloned();
+                    let rhs_value = registers.get(&node.op.args[1]).cloned();
+                    if let (Some(lhs), Some(rhs)) = (
+                        lhs_value
+                            .as_ref()
+                            .and_then(|value| coerce_to_i64(value, &mut body, &mut next_reg)),
+                        rhs_value
+                            .as_ref()
+                            .and_then(|value| coerce_to_i64(value, &mut body, &mut next_reg)),
+                    ) {
+                        let cmp = fresh_reg(&mut next_reg);
+                        body.push(format!("  {cmp} = icmp eq i64 {lhs}, {rhs}"));
+                        let reg = fresh_reg(&mut next_reg);
+                        body.push(format!("  {reg} = zext i1 {cmp} to i64"));
+                        registers.insert(
+                            node.name.clone(),
+                            LlvmValueRef::Bool {
+                                i1: cmp.clone(),
+                                i64: reg.clone(),
+                            },
+                        );
+                        *last_cpu_value = Some(reg);
+                    } else {
+                        body.push(format!(
                         "  ; deferred lowering for cpu.eq `{}` because one or more inputs are outside the current CPU LLVM slice",
                         node.name
                     ));
-                    continue;
+                        continue;
+                    }
                 }
             }
             ("cpu", "eq_i32") => {
@@ -776,32 +943,104 @@ fn emit_cpu_function(
                 *last_cpu_value = Some(widened);
             }
             ("cpu", "ne") => {
-                let lhs_value = registers.get(&node.op.args[0]).cloned();
-                let rhs_value = registers.get(&node.op.args[1]).cloned();
                 if let (Some(lhs), Some(rhs)) = (
-                    lhs_value
-                        .as_ref()
-                        .and_then(|value| coerce_to_i64(value, &mut body, &mut next_reg)),
-                    rhs_value
-                        .as_ref()
-                        .and_then(|value| coerce_to_i64(value, &mut body, &mut next_reg)),
+                    get_f64(&registers, &node.op.args[0]),
+                    get_f64(&registers, &node.op.args[1]),
                 ) {
                     let cmp = fresh_reg(&mut next_reg);
-                    body.push(format!("  {cmp} = icmp ne i64 {lhs}, {rhs}"));
+                    body.push(format!("  {cmp} = fcmp one double {lhs}, {rhs}"));
                     let reg = fresh_reg(&mut next_reg);
                     body.push(format!("  {reg} = zext i1 {cmp} to i64"));
-                    registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                    registers.insert(
+                        node.name.clone(),
+                        LlvmValueRef::Bool {
+                            i1: cmp.clone(),
+                            i64: reg.clone(),
+                        },
+                    );
+                    *last_cpu_value = Some(reg);
+                } else if let (Some(lhs), Some(rhs)) = (
+                    get_f32(&registers, &node.op.args[0]),
+                    get_f32(&registers, &node.op.args[1]),
+                ) {
+                    let cmp = fresh_reg(&mut next_reg);
+                    body.push(format!("  {cmp} = fcmp one float {lhs}, {rhs}"));
+                    let reg = fresh_reg(&mut next_reg);
+                    body.push(format!("  {reg} = zext i1 {cmp} to i64"));
+                    registers.insert(
+                        node.name.clone(),
+                        LlvmValueRef::Bool {
+                            i1: cmp.clone(),
+                            i64: reg.clone(),
+                        },
+                    );
                     *last_cpu_value = Some(reg);
                 } else {
-                    body.push(format!(
+                    let lhs_value = registers.get(&node.op.args[0]).cloned();
+                    let rhs_value = registers.get(&node.op.args[1]).cloned();
+                    if let (Some(lhs), Some(rhs)) = (
+                        lhs_value
+                            .as_ref()
+                            .and_then(|value| coerce_to_i64(value, &mut body, &mut next_reg)),
+                        rhs_value
+                            .as_ref()
+                            .and_then(|value| coerce_to_i64(value, &mut body, &mut next_reg)),
+                    ) {
+                        let cmp = fresh_reg(&mut next_reg);
+                        body.push(format!("  {cmp} = icmp ne i64 {lhs}, {rhs}"));
+                        let reg = fresh_reg(&mut next_reg);
+                        body.push(format!("  {reg} = zext i1 {cmp} to i64"));
+                        registers.insert(
+                            node.name.clone(),
+                            LlvmValueRef::Bool {
+                                i1: cmp.clone(),
+                                i64: reg.clone(),
+                            },
+                        );
+                        *last_cpu_value = Some(reg);
+                    } else {
+                        body.push(format!(
                         "  ; deferred lowering for cpu.ne `{}` because one or more inputs are outside the current CPU LLVM slice",
                         node.name
                     ));
-                    continue;
+                        continue;
+                    }
                 }
             }
             ("cpu", "lt") => {
                 if let (Some(lhs), Some(rhs)) = (
+                    get_f64(&registers, &node.op.args[0]),
+                    get_f64(&registers, &node.op.args[1]),
+                ) {
+                    let cmp = fresh_reg(&mut next_reg);
+                    body.push(format!("  {cmp} = fcmp olt double {lhs}, {rhs}"));
+                    let widened = fresh_reg(&mut next_reg);
+                    body.push(format!("  {widened} = zext i1 {cmp} to i64"));
+                    registers.insert(
+                        node.name.clone(),
+                        LlvmValueRef::Bool {
+                            i1: cmp.clone(),
+                            i64: widened.clone(),
+                        },
+                    );
+                    *last_cpu_value = Some(widened);
+                } else if let (Some(lhs), Some(rhs)) = (
+                    get_f32(&registers, &node.op.args[0]),
+                    get_f32(&registers, &node.op.args[1]),
+                ) {
+                    let cmp = fresh_reg(&mut next_reg);
+                    body.push(format!("  {cmp} = fcmp olt float {lhs}, {rhs}"));
+                    let widened = fresh_reg(&mut next_reg);
+                    body.push(format!("  {widened} = zext i1 {cmp} to i64"));
+                    registers.insert(
+                        node.name.clone(),
+                        LlvmValueRef::Bool {
+                            i1: cmp.clone(),
+                            i64: widened.clone(),
+                        },
+                    );
+                    *last_cpu_value = Some(widened);
+                } else if let (Some(lhs), Some(rhs)) = (
                     get_i64(&registers, &node.op.args[0]),
                     get_i64(&registers, &node.op.args[1]),
                 ) {
@@ -909,6 +1148,38 @@ fn emit_cpu_function(
             }
             ("cpu", "gt") => {
                 if let (Some(lhs), Some(rhs)) = (
+                    get_f64(&registers, &node.op.args[0]),
+                    get_f64(&registers, &node.op.args[1]),
+                ) {
+                    let cmp = fresh_reg(&mut next_reg);
+                    body.push(format!("  {cmp} = fcmp ogt double {lhs}, {rhs}"));
+                    let widened = fresh_reg(&mut next_reg);
+                    body.push(format!("  {widened} = zext i1 {cmp} to i64"));
+                    registers.insert(
+                        node.name.clone(),
+                        LlvmValueRef::Bool {
+                            i1: cmp.clone(),
+                            i64: widened.clone(),
+                        },
+                    );
+                    *last_cpu_value = Some(widened);
+                } else if let (Some(lhs), Some(rhs)) = (
+                    get_f32(&registers, &node.op.args[0]),
+                    get_f32(&registers, &node.op.args[1]),
+                ) {
+                    let cmp = fresh_reg(&mut next_reg);
+                    body.push(format!("  {cmp} = fcmp ogt float {lhs}, {rhs}"));
+                    let widened = fresh_reg(&mut next_reg);
+                    body.push(format!("  {widened} = zext i1 {cmp} to i64"));
+                    registers.insert(
+                        node.name.clone(),
+                        LlvmValueRef::Bool {
+                            i1: cmp.clone(),
+                            i64: widened.clone(),
+                        },
+                    );
+                    *last_cpu_value = Some(widened);
+                } else if let (Some(lhs), Some(rhs)) = (
                     get_i64(&registers, &node.op.args[0]),
                     get_i64(&registers, &node.op.args[1]),
                 ) {
@@ -1016,6 +1287,38 @@ fn emit_cpu_function(
             }
             ("cpu", "le") => {
                 if let (Some(lhs), Some(rhs)) = (
+                    get_f64(&registers, &node.op.args[0]),
+                    get_f64(&registers, &node.op.args[1]),
+                ) {
+                    let cmp = fresh_reg(&mut next_reg);
+                    body.push(format!("  {cmp} = fcmp ole double {lhs}, {rhs}"));
+                    let widened = fresh_reg(&mut next_reg);
+                    body.push(format!("  {widened} = zext i1 {cmp} to i64"));
+                    registers.insert(
+                        node.name.clone(),
+                        LlvmValueRef::Bool {
+                            i1: cmp.clone(),
+                            i64: widened.clone(),
+                        },
+                    );
+                    *last_cpu_value = Some(widened);
+                } else if let (Some(lhs), Some(rhs)) = (
+                    get_f32(&registers, &node.op.args[0]),
+                    get_f32(&registers, &node.op.args[1]),
+                ) {
+                    let cmp = fresh_reg(&mut next_reg);
+                    body.push(format!("  {cmp} = fcmp ole float {lhs}, {rhs}"));
+                    let widened = fresh_reg(&mut next_reg);
+                    body.push(format!("  {widened} = zext i1 {cmp} to i64"));
+                    registers.insert(
+                        node.name.clone(),
+                        LlvmValueRef::Bool {
+                            i1: cmp.clone(),
+                            i64: widened.clone(),
+                        },
+                    );
+                    *last_cpu_value = Some(widened);
+                } else if let (Some(lhs), Some(rhs)) = (
                     get_i64(&registers, &node.op.args[0]),
                     get_i64(&registers, &node.op.args[1]),
                 ) {
@@ -1051,6 +1354,38 @@ fn emit_cpu_function(
             }
             ("cpu", "ge") => {
                 if let (Some(lhs), Some(rhs)) = (
+                    get_f64(&registers, &node.op.args[0]),
+                    get_f64(&registers, &node.op.args[1]),
+                ) {
+                    let cmp = fresh_reg(&mut next_reg);
+                    body.push(format!("  {cmp} = fcmp oge double {lhs}, {rhs}"));
+                    let widened = fresh_reg(&mut next_reg);
+                    body.push(format!("  {widened} = zext i1 {cmp} to i64"));
+                    registers.insert(
+                        node.name.clone(),
+                        LlvmValueRef::Bool {
+                            i1: cmp.clone(),
+                            i64: widened.clone(),
+                        },
+                    );
+                    *last_cpu_value = Some(widened);
+                } else if let (Some(lhs), Some(rhs)) = (
+                    get_f32(&registers, &node.op.args[0]),
+                    get_f32(&registers, &node.op.args[1]),
+                ) {
+                    let cmp = fresh_reg(&mut next_reg);
+                    body.push(format!("  {cmp} = fcmp oge float {lhs}, {rhs}"));
+                    let widened = fresh_reg(&mut next_reg);
+                    body.push(format!("  {widened} = zext i1 {cmp} to i64"));
+                    registers.insert(
+                        node.name.clone(),
+                        LlvmValueRef::Bool {
+                            i1: cmp.clone(),
+                            i64: widened.clone(),
+                        },
+                    );
+                    *last_cpu_value = Some(widened);
+                } else if let (Some(lhs), Some(rhs)) = (
                     get_i64(&registers, &node.op.args[0]),
                     get_i64(&registers, &node.op.args[1]),
                 ) {
@@ -1086,6 +1421,26 @@ fn emit_cpu_function(
             }
             ("cpu", "sub") => {
                 if let (Some(lhs), Some(rhs)) = (
+                    get_f64(&registers, &node.op.args[0]),
+                    get_f64(&registers, &node.op.args[1]),
+                ) {
+                    let reg = fresh_reg(&mut next_reg);
+                    body.push(format!("  {reg} = fsub double {lhs}, {rhs}"));
+                    registers.insert(node.name.clone(), LlvmValueRef::F64(reg.clone()));
+                    let widened = fresh_reg(&mut next_reg);
+                    body.push(format!("  {widened} = fptosi double {reg} to i64"));
+                    *last_cpu_value = Some(widened);
+                } else if let (Some(lhs), Some(rhs)) = (
+                    get_f32(&registers, &node.op.args[0]),
+                    get_f32(&registers, &node.op.args[1]),
+                ) {
+                    let reg = fresh_reg(&mut next_reg);
+                    body.push(format!("  {reg} = fsub float {lhs}, {rhs}"));
+                    registers.insert(node.name.clone(), LlvmValueRef::F32(reg.clone()));
+                    let widened = fresh_reg(&mut next_reg);
+                    body.push(format!("  {widened} = fptosi float {reg} to i64"));
+                    *last_cpu_value = Some(widened);
+                } else if let (Some(lhs), Some(rhs)) = (
                     get_i64(&registers, &node.op.args[0]),
                     get_i64(&registers, &node.op.args[1]),
                 ) {
@@ -1167,6 +1522,26 @@ fn emit_cpu_function(
             }
             ("cpu", "mul") => {
                 if let (Some(lhs), Some(rhs)) = (
+                    get_f64(&registers, &node.op.args[0]),
+                    get_f64(&registers, &node.op.args[1]),
+                ) {
+                    let reg = fresh_reg(&mut next_reg);
+                    body.push(format!("  {reg} = fmul double {lhs}, {rhs}"));
+                    registers.insert(node.name.clone(), LlvmValueRef::F64(reg.clone()));
+                    let widened = fresh_reg(&mut next_reg);
+                    body.push(format!("  {widened} = fptosi double {reg} to i64"));
+                    *last_cpu_value = Some(widened);
+                } else if let (Some(lhs), Some(rhs)) = (
+                    get_f32(&registers, &node.op.args[0]),
+                    get_f32(&registers, &node.op.args[1]),
+                ) {
+                    let reg = fresh_reg(&mut next_reg);
+                    body.push(format!("  {reg} = fmul float {lhs}, {rhs}"));
+                    registers.insert(node.name.clone(), LlvmValueRef::F32(reg.clone()));
+                    let widened = fresh_reg(&mut next_reg);
+                    body.push(format!("  {widened} = fptosi float {reg} to i64"));
+                    *last_cpu_value = Some(widened);
+                } else if let (Some(lhs), Some(rhs)) = (
                     get_i64(&registers, &node.op.args[0]),
                     get_i64(&registers, &node.op.args[1]),
                 ) {
@@ -1248,6 +1623,26 @@ fn emit_cpu_function(
             }
             ("cpu", "div") => {
                 if let (Some(lhs), Some(rhs)) = (
+                    get_f64(&registers, &node.op.args[0]),
+                    get_f64(&registers, &node.op.args[1]),
+                ) {
+                    let reg = fresh_reg(&mut next_reg);
+                    body.push(format!("  {reg} = fdiv double {lhs}, {rhs}"));
+                    registers.insert(node.name.clone(), LlvmValueRef::F64(reg.clone()));
+                    let widened = fresh_reg(&mut next_reg);
+                    body.push(format!("  {widened} = fptosi double {reg} to i64"));
+                    *last_cpu_value = Some(widened);
+                } else if let (Some(lhs), Some(rhs)) = (
+                    get_f32(&registers, &node.op.args[0]),
+                    get_f32(&registers, &node.op.args[1]),
+                ) {
+                    let reg = fresh_reg(&mut next_reg);
+                    body.push(format!("  {reg} = fdiv float {lhs}, {rhs}"));
+                    registers.insert(node.name.clone(), LlvmValueRef::F32(reg.clone()));
+                    let widened = fresh_reg(&mut next_reg);
+                    body.push(format!("  {widened} = fptosi float {reg} to i64"));
+                    *last_cpu_value = Some(widened);
+                } else if let (Some(lhs), Some(rhs)) = (
                     get_i64(&registers, &node.op.args[0]),
                     get_i64(&registers, &node.op.args[1]),
                 ) {
@@ -1835,7 +2230,11 @@ fn emit_cpu_function(
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
                 *last_cpu_value = Some(reg);
             }
-            ("cpu", "call_bool") | ("cpu", "call_i32") | ("cpu", "call_i64") => {
+            ("cpu", "call_bool")
+            | ("cpu", "call_i32")
+            | ("cpu", "call_i64")
+            | ("cpu", "call_f32")
+            | ("cpu", "call_f64") => {
                 let callee = &node.op.args[0];
                 let Some(signature) = helper_signatures.get(callee) else {
                     body.push(format!(
@@ -1856,6 +2255,12 @@ fn emit_cpu_function(
                         }
                         CpuCallScalarKind::I64 => {
                             get_i64(&registers, arg).map(|value| format!("i64 {value}"))
+                        }
+                        CpuCallScalarKind::F32 => {
+                            get_f32(&registers, arg).map(|value| format!("float {value}"))
+                        }
+                        CpuCallScalarKind::F64 => {
+                            get_f64(&registers, arg).map(|value| format!("double {value}"))
                         }
                     })
                     .collect::<Option<Vec<_>>>();
@@ -1919,6 +2324,20 @@ fn emit_cpu_function(
                     CpuCallScalarKind::I64 => {
                         registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
                         *last_cpu_value = Some(reg);
+                    }
+                    CpuCallScalarKind::F32 => {
+                        registers.insert(node.name.clone(), LlvmValueRef::F32(reg.clone()));
+                        let widened = fresh_reg(&mut next_reg);
+                        body.push(format!("  {widened} = fpext float {reg} to double"));
+                        let as_i64 = fresh_reg(&mut next_reg);
+                        body.push(format!("  {as_i64} = fptosi double {widened} to i64"));
+                        *last_cpu_value = Some(as_i64);
+                    }
+                    CpuCallScalarKind::F64 => {
+                        registers.insert(node.name.clone(), LlvmValueRef::F64(reg.clone()));
+                        let as_i64 = fresh_reg(&mut next_reg);
+                        body.push(format!("  {as_i64} = fptosi double {reg} to i64"));
+                        *last_cpu_value = Some(as_i64);
                     }
                 }
             }
@@ -2005,6 +2424,38 @@ fn emit_cpu_function(
                 };
                 body.push(format!("  ret i64 {input}"));
                 *last_cpu_value = Some(input.to_owned());
+                state.ends_with_terminal_return = true;
+                break;
+            }
+            ("cpu", "return_f32") => {
+                let Some(input) = get_f32(&registers, &node.op.args[0]) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.return_f32 `{}` because its input is outside the current CPU LLVM slice",
+                        node.name
+                    ));
+                    continue;
+                };
+                let widened = fresh_reg(&mut next_reg);
+                body.push(format!("  {widened} = fpext float {input} to double"));
+                let as_i64 = fresh_reg(&mut next_reg);
+                body.push(format!("  {as_i64} = fptosi double {widened} to i64"));
+                *last_cpu_value = Some(as_i64);
+                body.push(format!("  ret float {input}"));
+                state.ends_with_terminal_return = true;
+                break;
+            }
+            ("cpu", "return_f64") => {
+                let Some(input) = get_f64(&registers, &node.op.args[0]) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.return_f64 `{}` because its input is outside the current CPU LLVM slice",
+                        node.name
+                    ));
+                    continue;
+                };
+                let as_i64 = fresh_reg(&mut next_reg);
+                body.push(format!("  {as_i64} = fptosi double {input} to i64"));
+                *last_cpu_value = Some(as_i64);
+                body.push(format!("  ret double {input}"));
                 state.ends_with_terminal_return = true;
                 break;
             }
@@ -2098,7 +2549,7 @@ fn emit_cpu_function(
                 registers.insert(node.name.clone(), LlvmValueRef::I64(current.clone()));
                 *last_cpu_value = Some(current);
             }
-            ("cpu", "loop_while_i64_chain") => {
+            ("cpu", "loop_while_i64_chain" | "loop_while_scalar_chain") => {
                 let initial_value = registers.get(&node.op.args[0]).cloned();
                 let limit_value = registers.get(&node.op.args[1]).cloned();
                 let step_value = registers.get(&node.op.args[2]).cloned();
@@ -2111,30 +2562,9 @@ fn emit_cpu_function(
                     ));
                     continue;
                 };
-                let Some(initial) = coerce_to_i64(&initial_value, &mut body, &mut next_reg) else {
-                    body.push(format!(
-                        "  ; deferred lowering for cpu.loop_while_i64_chain `{}` because its initial value is not coercible to i64",
-                        node.name
-                    ));
-                    continue;
-                };
-                let Some(limit) = coerce_to_i64(&limit_value, &mut body, &mut next_reg) else {
-                    body.push(format!(
-                        "  ; deferred lowering for cpu.loop_while_i64_chain `{}` because its limit value is not coercible to i64",
-                        node.name
-                    ));
-                    continue;
-                };
-                let Some(step) = coerce_to_i64(&step_value, &mut body, &mut next_reg) else {
-                    body.push(format!(
-                        "  ; deferred lowering for cpu.loop_while_i64_chain `{}` because its step value is not coercible to i64",
-                        node.name
-                    ));
-                    continue;
-                };
                 let cmp_kind = node.op.args[3].as_str();
                 let step_kind = node.op.args[4].as_str();
-                let mut carry_initials = Vec::new();
+                let mut carry_initial_values = Vec::new();
                 let mut carry_kinds = Vec::new();
                 for chunk in node.op.args[5..].chunks(2) {
                     let carry_initial_value = registers.get(&chunk[0]).cloned();
@@ -2145,27 +2575,78 @@ fn emit_cpu_function(
                         ));
                         continue;
                     };
-                    let Some(carry_initial) =
-                        coerce_to_i64(&carry_initial_value, &mut body, &mut next_reg)
-                    else {
+                    carry_initial_values.push(carry_initial_value);
+                    carry_kinds.push(chunk[1].clone());
+                }
+                let Some(loop_scalar_kind) = infer_loop_scalar_kind(
+                    [&initial_value, &limit_value, &step_value]
+                        .into_iter()
+                        .chain(carry_initial_values.iter()),
+                ) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.loop_while_i64_chain `{}` because its loop values are not representable as one scalar kind",
+                        node.name
+                    ));
+                    continue;
+                };
+                let Some(initial) = coerce_to_loop_scalar(
+                    &initial_value,
+                    loop_scalar_kind,
+                    &mut body,
+                    &mut next_reg,
+                ) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.loop_while_i64_chain `{}` because its initial value is not coercible to the selected loop scalar kind",
+                        node.name
+                    ));
+                    continue;
+                };
+                let Some(limit) =
+                    coerce_to_loop_scalar(&limit_value, loop_scalar_kind, &mut body, &mut next_reg)
+                else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.loop_while_i64_chain `{}` because its limit value is not coercible to the selected loop scalar kind",
+                        node.name
+                    ));
+                    continue;
+                };
+                let Some(step) =
+                    coerce_to_loop_scalar(&step_value, loop_scalar_kind, &mut body, &mut next_reg)
+                else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.loop_while_i64_chain `{}` because its step value is not coercible to the selected loop scalar kind",
+                        node.name
+                    ));
+                    continue;
+                };
+                let mut carry_initials = Vec::new();
+                for carry_initial_value in &carry_initial_values {
+                    let Some(carry_initial) = coerce_to_loop_scalar(
+                        carry_initial_value,
+                        loop_scalar_kind,
+                        &mut body,
+                        &mut next_reg,
+                    ) else {
                         body.push(format!(
-                            "  ; deferred lowering for cpu.loop_while_i64_chain `{}` because one or more carry initials are not coercible to i64",
+                            "  ; deferred lowering for cpu.loop_while_i64_chain `{}` because one or more carry initials are not coercible to the selected loop scalar kind",
                             node.name
                         ));
                         continue;
                     };
                     carry_initials.push(carry_initial);
-                    carry_kinds.push(chunk[1].clone());
                 }
+                let scalar_ty = loop_scalar_llvm_type(loop_scalar_kind);
                 let current_slot = fresh_reg(&mut next_reg);
-                body.push(format!("  {current_slot} = alloca i64"));
-                body.push(format!("  store i64 {initial}, ptr {current_slot}"));
+                body.push(format!("  {current_slot} = alloca {scalar_ty}"));
+                body.push(format!("  store {scalar_ty} {initial}, ptr {current_slot}"));
                 let carry_slots = carry_initials
                     .iter()
                     .map(|carry_initial| {
                         let carry_slot = fresh_reg(&mut next_reg);
-                        body.push(format!("  {carry_slot} = alloca i64"));
-                        body.push(format!("  store i64 {carry_initial}, ptr {carry_slot}"));
+                        body.push(format!("  {carry_slot} = alloca {scalar_ty}"));
+                        body.push(format!(
+                            "  store {scalar_ty} {carry_initial}, ptr {carry_slot}"
+                        ));
                         carry_slot
                     })
                     .collect::<Vec<_>>();
@@ -2175,49 +2656,47 @@ fn emit_cpu_function(
                 body.push(format!("  br label %{loop_cond}"));
                 body.push(format!("{loop_cond}:"));
                 let current = fresh_reg(&mut next_reg);
-                body.push(format!("  {current} = load i64, ptr {current_slot}"));
-                let cmp = fresh_reg(&mut next_reg);
-                let pred = match cmp_kind {
-                    "eq" => "eq",
-                    "ne" => "ne",
-                    "lt" => "slt",
-                    "le" => "sle",
-                    "gt" => "sgt",
-                    "ge" => "sge",
-                    other => {
-                        return Err(format!(
-                            "cpu.loop_while_i64_chain `{}` has unsupported compare kind `{other}` during LLVM lowering",
-                            node.name
-                        ));
-                    }
-                };
-                body.push(format!("  {cmp} = icmp {pred} i64 {current}, {limit}"));
+                body.push(format!(
+                    "  {current} = load {scalar_ty}, ptr {current_slot}"
+                ));
+                let cmp = emit_loop_compare(
+                    &mut body,
+                    &mut next_reg,
+                    loop_scalar_kind,
+                    cmp_kind,
+                    &current,
+                    &limit,
+                )
+                .map_err(|error| {
+                    format!(
+                        "cpu.loop_while_i64_chain `{}` {error} during LLVM lowering",
+                        node.name
+                    )
+                })?;
                 body.push(format!(
                     "  br i1 {cmp}, label %{loop_body}, label %{loop_exit}"
                 ));
                 body.push(format!("{loop_body}:"));
-                let next_current = match step_kind {
-                    "add" => {
-                        let reg = fresh_reg(&mut next_reg);
-                        body.push(format!("  {reg} = add i64 {current}, {step}"));
-                        reg
-                    }
-                    "sub" => {
-                        let reg = fresh_reg(&mut next_reg);
-                        body.push(format!("  {reg} = sub i64 {current}, {step}"));
-                        reg
-                    }
-                    other => {
-                        return Err(format!(
-                            "cpu.loop_while_i64_chain `{}` has unsupported step kind `{other}` during LLVM lowering",
-                            node.name
-                        ));
-                    }
-                };
+                let next_current = emit_loop_numeric_op(
+                    &mut body,
+                    &mut next_reg,
+                    loop_scalar_kind,
+                    step_kind,
+                    &current,
+                    &step,
+                )
+                .map_err(|error| {
+                    format!(
+                        "cpu.loop_while_i64_chain `{}` {error} during LLVM lowering",
+                        node.name
+                    )
+                })?;
                 let mut current_carries = Vec::new();
                 for carry_slot in &carry_slots {
                     let carry_before = fresh_reg(&mut next_reg);
-                    body.push(format!("  {carry_before} = load i64, ptr {carry_slot}"));
+                    body.push(format!(
+                        "  {carry_before} = load {scalar_ty}, ptr {carry_slot}"
+                    ));
                     current_carries.push(carry_before);
                 }
                 let mut next_carries = Vec::new();
@@ -2300,37 +2779,54 @@ fn emit_cpu_function(
                             node.name
                         ));
                     };
-                    let reg = fresh_reg(&mut next_reg);
-                    body.push(format!(
-                        "  {reg} = {op} i64 {}, {}",
-                        current_carries[index], source
-                    ));
+                    let reg = emit_loop_numeric_op(
+                        &mut body,
+                        &mut next_reg,
+                        loop_scalar_kind,
+                        op,
+                        &current_carries[index],
+                        &source,
+                    )
+                    .map_err(|error| {
+                        format!(
+                            "cpu.loop_while_i64_chain `{}` {error} during LLVM lowering",
+                            node.name
+                        )
+                    })?;
                     next_carries.push(reg);
                 }
-                body.push(format!("  store i64 {next_current}, ptr {current_slot}"));
+                body.push(format!(
+                    "  store {scalar_ty} {next_current}, ptr {current_slot}"
+                ));
                 for (carry_slot, next_carry) in carry_slots.iter().zip(next_carries.iter()) {
-                    body.push(format!("  store i64 {next_carry}, ptr {carry_slot}"));
+                    body.push(format!(
+                        "  store {scalar_ty} {next_carry}, ptr {carry_slot}"
+                    ));
                 }
                 body.push(format!("  br label %{loop_cond}"));
                 body.push(format!("{loop_exit}:"));
                 let final_current = fresh_reg(&mut next_reg);
-                body.push(format!("  {final_current} = load i64, ptr {current_slot}"));
+                body.push(format!(
+                    "  {final_current} = load {scalar_ty}, ptr {current_slot}"
+                ));
                 let final_carries = carry_slots
                     .iter()
                     .map(|carry_slot| {
                         let final_carry = fresh_reg(&mut next_reg);
-                        body.push(format!("  {final_carry} = load i64, ptr {carry_slot}"));
+                        body.push(format!(
+                            "  {final_carry} = load {scalar_ty}, ptr {carry_slot}"
+                        ));
                         final_carry
                     })
                     .collect::<Vec<_>>();
                 let mut fields = vec![(
                     "current".to_owned(),
-                    LlvmValueRef::I64(final_current.clone()),
+                    loop_scalar_value_ref(loop_scalar_kind, final_current.clone()),
                 )];
                 for (index, final_carry) in final_carries.iter().enumerate() {
                     fields.push((
                         format!("carry{index}"),
-                        LlvmValueRef::I64(final_carry.clone()),
+                        loop_scalar_value_ref(loop_scalar_kind, final_carry.clone()),
                     ));
                 }
                 registers.insert(
@@ -2340,9 +2836,18 @@ fn emit_cpu_function(
                         fields,
                     }),
                 );
-                *last_cpu_value = final_carries.last().cloned().or(Some(final_current));
+                *last_cpu_value = final_carries
+                    .last()
+                    .map(|carry| loop_scalar_value_ref(loop_scalar_kind, carry.clone()))
+                    .or_else(|| {
+                        Some(loop_scalar_value_ref(
+                            loop_scalar_kind,
+                            final_current.clone(),
+                        ))
+                    })
+                    .and_then(|value| coerce_to_i64(&value, &mut body, &mut next_reg));
             }
-            ("cpu", "loop_while_i64_async_chain") => {
+            ("cpu", "loop_while_i64_async_chain" | "loop_while_scalar_async_chain") => {
                 let initial_value = registers.get(&node.op.args[0]).cloned();
                 let limit_value = registers.get(&node.op.args[1]).cloned();
                 let callee = &node.op.args[2];
@@ -2578,7 +3083,7 @@ fn emit_cpu_function(
                 );
                 *last_cpu_value = final_carries.last().cloned().or(Some(final_current));
             }
-            ("cpu", "loop_while_i64_async_cond_chain") => {
+            ("cpu", "loop_while_i64_async_cond_chain" | "loop_while_scalar_async_cond_chain") => {
                 let initial_value = registers.get(&node.op.args[0]).cloned();
                 let limit_value = registers.get(&node.op.args[1]).cloned();
                 let callee = &node.op.args[2];
@@ -3053,7 +3558,7 @@ fn emit_cpu_function(
                 );
                 *last_cpu_value = final_carries.last().cloned().or(Some(final_current));
             }
-            ("cpu", "loop_while_i64_cond_chain") => {
+            ("cpu", "loop_while_i64_cond_chain" | "loop_while_scalar_cond_chain") => {
                 let initial_value = registers.get(&node.op.args[0]).cloned();
                 let limit_value = registers.get(&node.op.args[1]).cloned();
                 let step_value = registers.get(&node.op.args[2]).cloned();
@@ -3066,30 +3571,9 @@ fn emit_cpu_function(
                     ));
                     continue;
                 };
-                let Some(initial) = coerce_to_i64(&initial_value, &mut body, &mut next_reg) else {
-                    body.push(format!(
-                        "  ; deferred lowering for cpu.loop_while_i64_cond_chain `{}` because its initial value is not coercible to i64",
-                        node.name
-                    ));
-                    continue;
-                };
-                let Some(limit) = coerce_to_i64(&limit_value, &mut body, &mut next_reg) else {
-                    body.push(format!(
-                        "  ; deferred lowering for cpu.loop_while_i64_cond_chain `{}` because its limit value is not coercible to i64",
-                        node.name
-                    ));
-                    continue;
-                };
-                let Some(step) = coerce_to_i64(&step_value, &mut body, &mut next_reg) else {
-                    body.push(format!(
-                        "  ; deferred lowering for cpu.loop_while_i64_cond_chain `{}` because its step value is not coercible to i64",
-                        node.name
-                    ));
-                    continue;
-                };
                 let cmp_kind = node.op.args[3].as_str();
                 let step_kind = node.op.args[4].as_str();
-                let mut carry_initials = Vec::new();
+                let mut carry_initial_values = Vec::new();
                 let mut carry_specs = Vec::new();
                 let mut deferred = false;
                 for chunk in node.op.args[5..].chunks(5) {
@@ -3102,16 +3586,7 @@ fn emit_cpu_function(
                         deferred = true;
                         break;
                     };
-                    let Some(carry_initial) =
-                        coerce_to_i64(&carry_initial_value, &mut body, &mut next_reg)
-                    else {
-                        body.push(format!(
-                            "  ; deferred lowering for cpu.loop_while_i64_cond_chain `{}` because one or more carry initials are not coercible to i64",
-                            node.name
-                        ));
-                        deferred = true;
-                        break;
-                    };
+                    carry_initial_values.push(carry_initial_value);
                     let cond_rhs = if chunk[1] == "always" {
                         None
                     } else {
@@ -3124,19 +3599,8 @@ fn emit_cpu_function(
                             deferred = true;
                             break;
                         };
-                        let Some(cond_rhs) =
-                            coerce_to_i64(&cond_rhs_value, &mut body, &mut next_reg)
-                        else {
-                            body.push(format!(
-                                "  ; deferred lowering for cpu.loop_while_i64_cond_chain `{}` because one or more condition rhs values are not coercible to i64",
-                                node.name
-                            ));
-                            deferred = true;
-                            break;
-                        };
-                        Some(cond_rhs)
+                        Some(cond_rhs_value)
                     };
-                    carry_initials.push(carry_initial);
                     carry_specs.push((
                         chunk[1].clone(),
                         cond_rhs,
@@ -3147,15 +3611,109 @@ fn emit_cpu_function(
                 if deferred {
                     continue;
                 }
+                let Some(loop_scalar_kind) = infer_loop_scalar_kind(
+                    [&initial_value, &limit_value, &step_value]
+                        .into_iter()
+                        .chain(carry_initial_values.iter())
+                        .chain(
+                            carry_specs
+                                .iter()
+                                .filter_map(|(_, cond_rhs, _, _)| cond_rhs.as_ref()),
+                        ),
+                ) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.loop_while_i64_cond_chain `{}` because its loop values are not representable as one scalar kind",
+                        node.name
+                    ));
+                    continue;
+                };
+                let Some(initial) = coerce_to_loop_scalar(
+                    &initial_value,
+                    loop_scalar_kind,
+                    &mut body,
+                    &mut next_reg,
+                ) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.loop_while_i64_cond_chain `{}` because its initial value is not coercible to the selected loop scalar kind",
+                        node.name
+                    ));
+                    continue;
+                };
+                let Some(limit) =
+                    coerce_to_loop_scalar(&limit_value, loop_scalar_kind, &mut body, &mut next_reg)
+                else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.loop_while_i64_cond_chain `{}` because its limit value is not coercible to the selected loop scalar kind",
+                        node.name
+                    ));
+                    continue;
+                };
+                let Some(step) =
+                    coerce_to_loop_scalar(&step_value, loop_scalar_kind, &mut body, &mut next_reg)
+                else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.loop_while_i64_cond_chain `{}` because its step value is not coercible to the selected loop scalar kind",
+                        node.name
+                    ));
+                    continue;
+                };
+                let mut carry_initials = Vec::new();
+                for carry_initial_value in &carry_initial_values {
+                    let Some(carry_initial) = coerce_to_loop_scalar(
+                        carry_initial_value,
+                        loop_scalar_kind,
+                        &mut body,
+                        &mut next_reg,
+                    ) else {
+                        body.push(format!(
+                            "  ; deferred lowering for cpu.loop_while_i64_cond_chain `{}` because one or more carry initials are not coercible to the selected loop scalar kind",
+                            node.name
+                        ));
+                        deferred = true;
+                        break;
+                    };
+                    carry_initials.push(carry_initial);
+                }
+                if deferred {
+                    continue;
+                }
+                let mut lowered_carry_specs = Vec::new();
+                for (cond_kind, cond_rhs, then_kind, else_kind) in carry_specs {
+                    let lowered_cond_rhs = if let Some(cond_rhs) = cond_rhs {
+                        let Some(cond_rhs) = coerce_to_loop_scalar(
+                            &cond_rhs,
+                            loop_scalar_kind,
+                            &mut body,
+                            &mut next_reg,
+                        ) else {
+                            body.push(format!(
+                                "  ; deferred lowering for cpu.loop_while_i64_cond_chain `{}` because one or more condition rhs values are not coercible to the selected loop scalar kind",
+                                node.name
+                            ));
+                            deferred = true;
+                            break;
+                        };
+                        Some(cond_rhs)
+                    } else {
+                        None
+                    };
+                    lowered_carry_specs.push((cond_kind, lowered_cond_rhs, then_kind, else_kind));
+                }
+                if deferred {
+                    continue;
+                }
+                let scalar_ty = loop_scalar_llvm_type(loop_scalar_kind);
                 let current_slot = fresh_reg(&mut next_reg);
-                body.push(format!("  {current_slot} = alloca i64"));
-                body.push(format!("  store i64 {initial}, ptr {current_slot}"));
+                body.push(format!("  {current_slot} = alloca {scalar_ty}"));
+                body.push(format!("  store {scalar_ty} {initial}, ptr {current_slot}"));
                 let carry_slots = carry_initials
                     .iter()
                     .map(|carry_initial| {
                         let carry_slot = fresh_reg(&mut next_reg);
-                        body.push(format!("  {carry_slot} = alloca i64"));
-                        body.push(format!("  store i64 {carry_initial}, ptr {carry_slot}"));
+                        body.push(format!("  {carry_slot} = alloca {scalar_ty}"));
+                        body.push(format!(
+                            "  store {scalar_ty} {carry_initial}, ptr {carry_slot}"
+                        ));
                         carry_slot
                     })
                     .collect::<Vec<_>>();
@@ -3165,49 +3723,47 @@ fn emit_cpu_function(
                 body.push(format!("  br label %{loop_cond}"));
                 body.push(format!("{loop_cond}:"));
                 let current = fresh_reg(&mut next_reg);
-                body.push(format!("  {current} = load i64, ptr {current_slot}"));
-                let cmp = fresh_reg(&mut next_reg);
-                let pred = match cmp_kind {
-                    "eq" => "eq",
-                    "ne" => "ne",
-                    "lt" => "slt",
-                    "le" => "sle",
-                    "gt" => "sgt",
-                    "ge" => "sge",
-                    other => {
-                        return Err(format!(
-                            "cpu.loop_while_i64_cond_chain `{}` has unsupported compare kind `{other}` during LLVM lowering",
-                            node.name
-                        ));
-                    }
-                };
-                body.push(format!("  {cmp} = icmp {pred} i64 {current}, {limit}"));
+                body.push(format!(
+                    "  {current} = load {scalar_ty}, ptr {current_slot}"
+                ));
+                let cmp = emit_loop_compare(
+                    &mut body,
+                    &mut next_reg,
+                    loop_scalar_kind,
+                    cmp_kind,
+                    &current,
+                    &limit,
+                )
+                .map_err(|error| {
+                    format!(
+                        "cpu.loop_while_i64_cond_chain `{}` {error} during LLVM lowering",
+                        node.name
+                    )
+                })?;
                 body.push(format!(
                     "  br i1 {cmp}, label %{loop_body}, label %{loop_exit}"
                 ));
                 body.push(format!("{loop_body}:"));
-                let next_current = match step_kind {
-                    "add" => {
-                        let reg = fresh_reg(&mut next_reg);
-                        body.push(format!("  {reg} = add i64 {current}, {step}"));
-                        reg
-                    }
-                    "sub" => {
-                        let reg = fresh_reg(&mut next_reg);
-                        body.push(format!("  {reg} = sub i64 {current}, {step}"));
-                        reg
-                    }
-                    other => {
-                        return Err(format!(
-                            "cpu.loop_while_i64_cond_chain `{}` has unsupported step kind `{other}` during LLVM lowering",
-                            node.name
-                        ));
-                    }
-                };
+                let next_current = emit_loop_numeric_op(
+                    &mut body,
+                    &mut next_reg,
+                    loop_scalar_kind,
+                    step_kind,
+                    &current,
+                    &step,
+                )
+                .map_err(|error| {
+                    format!(
+                        "cpu.loop_while_i64_cond_chain `{}` {error} during LLVM lowering",
+                        node.name
+                    )
+                })?;
                 let mut current_carries = Vec::new();
                 for carry_slot in &carry_slots {
                     let carry_before = fresh_reg(&mut next_reg);
-                    body.push(format!("  {carry_before} = load i64, ptr {carry_slot}"));
+                    body.push(format!(
+                        "  {carry_before} = load {scalar_ty}, ptr {carry_slot}"
+                    ));
                     current_carries.push(carry_before);
                 }
                 let resolve_source = |kind: &str,
@@ -3292,29 +3848,45 @@ fn emit_cpu_function(
                 };
                 let mut next_carries = Vec::new();
                 for (index, (cond_kind, cond_rhs, then_kind, else_kind)) in
-                    carry_specs.iter().enumerate()
+                    lowered_carry_specs.iter().enumerate()
                 {
                     let then_value = if then_kind == "keep" {
                         current_carries[index].clone()
                     } else {
                         let (source, op) = resolve_source(then_kind, &next_current, &next_carries)?;
-                        let reg = fresh_reg(&mut next_reg);
-                        body.push(format!(
-                            "  {reg} = {op} i64 {}, {}",
-                            current_carries[index], source
-                        ));
-                        reg
+                        emit_loop_numeric_op(
+                            &mut body,
+                            &mut next_reg,
+                            loop_scalar_kind,
+                            op,
+                            &current_carries[index],
+                            &source,
+                        )
+                        .map_err(|error| {
+                            format!(
+                                "cpu.loop_while_i64_cond_chain `{}` {error} during LLVM lowering",
+                                node.name
+                            )
+                        })?
                     };
                     let else_value = if else_kind == "keep" {
                         current_carries[index].clone()
                     } else {
                         let (source, op) = resolve_source(else_kind, &next_current, &next_carries)?;
-                        let reg = fresh_reg(&mut next_reg);
-                        body.push(format!(
-                            "  {reg} = {op} i64 {}, {}",
-                            current_carries[index], source
-                        ));
-                        reg
+                        emit_loop_numeric_op(
+                            &mut body,
+                            &mut next_reg,
+                            loop_scalar_kind,
+                            op,
+                            &current_carries[index],
+                            &source,
+                        )
+                        .map_err(|error| {
+                            format!(
+                                "cpu.loop_while_i64_cond_chain `{}` {error} during LLVM lowering",
+                                node.name
+                            )
+                        })?
                     };
                     let next_carry = if cond_kind == "always" {
                         then_value
@@ -3413,53 +3985,74 @@ fn emit_cpu_function(
                                 node.name
                             )
                         })?;
-                        let cond_pred = if cond_kind.ends_with("_eq") || cond_kind == "current_eq" {
-                            "eq"
-                        } else if cond_kind.ends_with("_ne") || cond_kind == "current_ne" {
-                            "ne"
-                        } else if cond_kind.ends_with("_lt") || cond_kind == "current_lt" {
-                            "slt"
-                        } else if cond_kind.ends_with("_le") || cond_kind == "current_le" {
-                            "sle"
-                        } else if cond_kind.ends_with("_gt") || cond_kind == "current_gt" {
-                            "sgt"
-                        } else {
-                            "sge"
-                        };
-                        let cond_reg = fresh_reg(&mut next_reg);
-                        body.push(format!("  {cond_reg} = icmp {cond_pred} i64 {lhs}, {rhs}"));
+                        let cond_compare =
+                            if cond_kind.ends_with("_eq") || cond_kind == "current_eq" {
+                                "eq"
+                            } else if cond_kind.ends_with("_ne") || cond_kind == "current_ne" {
+                                "ne"
+                            } else if cond_kind.ends_with("_lt") || cond_kind == "current_lt" {
+                                "lt"
+                            } else if cond_kind.ends_with("_le") || cond_kind == "current_le" {
+                                "le"
+                            } else if cond_kind.ends_with("_gt") || cond_kind == "current_gt" {
+                                "gt"
+                            } else {
+                                "ge"
+                            };
+                        let cond_reg = emit_loop_compare(
+                            &mut body,
+                            &mut next_reg,
+                            loop_scalar_kind,
+                            cond_compare,
+                            &lhs,
+                            &rhs,
+                        )
+                        .map_err(|error| {
+                            format!(
+                                "cpu.loop_while_i64_cond_chain `{}` {error} during LLVM lowering",
+                                node.name
+                            )
+                        })?;
                         let select_reg = fresh_reg(&mut next_reg);
                         body.push(format!(
-                            "  {select_reg} = select i1 {cond_reg}, i64 {then_value}, i64 {else_value}"
+                            "  {select_reg} = select i1 {cond_reg}, {scalar_ty} {then_value}, {scalar_ty} {else_value}"
                         ));
                         select_reg
                     };
                     next_carries.push(next_carry);
                 }
-                body.push(format!("  store i64 {next_current}, ptr {current_slot}"));
+                body.push(format!(
+                    "  store {scalar_ty} {next_current}, ptr {current_slot}"
+                ));
                 for (carry_slot, next_carry) in carry_slots.iter().zip(next_carries.iter()) {
-                    body.push(format!("  store i64 {next_carry}, ptr {carry_slot}"));
+                    body.push(format!(
+                        "  store {scalar_ty} {next_carry}, ptr {carry_slot}"
+                    ));
                 }
                 body.push(format!("  br label %{loop_cond}"));
                 body.push(format!("{loop_exit}:"));
                 let final_current = fresh_reg(&mut next_reg);
-                body.push(format!("  {final_current} = load i64, ptr {current_slot}"));
+                body.push(format!(
+                    "  {final_current} = load {scalar_ty}, ptr {current_slot}"
+                ));
                 let final_carries = carry_slots
                     .iter()
                     .map(|carry_slot| {
                         let final_carry = fresh_reg(&mut next_reg);
-                        body.push(format!("  {final_carry} = load i64, ptr {carry_slot}"));
+                        body.push(format!(
+                            "  {final_carry} = load {scalar_ty}, ptr {carry_slot}"
+                        ));
                         final_carry
                     })
                     .collect::<Vec<_>>();
                 let mut fields = vec![(
                     "current".to_owned(),
-                    LlvmValueRef::I64(final_current.clone()),
+                    loop_scalar_value_ref(loop_scalar_kind, final_current.clone()),
                 )];
                 for (index, final_carry) in final_carries.iter().enumerate() {
                     fields.push((
                         format!("carry{index}"),
-                        LlvmValueRef::I64(final_carry.clone()),
+                        loop_scalar_value_ref(loop_scalar_kind, final_carry.clone()),
                     ));
                 }
                 registers.insert(
@@ -3469,7 +4062,16 @@ fn emit_cpu_function(
                         fields,
                     }),
                 );
-                *last_cpu_value = final_carries.last().cloned().or(Some(final_current));
+                *last_cpu_value = final_carries
+                    .last()
+                    .map(|carry| loop_scalar_value_ref(loop_scalar_kind, carry.clone()))
+                    .or_else(|| {
+                        Some(loop_scalar_value_ref(
+                            loop_scalar_kind,
+                            final_current.clone(),
+                        ))
+                    })
+                    .and_then(|value| coerce_to_i64(&value, &mut body, &mut next_reg));
             }
             ("cpu", "loop_while_i64_flow_chain") => {
                 let initial_value = registers.get(&node.op.args[0]).cloned();
@@ -6849,6 +7451,38 @@ fn emit_cpu_function(
                     CpuCallScalarKind::I64 => {
                         body.push(format!("  ret i64 {returned}"));
                     }
+                    CpuCallScalarKind::F32 => {
+                        if let Some(returned_f32) = get_f32(&registers, &node.op.args[1]) {
+                            body.push(format!("  ret float {returned_f32}"));
+                        } else if let Some(returned_f64) = get_f64(&registers, &node.op.args[1]) {
+                            let as_f32 = fresh_reg(&mut next_reg);
+                            body.push(format!(
+                                "  {as_f32} = fptrunc double {returned_f64} to float"
+                            ));
+                            body.push(format!("  ret float {as_f32}"));
+                        } else {
+                            body.push(format!(
+                                "  ; deferred lowering for cpu.guard_return `{}` because its return value is not coercible to f32",
+                                node.name
+                            ));
+                            continue;
+                        }
+                    }
+                    CpuCallScalarKind::F64 => {
+                        if let Some(returned_f64) = get_f64(&registers, &node.op.args[1]) {
+                            body.push(format!("  ret double {returned_f64}"));
+                        } else if let Some(returned_f32) = get_f32(&registers, &node.op.args[1]) {
+                            let as_f64 = fresh_reg(&mut next_reg);
+                            body.push(format!("  {as_f64} = fpext float {returned_f32} to double"));
+                            body.push(format!("  ret double {as_f64}"));
+                        } else {
+                            body.push(format!(
+                                "  ; deferred lowering for cpu.guard_return `{}` because its return value is not coercible to f64",
+                                node.name
+                            ));
+                            continue;
+                        }
+                    }
                 }
                 body.push(format!("{cont_label}:"));
             }
@@ -7427,6 +8061,202 @@ fn coerce_to_i64(
         }
         _ => None,
     }
+}
+
+fn infer_loop_scalar_kind<'a, I>(values: I) -> Option<CpuLoopScalarKind>
+where
+    I: IntoIterator<Item = &'a LlvmValueRef>,
+{
+    let mut saw_f32 = false;
+    for value in values {
+        match value {
+            LlvmValueRef::F64(_) => return Some(CpuLoopScalarKind::F64),
+            LlvmValueRef::F32(_) => saw_f32 = true,
+            LlvmValueRef::I64(_)
+            | LlvmValueRef::I32(_)
+            | LlvmValueRef::Bool { .. }
+            | LlvmValueRef::TextHandle { .. } => {}
+            _ => return None,
+        }
+    }
+    if saw_f32 {
+        Some(CpuLoopScalarKind::F32)
+    } else {
+        Some(CpuLoopScalarKind::I64)
+    }
+}
+
+fn loop_scalar_llvm_type(kind: CpuLoopScalarKind) -> &'static str {
+    match kind {
+        CpuLoopScalarKind::I64 => "i64",
+        CpuLoopScalarKind::F32 => "float",
+        CpuLoopScalarKind::F64 => "double",
+    }
+}
+
+fn loop_scalar_value_ref(kind: CpuLoopScalarKind, value: String) -> LlvmValueRef {
+    match kind {
+        CpuLoopScalarKind::I64 => LlvmValueRef::I64(value),
+        CpuLoopScalarKind::F32 => LlvmValueRef::F32(value),
+        CpuLoopScalarKind::F64 => LlvmValueRef::F64(value),
+    }
+}
+
+fn coerce_to_loop_scalar(
+    value: &LlvmValueRef,
+    kind: CpuLoopScalarKind,
+    body: &mut Vec<String>,
+    next_reg: &mut usize,
+) -> Option<String> {
+    match kind {
+        CpuLoopScalarKind::I64 => coerce_to_i64(value, body, next_reg),
+        CpuLoopScalarKind::F32 => match value {
+            LlvmValueRef::F32(value) => Some(value.clone()),
+            LlvmValueRef::F64(value) => {
+                let reg = fresh_reg(next_reg);
+                body.push(format!("  {reg} = fptrunc double {value} to float"));
+                Some(reg)
+            }
+            LlvmValueRef::I64(value) | LlvmValueRef::TextHandle { handle: value, .. } => {
+                let reg = fresh_reg(next_reg);
+                body.push(format!("  {reg} = sitofp i64 {value} to float"));
+                Some(reg)
+            }
+            LlvmValueRef::I32(value) => {
+                let reg = fresh_reg(next_reg);
+                body.push(format!("  {reg} = sitofp i32 {value} to float"));
+                Some(reg)
+            }
+            LlvmValueRef::Bool { i1, .. } => {
+                let as_i64 = fresh_reg(next_reg);
+                let reg = fresh_reg(next_reg);
+                body.push(format!("  {as_i64} = zext i1 {i1} to i64"));
+                body.push(format!("  {reg} = sitofp i64 {as_i64} to float"));
+                Some(reg)
+            }
+            _ => None,
+        },
+        CpuLoopScalarKind::F64 => match value {
+            LlvmValueRef::F64(value) => Some(value.clone()),
+            LlvmValueRef::F32(value) => {
+                let reg = fresh_reg(next_reg);
+                body.push(format!("  {reg} = fpext float {value} to double"));
+                Some(reg)
+            }
+            LlvmValueRef::I64(value) | LlvmValueRef::TextHandle { handle: value, .. } => {
+                let reg = fresh_reg(next_reg);
+                body.push(format!("  {reg} = sitofp i64 {value} to double"));
+                Some(reg)
+            }
+            LlvmValueRef::I32(value) => {
+                let reg = fresh_reg(next_reg);
+                body.push(format!("  {reg} = sitofp i32 {value} to double"));
+                Some(reg)
+            }
+            LlvmValueRef::Bool { i1, .. } => {
+                let as_i64 = fresh_reg(next_reg);
+                let reg = fresh_reg(next_reg);
+                body.push(format!("  {as_i64} = zext i1 {i1} to i64"));
+                body.push(format!("  {reg} = sitofp i64 {as_i64} to double"));
+                Some(reg)
+            }
+            _ => None,
+        },
+    }
+}
+
+fn emit_loop_compare(
+    body: &mut Vec<String>,
+    next_reg: &mut usize,
+    kind: CpuLoopScalarKind,
+    compare: &str,
+    lhs: &str,
+    rhs: &str,
+) -> Result<String, String> {
+    let reg = fresh_reg(next_reg);
+    match kind {
+        CpuLoopScalarKind::I64 => {
+            let pred = match compare {
+                "eq" => "eq",
+                "ne" => "ne",
+                "lt" => "slt",
+                "le" => "sle",
+                "gt" => "sgt",
+                "ge" => "sge",
+                other => return Err(format!("unsupported integer loop compare kind `{other}`")),
+            };
+            body.push(format!("  {reg} = icmp {pred} i64 {lhs}, {rhs}"));
+        }
+        CpuLoopScalarKind::F32 => {
+            let pred = match compare {
+                "eq" => "oeq",
+                "ne" => "one",
+                "lt" => "olt",
+                "le" => "ole",
+                "gt" => "ogt",
+                "ge" => "oge",
+                other => return Err(format!("unsupported float loop compare kind `{other}`")),
+            };
+            body.push(format!("  {reg} = fcmp {pred} float {lhs}, {rhs}"));
+        }
+        CpuLoopScalarKind::F64 => {
+            let pred = match compare {
+                "eq" => "oeq",
+                "ne" => "one",
+                "lt" => "olt",
+                "le" => "ole",
+                "gt" => "ogt",
+                "ge" => "oge",
+                other => return Err(format!("unsupported float loop compare kind `{other}`")),
+            };
+            body.push(format!("  {reg} = fcmp {pred} double {lhs}, {rhs}"));
+        }
+    }
+    Ok(reg)
+}
+
+fn emit_loop_numeric_op(
+    body: &mut Vec<String>,
+    next_reg: &mut usize,
+    kind: CpuLoopScalarKind,
+    op: &str,
+    lhs: &str,
+    rhs: &str,
+) -> Result<String, String> {
+    let reg = fresh_reg(next_reg);
+    match kind {
+        CpuLoopScalarKind::I64 => {
+            let instr = match op {
+                "add" => "add",
+                "sub" => "sub",
+                "mul" => "mul",
+                "div" => "sdiv",
+                other => return Err(format!("unsupported integer loop op `{other}`")),
+            };
+            body.push(format!("  {reg} = {instr} i64 {lhs}, {rhs}"));
+        }
+        CpuLoopScalarKind::F32 => {
+            let instr = match op {
+                "add" => "fadd",
+                "sub" => "fsub",
+                "mul" => "fmul",
+                "div" => "fdiv",
+                other => return Err(format!("unsupported float loop op `{other}`")),
+            };
+            body.push(format!("  {reg} = {instr} float {lhs}, {rhs}"));
+        }
+        CpuLoopScalarKind::F64 => {
+            let instr = match op {
+                "add" => "fadd",
+                "sub" => "fsub",
+                "mul" => "fmul",
+                "div" => "fdiv",
+                other => return Err(format!("unsupported float loop op `{other}`")),
+            };
+            body.push(format!("  {reg} = {instr} double {lhs}, {rhs}"));
+        }
+    }
+    Ok(reg)
 }
 
 fn coerce_to_cstr<'a>(

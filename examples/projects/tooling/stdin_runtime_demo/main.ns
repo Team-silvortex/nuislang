@@ -13,9 +13,15 @@ mod cpu Main {
     let secondary_backing: ref Buffer = alloc_buffer(secondary_len, 0);
     return StdinProjectSummary {
       primary_requested_len: primary_len,
-      primary_read_len: host_stdin_read(primary_backing, primary_len),
+      primary_read_len: host_stdin_read(
+        host_buffer_handle(primary_backing),
+        primary_len
+      ),
       secondary_requested_len: secondary_len,
-      secondary_read_len: host_stdin_read(secondary_backing, secondary_len)
+      secondary_read_len: host_stdin_read(
+        host_buffer_handle(secondary_backing),
+        secondary_len
+      )
     };
   }
 

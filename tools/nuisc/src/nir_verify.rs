@@ -609,6 +609,8 @@ fn verify_expr(
         NirExpr::Bool(_)
         | NirExpr::Text(_)
         | NirExpr::Int(_)
+        | NirExpr::F32(_)
+        | NirExpr::F64(_)
         | NirExpr::Var(_)
         | NirExpr::Null
         | NirExpr::Instantiate { .. } => {}
@@ -1266,6 +1268,7 @@ fn verify_expr(
         NirExpr::Await(inner)
         | NirExpr::Borrow(inner)
         | NirExpr::BorrowEnd(inner)
+        | NirExpr::HostBufferHandle(inner)
         | NirExpr::Move(inner)
         | NirExpr::CastI64ToI32(inner)
         | NirExpr::LoadValue(inner)
@@ -1734,6 +1737,7 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
         NirExpr::Await(inner)
         | NirExpr::Borrow(inner)
         | NirExpr::BorrowEnd(inner)
+        | NirExpr::HostBufferHandle(inner)
         | NirExpr::Move(inner)
         | NirExpr::LoadValue(inner)
         | NirExpr::LoadNext(inner)
@@ -1789,7 +1793,12 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
             verify_expr_uses(lhs, moved)?;
             verify_expr_uses(rhs, moved)?;
         }
-        NirExpr::Bool(_) | NirExpr::Text(_) | NirExpr::Int(_) | NirExpr::Null => {}
+        NirExpr::Bool(_)
+        | NirExpr::Text(_)
+        | NirExpr::Int(_)
+        | NirExpr::F32(_)
+        | NirExpr::F64(_)
+        | NirExpr::Null => {}
     }
     Ok(())
 }

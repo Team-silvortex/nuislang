@@ -49,7 +49,10 @@ mod cpu Main {
       stderr_written: host_stderr_write(seed.stderr_handle),
       stdout_flushed: host_stdout_flush(),
       stderr_flushed: host_stderr_flush(),
-      stdin_read_len: host_stdin_read(stdin_backing, seed.read_len),
+      stdin_read_len: host_stdin_read(
+        host_buffer_handle(stdin_backing),
+        seed.read_len
+      ),
       stdin_requested_len: seed.read_len,
       tty_fd: seed.fd,
       tty_is_tty: host_tty_isatty(seed.fd),

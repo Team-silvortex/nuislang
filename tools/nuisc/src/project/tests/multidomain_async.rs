@@ -2836,14 +2836,12 @@ fn compiles_async_loop_chain_project() {
     let artifacts = crate::pipeline::compile_source_path(&root).unwrap();
     let _ = fs::remove_dir_all(&root);
 
-    assert!(
-        artifacts
-            .yir
-            .nodes
-            .iter()
-            .any(|node| node.op.module == "cpu"
-                && node.op.instruction == "loop_while_i64_async_chain")
-    );
+    assert!(artifacts
+        .yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu"
+            && node.op.instruction == "loop_while_scalar_async_chain"));
     assert!(artifacts.llvm_ir.contains("@nuis_fn_step"));
 }
 
@@ -2920,7 +2918,7 @@ fn compiles_async_loop_cond_chain_project() {
         .nodes
         .iter()
         .any(|node| node.op.module == "cpu"
-            && node.op.instruction == "loop_while_i64_async_cond_chain"));
+            && node.op.instruction == "loop_while_scalar_async_cond_chain"));
     assert!(artifacts.llvm_ir.contains("@nuis_fn_step"));
 }
 

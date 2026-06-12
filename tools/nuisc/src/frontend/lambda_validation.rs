@@ -150,6 +150,7 @@ pub(super) fn validate_lambda_expr_no_capture(
         AstExpr::Bool(_)
         | AstExpr::Text(_)
         | AstExpr::Int(_)
+        | AstExpr::Float(_)
         | AstExpr::Var(_)
         | AstExpr::Instantiate { .. } => Ok(()),
     }

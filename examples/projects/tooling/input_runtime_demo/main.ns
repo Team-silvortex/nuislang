@@ -22,8 +22,15 @@ mod cpu Main {
     let file_handle: i64 = host_file_open(path_handle, 0);
     let file_backing: ref Buffer = alloc_buffer(read_len, 0);
     let stdin_backing: ref Buffer = alloc_buffer(read_len, 0);
-    let file_read_len: i64 = host_file_read(file_handle, file_backing, read_len);
-    let stdin_read_len: i64 = host_stdin_read(stdin_backing, read_len);
+    let file_read_len: i64 = host_file_read(
+      file_handle,
+      host_buffer_handle(file_backing),
+      read_len
+    );
+    let stdin_read_len: i64 = host_stdin_read(
+      host_buffer_handle(stdin_backing),
+      read_len
+    );
     return InputProjectSummary {
       argv_count: argv_count,
       path_handle: path_handle,

@@ -6,6 +6,8 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::Bool(_)
         | NirExpr::Text(_)
         | NirExpr::Int(_)
+        | NirExpr::F32(_)
+        | NirExpr::F64(_)
         | NirExpr::CastI64ToI32(_)
         | NirExpr::Var(_)
         | NirExpr::Await(_)
@@ -52,6 +54,14 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
             effect: NirGlmEffect::None,
         }),
         NirExpr::BorrowEnd(_) => Some(NirGlmProfile {
+            result_class: NirGlmValueClass::Val,
+            accesses: vec![NirGlmAccess {
+                class: NirGlmValueClass::Res,
+                mode: NirGlmUseMode::Read,
+            }],
+            effect: NirGlmEffect::None,
+        }),
+        NirExpr::HostBufferHandle(_) => Some(NirGlmProfile {
             result_class: NirGlmValueClass::Val,
             accesses: vec![NirGlmAccess {
                 class: NirGlmValueClass::Res,

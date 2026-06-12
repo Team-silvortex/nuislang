@@ -11,6 +11,8 @@ pub(super) fn lower_core_expr(
         NirExpr::Bool(value) => Some(Ok(lower_bool(*value, state))),
         NirExpr::Text(text) => Some(Ok(lower_text(text, state))),
         NirExpr::Int(value) => Some(Ok(lower_int(*value, state))),
+        NirExpr::F32(value) => Some(Ok(lower_f32(value, state))),
+        NirExpr::F64(value) => Some(Ok(lower_f64(value, state))),
         NirExpr::CastI64ToI32(value) => Some(lower_cast_i64_to_i32(value, state, bindings)),
         NirExpr::Var(name) => Some(
             bindings
@@ -23,6 +25,7 @@ pub(super) fn lower_core_expr(
         NirExpr::BorrowEnd(value) => {
             Some(lower_unary_cpu_expr("borrow_end", value, state, bindings))
         }
+        NirExpr::HostBufferHandle(value) => Some(lower_expr(value, state, bindings)),
         NirExpr::Move(value) => Some(lower_move(value, state, bindings)),
         NirExpr::AllocNode { value, next } => Some(lower_alloc_node(value, next, state, bindings)),
         NirExpr::AllocBuffer { len, fill } => Some(lower_alloc_buffer(len, fill, state, bindings)),
@@ -99,6 +102,34 @@ fn lower_int(value: i64, state: &mut LoweringState<'_>) -> String {
             module: "cpu".to_owned(),
             instruction: "const_i64".to_owned(),
             args: vec![value.to_string()],
+        },
+    });
+    name
+}
+
+fn lower_f32(value: &str, state: &mut LoweringState<'_>) -> String {
+    let name = next_name(state, "f32");
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "const_f32".to_owned(),
+            args: vec![value.to_owned()],
+        },
+    });
+    name
+}
+
+fn lower_f64(value: &str, state: &mut LoweringState<'_>) -> String {
+    let name = next_name(state, "f64");
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "const_f64".to_owned(),
+            args: vec![value.to_owned()],
         },
     });
     name

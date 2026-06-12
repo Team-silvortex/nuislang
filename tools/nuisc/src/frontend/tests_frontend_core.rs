@@ -65,6 +65,63 @@ fn infers_binary_result_from_operand_scalar_type() {
 }
 
 #[test]
+fn lowers_float_literals_with_expected_scalar_context() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn add32() -> f32 {
+            let sum: f32 = 1.5 + 2.25;
+            return sum;
+          }
+
+          fn add64() -> f64 {
+            return 1.5 + 2.25;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let add32 = module
+        .functions
+        .iter()
+        .find(|function| function.name == "add32")
+        .unwrap();
+    let sum_ty = add32
+        .body
+        .iter()
+        .find_map(|stmt| match stmt {
+            NirStmt::Let { name, ty, value } if name == "sum" => {
+                assert!(matches!(
+                    value,
+                    NirExpr::Binary {
+                        lhs,
+                        rhs,
+                        ..
+                    } if matches!(lhs.as_ref(), NirExpr::F32(value) if value == "1.5")
+                        && matches!(rhs.as_ref(), NirExpr::F32(value) if value == "2.25")
+                ));
+                ty.as_ref()
+            }
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(sum_ty.render(), "f32");
+
+    let add64 = module
+        .functions
+        .iter()
+        .find(|function| function.name == "add64")
+        .unwrap();
+    assert!(matches!(
+        add64.body.first(),
+        Some(NirStmt::Return(Some(NirExpr::Binary { lhs, rhs, .. })))
+            if matches!(lhs.as_ref(), NirExpr::F64(value) if value == "1.5")
+                && matches!(rhs.as_ref(), NirExpr::F64(value) if value == "2.25")
+    ));
+}
+
+#[test]
 fn lowers_project_local_cpu_helper_calls_with_qualified_callees() {
     let entry = parse_nuis_ast(
         r#"

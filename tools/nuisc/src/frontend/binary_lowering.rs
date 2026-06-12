@@ -17,8 +17,13 @@ pub(super) fn lower_binary_expr_with_async(
     module_consts: &BTreeMap<String, ModuleConstValue>,
     signatures: &BTreeMap<String, FunctionSignature>,
     struct_table: &BTreeMap<String, NirStructDef>,
+    expected: Option<&NirTypeRef>,
 ) -> Result<NirExpr, String> {
-    let lowered_lhs = lower_nested_expr_with_async_and_consts(
+    let operand_expected = match op {
+        AstBinaryOp::Add | AstBinaryOp::Sub | AstBinaryOp::Mul | AstBinaryOp::Div => expected,
+        _ => None,
+    };
+    let mut lowered_lhs = lower_nested_expr_with_async_and_consts(
         lhs,
         current_domain,
         current_function_is_async,
@@ -26,9 +31,9 @@ pub(super) fn lower_binary_expr_with_async(
         module_consts,
         signatures,
         struct_table,
-        None,
+        operand_expected,
     )?;
-    let lowered_rhs = lower_nested_expr_with_async_and_consts(
+    let mut lowered_rhs = lower_nested_expr_with_async_and_consts(
         rhs,
         current_domain,
         current_function_is_async,
@@ -36,12 +41,42 @@ pub(super) fn lower_binary_expr_with_async(
         module_consts,
         signatures,
         struct_table,
-        None,
+        operand_expected,
     )?;
-    let lhs_ty = infer_nir_expr_type(&lowered_lhs, bindings, signatures, struct_table)
+    let mut lhs_ty = infer_nir_expr_type(&lowered_lhs, bindings, signatures, struct_table)
         .ok_or_else(|| "cannot infer binary lhs type".to_owned())?;
-    let rhs_ty = infer_nir_expr_type(&lowered_rhs, bindings, signatures, struct_table)
+    let mut rhs_ty = infer_nir_expr_type(&lowered_rhs, bindings, signatures, struct_table)
         .ok_or_else(|| "cannot infer binary rhs type".to_owned())?;
+    if !compatible_types(&lhs_ty, &rhs_ty) {
+        if matches!(lhs, AstExpr::Float(_)) && rhs_ty.is_float_scalar() {
+            lowered_lhs = lower_nested_expr_with_async_and_consts(
+                lhs,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                module_consts,
+                signatures,
+                struct_table,
+                Some(&rhs_ty),
+            )?;
+            lhs_ty = infer_nir_expr_type(&lowered_lhs, bindings, signatures, struct_table)
+                .ok_or_else(|| "cannot infer binary lhs type".to_owned())?;
+        }
+        if matches!(rhs, AstExpr::Float(_)) && lhs_ty.is_float_scalar() {
+            lowered_rhs = lower_nested_expr_with_async_and_consts(
+                rhs,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                module_consts,
+                signatures,
+                struct_table,
+                Some(&lhs_ty),
+            )?;
+            rhs_ty = infer_nir_expr_type(&lowered_rhs, bindings, signatures, struct_table)
+                .ok_or_else(|| "cannot infer binary rhs type".to_owned())?;
+        }
+    }
     let result_ty = binary_result_type(*op, &lhs_ty, &rhs_ty)?;
     if matches!(
         op,
@@ -133,10 +168,11 @@ fn binary_result_type(
                 ));
             }
             if !((lhs.is_integer_scalar() && rhs.is_integer_scalar())
+                || (lhs.is_float_scalar() && rhs.is_float_scalar())
                 || (lhs.is_bool_scalar() && rhs.is_bool_scalar()))
             {
                 return Err(format!(
-                    "binary `{}` currently expects integer or bool scalar operands, found `{}` and `{}`",
+                    "binary `{}` currently expects integer, float, or bool scalar operands, found `{}` and `{}`",
                     render_binary_op(op),
                     lhs.render(),
                     rhs.render()
@@ -153,9 +189,9 @@ fn binary_result_type(
                     rhs.render()
                 ));
             }
-            if !lhs.is_integer_scalar() || !rhs.is_integer_scalar() {
+            if !lhs.is_numeric_scalar() || !rhs.is_numeric_scalar() {
                 return Err(format!(
-                    "binary `{}` currently expects integer scalar operands, found `{}` and `{}`",
+                    "binary `{}` currently expects numeric scalar operands, found `{}` and `{}`",
                     render_binary_op(op),
                     lhs.render(),
                     rhs.render()

@@ -29,6 +29,7 @@ pub(super) fn lower_binary_expr(
         &BTreeMap::new(),
         signatures,
         struct_table,
+        None,
     )
 }
 

@@ -5,9 +5,9 @@ use nuis_semantics::model::{
 };
 
 use super::{
-    async_parameter_violation_detail, ensure_result_like, expr_type, infer_nir_expr_address_class,
-    infer_nir_expr_type, infer_result_stage, lower_nested_expr_with_async_and_consts,
-    render_type_name, FunctionSignature, ModuleConstValue,
+    async_parameter_violation_detail, compatible_types, ensure_result_like, expr_type,
+    infer_nir_expr_address_class, infer_nir_expr_type, infer_result_stage,
+    lower_nested_expr_with_async_and_consts, render_type_name, FunctionSignature, ModuleConstValue,
 };
 
 pub(super) fn ensure_ref_like(
@@ -46,6 +46,37 @@ pub(super) fn ensure_task_like(
             "{name}(...) requires a typed task handle in the current frontend"
         )),
     }
+}
+
+pub(super) fn ensure_call_arg_matches_param(
+    callee: &str,
+    arg_index: usize,
+    arg: &NirExpr,
+    expected_param: &NirTypeRef,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+    is_extern: bool,
+) -> Result<(), String> {
+    let Some(actual_ty) = infer_nir_expr_type(arg, bindings, signatures, struct_table) else {
+        return Ok(());
+    };
+    if compatible_types(expected_param, &actual_ty)
+        || (is_extern && supports_host_buffer_handle_bridge(expected_param, &actual_ty))
+    {
+        return Ok(());
+    }
+    let param_position = arg_index + 1;
+    let bridge_detail = if is_extern && expected_param == &i64_host_value_type() {
+        "; only `ref Buffer -> i64` is currently allowed as the narrow host buffer-handle bridge"
+    } else {
+        ""
+    };
+    Err(format!(
+        "function `{callee}` argument {param_position} expects `{}`, found `{}`{bridge_detail}",
+        render_type_name(expected_param),
+        render_type_name(&actual_ty)
+    ))
 }
 
 pub(super) fn ensure_spawn_input_safe(
@@ -92,6 +123,29 @@ fn infer_boundary_address_class(
     struct_table: &BTreeMap<String, NirStructDef>,
 ) -> Option<NirAddressClass> {
     infer_nir_expr_address_class(expr, bindings, &BTreeMap::new(), signatures, struct_table)
+}
+
+fn supports_host_buffer_handle_bridge(expected: &NirTypeRef, actual: &NirTypeRef) -> bool {
+    expected == &i64_host_value_type()
+        && (actual == &buffer_ref_type() || actual == &i64_host_value_type())
+}
+
+fn i64_host_value_type() -> NirTypeRef {
+    NirTypeRef {
+        name: "i64".to_owned(),
+        generic_args: vec![],
+        is_optional: false,
+        is_ref: false,
+    }
+}
+
+fn buffer_ref_type() -> NirTypeRef {
+    NirTypeRef {
+        name: "Buffer".to_owned(),
+        generic_args: vec![],
+        is_optional: false,
+        is_ref: true,
+    }
 }
 
 #[cfg(test)]
@@ -144,6 +198,46 @@ mod tests {
         .unwrap_err();
         assert!(error.contains("borrowed `ref` task inputs"));
         assert!(error.contains("traversal-derived borrowed refs"));
+    }
+
+    #[test]
+    fn accepts_host_buffer_handle_bridge_for_extern_i64_slot() {
+        let expr = NirExpr::AllocBuffer {
+            len: Box::new(NirExpr::Int(8)),
+            fill: Box::new(NirExpr::Int(0)),
+        };
+        ensure_call_arg_matches_param(
+            "host_stdin_read",
+            0,
+            &expr,
+            &i64_host_value_type(),
+            &BTreeMap::new(),
+            &BTreeMap::new(),
+            &BTreeMap::new(),
+            true,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn rejects_non_buffer_ref_for_extern_i64_slot() {
+        let expr = NirExpr::AllocNode {
+            value: Box::new(NirExpr::Int(1)),
+            next: Box::new(NirExpr::Null),
+        };
+        let error = ensure_call_arg_matches_param(
+            "host_stdin_read",
+            0,
+            &expr,
+            &i64_host_value_type(),
+            &BTreeMap::new(),
+            &BTreeMap::new(),
+            &BTreeMap::new(),
+            true,
+        )
+        .unwrap_err();
+        assert!(error.contains("expects `i64`, found `ref Node`"));
+        assert!(error.contains("`ref Buffer -> i64`"));
     }
 }
 

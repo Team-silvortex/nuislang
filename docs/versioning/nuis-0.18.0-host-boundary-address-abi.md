@@ -60,13 +60,28 @@ For `0.18.0`, the current compiler rule is intentionally conservative:
 * `extern fn foo(...) -> ref T` is rejected
 * the same rule applies to `extern interface` methods
 
+There is one intentionally narrow bridge on top of that rule:
+
+* when an `extern` parameter is declared as plain `i64`
+* and the call site passes `ref Buffer`
+* the frontend currently accepts that as a host buffer-handle bridge
+
+The preferred explicit spelling for this route is now:
+
+* `host_buffer_handle(buffer_ref)`
+
+This is not general pointer ABI support.
+
+It is only the current explicit escape hatch for buffer-backed host read/write
+surfaces such as stdin/file transport facades.
+
 Current validation anchor:
 
 * [validation.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/frontend/validation.rs)
 
 Short rule:
 
-`extern surfaces are value-only for now, even though internal nuis code already has pointer semantics`
+`extern surfaces are value-only for now, with one narrow ref-Buffer-to-i64 buffer-handle bridge`
 
 ## Why The Rule Exists
 
@@ -95,10 +110,12 @@ Current async rule:
 Current host rule:
 
 * ordinary `extern` declarations reject `ref` in the ABI surface entirely
+* call sites may still bridge `ref Buffer` into an `i64` host slot for the
+  narrow buffer-handle route
 
 Short rule:
 
-`async boundaries know more about pointer classes; host boundaries still forbid pointer ABI altogether`
+`async boundaries know more about pointer classes; host boundaries still forbid general pointer ABI and only allow a narrow buffer-handle bridge`
 
 ## What This Unblocks
 

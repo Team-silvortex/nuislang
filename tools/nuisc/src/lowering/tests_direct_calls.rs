@@ -432,3 +432,103 @@ fn lowers_recursive_component_reachable_tri_scalar_helpers_into_helper_lanes() {
         "expected recursive i64 helper calls, found {i64_calls}"
     );
 }
+
+#[test]
+fn lowers_recursive_component_reachable_f32_helpers_into_helper_lanes() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn step(value: f32) -> f32 {
+            return value - 1.0;
+          }
+
+          fn cool(value: f32) -> f32 {
+            if value <= 1.0 {
+              return 0.5;
+            }
+            return warm(step(value));
+          }
+
+          fn warm(value: f32) -> f32 {
+            if value <= 1.0 {
+              return 1.5;
+            }
+            return cool(step(value));
+          }
+
+          fn main() -> i64 {
+            let result: f32 = warm(4.0);
+            if result > 1.0 {
+              return 7;
+            }
+            return 9;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    assert!(yir.node_lanes.values().any(|lane| lane == "fn:step"));
+    let f32_calls = yir
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "call_f32"
+                && node.op.args.first().is_some_and(|name| name == "step")
+        })
+        .count();
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "param_f32"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "return_f32"));
+    assert!(
+        f32_calls >= 2,
+        "expected calls into helper-lowered `step`, found {f32_calls}"
+    );
+}
+
+#[test]
+fn lowers_ordinary_self_recursive_function_into_helper_lane_and_call_f64() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn decay(current: f64) -> f64 {
+            if current <= 1.0 {
+              return 1.0;
+            }
+            return current * decay(current - 1.0);
+          }
+
+          fn main() -> i64 {
+            let result: f64 = decay(4.0);
+            if result > 1.0 {
+              return 7;
+            }
+            return 9;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "call_f64"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "param_f64"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "return_f64"));
+    assert!(yir.node_lanes.values().any(|lane| lane == "fn:decay"));
+}

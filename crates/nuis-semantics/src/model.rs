@@ -291,6 +291,7 @@ pub enum AstExpr {
     Bool(bool),
     Text(String),
     Int(i64),
+    Float(String),
     Var(String),
     If {
         condition: Box<AstExpr>,
@@ -1114,6 +1115,8 @@ pub enum NirExpr {
     Bool(bool),
     Text(String),
     Int(i64),
+    F32(String),
+    F64(String),
     Var(String),
     Await(Box<NirExpr>),
     Instantiate {
@@ -1513,6 +1516,7 @@ pub enum NirExpr {
         callee: String,
         args: Vec<NirExpr>,
     },
+    HostBufferHandle(Box<NirExpr>),
     CastI64ToI32(Box<NirExpr>),
     Free(Box<NirExpr>),
     IsNull(Box<NirExpr>),
@@ -1845,8 +1849,11 @@ pub fn nir_expr_effect_class(expr: &NirExpr) -> NirExprEffectClass {
         | NirExpr::Bool(_)
         | NirExpr::Text(_)
         | NirExpr::Int(_)
+        | NirExpr::F32(_)
+        | NirExpr::F64(_)
         | NirExpr::Var(_)
         | NirExpr::CastI64ToI32(_)
+        | NirExpr::HostBufferHandle(_)
         | NirExpr::StructLiteral { .. }
         | NirExpr::FieldAccess { .. }
         | NirExpr::Binary { .. }

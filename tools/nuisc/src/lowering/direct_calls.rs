@@ -5,6 +5,8 @@ enum DirectCallScalarKind {
     Bool,
     I32,
     I64,
+    F32,
+    F64,
 }
 
 pub(super) fn collect_recursive_direct_call_functions(module: &NirModule) -> BTreeSet<String> {
@@ -129,6 +131,10 @@ fn direct_call_scalar_kind(ty: &nuis_semantics::model::NirTypeRef) -> Option<Dir
         Some(DirectCallScalarKind::I32)
     } else if ty.name == "i64" {
         Some(DirectCallScalarKind::I64)
+    } else if ty.name == "f32" {
+        Some(DirectCallScalarKind::F32)
+    } else if ty.name == "f64" {
+        Some(DirectCallScalarKind::F64)
     } else {
         None
     }
@@ -395,6 +401,8 @@ fn expr_collect_called_functions(
         | NirExpr::Bool(_)
         | NirExpr::Text(_)
         | NirExpr::Int(_)
+        | NirExpr::F32(_)
+        | NirExpr::F64(_)
         | NirExpr::Var(_)
         | NirExpr::Null
         | NirExpr::DataBindCore(_)
@@ -452,7 +460,7 @@ pub(super) fn lower_direct_call_helper_function(
         let node_name = format!("__fn_{}_param_{}", function.name, index);
         let instruction = match direct_call_scalar_kind(&param.ty).ok_or_else(|| {
             format!(
-                "ordinary direct-call lowering only supports bool/i32/i64 params, found `{}` in `{}`",
+                "ordinary direct-call lowering only supports bool/i32/i64/f32/f64 params, found `{}` in `{}`",
                 param.ty.render(),
                 function.name
             )
@@ -460,6 +468,8 @@ pub(super) fn lower_direct_call_helper_function(
             DirectCallScalarKind::Bool => "param_bool",
             DirectCallScalarKind::I32 => "param_i32",
             DirectCallScalarKind::I64 => "param_i64",
+            DirectCallScalarKind::F32 => "param_f32",
+            DirectCallScalarKind::F64 => "param_f64",
         };
         state.yir.nodes.push(Node {
             name: node_name.clone(),
@@ -479,13 +489,15 @@ pub(super) fn lower_direct_call_helper_function(
     let return_name = format!("__fn_{}_return", function.name);
     let return_instruction = match direct_call_signature_kind(function).ok_or_else(|| {
         format!(
-            "ordinary direct-call lowering only supports bool/i32/i64 return type in `{}`",
+            "ordinary direct-call lowering only supports bool/i32/i64/f32/f64 return type in `{}`",
             function.name
         )
     })? {
         DirectCallScalarKind::Bool => "return_bool",
         DirectCallScalarKind::I32 => "return_i32",
         DirectCallScalarKind::I64 => "return_i64",
+        DirectCallScalarKind::F32 => "return_f32",
+        DirectCallScalarKind::F64 => "return_f64",
     };
     state.yir.nodes.push(Node {
         name: return_name.clone(),
@@ -516,13 +528,15 @@ pub(super) fn push_direct_call_node(
     let name = next_name(state, "cpu_call");
     let instruction = match direct_call_signature_kind(function).ok_or_else(|| {
         format!(
-            "ordinary direct-call lowering only supports bool/i32/i64 return type in `{}`",
+            "ordinary direct-call lowering only supports bool/i32/i64/f32/f64 return type in `{}`",
             function.name
         )
     })? {
         DirectCallScalarKind::Bool => "call_bool",
         DirectCallScalarKind::I32 => "call_i32",
         DirectCallScalarKind::I64 => "call_i64",
+        DirectCallScalarKind::F32 => "call_f32",
+        DirectCallScalarKind::F64 => "call_f64",
     };
     let mut op_args = vec![function.name.clone()];
     op_args.extend(args.iter().cloned());

@@ -32,9 +32,13 @@ fn expr_requires_statement_anchor(expr: &NirExpr) -> bool {
         NirExpr::StructLiteral { fields, .. } => fields
             .iter()
             .any(|(_, value)| expr_requires_statement_anchor(value)),
-        NirExpr::Null | NirExpr::Bool(_) | NirExpr::Text(_) | NirExpr::Int(_) | NirExpr::Var(_) => {
-            false
-        }
+        NirExpr::Null
+        | NirExpr::Bool(_)
+        | NirExpr::Text(_)
+        | NirExpr::Int(_)
+        | NirExpr::F32(_)
+        | NirExpr::F64(_)
+        | NirExpr::Var(_) => false,
         _ => false,
     }
 }

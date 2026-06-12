@@ -2,7 +2,7 @@ use super::lower_nir_to_yir_builtin_cpu;
 use crate::frontend::parse_nuis_module;
 
 #[test]
-fn lowers_chained_accumulating_while_into_loop_while_i64_chain() {
+fn lowers_chained_accumulating_while_into_loop_while_scalar_chain() {
     let mut module = parse_nuis_module(
         r#"
         mod cpu Main {
@@ -27,8 +27,8 @@ fn lowers_chained_accumulating_while_into_loop_while_i64_chain() {
     let loop_node = yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_chain")
-        .expect("expected loop_while_i64_chain node");
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_chain")
+        .expect("expected loop_while_scalar_chain node");
     assert_eq!(loop_node.op.args[6], "add_current");
     assert_eq!(loop_node.op.args[8], "add_carry0");
 }
@@ -59,8 +59,8 @@ fn lowers_chained_while_with_fixed_structural_read_carry_into_loop_node_contract
     let loop_node = yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_chain")
-        .expect("expected loop_while_i64_chain node");
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_chain")
+        .expect("expected loop_while_scalar_chain node");
     assert_eq!(loop_node.op.args[3], "lt");
     assert_eq!(loop_node.op.args[4], "add");
     assert_eq!(loop_node.op.args[6], "add_read_value_fixed");
@@ -96,8 +96,8 @@ fn lowers_chained_while_with_fixed_buffer_read_carry_into_loop_node_contract() {
     let loop_node = yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_chain")
-        .expect("expected loop_while_i64_chain node");
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_chain")
+        .expect("expected loop_while_scalar_chain node");
     assert_eq!(loop_node.op.args[3], "lt");
     assert_eq!(loop_node.op.args[4], "add");
     assert_eq!(loop_node.op.args[6], "add_read_at_fixed");
@@ -133,7 +133,7 @@ fn rejects_chained_while_with_dynamic_buffer_index_read_carry_until_contract_exp
 }
 
 #[test]
-fn lowers_branching_chained_while_into_loop_while_i64_cond_chain() {
+fn lowers_branching_chained_while_into_loop_while_scalar_cond_chain() {
     let mut module = parse_nuis_module(
         r#"
         mod cpu Main {
@@ -160,16 +160,18 @@ fn lowers_branching_chained_while_into_loop_while_i64_cond_chain() {
     let loop_node = yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_cond_chain")
-        .expect("expected loop_while_i64_cond_chain node");
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_cond_chain"
+        })
+        .expect("expected loop_while_scalar_cond_chain node");
     assert_eq!(loop_node.op.args[6], "current_gt");
     assert_eq!(loop_node.op.args[8], "add_current");
     assert_eq!(loop_node.op.args[9], "keep");
 }
 
 #[test]
-fn lowers_branching_chained_while_with_fixed_structural_read_carry_into_loop_while_i64_cond_chain()
-{
+fn lowers_branching_chained_while_with_fixed_structural_read_carry_into_loop_while_scalar_cond_chain(
+) {
     let mut module = parse_nuis_module(
         r#"
         mod cpu Main {
@@ -198,8 +200,10 @@ fn lowers_branching_chained_while_with_fixed_structural_read_carry_into_loop_whi
     let loop_node = yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_cond_chain")
-        .expect("expected loop_while_i64_cond_chain node");
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_cond_chain"
+        })
+        .expect("expected loop_while_scalar_cond_chain node");
     assert_eq!(loop_node.op.args[6], "current_gt");
     assert!(loop_node
         .op
@@ -239,7 +243,7 @@ fn rejects_branching_chained_while_with_dynamic_buffer_index_read_carry_until_co
 }
 
 #[test]
-fn lowers_match_branching_while_into_loop_while_i64_cond_chain() {
+fn lowers_match_branching_while_into_loop_while_scalar_cond_chain() {
     let mut module = parse_nuis_module(
         r#"
         mod cpu Main {
@@ -269,8 +273,10 @@ fn lowers_match_branching_while_into_loop_while_i64_cond_chain() {
     let loop_node = yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_cond_chain")
-        .expect("expected loop_while_i64_cond_chain node");
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_cond_chain"
+        })
+        .expect("expected loop_while_scalar_cond_chain node");
     assert_eq!(loop_node.op.args[6], "current_eq");
     assert_eq!(loop_node.op.args[8], "add_current");
     assert_eq!(loop_node.op.args[9], "keep");
@@ -361,8 +367,8 @@ fn lowers_chained_while_with_inlineable_pure_helper_wrapped_step_and_carry_into_
     let loop_node = yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_chain")
-        .expect("expected loop_while_i64_chain node");
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_chain")
+        .expect("expected loop_while_scalar_chain node");
     assert_eq!(loop_node.op.args[4], "add");
     assert_eq!(loop_node.op.args[6], "add_current");
 }
@@ -403,8 +409,10 @@ fn lowers_chained_while_with_conditional_pure_helper_wrapped_carry_into_cond_cha
     let loop_node = yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_cond_chain")
-        .expect("expected loop_while_i64_cond_chain node");
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_cond_chain"
+        })
+        .expect("expected loop_while_scalar_cond_chain node");
     assert_eq!(loop_node.op.args[4], "add");
     assert_eq!(loop_node.op.args[6], "current_gt");
     assert_eq!(loop_node.op.args[8], "add_current");
@@ -448,8 +456,10 @@ fn lowers_chained_while_with_prelude_conditional_pure_helper_wrapped_carry_into_
     let loop_node = yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_cond_chain")
-        .expect("expected loop_while_i64_cond_chain node");
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_cond_chain"
+        })
+        .expect("expected loop_while_scalar_cond_chain node");
     assert_eq!(loop_node.op.args[4], "add");
     assert_eq!(loop_node.op.args[6], "current_gt");
     assert_eq!(loop_node.op.args[8], "add_current");
@@ -491,8 +501,10 @@ fn lowers_chained_while_with_match_pure_helper_wrapped_carry_into_cond_chain() {
     let loop_node = yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_cond_chain")
-        .expect("expected loop_while_i64_cond_chain node");
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_cond_chain"
+        })
+        .expect("expected loop_while_scalar_cond_chain node");
     assert_eq!(loop_node.op.args[4], "add");
     assert_eq!(loop_node.op.args[6], "current_eq");
     assert_eq!(loop_node.op.args[8], "add_current");
@@ -535,8 +547,10 @@ fn lowers_chained_while_with_multi_arm_match_pure_helper_wrapped_carry_into_cond
     let loop_node = yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_cond_chain")
-        .expect("expected loop_while_i64_cond_chain node");
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_cond_chain"
+        })
+        .expect("expected loop_while_scalar_cond_chain node");
     assert_eq!(loop_node.op.args[4], "add");
     assert_eq!(loop_node.op.args[6], "or");
     assert_eq!(loop_node.op.args[7], "current_eq");
@@ -582,8 +596,10 @@ fn lowers_chained_while_with_four_arm_match_pure_helper_wrapped_carry_into_recur
     let loop_node = yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_cond_chain")
-        .expect("expected loop_while_i64_cond_chain node");
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_cond_chain"
+        })
+        .expect("expected loop_while_scalar_cond_chain node");
     assert_eq!(loop_node.op.args[4], "add");
     assert_eq!(loop_node.op.args[6], "or");
     assert_eq!(loop_node.op.args[7], "current_eq");
@@ -626,7 +642,7 @@ fn lowers_multi_arm_match_inside_guarded_while_into_guard_return() {
 }
 
 #[test]
-fn lowers_bool_match_branching_while_into_loop_while_i64_cond_chain() {
+fn lowers_bool_match_branching_while_into_loop_while_scalar_cond_chain() {
     let mut module = parse_nuis_module(
         r#"
         mod cpu Main {
@@ -656,15 +672,17 @@ fn lowers_bool_match_branching_while_into_loop_while_i64_cond_chain() {
     let loop_node = yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_cond_chain")
-        .expect("expected loop_while_i64_cond_chain node");
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_cond_chain"
+        })
+        .expect("expected loop_while_scalar_cond_chain node");
     assert_eq!(loop_node.op.args[6], "current_gt");
     assert_eq!(loop_node.op.args[8], "add_current");
     assert_eq!(loop_node.op.args[9], "keep");
 }
 
 #[test]
-fn lowers_inline_helper_bool_match_branching_while_into_loop_while_i64_cond_chain() {
+fn lowers_inline_helper_bool_match_branching_while_into_loop_while_scalar_cond_chain() {
     let mut module = parse_nuis_module(
         r#"
         mod cpu Main {
@@ -699,8 +717,10 @@ fn lowers_inline_helper_bool_match_branching_while_into_loop_while_i64_cond_chai
     let loop_node = yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_cond_chain")
-        .expect("expected loop_while_i64_cond_chain node");
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_cond_chain"
+        })
+        .expect("expected loop_while_scalar_cond_chain node");
     assert_eq!(loop_node.op.args[6], "current_gt");
     assert_eq!(loop_node.op.args[8], "add_current");
     assert_eq!(loop_node.op.args[9], "keep");

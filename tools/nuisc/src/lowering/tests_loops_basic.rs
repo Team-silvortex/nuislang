@@ -365,7 +365,7 @@ fn lowers_inequality_counted_while_into_loop_while_i64() {
 }
 
 #[test]
-fn lowers_accumulating_counted_while_into_loop_while_i64_chain() {
+fn lowers_accumulating_counted_while_into_loop_while_scalar_chain() {
     let mut module = parse_nuis_module(
         r#"
         mod cpu Main {
@@ -388,8 +388,8 @@ fn lowers_accumulating_counted_while_into_loop_while_i64_chain() {
     let loop_node = yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_chain")
-        .expect("expected loop_while_i64_chain node");
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_chain")
+        .expect("expected loop_while_scalar_chain node");
     assert_eq!(loop_node.op.args[3], "lt");
     assert_eq!(loop_node.op.args[4], "add");
     assert_eq!(loop_node.op.args[6], "add_current");

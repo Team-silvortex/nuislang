@@ -118,9 +118,9 @@ pub(super) fn lower_chained_while(
     let name = next_name(
         state,
         if has_conditional {
-            "loop_while_i64_cond_chain"
+            "loop_while_scalar_cond_chain"
         } else {
-            "loop_while_i64_chain"
+            "loop_while_scalar_chain"
         },
     );
     let compare = render_loop_compare(prepared.compare);
@@ -189,9 +189,9 @@ pub(super) fn lower_chained_while(
         op: Operation {
             module: "cpu".to_owned(),
             instruction: if has_conditional {
-                "loop_while_i64_cond_chain".to_owned()
+                "loop_while_scalar_cond_chain".to_owned()
             } else {
-                "loop_while_i64_chain".to_owned()
+                "loop_while_scalar_chain".to_owned()
             },
             args,
         },
@@ -317,9 +317,9 @@ pub(super) fn lower_async_chained_while(
     let name = next_name(
         state,
         if has_conditional {
-            "loop_while_i64_async_cond_chain"
+            "loop_while_scalar_async_cond_chain"
         } else {
-            "loop_while_i64_async_chain"
+            "loop_while_scalar_async_chain"
         },
     );
     let compare = render_loop_compare(prepared.compare);
@@ -383,9 +383,9 @@ pub(super) fn lower_async_chained_while(
         op: Operation {
             module: "cpu".to_owned(),
             instruction: if has_conditional {
-                "loop_while_i64_async_cond_chain".to_owned()
+                "loop_while_scalar_async_cond_chain".to_owned()
             } else {
-                "loop_while_i64_async_chain".to_owned()
+                "loop_while_scalar_async_chain".to_owned()
             },
             args,
         },

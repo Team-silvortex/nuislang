@@ -709,6 +709,7 @@ fn walk_child_exprs(expr: &NirExpr, f: &mut dyn FnMut(&NirExpr)) {
         NirExpr::Await(inner)
         | NirExpr::Borrow(inner)
         | NirExpr::BorrowEnd(inner)
+        | NirExpr::HostBufferHandle(inner)
         | NirExpr::Move(inner)
         | NirExpr::LoadValue(inner)
         | NirExpr::LoadNext(inner)

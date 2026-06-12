@@ -35,6 +35,7 @@ fn ast_expr_requires_match_hoist(expr: &AstExpr) -> bool {
         AstExpr::Bool(_)
         | AstExpr::Text(_)
         | AstExpr::Int(_)
+        | AstExpr::Float(_)
         | AstExpr::Var(_)
         | AstExpr::Lambda { .. } => false,
     }

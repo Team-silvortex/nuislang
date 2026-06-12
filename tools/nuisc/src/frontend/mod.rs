@@ -405,6 +405,47 @@ mod tests {
     }
 
     #[test]
+    fn accepts_host_buffer_handle_to_extern_i64_host_handle_bridge() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              extern "c" fn host_stdin_read(buffer_handle: i64, len: i64) -> i64;
+
+              fn main() -> i64 {
+                let backing: ref Buffer = alloc_buffer(8, 0);
+                return host_stdin_read(host_buffer_handle(backing), 8);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(module.functions.len(), 1);
+    }
+
+    #[test]
+    fn rejects_ref_node_to_extern_i64_host_handle_slot() {
+        let error = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              extern "c" fn host_stdin_read(buffer_handle: i64, len: i64) -> i64;
+
+              fn main() -> i64 {
+                let head: ref Node = alloc_node(1, null());
+                return host_stdin_read(head, 8);
+              }
+            }
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(
+            error.contains("function `host_stdin_read` argument 1 expects `i64`, found `ref Node`")
+        );
+        assert!(error.contains("`ref Buffer -> i64`"));
+    }
+
+    #[test]
     fn rejects_task_completed_on_raw_task_input() {
         let error = parse_nuis_module(
             r#"

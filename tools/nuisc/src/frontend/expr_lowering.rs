@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::binary_lowering::lower_binary_expr_with_async;
+use super::call_helpers::ensure_call_arg_matches_param;
 use super::metadata::{hidden_private_field_count, ModuleConstValue};
 use super::validation_helpers::render_type_name;
 use super::{
@@ -94,6 +95,21 @@ pub(super) fn lower_expr_with_async(
         AstExpr::Bool(value) => NirExpr::Bool(*value),
         AstExpr::Text(text) => NirExpr::Text(text.clone()),
         AstExpr::Int(value) => NirExpr::Int(*value),
+        AstExpr::Float(value) => match expected {
+            Some(expected) if expected.name == "f32" && !expected.is_ref && !expected.is_optional => {
+                NirExpr::F32(value.clone())
+            }
+            Some(expected) if expected.name == "f64" && !expected.is_ref && !expected.is_optional => {
+                NirExpr::F64(value.clone())
+            }
+            Some(expected) => {
+                return Err(format!(
+                    "float literal `{value}` cannot lower to expected type `{}`",
+                    render_type_name(expected)
+                ))
+            }
+            None => NirExpr::F64(value.clone()),
+        },
         AstExpr::If { .. } => {
             return Err(
                 "`if` expression is currently only supported as the direct value of `let`, `const`, `print`, or `return`"
@@ -205,6 +221,20 @@ pub(super) fn lower_expr_with_async(
                             signature.params.len(),
                             lowered_args.len()
                         ));
+                    }
+                    for (index, (arg, expected_param)) in
+                        lowered_args.iter().zip(signature.params.iter()).enumerate()
+                    {
+                        ensure_call_arg_matches_param(
+                            &signature_key,
+                            index,
+                            arg,
+                            expected_param,
+                            bindings,
+                            signatures,
+                            struct_table,
+                            signature.is_extern,
+                        )?;
                     }
                     if signature.is_extern {
                         if current_domain != "cpu" {
@@ -442,6 +472,7 @@ pub(super) fn lower_expr_with_async(
             module_consts,
             signatures,
             struct_table,
+            expected,
         )?,
     })
 }

@@ -8,7 +8,10 @@ mod cpu Main {
 
   fn read_stdin_once(requested_len: i64) -> StdinRead {
     let backing: ref Buffer = alloc_buffer(requested_len, 0);
-    let read_len: i64 = host_stdin_read(backing, requested_len);
+    let read_len: i64 = host_stdin_read(
+      host_buffer_handle(backing),
+      requested_len
+    );
     return StdinRead {
       requested_len: requested_len,
       read_len: read_len

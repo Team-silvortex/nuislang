@@ -59,7 +59,11 @@ pub(crate) fn validate_const_item(constant: &AstConstItem) -> Result<(), String>
 
 fn validate_const_safe_expr(expr: &AstExpr) -> Result<(), &'static str> {
     match expr {
-        AstExpr::Bool(_) | AstExpr::Text(_) | AstExpr::Int(_) | AstExpr::Var(_) => Ok(()),
+        AstExpr::Bool(_)
+        | AstExpr::Text(_)
+        | AstExpr::Int(_)
+        | AstExpr::Float(_)
+        | AstExpr::Var(_) => Ok(()),
         AstExpr::If {
             condition,
             then_body,

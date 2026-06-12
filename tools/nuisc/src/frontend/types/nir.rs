@@ -176,6 +176,8 @@ pub(crate) fn infer_nir_expr_type(
         NirExpr::Bool(_) | NirExpr::IsNull(_) => Some(bool_type()),
         NirExpr::Text(_) => Some(string_type()),
         NirExpr::Int(_) => Some(i64_type()),
+        NirExpr::F32(_) => Some(f32_type()),
+        NirExpr::F64(_) => Some(f64_type()),
         NirExpr::Var(name) => bindings.get(name).cloned(),
         NirExpr::Await(value) => infer_nir_expr_type(value, bindings, signatures, struct_table),
         NirExpr::Instantiate { unit, .. } => {
@@ -186,6 +188,7 @@ pub(crate) fn infer_nir_expr_type(
             infer_nir_expr_type(value, bindings, signatures, struct_table)
         }
         NirExpr::BorrowEnd(_) => Some(unit_type()),
+        NirExpr::HostBufferHandle(_) => Some(i64_type()),
         NirExpr::AllocNode { .. } => Some(ref_type("Node")),
         NirExpr::AllocBuffer { .. } => Some(ref_type("Buffer")),
         NirExpr::DataBindCore(_) | NirExpr::CpuBindCore(_) => Some(unit_type()),
@@ -579,6 +582,12 @@ pub(crate) fn i64_type() -> NirTypeRef {
 }
 pub(crate) fn i32_type() -> NirTypeRef {
     named_type("i32")
+}
+pub(crate) fn f32_type() -> NirTypeRef {
+    named_type("f32")
+}
+pub(crate) fn f64_type() -> NirTypeRef {
+    named_type("f64")
 }
 pub(crate) fn bool_type() -> NirTypeRef {
     named_type("bool")

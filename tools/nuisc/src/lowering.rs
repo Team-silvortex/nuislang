@@ -301,7 +301,10 @@ fn lower_expr(
         NirExpr::Bool(_)
         | NirExpr::Text(_)
         | NirExpr::Int(_)
+        | NirExpr::F32(_)
+        | NirExpr::F64(_)
         | NirExpr::CastI64ToI32(_)
+        | NirExpr::HostBufferHandle(_)
         | NirExpr::Var(_)
         | NirExpr::Null
         | NirExpr::Borrow(_)

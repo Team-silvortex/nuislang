@@ -702,6 +702,7 @@ fn rewrite_lambda_expr(
         AstExpr::Bool(_)
         | AstExpr::Text(_)
         | AstExpr::Int(_)
+        | AstExpr::Float(_)
         | AstExpr::Var(_)
         | AstExpr::Instantiate { .. } => expr.clone(),
     })

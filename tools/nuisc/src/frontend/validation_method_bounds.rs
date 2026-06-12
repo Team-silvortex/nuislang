@@ -48,7 +48,11 @@ pub(super) fn validate_expr_generic_method_bounds(
     context: &str,
 ) -> Result<(), String> {
     match expr {
-        AstExpr::Bool(_) | AstExpr::Text(_) | AstExpr::Int(_) | AstExpr::Var(_) => {}
+        AstExpr::Bool(_)
+        | AstExpr::Text(_)
+        | AstExpr::Int(_)
+        | AstExpr::Float(_)
+        | AstExpr::Var(_) => {}
         AstExpr::If {
             condition,
             then_body,

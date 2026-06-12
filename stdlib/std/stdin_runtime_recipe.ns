@@ -18,9 +18,15 @@ mod cpu Main {
     let secondary_backing: ref Buffer = alloc_buffer(seed.secondary_len, 0);
     return StdinRecipeSummary {
       primary_requested_len: seed.primary_len,
-      primary_read_len: host_stdin_read(primary_backing, seed.primary_len),
+      primary_read_len: host_stdin_read(
+        host_buffer_handle(primary_backing),
+        seed.primary_len
+      ),
       secondary_requested_len: seed.secondary_len,
-      secondary_read_len: host_stdin_read(secondary_backing, seed.secondary_len)
+      secondary_read_len: host_stdin_read(
+        host_buffer_handle(secondary_backing),
+        seed.secondary_len
+      )
     };
   }
 

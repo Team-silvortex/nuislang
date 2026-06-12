@@ -65,6 +65,7 @@ pub(super) fn lower_cpu_expr(
             callee,
             args,
         } => Some(lower_cpu_extern_call(abi, callee, args, state, bindings)),
+        NirExpr::HostBufferHandle(value) => Some(lower_expr(value, state, bindings)),
         _ => None,
     }
 }

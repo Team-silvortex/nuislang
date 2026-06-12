@@ -1563,6 +1563,7 @@ impl Parser {
             Some(Token::Word(word)) if word == "false" => Ok(AstExpr::Bool(false)),
             Some(Token::String(text)) => Ok(AstExpr::Text(text)),
             Some(Token::Integer(value)) => Ok(AstExpr::Int(value)),
+            Some(Token::Float(value)) => Ok(AstExpr::Float(value)),
             Some(Token::Word(name)) => {
                 let explicit_generic_args =
                     self.try_parse_expr_type_arg_list_followed_by_call_or_literal()?;

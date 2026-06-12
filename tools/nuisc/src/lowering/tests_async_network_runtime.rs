@@ -38,8 +38,10 @@ fn lowers_async_network_observer_step_into_async_loop_carry_chain() {
     let loop_node = yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_async_chain")
-        .expect("expected loop_while_i64_async_chain node");
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_async_chain"
+        })
+        .expect("expected loop_while_scalar_async_chain node");
     assert_eq!(loop_node.op.args[2], "step");
     assert!(yir
         .nodes

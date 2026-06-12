@@ -18,7 +18,11 @@ mod cpu Main {
   fn summarize_file_io(path_handle: i64, flags: i64, read_len: i64) -> i64 {
     let descriptor: FileDescriptor = open_descriptor(path_handle, flags);
     let backing: ref Buffer = alloc_buffer(read_len, 0);
-    let read_bytes: i64 = host_file_read(descriptor.handle, backing, read_len);
+    let read_bytes: i64 = host_file_read(
+      descriptor.handle,
+      host_buffer_handle(backing),
+      read_len
+    );
     let closed: i64 = host_file_close(descriptor.handle);
     return descriptor.flags + read_bytes + closed;
   }

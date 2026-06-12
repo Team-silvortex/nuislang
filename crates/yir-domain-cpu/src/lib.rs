@@ -191,7 +191,7 @@ impl RegisteredMod for CpuMod {
 
                 Ok(InstructionSemantics::pure(node.op.args.clone()))
             }
-            "param_bool" | "param_i32" | "param_i64" => {
+            "param_bool" | "param_i32" | "param_i64" | "param_f32" | "param_f64" => {
                 if node.op.args.len() != 1 {
                     return Err(format!(
                         "node `{}` expects `cpu.{} <name> <resource> <index>`",
@@ -206,7 +206,7 @@ impl RegisteredMod for CpuMod {
                 })?;
                 Ok(InstructionSemantics::pure(Vec::new()))
             }
-            "call_bool" | "call_i32" | "call_i64" => {
+            "call_bool" | "call_i32" | "call_i64" | "call_f32" | "call_f64" => {
                 if node.op.args.is_empty() {
                     return Err(format!(
                         "node `{}` expects `cpu.{} <name> <resource> <callee> [arg...]`",
@@ -217,7 +217,7 @@ impl RegisteredMod for CpuMod {
                     node.op.args.iter().skip(1).cloned().collect(),
                 ))
             }
-            "return_bool" | "return_i32" | "return_i64" => {
+            "return_bool" | "return_i32" | "return_i64" | "return_f32" | "return_f64" => {
                 if node.op.args.len() != 1 {
                     return Err(format!(
                         "node `{}` expects `cpu.{} <name> <resource> <value>`",
@@ -594,10 +594,10 @@ impl RegisteredMod for CpuMod {
                 }
                 Ok(InstructionSemantics::effect(node.op.args[..3].to_vec()))
             }
-            "loop_while_i64_chain" => {
+            "loop_while_i64_chain" | "loop_while_scalar_chain" => {
                 if node.op.args.len() < 7 || (node.op.args.len() - 5) % 2 != 0 {
                     return Err(format!(
-                        "node `{}` expects `cpu.loop_while_i64_chain <name> <resource> <initial> <limit> <step> <cmp> <step_kind> (<carry_initial> <carry_kind>)+`",
+                        "node `{}` expects `cpu.loop_while_scalar_chain <name> <resource> <initial> <limit> <step> <cmp> <step_kind> (<carry_initial> <carry_kind>)+`",
                         node.name
                     ));
                 }
@@ -678,10 +678,10 @@ impl RegisteredMod for CpuMod {
                         .collect(),
                 ))
             }
-            "loop_while_i64_async_chain" => {
+            "loop_while_i64_async_chain" | "loop_while_scalar_async_chain" => {
                 if node.op.args.len() < 6 || (node.op.args.len() - 4) % 2 != 0 {
                     return Err(format!(
-                        "node `{}` expects `cpu.loop_while_i64_async_chain <name> <resource> <initial> <limit> <step_callee> <cmp> (<carry_initial> <carry_kind>)+`",
+                        "node `{}` expects `cpu.loop_while_scalar_async_chain <name> <resource> <initial> <limit> <step_callee> <cmp> (<carry_initial> <carry_kind>)+`",
                         node.name
                     ));
                 }
@@ -753,10 +753,10 @@ impl RegisteredMod for CpuMod {
                         .collect(),
                 ))
             }
-            "loop_while_i64_async_cond_chain" => {
+            "loop_while_i64_async_cond_chain" | "loop_while_scalar_async_cond_chain" => {
                 if node.op.args.len() < 9 || (node.op.args.len() - 4) % 5 != 0 {
                     return Err(format!(
-                        "node `{}` expects `cpu.loop_while_i64_async_cond_chain <name> <resource> <initial> <limit> <step_callee> <cmp> (<carry_initial> <condition_kind> <condition_rhs> <then_kind> <else_kind>)+`",
+                        "node `{}` expects `cpu.loop_while_scalar_async_cond_chain <name> <resource> <initial> <limit> <step_callee> <cmp> (<carry_initial> <condition_kind> <condition_rhs> <then_kind> <else_kind>)+`",
                         node.name
                     ));
                 }
@@ -963,10 +963,10 @@ impl RegisteredMod for CpuMod {
                 }
                 Ok(InstructionSemantics::effect(inputs))
             }
-            "loop_while_i64_cond_chain" => {
+            "loop_while_i64_cond_chain" | "loop_while_scalar_cond_chain" => {
                 if node.op.args.len() < 10 || (node.op.args.len() - 5) % 5 != 0 {
                     return Err(format!(
-                        "node `{}` expects `cpu.loop_while_i64_cond_chain <name> <resource> <initial> <limit> <step> <cmp> <step_kind> (<carry_initial> <cond_kind> <cond_rhs> <then_kind> <else_kind>)+`",
+                        "node `{}` expects `cpu.loop_while_scalar_cond_chain <name> <resource> <initial> <limit> <step> <cmp> <step_kind> (<carry_initial> <cond_kind> <cond_rhs> <then_kind> <else_kind>)+`",
                         node.name
                     ));
                 }
@@ -2405,7 +2405,9 @@ impl RegisteredMod for CpuMod {
             "param_bool" => Ok(Value::Bool(false)),
             "param_i32" => Ok(Value::I32(0)),
             "param_i64" => Ok(Value::Int(0)),
-            "call_bool" | "call_i32" | "call_i64" => {
+            "param_f32" => Ok(Value::F32(0.0)),
+            "param_f64" => Ok(Value::F64(0.0)),
+            "call_bool" | "call_i32" | "call_i64" | "call_f32" | "call_f64" => {
                 let callee = &node.op.args[0];
                 let args = node.op.args[1..]
                     .iter()
@@ -2424,6 +2426,8 @@ impl RegisteredMod for CpuMod {
                 match node.op.instruction.as_str() {
                     "call_bool" => Ok(Value::Bool(false)),
                     "call_i32" => Ok(Value::I32(0)),
+                    "call_f32" => Ok(Value::F32(0.0)),
+                    "call_f64" => Ok(Value::F64(0.0)),
                     _ => Ok(Value::Int(0)),
                 }
             }
@@ -2459,6 +2463,28 @@ impl RegisteredMod for CpuMod {
                     ),
                 );
                 Ok(Value::Int(value))
+            }
+            "return_f32" => {
+                let value = state.expect_f32(&node.op.args[0])?;
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.return_f32 @{} [{}] {}",
+                        node.resource, resource.kind.raw, value
+                    ),
+                );
+                Ok(Value::F32(value))
+            }
+            "return_f64" => {
+                let value = state.expect_f64(&node.op.args[0])?;
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.return_f64 @{} [{}] {}",
+                        node.resource, resource.kind.raw, value
+                    ),
+                );
+                Ok(Value::F64(value))
             }
             "async_call" => {
                 let callee = &node.op.args[0];
@@ -2657,9 +2683,23 @@ impl RegisteredMod for CpuMod {
             }
             "neg" => Ok(Value::Int(-state.expect_int(&node.op.args[0])?)),
             "not" => Ok(Value::Int(!state.expect_int(&node.op.args[0])?)),
-            "add" => Ok(Value::Int(
-                state.expect_int(&node.op.args[0])? + state.expect_int(&node.op.args[1])?,
-            )),
+            "add" => {
+                if let (Ok(lhs), Ok(rhs)) = (
+                    state.expect_int(&node.op.args[0]),
+                    state.expect_int(&node.op.args[1]),
+                ) {
+                    Ok(Value::Int(lhs + rhs))
+                } else if let (Ok(lhs), Ok(rhs)) = (
+                    state.expect_f32(&node.op.args[0]),
+                    state.expect_f32(&node.op.args[1]),
+                ) {
+                    Ok(Value::F32(lhs + rhs))
+                } else {
+                    Ok(Value::F64(
+                        state.expect_f64(&node.op.args[0])? + state.expect_f64(&node.op.args[1])?,
+                    ))
+                }
+            }
             "add_i32" => Ok(Value::I32(
                 state.expect_i32(&node.op.args[0])? + state.expect_i32(&node.op.args[1])?,
             )),
@@ -2669,9 +2709,23 @@ impl RegisteredMod for CpuMod {
             "add_f64" => Ok(Value::F64(
                 state.expect_f64(&node.op.args[0])? + state.expect_f64(&node.op.args[1])?,
             )),
-            "sub" => Ok(Value::Int(
-                state.expect_int(&node.op.args[0])? - state.expect_int(&node.op.args[1])?,
-            )),
+            "sub" => {
+                if let (Ok(lhs), Ok(rhs)) = (
+                    state.expect_int(&node.op.args[0]),
+                    state.expect_int(&node.op.args[1]),
+                ) {
+                    Ok(Value::Int(lhs - rhs))
+                } else if let (Ok(lhs), Ok(rhs)) = (
+                    state.expect_f32(&node.op.args[0]),
+                    state.expect_f32(&node.op.args[1]),
+                ) {
+                    Ok(Value::F32(lhs - rhs))
+                } else {
+                    Ok(Value::F64(
+                        state.expect_f64(&node.op.args[0])? - state.expect_f64(&node.op.args[1])?,
+                    ))
+                }
+            }
             "sub_i32" => Ok(Value::I32(
                 state.expect_i32(&node.op.args[0])? - state.expect_i32(&node.op.args[1])?,
             )),
@@ -2681,9 +2735,23 @@ impl RegisteredMod for CpuMod {
             "sub_f64" => Ok(Value::F64(
                 state.expect_f64(&node.op.args[0])? - state.expect_f64(&node.op.args[1])?,
             )),
-            "mul" => Ok(Value::Int(
-                state.expect_int(&node.op.args[0])? * state.expect_int(&node.op.args[1])?,
-            )),
+            "mul" => {
+                if let (Ok(lhs), Ok(rhs)) = (
+                    state.expect_int(&node.op.args[0]),
+                    state.expect_int(&node.op.args[1]),
+                ) {
+                    Ok(Value::Int(lhs * rhs))
+                } else if let (Ok(lhs), Ok(rhs)) = (
+                    state.expect_f32(&node.op.args[0]),
+                    state.expect_f32(&node.op.args[1]),
+                ) {
+                    Ok(Value::F32(lhs * rhs))
+                } else {
+                    Ok(Value::F64(
+                        state.expect_f64(&node.op.args[0])? * state.expect_f64(&node.op.args[1])?,
+                    ))
+                }
+            }
             "mul_i32" => Ok(Value::I32(
                 state.expect_i32(&node.op.args[0])? * state.expect_i32(&node.op.args[1])?,
             )),
@@ -2694,12 +2762,30 @@ impl RegisteredMod for CpuMod {
                 state.expect_f64(&node.op.args[0])? * state.expect_f64(&node.op.args[1])?,
             )),
             "div" => {
-                let lhs = state.expect_int(&node.op.args[0])?;
-                let rhs = state.expect_int(&node.op.args[1])?;
-                if rhs == 0 {
-                    return Err(format!("node `{}` divides by zero", node.name));
+                if let (Ok(lhs), Ok(rhs)) = (
+                    state.expect_int(&node.op.args[0]),
+                    state.expect_int(&node.op.args[1]),
+                ) {
+                    if rhs == 0 {
+                        return Err(format!("node `{}` divides by zero", node.name));
+                    }
+                    Ok(Value::Int(lhs / rhs))
+                } else if let (Ok(lhs), Ok(rhs)) = (
+                    state.expect_f32(&node.op.args[0]),
+                    state.expect_f32(&node.op.args[1]),
+                ) {
+                    if rhs == 0.0 {
+                        return Err(format!("node `{}` divides by zero", node.name));
+                    }
+                    Ok(Value::F32(lhs / rhs))
+                } else {
+                    let lhs = state.expect_f64(&node.op.args[0])?;
+                    let rhs = state.expect_f64(&node.op.args[1])?;
+                    if rhs == 0.0 {
+                        return Err(format!("node `{}` divides by zero", node.name));
+                    }
+                    Ok(Value::F64(lhs / rhs))
                 }
-                Ok(Value::Int(lhs / rhs))
             }
             "div_i32" => {
                 let lhs = state.expect_i32(&node.op.args[0])?;
@@ -2744,6 +2830,16 @@ impl RegisteredMod for CpuMod {
                     state.expect_i32(&node.op.args[1]),
                 ) {
                     Ok(Value::Int((lhs == rhs) as i64))
+                } else if let (Ok(lhs), Ok(rhs)) = (
+                    state.expect_f32(&node.op.args[0]),
+                    state.expect_f32(&node.op.args[1]),
+                ) {
+                    Ok(Value::Int((lhs == rhs) as i64))
+                } else if let (Ok(lhs), Ok(rhs)) = (
+                    state.expect_f64(&node.op.args[0]),
+                    state.expect_f64(&node.op.args[1]),
+                ) {
+                    Ok(Value::Int((lhs == rhs) as i64))
                 } else {
                     Ok(Value::Int(
                         (state.expect_bool(&node.op.args[0])?
@@ -2771,6 +2867,16 @@ impl RegisteredMod for CpuMod {
                     state.expect_i32(&node.op.args[1]),
                 ) {
                     Ok(Value::Int((lhs != rhs) as i64))
+                } else if let (Ok(lhs), Ok(rhs)) = (
+                    state.expect_f32(&node.op.args[0]),
+                    state.expect_f32(&node.op.args[1]),
+                ) {
+                    Ok(Value::Int((lhs != rhs) as i64))
+                } else if let (Ok(lhs), Ok(rhs)) = (
+                    state.expect_f64(&node.op.args[0]),
+                    state.expect_f64(&node.op.args[1]),
+                ) {
+                    Ok(Value::Int((lhs != rhs) as i64))
                 } else {
                     Ok(Value::Int(
                         (state.expect_bool(&node.op.args[0])?
@@ -2782,6 +2888,16 @@ impl RegisteredMod for CpuMod {
                 if let (Ok(lhs), Ok(rhs)) = (
                     state.expect_int(&node.op.args[0]),
                     state.expect_int(&node.op.args[1]),
+                ) {
+                    Ok(Value::Int((lhs < rhs) as i64))
+                } else if let (Ok(lhs), Ok(rhs)) = (
+                    state.expect_f32(&node.op.args[0]),
+                    state.expect_f32(&node.op.args[1]),
+                ) {
+                    Ok(Value::Int((lhs < rhs) as i64))
+                } else if let (Ok(lhs), Ok(rhs)) = (
+                    state.expect_f64(&node.op.args[0]),
+                    state.expect_f64(&node.op.args[1]),
                 ) {
                     Ok(Value::Int((lhs < rhs) as i64))
                 } else {
@@ -2806,6 +2922,16 @@ impl RegisteredMod for CpuMod {
                     state.expect_int(&node.op.args[1]),
                 ) {
                     Ok(Value::Int((lhs > rhs) as i64))
+                } else if let (Ok(lhs), Ok(rhs)) = (
+                    state.expect_f32(&node.op.args[0]),
+                    state.expect_f32(&node.op.args[1]),
+                ) {
+                    Ok(Value::Int((lhs > rhs) as i64))
+                } else if let (Ok(lhs), Ok(rhs)) = (
+                    state.expect_f64(&node.op.args[0]),
+                    state.expect_f64(&node.op.args[1]),
+                ) {
+                    Ok(Value::Int((lhs > rhs) as i64))
                 } else {
                     Ok(Value::Int(
                         (state.expect_i32(&node.op.args[0])?
@@ -2828,6 +2954,16 @@ impl RegisteredMod for CpuMod {
                     state.expect_int(&node.op.args[1]),
                 ) {
                     Ok(Value::Int((lhs <= rhs) as i64))
+                } else if let (Ok(lhs), Ok(rhs)) = (
+                    state.expect_f32(&node.op.args[0]),
+                    state.expect_f32(&node.op.args[1]),
+                ) {
+                    Ok(Value::Int((lhs <= rhs) as i64))
+                } else if let (Ok(lhs), Ok(rhs)) = (
+                    state.expect_f64(&node.op.args[0]),
+                    state.expect_f64(&node.op.args[1]),
+                ) {
+                    Ok(Value::Int((lhs <= rhs) as i64))
                 } else {
                     Ok(Value::Int(
                         (state.expect_i32(&node.op.args[0])?
@@ -2839,6 +2975,16 @@ impl RegisteredMod for CpuMod {
                 if let (Ok(lhs), Ok(rhs)) = (
                     state.expect_int(&node.op.args[0]),
                     state.expect_int(&node.op.args[1]),
+                ) {
+                    Ok(Value::Int((lhs >= rhs) as i64))
+                } else if let (Ok(lhs), Ok(rhs)) = (
+                    state.expect_f32(&node.op.args[0]),
+                    state.expect_f32(&node.op.args[1]),
+                ) {
+                    Ok(Value::Int((lhs >= rhs) as i64))
+                } else if let (Ok(lhs), Ok(rhs)) = (
+                    state.expect_f64(&node.op.args[0]),
+                    state.expect_f64(&node.op.args[1]),
                 ) {
                     Ok(Value::Int((lhs >= rhs) as i64))
                 } else {
@@ -3313,7 +3459,7 @@ impl RegisteredMod for CpuMod {
                 );
                 Ok(Value::Unit)
             }
-            "loop_while_i64_chain" => {
+            "loop_while_i64_chain" | "loop_while_scalar_chain" => {
                 let initial = state.expect_value(&node.op.args[0])?.clone();
                 let limit = state.expect_value(&node.op.args[1])?.clone();
                 let step = state.expect_value(&node.op.args[2])?.clone();
@@ -3329,7 +3475,8 @@ impl RegisteredMod for CpuMod {
                 state.push_resource_event(
                     resource,
                     format!(
-                        "effect cpu.loop_while_i64_chain @{} [{}]: start {}, loop while current {} {}, step {} {}, carries {}",
+                        "effect cpu.{} @{} [{}]: start {}, loop while current {} {}, step {} {}, carries {}",
+                        node.op.instruction,
                         node.resource,
                         resource.kind.raw,
                         initial,
@@ -3342,7 +3489,7 @@ impl RegisteredMod for CpuMod {
                 );
                 Ok(Value::Unit)
             }
-            "loop_while_i64_async_chain" => {
+            "loop_while_i64_async_chain" | "loop_while_scalar_async_chain" => {
                 let initial = state.expect_value(&node.op.args[0])?.clone();
                 let limit = state.expect_value(&node.op.args[1])?.clone();
                 let step_callee = node.op.args.get(2).map_or("<missing>", String::as_str);
@@ -3357,7 +3504,8 @@ impl RegisteredMod for CpuMod {
                 state.push_resource_event(
                     resource,
                     format!(
-                        "effect cpu.loop_while_i64_async_chain @{} [{}]: start {}, loop while current {} {}, step await {}(current), carries {}",
+                        "effect cpu.{} @{} [{}]: start {}, loop while current {} {}, step await {}(current), carries {}",
+                        node.op.instruction,
                         node.resource,
                         resource.kind.raw,
                         initial,
@@ -3369,7 +3517,7 @@ impl RegisteredMod for CpuMod {
                 );
                 Ok(Value::Unit)
             }
-            "loop_while_i64_async_cond_chain" => {
+            "loop_while_i64_async_cond_chain" | "loop_while_scalar_async_cond_chain" => {
                 let initial = state.expect_value(&node.op.args[0])?.clone();
                 let limit = state.expect_value(&node.op.args[1])?.clone();
                 let step_callee = node.op.args.get(2).map_or("<missing>", String::as_str);
@@ -3392,7 +3540,8 @@ impl RegisteredMod for CpuMod {
                 state.push_resource_event(
                     resource,
                     format!(
-                        "effect cpu.loop_while_i64_async_cond_chain @{} [{}]: start {}, loop while current {} {}, step await {}(current), carries {}",
+                        "effect cpu.{} @{} [{}]: start {}, loop while current {} {}, step await {}(current), carries {}",
+                        node.op.instruction,
                         node.resource,
                         resource.kind.raw,
                         initial,
@@ -3404,7 +3553,7 @@ impl RegisteredMod for CpuMod {
                 );
                 Ok(Value::Unit)
             }
-            "loop_while_i64_cond_chain" => {
+            "loop_while_i64_cond_chain" | "loop_while_scalar_cond_chain" => {
                 let initial = state.expect_value(&node.op.args[0])?.clone();
                 let limit = state.expect_value(&node.op.args[1])?.clone();
                 let step = state.expect_value(&node.op.args[2])?.clone();
@@ -3428,7 +3577,8 @@ impl RegisteredMod for CpuMod {
                 state.push_resource_event(
                     resource,
                     format!(
-                        "effect cpu.loop_while_i64_cond_chain @{} [{}]: start {}, loop while current {} {}, step {} {}, carries {}",
+                        "effect cpu.{} @{} [{}]: start {}, loop while current {} {}, step {} {}, carries {}",
+                        node.op.instruction,
                         node.resource,
                         resource.kind.raw,
                         initial,

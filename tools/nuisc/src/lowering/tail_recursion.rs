@@ -174,7 +174,17 @@ fn extract_self_tail_recursive_shape(
                     post_flow_step,
                 ));
             }
-            None
+            let recursive_step = extract_self_tail_recursive_branch_step_from_body(
+                function,
+                std::slice::from_ref(control_stmt),
+                std::slice::from_ref(recursive_stmt),
+                pure_helpers,
+            )?;
+            Some((
+                invert_self_tail_recursive_condition(base_condition, &function.params[0].name)?,
+                base_return,
+                recursive_step,
+            ))
         }
         _ => None,
     }
@@ -186,6 +196,19 @@ fn extract_self_tail_recursive_branch_step(
     pure_helpers: &BTreeSet<String>,
 ) -> Option<SelfTailRecursiveStep> {
     let tree = extract_self_tail_recursive_decision_tree(function, stmt, pure_helpers)?;
+    collapse_self_tail_recursive_decision_tree(&tree)
+}
+
+fn extract_self_tail_recursive_branch_step_from_body(
+    function: &NirFunction,
+    prefix: &[NirStmt],
+    suffix: &[NirStmt],
+    pure_helpers: &BTreeSet<String>,
+) -> Option<SelfTailRecursiveStep> {
+    let mut combined = Vec::with_capacity(prefix.len() + suffix.len());
+    combined.extend_from_slice(prefix);
+    combined.extend_from_slice(suffix);
+    let tree = extract_self_tail_recursive_tree_body(function, &combined, pure_helpers)?;
     collapse_self_tail_recursive_decision_tree(&tree)
 }
 
@@ -935,7 +958,12 @@ fn canonicalize_tail_recursive_loop_arg(
                     .unwrap_or_else(|| expr.clone())
             }
         }
-        NirExpr::Bool(_) | NirExpr::Text(_) | NirExpr::Int(_) | NirExpr::Null => expr.clone(),
+        NirExpr::Bool(_)
+        | NirExpr::Text(_)
+        | NirExpr::Int(_)
+        | NirExpr::F32(_)
+        | NirExpr::F64(_)
+        | NirExpr::Null => expr.clone(),
         NirExpr::CastI64ToI32(inner) => {
             NirExpr::CastI64ToI32(Box::new(canonicalize_tail_recursive_loop_arg(
                 inner,
@@ -1062,7 +1090,12 @@ fn canonicalize_tail_recursive_condition_expr(
             .map(tail_recursive_prev_carry_binding)
             .map(NirExpr::Var)
             .unwrap_or_else(|| expr.clone()),
-        NirExpr::Bool(_) | NirExpr::Text(_) | NirExpr::Int(_) | NirExpr::Null => expr.clone(),
+        NirExpr::Bool(_)
+        | NirExpr::Text(_)
+        | NirExpr::Int(_)
+        | NirExpr::F32(_)
+        | NirExpr::F64(_)
+        | NirExpr::Null => expr.clone(),
         NirExpr::CastI64ToI32(inner) => {
             NirExpr::CastI64ToI32(Box::new(canonicalize_tail_recursive_condition_expr(
                 inner,

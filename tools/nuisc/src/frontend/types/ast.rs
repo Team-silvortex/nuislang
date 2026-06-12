@@ -79,6 +79,7 @@ pub(crate) fn infer_ast_expr_type_inner(
         AstExpr::Bool(_) => Some(ast_named_type("bool")),
         AstExpr::Text(_) => Some(ast_named_type("Text")),
         AstExpr::Int(_) => Some(ast_named_type("i64")),
+        AstExpr::Float(_) => Some(ast_named_type("f64")),
         AstExpr::Var(name) => env.get(name).cloned(),
         AstExpr::If {
             condition: _,

@@ -2,6 +2,7 @@
 pub enum Token {
     Word(String),
     Integer(i64),
+    Float(String),
     Symbol(char),
     Arrow,
     String(String),
@@ -58,9 +59,34 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, String> {
                     if next.is_ascii_digit() {
                         digits.push(next);
                         chars.next();
+                    } else if next == '.' {
+                        let mut lookahead = chars.clone();
+                        lookahead.next();
+                        if lookahead
+                            .peek()
+                            .copied()
+                            .is_some_and(|ch| ch.is_ascii_digit())
+                        {
+                            digits.push(next);
+                            chars.next();
+                            while let Some(fraction) = chars.peek().copied() {
+                                if fraction.is_ascii_digit() {
+                                    digits.push(fraction);
+                                    chars.next();
+                                } else {
+                                    break;
+                                }
+                            }
+                            tokens.push(Token::Float(digits.clone()));
+                            digits.clear();
+                        }
+                        break;
                     } else {
                         break;
                     }
+                }
+                if digits.is_empty() {
+                    continue;
                 }
                 let value = digits
                     .parse::<i64>()
@@ -95,6 +121,7 @@ pub fn describe_token(token: &Token) -> String {
     match token {
         Token::Word(value) => format!("identifier `{value}`"),
         Token::Integer(value) => format!("integer `{value}`"),
+        Token::Float(value) => format!("float `{value}`"),
         Token::Symbol(value) => format!("symbol `{value}`"),
         Token::Arrow => "symbol `->`".to_owned(),
         Token::String(value) => format!("string \"{value}\""),

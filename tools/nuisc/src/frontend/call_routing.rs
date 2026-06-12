@@ -284,6 +284,20 @@ pub(super) fn lower_routed_call_or_core_builtin(
             )?;
             NirExpr::BufferLen(Box::new(lowered))
         }
+        "host_buffer_handle" => {
+            let [buffer] = args else {
+                return Err("host_buffer_handle(...) expects 1 arg".to_owned());
+            };
+            let lowered = lower_expr(
+                buffer,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&ref_type("Buffer")),
+            )?;
+            NirExpr::HostBufferHandle(Box::new(lowered))
+        }
         "load_at" => {
             let [buffer, index] = args else {
                 return Err("load_at(...) expects 2 args".to_owned());

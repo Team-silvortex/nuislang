@@ -995,6 +995,7 @@ fn expand_nested_control_expr_as_stmt(
         super::AstExpr::Bool(_)
         | super::AstExpr::Text(_)
         | super::AstExpr::Int(_)
+        | super::AstExpr::Float(_)
         | super::AstExpr::Var(_)
         | super::AstExpr::Lambda { .. }
         | super::AstExpr::Instantiate { .. } => Ok(None),

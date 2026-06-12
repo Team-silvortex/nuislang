@@ -1180,8 +1180,8 @@ fn lowers_tail_recursive_sum_state_project_with_chain_loop_shape() {
         .yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_chain")
-        .expect("expected loop_while_i64_chain node");
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_chain")
+        .expect("expected loop_while_scalar_chain node");
     assert_eq!(loop_node.op.args[3], "ne");
     assert_eq!(loop_node.op.args[4], "sub");
     assert_eq!(loop_node.op.args[6], "add_current");
@@ -1206,8 +1206,8 @@ fn lowers_tail_recursive_factorial_state_project_with_multiplicative_chain_shape
         .yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_chain")
-        .expect("expected loop_while_i64_chain node");
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_chain")
+        .expect("expected loop_while_scalar_chain node");
     assert_eq!(loop_node.op.args[3], "gt");
     assert_eq!(loop_node.op.args[4], "sub");
     assert_eq!(loop_node.op.args[6], "mul_prev_current");
@@ -1232,8 +1232,8 @@ fn lowers_tail_recursive_cross_carry_state_project_with_cross_carry_chain_shape(
         .yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_chain")
-        .expect("expected loop_while_i64_chain node");
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_chain")
+        .expect("expected loop_while_scalar_chain node");
     assert_eq!(loop_node.op.args[3], "gt");
     assert_eq!(loop_node.op.args[4], "sub");
     assert_eq!(loop_node.op.args[6], "add_prev_carry1");
@@ -1259,8 +1259,10 @@ fn lowers_tail_recursive_branching_state_project_with_branching_cond_loop_shape(
         .yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_cond_chain")
-        .expect("expected loop_while_i64_cond_chain node");
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_cond_chain"
+        })
+        .expect("expected loop_while_scalar_cond_chain node");
     assert_eq!(loop_node.op.args[3], "ne");
     assert_eq!(loop_node.op.args[4], "sub");
     assert_eq!(loop_node.op.args[6], "prev_current_gt");
@@ -1288,8 +1290,8 @@ fn lowers_tail_recursive_multi_carry_state_project_with_multi_carry_chain_shape(
         .yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_chain")
-        .expect("expected loop_while_i64_chain node");
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_chain")
+        .expect("expected loop_while_scalar_chain node");
     assert_eq!(loop_node.op.args[3], "gt");
     assert_eq!(loop_node.op.args[4], "sub");
     assert_eq!(loop_node.op.args[6], "add_prev_current");
@@ -1316,8 +1318,10 @@ fn lowers_tail_recursive_carry_condition_multi_carry_state_project_with_carry_co
         .yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_cond_chain")
-        .expect("expected loop_while_i64_cond_chain node");
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_cond_chain"
+        })
+        .expect("expected loop_while_scalar_cond_chain node");
     assert_eq!(loop_node.op.args[3], "gt");
     assert_eq!(loop_node.op.args[4], "sub");
     assert_eq!(loop_node.op.args[6], "prev_carry0_gt");
@@ -1349,8 +1353,10 @@ fn lowers_tail_recursive_branching_cross_carry_state_project_with_cond_loop_shap
         .yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_cond_chain")
-        .expect("expected loop_while_i64_cond_chain node");
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_cond_chain"
+        })
+        .expect("expected loop_while_scalar_cond_chain node");
     assert_eq!(loop_node.op.args[3], "gt");
     assert_eq!(loop_node.op.args[4], "sub");
     assert_eq!(loop_node.op.args[6], "prev_current_gt");
@@ -1380,8 +1386,10 @@ fn lowers_tail_recursive_branching_multi_carry_state_project_with_cond_loop_shap
         .yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_cond_chain")
-        .expect("expected loop_while_i64_cond_chain node");
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_cond_chain"
+        })
+        .expect("expected loop_while_scalar_cond_chain node");
     assert_eq!(loop_node.op.args[3], "gt");
     assert_eq!(loop_node.op.args[4], "sub");
     assert_eq!(loop_node.op.args[6], "prev_current_gt");
@@ -1445,8 +1453,8 @@ fn lowers_accumulating_while_state_project_with_single_carry_chain_shape() {
         .yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_chain")
-        .expect("expected loop_while_i64_chain node");
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_chain")
+        .expect("expected loop_while_scalar_chain node");
     assert_eq!(loop_node.op.args[6], "add_current");
 }
 
@@ -1467,8 +1475,8 @@ fn lowers_chained_while_state_project_with_multi_carry_chain_shape() {
         .yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_chain")
-        .expect("expected loop_while_i64_chain node");
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_chain")
+        .expect("expected loop_while_scalar_chain node");
     assert_eq!(loop_node.op.args[6], "add_current");
     assert_eq!(loop_node.op.args[8], "add_carry0");
 }
@@ -1492,8 +1500,10 @@ fn lowers_match_branching_while_state_project_with_cond_loop_shape() {
         .yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_cond_chain")
-        .expect("expected loop_while_i64_cond_chain node");
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_cond_chain"
+        })
+        .expect("expected loop_while_scalar_cond_chain node");
     assert_eq!(loop_node.op.args[6], "current_eq");
     assert_eq!(loop_node.op.args[8], "add_current");
     assert_eq!(loop_node.op.args[9], "keep");
@@ -1517,8 +1527,10 @@ fn lowers_branching_while_state_project_with_plain_cond_loop_shape() {
         .yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_cond_chain")
-        .expect("expected loop_while_i64_cond_chain node");
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_cond_chain"
+        })
+        .expect("expected loop_while_scalar_cond_chain node");
     assert_eq!(loop_node.op.args[6], "current_gt");
     expect_const_i64_value(&artifacts, &loop_node.op.args[7], "2");
     assert_eq!(loop_node.op.args[8], "add_current");
@@ -1544,8 +1556,10 @@ fn lowers_bool_match_branching_while_state_project_with_cond_loop_shape() {
         .yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_cond_chain")
-        .expect("expected loop_while_i64_cond_chain node");
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_cond_chain"
+        })
+        .expect("expected loop_while_scalar_cond_chain node");
     assert_eq!(loop_node.op.args[6], "current_gt");
     assert_eq!(loop_node.op.args[8], "add_current");
     assert_eq!(loop_node.op.args[9], "keep");
@@ -1570,8 +1584,10 @@ fn lowers_lambda_match_branching_while_state_project_with_lambda_cond_loop_shape
         .yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_cond_chain")
-        .expect("expected loop_while_i64_cond_chain node");
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_cond_chain"
+        })
+        .expect("expected loop_while_scalar_cond_chain node");
     assert_eq!(loop_node.op.args[6], "current_gt");
     expect_const_i64_value(&artifacts, &loop_node.op.args[7], "2");
     assert_eq!(loop_node.op.args[8], "add_current");
@@ -2027,8 +2043,10 @@ fn lowers_double_branching_while_state_project_with_double_carry_cond_loop_shape
         .yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_cond_chain")
-        .expect("expected loop_while_i64_cond_chain node");
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_cond_chain"
+        })
+        .expect("expected loop_while_scalar_cond_chain node");
     assert_eq!(loop_node.op.args[6], "current_gt");
     expect_const_i64_value(&artifacts, &loop_node.op.args[7], "1");
     assert_eq!(loop_node.op.args[8], "add_current");

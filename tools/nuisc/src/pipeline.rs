@@ -296,6 +296,8 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         | NirExpr::KernelProfileQueueDepthRef { .. }
         | NirExpr::KernelProfileBatchLanesRef { .. }
         | NirExpr::KernelTensor { .. }
+        | NirExpr::F32(_)
+        | NirExpr::F64(_)
         | NirExpr::ShaderTarget { .. }
         | NirExpr::ShaderViewport { .. }
         | NirExpr::ShaderPipeline { .. }
@@ -340,6 +342,7 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         NirExpr::Borrow(inner)
         | NirExpr::Await(inner)
         | NirExpr::BorrowEnd(inner)
+        | NirExpr::HostBufferHandle(inner)
         | NirExpr::Move(inner)
         | NirExpr::CastI64ToI32(inner)
         | NirExpr::LoadValue(inner)

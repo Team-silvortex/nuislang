@@ -382,6 +382,7 @@ fn render_ast_expr(value: &AstExpr) -> String {
         AstExpr::Bool(value) => value.to_string(),
         AstExpr::Text(text) => format!("\"{}\"", escape_debug(text)),
         AstExpr::Int(value) => value.to_string(),
+        AstExpr::Float(value) => value.clone(),
         AstExpr::Var(name) => name.clone(),
         AstExpr::If {
             condition,
@@ -579,6 +580,7 @@ fn render_nir_expr(value: &NirExpr) -> String {
         NirExpr::Bool(value) => value.to_string(),
         NirExpr::Text(text) => format!("\"{}\"", escape_debug(text)),
         NirExpr::Int(value) => value.to_string(),
+        NirExpr::F32(value) | NirExpr::F64(value) => value.clone(),
         NirExpr::CastI64ToI32(value) => format!("i32_from_i64({})", render_nir_expr(value)),
         NirExpr::Var(name) => name.clone(),
         NirExpr::Await(value) => format!("await {}", render_nir_expr(value)),
@@ -587,6 +589,9 @@ fn render_nir_expr(value: &NirExpr) -> String {
         NirExpr::Borrow(value) => format!("borrow({})", render_nir_expr(value)),
         NirExpr::BorrowEnd(value) => format!("borrow_end({})", render_nir_expr(value)),
         NirExpr::Move(value) => format!("move({})", render_nir_expr(value)),
+        NirExpr::HostBufferHandle(value) => {
+            format!("host_buffer_handle({})", render_nir_expr(value))
+        }
         NirExpr::AllocNode { value, next } => {
             format!(
                 "alloc_node({}, {})",
