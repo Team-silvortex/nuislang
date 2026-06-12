@@ -18,6 +18,10 @@ like the integration/completion line it claims to be.
   still describes the actual current push
 * [ ] confirm [nuis-0.17.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-compile-workflow.md)
   still matches the real frontend/lowering story
+* [ ] confirm [nuis-0.17.0-lowering-capability-map.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-lowering-capability-map.md)
+  still matches the lowering routes we currently treat as real
+* [ ] confirm [nuis-0.17.0-network-http-readiness-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-network-http-readiness-checklist.md)
+  still matches the honest release-facing network/http story
 * [ ] confirm [nuis-0.17.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-mainline-regression-matrix.md)
   still matches the real test-backed release gate
 * [ ] confirm [nuis-0.17.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-release-checklist.md)
@@ -66,6 +70,12 @@ like the integration/completion line it claims to be.
 * [ ] control-flow lowering:
   loop-family, branch-local flow, and generic-heavy branch assembly continue to
   compose instead of regressing in combination
+  current concrete project anchors:
+  `flow_branching_while_demo`,
+  `post_flow_branching_while_demo`,
+  `post_flow_branching_continuing_while_demo`,
+  and
+  `tail_recursive_branching_cross_carry_demo`
 * [ ] async/task/memory bridge:
   session/policy/batch/windowed/task-value routes continue to compose as shared
   groundwork

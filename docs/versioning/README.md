@@ -21,6 +21,8 @@ Start with:
 * [nuis-0.17.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-release-checklist.md)
 * [nuis-0.17.0-mainline-goals.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-mainline-goals.md)
 * [nuis-0.17.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-compile-workflow.md)
+* [nuis-0.17.0-lowering-capability-map.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-lowering-capability-map.md)
+* [nuis-0.17.0-network-http-readiness-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-network-http-readiness-checklist.md)
 * [nuis-0.17.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-mainline-regression-matrix.md)
 * [nuis-0.17.0-self-hosted-mainline-gate-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-self-hosted-mainline-gate-plan.md)
 * [nuis-0.17.0-generic-completion-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-generic-completion-plan.md)
@@ -60,6 +62,13 @@ active push.
 
 The `0.17.0` compile workflow file is the current compiler-facing explanation
 of how the frontend/generic/higher-order/async pipeline actually composes.
+
+The `0.17.0` lowering capability map is the compact answer to which lowering
+routes already count as real, test-backed compiler behavior.
+
+The `0.17.0` network/http readiness checklist is the narrow release-facing
+answer to what the current repository can honestly say about that specific
+story.
 
 The `0.17.0` mainline regression matrix is the small execution map for which
 test families now defend that story.

@@ -604,7 +604,8 @@ fn lowers_post_flow_break_after_multi_arm_match_helper_carry_into_loop_while_i64
 }
 
 #[test]
-fn lowers_post_flow_continue_with_recursive_boolean_condition_into_recursive_post_flow_cond_chain() {
+fn lowers_post_flow_continue_with_recursive_boolean_condition_into_recursive_post_flow_cond_chain()
+{
     let mut module = parse_nuis_module(
         r#"
         mod cpu Main {

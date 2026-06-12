@@ -255,6 +255,530 @@ fn lowers_http_client_exchange_recipe_project_with_expected_summary_shape() {
 }
 
 #[test]
+fn lowers_http_request_recipe_project_with_expected_request_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_request_recipe_demo",
+    );
+
+    let capture = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "capture_net_http_request_summary")
+        .unwrap();
+    assert!(matches!(
+        capture.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "NetHttpRequestSummary"
+    ));
+    for (name, callee) in [
+        ("open_handle", "host_network_open_tcp_stream"),
+        ("close_value", "host_network_close_owned"),
+    ] {
+        assert!(capture.body.iter().any(|stmt| {
+            matches!(
+                stmt,
+                NirStmt::Let {
+                    name: stmt_name,
+                    value: NirExpr::CpuExternCall { callee: stmt_callee, .. },
+                    ..
+                } if stmt_name == name && stmt_callee == callee
+            )
+        }));
+    }
+    assert!(capture.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                value: NirExpr::NetworkResult { .. },
+                ..
+            } if name == "send_result"
+        )
+    }));
+    assert!(capture.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name: stmt_name,
+                value: NirExpr::Call { callee: stmt_callee, .. },
+                ..
+            } if stmt_name == "send_value" && stmt_callee == "encode_value"
+        )
+    }));
+    for field_name in [
+        "method_code",
+        "request_line_bytes",
+        "request_header_bytes",
+        "request_body_bytes",
+        "send_ready",
+        "request_value",
+    ] {
+        assert!(capture.body.iter().any(|stmt| {
+            matches!(
+                stmt,
+                NirStmt::Return(Some(NirExpr::StructLiteral { fields, .. }))
+                    if fields.iter().any(|(field, _)| field == field_name)
+            )
+        }));
+    }
+
+    let summarize = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "summarize_net_http_request_recipe")
+        .unwrap();
+    assert!(matches!(
+        summarize.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "i64"
+    ));
+    assert!(matches!(
+        summarize.body.first(),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::Call { callee, .. },
+            ..
+        }) if name == "summary" && callee == "capture_net_http_request_summary"
+    ));
+}
+
+#[test]
+fn lowers_httpish_client_session_packet_recipe_project_with_expected_packet_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_client_session_packet_recipe_demo",
+    );
+
+    let capture = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "capture_net_httpish_client_session_packet_summary")
+        .unwrap();
+    assert!(matches!(
+        capture.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "NetHttpishClientSessionPacketSummary"
+    ));
+    for (name, callee) in [
+        ("request_plan", "build_request_plan"),
+        ("primary_result", "run_primary_fetch"),
+        ("fallback_result", "run_fallback_fetch"),
+        ("packet", "stage_response_packet"),
+    ] {
+        assert!(capture.body.iter().any(|stmt| {
+            matches!(
+                stmt,
+                NirStmt::Let {
+                    name: stmt_name,
+                    value: NirExpr::Call { callee: stmt_callee, .. },
+                    ..
+                } if stmt_name == name && stmt_callee == callee
+            )
+        }));
+    }
+    for field_name in ["status_code", "body_code", "staged_total", "packet_value"] {
+        assert!(capture.body.iter().any(|stmt| {
+            matches!(
+                stmt,
+                NirStmt::Return(Some(NirExpr::StructLiteral { fields, .. }))
+                    if fields.iter().any(|(field, _)| field == field_name)
+            )
+        }));
+    }
+
+    let stage = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "stage_response_packet")
+        .unwrap();
+    assert!(matches!(
+        stage.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "NetHttpishResponsePacket"
+    ));
+    assert!(stage.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Return(Some(NirExpr::StructLiteral { fields, .. }))
+                if fields.iter().any(|(field, _)| field == "staged_total")
+        )
+    }));
+
+    let summarize = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "summarize_net_httpish_client_session_packet_recipe")
+        .unwrap();
+    assert!(matches!(
+        summarize.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "i64"
+    ));
+    assert!(matches!(
+        summarize.body.first(),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::Call { callee, .. },
+            ..
+        }) if name == "summary"
+            && callee == "capture_net_httpish_client_session_packet_summary"
+    ));
+}
+
+#[test]
+fn lowers_httpish_service_session_packet_recipe_project_with_expected_packet_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_service_session_packet_recipe_demo",
+    );
+
+    let capture = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "capture_net_httpish_service_session_packet_summary")
+        .unwrap();
+    assert!(matches!(
+        capture.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "NetHttpishServiceSessionPacketSummary"
+    ));
+    for (name, callee) in [
+        ("accept_plan", "build_accept_plan"),
+        ("primary_result", "run_primary_recv"),
+        ("fallback_result", "run_fallback_recv"),
+        ("packet", "stage_service_packet"),
+    ] {
+        assert!(capture.body.iter().any(|stmt| {
+            matches!(
+                stmt,
+                NirStmt::Let {
+                    name: stmt_name,
+                    value: NirExpr::Call { callee: stmt_callee, .. },
+                    ..
+                } if stmt_name == name && stmt_callee == callee
+            )
+        }));
+    }
+    for field_name in ["status_code", "body_code", "staged_total", "packet_value"] {
+        assert!(capture.body.iter().any(|stmt| {
+            matches!(
+                stmt,
+                NirStmt::Return(Some(NirExpr::StructLiteral { fields, .. }))
+                    if fields.iter().any(|(field, _)| field == field_name)
+            )
+        }));
+    }
+
+    let stage = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "stage_service_packet")
+        .unwrap();
+    assert!(matches!(
+        stage.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "NetHttpishServicePacket"
+    ));
+    assert!(stage.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Return(Some(NirExpr::StructLiteral { fields, .. }))
+                if fields.iter().any(|(field, _)| field == "staged_total")
+        )
+    }));
+
+    let summarize = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "summarize_net_httpish_service_session_packet_recipe")
+        .unwrap();
+    assert!(matches!(
+        summarize.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "i64"
+    ));
+    assert!(matches!(
+        summarize.body.first(),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::Call { callee, .. },
+            ..
+        }) if name == "summary"
+            && callee == "capture_net_httpish_service_session_packet_summary"
+    ));
+}
+
+#[test]
+fn lowers_httpish_header_session_recipe_project_with_expected_session_packet_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_header_session_recipe_demo",
+    );
+
+    let packet = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "stage_header_session_packet")
+        .unwrap();
+    assert!(matches!(
+        packet.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "NetHttpishHeaderSessionPacket"
+    ));
+    assert!(packet.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                value: NirExpr::AllocBuffer { .. },
+                ..
+            } if name == "scratch"
+        )
+    }));
+    assert!(packet
+        .body
+        .iter()
+        .any(|stmt| { matches!(stmt, NirStmt::Expr(NirExpr::StoreAt { .. })) }));
+    assert!(packet.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                value: NirExpr::LoadAt { .. },
+                ..
+            } if name == "staged_status"
+                || name == "staged_request_header"
+                || name == "staged_response_header"
+                || name == "staged_body"
+                || name == "staged_retry"
+        )
+    }));
+    assert!(packet
+        .body
+        .iter()
+        .any(|stmt| matches!(stmt, NirStmt::Expr(NirExpr::Free(_)))));
+
+    let capture = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "capture_net_httpish_header_session_summary")
+        .unwrap();
+    assert!(matches!(
+        capture.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "NetHttpishHeaderSessionSummary"
+    ));
+    for (name, callee) in [
+        ("request_plan", "build_request_plan"),
+        ("request_headers", "build_request_headers"),
+        ("send_result", "send_session_headers"),
+        ("status_result", "recv_session_status"),
+        ("recv_result", "recv_session_body"),
+        ("packet", "stage_header_session_packet"),
+    ] {
+        assert!(capture.body.iter().any(|stmt| {
+            matches!(
+                stmt,
+                NirStmt::Let {
+                    name: stmt_name,
+                    value: NirExpr::Call { callee: stmt_callee, .. },
+                    ..
+                } if stmt_name == name && stmt_callee == callee
+            )
+        }));
+    }
+
+    let summarize = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "summarize_net_httpish_header_session_recipe")
+        .unwrap();
+    assert!(matches!(
+        summarize.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "i64"
+    ));
+    assert!(matches!(
+        summarize.body.first(),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::Call { callee, .. },
+            ..
+        }) if name == "summary" && callee == "capture_net_httpish_header_session_summary"
+    ));
+}
+
+#[test]
+fn lowers_http_client_lane_recipe_project_with_expected_client_lane_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_lane_recipe_demo",
+    );
+
+    let capture = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "capture_net_http_client_lane_summary")
+        .unwrap();
+    assert!(matches!(
+        capture.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "NetHttpClientLaneSummary"
+    ));
+    for (name, callee) in [
+        ("open_handle", "host_network_open_tcp_stream"),
+        ("close_value", "host_network_close_owned"),
+    ] {
+        assert!(capture.body.iter().any(|stmt| {
+            matches!(
+                stmt,
+                NirStmt::Let {
+                    name: stmt_name,
+                    value: NirExpr::CpuExternCall { callee: stmt_callee, .. },
+                    ..
+                } if stmt_name == name && stmt_callee == callee
+            )
+        }));
+    }
+    for name in ["send_result", "status_result", "recv_result"] {
+        assert!(capture.body.iter().any(|stmt| {
+            matches!(
+                stmt,
+                NirStmt::Let {
+                    name: stmt_name,
+                    value: NirExpr::NetworkResult { .. },
+                    ..
+                } if stmt_name == name
+            )
+        }));
+    }
+    for (name, callee) in [
+        ("status_code", "encode_value"),
+        ("send_value", "encode_value"),
+        ("recv_value", "encode_value"),
+    ] {
+        assert!(capture.body.iter().any(|stmt| {
+            matches!(
+                stmt,
+                NirStmt::Let {
+                    name: stmt_name,
+                    value: NirExpr::Call { callee: stmt_callee, .. },
+                    ..
+                } if stmt_name == name && stmt_callee == callee
+            )
+        }));
+    }
+    for field_name in ["send_ready", "recv_ready", "lane_value"] {
+        assert!(capture.body.iter().any(|stmt| {
+            matches!(
+                stmt,
+                NirStmt::Return(Some(NirExpr::StructLiteral { fields, .. }))
+                    if fields.iter().any(|(field, _)| field == field_name)
+            )
+        }));
+    }
+
+    let summarize = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "summarize_net_http_client_lane_recipe")
+        .unwrap();
+    assert!(matches!(
+        summarize.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "i64"
+    ));
+    assert!(matches!(
+        summarize.body.first(),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::Call { callee, .. },
+            ..
+        }) if name == "summary" && callee == "capture_net_http_client_lane_summary"
+    ));
+}
+
+#[test]
+fn lowers_http_service_lane_recipe_project_with_expected_service_lane_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_service_lane_recipe_demo",
+    );
+
+    let capture = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "capture_net_http_service_lane_summary")
+        .unwrap();
+    assert!(matches!(
+        capture.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "NetHttpServiceLaneSummary"
+    ));
+    for (name, callee) in [
+        ("listener_handle", "host_network_open_tcp_listener"),
+        ("accepted_close_value", "host_network_close_owned"),
+        ("listener_close_value", "host_network_close_owned"),
+    ] {
+        assert!(capture.body.iter().any(|stmt| {
+            matches!(
+                stmt,
+                NirStmt::Let {
+                    name: stmt_name,
+                    value: NirExpr::CpuExternCall { callee: stmt_callee, .. },
+                    ..
+                } if stmt_name == name && stmt_callee == callee
+            )
+        }));
+    }
+    for name in ["accept_result", "recv_result", "send_result"] {
+        assert!(capture.body.iter().any(|stmt| {
+            matches!(
+                stmt,
+                NirStmt::Let {
+                    name: stmt_name,
+                    value: NirExpr::NetworkResult { .. },
+                    ..
+                } if stmt_name == name
+            )
+        }));
+    }
+    assert!(capture.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                value: NirExpr::Call { callee, .. },
+                ..
+            } if name == "accepted_handle" && callee == "encode_value"
+        )
+    }));
+    for field_name in ["accept_ready", "recv_ready", "send_ready"] {
+        assert!(capture.body.iter().any(|stmt| {
+            matches!(
+                stmt,
+                NirStmt::Return(Some(NirExpr::StructLiteral { fields, .. }))
+                    if fields.iter().any(|(field, _)| field == field_name)
+            )
+        }));
+    }
+
+    let summarize = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "summarize_net_http_service_lane_recipe")
+        .unwrap();
+    assert!(matches!(
+        summarize.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "i64"
+    ));
+    assert!(matches!(
+        summarize.body.first(),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::Call { callee, .. },
+            ..
+        }) if name == "summary" && callee == "capture_net_http_service_lane_summary"
+    ));
+}
+
+#[test]
 fn lowers_net_session_recipe_project_with_expected_async_task_shape() {
     let artifacts = compiled_project(
         "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_session_recipe_demo",

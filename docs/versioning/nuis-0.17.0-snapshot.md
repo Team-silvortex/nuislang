@@ -50,6 +50,63 @@ The highest-signal targets for `0.17.0` are:
   stand on the same async/task/memory story instead of feeling like separate
   islands
 
+## Current Generic/Project Shape Win
+
+One concrete `0.17.0` mainline gain is that higher-order generic truth now has
+a clearer project-facing forwarding route instead of living only in
+frontend-local probes.
+
+The current rule of thumb is:
+
+* explicit generic helper calls should keep their specialization truth even
+  when wrapped by higher-order templates
+* callable parameters should be able to forward through nested helper layers
+  instead of only surviving one direct call site
+* project anchors should prove this with ordinary `relay -> chain -> apply`
+  structure, not only toy one-function snippets
+
+This is now visible in the current checked-in state project anchors:
+
+* [generic_payload_alias_method_hof_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_payload_alias_method_hof_demo)
+* [generic_callable_forwarding_hof_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_callable_forwarding_hof_demo)
+* [state_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/state_compile.rs)
+
+That is still not a claim that callable values are a fully general first-class
+surface.
+
+It is a real integration step: `Fn1` / `Fn2` / `Fn3` forwarding through nested
+higher-order helper chains is now part of the project-backed `0.17.0` generic
+story.
+
+## Current Lowering/Project Shape Win
+
+One concrete `0.17.0` mainline gain is that several composed control-flow
+lowering shapes now have state-project anchors instead of living only in
+lowering-local snippet tests.
+
+The current rule of thumb is:
+
+* `flow` control should not only lower correctly in isolated loop tests
+* post-body `break` / `continue` control should not only lower correctly in
+  isolated post-flow probes
+* a few ordinary checked-in state projects should prove the same loop-family
+  truth through the real project pipeline
+
+This is now visible in the current checked-in state project anchors:
+
+* [flow_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/flow_branching_while_demo)
+* [post_flow_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_while_demo)
+* [post_flow_branching_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_continuing_while_demo)
+* [tail_recursive_branching_cross_carry_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_branching_cross_carry_demo)
+* [state_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/state_compile.rs)
+
+That is still not a claim that every loop/control form has equal project-level
+coverage.
+
+It is a real integration step: `flow_cond_chain`, `post_flow_cond_chain`, and
+branching carry loop shapes now belong to the project-backed `0.17.0`
+lowering story.
+
 ## Current `std net` Shape Win
 
 One concrete `0.17.0` mainline gain is that the network-facing `std` recipes

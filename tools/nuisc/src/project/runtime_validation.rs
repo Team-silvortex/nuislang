@@ -21,13 +21,13 @@ use super::profile_refs::{
 };
 use super::profile_targets::has_xfer_segment;
 use super::profile_usage::{
-    nir_uses_cpu_extern_call,
-    nir_uses_data_profile_handle_table, nir_uses_data_profile_send_downlink,
-    nir_uses_data_profile_send_uplink, nir_uses_network_profile_bind_core,
-    nir_uses_network_profile_endpoint_kind, nir_uses_network_profile_slot,
-    nir_uses_shader_profile_color_seed, nir_uses_shader_profile_draw_instanced,
-    nir_uses_shader_profile_packet, nir_uses_shader_profile_radius_seed,
-    nir_uses_shader_profile_render, nir_uses_shader_profile_speed_seed,
+    nir_uses_cpu_extern_call, nir_uses_data_profile_handle_table,
+    nir_uses_data_profile_send_downlink, nir_uses_data_profile_send_uplink,
+    nir_uses_network_profile_bind_core, nir_uses_network_profile_endpoint_kind,
+    nir_uses_network_profile_slot, nir_uses_shader_profile_color_seed,
+    nir_uses_shader_profile_draw_instanced, nir_uses_shader_profile_packet,
+    nir_uses_shader_profile_radius_seed, nir_uses_shader_profile_render,
+    nir_uses_shader_profile_speed_seed,
 };
 use super::shader_validation::validate_shader_profile_for_link;
 use super::support_contracts::{require_declared_support_surface, support_surface_for_domain};
@@ -522,7 +522,10 @@ fn validate_network_host_call_requirements(
         unit,
         "host_network_send_probe",
         &["stream_window", "send_window", "remote_port"],
-        &["network.profile.send.v1", "network.profile.stream-window.v1"],
+        &[
+            "network.profile.send.v1",
+            "network.profile.stream-window.v1",
+        ],
     )?;
     validate_network_host_call(
         project,
@@ -533,7 +536,10 @@ fn validate_network_host_call_requirements(
         unit,
         "host_network_send_owned",
         &["stream_window", "send_window"],
-        &["network.profile.send.v1", "network.profile.stream-window.v1"],
+        &[
+            "network.profile.send.v1",
+            "network.profile.stream-window.v1",
+        ],
     )?;
     validate_network_host_call(
         project,
@@ -544,7 +550,10 @@ fn validate_network_host_call_requirements(
         unit,
         "host_network_recv_probe",
         &["stream_window", "recv_window", "local_port"],
-        &["network.profile.recv.v1", "network.profile.stream-window.v1"],
+        &[
+            "network.profile.recv.v1",
+            "network.profile.stream-window.v1",
+        ],
     )?;
     validate_network_host_call(
         project,
@@ -555,7 +564,10 @@ fn validate_network_host_call_requirements(
         unit,
         "host_network_recv_owned",
         &["stream_window", "recv_window"],
-        &["network.profile.recv.v1", "network.profile.stream-window.v1"],
+        &[
+            "network.profile.recv.v1",
+            "network.profile.stream-window.v1",
+        ],
     )?;
     validate_network_host_call(
         project,
@@ -641,8 +653,7 @@ fn validate_network_owned_handle_shape(
     let uses_open_tcp_stream = nir_uses_cpu_extern_call(module, "host_network_open_tcp_stream");
     let uses_open_udp_datagram = nir_uses_cpu_extern_call(module, "host_network_open_udp_datagram");
     let uses_bind_udp_datagram = nir_uses_cpu_extern_call(module, "host_network_bind_udp_datagram");
-    let uses_open_tcp_listener =
-        nir_uses_cpu_extern_call(module, "host_network_open_tcp_listener");
+    let uses_open_tcp_listener = nir_uses_cpu_extern_call(module, "host_network_open_tcp_listener");
     let uses_accept_owned = nir_uses_cpu_extern_call(module, "host_network_accept_owned");
     let uses_send_owned = nir_uses_cpu_extern_call(module, "host_network_send_owned");
     let uses_recv_owned = nir_uses_cpu_extern_call(module, "host_network_recv_owned");
@@ -650,8 +661,10 @@ fn validate_network_owned_handle_shape(
         nir_uses_cpu_extern_call(module, "host_network_recv_http_status_owned");
     let uses_close_owned = nir_uses_cpu_extern_call(module, "host_network_close_owned");
 
-    let has_transport_owned_source =
-        uses_open_tcp_stream || uses_open_udp_datagram || uses_bind_udp_datagram || uses_accept_owned;
+    let has_transport_owned_source = uses_open_tcp_stream
+        || uses_open_udp_datagram
+        || uses_bind_udp_datagram
+        || uses_accept_owned;
     let has_any_owned_source = has_transport_owned_source || uses_open_tcp_listener;
 
     if uses_accept_owned && !uses_open_tcp_listener {
@@ -1496,8 +1509,7 @@ fn validate_network_owned_handle_call(
                 "listener",
             )?;
         }
-        "host_network_send_owned"
-        | "host_network_recv_owned" => {
+        "host_network_send_owned" | "host_network_recv_owned" => {
             validate_network_transport_handle_arg(callee, args.first(), from, to, bindings)?;
         }
         "host_network_recv_http_status_owned" => {
@@ -1671,17 +1683,15 @@ fn infer_network_owned_handle_kind(
 ) -> Option<NetworkOwnedHandleBinding> {
     match expr {
         NirExpr::CpuExternCall { callee, .. } => match callee.as_str() {
-            "host_network_open_tcp_listener" => {
-                Some(NetworkOwnedHandleBinding::Concrete(NetworkOwnedHandleKind::Listener))
-            }
+            "host_network_open_tcp_listener" => Some(NetworkOwnedHandleBinding::Concrete(
+                NetworkOwnedHandleKind::Listener,
+            )),
             "host_network_open_tcp_stream" => Some(NetworkOwnedHandleBinding::Concrete(
                 NetworkOwnedHandleKind::StreamTransport,
             )),
-            "host_network_open_udp_datagram" | "host_network_bind_udp_datagram" => {
-                Some(NetworkOwnedHandleBinding::Concrete(
-                    NetworkOwnedHandleKind::DatagramTransport,
-                ))
-            }
+            "host_network_open_udp_datagram" | "host_network_bind_udp_datagram" => Some(
+                NetworkOwnedHandleBinding::Concrete(NetworkOwnedHandleKind::DatagramTransport),
+            ),
             "host_network_accept_owned" => Some(NetworkOwnedHandleBinding::Concrete(
                 NetworkOwnedHandleKind::StreamTransport,
             )),
@@ -1691,7 +1701,9 @@ fn infer_network_owned_handle_kind(
             .get(callee)
             .copied()
             .flatten()
-            .and_then(|summary| resolve_network_owned_handle_return(summary, args, bindings, function_return_kinds)),
+            .and_then(|summary| {
+                resolve_network_owned_handle_return(summary, args, bindings, function_return_kinds)
+            }),
         NirExpr::NetworkValue(inner) => {
             infer_network_owned_handle_kind(inner, bindings, function_return_kinds)
         }
@@ -1797,8 +1809,9 @@ fn infer_network_return_kind_in_body(
                 }
             }
             NirStmt::Return(Some(value)) => {
-                let current = infer_network_owned_handle_kind(value, bindings, function_return_kinds)
-                    .and_then(binding_to_network_owned_handle_return);
+                let current =
+                    infer_network_owned_handle_kind(value, bindings, function_return_kinds)
+                        .and_then(binding_to_network_owned_handle_return);
                 return_kind = merge_optional_network_owned_handle_kind(return_kind, current);
             }
             NirStmt::If {
@@ -1865,7 +1878,9 @@ fn binding_to_network_owned_handle_return(
 ) -> Option<NetworkOwnedHandleReturn> {
     match binding {
         NetworkOwnedHandleBinding::Concrete(kind) => Some(NetworkOwnedHandleReturn::Concrete(kind)),
-        NetworkOwnedHandleBinding::Param { index, .. } => Some(NetworkOwnedHandleReturn::ParamIndex(index)),
+        NetworkOwnedHandleBinding::Param { index, .. } => {
+            Some(NetworkOwnedHandleReturn::ParamIndex(index))
+        }
     }
 }
 
@@ -1993,7 +2008,12 @@ fn infer_network_param_requirements_in_expr(
                         continue;
                     };
                     if let Some(origin) = infer_network_param_origin(arg, bindings) {
-                        merge_network_param_requirement(requirements, origin, *requirement, callee)?;
+                        merge_network_param_requirement(
+                            requirements,
+                            origin,
+                            *requirement,
+                            callee,
+                        )?;
                     }
                 }
             }
@@ -2100,7 +2120,11 @@ fn infer_network_param_requirements_in_expr(
                 bindings,
             )?;
         }
-        NirExpr::DataWriteWindow { window, index, value }
+        NirExpr::DataWriteWindow {
+            window,
+            index,
+            value,
+        }
         | NirExpr::StoreAt {
             buffer: window,
             index,
@@ -2167,12 +2191,14 @@ fn infer_network_param_requirements_in_expr(
         NirExpr::DataProfileSendUplink { input, .. }
         | NirExpr::DataProfileSendDownlink { input, .. }
         | NirExpr::FieldAccess { base: input, .. }
-        | NirExpr::ShaderProfileRender { packet: input, .. } => infer_network_param_requirements_in_expr(
-            input,
-            requirements,
-            function_requirements,
-            bindings,
-        )?,
+        | NirExpr::ShaderProfileRender { packet: input, .. } => {
+            infer_network_param_requirements_in_expr(
+                input,
+                requirements,
+                function_requirements,
+                bindings,
+            )?
+        }
         NirExpr::ShaderProfileColorSeed { base, delta, .. }
         | NirExpr::ShaderProfileRadiusSeed { base, delta, .. } => {
             infer_network_param_requirements_in_expr(
@@ -2189,10 +2215,7 @@ fn infer_network_param_requirements_in_expr(
             )?;
         }
         NirExpr::ShaderProfileSpeedSeed {
-            delta,
-            scale,
-            base,
-            ..
+            delta, scale, base, ..
         } => {
             infer_network_param_requirements_in_expr(
                 delta,
@@ -2387,19 +2410,22 @@ fn merge_network_param_requirement(
     incoming: NetworkOwnedHandleRequirement,
     context: &str,
 ) -> Result<(), String> {
-    let slot = requirements
-        .get_mut(index)
-        .ok_or_else(|| format!("network handle requirement index {} out of bounds in {}", index, context))?;
+    let slot = requirements.get_mut(index).ok_or_else(|| {
+        format!(
+            "network handle requirement index {} out of bounds in {}",
+            index, context
+        )
+    })?;
     *slot = Some(match *slot {
         None => incoming,
-        Some(existing) => merge_network_owned_handle_requirement(existing, incoming).ok_or_else(
-            || {
+        Some(existing) => {
+            merge_network_owned_handle_requirement(existing, incoming).ok_or_else(|| {
                 format!(
                     "function `{}` uses parameter {} as incompatible network handle kinds",
                     context, index
                 )
-            },
-        )?,
+            })?
+        }
     });
     Ok(())
 }
@@ -2419,10 +2445,7 @@ fn merge_network_owned_handle_requirement(
     }
 }
 
-fn infer_network_param_origin(
-    expr: &NirExpr,
-    bindings: &BTreeMap<String, usize>,
-) -> Option<usize> {
+fn infer_network_param_origin(expr: &NirExpr, bindings: &BTreeMap<String, usize>) -> Option<usize> {
     match expr {
         NirExpr::Var(name) => bindings.get(name).copied(),
         NirExpr::NetworkValue(inner) => infer_network_param_origin(inner, bindings),
@@ -2443,7 +2466,10 @@ fn merge_network_param_origin_bindings(
         .cloned()
         .collect::<BTreeSet<_>>();
     for name in merged {
-        match (then_bindings.get(&name).copied(), else_bindings.get(&name).copied()) {
+        match (
+            then_bindings.get(&name).copied(),
+            else_bindings.get(&name).copied(),
+        ) {
             (Some(lhs), Some(rhs)) if lhs == rhs => {
                 bindings.insert(name, lhs);
             }
@@ -2679,7 +2705,9 @@ fn validate_network_profile_slot_requirements(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use nuis_semantics::model::{NirFunction, NirNetworkFlowState, NirParam, NirTypeRef, NirVisibility};
+    use nuis_semantics::model::{
+        NirFunction, NirNetworkFlowState, NirParam, NirTypeRef, NirVisibility,
+    };
 
     fn i64_type() -> NirTypeRef {
         NirTypeRef {
@@ -2908,7 +2936,11 @@ mod tests {
                         abi: "c".to_owned(),
                         interface: None,
                         callee: "host_network_send_owned".to_owned(),
-                        args: vec![NirExpr::Var("handle".to_owned()), NirExpr::Int(64), NirExpr::Int(32)],
+                        args: vec![
+                            NirExpr::Var("handle".to_owned()),
+                            NirExpr::Int(64),
+                            NirExpr::Int(32),
+                        ],
                     }),
                 ],
             ),

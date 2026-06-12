@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
 use super::support_contracts::{
-    network_profile_slot_targets, network_support_surface_contract, require_declared_support_surface,
-    support_profile_slots_for_domain, support_surface_for_domain,
+    network_profile_slot_targets, network_support_surface_contract,
+    require_declared_support_surface, support_profile_slots_for_domain, support_surface_for_domain,
 };
 use super::{
     collect_profile_int_bindings, require_declared_profile_slot, split_domain_unit, LoadedProject,

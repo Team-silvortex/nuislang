@@ -256,7 +256,11 @@ fn find_route_payload_type_in_nir(
     data_unit: &str,
     uplink: bool,
 ) -> Option<NirTypeRef> {
-    if let Some(function) = module.functions.iter().find(|function| function.name == "main") {
+    if let Some(function) = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+    {
         if let Some(ty) = find_route_payload_type_in_stmts(
             &function.body,
             function.return_type.as_ref(),
@@ -299,14 +303,20 @@ fn find_route_payload_type_in_stmts(
                 else_body,
                 ..
             } => {
-                if let Some(ty) =
-                    find_route_payload_type_in_stmts(then_body, current_return_type, data_unit, uplink)
-                {
+                if let Some(ty) = find_route_payload_type_in_stmts(
+                    then_body,
+                    current_return_type,
+                    data_unit,
+                    uplink,
+                ) {
                     return Some(ty);
                 }
-                if let Some(ty) =
-                    find_route_payload_type_in_stmts(else_body, current_return_type, data_unit, uplink)
-                {
+                if let Some(ty) = find_route_payload_type_in_stmts(
+                    else_body,
+                    current_return_type,
+                    data_unit,
+                    uplink,
+                ) {
                     return Some(ty);
                 }
             }

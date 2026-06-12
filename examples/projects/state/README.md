@@ -59,19 +59,35 @@ Recursion / higher-order route:
 * [ordinary_recursive_match_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_match_call_graph_demo)
 * [ordinary_recursive_composed_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_composed_call_graph_demo)
 * [ordinary_recursive_generic_alias_fn3_higher_order_call_graph_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/ordinary_recursive_generic_alias_fn3_higher_order_call_graph_demo)
+* [generic_callable_forwarding_hof_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_callable_forwarding_hof_demo)
 * [lambda_alias_fn3_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/lambda_alias_fn3_demo)
 * [generic_payload_alias_higher_order_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_payload_alias_higher_order_demo)
 * [generic_payload_alias_method_hof_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_payload_alias_method_hof_demo)
 * [generic_lambda_method_bound_hof_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_lambda_method_bound_hof_demo)
 * [generic_lambda_method_bound_fn3_hof_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_lambda_method_bound_fn3_hof_demo)
 
+This route now also carries:
+
+* generic callable forwarding through `Fn2` / `Fn3`
+* nested `relay -> chain -> apply` helper specialization
+* explicit generic arguments on project-shaped higher-order calls
+
 Loop / lowering route:
 
 * [counted_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/counted_while_demo)
 * [guarded_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/guarded_while_demo)
 * [flow_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/flow_branching_while_demo)
+* [post_flow_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_while_demo)
 * [post_flow_branching_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_continuing_while_demo)
 * [tail_recursive_branching_cross_carry_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_branching_cross_carry_demo)
+
+This route now also carries:
+
+* project-backed `flow_cond_chain` lowering truth
+* project-backed `post_flow_cond_chain` lowering truth for both `break` and
+  `continue`
+* one checked-in state compile gate for ordinary structured while loops, not
+  only lowering-local snippet probes
 
 GLM / state ownership route:
 

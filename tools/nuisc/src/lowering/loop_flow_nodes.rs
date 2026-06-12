@@ -37,7 +37,11 @@ pub(super) fn lower_async_flow_while(
     state: &mut LoweringState<'_>,
     bindings: &mut BTreeMap<String, String>,
 ) -> Result<(), String> {
-    let Some(function) = state.function_map.get(prepared.step_callee.as_str()).copied() else {
+    let Some(function) = state
+        .function_map
+        .get(prepared.step_callee.as_str())
+        .copied()
+    else {
         return Err(format!(
             "async flow `while` references unknown step helper `{}`",
             prepared.step_callee
@@ -492,16 +496,15 @@ pub(super) fn lower_post_flow_while(
                 )
             }
             PreparedLoopFlowCondition::Compound { op, lhs, rhs } => {
-                let (mut condition_args, dep_inputs, effect_inputs) =
-                    encode_carry_condition_args(
-                        &PreparedLoopFlowCondition::Compound {
-                            op: *op,
-                            lhs: lhs.clone(),
-                            rhs: rhs.clone(),
-                        },
-                        state,
-                        bindings,
-                    )?;
+                let (mut condition_args, dep_inputs, effect_inputs) = encode_carry_condition_args(
+                    &PreparedLoopFlowCondition::Compound {
+                        op: *op,
+                        lhs: lhs.clone(),
+                        rhs: rhs.clone(),
+                    },
+                    state,
+                    bindings,
+                )?;
                 condition_args.push(match prepared.control.action {
                     PreparedLoopFlowAction::Break => "break".to_owned(),
                     PreparedLoopFlowAction::Continue => "continue".to_owned(),
@@ -669,7 +672,11 @@ pub(super) fn lower_async_post_flow_while(
     state: &mut LoweringState<'_>,
     bindings: &mut BTreeMap<String, String>,
 ) -> Result<(), String> {
-    let Some(function) = state.function_map.get(prepared.step_callee.as_str()).copied() else {
+    let Some(function) = state
+        .function_map
+        .get(prepared.step_callee.as_str())
+        .copied()
+    else {
         return Err(format!(
             "async post-flow `while` references unknown step helper `{}`",
             prepared.step_callee
@@ -723,16 +730,15 @@ pub(super) fn lower_async_post_flow_while(
                 )
             }
             PreparedLoopFlowCondition::Compound { op, lhs, rhs } => {
-                let (mut condition_args, dep_inputs, effect_inputs) =
-                    encode_carry_condition_args(
-                        &PreparedLoopFlowCondition::Compound {
-                            op: *op,
-                            lhs: lhs.clone(),
-                            rhs: rhs.clone(),
-                        },
-                        state,
-                        bindings,
-                    )?;
+                let (mut condition_args, dep_inputs, effect_inputs) = encode_carry_condition_args(
+                    &PreparedLoopFlowCondition::Compound {
+                        op: *op,
+                        lhs: lhs.clone(),
+                        rhs: rhs.clone(),
+                    },
+                    state,
+                    bindings,
+                )?;
                 condition_args.push(match prepared.control.action {
                     PreparedLoopFlowAction::Break => "break".to_owned(),
                     PreparedLoopFlowAction::Continue => "continue".to_owned(),

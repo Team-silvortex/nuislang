@@ -435,6 +435,590 @@ fn lowers_recursive_async_call_into_schedule_boundary_and_helper_lane() {
 }
 
 #[test]
+fn lowers_self_tail_recursive_async_function_into_loop_while_i64_chain() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn sum_next(current: i64, acc: i64) -> i64 {
+            if current == 0 {
+              return acc;
+            }
+            return await sum_next(current - 1, acc + (current - 1));
+          }
+
+          async fn main() -> i64 {
+            return await sum_next(4, 1);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    dbg!(yir
+        .nodes
+        .iter()
+        .map(|node| format!("{}::{}", node.op.module, node.op.instruction))
+        .collect::<Vec<_>>());
+
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_chain")
+        .expect("expected loop_while_i64_chain node");
+    assert_eq!(loop_node.op.args[3], "ne");
+    assert_eq!(loop_node.op.args[4], "sub");
+    assert_eq!(loop_node.op.args[6], "add_current");
+    let self_async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "async_call"
+                && node.op.args.first().is_some_and(|name| name == "sum_next")
+        })
+        .count();
+    assert_eq!(
+        self_async_call_count, 1,
+        "expected only the outer entry async call to remain after self tail-recursive async rewrite"
+    );
+}
+
+#[test]
+fn lowers_branching_self_tail_recursive_async_function_into_loop_while_i64_cond_chain() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn sum_selected(current: i64, acc: i64) -> i64 {
+            if current == 0 {
+              return acc;
+            }
+            if current > 2 {
+              return await sum_selected(current - 1, acc + (current - 1));
+            } else {
+              return await sum_selected(current - 1, acc + 0);
+            }
+          }
+
+          async fn main() -> i64 {
+            return await sum_selected(4, 0);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_cond_chain")
+        .expect("expected loop_while_i64_cond_chain node");
+    assert_eq!(loop_node.op.args[3], "ne");
+    assert_eq!(loop_node.op.args[4], "sub");
+    assert_eq!(loop_node.op.args[6], "prev_current_gt");
+    assert_eq!(loop_node.op.args[8], "add_current");
+    assert_eq!(loop_node.op.args[9], "keep");
+    let self_async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "async_call"
+                && node
+                    .op
+                    .args
+                    .first()
+                    .is_some_and(|name| name == "sum_selected")
+        })
+        .count();
+    assert_eq!(
+        self_async_call_count, 1,
+        "expected only the outer entry async call to remain after branching self tail-recursive async rewrite"
+    );
+}
+
+#[test]
+fn lowers_multi_carry_prev_current_self_tail_recursive_async_function_into_loop_while_i64_chain() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn accumulate(current: i64, sum: i64, prod: i64) -> i64 {
+            if current <= 1 {
+              return sum + prod;
+            }
+            return await accumulate(current - 1, sum + current, prod * current);
+          }
+
+          async fn main() -> i64 {
+            return await accumulate(4, 0, 1);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_chain")
+        .expect("expected loop_while_i64_chain node");
+    assert_eq!(loop_node.op.args[3], "gt");
+    assert_eq!(loop_node.op.args[4], "sub");
+    assert_eq!(loop_node.op.args[6], "add_prev_current");
+    assert_eq!(loop_node.op.args[8], "mul_prev_current");
+    let self_async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "async_call"
+                && node
+                    .op
+                    .args
+                    .first()
+                    .is_some_and(|name| name == "accumulate")
+        })
+        .count();
+    assert_eq!(self_async_call_count, 1);
+}
+
+#[test]
+fn lowers_carry_condition_branching_multi_carry_prev_current_self_tail_recursive_async_function_into_loop_while_i64_cond_chain(
+) {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn accumulate(current: i64, sum: i64, prod: i64) -> i64 {
+            if current <= 1 {
+              return sum + prod;
+            }
+            if sum > 3 {
+              return await accumulate(current - 1, sum + 0, prod + current);
+            } else {
+              return await accumulate(current - 1, sum + current, prod * current);
+            }
+          }
+
+          async fn main() -> i64 {
+            return await accumulate(4, 0, 1);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_cond_chain")
+        .expect("expected loop_while_i64_cond_chain node");
+    assert_eq!(loop_node.op.args[3], "gt");
+    assert_eq!(loop_node.op.args[4], "sub");
+    assert_eq!(loop_node.op.args[6], "prev_carry0_gt");
+    assert_eq!(loop_node.op.args[8], "keep");
+    assert_eq!(loop_node.op.args[9], "add_prev_current");
+    assert_eq!(loop_node.op.args[11], "prev_carry0_gt");
+    assert_eq!(loop_node.op.args[13], "add_prev_current");
+    assert_eq!(loop_node.op.args[14], "mul_prev_current");
+    let self_async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "async_call"
+                && node
+                    .op
+                    .args
+                    .first()
+                    .is_some_and(|name| name == "accumulate")
+        })
+        .count();
+    assert_eq!(self_async_call_count, 1);
+}
+
+#[test]
+fn lowers_cross_prev_carry_self_tail_recursive_async_function_into_loop_while_i64_chain() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn accumulate(current: i64, sum: i64, prod: i64) -> i64 {
+            if current <= 1 {
+              return sum + prod;
+            }
+            return await accumulate(current - 1, sum + prod, prod + current);
+          }
+
+          async fn main() -> i64 {
+            return await accumulate(4, 0, 1);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_chain")
+        .expect("expected loop_while_i64_chain node");
+    assert_eq!(loop_node.op.args[3], "gt");
+    assert_eq!(loop_node.op.args[4], "sub");
+    assert_eq!(loop_node.op.args[6], "add_prev_carry1");
+    assert_eq!(loop_node.op.args[8], "add_prev_current");
+    let self_async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "async_call"
+                && node
+                    .op
+                    .args
+                    .first()
+                    .is_some_and(|name| name == "accumulate")
+        })
+        .count();
+    assert_eq!(self_async_call_count, 1);
+}
+
+#[test]
+fn lowers_branching_cross_prev_carry_self_tail_recursive_async_function_into_loop_while_i64_cond_chain(
+) {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn accumulate(current: i64, sum: i64, prod: i64) -> i64 {
+            if current <= 1 {
+              return sum + prod;
+            }
+            if current > 2 {
+              return await accumulate(current - 1, sum + prod, prod + current);
+            } else {
+              return await accumulate(current - 1, sum + 0, prod + sum);
+            }
+          }
+
+          async fn main() -> i64 {
+            return await accumulate(4, 0, 1);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_cond_chain")
+        .expect("expected loop_while_i64_cond_chain node");
+    assert_eq!(loop_node.op.args[3], "gt");
+    assert_eq!(loop_node.op.args[4], "sub");
+    assert_eq!(loop_node.op.args[6], "prev_current_gt");
+    assert_eq!(loop_node.op.args[8], "add_prev_carry1");
+    assert_eq!(loop_node.op.args[9], "keep");
+    assert_eq!(loop_node.op.args[11], "prev_current_gt");
+    assert_eq!(loop_node.op.args[13], "add_prev_current");
+    assert_eq!(loop_node.op.args[14], "add_prev_carry0");
+    let self_async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "async_call"
+                && node
+                    .op
+                    .args
+                    .first()
+                    .is_some_and(|name| name == "accumulate")
+        })
+        .count();
+    assert_eq!(self_async_call_count, 1);
+}
+
+#[test]
+fn lowers_early_break_self_tail_recursive_async_function_into_loop_while_i64_flow_chain() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn sum_until(current: i64, acc: i64) -> i64 {
+            if current == 0 {
+              return acc;
+            }
+            if current > 2 {
+              return acc;
+            } else {
+              return await sum_until(current - 1, acc + current);
+            }
+          }
+
+          async fn main() -> i64 {
+            return await sum_until(4, 0);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_flow_chain")
+        .expect("expected loop_while_i64_flow_chain node");
+    assert_eq!(loop_node.op.args[3], "ne");
+    assert_eq!(loop_node.op.args[4], "sub");
+    assert_eq!(loop_node.op.args[5], "prev_current_gt");
+    assert_eq!(loop_node.op.args[7], "break");
+    assert_eq!(loop_node.op.args[9], "add_prev_current");
+    let self_async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "async_call"
+                && node.op.args.first().is_some_and(|name| name == "sum_until")
+        })
+        .count();
+    assert_eq!(self_async_call_count, 1);
+}
+
+#[test]
+fn lowers_early_break_branching_self_tail_recursive_async_function_into_loop_while_i64_flow_cond_chain(
+) {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn sum_until(current: i64, acc: i64) -> i64 {
+            if current == 0 {
+              return acc;
+            }
+            if current > 2 {
+              return acc;
+            } else {
+              if current > 1 {
+                return await sum_until(current - 1, acc + current);
+              } else {
+                return await sum_until(current - 1, acc + 0);
+              }
+            }
+          }
+
+          async fn main() -> i64 {
+            return await sum_until(4, 0);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_flow_cond_chain"
+        })
+        .expect("expected loop_while_i64_flow_cond_chain node");
+    assert_eq!(loop_node.op.args[3], "ne");
+    assert_eq!(loop_node.op.args[4], "sub");
+    assert_eq!(loop_node.op.args[5], "prev_current_gt");
+    assert_eq!(loop_node.op.args[7], "break");
+    assert_eq!(loop_node.op.args[9], "prev_current_gt");
+    assert_eq!(loop_node.op.args[11], "add_prev_current");
+    assert_eq!(loop_node.op.args[12], "keep");
+    let self_async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "async_call"
+                && node.op.args.first().is_some_and(|name| name == "sum_until")
+        })
+        .count();
+    assert_eq!(self_async_call_count, 1);
+}
+
+#[test]
+fn lowers_post_flow_break_self_tail_recursive_async_function_into_loop_while_i64_post_flow_chain() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn sum_until(current: i64, acc: i64) -> i64 {
+            if current == 0 {
+              return acc;
+            }
+            if acc + current > 5 {
+              return acc + current;
+            }
+            return await sum_until(current - 1, acc + current);
+          }
+
+          async fn main() -> i64 {
+            return await sum_until(4, 0);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_post_flow_chain"
+        })
+        .expect("expected loop_while_i64_post_flow_chain node");
+    assert_eq!(loop_node.op.args[3], "ne");
+    assert_eq!(loop_node.op.args[4], "sub");
+    assert_eq!(loop_node.op.args[5], "carry0_gt");
+    assert_eq!(loop_node.op.args[7], "break");
+    assert_eq!(loop_node.op.args[9], "add_prev_current");
+    let self_async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "async_call"
+                && node.op.args.first().is_some_and(|name| name == "sum_until")
+        })
+        .count();
+    assert_eq!(self_async_call_count, 1);
+}
+
+#[test]
+fn lowers_post_flow_break_branching_aux_carry_self_tail_recursive_async_function_into_loop_while_i64_post_flow_cond_chain(
+) {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn sum_until(current: i64, acc: i64, flag: i64) -> i64 {
+            if current == 0 {
+              return acc;
+            }
+            if acc + current > 5 {
+              return acc + current;
+            }
+            if current > 1 {
+              return await sum_until(current - 1, acc + current, flag + current);
+            } else {
+              return await sum_until(current - 1, acc + current, flag + 0);
+            }
+          }
+
+          async fn main() -> i64 {
+            return await sum_until(4, 0, 0);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let lowered_ops = yir
+        .nodes
+        .iter()
+        .map(|node| format!("{}::{}", node.op.module, node.op.instruction))
+        .collect::<Vec<_>>();
+
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_post_flow_cond_chain"
+        })
+        .unwrap_or_else(|| {
+            panic!("expected loop_while_i64_post_flow_cond_chain node, got {lowered_ops:?}")
+        });
+    assert_eq!(loop_node.op.args[3], "ne");
+    assert_eq!(loop_node.op.args[4], "sub");
+    assert_eq!(loop_node.op.args[5], "carry0_gt");
+    assert_eq!(loop_node.op.args[7], "break");
+    assert_eq!(loop_node.op.args[9], "always");
+    assert_eq!(loop_node.op.args[11], "add_prev_current");
+    assert_eq!(loop_node.op.args[14], "prev_current_gt");
+    assert_eq!(loop_node.op.args[16], "add_prev_current");
+    assert_eq!(loop_node.op.args[17], "keep");
+    let self_async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "async_call"
+                && node.op.args.first().is_some_and(|name| name == "sum_until")
+        })
+        .count();
+    assert_eq!(self_async_call_count, 1);
+}
+
+#[test]
+fn lowers_post_flow_break_nested_branching_aux_carry_self_tail_recursive_async_function_into_loop_while_i64_post_flow_cond_chain(
+) {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn sum_until(current: i64, acc: i64, flag: i64) -> i64 {
+            if current == 0 {
+              return acc;
+            }
+            if acc + current > 6 {
+              return acc + current;
+            }
+            if current > 3 {
+              return await sum_until(current - 1, acc + current, flag + current);
+            } else {
+              if current > 1 {
+                return await sum_until(current - 1, acc + current, flag + current);
+              } else {
+                return await sum_until(current - 1, acc + current, flag + 0);
+              }
+            }
+          }
+
+          async fn main() -> i64 {
+            return await sum_until(5, 0, 0);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_post_flow_cond_chain"
+        })
+        .expect("expected loop_while_i64_post_flow_cond_chain node");
+    assert_eq!(loop_node.op.args[3], "ne");
+    assert_eq!(loop_node.op.args[4], "sub");
+    assert_eq!(loop_node.op.args[5], "carry0_gt");
+    assert_eq!(loop_node.op.args[7], "break");
+    assert!(loop_node.op.args.iter().any(|arg| arg == "or"));
+    assert!(loop_node.op.args.iter().any(|arg| arg == "prev_current_gt"));
+    assert!(loop_node
+        .op
+        .args
+        .iter()
+        .any(|arg| arg == "add_prev_current"));
+    assert!(loop_node.op.args.iter().any(|arg| arg == "keep"));
+    let self_async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "async_call"
+                && node.op.args.first().is_some_and(|name| name == "sum_until")
+        })
+        .count();
+    assert_eq!(self_async_call_count, 1);
+}
+
+#[test]
 fn lowers_async_while_with_await_step_and_pure_carry_into_async_loop_chain() {
     let mut module = parse_nuis_module(
         r#"
@@ -500,7 +1084,7 @@ fn lowers_async_while_with_await_step_and_break_flow_control() {
     let loop_node = yir
         .nodes
         .iter()
-    .find(|node| {
+        .find(|node| {
             node.op.module == "cpu" && node.op.instruction == "loop_while_i64_async_flow_chain"
         })
         .expect("expected loop_while_i64_async_flow_chain node");
@@ -542,7 +1126,7 @@ fn lowers_async_while_with_await_step_and_continue_flow_control() {
     let loop_node = yir
         .nodes
         .iter()
-    .find(|node| {
+        .find(|node| {
             node.op.module == "cpu" && node.op.instruction == "loop_while_i64_async_flow_chain"
         })
         .expect("expected loop_while_i64_async_flow_chain node");
@@ -589,8 +1173,7 @@ fn lowers_async_while_with_await_step_and_conditional_carry_flow_control() {
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu"
-                && node.op.instruction == "loop_while_i64_async_flow_cond_chain"
+            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_async_flow_cond_chain"
         })
         .expect("expected loop_while_i64_async_flow_cond_chain node");
     assert_eq!(loop_node.op.args[2], "step");
@@ -600,6 +1183,113 @@ fn lowers_async_while_with_await_step_and_conditional_carry_flow_control() {
     assert_eq!(loop_node.op.args[8], "current_gt");
     assert_eq!(loop_node.op.args[10], "add_current");
     assert_eq!(loop_node.op.args[11], "keep");
+}
+
+#[test]
+fn lowers_async_while_with_compound_flow_control_and_conditional_carry() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn step(value: i64) -> i64 {
+            return value + 1;
+          }
+
+          async fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            while value < 6 {
+              let value: i64 = await step(value);
+              if value > 1 {
+                if value > 4 {
+                  break;
+                } else {
+                }
+              } else {
+              }
+              if value > 2 {
+                let acc: i64 = acc + value;
+              } else {
+                let acc: i64 = acc + 0;
+              }
+            }
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_async_flow_cond_chain"
+        })
+        .expect("expected loop_while_i64_async_flow_cond_chain node");
+    assert_eq!(loop_node.op.args[2], "step");
+    assert_eq!(loop_node.op.args[3], "lt");
+    assert_eq!(loop_node.op.args[4], "and");
+    assert_eq!(loop_node.op.args[5], "current_gt");
+    assert_eq!(loop_node.op.args[7], "current_gt");
+    assert_eq!(loop_node.op.args[9], "break");
+    assert_eq!(loop_node.op.args[11], "current_gt");
+    assert_eq!(loop_node.op.args[13], "add_current");
+    assert_eq!(loop_node.op.args[14], "keep");
+}
+
+#[test]
+fn lowers_async_recursive_boolean_break_then_branching_carry_into_flow_cond_chain() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn step(value: i64) -> i64 {
+            return value + 1;
+          }
+
+          async fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            while value < 7 {
+              let value: i64 = await step(value);
+              if value > 1 && value > 3 && value < 6 {
+                break;
+              } else {
+              }
+              if value > 4 {
+                let acc: i64 = acc + value;
+              } else {
+                let acc: i64 = acc + 0;
+              }
+            }
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_async_flow_cond_chain"
+        })
+        .expect("expected loop_while_i64_async_flow_cond_chain node");
+    assert_eq!(loop_node.op.args[2], "step");
+    assert_eq!(loop_node.op.args[3], "lt");
+    assert_eq!(loop_node.op.args[4], "and");
+    assert_eq!(loop_node.op.args[5], "and");
+    assert_eq!(loop_node.op.args[6], "current_gt");
+    assert_eq!(loop_node.op.args[8], "current_gt");
+    assert_eq!(loop_node.op.args[10], "current_lt");
+    assert_eq!(loop_node.op.args[12], "break");
+    assert_eq!(loop_node.op.args[14], "current_gt");
+    assert_eq!(loop_node.op.args[16], "add_current");
+    assert_eq!(loop_node.op.args[17], "keep");
 }
 
 #[test]
@@ -634,8 +1324,7 @@ fn lowers_async_while_with_await_step_and_post_flow_break() {
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu"
-                && node.op.instruction == "loop_while_i64_async_post_flow_chain"
+            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_async_post_flow_chain"
         })
         .expect("expected loop_while_i64_async_post_flow_chain node");
     assert_eq!(loop_node.op.args[2], "step");
@@ -695,28 +1384,33 @@ fn lowers_async_while_with_await_step_and_post_flow_conditional_break() {
 }
 
 #[test]
-fn lowers_async_network_observer_step_into_async_loop_carry_chain() {
+fn lowers_async_while_with_compound_post_flow_control_and_conditional_carry() {
     let mut module = parse_nuis_module(
         r#"
         mod cpu Main {
           async fn step(value: i64) -> i64 {
-            let probe: NetworkResult<i64> =
-              network_result(network_profile_send_window("NetworkUnit"));
-            if network_send_ready(probe) || network_recv_ready(probe) {
-              return value + network_value(probe);
-            }
-            if network_config_ready(probe) {
-              return value + network_value(probe);
-            }
             return value + 1;
           }
 
           async fn main() -> i64 {
             let value: i64 = 0;
             let acc: i64 = 0;
-            while value < 5 {
+            while value < 6 {
               let value: i64 = await step(value);
-              let acc: i64 = acc + value;
+              if value > 2 {
+                let acc: i64 = acc + value;
+              } else {
+                let acc: i64 = acc + 0;
+              }
+              match acc {
+                5 => { continue; },
+                _ => {
+                  if acc < 6 {
+                    continue;
+                  } else {
+                  }
+                }
+              }
             }
             return acc;
           }
@@ -730,21 +1424,74 @@ fn lowers_async_network_observer_step_into_async_loop_carry_chain() {
     let loop_node = yir
         .nodes
         .iter()
-        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_i64_async_chain")
-        .expect("expected loop_while_i64_async_chain node");
+        .find(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "loop_while_i64_async_post_flow_cond_chain"
+        })
+        .expect("expected loop_while_i64_async_post_flow_cond_chain node");
     assert_eq!(loop_node.op.args[2], "step");
-    assert!(yir
+    assert_eq!(loop_node.op.args[3], "lt");
+    assert_eq!(loop_node.op.args[4], "or");
+    assert_eq!(loop_node.op.args[5], "carry0_eq");
+    assert_eq!(loop_node.op.args[7], "carry0_lt");
+    assert_eq!(loop_node.op.args[9], "continue");
+    assert_eq!(loop_node.op.args[11], "current_gt");
+    assert_eq!(loop_node.op.args[13], "add_current");
+    assert_eq!(loop_node.op.args[14], "keep");
+}
+
+#[test]
+fn lowers_async_post_flow_continue_with_recursive_boolean_condition_into_post_flow_cond_chain() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn step(value: i64) -> i64 {
+            return value + 1;
+          }
+
+          async fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            while value < 7 {
+              let value: i64 = await step(value);
+              if value > 4 {
+                let acc: i64 = acc + value;
+              } else {
+                let acc: i64 = acc + 0;
+              }
+              if acc > 1 && acc > 3 && acc < 10 {
+                continue;
+              } else {
+              }
+            }
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let loop_node = yir
         .nodes
         .iter()
-        .any(|node| node.op.module == "network" && node.op.instruction == "observe"));
-    assert!(yir
-        .nodes
-        .iter()
-        .any(|node| node.op.module == "network" && node.op.instruction == "is_send_ready"));
-    assert!(yir
-        .nodes
-        .iter()
-        .any(|node| node.op.module == "network" && node.op.instruction == "value"));
+        .find(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "loop_while_i64_async_post_flow_cond_chain"
+        })
+        .expect("expected loop_while_i64_async_post_flow_cond_chain node");
+    assert_eq!(loop_node.op.args[2], "step");
+    assert_eq!(loop_node.op.args[3], "lt");
+    assert_eq!(loop_node.op.args[4], "and");
+    assert_eq!(loop_node.op.args[5], "and");
+    assert_eq!(loop_node.op.args[6], "carry0_gt");
+    assert_eq!(loop_node.op.args[8], "carry0_gt");
+    assert_eq!(loop_node.op.args[10], "carry0_lt");
+    assert_eq!(loop_node.op.args[12], "continue");
+    assert_eq!(loop_node.op.args[14], "current_gt");
+    assert_eq!(loop_node.op.args[16], "add_current");
+    assert_eq!(loop_node.op.args[17], "keep");
 }
 
 #[test]
@@ -784,8 +1531,7 @@ fn lowers_async_kernel_observer_step_into_async_post_flow_break_chain() {
         .nodes
         .iter()
         .find(|node| {
-            node.op.module == "cpu"
-                && node.op.instruction == "loop_while_i64_async_post_flow_chain"
+            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_async_post_flow_chain"
         })
         .expect("expected loop_while_i64_async_post_flow_chain node");
     assert_eq!(loop_node.op.args[2], "step");
@@ -801,88 +1547,6 @@ fn lowers_async_kernel_observer_step_into_async_post_flow_break_chain() {
         .nodes
         .iter()
         .any(|node| node.op.module == "kernel" && node.op.instruction == "value"));
-}
-
-#[test]
-fn lowers_async_owned_network_session_step_into_async_post_flow_break_chain() {
-    let mut module = parse_nuis_module(
-        r#"
-        mod cpu Main {
-          extern "c" fn host_network_open_tcp_stream(
-            remote_port: i64,
-            connect_timeout_ms: i64
-          ) -> i64;
-          extern "c" fn host_network_send_owned(
-            handle: i64,
-            stream_window: i64,
-            send_window: i64
-          ) -> i64;
-          extern "c" fn host_network_recv_owned(
-            handle: i64,
-            stream_window: i64,
-            recv_window: i64
-          ) -> i64;
-          extern "c" fn host_network_close_owned(handle: i64) -> i64;
-
-          async fn step(value: i64) -> i64 {
-            let remote_port: i64 = network_profile_remote_port("NetworkUnit");
-            let connect_timeout_ms: i64 = network_profile_connect_timeout("NetworkUnit");
-            let stream_window: i64 = network_profile_stream_window("NetworkUnit");
-            let recv_window: i64 = network_profile_recv_window("NetworkUnit");
-            let send_window: i64 = network_profile_send_window("NetworkUnit");
-            let handle: i64 = host_network_open_tcp_stream(remote_port, connect_timeout_ms);
-            let send_result: NetworkResult<i64> =
-              network_result(host_network_send_owned(handle, stream_window, send_window));
-            let recv_result: NetworkResult<i64> =
-              network_result(host_network_recv_owned(handle, stream_window, recv_window));
-            let close_value: i64 = host_network_close_owned(handle);
-            if network_send_ready(send_result) || network_recv_ready(recv_result) {
-              return value + network_value(send_result) + network_value(recv_result) + close_value;
-            }
-            return value + close_value;
-          }
-
-          async fn main() -> i64 {
-            let value: i64 = 0;
-            let acc: i64 = 0;
-            while value < 6 {
-              let value: i64 = await step(value);
-              let acc: i64 = acc + value;
-              if acc > 9 {
-                break;
-              }
-            }
-            return acc;
-          }
-        }
-        "#,
-    )
-    .unwrap();
-    crate::optimize::simplify_nir_module(&mut module);
-    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
-
-    let loop_node = yir
-        .nodes
-        .iter()
-        .find(|node| {
-            node.op.module == "cpu"
-                && node.op.instruction == "loop_while_i64_async_post_flow_chain"
-        })
-        .expect("expected loop_while_i64_async_post_flow_chain node");
-    assert_eq!(loop_node.op.args[2], "step");
-    assert!(yir.node_lanes.values().any(|lane| lane == "fn:step"));
-    assert!(yir
-        .nodes
-        .iter()
-        .any(|node| node.op.module == "network" && node.op.instruction == "observe"));
-    assert!(yir
-        .nodes
-        .iter()
-        .any(|node| node.op.module == "network" && node.op.instruction == "is_send_ready"));
-    assert!(yir
-        .nodes
-        .iter()
-        .any(|node| node.op.module == "network" && node.op.instruction == "is_recv_ready"));
 }
 
 #[test]

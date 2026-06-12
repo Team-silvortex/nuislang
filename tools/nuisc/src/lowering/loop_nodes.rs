@@ -261,7 +261,11 @@ pub(super) fn lower_async_chained_while(
     state: &mut LoweringState<'_>,
     bindings: &mut BTreeMap<String, String>,
 ) -> Result<(), String> {
-    let Some(function) = state.function_map.get(prepared.step_callee.as_str()).copied() else {
+    let Some(function) = state
+        .function_map
+        .get(prepared.step_callee.as_str())
+        .copied()
+    else {
         return Err(format!(
             "async chained `while` references unknown step helper `{}`",
             prepared.step_callee

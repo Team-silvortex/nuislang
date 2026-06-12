@@ -114,9 +114,7 @@ fn collect_async_loop_step_function_in_while(
     let NirExpr::Call { callee, args } = inner.as_ref() else {
         return;
     };
-    if eligible_names.contains(callee.as_str())
-        && matches!(args.as_slice(), [NirExpr::Var(_)])
-    {
+    if eligible_names.contains(callee.as_str()) && matches!(args.as_slice(), [NirExpr::Var(_)]) {
         collected.insert(callee.clone());
     }
 }

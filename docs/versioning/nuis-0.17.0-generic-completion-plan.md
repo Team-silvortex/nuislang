@@ -153,6 +153,8 @@ Checklist:
   higher-order specialization truth
   current added anchor:
   `examples/projects/state/generic_payload_alias_method_hof_demo`
+  and
+  `examples/projects/state/generic_callable_forwarding_hof_demo`
 * [x] ensure at least one non-network project route also exercises the same
   generic completion claims if practical
   current compile-harness proof:
@@ -162,6 +164,9 @@ Checklist:
   `generic_payload_alias_higher_order_demo`
   and
   `generic_payload_alias_method_hof_demo`
+  and now
+  `generic_callable_forwarding_hof_demo` for project-shaped `Fn2` / `Fn3`
+  callable forwarding through nested `relay -> chain -> apply` helper lanes
 
 ## Priority 2: Make Diagnostics Match The Stronger Surface
 

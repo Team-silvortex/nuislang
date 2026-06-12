@@ -167,6 +167,17 @@ Start here:
   [network_task_async_shapes.ns](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shared/network_task_async_shapes.ns) ->
   result ladder ->
   session/task ladder
+* current project-backed network anchors:
+  [net_http_client_exchange_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_exchange_recipe_demo),
+  [net_http_client_lane_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_lane_recipe_demo),
+  [net_http_request_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_request_recipe_demo),
+  [net_httpish_client_session_packet_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_client_session_packet_recipe_demo),
+  [net_httpish_header_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_header_session_recipe_demo),
+  [net_httpish_service_session_packet_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_httpish_service_session_packet_recipe_demo),
+  [net_http_service_lane_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_service_lane_recipe_demo),
+  [net_session_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_session_recipe_demo),
+  [net_session_loop_control_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_session_loop_control_recipe_demo),
+  [net_http_session_loop_bridge_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_session_loop_bridge_recipe_demo)
 * short network rule:
   `profile core -> endpoint/timing -> host control/runtime transport -> shared helper -> result observe -> session -> result-policy/result-batch/result-windowed/policy/fallback -> batch/windowed`
 * owned transport rule:
@@ -217,6 +228,15 @@ Start here:
   [network_host_open_surface_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_open_surface_runtime_demo)
 * network host handle transport runtime:
   [network_host_handle_transport_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_host_handle_transport_runtime_demo)
+
+Current `0.17.0` lowering-facing HTTP/session bridge anchor:
+
+* [net_http_session_loop_bridge_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_session_loop_bridge_recipe_demo)
+  This is the current project-form companion for the `HTTP-like request
+  session` lowering story described in
+  [nuis-0.17.0-lowering-capability-map.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-lowering-capability-map.md).
+  The matching compile-proof entry point is
+  [network_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/network_compile.rs).
 
 If you are validating real socket behavior on another host, use the runtime
 probe order in:

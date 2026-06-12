@@ -1,0 +1,47 @@
+mod cpu Main {
+  type Combiner<T> = Fn2<T, T, T>;
+  type Reducer<T> = Fn3<T, T, T, T>;
+
+  trait Addable {
+    fn add(lhs: Self, rhs: Self) -> Self;
+  }
+
+  impl Addable for i64 {
+    fn add(lhs: i64, rhs: i64) -> i64 {
+      return lhs + rhs;
+    }
+  }
+
+  fn apply2<T: Addable>(x: T, y: T, f: Combiner<T>) -> T {
+    return f(x, y);
+  }
+
+  fn chain2<T: Addable>(x: T, y: T, f: Combiner<T>) -> T {
+    return apply2<T>(f(x, y), y, |lhs: T, rhs: T| -> T { return lhs.add(rhs); });
+  }
+
+  fn relay2<T: Addable>(x: T, y: T, f: Combiner<T>) -> T {
+    return chain2<T>(x, y, f);
+  }
+
+  fn apply3<T: Addable>(x: T, y: T, z: T, f: Reducer<T>) -> T {
+    return f(x, y, z);
+  }
+
+  fn chain3<T: Addable>(x: T, y: T, z: T, f: Reducer<T>) -> T {
+    return apply3<T>(f(x, y, z), y, z, |lhs: T, mid: T, rhs: T| -> T {
+      return lhs.add(mid).add(rhs);
+    });
+  }
+
+  fn relay3<T: Addable>(x: T, y: T, z: T, f: Reducer<T>) -> T {
+    return chain3<T>(x, y, z, f);
+  }
+
+  fn main() -> i64 {
+    let pair: i64 = relay2<i64>(6, 2, |x: i64, y: i64| -> i64 { return x - y; });
+    let triple: i64 =
+      relay3<i64>(6, 2, 1, |x: i64, y: i64, z: i64| -> i64 { return x - y - z; });
+    return pair.add(triple);
+  }
+}

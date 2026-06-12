@@ -215,9 +215,7 @@ fn parse_prepared_async_loop_step(stmt: &NirStmt, binding_name: &str) -> Option<
     }
     match step_expr {
         NirExpr::Await(inner) => match inner.as_ref() {
-            NirExpr::Call { callee, args }
-                if matches!(args.as_slice(), [NirExpr::Var(arg_name)] if arg_name == binding_name) =>
-            {
+            NirExpr::Call { callee, args } if matches!(args.as_slice(), [NirExpr::Var(arg_name)] if arg_name == binding_name) => {
                 Some(callee.clone())
             }
             _ => None,
@@ -682,10 +680,14 @@ fn parse_loop_carry_update(
             if then_name != else_name {
                 return None;
             }
-            let condition = parse_loop_carry_condition(
+            let carry_binding_names = carries
+                .iter()
+                .map(|carry| carry.binding_name.clone())
+                .collect::<Vec<_>>();
+            let condition = parse_loop_flow_condition(
                 condition,
                 binding_name,
-                carries,
+                &carry_binding_names,
                 pure_helpers,
                 inlineable_pure_helpers,
             )?;
@@ -706,7 +708,7 @@ fn parse_loop_carry_update(
             Some(PreparedCarryUpdate {
                 binding_name: then_name,
                 kind: PreparedCarryUpdateKind::Conditional {
-                    condition: PreparedLoopFlowCondition::Simple(condition),
+                    condition,
                     then_source,
                     else_source,
                 },

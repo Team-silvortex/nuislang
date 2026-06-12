@@ -277,11 +277,12 @@ pub(crate) fn rewrite_higher_order_template_expr(
     specialized_functions: &mut Vec<AstFunction>,
 ) -> Result<AstExpr, String> {
     Ok(match expr {
-        AstExpr::Var(name) if callable_bindings.contains_key(name) => {
-            return Err(format!(
-                "higher-order function parameter `{name}` can currently only be used in direct call position"
-            ))
-        }
+        AstExpr::Var(name) if callable_bindings.contains_key(name) => AstExpr::Var(
+            callable_bindings
+                .get(name)
+                .cloned()
+                .unwrap_or_else(|| name.clone()),
+        ),
         AstExpr::If {
             condition,
             then_body,
@@ -384,23 +385,18 @@ pub(crate) fn rewrite_higher_order_template_expr(
             callee,
             generic_args,
             args,
-        } if templates.contains_key(callee) => {
-            if !generic_args.is_empty() {
-                return Err(format!(
-                    "explicit generic arguments are not yet supported for higher-order template call `{callee}<...>(...)`"
-                ));
-            }
-            specialize_higher_order_call(
-                callee,
-                args,
-                None,
-                templates,
-                function_table,
-                visible_type_aliases,
-                specialized_cache,
-                specialized_functions,
-            )?
-        }
+        } if templates.contains_key(callee) => specialize_higher_order_call(
+            callee,
+            args,
+            generic_args,
+            Some(callable_bindings),
+            None,
+            templates,
+            function_table,
+            visible_type_aliases,
+            specialized_cache,
+            specialized_functions,
+        )?,
         AstExpr::Await(value) => AstExpr::Await(Box::new(rewrite_higher_order_template_expr(
             value,
             callable_bindings,

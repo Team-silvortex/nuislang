@@ -116,6 +116,70 @@ fn lowers_generic_fn1_higher_order_lambda_family() {
 }
 
 #[test]
+fn lowers_explicit_generic_fn1_higher_order_call_with_zero_arg_generic_argument() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          fn typed_zero<T>() -> T {
+            return 0;
+          }
+
+          fn apply<T: Addable>(x: T, f: Fn1<T, T>) -> T {
+            return f(x);
+          }
+
+          fn main() -> i64 {
+            return apply<i64>(typed_zero(), |x: i64| -> i64 { return x + 1; });
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let specialized_zero = module
+        .functions
+        .iter()
+        .find(|function| function.name == "typed_zero__i64")
+        .expect("expected zero-arg generic call to specialize through explicit higher-order call");
+    assert!(specialized_zero.generic_params.is_empty());
+
+    let higher_order_concrete = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__hof_apply_") && function.name.ends_with("__i64")
+        })
+        .expect("expected explicit-generic higher-order helper");
+    assert!(higher_order_concrete.generic_params.is_empty());
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Call { callee, args })))
+            if callee == &higher_order_concrete.name
+                && matches!(
+                    args.as_slice(),
+                    [NirExpr::Call { callee: zero_callee, .. }]
+                        if zero_callee == "typed_zero__i64"
+                )
+    ));
+}
+
+#[test]
 fn lowers_generic_fn1_alias_higher_order_lambda_family() {
     let module = parse_nuis_module(
         r#"
@@ -162,6 +226,110 @@ fn lowers_generic_fn1_alias_higher_order_lambda_family() {
         main.body.last(),
         Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
             if callee == &higher_order_concrete.name
+    ));
+}
+
+#[test]
+fn lowers_explicit_generic_higher_order_template_call_inside_template_body() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn add_one(value: i64) -> i64 {
+            return value + 1;
+          }
+
+          fn apply<T>(x: T, f: Fn1<T, T>) -> T {
+            return f(x);
+          }
+
+          fn chain(x: i64, f: Fn1<i64, i64>) -> i64 {
+            return apply<i64>(f(x), add_one);
+          }
+
+          fn main() -> i64 {
+            return chain(6, |x: i64| -> i64 { return x + 2; });
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let apply_helper_count = module
+        .functions
+        .iter()
+        .filter(|function| {
+            function.name.starts_with("__hof_apply_") && function.name.ends_with("__i64")
+        })
+        .count();
+    assert!(
+        apply_helper_count >= 1,
+        "expected nested explicit-generic higher-order expansion to emit an apply specialization, found {apply_helper_count}"
+    );
+
+    let chain_helper = module
+        .functions
+        .iter()
+        .find(|function| function.name.starts_with("__hof_chain_"))
+        .expect("expected explicit-generic chain higher-order helper");
+    assert!(chain_helper.generic_params.is_empty());
+    assert!(matches!(
+        chain_helper.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, .. }))]
+            if callee.starts_with("__hof_apply_") && callee.ends_with("__i64")
+    ));
+}
+
+#[test]
+fn lowers_forwarded_callable_parameter_into_nested_higher_order_template_call() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn add_one(value: i64) -> i64 {
+            return value + 1;
+          }
+
+          fn apply<T>(x: T, f: Fn1<T, T>) -> T {
+            return f(x);
+          }
+
+          fn chain(x: i64, f: Fn1<i64, i64>) -> i64 {
+            return apply(f(x), add_one);
+          }
+
+          fn relay(x: i64, f: Fn1<i64, i64>) -> i64 {
+            return chain(x, f);
+          }
+
+          fn main() -> i64 {
+            return relay(6, |x: i64| -> i64 { return x + 2; });
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let relay_helper = module
+        .functions
+        .iter()
+        .find(|function| function.name.starts_with("__hof_relay_"))
+        .expect("expected forwarding relay higher-order helper");
+    assert!(relay_helper.generic_params.is_empty());
+    assert!(matches!(
+        relay_helper.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, .. }))]
+            if callee.starts_with("__hof_chain_")
+    ));
+
+    let chain_helper = module
+        .functions
+        .iter()
+        .find(|function| function.name.starts_with("__hof_chain_"))
+        .expect("expected forwarded chain higher-order helper");
+    assert!(chain_helper.generic_params.is_empty());
+    assert!(matches!(
+        chain_helper.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, .. }))]
+            if callee.starts_with("__hof_apply_")
     ));
 }
 
@@ -864,6 +1032,60 @@ fn lowers_generic_fn2_lambda_method_call_with_present_bound() {
 }
 
 #[test]
+fn lowers_forwarded_fn2_callable_parameter_into_nested_higher_order_template_call() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn add_pair(lhs: i64, rhs: i64) -> i64 {
+            return lhs + rhs;
+          }
+
+          fn apply2<T>(x: T, y: T, f: Fn2<T, T, T>) -> T {
+            return f(x, y);
+          }
+
+          fn chain2(x: i64, y: i64, f: Fn2<i64, i64, i64>) -> i64 {
+            return apply2(f(x, y), y, add_pair);
+          }
+
+          fn relay2(x: i64, y: i64, f: Fn2<i64, i64, i64>) -> i64 {
+            return chain2(x, y, f);
+          }
+
+          fn main() -> i64 {
+            return relay2(6, 2, |x: i64, y: i64| -> i64 { return x - y; });
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let relay_helper = module
+        .functions
+        .iter()
+        .find(|function| function.name.starts_with("__hof_relay2_"))
+        .expect("expected forwarding Fn2 relay higher-order helper");
+    assert!(relay_helper.generic_params.is_empty());
+    assert!(matches!(
+        relay_helper.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, .. }))]
+            if callee.starts_with("__hof_chain2_")
+    ));
+
+    let chain_helper = module
+        .functions
+        .iter()
+        .find(|function| function.name.starts_with("__hof_chain2_"))
+        .expect("expected forwarded Fn2 chain higher-order helper");
+    assert!(chain_helper.generic_params.is_empty());
+    assert!(matches!(
+        chain_helper.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, .. }))]
+            if callee.starts_with("__hof_apply2_")
+    ));
+}
+
+#[test]
 fn lowers_generic_fn3_lambda_method_call_with_present_bound() {
     let module = parse_nuis_module(
         r#"
@@ -933,6 +1155,60 @@ fn lowers_generic_fn3_lambda_method_call_with_present_bound() {
                     && matches!(inner_args.as_slice(), [NirExpr::Var(lhs), NirExpr::Var(mid)] if lhs == "lhs" && mid == "mid")
                     && rhs == "rhs"
             )
+    ));
+}
+
+#[test]
+fn lowers_forwarded_fn3_callable_parameter_into_nested_higher_order_template_call() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn add_three(lhs: i64, mid: i64, rhs: i64) -> i64 {
+            return lhs + mid + rhs;
+          }
+
+          fn apply3<T>(x: T, y: T, z: T, f: Fn3<T, T, T, T>) -> T {
+            return f(x, y, z);
+          }
+
+          fn chain3(x: i64, y: i64, z: i64, f: Fn3<i64, i64, i64, i64>) -> i64 {
+            return apply3(f(x, y, z), y, z, add_three);
+          }
+
+          fn relay3(x: i64, y: i64, z: i64, f: Fn3<i64, i64, i64, i64>) -> i64 {
+            return chain3(x, y, z, f);
+          }
+
+          fn main() -> i64 {
+            return relay3(6, 2, 1, |x: i64, y: i64, z: i64| -> i64 { return x - y - z; });
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let relay_helper = module
+        .functions
+        .iter()
+        .find(|function| function.name.starts_with("__hof_relay3_"))
+        .expect("expected forwarding Fn3 relay higher-order helper");
+    assert!(relay_helper.generic_params.is_empty());
+    assert!(matches!(
+        relay_helper.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, .. }))]
+            if callee.starts_with("__hof_chain3_")
+    ));
+
+    let chain_helper = module
+        .functions
+        .iter()
+        .find(|function| function.name.starts_with("__hof_chain3_"))
+        .expect("expected forwarded Fn3 chain higher-order helper");
+    assert!(chain_helper.generic_params.is_empty());
+    assert!(matches!(
+        chain_helper.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, .. }))]
+            if callee.starts_with("__hof_apply3_")
     ));
 }
 

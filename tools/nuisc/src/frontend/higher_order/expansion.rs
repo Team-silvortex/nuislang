@@ -9,7 +9,7 @@ use super::super::{lower_type_ref, resolve_ast_type_ref_aliases};
 use super::callables::{
     function_type_matches_callable, is_callable_type_with_aliases, sanitize_symbol_fragment,
 };
-use super::templates::specialize_higher_order_template;
+use super::templates::{rewrite_higher_order_template_expr, specialize_higher_order_template};
 
 pub(crate) fn expand_higher_order_functions(
     module: &AstModule,
@@ -383,23 +383,18 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
             callee,
             generic_args,
             args,
-        } if templates.contains_key(callee) => {
-            if !generic_args.is_empty() {
-                return Err(format!(
-                    "explicit generic arguments are not yet supported for higher-order template call `{callee}<...>(...)`"
-                ));
-            }
-            specialize_higher_order_call(
-                callee,
-                args,
-                expected,
-                templates,
-                function_table,
-                visible_type_aliases,
-                specialized_cache,
-                specialized_functions,
-            )?
-        }
+        } if templates.contains_key(callee) => specialize_higher_order_call(
+            callee,
+            args,
+            generic_args,
+            None,
+            expected,
+            templates,
+            function_table,
+            visible_type_aliases,
+            specialized_cache,
+            specialized_functions,
+        )?,
         AstExpr::Await(value) => AstExpr::Await(Box::new(rewrite_higher_order_calls_in_expr(
             value,
             expected,
@@ -551,6 +546,8 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
 pub(crate) fn specialize_higher_order_call(
     callee: &str,
     args: &[AstExpr],
+    explicit_generic_args: &[AstTypeRef],
+    template_callable_bindings: Option<&BTreeMap<String, String>>,
     expected: Option<&AstTypeRef>,
     templates: &BTreeMap<String, AstFunction>,
     function_table: &BTreeMap<String, AstFunction>,
@@ -570,6 +567,11 @@ pub(crate) fn specialize_higher_order_call(
         ));
     }
 
+    let explicit_substitutions = explicit_higher_order_generic_substitutions(
+        template,
+        explicit_generic_args,
+        visible_type_aliases,
+    )?;
     let mut callable_bindings = BTreeMap::<String, String>::new();
     let mut ordinary_args = Vec::new();
     let mut callable_fragments = Vec::new();
@@ -580,29 +582,47 @@ pub(crate) fn specialize_higher_order_call(
         .collect::<BTreeSet<_>>();
 
     for (param, arg) in template.params.iter().zip(args) {
-        let ordinary_expected = higher_order_param_expected_type_from_call_expected(
+        let callable_param = is_callable_type_with_aliases(&param.ty, visible_type_aliases)?;
+        let ordinary_expected = higher_order_param_expected_type(
             template,
             param,
+            &explicit_substitutions,
             expected,
             visible_type_aliases,
         );
-        let rewritten_arg = rewrite_higher_order_calls_in_expr(
-            arg,
-            ordinary_expected.as_ref(),
-            templates,
-            function_table,
-            visible_type_aliases,
-            specialized_cache,
-            specialized_functions,
-        )?;
-        if is_callable_type_with_aliases(&param.ty, visible_type_aliases)? {
-            let AstExpr::Var(callable_name) = &rewritten_arg else {
-                return Err(format!(
-                    "higher-order parameter `{}` currently expects a no-capture lambda or named function symbol",
-                    param.name
-                ));
+        if callable_param {
+            let callable_name = match arg {
+                AstExpr::Var(name) => template_callable_bindings
+                    .and_then(|bindings| bindings.get(name))
+                    .cloned()
+                    .unwrap_or_else(|| name.clone()),
+                _ => {
+                    let rewritten_arg = rewrite_higher_order_argument_expr(
+                        arg,
+                        template_callable_bindings,
+                        ordinary_expected.as_ref(),
+                        templates,
+                        function_table,
+                        visible_type_aliases,
+                        specialized_cache,
+                        specialized_functions,
+                    )?;
+                    let AstExpr::Var(callable_name) = rewritten_arg else {
+                        return Err(format!(
+                            "higher-order parameter `{}` currently expects a no-capture lambda or named function symbol",
+                            param.name
+                        ));
+                    };
+                    callable_name
+                }
             };
-            let callable = function_table.get(callable_name).ok_or_else(|| {
+            if !function_table.contains_key(&callable_name) {
+                return Err(format!(
+                    "higher-order parameter `{}` references unknown callable `{}`",
+                    param.name, callable_name
+                ));
+            }
+            let callable = function_table.get(&callable_name).ok_or_else(|| {
                 format!(
                     "higher-order parameter `{}` references unknown callable `{}`",
                     param.name, callable_name
@@ -620,8 +640,18 @@ pub(crate) fn specialize_higher_order_call(
                 ));
             }
             callable_bindings.insert(param.name.clone(), callable_name.clone());
-            callable_fragments.push(sanitize_symbol_fragment(callable_name));
+            callable_fragments.push(sanitize_symbol_fragment(&callable_name));
         } else {
+            let rewritten_arg = rewrite_higher_order_argument_expr(
+                arg,
+                template_callable_bindings,
+                ordinary_expected.as_ref(),
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?;
             ordinary_args.push(annotate_expr_head_with_expected_type(
                 rewritten_arg,
                 ordinary_expected.as_ref(),
@@ -646,17 +676,86 @@ pub(crate) fn specialize_higher_order_call(
 
     Ok(AstExpr::Call {
         callee: specialized_name,
-        generic_args: Vec::new(),
+        generic_args: explicit_generic_args.to_vec(),
         args: ordinary_args,
     })
 }
 
-fn higher_order_param_expected_type_from_call_expected(
+fn rewrite_higher_order_argument_expr(
+    expr: &AstExpr,
+    template_callable_bindings: Option<&BTreeMap<String, String>>,
+    expected: Option<&AstTypeRef>,
+    templates: &BTreeMap<String, AstFunction>,
+    function_table: &BTreeMap<String, AstFunction>,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+    specialized_cache: &mut BTreeSet<String>,
+    specialized_functions: &mut Vec<AstFunction>,
+) -> Result<AstExpr, String> {
+    if let Some(bindings) = template_callable_bindings {
+        return rewrite_higher_order_template_expr(
+            expr,
+            bindings,
+            templates,
+            function_table,
+            visible_type_aliases,
+            specialized_cache,
+            specialized_functions,
+        );
+    }
+    rewrite_higher_order_calls_in_expr(
+        expr,
+        expected,
+        templates,
+        function_table,
+        visible_type_aliases,
+        specialized_cache,
+        specialized_functions,
+    )
+}
+
+fn explicit_higher_order_generic_substitutions(
+    template: &AstFunction,
+    explicit_generic_args: &[AstTypeRef],
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+) -> Result<BTreeMap<String, AstTypeRef>, String> {
+    if explicit_generic_args.is_empty() {
+        return Ok(BTreeMap::new());
+    }
+    if explicit_generic_args.len() != template.generic_params.len() {
+        return Err(format!(
+            "generic function `{}` expects {} explicit generic argument(s), found {}",
+            template.name,
+            template.generic_params.len(),
+            explicit_generic_args.len()
+        ));
+    }
+    template
+        .generic_params
+        .iter()
+        .zip(explicit_generic_args.iter())
+        .map(|(param, arg)| {
+            Ok((
+                param.name.clone(),
+                resolve_ast_type_ref_aliases(arg, visible_type_aliases)?,
+            ))
+        })
+        .collect()
+}
+
+fn higher_order_param_expected_type(
     template: &AstFunction,
     param: &AstParam,
+    explicit_substitutions: &BTreeMap<String, AstTypeRef>,
     expected: Option<&AstTypeRef>,
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
 ) -> Option<AstTypeRef> {
+    if !explicit_substitutions.is_empty() {
+        let lowered_substitutions = explicit_substitutions
+            .iter()
+            .map(|(name, ty)| (name.clone(), lower_type_ref(ty)))
+            .collect::<BTreeMap<_, _>>();
+        return specialize_ast_type_ref(&param.ty, &lowered_substitutions).ok();
+    }
     let expected = expected?;
     let return_pattern = template.return_type.as_ref()?;
     let generic_names = template

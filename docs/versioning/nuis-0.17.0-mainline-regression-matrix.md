@@ -10,6 +10,7 @@ Use it together with:
 
 * [nuis-0.17.0-mainline-goals.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-mainline-goals.md)
 * [nuis-0.17.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-compile-workflow.md)
+* [nuis-0.17.0-lowering-capability-map.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-lowering-capability-map.md)
 * [nuis-0.17.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-release-checklist.md)
 
 ## Reading Rule
@@ -181,6 +182,8 @@ Primary family:
 
 * `core`:
   [tests_async_runtime.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_async_runtime.rs)
+* `core`:
+  [tests_async_network_runtime.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_async_network_runtime.rs)
 
 Recommended command:
 
@@ -218,6 +221,9 @@ This family currently protects:
 * generic recursive async demos
 * mutual recursion demos
 * payload-alias higher-order async demos
+* task/memory/session project closure with explicit timeout and staging helpers
+* project-backed generic async specialization with compiled async call / await
+  structure
 
 If this fails, suspect:
 
@@ -255,6 +261,77 @@ This layer currently protects:
 * `cpu helper -> network` profile-usage closure
 * project analyses that must not silently fall back to isolated module lowering
 
+### 8. State Project Generic/Higher-Order Anchors
+
+Role:
+
+* real-project generic callable forwarding truth
+* higher-order helper expansion surviving multi-file project compilation
+* project-facing `Fn2` / `Fn3` callable forwarding closure
+
+Primary family:
+
+* `anchor`:
+  [state_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/state_compile.rs)
+
+Recommended command:
+
+```bash
+cargo test -q -p nuisc --test state_compile
+```
+
+Important current anchors inside this family:
+
+* `anchor`:
+  [generic_payload_alias_method_hof_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_payload_alias_method_hof_demo)
+* `anchor`:
+  [generic_callable_forwarding_hof_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_callable_forwarding_hof_demo)
+
+This layer currently protects:
+
+* payload-alias generic higher-order project closure
+* project-shaped `Fn2` / `Fn3` callable forwarding through nested
+  `relay -> chain -> apply` helper specialization
+* helper naming / reachability truth in project compilation, not only in
+  unit-style frontend probes
+
+### 9. State Project Lowering Anchors
+
+Role:
+
+* project-backed `flow_cond_chain` truth
+* project-backed `post_flow_cond_chain` truth
+* lowering-local control-flow shapes surviving real project compilation
+
+Primary family:
+
+* `anchor`:
+  [state_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/state_compile.rs)
+
+Recommended command:
+
+```bash
+cargo test -q -p nuisc --test state_compile
+```
+
+Important current anchors inside this family:
+
+* `anchor`:
+  [flow_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/flow_branching_while_demo)
+* `anchor`:
+  [post_flow_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_while_demo)
+* `anchor`:
+  [post_flow_branching_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_continuing_while_demo)
+* `anchor`:
+  [tail_recursive_branching_cross_carry_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_branching_cross_carry_demo)
+
+This layer currently protects:
+
+* structured `while` lowering into `loop_while_i64_flow_cond_chain`
+* post-body `break` lowering into `loop_while_i64_post_flow_cond_chain`
+* post-body `continue` lowering into `loop_while_i64_post_flow_cond_chain`
+* tail-recursive branching carry lowering into `loop_while_i64_cond_chain`
+
 If this fails, suspect:
 
 * project-aware lowering drift
@@ -268,6 +345,7 @@ Role:
 
 * network/profile/transport/session compile closure
 * generic helper stories surviving outside pure frontend probes
+* request/header/session packet staging surviving as project-backed compile truth
 
 Primary family:
 
@@ -285,6 +363,7 @@ If this fails, suspect:
 * alias-heavy project assembly
 * helper-bridge generic routes
 * network-facing examples drifting away from the shared compiler spine
+* memory-staged session packet routes drifting from domain examples
 
 ### 9. State Project Anchors
 

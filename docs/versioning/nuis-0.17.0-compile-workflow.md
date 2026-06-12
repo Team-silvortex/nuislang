@@ -16,6 +16,10 @@ This `0.17.0` file narrows in on something more specific:
 Use it when the question is not only “which command do I run?”, but
 “what is the current truthful compile spine?”
 
+For the lowering-facing complement to this file, use:
+
+* [nuis-0.17.0-lowering-capability-map.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-lowering-capability-map.md)
+
 ## Core Rule
 
 For the current `0.17.0` line, the mainline story should be read as:

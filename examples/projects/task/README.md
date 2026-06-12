@@ -87,3 +87,12 @@ Reading rule:
   for the project-wide route
 * use [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
   for the shortest repo-level route
+
+Current project-facing lowering anchors worth remembering:
+
+* [task_generic_recursive_async_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_generic_recursive_async_demo)
+  now serves as a checked-in generic async specialization anchor through the
+  real project pipeline
+* [task_memory_session_policy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_memory_session_policy_demo)
+  now serves as a checked-in `task + timeout + memory staging` anchor through
+  the real project pipeline

@@ -22,6 +22,7 @@ across:
 * explicit generic arguments
 * expected-type propagation
 * nested helper chains
+* callable forwarding through nested higher-order helper chains
 * alias-aware payload and struct routes
 * control-flow-local specialization
 * lambda-lifted and higher-order routes

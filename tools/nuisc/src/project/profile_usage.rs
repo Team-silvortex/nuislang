@@ -180,7 +180,9 @@ fn stmt_uses_network_profile_endpoint_kind(stmt: &NirStmt, unit: &str) -> bool {
 }
 
 fn stmt_uses_network_profile_slot(stmt: &NirStmt, unit: &str, slot: &str) -> bool {
-    stmt_uses_expr_predicate(stmt, &|value| expr_uses_network_profile_slot(value, unit, slot))
+    stmt_uses_expr_predicate(stmt, &|value| {
+        expr_uses_network_profile_slot(value, unit, slot)
+    })
 }
 
 fn stmt_uses_cpu_extern_call(stmt: &NirStmt, callee: &str) -> bool {
@@ -583,9 +585,7 @@ pub(super) fn expr_walk_any(expr: &NirExpr, predicate: &dyn Fn(&NirExpr) -> bool
         | NirExpr::FieldAccess { base: inner, .. } => predicate(inner),
         NirExpr::DataResult { value: inner, .. }
         | NirExpr::ShaderResult { value: inner, .. }
-        | NirExpr::NetworkResult { value: inner, .. } => {
-            predicate(inner)
-        }
+        | NirExpr::NetworkResult { value: inner, .. } => predicate(inner),
         NirExpr::KernelResult { value: inner, .. } => predicate(inner),
         NirExpr::AllocNode { value, next } => predicate(value) || predicate(next),
         NirExpr::AllocBuffer { len, fill } => predicate(len) || predicate(fill),

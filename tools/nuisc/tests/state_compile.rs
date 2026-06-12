@@ -26,6 +26,84 @@ fn compiles_generic_payload_alias_method_hof_state_project() {
 }
 
 #[test]
+fn compiles_generic_callable_forwarding_hof_state_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_callable_forwarding_hof_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("generic callable forwarding higher-order state project should compile");
+}
+
+#[test]
+fn lowers_generic_callable_forwarding_hof_state_project_with_forwarded_fn2_and_fn3_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_callable_forwarding_hof_demo",
+    );
+
+    for prefix in [
+        "__hof_relay2_",
+        "__hof_chain2_",
+        "__hof_apply2_",
+        "__hof_relay3_",
+        "__hof_chain3_",
+        "__hof_apply3_",
+    ] {
+        assert!(
+            artifacts
+                .nir
+                .functions
+                .iter()
+                .any(|function| function.name.starts_with(prefix)
+                    && function.name.ends_with("__i64")),
+            "expected project to emit `{prefix}...__i64` higher-order helper"
+        );
+    }
+
+    assert!(artifacts.nir.functions.iter().any(|function| {
+        function.name.starts_with("__lambda_chain2_") && function.name.ends_with("__i64")
+    }));
+    assert!(artifacts.nir.functions.iter().any(|function| {
+        function.name.starts_with("__lambda_chain3_") && function.name.ends_with("__i64")
+    }));
+    assert!(artifacts
+        .nir
+        .functions
+        .iter()
+        .any(|function| function.name.starts_with("__lambda_main_")));
+
+    let main = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .expect("expected main function");
+    assert!(main.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::Call { callee, .. },
+            } if name == "pair"
+                && ty.render() == "i64"
+                && callee.starts_with("__hof_relay2_")
+        )
+    }));
+    assert!(main.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::Call { callee, .. },
+            } if name == "triple"
+                && ty.render() == "i64"
+                && callee.starts_with("__hof_relay3_")
+        )
+    }));
+}
+
+#[test]
 fn lowers_generic_payload_alias_method_hof_state_project_with_hof_and_lambda_shape() {
     let artifacts = compiled_project(
         "/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_payload_alias_method_hof_demo",
@@ -218,4 +296,95 @@ fn lowers_tail_recursive_branching_cross_carry_state_project_with_cond_loop_shap
     assert_eq!(loop_node.op.args[11], "prev_current_gt");
     assert_eq!(loop_node.op.args[13], "add_prev_current");
     assert_eq!(loop_node.op.args[14], "add_prev_carry0");
+}
+
+#[test]
+fn compiles_flow_branching_while_state_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/flow_branching_while_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("flow branching while state project should compile");
+}
+
+#[test]
+fn lowers_flow_branching_while_state_project_with_flow_cond_loop_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/flow_branching_while_demo",
+    );
+
+    let loop_node = artifacts
+        .yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_flow_cond_chain"
+        })
+        .expect("expected loop_while_i64_flow_cond_chain node");
+    assert_eq!(loop_node.op.args[5], "current_gt");
+    assert_eq!(loop_node.op.args[7], "break");
+    assert_eq!(loop_node.op.args[9], "current_gt");
+    assert_eq!(loop_node.op.args[11], "add_current");
+    assert_eq!(loop_node.op.args[12], "keep");
+}
+
+#[test]
+fn compiles_post_flow_branching_while_state_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_while_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("post-flow branching while state project should compile");
+}
+
+#[test]
+fn lowers_post_flow_branching_while_state_project_with_post_flow_cond_loop_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_while_demo",
+    );
+
+    let loop_node = artifacts
+        .yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_post_flow_cond_chain"
+        })
+        .expect("expected loop_while_i64_post_flow_cond_chain node");
+    assert_eq!(loop_node.op.args[5], "carry0_gt");
+    assert_eq!(loop_node.op.args[7], "break");
+    assert_eq!(loop_node.op.args[9], "current_gt");
+    assert_eq!(loop_node.op.args[11], "add_current");
+    assert_eq!(loop_node.op.args[12], "keep");
+}
+
+#[test]
+fn compiles_post_flow_branching_continuing_while_state_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_continuing_while_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("post-flow branching continuing while state project should compile");
+}
+
+#[test]
+fn lowers_post_flow_branching_continuing_while_state_project_with_post_flow_continue_cond_loop_shape(
+) {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_continuing_while_demo",
+    );
+
+    let loop_node = artifacts
+        .yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_i64_post_flow_cond_chain"
+        })
+        .expect("expected loop_while_i64_post_flow_cond_chain node");
+    assert_eq!(loop_node.op.args[5], "carry0_lt");
+    assert_eq!(loop_node.op.args[7], "continue");
+    assert_eq!(loop_node.op.args[9], "current_gt");
+    assert_eq!(loop_node.op.args[11], "add_current");
+    assert_eq!(loop_node.op.args[12], "keep");
 }

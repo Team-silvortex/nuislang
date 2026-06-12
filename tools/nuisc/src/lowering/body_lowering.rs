@@ -363,10 +363,13 @@ fn expr_contains_async_loop_primitive(expr: &NirExpr) -> bool {
             window: buffer,
             index,
         } => {
-            expr_contains_async_loop_primitive(buffer)
-                || expr_contains_async_loop_primitive(index)
+            expr_contains_async_loop_primitive(buffer) || expr_contains_async_loop_primitive(index)
         }
-        NirExpr::DataWriteWindow { window, index, value }
+        NirExpr::DataWriteWindow {
+            window,
+            index,
+            value,
+        }
         | NirExpr::StoreAt {
             buffer: window,
             index,
@@ -381,8 +384,7 @@ fn expr_contains_async_loop_primitive(expr: &NirExpr) -> bool {
             target,
             next: value,
         } => {
-            expr_contains_async_loop_primitive(target)
-                || expr_contains_async_loop_primitive(value)
+            expr_contains_async_loop_primitive(target) || expr_contains_async_loop_primitive(value)
         }
         NirExpr::DataCopyWindow { input, offset, len }
         | NirExpr::DataImmutableWindow { input, offset, len } => {
@@ -401,10 +403,7 @@ fn expr_contains_async_loop_primitive(expr: &NirExpr) -> bool {
             expr_contains_async_loop_primitive(base) || expr_contains_async_loop_primitive(delta)
         }
         NirExpr::ShaderProfileSpeedSeed {
-            delta,
-            scale,
-            base,
-            ..
+            delta, scale, base, ..
         } => {
             expr_contains_async_loop_primitive(delta)
                 || expr_contains_async_loop_primitive(scale)

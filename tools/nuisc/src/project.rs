@@ -254,14 +254,14 @@ mod tests {
 
     #[path = "abi_recommendation.rs"]
     mod abi_recommendation;
+    #[path = "multidomain_async.rs"]
+    mod multidomain_async;
     #[path = "packet_data_contracts.rs"]
     mod packet_data_contracts;
     #[path = "planning_kernel.rs"]
     mod planning_kernel;
     #[path = "shader_nova_contracts.rs"]
     mod shader_nova_contracts;
-    #[path = "multidomain_async.rs"]
-    mod multidomain_async;
 
     fn project_with_modules(modules: Vec<(&str, &str)>) -> LoadedProject {
         LoadedProject {
