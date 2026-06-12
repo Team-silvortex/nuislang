@@ -215,6 +215,32 @@ Current checked-in anchors:
 * [shader_nova_contracts.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/project/tests/shader_nova_contracts.rs)
 * [multidomain_async.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/project/tests/multidomain_async.rs)
 
+For `shader`, the current practical reading order is now much clearer than it
+was earlier in the line:
+
+* packet entry:
+  `shader_packet_profile_demo`
+* packet bridge:
+  `shader_packet_bridge_demo`
+* sync result spine:
+  `shader_result_profile_demo`
+* dual draw/render spine:
+  `shader_draw_render_profile_demo`
+* async policy:
+  `shader_async_policy_profile_demo`
+* async fallback:
+  `shader_async_fallback_profile_demo`
+* async schedule:
+  `shader_async_schedule_profile_demo`
+* async fanin:
+  `shader_async_fanin_profile_demo`
+* async windowed batch:
+  `shader_async_windowed_batch_profile_demo`
+
+Short rule:
+
+`0.17.x shader should now be taught as one continuous packet -> bridge -> result -> async scheduling story, not as isolated packet and async tricks`
+
 This does not mean every future bridge pattern is complete.
 
 It does mean the current line should no longer describe helper-mediated project
@@ -293,6 +319,19 @@ Current anchor families:
 * project integration probes:
   [shader_nova_contracts.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/project/tests/shader_nova_contracts.rs),
   [multidomain_async.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/project/tests/multidomain_async.rs)
+
+Inside `shader_nova_contracts`, the current line now keeps these checked-in
+project truths honest:
+
+* packet/profile seed and slot discovery
+* packet -> data bridge -> frame present closure
+* pass/draw/render `ShaderResult` observer closure
+* draw/render dual-result coexistence
+* async policy aggregation
+* async fallback with timed task route
+* async schedule with explicit spawn/join_result staging
+* async fanin across pass/frame observer tasks
+* async windowed batch summary capture
 
 Short rule:
 

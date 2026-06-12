@@ -257,6 +257,8 @@ cargo test -q -p nuisc multidomain_async
 This layer currently protects:
 
 * `cpu helper -> shader/data` packet + bridge closure
+* shader packet/result/async project workflow closure through:
+  `packet -> bridge -> result -> draw/render -> policy/fallback/schedule/fanin/windowed-batch`
 * `cpu helper -> kernel/data` bridge payload closure
 * `cpu helper -> network` profile-usage closure
 * project analyses that must not silently fall back to isolated module lowering
