@@ -123,11 +123,30 @@ mod cpu Main {
     executed_steps: i64
   }
 
+  struct BuildPipelinePlanReport {
+    plan_handle: i64,
+    success_handle: i64,
+    failure_handle: i64,
+    pipeline: BuildPipelineReport,
+    selected_summary_handle: i64
+  }
+
+  struct WorkflowFrontdoorSurface {
+    source_kind_handle: i64,
+    workflow_kind_handle: i64,
+    workflow_brief_handle: i64,
+    workflow_samples_handle: i64,
+    recommended_next_step_handle: i64,
+    recommended_command_handle: i64,
+    recommended_reason_handle: i64
+  }
+
   struct CliBuildPipelineSummary {
     cli: PipelineCliSummary,
     automation: PipelineAutomationSummary,
     plan: BuildPlan,
-    pipeline: BuildPipelineReport,
+    pipeline: BuildPipelinePlanReport,
+    frontdoor: WorkflowFrontdoorSurface,
     diag_code: i64,
     stdout_code: i64,
     stderr_code: i64,
@@ -518,10 +537,13 @@ mod cpu Main {
     );
   }
 
-  fn capture_pipeline_report(
+  fn run_build_pipeline_plan(
+    plan_handle: i64,
+    success_handle: i64,
+    failure_handle: i64,
     cli: PipelineCliSummary,
     plan: BuildPlan
-  ) -> BuildPipelineReport {
+  ) -> BuildPipelinePlanReport {
     let prepare_step: WorkflowStep =
       build_pipeline_step(5101, 901, 31, plan.workspace_handle, 250, true);
     let check_step: WorkflowStep =
@@ -532,42 +554,144 @@ mod cpu Main {
       build_pipeline_step(5104, 907, 43, plan.artifact_dir_handle, 750, true);
 
     if cli.completed == false {
-      return skipped_pipeline_report(
-        prepare_step,
-        check_step,
-        compile_step,
-        package_step
-      );
+      return BuildPipelinePlanReport {
+        plan_handle: plan_handle,
+        success_handle: success_handle,
+        failure_handle: failure_handle,
+        pipeline: skipped_pipeline_report(
+          prepare_step,
+          check_step,
+          compile_step,
+          package_step
+        ),
+        selected_summary_handle: failure_handle
+      };
     }
 
-    return run_build_pipeline(
+    let pipeline: BuildPipelineReport = run_build_pipeline(
       prepare_step,
       check_step,
       compile_step,
       package_step
     );
+    if pipeline.overall_success {
+      return BuildPipelinePlanReport {
+        plan_handle: plan_handle,
+        success_handle: success_handle,
+        failure_handle: failure_handle,
+        pipeline: pipeline,
+        selected_summary_handle: success_handle
+      };
+    }
+    return BuildPipelinePlanReport {
+      plan_handle: plan_handle,
+      success_handle: success_handle,
+      failure_handle: failure_handle,
+      pipeline: pipeline,
+      selected_summary_handle: failure_handle
+    };
   }
 
   fn emit_success_diag(
     cli: PipelineCliSummary,
-    pipeline: BuildPipelineReport,
+    pipeline: BuildPipelinePlanReport,
     text_handle: i64,
     severity: i64
   ) -> i64 {
     let label_handle: i64 = host_diag_label(text_handle);
-    let span_handle: i64 = host_diag_span(0, cli.line_len + pipeline.executed_steps);
+    let span_handle: i64 = host_diag_span(0, cli.line_len + pipeline.pipeline.executed_steps);
     return host_diag_emit(label_handle, span_handle, severity);
   }
 
   fn emit_failure_diag(
     cli: PipelineCliSummary,
-    pipeline: BuildPipelineReport,
+    pipeline: BuildPipelinePlanReport,
     text_handle: i64,
     severity: i64
   ) -> i64 {
     let label_handle: i64 = host_diag_label(text_handle);
-    let span_handle: i64 = host_diag_span(0, cli.line_len + pipeline.executed_steps);
+    let span_handle: i64 = host_diag_span(0, cli.line_len + pipeline.pipeline.executed_steps);
     return host_diag_emit(label_handle, span_handle, severity);
+  }
+
+  fn build_frontdoor_surface(
+    cli: PipelineCliSummary,
+    pipeline: BuildPipelinePlanReport
+  ) -> WorkflowFrontdoorSurface {
+    if cli.completed == false {
+      return WorkflowFrontdoorSurface {
+        source_kind_handle: 13021,
+        workflow_kind_handle: 12201,
+        workflow_brief_handle: 14003,
+        workflow_samples_handle: 14005,
+        recommended_next_step_handle: 14031,
+        recommended_command_handle: 14033,
+        recommended_reason_handle: 14035
+      };
+    }
+    if pipeline_step_failed(pipeline.pipeline.prepare) {
+      return WorkflowFrontdoorSurface {
+        source_kind_handle: 13021,
+        workflow_kind_handle: 12201,
+        workflow_brief_handle: 14003,
+        workflow_samples_handle: 14005,
+        recommended_next_step_handle: 14041,
+        recommended_command_handle: 14043,
+        recommended_reason_handle: 14045
+      };
+    }
+    if pipeline_step_failed(pipeline.pipeline.check) {
+      return WorkflowFrontdoorSurface {
+        source_kind_handle: 13021,
+        workflow_kind_handle: 12201,
+        workflow_brief_handle: 14003,
+        workflow_samples_handle: 14005,
+        recommended_next_step_handle: 14051,
+        recommended_command_handle: 14053,
+        recommended_reason_handle: 14055
+      };
+    }
+    if pipeline_step_failed(pipeline.pipeline.compile) {
+      return WorkflowFrontdoorSurface {
+        source_kind_handle: 13021,
+        workflow_kind_handle: 12201,
+        workflow_brief_handle: 14003,
+        workflow_samples_handle: 14005,
+        recommended_next_step_handle: 14061,
+        recommended_command_handle: 14063,
+        recommended_reason_handle: 14065
+      };
+    }
+    if pipeline_step_failed(pipeline.pipeline.package) {
+      return WorkflowFrontdoorSurface {
+        source_kind_handle: 13021,
+        workflow_kind_handle: 12201,
+        workflow_brief_handle: 14003,
+        workflow_samples_handle: 14005,
+        recommended_next_step_handle: 14071,
+        recommended_command_handle: 14073,
+        recommended_reason_handle: 14075
+      };
+    }
+    return WorkflowFrontdoorSurface {
+      source_kind_handle: 13021,
+      workflow_kind_handle: 12201,
+      workflow_brief_handle: 14003,
+      workflow_samples_handle: 14005,
+      recommended_next_step_handle: 14081,
+      recommended_command_handle: 14083,
+      recommended_reason_handle: 14085
+    };
+  }
+
+  fn summarize_frontdoor_surface(surface: WorkflowFrontdoorSurface) -> i64 {
+    return surface.source_kind_handle
+      + surface.workflow_kind_handle
+      + surface.workflow_brief_handle
+      + surface.workflow_samples_handle
+      + surface.recommended_next_step_handle
+      + surface.recommended_command_handle
+      + surface.recommended_reason_handle;
   }
 
   fn build_success_summary(
@@ -575,13 +699,15 @@ mod cpu Main {
     cli: PipelineCliSummary,
     automation: PipelineAutomationSummary,
     plan: BuildPlan,
-    pipeline: BuildPipelineReport
+    pipeline: BuildPipelinePlanReport
   ) -> CliBuildPipelineSummary {
+    let frontdoor: WorkflowFrontdoorSurface = build_frontdoor_surface(cli, pipeline);
     return CliBuildPipelineSummary {
       cli: cli,
       automation: automation,
       plan: plan,
       pipeline: pipeline,
+      frontdoor: frontdoor,
       diag_code: emit_success_diag(
         cli,
         pipeline,
@@ -600,13 +726,15 @@ mod cpu Main {
     cli: PipelineCliSummary,
     automation: PipelineAutomationSummary,
     plan: BuildPlan,
-    pipeline: BuildPipelineReport
+    pipeline: BuildPipelinePlanReport
   ) -> CliBuildPipelineSummary {
+    let frontdoor: WorkflowFrontdoorSurface = build_frontdoor_surface(cli, pipeline);
     return CliBuildPipelineSummary {
       cli: cli,
       automation: automation,
       plan: plan,
       pipeline: pipeline,
+      frontdoor: frontdoor,
       diag_code: emit_failure_diag(
         cli,
         pipeline,
@@ -625,12 +753,18 @@ mod cpu Main {
     let automation: PipelineAutomationSummary =
       capture_pipeline_automation(seed.automation, cli.selected_target_handle);
     let plan: BuildPlan = build_plan(cli, automation);
-    let pipeline: BuildPipelineReport = capture_pipeline_report(cli, plan);
+    let pipeline: BuildPipelinePlanReport = run_build_pipeline_plan(
+      6101,
+      6201,
+      6203,
+      cli,
+      plan
+    );
 
     if cli.completed == false {
       return build_failure_summary(seed, cli, automation, plan, pipeline);
     }
-    if pipeline.overall_success {
+    if pipeline.pipeline.overall_success {
       return build_success_summary(seed, cli, automation, plan, pipeline);
     }
     return build_failure_summary(seed, cli, automation, plan, pipeline);
@@ -660,6 +794,14 @@ mod cpu Main {
       + report.first_failure_handle
       + encode_bool(report.overall_success)
       + report.executed_steps;
+  }
+
+  fn summarize_build_pipeline_plan_report(report: BuildPipelinePlanReport) -> i64 {
+    return report.plan_handle
+      + report.success_handle
+      + report.failure_handle
+      + report.selected_summary_handle
+      + summarize_build_pipeline(report.pipeline);
   }
 
   fn summarize_cli_build_pipeline_recipe(
@@ -703,7 +845,8 @@ mod cpu Main {
       + summary.plan.selected_target_handle
       + summary.plan.cache_value_handle
       + summary.plan.timeout_budget
-      + summarize_build_pipeline(summary.pipeline)
+      + summarize_frontdoor_surface(summary.frontdoor)
+      + summarize_build_pipeline_plan_report(summary.pipeline)
       + summary.diag_code
       + summary.stdout_code
       + summary.stderr_code

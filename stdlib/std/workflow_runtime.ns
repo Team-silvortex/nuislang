@@ -80,6 +80,24 @@ mod cpu Main {
     executed_steps: i64
   }
 
+  struct WorkflowQuadPlan {
+    plan_handle: i64,
+    success_handle: i64,
+    failure_handle: i64,
+    first: WorkflowStep,
+    second: WorkflowStep,
+    third: WorkflowStep,
+    fourth: WorkflowStep
+  }
+
+  struct WorkflowPlanReport {
+    plan_handle: i64,
+    success_handle: i64,
+    failure_handle: i64,
+    workflow: WorkflowQuadReport,
+    selected_summary_handle: i64
+  }
+
   fn build_default_command_context() -> CommandContext {
     return CommandContext {
       env_handle: 0,
@@ -196,6 +214,26 @@ mod cpu Main {
       ),
       fail_fast
     );
+  }
+
+  fn build_workflow_quad_plan(
+    plan_handle: i64,
+    success_handle: i64,
+    failure_handle: i64,
+    first: WorkflowStep,
+    second: WorkflowStep,
+    third: WorkflowStep,
+    fourth: WorkflowStep
+  ) -> WorkflowQuadPlan {
+    return WorkflowQuadPlan {
+      plan_handle: plan_handle,
+      success_handle: success_handle,
+      failure_handle: failure_handle,
+      first: first,
+      second: second,
+      third: third,
+      fourth: fourth
+    };
   }
 
   fn run_workflow_step(step: WorkflowStep) -> WorkflowStepReport {
@@ -512,6 +550,31 @@ mod cpu Main {
     );
   }
 
+  fn run_workflow_quad_plan(plan: WorkflowQuadPlan) -> WorkflowPlanReport {
+    let workflow: WorkflowQuadReport = run_workflow_quad(
+      plan.first,
+      plan.second,
+      plan.third,
+      plan.fourth
+    );
+    if workflow.overall_success {
+      return WorkflowPlanReport {
+        plan_handle: plan.plan_handle,
+        success_handle: plan.success_handle,
+        failure_handle: plan.failure_handle,
+        workflow: workflow,
+        selected_summary_handle: plan.success_handle
+      };
+    }
+    return WorkflowPlanReport {
+      plan_handle: plan.plan_handle,
+      success_handle: plan.success_handle,
+      failure_handle: plan.failure_handle,
+      workflow: workflow,
+      selected_summary_handle: plan.failure_handle
+    };
+  }
+
   fn summarize_workflow_step_report(report: WorkflowStepReport) -> i64 {
     let executed_bonus: i64 = encode_bool(report.executed);
     let blocked_bonus: i64 = encode_bool(report.blocked_by_failure);
@@ -567,14 +630,25 @@ mod cpu Main {
       + overall_bonus;
   }
 
+  fn summarize_workflow_plan_report(report: WorkflowPlanReport) -> i64 {
+    return report.plan_handle
+      + report.success_handle
+      + report.failure_handle
+      + report.selected_summary_handle
+      + summarize_workflow_quad_report(report.workflow);
+  }
+
   fn summarize_workflow_runtime() -> i64 {
-    let report: WorkflowQuadReport = run_workflow_quad(
+    let plan: WorkflowQuadPlan = build_workflow_quad_plan(
+      4101,
+      4201,
+      4203,
       build_workflow_step_with_context(3001, 401, 17, 901, 250, true),
       build_workflow_step_from_handles(3002, 503, 29, false),
       build_workflow_step_with_context(3003, 601, 31, 1001, 500, false),
       build_workflow_step_with_context(3004, 701, 37, 1101, 750, true)
     );
-    return summarize_workflow_quad_report(report);
+    return summarize_workflow_plan_report(run_workflow_quad_plan(plan));
   }
 
   fn main() {

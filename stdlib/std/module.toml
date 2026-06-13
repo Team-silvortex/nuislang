@@ -141,6 +141,7 @@ source_modules = [
   "cli_workflow_automation_recipe.ns",
   "cli_build_pipeline_recipe.ns",
   "cli_project_build_report_recipe.ns",
+  "cli_compile_workflow_recipe.ns",
   "net_endpoint_recipe.ns",
   "net_ip_packet_recipe.ns",
   "net_tcp_stream_recipe.ns",
@@ -221,6 +222,7 @@ source_modules = [
   "report_runtime_recipe.ns",
   "automation_runtime_recipe.ns",
   "workflow_runtime_recipe.ns",
+  "workflow_frontdoor_runtime_recipe.ns",
   "command_shell_recipe.ns",
   "command_text_builder_recipe.ns"
 ]

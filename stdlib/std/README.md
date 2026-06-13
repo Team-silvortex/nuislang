@@ -103,6 +103,7 @@ Recipe modules:
   - [cli_workflow_automation_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_workflow_automation_recipe.ns)
   - [cli_build_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_build_pipeline_recipe.ns)
   - [cli_project_build_report_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_project_build_report_recipe.ns)
+  - [cli_compile_workflow_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_compile_workflow_recipe.ns)
 * net/runtime staging
   - grouped rule:
     `profile core -> transport edge -> syscall edge -> socket edge -> control edge -> protocol edge -> http edge -> result spine -> task spine -> session`
@@ -145,24 +146,37 @@ Recipe modules:
 * automation/workflow tooling
   - [automation_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/automation_runtime_recipe.ns)
   - [workflow_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/workflow_runtime_recipe.ns)
+  - [workflow_frontdoor_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/workflow_frontdoor_runtime_recipe.ns)
   - [cli_workflow_automation_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_workflow_automation_recipe.ns)
   - [cli_build_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_build_pipeline_recipe.ns)
   - [cli_project_build_report_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_project_build_report_recipe.ns)
+  - [cli_compile_workflow_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_compile_workflow_recipe.ns)
   - current recipe shape:
     the checked-in workflow example is now a four-step gate with executed-step
     counting, blocked-step reporting, and per-step launch/cwd/timeout summary
+  - shared front-door shape:
+    `workflow_frontdoor_runtime_recipe` is the current narrow reference for the
+    grouped `frontdoor surface` contract reused by the higher tooling samples
   - integration example:
     `cli_workflow_automation_recipe` is the current smallest checked-in sample
     that ties CLI session, async gate, report emission, automation staging, and
     four-step workflow execution into one toolchain-shaped entry
   - concrete tool example:
     `cli_build_pipeline_recipe` is the current build-oriented sample with
-    `prepare/check/compile/package` stage naming, artifact staging, and
-    pipeline-specific plan summary
+    `prepare/check/compile/package` stage naming, artifact staging,
+    pipeline-specific plan summary, and the shared front-door summary surface
   - project-facing report example:
     `cli_project_build_report_recipe` is the current most concrete sample with
     `project/artifact/manifest/build_report` vocabulary and
-    `configure/verify/emit/report` stage naming
+    `configure/verify/emit/report` stage naming plus the shared front-door
+    summary surface
+  - front-door compile example:
+    `cli_compile_workflow_recipe` is the current highest-level sample with
+    `doctor/check/test/build/release-check` orchestration, where the build
+    stage reuses the nested project build plan/report contract and the summary
+    surface now also carries workflow-entrance recommendation handles plus a
+    thin `project` / `single-file` source-kind split, debug-workflow mirror,
+    and one grouped front-door summary surface
 * location/runtime staging
   - [location_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/location_runtime_recipe.ns)
 * kv/runtime staging

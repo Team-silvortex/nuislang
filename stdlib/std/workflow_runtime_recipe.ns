@@ -63,6 +63,24 @@ mod cpu Main {
     executed_steps: i64
   }
 
+  struct WorkflowPlan {
+    plan_handle: i64,
+    success_handle: i64,
+    failure_handle: i64,
+    first: WorkflowStep,
+    second: WorkflowStep,
+    third: WorkflowStep,
+    fourth: WorkflowStep
+  }
+
+  struct WorkflowPlanReport {
+    plan_handle: i64,
+    success_handle: i64,
+    failure_handle: i64,
+    workflow: WorkflowReport,
+    selected_summary_handle: i64
+  }
+
   fn build_default_command_context() -> CommandContext {
     return CommandContext {
       env_handle: 0,
@@ -166,6 +184,26 @@ mod cpu Main {
         build_command_context(0, cwd_handle, timeout_ms, true, false, true)
       ),
       fail_fast: fail_fast
+    };
+  }
+
+  fn build_workflow_plan(
+    plan_handle: i64,
+    success_handle: i64,
+    failure_handle: i64,
+    first: WorkflowStep,
+    second: WorkflowStep,
+    third: WorkflowStep,
+    fourth: WorkflowStep
+  ) -> WorkflowPlan {
+    return WorkflowPlan {
+      plan_handle: plan_handle,
+      success_handle: success_handle,
+      failure_handle: failure_handle,
+      first: first,
+      second: second,
+      third: third,
+      fourth: fourth
     };
   }
 
@@ -307,52 +345,95 @@ mod cpu Main {
     };
   }
 
-  fn capture_workflow_runtime_recipe() -> WorkflowReport {
-    let first_step: WorkflowStep = build_workflow_step(3001, 401, 17, true);
-    let second_step: WorkflowStep = build_workflow_step(3002, 503, 29, false);
-    let third_step: WorkflowStep = build_workflow_step_with_context(3003, 601, 31, 1001, 500, false);
-    let fourth_step: WorkflowStep = build_workflow_step_with_context(3004, 701, 37, 1101, 750, true);
-    let first_report: WorkflowStepReport = run_workflow_step(first_step);
+  fn run_workflow_plan(plan: WorkflowPlan) -> WorkflowPlanReport {
+    let first_report: WorkflowStepReport = run_workflow_step(plan.first);
 
-    if first_step.fail_fast && first_report.result.succeeded == false {
-      return build_workflow_report(
+    if plan.first.fail_fast && first_report.result.succeeded == false {
+      let workflow: WorkflowReport = build_workflow_report(
         first_report,
-        skipped_workflow_step(second_step),
-        skipped_workflow_step(third_step),
-        skipped_workflow_step(fourth_step)
+        skipped_workflow_step(plan.second),
+        skipped_workflow_step(plan.third),
+        skipped_workflow_step(plan.fourth)
       );
+      return WorkflowPlanReport {
+        plan_handle: plan.plan_handle,
+        success_handle: plan.success_handle,
+        failure_handle: plan.failure_handle,
+        workflow: workflow,
+        selected_summary_handle: plan.failure_handle
+      };
     }
 
-    let second_report: WorkflowStepReport = run_workflow_step(second_step);
-    if second_step.fail_fast && second_report.result.succeeded == false {
-      return build_workflow_report(
+    let second_report: WorkflowStepReport = run_workflow_step(plan.second);
+    if plan.second.fail_fast && second_report.result.succeeded == false {
+      let workflow: WorkflowReport = build_workflow_report(
         first_report,
         second_report,
-        skipped_workflow_step(third_step),
-        skipped_workflow_step(fourth_step)
+        skipped_workflow_step(plan.third),
+        skipped_workflow_step(plan.fourth)
       );
+      return WorkflowPlanReport {
+        plan_handle: plan.plan_handle,
+        success_handle: plan.success_handle,
+        failure_handle: plan.failure_handle,
+        workflow: workflow,
+        selected_summary_handle: plan.failure_handle
+      };
     }
 
-    let third_report: WorkflowStepReport = run_workflow_step(third_step);
-    if third_step.fail_fast && third_report.result.succeeded == false {
-      return build_workflow_report(
+    let third_report: WorkflowStepReport = run_workflow_step(plan.third);
+    if plan.third.fail_fast && third_report.result.succeeded == false {
+      let workflow: WorkflowReport = build_workflow_report(
         first_report,
         second_report,
         third_report,
-        skipped_workflow_step(fourth_step)
+        skipped_workflow_step(plan.fourth)
       );
+      return WorkflowPlanReport {
+        plan_handle: plan.plan_handle,
+        success_handle: plan.success_handle,
+        failure_handle: plan.failure_handle,
+        workflow: workflow,
+        selected_summary_handle: plan.failure_handle
+      };
     }
 
-    return build_workflow_report(
+    let workflow: WorkflowReport = build_workflow_report(
       first_report,
       second_report,
       third_report,
-      run_workflow_step(fourth_step)
+      run_workflow_step(plan.fourth)
     );
+    if workflow.overall_success {
+      return WorkflowPlanReport {
+        plan_handle: plan.plan_handle,
+        success_handle: plan.success_handle,
+        failure_handle: plan.failure_handle,
+        workflow: workflow,
+        selected_summary_handle: plan.success_handle
+      };
+    }
+    return WorkflowPlanReport {
+      plan_handle: plan.plan_handle,
+      success_handle: plan.success_handle,
+      failure_handle: plan.failure_handle,
+      workflow: workflow,
+      selected_summary_handle: plan.failure_handle
+    };
   }
 
   fn summarize_workflow_runtime_recipe() -> i64 {
-    let report: WorkflowReport = capture_workflow_runtime_recipe();
+    let plan: WorkflowPlan = build_workflow_plan(
+      4101,
+      4201,
+      4203,
+      build_workflow_step(3001, 401, 17, true),
+      build_workflow_step(3002, 503, 29, false),
+      build_workflow_step_with_context(3003, 601, 31, 1001, 500, false),
+      build_workflow_step_with_context(3004, 701, 37, 1101, 750, true)
+    );
+    let plan_report: WorkflowPlanReport = run_workflow_plan(plan);
+    let report: WorkflowReport = plan_report.workflow;
     let overall_bonus: i64 = encode_bool(report.overall_success);
     let first_executed_bonus: i64 = encode_bool(report.first.executed);
     let second_executed_bonus: i64 = encode_bool(report.second.executed);
@@ -377,7 +458,11 @@ mod cpu Main {
     let second_timeout_bonus: i64 = encode_bool(report.second.result.has_timeout);
     let third_timeout_bonus: i64 = encode_bool(report.third.result.has_timeout);
     let fourth_timeout_bonus: i64 = encode_bool(report.fourth.result.has_timeout);
-    return report.first.result.handle
+    return plan_report.plan_handle
+      + plan_report.success_handle
+      + plan_report.failure_handle
+      + plan_report.selected_summary_handle
+      + report.first.result.handle
       + report.first.result.status
       + report.first.result.wait_code
       + report.first.result.wait_exit

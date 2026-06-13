@@ -39,7 +39,8 @@ mod cpu Main {
   struct ProjectBuildSeed {
     prefix_handle: i64,
     cache_name_handle: i64,
-    cache_key_handle: i64
+    cache_key_handle: i64,
+    source_kind_handle: i64
   }
 
   struct ProjectSeed {
@@ -131,27 +132,81 @@ mod cpu Main {
     selected_summary_handle: i64
   }
 
-  struct WorkflowFrontdoorSurface {
-    source_kind_handle: i64,
-    workflow_kind_handle: i64,
-    workflow_brief_handle: i64,
-    workflow_samples_handle: i64,
-    recommended_next_step_handle: i64,
-    recommended_command_handle: i64,
-    recommended_reason_handle: i64
-  }
-
   struct CliProjectBuildSummary {
     session: ProjectSessionSummary,
     artifact: ProjectArtifactSummary,
     manifest: BuildManifest,
     build_report: ProjectBuildPlanReport,
+    diag_code: i64,
+    stdout_code: i64,
+    stderr_code: i64,
+    stdout_flushed: i64,
+    stderr_flushed: i64
+  }
+
+  struct CompileWorkflowReport {
+    doctor: ProjectBuildStepReport,
+    check: ProjectBuildStepReport,
+    test: ProjectBuildStepReport,
+    release: ProjectBuildStepReport,
+    build_selected_summary_handle: i64,
+    build_executed: bool,
+    build_success: bool,
+    first_failure_handle: i64,
+    overall_success: bool,
+    executed_stages: i64
+  }
+
+  struct CompileWorkflowPlanReport {
+    plan_handle: i64,
+    success_handle: i64,
+    failure_handle: i64,
+    project_build: ProjectBuildPlanReport,
+    workflow: CompileWorkflowReport,
+    selected_summary_handle: i64
+  }
+
+  struct CliCompileWorkflowSummary {
+    session: ProjectSessionSummary,
+    artifact: ProjectArtifactSummary,
+    manifest: BuildManifest,
+    workflow: CompileWorkflowPlanReport,
     frontdoor: WorkflowFrontdoorSurface,
     diag_code: i64,
     stdout_code: i64,
     stderr_code: i64,
     stdout_flushed: i64,
     stderr_flushed: i64
+  }
+
+  struct WorkflowRecommendation {
+    next_step_handle: i64,
+    command_handle: i64,
+    reason_handle: i64
+  }
+
+  struct WorkflowSourceProfile {
+    source_kind_handle: i64,
+    workflow_brief_handle: i64,
+    workflow_samples_handle: i64,
+    debug_workflow_handle: i64,
+    debug_samples_handle: i64,
+    default_build_output_handle: i64,
+    default_release_output_handle: i64
+  }
+
+  struct WorkflowFrontdoorSurface {
+    source_kind_handle: i64,
+    workflow_kind_handle: i64,
+    workflow_brief_handle: i64,
+    workflow_samples_handle: i64,
+    debug_workflow_handle: i64,
+    debug_samples_handle: i64,
+    default_build_output_handle: i64,
+    default_release_output_handle: i64,
+    recommended_next_step_handle: i64,
+    recommended_command_handle: i64,
+    recommended_reason_handle: i64
   }
 
   async fn ping(seed: i64) -> i64 {
@@ -186,12 +241,14 @@ mod cpu Main {
   fn build_project_build_seed(
     prefix_handle: i64,
     cache_name_handle: i64,
-    cache_key_handle: i64
+    cache_key_handle: i64,
+    source_kind_handle: i64
   ) -> ProjectBuildSeed {
     return ProjectBuildSeed {
       prefix_handle: prefix_handle,
       cache_name_handle: cache_name_handle,
-      cache_key_handle: cache_key_handle
+      cache_key_handle: cache_key_handle,
+      source_kind_handle: source_kind_handle
     };
   }
 
@@ -204,7 +261,8 @@ mod cpu Main {
     failed_severity: i64,
     prefix_handle: i64,
     cache_name_handle: i64,
-    cache_key_handle: i64
+    cache_key_handle: i64,
+    source_kind_handle: i64
   ) -> ProjectSeed {
     return ProjectSeed {
       cli: build_cli_seed(
@@ -218,7 +276,8 @@ mod cpu Main {
       build: build_project_build_seed(
         prefix_handle,
         cache_name_handle,
-        cache_key_handle
+        cache_key_handle,
+        source_kind_handle
       )
     };
   }
@@ -592,95 +651,415 @@ mod cpu Main {
     };
   }
 
-  fn emit_success_diag(
-    session: ProjectSessionSummary,
-    build_report: ProjectBuildPlanReport,
-    text_handle: i64,
-    severity: i64
-  ) -> i64 {
-    let label_handle: i64 = host_diag_label(text_handle);
-    let span_handle: i64 = host_diag_span(0, session.line_len + build_report.build_report.executed_steps);
-    return host_diag_emit(label_handle, span_handle, severity);
+  fn skipped_project_build_plan(
+    plan_handle: i64,
+    success_handle: i64,
+    failure_handle: i64,
+    manifest: BuildManifest
+  ) -> ProjectBuildPlanReport {
+    let configure_step: ProjectBuildStep =
+      build_project_build_step(6101, 1001, 47, manifest.project_root_handle, 250, true);
+    let verify_step: ProjectBuildStep =
+      build_project_build_step(6102, 1003, 53, manifest.project_root_handle, 500, true);
+    let emit_step: ProjectBuildStep =
+      build_project_build_step(6103, 1005, 59, manifest.project_root_handle, manifest.timeout_budget, true);
+    let report_step: ProjectBuildStep =
+      build_project_build_step(6104, 1007, 61, manifest.artifact_dir_handle, 750, true);
+
+    return ProjectBuildPlanReport {
+      plan_handle: plan_handle,
+      success_handle: success_handle,
+      failure_handle: failure_handle,
+      build_report: skipped_project_report(
+        configure_step,
+        verify_step,
+        emit_step,
+        report_step
+      ),
+      selected_summary_handle: failure_handle
+    };
   }
 
-  fn emit_failure_diag(
-    session: ProjectSessionSummary,
-    build_report: ProjectBuildPlanReport,
-    text_handle: i64,
-    severity: i64
+  fn count_compile_executed_stages(
+    check: ProjectBuildStepReport,
+    test: ProjectBuildStepReport,
+    build_executed: bool,
+    release: ProjectBuildStepReport
   ) -> i64 {
-    let label_handle: i64 = host_diag_label(text_handle);
-    let span_handle: i64 = host_diag_span(0, session.line_len + build_report.build_report.executed_steps);
-    return host_diag_emit(label_handle, span_handle, severity);
+    if check.executed == false {
+      return 1;
+    }
+    if test.executed == false {
+      return 2;
+    }
+    if build_executed == false {
+      return 3;
+    }
+    if release.executed == false {
+      return 4;
+    }
+    return 5;
+  }
+
+  fn build_compile_workflow_report(
+    doctor: ProjectBuildStepReport,
+    check: ProjectBuildStepReport,
+    test: ProjectBuildStepReport,
+    project_build: ProjectBuildPlanReport,
+    build_executed: bool,
+    release: ProjectBuildStepReport
+  ) -> CompileWorkflowReport {
+    if build_step_failed(doctor) {
+      return CompileWorkflowReport {
+        doctor: doctor,
+        check: check,
+        test: test,
+        release: release,
+        build_selected_summary_handle: project_build.selected_summary_handle,
+        build_executed: build_executed,
+        build_success: project_build.build_report.overall_success,
+        first_failure_handle: doctor.name_handle,
+        overall_success: false,
+        executed_stages: count_compile_executed_stages(check, test, build_executed, release)
+      };
+    }
+    if build_step_failed(check) {
+      return CompileWorkflowReport {
+        doctor: doctor,
+        check: check,
+        test: test,
+        release: release,
+        build_selected_summary_handle: project_build.selected_summary_handle,
+        build_executed: build_executed,
+        build_success: project_build.build_report.overall_success,
+        first_failure_handle: check.name_handle,
+        overall_success: false,
+        executed_stages: count_compile_executed_stages(check, test, build_executed, release)
+      };
+    }
+    if build_step_failed(test) {
+      return CompileWorkflowReport {
+        doctor: doctor,
+        check: check,
+        test: test,
+        release: release,
+        build_selected_summary_handle: project_build.selected_summary_handle,
+        build_executed: build_executed,
+        build_success: project_build.build_report.overall_success,
+        first_failure_handle: test.name_handle,
+        overall_success: false,
+        executed_stages: count_compile_executed_stages(check, test, build_executed, release)
+      };
+    }
+    if project_build.build_report.overall_success == false {
+      return CompileWorkflowReport {
+        doctor: doctor,
+        check: check,
+        test: test,
+        release: release,
+        build_selected_summary_handle: project_build.selected_summary_handle,
+        build_executed: build_executed,
+        build_success: false,
+        first_failure_handle: project_build.build_report.first_failure_handle,
+        overall_success: false,
+        executed_stages: count_compile_executed_stages(check, test, build_executed, release)
+      };
+    }
+    if build_step_failed(release) {
+      return CompileWorkflowReport {
+        doctor: doctor,
+        check: check,
+        test: test,
+        release: release,
+        build_selected_summary_handle: project_build.selected_summary_handle,
+        build_executed: build_executed,
+        build_success: true,
+        first_failure_handle: release.name_handle,
+        overall_success: false,
+        executed_stages: 5
+      };
+    }
+    return CompileWorkflowReport {
+      doctor: doctor,
+      check: check,
+      test: test,
+      release: release,
+      build_selected_summary_handle: project_build.selected_summary_handle,
+      build_executed: build_executed,
+      build_success: true,
+      first_failure_handle: 0,
+      overall_success: true,
+      executed_stages: 5
+    };
+  }
+
+  fn skipped_compile_workflow_report(
+    doctor: ProjectBuildStep,
+    check: ProjectBuildStep,
+    test: ProjectBuildStep,
+    project_build: ProjectBuildPlanReport,
+    release: ProjectBuildStep
+  ) -> CompileWorkflowReport {
+    return CompileWorkflowReport {
+      doctor: skipped_build_step(doctor),
+      check: skipped_build_step(check),
+      test: skipped_build_step(test),
+      release: skipped_build_step(release),
+      build_selected_summary_handle: project_build.selected_summary_handle,
+      build_executed: false,
+      build_success: false,
+      first_failure_handle: doctor.name_handle,
+      overall_success: false,
+      executed_stages: 0
+    };
+  }
+
+  fn run_compile_workflow_plan(
+    plan_handle: i64,
+    success_handle: i64,
+    failure_handle: i64,
+    session: ProjectSessionSummary,
+    manifest: BuildManifest
+  ) -> CompileWorkflowPlanReport {
+    let doctor_step: ProjectBuildStep =
+      build_project_build_step(8101, 1101, 67, manifest.project_root_handle, 250, true);
+    let check_step: ProjectBuildStep =
+      build_project_build_step(8102, 1103, 71, manifest.project_root_handle, 500, true);
+    let test_step: ProjectBuildStep =
+      build_project_build_step(8103, 1105, 73, manifest.project_root_handle, manifest.timeout_budget, true);
+    let release_step: ProjectBuildStep =
+      build_project_build_step(8105, 1109, 79, manifest.artifact_dir_handle, 750, true);
+    let skipped_build: ProjectBuildPlanReport =
+      skipped_project_build_plan(9101, 9201, 9203, manifest);
+
+    if session.completed == false {
+      return CompileWorkflowPlanReport {
+        plan_handle: plan_handle,
+        success_handle: success_handle,
+        failure_handle: failure_handle,
+        project_build: skipped_build,
+        workflow: skipped_compile_workflow_report(
+          doctor_step,
+          check_step,
+          test_step,
+          skipped_build,
+          release_step
+        ),
+        selected_summary_handle: failure_handle
+      };
+    }
+
+    let doctor_report: ProjectBuildStepReport = run_build_step(doctor_step);
+    if build_should_stop(doctor_step, doctor_report) {
+      return CompileWorkflowPlanReport {
+        plan_handle: plan_handle,
+        success_handle: success_handle,
+        failure_handle: failure_handle,
+        project_build: skipped_build,
+        workflow: build_compile_workflow_report(
+          doctor_report,
+          skipped_build_step(check_step),
+          skipped_build_step(test_step),
+          skipped_build,
+          false,
+          skipped_build_step(release_step)
+        ),
+        selected_summary_handle: failure_handle
+      };
+    }
+
+    let check_report: ProjectBuildStepReport = run_build_step(check_step);
+    if build_should_stop(check_step, check_report) {
+      return CompileWorkflowPlanReport {
+        plan_handle: plan_handle,
+        success_handle: success_handle,
+        failure_handle: failure_handle,
+        project_build: skipped_build,
+        workflow: build_compile_workflow_report(
+          doctor_report,
+          check_report,
+          skipped_build_step(test_step),
+          skipped_build,
+          false,
+          skipped_build_step(release_step)
+        ),
+        selected_summary_handle: failure_handle
+      };
+    }
+
+    let test_report: ProjectBuildStepReport = run_build_step(test_step);
+    if build_should_stop(test_step, test_report) {
+      return CompileWorkflowPlanReport {
+        plan_handle: plan_handle,
+        success_handle: success_handle,
+        failure_handle: failure_handle,
+        project_build: skipped_build,
+        workflow: build_compile_workflow_report(
+          doctor_report,
+          check_report,
+          test_report,
+          skipped_build,
+          false,
+          skipped_build_step(release_step)
+        ),
+        selected_summary_handle: failure_handle
+      };
+    }
+
+    let project_build: ProjectBuildPlanReport =
+      run_project_build_plan(9101, 9201, 9203, session, manifest);
+    if project_build.build_report.overall_success == false {
+      return CompileWorkflowPlanReport {
+        plan_handle: plan_handle,
+        success_handle: success_handle,
+        failure_handle: failure_handle,
+        project_build: project_build,
+        workflow: build_compile_workflow_report(
+          doctor_report,
+          check_report,
+          test_report,
+          project_build,
+          true,
+          skipped_build_step(release_step)
+        ),
+        selected_summary_handle: failure_handle
+      };
+    }
+
+    let release_report: ProjectBuildStepReport = run_build_step(release_step);
+    let workflow: CompileWorkflowReport = build_compile_workflow_report(
+      doctor_report,
+      check_report,
+      test_report,
+      project_build,
+      true,
+      release_report
+    );
+    if workflow.overall_success {
+      return CompileWorkflowPlanReport {
+        plan_handle: plan_handle,
+        success_handle: success_handle,
+        failure_handle: failure_handle,
+        project_build: project_build,
+        workflow: workflow,
+        selected_summary_handle: success_handle
+      };
+    }
+    return CompileWorkflowPlanReport {
+      plan_handle: plan_handle,
+      success_handle: success_handle,
+      failure_handle: failure_handle,
+      project_build: project_build,
+      workflow: workflow,
+      selected_summary_handle: failure_handle
+    };
+  }
+
+  fn summarize_compile_workflow_brief_handle() -> i64 {
+    return 12001;
+  }
+
+  fn summarize_compile_workflow_samples_handle() -> i64 {
+    return 12003;
+  }
+
+  fn select_workflow_source_profile(source_kind_handle: i64) -> WorkflowSourceProfile {
+    if source_kind_handle == 13001 {
+      return WorkflowSourceProfile {
+        source_kind_handle: source_kind_handle,
+        workflow_brief_handle: 13003,
+        workflow_samples_handle: 13005,
+        debug_workflow_handle: 13011,
+        debug_samples_handle: 13013,
+        default_build_output_handle: 13007,
+        default_release_output_handle: 13009
+      };
+    }
+    return WorkflowSourceProfile {
+      source_kind_handle: 13021,
+      workflow_brief_handle: 13023,
+      workflow_samples_handle: 13025,
+      debug_workflow_handle: 13031,
+      debug_samples_handle: 13033,
+      default_build_output_handle: 13027,
+      default_release_output_handle: 13029
+    };
+  }
+
+  fn recommend_compile_workflow_step(
+    session: ProjectSessionSummary,
+    workflow: CompileWorkflowPlanReport
+  ) -> WorkflowRecommendation {
+    if session.completed == false {
+      return WorkflowRecommendation {
+        next_step_handle: 12101,
+        command_handle: 12103,
+        reason_handle: 12105
+      };
+    }
+    if build_step_failed(workflow.workflow.doctor) {
+      return WorkflowRecommendation {
+        next_step_handle: 12111,
+        command_handle: 12113,
+        reason_handle: 12115
+      };
+    }
+    if build_step_failed(workflow.workflow.check) {
+      return WorkflowRecommendation {
+        next_step_handle: 12121,
+        command_handle: 12123,
+        reason_handle: 12125
+      };
+    }
+    if build_step_failed(workflow.workflow.test) {
+      return WorkflowRecommendation {
+        next_step_handle: 12131,
+        command_handle: 12133,
+        reason_handle: 12135
+      };
+    }
+    if workflow.project_build.build_report.overall_success == false {
+      return WorkflowRecommendation {
+        next_step_handle: 12141,
+        command_handle: 12143,
+        reason_handle: 12145
+      };
+    }
+    if build_step_failed(workflow.workflow.release) {
+      return WorkflowRecommendation {
+        next_step_handle: 12151,
+        command_handle: 12153,
+        reason_handle: 12155
+      };
+    }
+    return WorkflowRecommendation {
+      next_step_handle: 12161,
+      command_handle: 12163,
+      reason_handle: 12165
+    };
   }
 
   fn build_frontdoor_surface(
+    source_kind_handle: i64,
     session: ProjectSessionSummary,
-    build_report: ProjectBuildPlanReport
+    workflow: CompileWorkflowPlanReport
   ) -> WorkflowFrontdoorSurface {
-    if session.completed == false {
-      return WorkflowFrontdoorSurface {
-        source_kind_handle: 13021,
-        workflow_kind_handle: 12201,
-        workflow_brief_handle: 15003,
-        workflow_samples_handle: 15005,
-        recommended_next_step_handle: 15031,
-        recommended_command_handle: 15033,
-        recommended_reason_handle: 15035
-      };
-    }
-    if build_step_failed(build_report.build_report.configure) {
-      return WorkflowFrontdoorSurface {
-        source_kind_handle: 13021,
-        workflow_kind_handle: 12201,
-        workflow_brief_handle: 15003,
-        workflow_samples_handle: 15005,
-        recommended_next_step_handle: 15041,
-        recommended_command_handle: 15043,
-        recommended_reason_handle: 15045
-      };
-    }
-    if build_step_failed(build_report.build_report.verify) {
-      return WorkflowFrontdoorSurface {
-        source_kind_handle: 13021,
-        workflow_kind_handle: 12201,
-        workflow_brief_handle: 15003,
-        workflow_samples_handle: 15005,
-        recommended_next_step_handle: 15051,
-        recommended_command_handle: 15053,
-        recommended_reason_handle: 15055
-      };
-    }
-    if build_step_failed(build_report.build_report.emit) {
-      return WorkflowFrontdoorSurface {
-        source_kind_handle: 13021,
-        workflow_kind_handle: 12201,
-        workflow_brief_handle: 15003,
-        workflow_samples_handle: 15005,
-        recommended_next_step_handle: 15061,
-        recommended_command_handle: 15063,
-        recommended_reason_handle: 15065
-      };
-    }
-    if build_step_failed(build_report.build_report.report) {
-      return WorkflowFrontdoorSurface {
-        source_kind_handle: 13021,
-        workflow_kind_handle: 12201,
-        workflow_brief_handle: 15003,
-        workflow_samples_handle: 15005,
-        recommended_next_step_handle: 15071,
-        recommended_command_handle: 15073,
-        recommended_reason_handle: 15075
-      };
-    }
+    let recommendation: WorkflowRecommendation =
+      recommend_compile_workflow_step(session, workflow);
+    let source_profile: WorkflowSourceProfile =
+      select_workflow_source_profile(source_kind_handle);
     return WorkflowFrontdoorSurface {
-      source_kind_handle: 13021,
+      source_kind_handle: source_profile.source_kind_handle,
       workflow_kind_handle: 12201,
-      workflow_brief_handle: 15003,
-      workflow_samples_handle: 15005,
-      recommended_next_step_handle: 15081,
-      recommended_command_handle: 15083,
-      recommended_reason_handle: 15085
+      workflow_brief_handle: source_profile.workflow_brief_handle,
+      workflow_samples_handle: source_profile.workflow_samples_handle,
+      debug_workflow_handle: source_profile.debug_workflow_handle,
+      debug_samples_handle: source_profile.debug_samples_handle,
+      default_build_output_handle: source_profile.default_build_output_handle,
+      default_release_output_handle: source_profile.default_release_output_handle,
+      recommended_next_step_handle: recommendation.next_step_handle,
+      recommended_command_handle: recommendation.command_handle,
+      recommended_reason_handle: recommendation.reason_handle
     };
   }
 
@@ -689,9 +1068,45 @@ mod cpu Main {
       + surface.workflow_kind_handle
       + surface.workflow_brief_handle
       + surface.workflow_samples_handle
+      + surface.debug_workflow_handle
+      + surface.debug_samples_handle
+      + surface.default_build_output_handle
+      + surface.default_release_output_handle
       + surface.recommended_next_step_handle
       + surface.recommended_command_handle
       + surface.recommended_reason_handle;
+  }
+
+  fn emit_success_diag(
+    session: ProjectSessionSummary,
+    workflow: CompileWorkflowPlanReport,
+    text_handle: i64,
+    severity: i64
+  ) -> i64 {
+    let label_handle: i64 = host_diag_label(text_handle);
+    let span_handle: i64 = host_diag_span(
+      0,
+      session.line_len
+        + workflow.workflow.executed_stages
+        + workflow.project_build.build_report.executed_steps
+    );
+    return host_diag_emit(label_handle, span_handle, severity);
+  }
+
+  fn emit_failure_diag(
+    session: ProjectSessionSummary,
+    workflow: CompileWorkflowPlanReport,
+    text_handle: i64,
+    severity: i64
+  ) -> i64 {
+    let label_handle: i64 = host_diag_label(text_handle);
+    let span_handle: i64 = host_diag_span(
+      0,
+      session.line_len
+        + workflow.workflow.executed_stages
+        + workflow.project_build.build_report.executed_steps
+    );
+    return host_diag_emit(label_handle, span_handle, severity);
   }
 
   fn build_success_summary(
@@ -699,19 +1114,19 @@ mod cpu Main {
     session: ProjectSessionSummary,
     artifact: ProjectArtifactSummary,
     manifest: BuildManifest,
-    build_report: ProjectBuildPlanReport
-  ) -> CliProjectBuildSummary {
+    workflow: CompileWorkflowPlanReport
+  ) -> CliCompileWorkflowSummary {
     let frontdoor: WorkflowFrontdoorSurface =
-      build_frontdoor_surface(session, build_report);
-    return CliProjectBuildSummary {
+      build_frontdoor_surface(seed.build.source_kind_handle, session, workflow);
+    return CliCompileWorkflowSummary {
       session: session,
       artifact: artifact,
       manifest: manifest,
-      build_report: build_report,
+      workflow: workflow,
       frontdoor: frontdoor,
       diag_code: emit_success_diag(
         session,
-        build_report,
+        workflow,
         seed.cli.ready_text_handle,
         seed.cli.ready_severity
       ),
@@ -727,19 +1142,19 @@ mod cpu Main {
     session: ProjectSessionSummary,
     artifact: ProjectArtifactSummary,
     manifest: BuildManifest,
-    build_report: ProjectBuildPlanReport
-  ) -> CliProjectBuildSummary {
+    workflow: CompileWorkflowPlanReport
+  ) -> CliCompileWorkflowSummary {
     let frontdoor: WorkflowFrontdoorSurface =
-      build_frontdoor_surface(session, build_report);
-    return CliProjectBuildSummary {
+      build_frontdoor_surface(seed.build.source_kind_handle, session, workflow);
+    return CliCompileWorkflowSummary {
       session: session,
       artifact: artifact,
       manifest: manifest,
-      build_report: build_report,
+      workflow: workflow,
       frontdoor: frontdoor,
       diag_code: emit_failure_diag(
         session,
-        build_report,
+        workflow,
         seed.cli.failed_text_handle,
         seed.cli.failed_severity
       ),
@@ -750,21 +1165,21 @@ mod cpu Main {
     };
   }
 
-  fn capture_cli_project_build(seed: ProjectSeed) -> CliProjectBuildSummary {
+  fn capture_cli_compile_workflow(seed: ProjectSeed) -> CliCompileWorkflowSummary {
     let session: ProjectSessionSummary = capture_project_session(seed.cli);
     let artifact: ProjectArtifactSummary =
       capture_project_artifact(seed.build, session.target_handle);
     let manifest: BuildManifest = build_manifest(session, artifact);
-    let build_report: ProjectBuildPlanReport =
-      run_project_build_plan(7101, 7201, 7203, session, manifest);
+    let workflow: CompileWorkflowPlanReport =
+      run_compile_workflow_plan(10101, 10201, 10203, session, manifest);
 
     if session.completed == false {
-      return build_failure_summary(seed, session, artifact, manifest, build_report);
+      return build_failure_summary(seed, session, artifact, manifest, workflow);
     }
-    if build_report.build_report.overall_success {
-      return build_success_summary(seed, session, artifact, manifest, build_report);
+    if workflow.workflow.overall_success {
+      return build_success_summary(seed, session, artifact, manifest, workflow);
     }
-    return build_failure_summary(seed, session, artifact, manifest, build_report);
+    return build_failure_summary(seed, session, artifact, manifest, workflow);
   }
 
   fn summarize_build_step(report: ProjectBuildStepReport) -> i64 {
@@ -801,7 +1216,29 @@ mod cpu Main {
       + summarize_project_report(report.build_report);
   }
 
-  fn summarize_cli_project_build_report_recipe(
+  fn summarize_compile_workflow_report(report: CompileWorkflowReport) -> i64 {
+    return summarize_build_step(report.doctor)
+      + summarize_build_step(report.check)
+      + summarize_build_step(report.test)
+      + summarize_build_step(report.release)
+      + report.build_selected_summary_handle
+      + encode_bool(report.build_executed)
+      + encode_bool(report.build_success)
+      + report.first_failure_handle
+      + encode_bool(report.overall_success)
+      + report.executed_stages;
+  }
+
+  fn summarize_compile_workflow_plan_report(report: CompileWorkflowPlanReport) -> i64 {
+    return report.plan_handle
+      + report.success_handle
+      + report.failure_handle
+      + report.selected_summary_handle
+      + summarize_project_build_plan_report(report.project_build)
+      + summarize_compile_workflow_report(report.workflow);
+  }
+
+  fn summarize_cli_compile_workflow_recipe(
     prompt_handle: i64,
     ready_text_handle: i64,
     failed_text_handle: i64,
@@ -810,7 +1247,8 @@ mod cpu Main {
     failed_severity: i64,
     prefix_handle: i64,
     cache_name_handle: i64,
-    cache_key_handle: i64
+    cache_key_handle: i64,
+    source_kind_handle: i64
   ) -> i64 {
     let seed: ProjectSeed = build_project_seed(
       prompt_handle,
@@ -821,9 +1259,10 @@ mod cpu Main {
       failed_severity,
       prefix_handle,
       cache_name_handle,
-      cache_key_handle
+      cache_key_handle,
+      source_kind_handle
     );
-    let summary: CliProjectBuildSummary = capture_cli_project_build(seed);
+    let summary: CliCompileWorkflowSummary = capture_cli_compile_workflow(seed);
     return summary.session.argv_count
       + summary.session.line_handle
       + summary.session.line_len
@@ -843,7 +1282,7 @@ mod cpu Main {
       + summary.manifest.manifest_value_handle
       + summary.manifest.timeout_budget
       + summarize_frontdoor_surface(summary.frontdoor)
-      + summarize_project_build_plan_report(summary.build_report)
+      + summarize_compile_workflow_plan_report(summary.workflow)
       + summary.diag_code
       + summary.stdout_code
       + summary.stderr_code
@@ -852,7 +1291,7 @@ mod cpu Main {
   }
 
   fn main() {
-    print(summarize_cli_project_build_report_recipe(
+    print(summarize_cli_compile_workflow_recipe(
       701,
       2701,
       2703,
@@ -861,7 +1300,8 @@ mod cpu Main {
       2,
       2401,
       1607,
-      41
+      41,
+      13001
     ));
   }
 }

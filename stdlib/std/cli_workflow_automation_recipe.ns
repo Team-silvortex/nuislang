@@ -114,10 +114,21 @@ mod cpu Main {
     executed_steps: i64
   }
 
+  struct WorkflowFrontdoorSurface {
+    source_kind_handle: i64,
+    workflow_kind_handle: i64,
+    workflow_brief_handle: i64,
+    workflow_samples_handle: i64,
+    recommended_next_step_handle: i64,
+    recommended_command_handle: i64,
+    recommended_reason_handle: i64
+  }
+
   struct CombinedSummary {
     cli: CliSummary,
     automation: AutomationSummary,
     workflow: WorkflowQuadReport,
+    frontdoor: WorkflowFrontdoorSurface,
     diag_code: i64,
     stdout_code: i64,
     stderr_code: i64,
@@ -543,16 +554,98 @@ mod cpu Main {
     return host_diag_emit(label_handle, span_handle, err_severity);
   }
 
+  fn build_frontdoor_surface(
+    cli: CliSummary,
+    workflow: WorkflowQuadReport
+  ) -> WorkflowFrontdoorSurface {
+    if cli.completed == false {
+      return WorkflowFrontdoorSurface {
+        source_kind_handle: 13021,
+        workflow_kind_handle: 12201,
+        workflow_brief_handle: 16003,
+        workflow_samples_handle: 16005,
+        recommended_next_step_handle: 16031,
+        recommended_command_handle: 16033,
+        recommended_reason_handle: 16035
+      };
+    }
+    if workflow_step_failed(workflow.first) {
+      return WorkflowFrontdoorSurface {
+        source_kind_handle: 13021,
+        workflow_kind_handle: 12201,
+        workflow_brief_handle: 16003,
+        workflow_samples_handle: 16005,
+        recommended_next_step_handle: 16041,
+        recommended_command_handle: 16043,
+        recommended_reason_handle: 16045
+      };
+    }
+    if workflow_step_failed(workflow.second) {
+      return WorkflowFrontdoorSurface {
+        source_kind_handle: 13021,
+        workflow_kind_handle: 12201,
+        workflow_brief_handle: 16003,
+        workflow_samples_handle: 16005,
+        recommended_next_step_handle: 16051,
+        recommended_command_handle: 16053,
+        recommended_reason_handle: 16055
+      };
+    }
+    if workflow_step_failed(workflow.third) {
+      return WorkflowFrontdoorSurface {
+        source_kind_handle: 13021,
+        workflow_kind_handle: 12201,
+        workflow_brief_handle: 16003,
+        workflow_samples_handle: 16005,
+        recommended_next_step_handle: 16061,
+        recommended_command_handle: 16063,
+        recommended_reason_handle: 16065
+      };
+    }
+    if workflow_step_failed(workflow.fourth) {
+      return WorkflowFrontdoorSurface {
+        source_kind_handle: 13021,
+        workflow_kind_handle: 12201,
+        workflow_brief_handle: 16003,
+        workflow_samples_handle: 16005,
+        recommended_next_step_handle: 16071,
+        recommended_command_handle: 16073,
+        recommended_reason_handle: 16075
+      };
+    }
+    return WorkflowFrontdoorSurface {
+      source_kind_handle: 13021,
+      workflow_kind_handle: 12201,
+      workflow_brief_handle: 16003,
+      workflow_samples_handle: 16005,
+      recommended_next_step_handle: 16081,
+      recommended_command_handle: 16083,
+      recommended_reason_handle: 16085
+    };
+  }
+
+  fn summarize_frontdoor_surface(surface: WorkflowFrontdoorSurface) -> i64 {
+    return surface.source_kind_handle
+      + surface.workflow_kind_handle
+      + surface.workflow_brief_handle
+      + surface.workflow_samples_handle
+      + surface.recommended_next_step_handle
+      + surface.recommended_command_handle
+      + surface.recommended_reason_handle;
+  }
+
   fn build_success_summary(
     seed: CombinedSeed,
     cli: CliSummary,
     automation: AutomationSummary,
     workflow: WorkflowQuadReport
   ) -> CombinedSummary {
+    let frontdoor: WorkflowFrontdoorSurface = build_frontdoor_surface(cli, workflow);
     return CombinedSummary {
       cli: cli,
       automation: automation,
       workflow: workflow,
+      frontdoor: frontdoor,
       diag_code: emit_report(
         cli,
         workflow,
@@ -574,10 +667,12 @@ mod cpu Main {
     automation: AutomationSummary,
     workflow: WorkflowQuadReport
   ) -> CombinedSummary {
+    let frontdoor: WorkflowFrontdoorSurface = build_frontdoor_surface(cli, workflow);
     return CombinedSummary {
       cli: cli,
       automation: automation,
       workflow: workflow,
+      frontdoor: frontdoor,
       diag_code: emit_report(
         cli,
         workflow,
@@ -683,6 +778,7 @@ mod cpu Main {
       + summary.automation.cache_hit_handle
       + summary.automation.cache_store_code
       + summarize_quad_report(summary.workflow)
+      + summarize_frontdoor_surface(summary.frontdoor)
       + summary.diag_code
       + summary.stdout_code
       + summary.stderr_code

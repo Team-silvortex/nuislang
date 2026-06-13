@@ -1,0 +1,167 @@
+mod cpu Main {
+  struct WorkflowRecommendation {
+    next_step_handle: i64,
+    command_handle: i64,
+    reason_handle: i64
+  }
+
+  struct WorkflowSourceProfile {
+    source_kind_handle: i64,
+    workflow_kind_handle: i64,
+    workflow_brief_handle: i64,
+    workflow_samples_handle: i64,
+    debug_workflow_handle: i64,
+    debug_samples_handle: i64,
+    default_build_output_handle: i64,
+    default_release_output_handle: i64
+  }
+
+  struct WorkflowFrontdoorSurface {
+    source_kind_handle: i64,
+    workflow_kind_handle: i64,
+    workflow_brief_handle: i64,
+    workflow_samples_handle: i64,
+    debug_workflow_handle: i64,
+    debug_samples_handle: i64,
+    default_build_output_handle: i64,
+    default_release_output_handle: i64,
+    recommended_next_step_handle: i64,
+    recommended_command_handle: i64,
+    recommended_reason_handle: i64
+  }
+
+  fn build_workflow_recommendation(
+    next_step_handle: i64,
+    command_handle: i64,
+    reason_handle: i64
+  ) -> WorkflowRecommendation {
+    return WorkflowRecommendation {
+      next_step_handle: next_step_handle,
+      command_handle: command_handle,
+      reason_handle: reason_handle
+    };
+  }
+
+  fn build_workflow_source_profile(
+    source_kind_handle: i64,
+    workflow_kind_handle: i64,
+    workflow_brief_handle: i64,
+    workflow_samples_handle: i64,
+    debug_workflow_handle: i64,
+    debug_samples_handle: i64,
+    default_build_output_handle: i64,
+    default_release_output_handle: i64
+  ) -> WorkflowSourceProfile {
+    return WorkflowSourceProfile {
+      source_kind_handle: source_kind_handle,
+      workflow_kind_handle: workflow_kind_handle,
+      workflow_brief_handle: workflow_brief_handle,
+      workflow_samples_handle: workflow_samples_handle,
+      debug_workflow_handle: debug_workflow_handle,
+      debug_samples_handle: debug_samples_handle,
+      default_build_output_handle: default_build_output_handle,
+      default_release_output_handle: default_release_output_handle
+    };
+  }
+
+  fn build_workflow_frontdoor_surface(
+    profile: WorkflowSourceProfile,
+    recommendation: WorkflowRecommendation
+  ) -> WorkflowFrontdoorSurface {
+    return WorkflowFrontdoorSurface {
+      source_kind_handle: profile.source_kind_handle,
+      workflow_kind_handle: profile.workflow_kind_handle,
+      workflow_brief_handle: profile.workflow_brief_handle,
+      workflow_samples_handle: profile.workflow_samples_handle,
+      debug_workflow_handle: profile.debug_workflow_handle,
+      debug_samples_handle: profile.debug_samples_handle,
+      default_build_output_handle: profile.default_build_output_handle,
+      default_release_output_handle: profile.default_release_output_handle,
+      recommended_next_step_handle: recommendation.next_step_handle,
+      recommended_command_handle: recommendation.command_handle,
+      recommended_reason_handle: recommendation.reason_handle
+    };
+  }
+
+  fn summarize_workflow_recommendation(recommendation: WorkflowRecommendation) -> i64 {
+    return recommendation.next_step_handle
+      + recommendation.command_handle
+      + recommendation.reason_handle;
+  }
+
+  fn summarize_workflow_source_profile(profile: WorkflowSourceProfile) -> i64 {
+    return profile.source_kind_handle
+      + profile.workflow_kind_handle
+      + profile.workflow_brief_handle
+      + profile.workflow_samples_handle
+      + profile.debug_workflow_handle
+      + profile.debug_samples_handle
+      + profile.default_build_output_handle
+      + profile.default_release_output_handle;
+  }
+
+  fn summarize_workflow_frontdoor_surface(surface: WorkflowFrontdoorSurface) -> i64 {
+    return surface.source_kind_handle
+      + surface.workflow_kind_handle
+      + surface.workflow_brief_handle
+      + surface.workflow_samples_handle
+      + surface.debug_workflow_handle
+      + surface.debug_samples_handle
+      + surface.default_build_output_handle
+      + surface.default_release_output_handle
+      + surface.recommended_next_step_handle
+      + surface.recommended_command_handle
+      + surface.recommended_reason_handle;
+  }
+
+  fn summarize_workflow_frontdoor_runtime_recipe(
+    source_kind_handle: i64,
+    workflow_kind_handle: i64,
+    workflow_brief_handle: i64,
+    workflow_samples_handle: i64,
+    debug_workflow_handle: i64,
+    debug_samples_handle: i64,
+    default_build_output_handle: i64,
+    default_release_output_handle: i64,
+    next_step_handle: i64,
+    command_handle: i64,
+    reason_handle: i64
+  ) -> i64 {
+    let profile: WorkflowSourceProfile = build_workflow_source_profile(
+      source_kind_handle,
+      workflow_kind_handle,
+      workflow_brief_handle,
+      workflow_samples_handle,
+      debug_workflow_handle,
+      debug_samples_handle,
+      default_build_output_handle,
+      default_release_output_handle
+    );
+    let recommendation: WorkflowRecommendation = build_workflow_recommendation(
+      next_step_handle,
+      command_handle,
+      reason_handle
+    );
+    let surface: WorkflowFrontdoorSurface =
+      build_workflow_frontdoor_surface(profile, recommendation);
+    return summarize_workflow_source_profile(profile)
+      + summarize_workflow_recommendation(recommendation)
+      + summarize_workflow_frontdoor_surface(surface);
+  }
+
+  fn main() {
+    print(summarize_workflow_frontdoor_runtime_recipe(
+      13001,
+      12201,
+      13003,
+      13005,
+      13011,
+      13013,
+      13007,
+      13009,
+      12161,
+      12163,
+      12165
+    ));
+  }
+}

@@ -36,7 +36,12 @@ fn run() -> Result<(), String> {
         cli::CommandKind::Status => {
             let index = nuisc::registry::load_index(std::path::Path::new("nustar-packages"))?;
             let engine = nuisc::engine::default_engine();
+            let frontdoor = toolchain_frontdoor_surface();
             println!("nuis toolchain frontdoor");
+            print_workflow_frontdoor_surface(&frontdoor);
+            println!("  recommended_next_step: {}", frontdoor.recommended_next_step);
+            println!("  recommended_command: {}", frontdoor.recommended_command);
+            println!("  recommended_reason: {}", frontdoor.recommended_reason);
             println!("  tool: nuis");
             println!("  compiler_core: nuisc");
             println!("  resident_control: nuis-rc");
@@ -827,6 +832,131 @@ struct WorkflowRecommendation {
     reason: &'static str,
 }
 
+struct WorkflowSourceProfile {
+    source_kind: &'static str,
+    workflow_kind: &'static str,
+    workflow_brief: &'static str,
+    workflow_samples: &'static str,
+}
+
+struct WorkflowFrontdoorSurface {
+    source_kind: &'static str,
+    workflow_kind: &'static str,
+    workflow_brief: &'static str,
+    workflow_samples: &'static str,
+    recommended_next_step: &'static str,
+    recommended_command: &'static str,
+    recommended_reason: &'static str,
+}
+
+fn build_workflow_frontdoor_surface(
+    profile: WorkflowSourceProfile,
+    recommendation: WorkflowRecommendation,
+) -> WorkflowFrontdoorSurface {
+    WorkflowFrontdoorSurface {
+        source_kind: profile.source_kind,
+        workflow_kind: profile.workflow_kind,
+        workflow_brief: profile.workflow_brief,
+        workflow_samples: profile.workflow_samples,
+        recommended_next_step: recommendation.label,
+        recommended_command: recommendation.command,
+        recommended_reason: recommendation.reason,
+    }
+}
+
+fn workflow_frontdoor_json_fields(surface: &WorkflowFrontdoorSurface) -> Vec<String> {
+    vec![
+        json_field("source_kind", surface.source_kind),
+        json_field("workflow_kind", surface.workflow_kind),
+        json_field("workflow_brief", surface.workflow_brief),
+        json_field("workflow_samples", surface.workflow_samples),
+        json_field("recommended_next_step", surface.recommended_next_step),
+        json_field("recommended_command", surface.recommended_command),
+        json_field("recommended_reason", surface.recommended_reason),
+    ]
+}
+
+fn print_workflow_frontdoor_surface(surface: &WorkflowFrontdoorSurface) {
+    println!("  frontdoor.source_kind: {}", surface.source_kind);
+    println!("  frontdoor.workflow_kind: {}", surface.workflow_kind);
+    println!("  frontdoor.workflow_brief: {}", surface.workflow_brief);
+    print_scheduler_sample_field("frontdoor.workflow_samples", surface.workflow_samples);
+    println!(
+        "  frontdoor.recommended_next_step: {}",
+        surface.recommended_next_step
+    );
+    println!(
+        "  frontdoor.recommended_command: {}",
+        surface.recommended_command
+    );
+    println!(
+        "  frontdoor.recommended_reason: {}",
+        surface.recommended_reason
+    );
+}
+
+fn single_source_workflow_source_profile() -> WorkflowSourceProfile {
+    WorkflowSourceProfile {
+        source_kind: "single-file",
+        workflow_kind: "compile_workflow",
+        workflow_brief: single_source_compile_workflow_brief(),
+        workflow_samples: single_source_compile_samples_brief(),
+    }
+}
+
+fn project_compile_workflow_source_profile() -> WorkflowSourceProfile {
+    WorkflowSourceProfile {
+        source_kind: "project",
+        workflow_kind: "project_compile_workflow",
+        workflow_brief: nuisc::project_compile_workflow_brief(),
+        workflow_samples: nuisc::project_compile_samples_brief(),
+    }
+}
+
+fn project_frontdoor_surface(
+    plan: &nuisc::project::ProjectCompilationPlan,
+    declared_tests: &[PathBuf],
+    missing_tests: &[PathBuf],
+    galaxy_doctor: &galaxy::GalaxyDoctorReport,
+    galaxy_check_invalid: bool,
+) -> WorkflowFrontdoorSurface {
+    let recommendation = recommend_project_workflow_step(
+        plan,
+        declared_tests,
+        missing_tests,
+        galaxy_doctor,
+        galaxy_check_invalid,
+    );
+    build_workflow_frontdoor_surface(project_compile_workflow_source_profile(), recommendation)
+}
+
+fn single_source_frontdoor_surface() -> WorkflowFrontdoorSurface {
+    build_workflow_frontdoor_surface(
+        single_source_workflow_source_profile(),
+        WorkflowRecommendation {
+            label: single_source_workflow_next_step_label(),
+            command: recommended_single_source_workflow_command(),
+            reason: "single-file inputs usually want direct compile truth first, so `check` stays the best default front-door step",
+        },
+    )
+}
+
+fn toolchain_frontdoor_surface() -> WorkflowFrontdoorSurface {
+    build_workflow_frontdoor_surface(
+        WorkflowSourceProfile {
+            source_kind: "toolchain",
+            workflow_kind: "default_compile_frontdoor",
+            workflow_brief: "workflow -> project_doctor -> check -> test -> build -> release_check",
+            workflow_samples: "workflow=nuis workflow [input]; doctor=nuis project-doctor [project-dir|nuis.toml]; check=nuis check [input]; test=nuis test [input]; build=nuis build [input] <output-dir>; release=nuis release-check [input] [output-dir]",
+        },
+        WorkflowRecommendation {
+            label: "workflow",
+            command: "nuis workflow [--json] [input.ns|project-dir|nuis.toml]",
+            reason: "the compile frontdoor should classify the input shape first, then route into the right project or single-file workflow branch",
+        },
+    )
+}
+
 fn recommend_project_workflow_step(
     plan: &nuisc::project::ProjectCompilationPlan,
     declared_tests: &[PathBuf],
@@ -958,7 +1088,7 @@ fn handle_workflow(input: std::path::PathBuf, json: bool) -> Result<(), String> 
         };
         let galaxy_check_invalid = matches!(galaxy_check.as_ref(), Some(Err(_)));
         let galaxy_doctor = galaxy::doctor_project(&project.root)?;
-        let recommendation = recommend_project_workflow_step(
+        let frontdoor = project_frontdoor_surface(
             &plan,
             &declared_tests,
             &missing_tests,
@@ -969,26 +1099,24 @@ fn handle_workflow(input: std::path::PathBuf, json: bool) -> Result<(), String> 
             galaxy_manifest_path.exists() || !project.manifest.galaxy_dependencies.is_empty();
         if json {
             let mut fields = vec![
-                json_field("source_kind", "project"),
+                json_field("source_kind", frontdoor.source_kind),
                 json_field("input", &input.display().to_string()),
                 json_field("project", &project.manifest.name),
                 json_field("root", &project.root.display().to_string()),
                 json_field("entry", &project.manifest.entry),
-                json_field(
-                    "project_compile_workflow",
-                    nuisc::project_compile_workflow_brief(),
-                ),
-                json_field(
-                    "project_compile_samples",
-                    nuisc::project_compile_samples_brief(),
-                ),
+                json_object_field("frontdoor", &workflow_frontdoor_json_fields(&frontdoor)),
+                json_field("workflow_kind", frontdoor.workflow_kind),
+                json_field("workflow_brief", frontdoor.workflow_brief),
+                json_field("workflow_samples", frontdoor.workflow_samples),
+                json_field("project_compile_workflow", frontdoor.workflow_brief),
+                json_field("project_compile_samples", frontdoor.workflow_samples),
                 json_field(
                     "project_test_workflow",
                     nuisc::project_test_workflow_brief(),
                 ),
-                json_field("recommended_next_step", recommendation.label),
-                json_field("recommended_command", recommendation.command),
-                json_field("recommended_reason", recommendation.reason),
+                json_field("recommended_next_step", frontdoor.recommended_next_step),
+                json_field("recommended_command", frontdoor.recommended_command),
+                json_field("recommended_reason", frontdoor.recommended_reason),
                 json_field("debug_workflow", debug_workflow_brief()),
                 json_field("debug_samples", debug_workflow_samples_brief()),
                 json_field(
@@ -1013,9 +1141,10 @@ fn handle_workflow(input: std::path::PathBuf, json: bool) -> Result<(), String> 
         println!("  project: {}", project.manifest.name);
         println!("  root: {}", project.root.display());
         println!("  entry: {}", project.manifest.entry);
-        println!("  recommended_next_step: {}", recommendation.label);
-        println!("  recommended_command: {}", recommendation.command);
-        println!("  recommended_reason: {}", recommendation.reason);
+        print_workflow_frontdoor_surface(&frontdoor);
+        println!("  recommended_next_step: {}", frontdoor.recommended_next_step);
+        println!("  recommended_command: {}", frontdoor.recommended_command);
+        println!("  recommended_reason: {}", frontdoor.recommended_reason);
         print_project_management_hints(include_galaxy_flow);
         println!("  debug_workflow: {}", debug_workflow_brief());
         print_scheduler_sample_field("debug_samples", debug_workflow_samples_brief());
@@ -1027,29 +1156,26 @@ fn handle_workflow(input: std::path::PathBuf, json: bool) -> Result<(), String> 
     }
 
     if json {
+        let frontdoor = build_workflow_frontdoor_surface(
+            single_source_workflow_source_profile(),
+            WorkflowRecommendation {
+                label: single_source_workflow_next_step_label(),
+                command: recommended_single_source_workflow_command(),
+                reason: "single-file inputs usually want direct compile truth first, so `check` stays the best default front-door step",
+            },
+        );
         let fields = vec![
-            json_field("source_kind", "single-file"),
+            json_field("source_kind", frontdoor.source_kind),
             json_field("input", &input.display().to_string()),
-            json_field(
-                "single_source_compile_workflow",
-                single_source_compile_workflow_brief(),
-            ),
-            json_field(
-                "single_source_compile_samples",
-                single_source_compile_samples_brief(),
-            ),
-            json_field(
-                "recommended_next_step",
-                single_source_workflow_next_step_label(),
-            ),
-            json_field(
-                "recommended_command",
-                recommended_single_source_workflow_command(),
-            ),
-            json_field(
-                "recommended_reason",
-                "single-file inputs usually want direct compile truth first, so `check` stays the best default front-door step",
-            ),
+            json_object_field("frontdoor", &workflow_frontdoor_json_fields(&frontdoor)),
+            json_field("workflow_kind", frontdoor.workflow_kind),
+            json_field("workflow_brief", frontdoor.workflow_brief),
+            json_field("workflow_samples", frontdoor.workflow_samples),
+            json_field("single_source_compile_workflow", frontdoor.workflow_brief),
+            json_field("single_source_compile_samples", frontdoor.workflow_samples),
+            json_field("recommended_next_step", frontdoor.recommended_next_step),
+            json_field("recommended_command", frontdoor.recommended_command),
+            json_field("recommended_reason", frontdoor.recommended_reason),
             json_field("debug_workflow", debug_workflow_brief()),
             json_field("debug_samples", debug_workflow_samples_brief()),
             json_field(
@@ -1067,28 +1193,22 @@ fn handle_workflow(input: std::path::PathBuf, json: bool) -> Result<(), String> 
         return Ok(());
     }
 
+    let frontdoor = build_workflow_frontdoor_surface(
+        single_source_workflow_source_profile(),
+        WorkflowRecommendation {
+            label: single_source_workflow_next_step_label(),
+            command: recommended_single_source_workflow_command(),
+            reason: "single-file inputs usually want direct compile truth first, so `check` stays the best default front-door step",
+        },
+    );
     println!("workflow: single-file");
     println!("  input: {}", input.display());
-    println!(
-        "  recommended_next_step: {}",
-        single_source_workflow_next_step_label()
-    );
-    println!(
-        "  recommended_command: {}",
-        recommended_single_source_workflow_command()
-    );
-    println!(
-        "  recommended_reason: {}",
-        "single-file inputs usually want direct compile truth first, so `check` stays the best default front-door step"
-    );
-    println!(
-        "  single_source_compile_workflow: {}",
-        single_source_compile_workflow_brief()
-    );
-    print_scheduler_sample_field(
-        "single_source_compile_samples",
-        single_source_compile_samples_brief(),
-    );
+    print_workflow_frontdoor_surface(&frontdoor);
+    println!("  recommended_next_step: {}", frontdoor.recommended_next_step);
+    println!("  recommended_command: {}", frontdoor.recommended_command);
+    println!("  recommended_reason: {}", frontdoor.recommended_reason);
+    println!("  single_source_compile_workflow: {}", frontdoor.workflow_brief);
+    print_scheduler_sample_field("single_source_compile_samples", frontdoor.workflow_samples);
     println!("  debug_workflow: {}", debug_workflow_brief());
     print_scheduler_sample_field("debug_samples", debug_workflow_samples_brief());
     println!(
@@ -1173,6 +1293,10 @@ fn json_string_array_field(name: &str, values: &[String]) -> String {
         .collect::<Vec<_>>()
         .join(",");
     format!("\"{}\":[{}]", name, entries)
+}
+
+fn json_object_field(name: &str, fields: &[String]) -> String {
+    format!("\"{}\":{{{}}}", name, fields.join(","))
 }
 
 fn json_object_array_field(name: &str, values: &[String]) -> String {
@@ -1437,20 +1561,24 @@ fn project_plan_domains_json(
         .join(","))
 }
 
-fn project_workflow_json_fields(include_galaxy_flow: bool) -> Vec<String> {
+fn project_workflow_json_fields(
+    frontdoor: &WorkflowFrontdoorSurface,
+    include_galaxy_flow: bool,
+) -> Vec<String> {
     let mut fields = vec![
-        json_field(
-            "project_compile_workflow",
-            nuisc::project_compile_workflow_brief(),
-        ),
-        json_field(
-            "project_compile_samples",
-            nuisc::project_compile_samples_brief(),
-        ),
+        json_object_field("frontdoor", &workflow_frontdoor_json_fields(frontdoor)),
+        json_field("workflow_kind", frontdoor.workflow_kind),
+        json_field("workflow_brief", frontdoor.workflow_brief),
+        json_field("workflow_samples", frontdoor.workflow_samples),
+        json_field("project_compile_workflow", frontdoor.workflow_brief),
+        json_field("project_compile_samples", frontdoor.workflow_samples),
         json_field(
             "project_test_workflow",
             nuisc::project_test_workflow_brief(),
         ),
+        json_field("recommended_next_step", frontdoor.recommended_next_step),
+        json_field("recommended_command", frontdoor.recommended_command),
+        json_field("recommended_reason", frontdoor.recommended_reason),
     ];
     if include_galaxy_flow {
         fields.push(json_field(
@@ -1559,8 +1687,38 @@ fn handle_scheduler_view(input: std::path::PathBuf, json: bool) -> Result<(), St
     if nuisc::project::is_project_input(&input) {
         let project = nuisc::project::load_project(&input)?;
         let plan = nuisc::project::build_project_compilation_plan(&project)?;
+        let declared_tests = project
+            .manifest
+            .tests
+            .iter()
+            .map(|relative| project.root.join(relative))
+            .collect::<Vec<_>>();
+        let missing_tests = declared_tests
+            .iter()
+            .filter(|path| !path.exists())
+            .cloned()
+            .collect::<Vec<_>>();
+        let galaxy_manifest_path = project.root.join("galaxy.toml");
+        let galaxy_check = if galaxy_manifest_path.exists() {
+            Some(galaxy::check(&project.root))
+        } else {
+            None
+        };
+        let galaxy_check_invalid = matches!(galaxy_check.as_ref(), Some(Err(_)));
+        let galaxy_doctor = galaxy::doctor_project(&project.root)?;
+        let frontdoor = project_frontdoor_surface(
+            &plan,
+            &declared_tests,
+            &missing_tests,
+            &galaxy_doctor,
+            galaxy_check_invalid,
+        );
         println!("  source_kind: project");
         println!("  project: {}", project.manifest.name);
+        print_workflow_frontdoor_surface(&frontdoor);
+        println!("  recommended_next_step: {}", frontdoor.recommended_next_step);
+        println!("  recommended_command: {}", frontdoor.recommended_command);
+        println!("  recommended_reason: {}", frontdoor.recommended_reason);
         println!(
             "  project_plan: {}",
             nuisc::project::describe_project_compilation_plan(&plan)
@@ -1625,9 +1783,14 @@ fn handle_scheduler_view(input: std::path::PathBuf, json: bool) -> Result<(), St
         std::path::Path::new("nustar-packages"),
         &artifacts.yir,
     )?;
+    let frontdoor = single_source_frontdoor_surface();
     println!("  source_kind: single-file");
     println!("  ast_domain: {}", artifacts.ast.domain);
     println!("  ast_unit: {}", artifacts.ast.unit);
+    print_workflow_frontdoor_surface(&frontdoor);
+    println!("  recommended_next_step: {}", frontdoor.recommended_next_step);
+    println!("  recommended_command: {}", frontdoor.recommended_command);
+    println!("  recommended_reason: {}", frontdoor.recommended_reason);
     println!("  resolved_domains: {}", manifests.len());
     for manifest in manifests {
         println!("  domain: {}", manifest.domain_family);
@@ -1641,6 +1804,32 @@ fn handle_scheduler_view_json(input: std::path::PathBuf) -> Result<(), String> {
     if nuisc::project::is_project_input(&input) {
         let project = nuisc::project::load_project(&input)?;
         let plan = nuisc::project::build_project_compilation_plan(&project)?;
+        let declared_tests = project
+            .manifest
+            .tests
+            .iter()
+            .map(|relative| project.root.join(relative))
+            .collect::<Vec<_>>();
+        let missing_tests = declared_tests
+            .iter()
+            .filter(|path| !path.exists())
+            .cloned()
+            .collect::<Vec<_>>();
+        let galaxy_manifest_path = project.root.join("galaxy.toml");
+        let galaxy_check = if galaxy_manifest_path.exists() {
+            Some(galaxy::check(&project.root))
+        } else {
+            None
+        };
+        let galaxy_check_invalid = matches!(galaxy_check.as_ref(), Some(Err(_)));
+        let galaxy_doctor = galaxy::doctor_project(&project.root)?;
+        let frontdoor = project_frontdoor_surface(
+            &plan,
+            &declared_tests,
+            &missing_tests,
+            &galaxy_doctor,
+            galaxy_check_invalid,
+        );
         let mut domains = Vec::new();
         for item in &plan.abi_resolution.requirements {
             domains.push(scheduler_view_domain_record(
@@ -1658,6 +1847,13 @@ fn handle_scheduler_view_json(input: std::path::PathBuf) -> Result<(), String> {
             json_field("source_kind", "project"),
             json_field("input", &input.display().to_string()),
             json_field("project", &project.manifest.name),
+            json_object_field("frontdoor", &workflow_frontdoor_json_fields(&frontdoor)),
+            json_field("workflow_kind", frontdoor.workflow_kind),
+            json_field("workflow_brief", frontdoor.workflow_brief),
+            json_field("workflow_samples", frontdoor.workflow_samples),
+            json_field("recommended_next_step", frontdoor.recommended_next_step),
+            json_field("recommended_command", frontdoor.recommended_command),
+            json_field("recommended_reason", frontdoor.recommended_reason),
             json_field(
                 "abi_mode",
                 if plan.abi_resolution.explicit {
@@ -1703,6 +1899,7 @@ fn handle_scheduler_view_json(input: std::path::PathBuf) -> Result<(), String> {
         std::path::Path::new("nustar-packages"),
         &artifacts.yir,
     )?;
+    let frontdoor = single_source_frontdoor_surface();
     let mut domains = Vec::new();
     for manifest in manifests {
         domains.push(scheduler_view_domain_record(
@@ -1716,14 +1913,20 @@ fn handle_scheduler_view_json(input: std::path::PathBuf) -> Result<(), String> {
         .map(scheduler_view_domain_record_json)
         .collect::<Vec<_>>()
         .join(",");
-    println!(
-        "{{{},{},{},{},\"domains\":[{}]}}",
+    let fields = vec![
         json_field("source_kind", "single-file"),
         json_field("input", &input.display().to_string()),
         json_field("ast_domain", &artifacts.ast.domain),
         json_field("ast_unit", &artifacts.ast.unit),
-        domain_json
-    );
+        json_object_field("frontdoor", &workflow_frontdoor_json_fields(&frontdoor)),
+        json_field("workflow_kind", frontdoor.workflow_kind),
+        json_field("workflow_brief", frontdoor.workflow_brief),
+        json_field("workflow_samples", frontdoor.workflow_samples),
+        json_field("recommended_next_step", frontdoor.recommended_next_step),
+        json_field("recommended_command", frontdoor.recommended_command),
+        json_field("recommended_reason", frontdoor.recommended_reason),
+    ];
+    println!("{{{},\"domains\":[{}]}}", fields.join(","), domain_json);
     Ok(())
 }
 
@@ -1744,10 +1947,33 @@ fn handle_project_status(input: std::path::PathBuf, json: bool) -> Result<(), St
         .iter()
         .map(|relative| project.root.join(relative))
         .collect::<Vec<_>>();
+    let missing_tests = declared_tests
+        .iter()
+        .filter(|path| !path.exists())
+        .cloned()
+        .collect::<Vec<_>>();
+    let galaxy_check = if galaxy_manifest_path.exists() {
+        Some(galaxy::check(&project.root))
+    } else {
+        None
+    };
+    let galaxy_check_invalid = matches!(galaxy_check.as_ref(), Some(Err(_)));
+    let galaxy_doctor = galaxy::doctor_project(&project.root)?;
+    let frontdoor = project_frontdoor_surface(
+        &plan,
+        &declared_tests,
+        &missing_tests,
+        &galaxy_doctor,
+        galaxy_check_invalid,
+    );
     println!("project status: {}", project.manifest.name);
     println!("  root: {}", project.root.display());
     println!("  manifest: {}", project.manifest_path.display());
     println!("  entry: {}", project.manifest.entry);
+    print_workflow_frontdoor_surface(&frontdoor);
+    println!("  recommended_next_step: {}", frontdoor.recommended_next_step);
+    println!("  recommended_command: {}", frontdoor.recommended_command);
+    println!("  recommended_reason: {}", frontdoor.recommended_reason);
     println!("  modules: {}", project.modules.len());
     println!(
         "  public_surface: {}",
@@ -1904,6 +2130,25 @@ fn handle_project_status_json(input: std::path::PathBuf) -> Result<(), String> {
         .iter()
         .map(|relative| project.root.join(relative))
         .collect::<Vec<_>>();
+    let missing_tests = declared_tests
+        .iter()
+        .filter(|path| !path.exists())
+        .cloned()
+        .collect::<Vec<_>>();
+    let galaxy_check = if galaxy_manifest_path.exists() {
+        Some(galaxy::check(&project.root))
+    } else {
+        None
+    };
+    let galaxy_check_invalid = matches!(galaxy_check.as_ref(), Some(Err(_)));
+    let galaxy_doctor = galaxy::doctor_project(&project.root)?;
+    let frontdoor = project_frontdoor_surface(
+        &plan,
+        &declared_tests,
+        &missing_tests,
+        &galaxy_doctor,
+        galaxy_check_invalid,
+    );
     let test_json = declared_tests
         .iter()
         .map(|path| {
@@ -1964,7 +2209,7 @@ fn handle_project_status_json(input: std::path::PathBuf) -> Result<(), String> {
     ];
     fields.extend(project_plan_json_fields(&plan));
     fields.push(json_usize_field("tests_declared", declared_tests.len()));
-    fields.extend(project_workflow_json_fields(include_galaxy_flow));
+    fields.extend(project_workflow_json_fields(&frontdoor, include_galaxy_flow));
     fields.push(json_field(
         "abi_mode",
         if plan.abi_resolution.explicit {
@@ -2089,11 +2334,22 @@ fn handle_project_doctor(input: std::path::PathBuf, json: bool) -> Result<(), St
         .dependencies
         .iter()
         .any(|dependency| !dependency.installed);
+    let frontdoor = project_frontdoor_surface(
+        &plan,
+        &declared_tests,
+        &missing_tests,
+        &galaxy_doctor,
+        galaxy_check_invalid,
+    );
 
     println!("project doctor: {}", project.manifest.name);
     println!("  root: {}", project.root.display());
     println!("  manifest: {}", project.manifest_path.display());
     println!("  entry: {}", project.manifest.entry);
+    print_workflow_frontdoor_surface(&frontdoor);
+    println!("  recommended_next_step: {}", frontdoor.recommended_next_step);
+    println!("  recommended_command: {}", frontdoor.recommended_command);
+    println!("  recommended_reason: {}", frontdoor.recommended_reason);
     println!("  modules: {}", project.modules.len());
     println!(
         "  public_surface: {}",
@@ -2441,6 +2697,13 @@ fn handle_project_doctor_json(input: std::path::PathBuf) -> Result<(), String> {
         .dependencies
         .iter()
         .any(|dependency| !dependency.installed);
+    let frontdoor = project_frontdoor_surface(
+        &plan,
+        &declared_tests,
+        &missing_tests,
+        &galaxy_doctor,
+        galaxy_check_invalid,
+    );
     let mut next_steps = Vec::new();
     if !galaxy_manifest_exists {
         next_steps.push(
@@ -2639,7 +2902,7 @@ fn handle_project_doctor_json(input: std::path::PathBuf) -> Result<(), String> {
     fields.extend(project_plan_json_fields(&plan));
     fields.push(json_usize_field("tests_declared", declared_tests.len()));
     fields.push(json_usize_field("tests_missing", missing_tests.len()));
-    fields.extend(project_workflow_json_fields(include_galaxy_flow));
+    fields.extend(project_workflow_json_fields(&frontdoor, include_galaxy_flow));
     fields.push(json_field(
         "abi_mode",
         if plan.abi_resolution.explicit {
@@ -3076,7 +3339,12 @@ fn handle_galaxy(command: cli::GalaxyCommand) -> Result<(), String> {
 }
 
 fn print_help() {
+    let frontdoor = toolchain_frontdoor_surface();
     println!("nuis toolchain frontdoor");
+    print_workflow_frontdoor_surface(&frontdoor);
+    println!("  recommended_next_step: {}", frontdoor.recommended_next_step);
+    println!("  recommended_command: {}", frontdoor.recommended_command);
+    println!("  recommended_reason: {}", frontdoor.recommended_reason);
     println!("usage:");
     println!();
     println!("  default compile workflow:");
@@ -3256,8 +3524,10 @@ fn find_abi_block_span(source: &str) -> Option<(usize, usize)> {
 #[cfg(test)]
 mod tests {
     use super::{
-        handle_check, handle_test, resolve_runner_clock_domain, run_language_tests_for_source_file,
-        wait_for_test_child, RawTestOutcome,
+        build_workflow_frontdoor_surface, handle_check, handle_test,
+        project_compile_workflow_source_profile, resolve_runner_clock_domain,
+        run_language_tests_for_source_file, single_source_workflow_source_profile,
+        wait_for_test_child, RawTestOutcome, WorkflowRecommendation,
     };
     use std::{
         env, fs,
@@ -3336,6 +3606,49 @@ mod tests {
         let dir = env::temp_dir().join(format!("nuis_{label}_{}_{}", std::process::id(), nanos));
         fs::create_dir_all(&dir).expect("create temp dir");
         dir
+    }
+
+    #[test]
+    fn single_source_frontdoor_surface_matches_compile_contract() {
+        let frontdoor = build_workflow_frontdoor_surface(
+            single_source_workflow_source_profile(),
+            WorkflowRecommendation {
+                label: "check",
+                command: "nuis check <input.ns>",
+                reason: "single-file inputs should re-check compile truth first",
+            },
+        );
+        assert_eq!(frontdoor.source_kind, "single-file");
+        assert_eq!(frontdoor.workflow_kind, "compile_workflow");
+        assert_eq!(
+            frontdoor.workflow_brief,
+            "check -> test -> build -> release_check"
+        );
+        assert!(frontdoor.workflow_samples.contains("nuis build <input.ns> <output-dir>"));
+        assert_eq!(frontdoor.recommended_next_step, "check");
+    }
+
+    #[test]
+    fn project_frontdoor_surface_uses_project_compile_profile() {
+        let frontdoor = build_workflow_frontdoor_surface(
+            project_compile_workflow_source_profile(),
+            WorkflowRecommendation {
+                label: "project_lock_abi",
+                command: "nuis project-lock-abi <project-dir|nuis.toml>",
+                reason: "freeze ABI choice before broader compile work",
+            },
+        );
+        assert_eq!(frontdoor.source_kind, "project");
+        assert_eq!(frontdoor.workflow_kind, "project_compile_workflow");
+        assert_eq!(
+            frontdoor.workflow_brief,
+            nuisc::project_compile_workflow_brief()
+        );
+        assert_eq!(
+            frontdoor.workflow_samples,
+            nuisc::project_compile_samples_brief()
+        );
+        assert_eq!(frontdoor.recommended_next_step, "project_lock_abi");
     }
 
     #[test]

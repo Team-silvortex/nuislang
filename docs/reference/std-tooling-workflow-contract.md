@@ -328,12 +328,18 @@ session capture
 
 The three current reference samples occupy different points on that ladder:
 
+* [workflow_frontdoor_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/workflow_frontdoor_runtime_recipe.ns)
+  narrow grouped front-door surface reference
 * [cli_workflow_automation_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_workflow_automation_recipe.ns)
   smallest integrated sample
 * [cli_build_pipeline_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_build_pipeline_recipe.ns)
-  build-oriented stage naming
+  build-oriented stage naming plus shared front-door surface
 * [cli_project_build_report_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_project_build_report_recipe.ns)
-  project/artifact/manifest/report naming
+  project/artifact/manifest/report naming plus shared front-door surface
+* [cli_compile_workflow_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/std/cli_compile_workflow_recipe.ns)
+  front-door compile workflow naming with nested project build plan/report and
+  recommendation-style workflow hints plus source-kind workflow profiles and
+  debug-workflow mirror fields grouped as one front-door surface
 
 Short rule:
 
