@@ -21,6 +21,175 @@ fn rejects_unknown_generic_bound_trait_in_function_declaration() {
 }
 
 #[test]
+fn suggests_visible_qualified_trait_name_for_unknown_bare_generic_bound() {
+    let main_ast = super::parse_nuis_ast(
+        r#"
+        use cpu Helper;
+
+        mod cpu Main {
+          fn keep<T: Worker.Missing>(value: T) -> T {
+            return value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let helper_ast = super::parse_nuis_ast(
+        r#"
+        mod cpu Helper {
+          pub trait Missing {
+            fn keep(value: Self) -> Self;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let error = super::lower_project_ast_to_nir(&main_ast, &[helper_ast]).unwrap_err();
+    assert!(error.contains("unknown generic bound trait `Worker.Missing`"), "{error}");
+    assert!(error.contains("did you mean `Helper.Missing`?"), "{error}");
+}
+
+#[test]
+fn rejects_impl_for_unknown_trait() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          impl Missing for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          fn main() -> i64 {
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(error.contains("impl references unknown trait `Missing`"), "{error}");
+}
+
+#[test]
+fn rejects_duplicate_impl_for_same_trait_and_type() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          fn main() -> i64 {
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(error.contains("duplicate impl for trait `Addable` and type `i64`"), "{error}");
+}
+
+#[test]
+fn rejects_impl_missing_required_trait_method() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+            fn zero() -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          fn main() -> i64 {
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(error.contains("missing required trait method `zero`"), "{error}");
+    assert!(error.contains("impl `Addable` for `i64`"), "{error}");
+}
+
+#[test]
+fn rejects_impl_extra_method_not_declared_by_trait() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+
+            fn zero() -> i64 {
+              return 0;
+            }
+          }
+
+          fn main() -> i64 {
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(error.contains("extra impl method `zero`"), "{error}");
+    assert!(error.contains("trait `Addable`"), "{error}");
+}
+
+#[test]
+fn rejects_impl_method_signature_mismatch_against_trait() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> Text {
+              return "oops";
+            }
+          }
+
+          fn main() -> i64 {
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(error.contains("method `add` in impl `Addable` for `i64` does not match trait signature"), "{error}");
+}
+
+#[test]
 fn rejects_type_alias_generic_arg_that_does_not_satisfy_bound() {
     let error = parse_nuis_module(
         r#"

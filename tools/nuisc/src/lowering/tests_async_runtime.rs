@@ -1458,6 +1458,57 @@ fn lowers_async_recursive_boolean_break_then_branching_carry_into_flow_cond_chai
 }
 
 #[test]
+fn lowers_async_mixed_break_continue_control_into_recursive_flow_cond_chain() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn step(value: i64) -> i64 {
+            return value + 1;
+          }
+
+          async fn main() -> i64 {
+            let value: i64 = 0;
+            while value < 5 {
+              let value: i64 = await step(value);
+              if value > 3 {
+                break;
+              } else {
+                if value < 2 {
+                  continue;
+                } else {
+                  break;
+                }
+              }
+            }
+            return value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "loop_while_scalar_async_flow_cond_chain"
+        })
+        .expect("expected loop_while_scalar_async_flow_cond_chain node");
+    assert_eq!(loop_node.op.args[2], "step");
+    assert_eq!(loop_node.op.args[3], "lt");
+    assert_eq!(loop_node.op.args[4], "flow_or");
+    assert_eq!(loop_node.op.args[5], "flow_break");
+    assert_eq!(loop_node.op.args[6], "current_gt");
+    assert_eq!(loop_node.op.args[8], "flow_or");
+    assert_eq!(loop_node.op.args[9], "flow_continue");
+    assert_eq!(loop_node.op.args[10], "current_lt");
+    assert_eq!(loop_node.op.args[12], "flow_break");
+}
+
+#[test]
 fn lowers_async_while_with_await_step_and_post_flow_break() {
     let mut module = parse_nuis_module(
         r#"
@@ -1701,6 +1752,63 @@ fn lowers_async_post_flow_continue_with_recursive_boolean_condition_into_post_fl
 }
 
 #[test]
+fn lowers_async_mixed_break_continue_post_flow_control_into_recursive_cond_chain() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn step(value: i64) -> i64 {
+            return value + 1;
+          }
+
+          async fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            while value < 7 {
+              let value: i64 = await step(value);
+              if value > 2 {
+                let acc: i64 = acc + value;
+              } else {
+                let acc: i64 = acc + 0;
+              }
+              if acc > 5 {
+                break;
+              } else {
+                if acc < 3 {
+                  continue;
+                } else {
+                  break;
+                }
+              }
+            }
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "loop_while_scalar_async_post_flow_cond_chain"
+        })
+        .expect("expected loop_while_scalar_async_post_flow_cond_chain node");
+    assert_eq!(loop_node.op.args[2], "step");
+    assert_eq!(loop_node.op.args[3], "lt");
+    assert_eq!(loop_node.op.args[4], "flow_or");
+    assert_eq!(loop_node.op.args[5], "flow_break");
+    assert_eq!(loop_node.op.args[6], "carry0_gt");
+    assert_eq!(loop_node.op.args[8], "flow_or");
+    assert_eq!(loop_node.op.args[9], "flow_continue");
+    assert_eq!(loop_node.op.args[10], "carry0_lt");
+    assert_eq!(loop_node.op.args[12], "flow_break");
+}
+
+#[test]
 fn lowers_async_kernel_observer_step_into_async_post_flow_break_chain() {
     let mut module = parse_nuis_module(
         r#"
@@ -1785,10 +1893,10 @@ fn rejects_async_while_with_await_step_and_task_observer_flow_control() {
     let error = lower_nir_to_yir_builtin_cpu(&module).unwrap_err();
 
     assert!(error.contains(
-        "async/task-driven `while` lowering currently recognizes only structured async loop shapes"
+        "structured `while` lowering recognized loop state `value` and a loop-control `if`"
     ));
     assert!(error.contains(
-        "general async backedge execution with task primitives inside arbitrary loop conditions/bodies is not lowered yet"
+        "control condition is not reducible to supported loop-state/carry boolean tests"
     ));
 }
 

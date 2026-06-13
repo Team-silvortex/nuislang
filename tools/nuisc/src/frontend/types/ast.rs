@@ -396,13 +396,60 @@ pub(crate) fn infer_ast_expr_type_inner(
                     None
                 }
             }
-            _ => function_return_types.get(callee).cloned().flatten(),
+            _ => {
+                if let Some((trait_name, method)) = callee.rsplit_once('.') {
+                    let receiver = args.first()?;
+                    let receiver_ty = infer_ast_expr_type_inner(
+                        receiver,
+                        env,
+                        impl_lookup,
+                        struct_table,
+                        function_return_types,
+                        active_exprs,
+                    )?;
+                    let definition = impl_lookup.get(&(
+                        trait_name.to_owned(),
+                        lower_type_ref(&receiver_ty).render(),
+                    ))?;
+                    let method_def = definition.methods.iter().find(|item| item.name == *method)?;
+                    method_def
+                        .return_type
+                        .clone()
+                        .or_else(|| Some(receiver_ty.clone()))
+                } else {
+                    function_return_types.get(callee).cloned().flatten()
+                }
+            }
         },
         AstExpr::MethodCall {
             receiver,
             method,
-            args: _,
+            args,
         } => {
+            if let Some(trait_name) = super::super::render_field_access_path(receiver) {
+                if let Some(receiver_arg) = args.first() {
+                    let receiver_ty = infer_ast_expr_type_inner(
+                        receiver_arg,
+                        env,
+                        impl_lookup,
+                        struct_table,
+                        function_return_types,
+                        active_exprs,
+                    )?;
+                    if let Some(definition) = impl_lookup
+                        .get(&(trait_name.clone(), lower_type_ref(&receiver_ty).render()))
+                    {
+                        if let Some(method_def) =
+                            definition.methods.iter().find(|item| item.name == *method)
+                        {
+                            return method_def
+                                .return_type
+                                .clone()
+                                .or_else(|| Some(receiver_ty.clone()));
+                        }
+                    }
+                }
+            }
             let receiver_ty = infer_ast_expr_type_inner(
                 receiver,
                 env,

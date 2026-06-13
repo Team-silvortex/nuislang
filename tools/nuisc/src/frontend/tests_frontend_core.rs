@@ -625,3 +625,159 @@ fn parses_struct_destructuring_let_into_ast() {
         other => panic!("expected destructuring let statement, found {other:?}"),
     }
 }
+
+#[test]
+fn lowers_explicit_trait_qualified_call_to_impl_symbol() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          fn main() -> i64 {
+            return Addable.add(7, 8);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.first(),
+        Some(NirStmt::Return(Some(NirExpr::Call { callee, args })))
+            if callee == "impl.Addable.for.i64.add"
+                && matches!(args.as_slice(), [NirExpr::Int(7), NirExpr::Int(8)])
+    ));
+}
+
+#[test]
+fn lowers_explicit_trait_qualified_call_with_public_helper_trait() {
+    let main_ast = parse_nuis_ast(
+        r#"
+        use cpu Helper;
+
+        mod cpu Main {
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          fn main() -> i64 {
+            return Addable.add(7, 8);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let helper_ast = parse_nuis_ast(
+        r#"
+        mod cpu Helper {
+          pub trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let module = super::lower_project_ast_to_nir(&main_ast, &[helper_ast]).unwrap();
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.first(),
+        Some(NirStmt::Return(Some(NirExpr::Call { callee, args })))
+            if callee == "impl.Addable.for.i64.add"
+                && matches!(args.as_slice(), [NirExpr::Int(7), NirExpr::Int(8)])
+    ));
+}
+
+#[test]
+fn lowers_fully_qualified_helper_trait_call_to_impl_symbol() {
+    let main_ast = parse_nuis_ast(
+        r#"
+        use cpu Helper;
+
+        mod cpu Main {
+          impl Helper.Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          fn main() -> i64 {
+            return Helper.Addable.add(7, 8);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let helper_ast = parse_nuis_ast(
+        r#"
+        mod cpu Helper {
+          pub trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let module = super::lower_project_ast_to_nir(&main_ast, &[helper_ast]).unwrap();
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.first(),
+        Some(NirStmt::Return(Some(NirExpr::Call { callee, args })))
+            if callee == "impl.Helper.Addable.for.i64.add"
+                && matches!(args.as_slice(), [NirExpr::Int(7), NirExpr::Int(8)])
+    ));
+}
+
+#[test]
+fn reports_missing_impl_for_explicit_qualified_trait_call_on_concrete_type() {
+    let main_ast = parse_nuis_ast(
+        r#"
+        use cpu Helper;
+
+        mod cpu Main {
+          fn main() -> i64 {
+            return Helper.Addable.add(7, 8);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let helper_ast = parse_nuis_ast(
+        r#"
+        mod cpu Helper {
+          pub trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let error = super::lower_project_ast_to_nir(&main_ast, &[helper_ast]).unwrap_err();
+    assert!(error.contains("trait `Helper.Addable` has no impl for `i64`"), "{error}");
+    assert!(error.contains("Helper.Addable.add"), "{error}");
+}

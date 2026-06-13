@@ -232,6 +232,47 @@ fn parse_loop_flow_control(
     pure_helpers: &BTreeSet<String>,
     inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
 ) -> Option<PreparedLoopFlowControl> {
+    fn terminal(
+        condition: PreparedLoopFlowCondition,
+        action: PreparedLoopFlowAction,
+    ) -> PreparedLoopFlowControl {
+        PreparedLoopFlowControl::Terminal { condition, action }
+    }
+
+    fn compound(
+        op: PreparedLoopLogicOp,
+        lhs: PreparedLoopFlowControl,
+        rhs: PreparedLoopFlowControl,
+    ) -> PreparedLoopFlowControl {
+        PreparedLoopFlowControl::Compound {
+            op,
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+        }
+    }
+
+    fn prefix_condition(
+        control: PreparedLoopFlowControl,
+        op: PreparedLoopLogicOp,
+        condition: PreparedLoopFlowCondition,
+    ) -> PreparedLoopFlowControl {
+        match control {
+            PreparedLoopFlowControl::Terminal {
+                condition: leaf_condition,
+                action,
+            } => {
+                let merged = combine_loop_flow_conditions(condition, op, leaf_condition)
+                    .expect("loop flow control prefix condition should always combine");
+                terminal(merged, action)
+            }
+            PreparedLoopFlowControl::Compound { op: branch_op, lhs, rhs } => compound(
+                branch_op,
+                prefix_condition(*lhs, op, condition.clone()),
+                prefix_condition(*rhs, op, condition),
+            ),
+        }
+    }
+
     let NirStmt::If {
         condition,
         then_body,
@@ -247,22 +288,31 @@ fn parse_loop_flow_control(
         pure_helpers,
         inlineable_pure_helpers,
     )?;
-    if else_body.is_empty() {
-        let [action_stmt] = then_body.as_slice() else {
+    if then_body.is_empty() {
+        let [action_stmt] = else_body.as_slice() else {
             return None;
         };
+        let inverted_condition = normalize_pure_bool_test_expr(NirExpr::Binary {
+            op: NirBinaryOp::Eq,
+            lhs: Box::new(condition.clone()),
+            rhs: Box::new(NirExpr::Bool(false)),
+        });
+        let inverted_condition = parse_loop_flow_condition(
+            &inverted_condition,
+            binding_name,
+            carries,
+            pure_helpers,
+            inlineable_pure_helpers,
+        )?;
         match action_stmt {
             NirStmt::Break => {
-                return Some(PreparedLoopFlowControl {
-                    condition: outer_condition,
-                    action: PreparedLoopFlowAction::Break,
-                });
+                return Some(terminal(inverted_condition, PreparedLoopFlowAction::Break));
             }
             NirStmt::Continue => {
-                return Some(PreparedLoopFlowControl {
-                    condition: outer_condition,
-                    action: PreparedLoopFlowAction::Continue,
-                });
+                return Some(terminal(
+                    inverted_condition,
+                    PreparedLoopFlowAction::Continue,
+                ));
             }
             NirStmt::If { .. } => {
                 let nested = parse_loop_flow_control(
@@ -272,15 +322,39 @@ fn parse_loop_flow_control(
                     pure_helpers,
                     inlineable_pure_helpers,
                 )?;
-                let condition = combine_loop_flow_conditions(
-                    outer_condition,
+                return Some(prefix_condition(
+                    nested,
                     PreparedLoopLogicOp::And,
-                    nested.condition,
+                    inverted_condition,
+                ));
+            }
+            _ => return None,
+        }
+    }
+    if else_body.is_empty() {
+        let [action_stmt] = then_body.as_slice() else {
+            return None;
+        };
+        match action_stmt {
+            NirStmt::Break => {
+                return Some(terminal(outer_condition, PreparedLoopFlowAction::Break));
+            }
+            NirStmt::Continue => {
+                return Some(terminal(outer_condition, PreparedLoopFlowAction::Continue));
+            }
+            NirStmt::If { .. } => {
+                let nested = parse_loop_flow_control(
+                    action_stmt,
+                    binding_name,
+                    carries,
+                    pure_helpers,
+                    inlineable_pure_helpers,
                 )?;
-                return Some(PreparedLoopFlowControl {
-                    condition,
-                    action: nested.action,
-                });
+                return Some(prefix_condition(
+                    nested,
+                    PreparedLoopLogicOp::And,
+                    outer_condition,
+                ));
             }
             _ => return None,
         }
@@ -288,37 +362,160 @@ fn parse_loop_flow_control(
     let [then_stmt] = then_body.as_slice() else {
         return None;
     };
-    let then_action = match then_stmt {
-        NirStmt::Break => Some(PreparedLoopFlowAction::Break),
-        NirStmt::Continue => Some(PreparedLoopFlowAction::Continue),
-        _ => None,
-    }?;
     let [else_stmt] = else_body.as_slice() else {
         return None;
     };
-    let nested = parse_loop_flow_control(
-        else_stmt,
+    let direct_action = |stmt: &NirStmt| match stmt {
+        NirStmt::Break => Some(PreparedLoopFlowAction::Break),
+        NirStmt::Continue => Some(PreparedLoopFlowAction::Continue),
+        _ => None,
+    };
+    if let (Some(then_action), Some(else_action)) =
+        (direct_action(then_stmt), direct_action(else_stmt))
+    {
+        let inverted_condition = normalize_pure_bool_test_expr(NirExpr::Binary {
+            op: NirBinaryOp::Eq,
+            lhs: Box::new(condition.clone()),
+            rhs: Box::new(NirExpr::Bool(false)),
+        });
+        let inverted_condition = parse_loop_flow_condition(
+            &inverted_condition,
+            binding_name,
+            carries,
+            pure_helpers,
+            inlineable_pure_helpers,
+        )?;
+        return Some(compound(
+            PreparedLoopLogicOp::Or,
+            terminal(outer_condition, then_action),
+            terminal(inverted_condition, else_action),
+        ));
+    }
+    if let Some(then_action) = direct_action(then_stmt) {
+        let nested = parse_loop_flow_control(
+            else_stmt,
+            binding_name,
+            carries,
+            pure_helpers,
+            inlineable_pure_helpers,
+        )?;
+        return Some(compound(
+            PreparedLoopLogicOp::Or,
+            terminal(outer_condition, then_action),
+            nested,
+        ));
+    }
+    if let Some(else_action) = direct_action(else_stmt) {
+        let nested = parse_loop_flow_control(
+            then_stmt,
+            binding_name,
+            carries,
+            pure_helpers,
+            inlineable_pure_helpers,
+        )?;
+        let inverted_condition = normalize_pure_bool_test_expr(NirExpr::Binary {
+            op: NirBinaryOp::Eq,
+            lhs: Box::new(condition.clone()),
+            rhs: Box::new(NirExpr::Bool(false)),
+        });
+        let inverted_condition = parse_loop_flow_condition(
+            &inverted_condition,
+            binding_name,
+            carries,
+            pure_helpers,
+            inlineable_pure_helpers,
+        )?;
+        return Some(compound(
+            PreparedLoopLogicOp::Or,
+            nested,
+            terminal(inverted_condition, else_action),
+        ));
+    }
+    None
+}
+
+fn stmt_contains_terminal_loop_control_action(stmt: &NirStmt) -> bool {
+    match stmt {
+        NirStmt::Break | NirStmt::Continue => true,
+        NirStmt::If {
+            then_body,
+            else_body,
+            ..
+        } => {
+            then_body
+                .iter()
+                .any(stmt_contains_terminal_loop_control_action)
+                || else_body
+                    .iter()
+                    .any(stmt_contains_terminal_loop_control_action)
+        }
+        _ => false,
+    }
+}
+
+fn collect_terminal_loop_control_actions(
+    stmt: &PreparedLoopFlowControl,
+    actions: &mut BTreeSet<&'static str>,
+) {
+    match stmt {
+        PreparedLoopFlowControl::Terminal { action, .. } => {
+            actions.insert(match action {
+                PreparedLoopFlowAction::Break => "break",
+                PreparedLoopFlowAction::Continue => "continue",
+            });
+        }
+        PreparedLoopFlowControl::Compound { lhs, rhs, .. } => {
+            collect_terminal_loop_control_actions(lhs, actions);
+            collect_terminal_loop_control_actions(rhs, actions);
+        }
+    }
+}
+
+fn diagnose_unstructured_loop_flow_control(
+    stmt: &NirStmt,
+    binding_name: &str,
+    carries: &[PreparedCarryUpdate],
+    pure_helpers: &BTreeSet<String>,
+    inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
+) -> Option<String> {
+    let NirStmt::If { condition, .. } = stmt else {
+        return None;
+    };
+    if !stmt_contains_terminal_loop_control_action(stmt) {
+        return None;
+    }
+    if parse_loop_flow_condition(
+        condition,
         binding_name,
         carries,
         pure_helpers,
         inlineable_pure_helpers,
-    )?;
-    if !matches!(
-        (then_action, nested.action),
-        (PreparedLoopFlowAction::Break, PreparedLoopFlowAction::Break)
-            | (
-                PreparedLoopFlowAction::Continue,
-                PreparedLoopFlowAction::Continue
-            )
-    ) {
-        return None;
+    )
+    .is_none()
+    {
+        return Some(format!(
+            "structured `while` lowering recognized loop state `{binding_name}` and a loop-control `if`, but its control condition is not reducible to supported loop-state/carry boolean tests"
+        ));
     }
-    let condition =
-        combine_loop_flow_conditions(outer_condition, PreparedLoopLogicOp::Or, nested.condition)?;
-    Some(PreparedLoopFlowControl {
-        condition,
-        action: then_action,
-    })
+    let Some(control) = parse_loop_flow_control(
+        stmt,
+        binding_name,
+        carries,
+        pure_helpers,
+        inlineable_pure_helpers,
+    ) else {
+        return Some(format!(
+            "structured `while` lowering recognized loop state `{binding_name}` and a loop-control `if`, but the control branches do not match a supported break/continue flow shape"
+        ));
+    };
+    let mut actions = BTreeSet::new();
+    collect_terminal_loop_control_actions(&control, &mut actions);
+    if actions.len() > 1 {
+        return Some(format!(
+            "structured `while` lowering recognized loop state `{binding_name}` and a loop-control `if`, but this control tree mixes `break` and `continue`; current flow/post-flow loop lowering requires one terminal loop action kind per structured control chain"
+        ));
+    }
+    None
 }
 
 enum PreparedReturnDecisionTree {
@@ -1269,6 +1466,94 @@ pub(super) fn diagnose_unsupported_prepared_while_carry(
     None
 }
 
+pub(super) fn diagnose_unstructured_while_shape(
+    condition: &NirExpr,
+    body: &[NirStmt],
+    pure_helpers: &BTreeSet<String>,
+    inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
+) -> Option<String> {
+    let (binding_name, _, _) =
+        parse_prepared_loop_header(condition, pure_helpers, inlineable_pure_helpers)?;
+
+    let Some((first_stmt, rest)) = body.split_first() else {
+        return Some(
+            "structured `while` lowering recognized the loop header, but the body is empty; expected a loop-state step, a guarded terminal body, or a structured carry/control sequence"
+                .to_owned(),
+        );
+    };
+
+    let first_binding_name = match first_stmt {
+        NirStmt::Let { name, .. } | NirStmt::Const { name, .. } => Some(name.as_str()),
+        _ => None,
+    };
+    let sync_step = parse_prepared_loop_step(
+        first_stmt,
+        &binding_name,
+        pure_helpers,
+        inlineable_pure_helpers,
+    );
+    let async_step = parse_prepared_async_loop_step(first_stmt, &binding_name);
+    if sync_step.is_none() && async_step.is_none() {
+        return Some(match first_binding_name {
+            Some(name) => format!(
+                "structured `while` lowering recognized loop state `{binding_name}`, but the first body binding `{name}` is not a supported step; expected `{binding_name}` to be updated via `{binding_name} +/- ...` or `await callee({binding_name})`"
+            ),
+            None => format!(
+                "structured `while` lowering recognized loop state `{binding_name}`, but the body does not begin with a supported step binding; expected `let {binding_name} = {binding_name} +/- ...`, `let {binding_name} = await callee({binding_name})`, or a guarded terminal body"
+            ),
+        });
+    }
+
+    if rest.is_empty() {
+        if async_step.is_some() {
+            return Some(
+                "structured async `while` lowering recognized the loop header and awaited step, but the remaining body is empty; expected a structured carry/control sequence after the async step"
+                    .to_owned(),
+            );
+        }
+        return None;
+    }
+
+    if rest.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Print(_)
+                | NirStmt::Expr(_)
+                | NirStmt::Await(_)
+                | NirStmt::Return(_)
+                | NirStmt::While { .. }
+        )
+    }) {
+        return Some(format!(
+            "structured `while` lowering recognized loop state `{binding_name}` and its step, but the remaining body still contains arbitrary executable statements; only structured carry updates and flow/post-flow control are lowered after the step"
+        ));
+    }
+
+    let carries = prepare_loop_carry_sequence(
+        rest,
+        &binding_name,
+        pure_helpers,
+        inlineable_pure_helpers,
+        &BTreeMap::<String, PureHelperBlock>::new(),
+    )
+    .unwrap_or_default();
+    if let Some(diagnostic) = rest.iter().find_map(|stmt| {
+        diagnose_unstructured_loop_flow_control(
+            stmt,
+            &binding_name,
+            &carries,
+            pure_helpers,
+            inlineable_pure_helpers,
+        )
+    }) {
+        return Some(diagnostic);
+    }
+
+    Some(format!(
+        "structured `while` lowering recognized loop state `{binding_name}` and its step, but the remaining body is not reducible to supported carry updates or flow/post-flow control"
+    ))
+}
+
 fn split_temp_prefixed_loop_flow_control<'a>(
     stmts: &'a [NirStmt],
     pure_helpers: &BTreeSet<String>,
@@ -1464,27 +1749,44 @@ pub(super) fn prepare_async_flow_while(
                 NirStmt::Continue => Some(PreparedLoopFlowAction::Continue),
                 _ => None,
             } {
-                let prepared_carries = prepare_loop_carry_sequence(
+                if let Some(prepared_carries) = prepare_loop_carry_sequence(
                     else_body,
                     &binding_name,
                     pure_helpers,
                     inlineable_pure_helpers,
                     pure_helper_blocks,
-                )?;
-                let control_condition = parse_loop_flow_condition(
-                    condition,
-                    &binding_name,
-                    &prepared_carries,
-                    pure_helpers,
-                    inlineable_pure_helpers,
-                )?;
-                (
-                    PreparedLoopFlowControl {
-                        condition: control_condition,
-                        action,
-                    },
-                    prepared_carries,
-                )
+                ) {
+                    let control_condition = parse_loop_flow_condition(
+                        condition,
+                        &binding_name,
+                        &prepared_carries,
+                        pure_helpers,
+                        inlineable_pure_helpers,
+                    )?;
+                    (
+                        PreparedLoopFlowControl::Terminal {
+                            condition: control_condition,
+                            action,
+                        },
+                        prepared_carries,
+                    )
+                } else {
+                    let prepared_carries = prepare_loop_carry_sequence(
+                        carry_bindings,
+                        &binding_name,
+                        pure_helpers,
+                        inlineable_pure_helpers,
+                        pure_helper_blocks,
+                    )?;
+                    let control = parse_loop_flow_control(
+                        &substituted_control_stmt,
+                        &binding_name,
+                        &prepared_carries,
+                        pure_helpers,
+                        inlineable_pure_helpers,
+                    )?;
+                    (control, prepared_carries)
+                }
             } else {
                 let prepared_carries = prepare_loop_carry_sequence(
                     carry_bindings,
@@ -1588,27 +1890,44 @@ pub(super) fn prepare_flow_while(
                 NirStmt::Continue => Some(PreparedLoopFlowAction::Continue),
                 _ => None,
             } {
-                let prepared_carries = prepare_loop_carry_sequence(
+                if let Some(prepared_carries) = prepare_loop_carry_sequence(
                     else_body,
                     &binding_name,
                     pure_helpers,
                     inlineable_pure_helpers,
                     pure_helper_blocks,
-                )?;
-                let control_condition = parse_loop_flow_condition(
-                    condition,
-                    &binding_name,
-                    &prepared_carries,
-                    pure_helpers,
-                    inlineable_pure_helpers,
-                )?;
-                (
-                    PreparedLoopFlowControl {
-                        condition: control_condition,
-                        action,
-                    },
-                    prepared_carries,
-                )
+                ) {
+                    let control_condition = parse_loop_flow_condition(
+                        condition,
+                        &binding_name,
+                        &prepared_carries,
+                        pure_helpers,
+                        inlineable_pure_helpers,
+                    )?;
+                    (
+                        PreparedLoopFlowControl::Terminal {
+                            condition: control_condition,
+                            action,
+                        },
+                        prepared_carries,
+                    )
+                } else {
+                    let prepared_carries = prepare_loop_carry_sequence(
+                        carry_bindings,
+                        &binding_name,
+                        pure_helpers,
+                        inlineable_pure_helpers,
+                        pure_helper_blocks,
+                    )?;
+                    let control = parse_loop_flow_control(
+                        &substituted_control_stmt,
+                        &binding_name,
+                        &prepared_carries,
+                        pure_helpers,
+                        inlineable_pure_helpers,
+                    )?;
+                    (control, prepared_carries)
+                }
             } else {
                 let prepared_carries = prepare_loop_carry_sequence(
                     carry_bindings,

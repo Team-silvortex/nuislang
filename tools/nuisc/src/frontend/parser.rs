@@ -324,7 +324,7 @@ impl Parser {
 
     fn parse_impl_def(&mut self) -> Result<AstImplDef, String> {
         self.expect_word("impl")?;
-        let trait_name = self.expect_ident()?;
+        let trait_name = self.parse_qualified_ident()?;
         self.expect_word("for")?;
         let for_type = self.parse_type_ref()?;
         self.expect_symbol('{')?;
@@ -1037,7 +1037,7 @@ impl Parser {
         } else {
             false
         };
-        let name = self.expect_ident()?;
+        let name = self.parse_qualified_ident()?;
         let generic_args = if self.peek_symbol('<') {
             self.parse_type_arg_list()?
         } else {
@@ -1055,6 +1055,16 @@ impl Parser {
             is_optional,
             is_ref,
         })
+    }
+
+    fn parse_qualified_ident(&mut self) -> Result<String, String> {
+        let mut name = self.expect_ident()?;
+        while self.peek_symbol('.') {
+            self.expect_symbol('.')?;
+            name.push('.');
+            name.push_str(&self.expect_ident()?);
+        }
+        Ok(name)
     }
 
     fn parse_type_arg_list(&mut self) -> Result<Vec<AstTypeRef>, String> {

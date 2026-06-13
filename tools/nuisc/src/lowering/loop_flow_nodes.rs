@@ -1,6 +1,111 @@
 use super::*;
 use crate::lowering::edge_helpers::push_effect_edge;
 
+fn flatten_uniform_loop_flow_control(
+    control: &PreparedLoopFlowControl,
+) -> Option<(PreparedLoopFlowCondition, PreparedLoopFlowAction)> {
+    match control {
+        PreparedLoopFlowControl::Terminal { condition, action } => {
+            Some((condition.clone(), *action))
+        }
+        PreparedLoopFlowControl::Compound { op, lhs, rhs } => {
+            let (lhs_condition, lhs_action) = flatten_uniform_loop_flow_control(lhs)?;
+            let (rhs_condition, rhs_action) = flatten_uniform_loop_flow_control(rhs)?;
+            if lhs_action != rhs_action {
+                return None;
+            }
+            Some((
+                PreparedLoopFlowCondition::Compound {
+                    op: *op,
+                    lhs: Box::new(lhs_condition),
+                    rhs: Box::new(rhs_condition),
+                },
+                lhs_action,
+            ))
+        }
+    }
+}
+
+fn encode_mixed_loop_flow_control_args(
+    control: &PreparedLoopFlowControl,
+    state: &mut LoweringState<'_>,
+    bindings: &mut BTreeMap<String, String>,
+) -> Result<(Vec<String>, Vec<String>, Vec<String>), String> {
+    match control {
+        PreparedLoopFlowControl::Terminal { condition, action } => {
+            let (mut condition_args, dep_inputs, effect_inputs) =
+                encode_carry_condition_args(condition, state, bindings)?;
+            let mut args = vec![match action {
+                PreparedLoopFlowAction::Break => "flow_break".to_owned(),
+                PreparedLoopFlowAction::Continue => "flow_continue".to_owned(),
+            }];
+            args.append(&mut condition_args);
+            Ok((args, dep_inputs, effect_inputs))
+        }
+        PreparedLoopFlowControl::Compound { op, lhs, rhs } => {
+            let (mut lhs_args, mut lhs_dep_inputs, mut lhs_effect_inputs) =
+                encode_mixed_loop_flow_control_args(lhs, state, bindings)?;
+            let (rhs_args, rhs_dep_inputs, rhs_effect_inputs) =
+                encode_mixed_loop_flow_control_args(rhs, state, bindings)?;
+            let mut args = vec![match op {
+                PreparedLoopLogicOp::And => "flow_and".to_owned(),
+                PreparedLoopLogicOp::Or => "flow_or".to_owned(),
+            }];
+            args.append(&mut lhs_args);
+            args.extend(rhs_args);
+            lhs_dep_inputs.extend(rhs_dep_inputs);
+            lhs_effect_inputs.extend(rhs_effect_inputs);
+            Ok((args, lhs_dep_inputs, lhs_effect_inputs))
+        }
+    }
+}
+
+fn encode_loop_flow_control_args(
+    control: &PreparedLoopFlowControl,
+    state: &mut LoweringState<'_>,
+    bindings: &mut BTreeMap<String, String>,
+) -> Result<(Vec<String>, Vec<String>, Vec<String>, bool), String> {
+    let Some((condition, action)) = flatten_uniform_loop_flow_control(control) else {
+        let (args, dep_inputs, effect_inputs) =
+            encode_mixed_loop_flow_control_args(control, state, bindings)?;
+        return Ok((args, dep_inputs, effect_inputs, true));
+    };
+    match &condition {
+        PreparedLoopFlowCondition::Simple(condition) => {
+            let control_rhs_name = lower_expr(&condition.rhs, state, bindings)?;
+            Ok((
+                vec![
+                    render_loop_cond_kind(&condition.lhs, condition.compare),
+                    control_rhs_name.clone(),
+                    match action {
+                        PreparedLoopFlowAction::Break => "break".to_owned(),
+                        PreparedLoopFlowAction::Continue => "continue".to_owned(),
+                    },
+                ],
+                vec![control_rhs_name.clone()],
+                vec![control_rhs_name],
+                false,
+            ))
+        }
+        PreparedLoopFlowCondition::Compound { op, lhs, rhs } => {
+            let (mut condition_args, dep_inputs, effect_inputs) = encode_carry_condition_args(
+                &PreparedLoopFlowCondition::Compound {
+                    op: *op,
+                    lhs: lhs.clone(),
+                    rhs: rhs.clone(),
+                },
+                state,
+                bindings,
+            )?;
+            condition_args.push(match action {
+                PreparedLoopFlowAction::Break => "break".to_owned(),
+                PreparedLoopFlowAction::Continue => "continue".to_owned(),
+            });
+            Ok((condition_args, dep_inputs, effect_inputs, false))
+        }
+    }
+}
+
 fn encode_carry_condition_args(
     condition: &PreparedLoopFlowCondition,
     state: &mut LoweringState<'_>,
@@ -78,40 +183,8 @@ pub(super) fn lower_async_flow_while(
         carry_initial_names.push(carry_initial_name);
     }
     let limit_name = lower_expr(&prepared.limit, state, bindings)?;
-    let (control_args, control_dep_inputs, control_effect_inputs) =
-        match &prepared.control.condition {
-            PreparedLoopFlowCondition::Simple(condition) => {
-                let control_rhs_name = lower_expr(&condition.rhs, state, bindings)?;
-                (
-                    vec![
-                        render_loop_cond_kind(&condition.lhs, condition.compare),
-                        control_rhs_name.clone(),
-                        match prepared.control.action {
-                            PreparedLoopFlowAction::Break => "break".to_owned(),
-                            PreparedLoopFlowAction::Continue => "continue".to_owned(),
-                        },
-                    ],
-                    vec![control_rhs_name.clone()],
-                    vec![control_rhs_name],
-                )
-            }
-            PreparedLoopFlowCondition::Compound { op, lhs, rhs } => {
-                let (mut condition_args, dep_inputs, effect_inputs) = encode_carry_condition_args(
-                    &PreparedLoopFlowCondition::Compound {
-                        op: *op,
-                        lhs: lhs.clone(),
-                        rhs: rhs.clone(),
-                    },
-                    state,
-                    bindings,
-                )?;
-                condition_args.push(match prepared.control.action {
-                    PreparedLoopFlowAction::Break => "break".to_owned(),
-                    PreparedLoopFlowAction::Continue => "continue".to_owned(),
-                });
-                (condition_args, dep_inputs, effect_inputs)
-            }
-        };
+    let (control_args, control_dep_inputs, control_effect_inputs, control_uses_cond_chain) =
+        encode_loop_flow_control_args(&prepared.control, state, bindings)?;
     let has_conditional = prepared
         .carries
         .iter()
@@ -174,7 +247,7 @@ pub(super) fn lower_async_flow_while(
     }
     let name = next_name(
         state,
-        if has_conditional {
+        if has_conditional || control_uses_cond_chain {
             "loop_while_scalar_async_flow_cond_chain"
         } else {
             "loop_while_scalar_async_flow_chain"
@@ -185,7 +258,7 @@ pub(super) fn lower_async_flow_while(
         resource: "cpu0".to_owned(),
         op: Operation {
             module: "cpu".to_owned(),
-            instruction: if has_conditional {
+            instruction: if has_conditional || control_uses_cond_chain {
                 "loop_while_scalar_async_flow_cond_chain".to_owned()
             } else {
                 "loop_while_scalar_async_flow_chain".to_owned()
@@ -285,47 +358,16 @@ pub(super) fn lower_flow_while(
     }
     let limit_name = lower_expr(&prepared.limit, state, bindings)?;
     let step_name = lower_expr(&prepared.step, state, bindings)?;
-    let (control_args, control_dep_inputs, control_effect_inputs) =
-        match &prepared.control.condition {
-            PreparedLoopFlowCondition::Simple(condition) => {
-                let control_rhs_name = lower_expr(&condition.rhs, state, bindings)?;
-                (
-                    vec![
-                        render_loop_cond_kind(&condition.lhs, condition.compare),
-                        control_rhs_name.clone(),
-                        match prepared.control.action {
-                            PreparedLoopFlowAction::Break => "break".to_owned(),
-                            PreparedLoopFlowAction::Continue => "continue".to_owned(),
-                        },
-                    ],
-                    vec![control_rhs_name.clone()],
-                    vec![control_rhs_name],
-                )
-            }
-            PreparedLoopFlowCondition::Compound { op, lhs, rhs } => {
-                let (mut condition_args, dep_inputs, effect_inputs) = encode_carry_condition_args(
-                    &PreparedLoopFlowCondition::Compound {
-                        op: *op,
-                        lhs: lhs.clone(),
-                        rhs: rhs.clone(),
-                    },
-                    state,
-                    bindings,
-                )?;
-                condition_args.push(match prepared.control.action {
-                    PreparedLoopFlowAction::Break => "break".to_owned(),
-                    PreparedLoopFlowAction::Continue => "continue".to_owned(),
-                });
-                (condition_args, dep_inputs, effect_inputs)
-            }
-        };
+    let (control_args, control_dep_inputs, control_effect_inputs, control_uses_cond_chain) =
+        encode_loop_flow_control_args(&prepared.control, state, bindings)?;
     let has_conditional = prepared
         .carries
         .iter()
         .any(|carry| matches!(carry.kind, PreparedCarryUpdateKind::Conditional { .. }));
+    let uses_cond_chain = has_conditional || control_uses_cond_chain;
     let name = next_name(
         state,
-        if has_conditional {
+        if uses_cond_chain {
             "loop_while_scalar_flow_cond_chain"
         } else {
             "loop_while_scalar_flow_chain"
@@ -397,7 +439,7 @@ pub(super) fn lower_flow_while(
         resource: "cpu0".to_owned(),
         op: Operation {
             module: "cpu".to_owned(),
-            instruction: if has_conditional {
+            instruction: if uses_cond_chain {
                 "loop_while_scalar_flow_cond_chain".to_owned()
             } else {
                 "loop_while_scalar_flow_chain".to_owned()
@@ -497,44 +539,13 @@ pub(super) fn lower_post_flow_while(
     }
     let limit_name = lower_expr(&prepared.limit, state, bindings)?;
     let step_name = lower_expr(&prepared.step, state, bindings)?;
-    let (control_args, control_dep_inputs, control_effect_inputs) =
-        match &prepared.control.condition {
-            PreparedLoopFlowCondition::Simple(condition) => {
-                let control_rhs_name = lower_expr(&condition.rhs, state, bindings)?;
-                (
-                    vec![
-                        render_loop_cond_kind(&condition.lhs, condition.compare),
-                        control_rhs_name.clone(),
-                        match prepared.control.action {
-                            PreparedLoopFlowAction::Break => "break".to_owned(),
-                            PreparedLoopFlowAction::Continue => "continue".to_owned(),
-                        },
-                    ],
-                    vec![control_rhs_name.clone()],
-                    vec![control_rhs_name],
-                )
-            }
-            PreparedLoopFlowCondition::Compound { op, lhs, rhs } => {
-                let (mut condition_args, dep_inputs, effect_inputs) = encode_carry_condition_args(
-                    &PreparedLoopFlowCondition::Compound {
-                        op: *op,
-                        lhs: lhs.clone(),
-                        rhs: rhs.clone(),
-                    },
-                    state,
-                    bindings,
-                )?;
-                condition_args.push(match prepared.control.action {
-                    PreparedLoopFlowAction::Break => "break".to_owned(),
-                    PreparedLoopFlowAction::Continue => "continue".to_owned(),
-                });
-                (condition_args, dep_inputs, effect_inputs)
-            }
-        };
+    let (control_args, control_dep_inputs, control_effect_inputs, control_uses_cond_chain) =
+        encode_loop_flow_control_args(&prepared.control, state, bindings)?;
     let has_conditional = prepared
         .carries
         .iter()
         .any(|carry| matches!(carry.kind, PreparedCarryUpdateKind::Conditional { .. }));
+    let uses_cond_chain = has_conditional || control_uses_cond_chain;
     let compare = render_loop_compare(prepared.compare);
     let step_kind = match prepared.step_kind {
         PreparedLoopStepKind::Add => "add",
@@ -598,7 +609,7 @@ pub(super) fn lower_post_flow_while(
     }
     let name = next_name(
         state,
-        if has_conditional {
+        if uses_cond_chain {
             "loop_while_scalar_post_flow_cond_chain"
         } else {
             "loop_while_scalar_post_flow_chain"
@@ -609,7 +620,7 @@ pub(super) fn lower_post_flow_while(
         resource: "cpu0".to_owned(),
         op: Operation {
             module: "cpu".to_owned(),
-            instruction: if has_conditional {
+            instruction: if uses_cond_chain {
                 "loop_while_scalar_post_flow_cond_chain".to_owned()
             } else {
                 "loop_while_scalar_post_flow_chain".to_owned()
@@ -716,40 +727,8 @@ pub(super) fn lower_async_post_flow_while(
         carry_initial_names.push(carry_initial_name);
     }
     let limit_name = lower_expr(&prepared.limit, state, bindings)?;
-    let (control_args, control_dep_inputs, control_effect_inputs) =
-        match &prepared.control.condition {
-            PreparedLoopFlowCondition::Simple(condition) => {
-                let control_rhs_name = lower_expr(&condition.rhs, state, bindings)?;
-                (
-                    vec![
-                        render_loop_cond_kind(&condition.lhs, condition.compare),
-                        control_rhs_name.clone(),
-                        match prepared.control.action {
-                            PreparedLoopFlowAction::Break => "break".to_owned(),
-                            PreparedLoopFlowAction::Continue => "continue".to_owned(),
-                        },
-                    ],
-                    vec![control_rhs_name.clone()],
-                    vec![control_rhs_name],
-                )
-            }
-            PreparedLoopFlowCondition::Compound { op, lhs, rhs } => {
-                let (mut condition_args, dep_inputs, effect_inputs) = encode_carry_condition_args(
-                    &PreparedLoopFlowCondition::Compound {
-                        op: *op,
-                        lhs: lhs.clone(),
-                        rhs: rhs.clone(),
-                    },
-                    state,
-                    bindings,
-                )?;
-                condition_args.push(match prepared.control.action {
-                    PreparedLoopFlowAction::Break => "break".to_owned(),
-                    PreparedLoopFlowAction::Continue => "continue".to_owned(),
-                });
-                (condition_args, dep_inputs, effect_inputs)
-            }
-        };
+    let (control_args, control_dep_inputs, control_effect_inputs, control_uses_cond_chain) =
+        encode_loop_flow_control_args(&prepared.control, state, bindings)?;
     let has_conditional = prepared
         .carries
         .iter()
@@ -812,7 +791,7 @@ pub(super) fn lower_async_post_flow_while(
     }
     let name = next_name(
         state,
-        if has_conditional {
+        if has_conditional || control_uses_cond_chain {
             "loop_while_scalar_async_post_flow_cond_chain"
         } else {
             "loop_while_scalar_async_post_flow_chain"
@@ -823,7 +802,7 @@ pub(super) fn lower_async_post_flow_while(
         resource: "cpu0".to_owned(),
         op: Operation {
             module: "cpu".to_owned(),
-            instruction: if has_conditional {
+            instruction: if has_conditional || control_uses_cond_chain {
                 "loop_while_scalar_async_post_flow_cond_chain".to_owned()
             } else {
                 "loop_while_scalar_async_post_flow_chain".to_owned()

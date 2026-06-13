@@ -149,6 +149,16 @@ fn is_public_visibility(visibility: AstVisibility) -> bool {
     matches!(visibility, AstVisibility::Public)
 }
 
+fn render_field_access_path(expr: &AstExpr) -> Option<String> {
+    match expr {
+        AstExpr::Var(name) => Some(name.clone()),
+        AstExpr::FieldAccess { base, field } => {
+            Some(format!("{}.{}", render_field_access_path(base)?, field))
+        }
+        _ => None,
+    }
+}
+
 pub fn parse_nuis_ast(input: &str) -> Result<AstModule, String> {
     let tokens = lexer::tokenize(input)?;
     let mut parser = parser::Parser::new(tokens);

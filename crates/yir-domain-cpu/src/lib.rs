@@ -21,6 +21,23 @@ enum LoopCondExpr {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+enum LoopFlowExpr {
+    Legacy {
+        condition: LoopCondExpr,
+        action: String,
+    },
+    Terminal {
+        action: String,
+        condition: LoopCondExpr,
+    },
+    Binary {
+        op: String,
+        lhs: Box<LoopFlowExpr>,
+        rhs: Box<LoopFlowExpr>,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct ParsedConditionalCarry {
     initial: String,
     condition: LoopCondExpr,
@@ -229,6 +246,68 @@ where
     }
 }
 
+fn parse_loop_flow_expr<F>(
+    args: &[String],
+    start: usize,
+    node_name: &str,
+    validate_kind: &F,
+) -> Result<(LoopFlowExpr, usize), String>
+where
+    F: Fn(&str, &str) -> Result<(), String>,
+{
+    let Some(token) = args.get(start).map(String::as_str) else {
+        return Err(format!(
+            "node `{}` is missing flow control metadata",
+            node_name
+        ));
+    };
+    match token {
+        "flow_and" | "flow_or" => {
+            let (lhs, after_lhs) = parse_loop_flow_expr(args, start + 1, node_name, validate_kind)?;
+            let (rhs, after_rhs) = parse_loop_flow_expr(args, after_lhs, node_name, validate_kind)?;
+            Ok((
+                LoopFlowExpr::Binary {
+                    op: token.to_owned(),
+                    lhs: Box::new(lhs),
+                    rhs: Box::new(rhs),
+                },
+                after_rhs,
+            ))
+        }
+        "flow_break" | "flow_continue" => {
+            let (condition, after_condition) =
+                parse_loop_control_expr(args, start + 1, node_name, validate_kind)?;
+            Ok((
+                LoopFlowExpr::Terminal {
+                    action: token.trim_start_matches("flow_").to_owned(),
+                    condition,
+                },
+                after_condition,
+            ))
+        }
+        _ => {
+            let (condition, action_index) =
+                parse_loop_control_expr(args, start, node_name, validate_kind)?;
+            let Some(action) = args.get(action_index) else {
+                return Err(format!("node `{}` is missing flow control action", node_name));
+            };
+            match action.as_str() {
+                "break" | "continue" => Ok((
+                    LoopFlowExpr::Legacy {
+                        condition,
+                        action: action.clone(),
+                    },
+                    action_index + 1,
+                )),
+                other => Err(format!(
+                    "node `{}` has invalid flow control action `{}`",
+                    node_name, other
+                )),
+            }
+        }
+    }
+}
+
 fn parse_loop_carry_condition_expr(
     args: &[String],
     start: usize,
@@ -288,6 +367,9 @@ fn parse_conditional_carries(
     node_name: &str,
     allow_prev: bool,
 ) -> Result<Vec<ParsedConditionalCarry>, String> {
+    if start >= args.len() {
+        return Ok(Vec::new());
+    }
     let mut index = start;
     let mut carries = Vec::new();
     while index < args.len() {
@@ -316,12 +398,6 @@ fn parse_conditional_carries(
         });
         index = after_else;
     }
-    if carries.is_empty() {
-        return Err(format!(
-            "node `{}` expects at least one conditional carry",
-            node_name
-        ));
-    }
     Ok(carries)
 }
 
@@ -335,6 +411,18 @@ fn collect_loop_condition_rhs_inputs(expr: &LoopCondExpr, inputs: &mut Vec<Strin
         LoopCondExpr::Binary { lhs, rhs, .. } => {
             collect_loop_condition_rhs_inputs(lhs, inputs);
             collect_loop_condition_rhs_inputs(rhs, inputs);
+        }
+    }
+}
+
+fn collect_loop_flow_rhs_inputs(expr: &LoopFlowExpr, inputs: &mut Vec<String>) {
+    match expr {
+        LoopFlowExpr::Legacy { condition, .. } | LoopFlowExpr::Terminal { condition, .. } => {
+            collect_loop_condition_rhs_inputs(condition, inputs);
+        }
+        LoopFlowExpr::Binary { lhs, rhs, .. } => {
+            collect_loop_flow_rhs_inputs(lhs, inputs);
+            collect_loop_flow_rhs_inputs(rhs, inputs);
         }
     }
 }
@@ -353,6 +441,27 @@ where
             format_loop_condition_expr(lhs, resolve_rhs)?,
             op,
             format_loop_condition_expr(rhs, resolve_rhs)?
+        )),
+    }
+}
+
+fn format_loop_flow_expr<F>(expr: &LoopFlowExpr, resolve_rhs: &F) -> Result<String, String>
+where
+    F: Fn(&str) -> Result<String, String>,
+{
+    match expr {
+        LoopFlowExpr::Legacy { condition, action } | LoopFlowExpr::Terminal { action, condition } => {
+            Ok(format!(
+                "if {} then {}",
+                format_loop_condition_expr(condition, resolve_rhs)?,
+                action
+            ))
+        }
+        LoopFlowExpr::Binary { op, lhs, rhs } => Ok(format!(
+            "({} {} {})",
+            format_loop_flow_expr(lhs, resolve_rhs)?,
+            op,
+            format_loop_flow_expr(rhs, resolve_rhs)?
         )),
     }
 }
@@ -1414,40 +1523,24 @@ impl RegisteredMod for CpuMod {
             }
             "loop_while_i64_async_flow_cond_chain" | "loop_while_scalar_async_flow_cond_chain" => {
                 validate_loop_compare_kind(&node.op.args[3], &node.name)?;
-                let (control_expr, control_action_index) = parse_loop_control_expr(
+                let (control_expr, carry_start_index) = parse_loop_flow_expr(
                     &node.op.args,
                     4,
                     &node.name,
                     &validate_flow_control_kind,
                 )?;
-                if control_action_index >= node.op.args.len() {
-                    return Err(format!(
-                        "node `{}` is missing flow control action",
-                        node.name
-                    ));
-                }
-                let carry_start_index = control_action_index + 1;
-                if node.op.args.len() < carry_start_index + 5
-                    || (node.op.args.len() - carry_start_index) % 5 != 0
+                if carry_start_index < node.op.args.len()
+                    && (node.op.args.len() - carry_start_index) % 5 != 0
                 {
                     return Err(format!(
-                        "node `{}` expects `cpu.loop_while_scalar_async_flow_cond_chain <name> <resource> <initial> <limit> <step_callee> <cmp> <control_expr> <control_action> (<carry_initial> <cond_kind> <cond_rhs> <then_kind> <else_kind>)+`",
+                        "node `{}` expects `cpu.loop_while_scalar_async_flow_cond_chain <name> <resource> <initial> <limit> <step_callee> <cmp> <control_flow_expr> (<carry_initial> <cond_kind> <cond_rhs> <then_kind> <else_kind>)*`",
                         node.name
                     ));
-                }
-                match node.op.args[control_action_index].as_str() {
-                    "break" | "continue" => {}
-                    other => {
-                        return Err(format!(
-                            "node `{}` has invalid flow control action `{}`",
-                            node.name, other
-                        ))
-                    }
                 }
                 let carries =
                     parse_conditional_carries(&node.op.args, carry_start_index, &node.name, true)?;
                 let mut inputs = vec![node.op.args[0].clone(), node.op.args[1].clone()];
-                collect_loop_condition_rhs_inputs(&control_expr, &mut inputs);
+                collect_loop_flow_rhs_inputs(&control_expr, &mut inputs);
                 for carry in &carries {
                     inputs.push(carry.initial.clone());
                     collect_loop_condition_rhs_inputs(&carry.condition, &mut inputs);
@@ -1684,40 +1777,24 @@ impl RegisteredMod for CpuMod {
             "loop_while_i64_async_post_flow_cond_chain"
             | "loop_while_scalar_async_post_flow_cond_chain" => {
                 validate_loop_compare_kind(&node.op.args[3], &node.name)?;
-                let (control_expr, control_action_index) = parse_loop_control_expr(
+                let (control_expr, carry_start_index) = parse_loop_flow_expr(
                     &node.op.args,
                     4,
                     &node.name,
                     &validate_flow_control_kind,
                 )?;
-                if control_action_index >= node.op.args.len() {
-                    return Err(format!(
-                        "node `{}` is missing flow control action",
-                        node.name
-                    ));
-                }
-                let carry_start_index = control_action_index + 1;
-                if node.op.args.len() < carry_start_index + 5
-                    || (node.op.args.len() - carry_start_index) % 5 != 0
+                if carry_start_index < node.op.args.len()
+                    && (node.op.args.len() - carry_start_index) % 5 != 0
                 {
                     return Err(format!(
-                        "node `{}` expects `cpu.loop_while_scalar_async_post_flow_cond_chain <name> <resource> <initial> <limit> <step_callee> <cmp> <control_expr> <control_action> (<carry_initial> <cond_kind> <cond_rhs> <then_kind> <else_kind>)+`",
+                        "node `{}` expects `cpu.loop_while_scalar_async_post_flow_cond_chain <name> <resource> <initial> <limit> <step_callee> <cmp> <control_flow_expr> (<carry_initial> <cond_kind> <cond_rhs> <then_kind> <else_kind>)*`",
                         node.name
                     ));
-                }
-                match node.op.args[control_action_index].as_str() {
-                    "break" | "continue" => {}
-                    other => {
-                        return Err(format!(
-                            "node `{}` has invalid flow control action `{}`",
-                            node.name, other
-                        ))
-                    }
                 }
                 let carries =
                     parse_conditional_carries(&node.op.args, carry_start_index, &node.name, true)?;
                 let mut inputs = vec![node.op.args[0].clone(), node.op.args[1].clone()];
-                collect_loop_condition_rhs_inputs(&control_expr, &mut inputs);
+                collect_loop_flow_rhs_inputs(&control_expr, &mut inputs);
                 for carry in &carries {
                     inputs.push(carry.initial.clone());
                     collect_loop_condition_rhs_inputs(&carry.condition, &mut inputs);
@@ -1729,26 +1806,16 @@ impl RegisteredMod for CpuMod {
             "loop_while_i64_post_flow_cond_chain" | "loop_while_scalar_post_flow_cond_chain" => {
                 validate_loop_compare_kind(&node.op.args[3], &node.name)?;
                 validate_loop_step_kind(&node.op.args[4], &node.name)?;
-                let (control_expr, control_action_index) = parse_loop_control_expr(
+                let (control_expr, carry_start_index) = parse_loop_flow_expr(
                     &node.op.args,
                     5,
                     &node.name,
                     &validate_flow_control_kind,
                 )?;
-                let carry_start_index = control_action_index + 1;
-                match node.op.args[control_action_index].as_str() {
-                    "break" | "continue" => {}
-                    other => {
-                        return Err(format!(
-                            "node `{}` has invalid flow control action `{}`",
-                            node.name, other
-                        ));
-                    }
-                }
                 let carries =
                     parse_conditional_carries(&node.op.args, carry_start_index, &node.name, true)?;
                 let mut inputs = node.op.args[..3].to_vec();
-                collect_loop_condition_rhs_inputs(&control_expr, &mut inputs);
+                collect_loop_flow_rhs_inputs(&control_expr, &mut inputs);
                 for carry in &carries {
                     inputs.push(carry.initial.clone());
                     collect_loop_condition_rhs_inputs(&carry.condition, &mut inputs);
@@ -1760,26 +1827,16 @@ impl RegisteredMod for CpuMod {
             "loop_while_i64_flow_cond_chain" | "loop_while_scalar_flow_cond_chain" => {
                 validate_loop_compare_kind(&node.op.args[3], &node.name)?;
                 validate_loop_step_kind(&node.op.args[4], &node.name)?;
-                let (control_expr, control_action_index) = parse_loop_control_expr(
+                let (control_expr, carry_start_index) = parse_loop_flow_expr(
                     &node.op.args,
                     5,
                     &node.name,
                     &validate_flow_control_kind,
                 )?;
-                let carry_start_index = control_action_index + 1;
-                match node.op.args[control_action_index].as_str() {
-                    "break" | "continue" => {}
-                    other => {
-                        return Err(format!(
-                            "node `{}` has invalid flow control action `{}`",
-                            node.name, other
-                        ));
-                    }
-                }
                 let carries =
                     parse_conditional_carries(&node.op.args, carry_start_index, &node.name, true)?;
                 let mut inputs = node.op.args[..3].to_vec();
-                collect_loop_condition_rhs_inputs(&control_expr, &mut inputs);
+                collect_loop_flow_rhs_inputs(&control_expr, &mut inputs);
                 for carry in &carries {
                     inputs.push(carry.initial.clone());
                     collect_loop_condition_rhs_inputs(&carry.condition, &mut inputs);
@@ -2020,20 +2077,15 @@ impl RegisteredMod for CpuMod {
                 let limit = state.expect_value(&node.op.args[1])?.clone();
                 let step_callee = node.op.args.get(2).map_or("<missing>", String::as_str);
                 let cmp = node.op.args.get(3).map_or("<missing>", String::as_str);
-                let (control_expr, control_action_index) = parse_loop_control_expr(
+                let (control_expr, carry_start_index) = parse_loop_flow_expr(
                     &node.op.args,
                     4,
                     &node.name,
                     &validate_flow_control_kind,
                 )?;
-                let control_action = node
-                    .op
-                    .args
-                    .get(control_action_index)
-                    .map_or("<missing>", String::as_str);
                 let carries = parse_conditional_carries(
                     &node.op.args,
-                    control_action_index + 1,
+                    carry_start_index,
                     &node.name,
                     true,
                 )?
@@ -2046,7 +2098,7 @@ impl RegisteredMod for CpuMod {
                     })
                 })
                 .collect::<Result<Vec<_>, String>>()?;
-                let control_display = format_loop_condition_expr(&control_expr, &|value_name| {
+                let control_display = format_loop_flow_expr(&control_expr, &|value_name| {
                     state
                         .expect_value(value_name)
                         .map(|value| value.to_string())
@@ -2054,7 +2106,7 @@ impl RegisteredMod for CpuMod {
                 state.push_resource_event(
                     resource,
                     format!(
-                        "effect cpu.{} @{} [{}]: start {}, loop while current {} {}, step await {}(current), if {} then {}, carries {}",
+                        "effect cpu.{} @{} [{}]: start {}, loop while current {} {}, step await {}(current), {}, carries {}",
                         node.op.instruction,
                         node.resource,
                         resource.kind.raw,
@@ -2063,7 +2115,6 @@ impl RegisteredMod for CpuMod {
                         limit,
                         step_callee,
                         control_display,
-                        control_action,
                         carries.join(", ")
                     ),
                 );
@@ -3260,20 +3311,15 @@ impl RegisteredMod for CpuMod {
                 let limit = state.expect_value(&node.op.args[1])?.clone();
                 let step_callee = node.op.args.get(2).map_or("<missing>", String::as_str);
                 let cmp = node.op.args.get(3).map_or("<missing>", String::as_str);
-                let (control_expr, control_action_index) = parse_loop_control_expr(
+                let (control_expr, carry_start_index) = parse_loop_flow_expr(
                     &node.op.args,
                     4,
                     &node.name,
                     &validate_flow_control_kind,
                 )?;
-                let control_action = node
-                    .op
-                    .args
-                    .get(control_action_index)
-                    .map_or("<missing>", String::as_str);
                 let carries = parse_conditional_carries(
                     &node.op.args,
-                    control_action_index + 1,
+                    carry_start_index,
                     &node.name,
                     true,
                 )?
@@ -3286,7 +3332,7 @@ impl RegisteredMod for CpuMod {
                     })
                 })
                 .collect::<Result<Vec<_>, String>>()?;
-                let control_display = format_loop_condition_expr(&control_expr, &|value_name| {
+                let control_display = format_loop_flow_expr(&control_expr, &|value_name| {
                     state
                         .expect_value(value_name)
                         .map(|value| value.to_string())
@@ -3294,7 +3340,7 @@ impl RegisteredMod for CpuMod {
                 state.push_resource_event(
                     resource,
                     format!(
-                        "effect cpu.{} @{} [{}]: start {}, loop while current {} {}, step await {}(current), update carries {}, then if {} then {}",
+                        "effect cpu.{} @{} [{}]: start {}, loop while current {} {}, step await {}(current), update carries {}, then {}",
                         node.op.instruction,
                         node.resource,
                         resource.kind.raw,
@@ -3303,8 +3349,7 @@ impl RegisteredMod for CpuMod {
                         limit,
                         step_callee,
                         carries.join(", "),
-                        control_display,
-                        control_action
+                        control_display
                     ),
                 );
                 Ok(Value::Unit)
@@ -3315,20 +3360,15 @@ impl RegisteredMod for CpuMod {
                 let step = state.expect_value(&node.op.args[2])?.clone();
                 let cmp = node.op.args.get(3).map_or("<missing>", String::as_str);
                 let step_kind = node.op.args.get(4).map_or("<missing>", String::as_str);
-                let (control_expr, control_action_index) = parse_loop_control_expr(
+                let (control_expr, carry_start_index) = parse_loop_flow_expr(
                     &node.op.args,
                     5,
                     &node.name,
                     &validate_flow_control_kind,
                 )?;
-                let control_action = node
-                    .op
-                    .args
-                    .get(control_action_index)
-                    .map_or("<missing>", String::as_str);
                 let carries = parse_conditional_carries(
                     &node.op.args,
-                    control_action_index + 1,
+                    carry_start_index,
                     &node.name,
                     true,
                 )?
@@ -3341,7 +3381,7 @@ impl RegisteredMod for CpuMod {
                     })
                 })
                 .collect::<Result<Vec<_>, String>>()?;
-                let control_display = format_loop_condition_expr(&control_expr, &|value_name| {
+                let control_display = format_loop_flow_expr(&control_expr, &|value_name| {
                     state
                         .expect_value(value_name)
                         .map(|value| value.to_string())
@@ -3349,7 +3389,7 @@ impl RegisteredMod for CpuMod {
                 state.push_resource_event(
                     resource,
                     format!(
-                        "effect cpu.{} @{} [{}]: start {}, loop while current {} {}, step {} {}, update carries {}, then if {} then {}",
+                        "effect cpu.{} @{} [{}]: start {}, loop while current {} {}, step {} {}, update carries {}, then {}",
                         node.op.instruction,
                         node.resource,
                         resource.kind.raw,
@@ -3360,7 +3400,6 @@ impl RegisteredMod for CpuMod {
                         step,
                         carries.join(", "),
                         control_display,
-                        control_action,
                     ),
                 );
                 Ok(Value::Unit)
@@ -3371,20 +3410,15 @@ impl RegisteredMod for CpuMod {
                 let step = state.expect_value(&node.op.args[2])?.clone();
                 let cmp = node.op.args.get(3).map_or("<missing>", String::as_str);
                 let step_kind = node.op.args.get(4).map_or("<missing>", String::as_str);
-                let (control_expr, control_action_index) = parse_loop_control_expr(
+                let (control_expr, carry_start_index) = parse_loop_flow_expr(
                     &node.op.args,
                     5,
                     &node.name,
                     &validate_flow_control_kind,
                 )?;
-                let control_action = node
-                    .op
-                    .args
-                    .get(control_action_index)
-                    .map_or("<missing>", String::as_str);
                 let carries = parse_conditional_carries(
                     &node.op.args,
-                    control_action_index + 1,
+                    carry_start_index,
                     &node.name,
                     true,
                 )?
@@ -3397,7 +3431,7 @@ impl RegisteredMod for CpuMod {
                     })
                 })
                 .collect::<Result<Vec<_>, String>>()?;
-                let control_display = format_loop_condition_expr(&control_expr, &|value_name| {
+                let control_display = format_loop_flow_expr(&control_expr, &|value_name| {
                     state
                         .expect_value(value_name)
                         .map(|value| value.to_string())
@@ -3405,7 +3439,7 @@ impl RegisteredMod for CpuMod {
                 state.push_resource_event(
                     resource,
                     format!(
-                        "effect cpu.{} @{} [{}]: start {}, loop while current {} {}, step {} {}, if {} then {}, carries {}",
+                        "effect cpu.{} @{} [{}]: start {}, loop while current {} {}, step {} {}, {}, carries {}",
                         node.op.instruction,
                         node.resource,
                         resource.kind.raw,
@@ -3415,7 +3449,6 @@ impl RegisteredMod for CpuMod {
                         step_kind,
                         step,
                         control_display,
-                        control_action,
                         carries.join(", ")
                     ),
                 );

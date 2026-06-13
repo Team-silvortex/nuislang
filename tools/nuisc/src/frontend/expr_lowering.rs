@@ -197,7 +197,7 @@ pub(super) fn lower_expr_with_async(
             method,
             args,
         } => {
-            if let AstExpr::Var(receiver_name) = receiver.as_ref() {
+            if let Some(receiver_name) = super::render_field_access_path(receiver) {
                 let signature_key = format!("{receiver_name}.{method}");
                 if let Some(signature) = signatures.get(&signature_key) {
                     let lowered_args = args
@@ -265,6 +265,53 @@ pub(super) fn lower_expr_with_async(
                         callee: signature.symbol_name.clone(),
                         args: lowered_args,
                     });
+                }
+                let is_shadowed_simple_local = matches!(
+                    receiver.as_ref(),
+                    AstExpr::Var(name) if bindings.contains_key(name)
+                );
+                if !is_shadowed_simple_local {
+                    let lowered_args = args
+                        .iter()
+                        .map(|arg| {
+                            lower_nested_expr_with_async_and_consts(
+                                arg,
+                                current_domain,
+                                current_function_is_async,
+                                bindings,
+                                module_consts,
+                                signatures,
+                                struct_table,
+                                None,
+                            )
+                        })
+                        .collect::<Result<Vec<_>, _>>()?;
+                    if let Some(first_arg) = lowered_args.first() {
+                        if let Some(receiver_ty) =
+                            infer_nir_expr_type(first_arg, bindings, signatures, struct_table)
+                        {
+                            let symbol_name =
+                                super::impl_method_symbol_name(&receiver_name, &receiver_ty, method);
+                            if let Some(signature) = signatures.get(&symbol_name) {
+                                if signature.params.len() != lowered_args.len() {
+                                    return Err(format!(
+                                        "trait method `{signature_key}` for `{}` expects {} args, found {}",
+                                        receiver_ty.render(),
+                                        signature.params.len(),
+                                        lowered_args.len()
+                                    ));
+                                }
+                                return Ok(NirExpr::Call {
+                                    callee: signature.symbol_name.clone(),
+                                    args: lowered_args,
+                                });
+                            }
+                            return Err(format!(
+                                "trait method `{signature_key}` has no impl for `{}`",
+                                receiver_ty.render()
+                            ));
+                        }
+                    }
                 }
             }
             let lowered_receiver = lower_nested_expr_with_async_and_consts(

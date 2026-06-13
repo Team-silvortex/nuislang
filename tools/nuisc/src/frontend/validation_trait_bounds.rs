@@ -53,12 +53,61 @@ pub(super) fn validate_generic_bound_type(
         ));
     }
     if !visible_trait_names.contains(&bound.name) {
+        let variants = collect_trait_name_variants(&bound.name, visible_trait_names);
+        if let Some(preferred) = preferred_trait_name_variant(&bound.name, &variants) {
+            return Err(format!(
+                "{context} references unknown generic bound trait `{}`; did you mean `{}`?",
+                bound.name, preferred
+            ));
+        }
+        if variants.len() == 1 {
+            return Err(format!(
+                "{context} references unknown generic bound trait `{}`; did you mean `{}`?",
+                bound.name, variants[0]
+            ));
+        }
+        if !variants.is_empty() {
+            return Err(format!(
+                "{context} references unknown generic bound trait `{}`; matching visible traits: {}",
+                bound.name,
+                variants.join(", ")
+            ));
+        }
         return Err(format!(
             "{context} references unknown generic bound trait `{}`",
             bound.name
         ));
     }
     Ok(bound.name.clone())
+}
+
+fn collect_trait_name_variants(
+    trait_name: &str,
+    visible_trait_names: &BTreeSet<String>,
+) -> Vec<String> {
+    let short_name = trait_name.rsplit('.').next().unwrap_or(trait_name);
+    let mut variants = visible_trait_names
+        .iter()
+        .filter(|candidate| candidate.as_str() != trait_name)
+        .filter(|candidate| candidate.rsplit('.').next().is_some_and(|name| name == short_name))
+        .cloned()
+        .collect::<Vec<_>>();
+    variants.sort_by_key(|candidate| (!candidate.contains('.'), candidate.clone()));
+    variants
+}
+
+fn preferred_trait_name_variant(trait_name: &str, variants: &[String]) -> Option<String> {
+    if trait_name.contains('.') {
+        let qualified = variants
+            .iter()
+            .filter(|candidate| candidate.contains('.'))
+            .cloned()
+            .collect::<Vec<_>>();
+        if qualified.len() == 1 {
+            return qualified.into_iter().next();
+        }
+    }
+    None
 }
 
 pub(super) fn validate_generic_bound_satisfaction(

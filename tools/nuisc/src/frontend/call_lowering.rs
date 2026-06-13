@@ -4,9 +4,10 @@ use nuis_semantics::model::{AstBinaryOp, AstExpr, NirExpr, NirStructDef, NirType
 
 use super::metadata::hidden_private_field_count;
 use super::{
-    infer_nir_expr_type, lower_binary_expr_with_async, lower_direct_call_builtin_or_named_call,
-    lower_expr_with_async, lower_routed_call_or_core_builtin, resolve_declared_or_inferred,
-    FunctionSignature, ModuleConstValue,
+    impl_method_symbol_name, infer_nir_expr_type, lower_binary_expr_with_async,
+    lower_direct_call_builtin_or_named_call, lower_expr_with_async,
+    lower_routed_call_or_core_builtin, resolve_declared_or_inferred, FunctionSignature,
+    ModuleConstValue,
 };
 
 #[allow(dead_code)]
@@ -100,6 +101,19 @@ pub(super) fn lower_call_expr_with_async(
     )? {
         return Ok(routed_or_core);
     }
+    if let Some(explicit_trait_call) = lower_explicit_trait_qualified_call(
+        callee,
+        args,
+        current_domain,
+        current_function_is_async,
+        bindings,
+        module_consts,
+        signatures,
+        struct_table,
+        allow_async_calls,
+    )? {
+        return Ok(explicit_trait_call);
+    }
     match callee {
         _ => lower_direct_call_builtin_or_named_call(
             callee,
@@ -114,6 +128,67 @@ pub(super) fn lower_call_expr_with_async(
         )?
         .ok_or_else(|| format!("unknown function `{callee}`")),
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_explicit_trait_qualified_call(
+    callee: &str,
+    args: &[AstExpr],
+    current_domain: &str,
+    current_function_is_async: bool,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    module_consts: &BTreeMap<String, ModuleConstValue>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+    allow_async_calls: bool,
+) -> Result<Option<NirExpr>, String> {
+    let Some((trait_name, method)) = callee.rsplit_once('.') else {
+        return Ok(None);
+    };
+    if signatures.contains_key(callee) || args.is_empty() {
+        return Ok(None);
+    }
+
+    let lowered_args = args
+        .iter()
+        .map(|arg| {
+            lower_expr_with_async(
+                arg,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                module_consts,
+                signatures,
+                struct_table,
+                None,
+                allow_async_calls,
+            )
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let Some(receiver_ty) =
+        infer_nir_expr_type(&lowered_args[0], bindings, signatures, struct_table)
+    else {
+        return Ok(None);
+    };
+    let symbol_name = impl_method_symbol_name(trait_name, &receiver_ty, method);
+    let Some(signature) = signatures.get(&symbol_name) else {
+        return Err(format!(
+            "trait method `{callee}` has no impl for `{}`",
+            receiver_ty.render()
+        ));
+    };
+    if signature.params.len() != lowered_args.len() {
+        return Err(format!(
+            "trait method `{callee}` for `{}` expects {} args, found {}",
+            receiver_ty.render(),
+            signature.params.len(),
+            lowered_args.len()
+        ));
+    }
+    Ok(Some(NirExpr::Call {
+        callee: signature.symbol_name.clone(),
+        args: lowered_args,
+    }))
 }
 
 #[allow(clippy::too_many_arguments)]

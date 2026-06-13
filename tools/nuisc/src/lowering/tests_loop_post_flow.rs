@@ -315,6 +315,43 @@ fn lowers_post_flow_breaking_after_branching_carry_into_loop_while_scalar_post_f
 }
 
 #[test]
+fn lowers_post_flow_continue_with_else_only_control_into_loop_while_scalar_post_flow_chain() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            while value < 6 {
+              let value: i64 = value + 1;
+              let acc: i64 = acc + value;
+              if acc >= 3 {
+              } else {
+                continue;
+              }
+            }
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_post_flow_chain"
+        })
+        .expect("expected loop_while_scalar_post_flow_chain node");
+    assert_eq!(loop_node.op.args[5], "carry0_lt");
+    assert_eq!(loop_node.op.args[7], "continue");
+    assert_eq!(loop_node.op.args[9], "add_current");
+}
+
+#[test]
 fn lowers_post_flow_continue_with_pure_control_temp_chain_into_loop_while_scalar_post_flow_chain() {
     let mut module = parse_nuis_module(
         r#"
@@ -819,6 +856,56 @@ fn lowers_nested_match_continuing_after_branching_carry_into_loop_while_scalar_p
 }
 
 #[test]
+fn lowers_nested_if_continue_in_then_and_direct_continue_in_else_into_loop_while_scalar_post_flow_cond_chain(
+) {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            while value < 6 {
+              let value: i64 = value + 1;
+              if value > 2 {
+                let acc: i64 = acc + value;
+              } else {
+                let acc: i64 = acc + 0;
+              }
+              if acc > 4 {
+                if acc < 8 {
+                  continue;
+                } else {
+                }
+              } else {
+                continue;
+              }
+            }
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "loop_while_scalar_post_flow_cond_chain"
+        })
+        .expect("expected loop_while_scalar_post_flow_cond_chain node");
+    assert_eq!(loop_node.op.args[5], "or");
+    assert!(loop_node.op.args.iter().any(|arg| arg == "carry0_lt"));
+    assert!(loop_node.op.args.iter().any(|arg| arg == "carry0_le"));
+    assert!(loop_node.op.args.iter().any(|arg| arg == "continue"));
+    assert!(loop_node.op.args.iter().any(|arg| arg == "add_current"));
+    assert!(loop_node.op.args.iter().any(|arg| arg == "keep"));
+}
+
+#[test]
 fn lowers_post_flow_break_after_multi_arm_match_helper_carry_into_loop_while_scalar_post_flow_cond_chain(
 ) {
     let mut module = parse_nuis_module(
@@ -987,7 +1074,8 @@ fn rejects_general_iterative_while_until_loop_lowering_exists() {
     .unwrap();
 
     let error = lower_nir_to_yir_builtin_cpu(&module).unwrap_err();
-    assert!(error.contains("guard-style `while` loops or simple counted `while` loops"));
+    assert!(error.contains("body does not begin with a supported step binding"));
+    assert!(error.contains("loop state `value`"));
 }
 
 #[test]
@@ -1020,7 +1108,8 @@ fn rejects_memory_address_backedge_while_until_general_loop_lowering_exists() {
     .unwrap();
 
     let error = lower_nir_to_yir_builtin_cpu(&module).unwrap_err();
-    assert!(error.contains("guard-style `while` loops or simple counted `while` loops"));
+    assert!(error.contains("the first body binding `head_ref` is not a supported step"));
+    assert!(error.contains("loop state `step`"));
 }
 
 #[test]

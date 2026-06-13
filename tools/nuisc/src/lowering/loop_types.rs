@@ -389,15 +389,23 @@ impl PreparedCarryBranchSource {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum PreparedLoopFlowAction {
     Break,
     Continue,
 }
 
-pub(super) struct PreparedLoopFlowControl {
-    pub(super) condition: PreparedLoopFlowCondition,
-    pub(super) action: PreparedLoopFlowAction,
+#[derive(Clone)]
+pub(super) enum PreparedLoopFlowControl {
+    Terminal {
+        condition: PreparedLoopFlowCondition,
+        action: PreparedLoopFlowAction,
+    },
+    Compound {
+        op: PreparedLoopLogicOp,
+        lhs: Box<PreparedLoopFlowControl>,
+        rhs: Box<PreparedLoopFlowControl>,
+    },
 }
 
 #[derive(Clone)]

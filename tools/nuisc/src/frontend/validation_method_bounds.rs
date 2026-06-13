@@ -190,7 +190,41 @@ pub(super) fn validate_expr_generic_method_bounds(
                 context,
             )?;
         }
-        AstExpr::Call { args, .. } | AstExpr::Invoke { args, .. } => {
+        AstExpr::Call { callee, args, .. } => {
+            for arg in args {
+                validate_expr_generic_method_bounds(
+                    arg,
+                    visible_type_aliases,
+                    impl_lookup,
+                    visible_structs,
+                    function_return_types,
+                    trait_methods,
+                    generic_param_names,
+                    generic_bounds,
+                    local_type_env,
+                    context,
+                )?;
+            }
+            if let Some((trait_name, method)) = callee.rsplit_once('.') {
+                if trait_methods.contains_key(trait_name) {
+                    validate_explicit_trait_call_bound(
+                        trait_name,
+                        method,
+                        args,
+                        visible_type_aliases,
+                        impl_lookup,
+                        visible_structs,
+                        function_return_types,
+                        trait_methods,
+                        generic_param_names,
+                        generic_bounds,
+                        local_type_env,
+                        context,
+                    )?;
+                }
+            }
+        }
+        AstExpr::Invoke { args, .. } => {
             for arg in args {
                 validate_expr_generic_method_bounds(
                     arg,
@@ -211,6 +245,43 @@ pub(super) fn validate_expr_generic_method_bounds(
             method,
             args,
         } => {
+            if let Some(receiver_name) = super::render_field_access_path(receiver) {
+                let is_shadowed_simple_local = matches!(
+                    receiver.as_ref(),
+                    AstExpr::Var(name) if local_type_env.contains_key(name)
+                );
+                if !is_shadowed_simple_local && trait_methods.contains_key(&receiver_name) {
+                    for arg in args {
+                        validate_expr_generic_method_bounds(
+                            arg,
+                            visible_type_aliases,
+                            impl_lookup,
+                            visible_structs,
+                            function_return_types,
+                            trait_methods,
+                            generic_param_names,
+                            generic_bounds,
+                            local_type_env,
+                            context,
+                        )?;
+                    }
+                    validate_explicit_trait_call_bound(
+                        &receiver_name,
+                        method,
+                        args,
+                        visible_type_aliases,
+                        impl_lookup,
+                        visible_structs,
+                        function_return_types,
+                        trait_methods,
+                        generic_param_names,
+                        generic_bounds,
+                        local_type_env,
+                        context,
+                    )?;
+                    return Ok(());
+                }
+            }
             validate_expr_generic_method_bounds(
                 receiver,
                 visible_type_aliases,
@@ -646,6 +717,120 @@ fn validate_generic_receiver_method_bound(
         ));
     }
     Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn validate_explicit_trait_call_bound(
+    trait_name: &str,
+    method: &str,
+    args: &[AstExpr],
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
+    visible_structs: &BTreeMap<String, AstStructDef>,
+    function_return_types: &BTreeMap<String, Option<AstTypeRef>>,
+    trait_methods: &BTreeMap<String, BTreeSet<String>>,
+    generic_param_names: &BTreeSet<String>,
+    generic_bounds: &BTreeMap<String, String>,
+    local_type_env: &BTreeMap<String, AstTypeRef>,
+    context: &str,
+) -> Result<(), String> {
+    let Some(receiver) = args.first() else {
+        return Ok(());
+    };
+    if !trait_methods
+        .get(trait_name)
+        .is_some_and(|methods| methods.contains(method))
+    {
+        let variants = collect_trait_name_variants(trait_name, trait_methods);
+        if variants.len() == 1
+            && trait_methods
+                .get(&variants[0])
+                .is_some_and(|methods| methods.contains(method))
+        {
+            return Err(format!(
+                "{context} calls trait method `{trait_name}.{method}`, but trait `{trait_name}` does not define method `{method}`; did you mean `{}`?",
+                format!("{}.{}", variants[0], method)
+            ));
+        }
+        return Err(format!(
+            "{context} calls trait method `{trait_name}.{method}`, but trait `{trait_name}` does not define method `{method}`"
+        ));
+    }
+    let Some(receiver_ty) = infer_ast_expr_type(
+        receiver,
+        local_type_env,
+        impl_lookup,
+        visible_structs,
+        function_return_types,
+    ) else {
+        return Ok(());
+    };
+    let receiver_rendered = lower_type_ref(&receiver_ty).render();
+    let Some((generic_name, receiver_context)) = resolve_generic_receiver_context(
+        &receiver_ty,
+        visible_type_aliases,
+        generic_param_names,
+        &mut BTreeSet::new(),
+    )?
+    else {
+        if impl_lookup.contains_key(&(trait_name.to_owned(), receiver_rendered.clone())) {
+            return Ok(());
+        }
+        let available_impls = collect_receiver_trait_impl_candidates(&receiver_rendered, impl_lookup);
+        if available_impls.is_empty() {
+            return Err(format!(
+                "{context} calls trait method `{trait_name}.{method}` for `{receiver_rendered}`, but trait `{trait_name}` has no impl for `{receiver_rendered}`"
+            ));
+        }
+        return Err(format!(
+            "{context} calls trait method `{trait_name}.{method}` for `{receiver_rendered}`, but trait `{trait_name}` has no impl for `{receiver_rendered}`; available trait impls for `{receiver_rendered}`: {}",
+            available_impls.join(", ")
+        ));
+    };
+    let context = format!("{context}{receiver_context}");
+
+    if let Some(bound) = generic_bounds.get(&generic_name) {
+        if bound == trait_name {
+            return Ok(());
+        }
+        let variants = collect_trait_name_variants(trait_name, trait_methods);
+        if variants.iter().any(|candidate| candidate == bound) {
+            return Err(format!(
+                "{context} calls trait method `{trait_name}.{method}` on generic parameter `{generic_name}` but bound `{bound}` uses a different visible name for the same trait; use `{trait_name}` consistently"
+            ));
+        }
+        return Err(format!(
+            "{context} calls trait method `{trait_name}.{method}` on generic parameter `{generic_name}` but bound `{bound}` does not satisfy required trait `{trait_name}`"
+        ));
+    }
+
+    Err(format!(
+        "{context} calls trait method `{trait_name}.{method}` on generic parameter `{generic_name}` without required bound `{trait_name}`"
+    ))
+}
+
+fn collect_trait_name_variants(
+    trait_name: &str,
+    trait_methods: &BTreeMap<String, BTreeSet<String>>,
+) -> Vec<String> {
+    let short_name = trait_name.rsplit('.').next().unwrap_or(trait_name);
+    trait_methods
+        .keys()
+        .filter(|candidate| candidate.as_str() != trait_name)
+        .filter(|candidate| candidate.rsplit('.').next().is_some_and(|name| name == short_name))
+        .cloned()
+        .collect()
+}
+
+fn collect_receiver_trait_impl_candidates(
+    receiver_rendered: &str,
+    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
+) -> Vec<String> {
+    impl_lookup
+        .keys()
+        .filter(|(_, for_type)| for_type == receiver_rendered)
+        .map(|(trait_name, _)| trait_name.clone())
+        .collect()
 }
 
 fn resolve_generic_receiver_context(

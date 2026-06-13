@@ -67,6 +67,272 @@ struct CpuHelperSignature {
     ret: CpuCallScalarKind,
 }
 
+#[derive(Clone)]
+enum LoopControlExpr {
+    Cond { kind: String, rhs_name: String },
+    And(Box<LoopControlExpr>, Box<LoopControlExpr>),
+    Or(Box<LoopControlExpr>, Box<LoopControlExpr>),
+}
+
+#[derive(Clone)]
+enum ResolvedLoopControlExpr {
+    Cond { kind: String, rhs: String },
+    And(Box<ResolvedLoopControlExpr>, Box<ResolvedLoopControlExpr>),
+    Or(Box<ResolvedLoopControlExpr>, Box<ResolvedLoopControlExpr>),
+}
+
+#[derive(Clone)]
+enum LoopFlowExpr {
+    Legacy {
+        condition: LoopControlExpr,
+        action: String,
+    },
+    Terminal {
+        action: String,
+        condition: LoopControlExpr,
+    },
+    Or(Box<LoopFlowExpr>, Box<LoopFlowExpr>),
+}
+
+#[derive(Clone)]
+enum ResolvedLoopFlowExpr {
+    Legacy {
+        condition: ResolvedLoopControlExpr,
+        action: String,
+    },
+    Terminal {
+        action: String,
+        condition: ResolvedLoopControlExpr,
+    },
+    Or(Box<ResolvedLoopFlowExpr>, Box<ResolvedLoopFlowExpr>),
+}
+
+fn parse_loop_control_expr_for_llvm(
+    args: &[String],
+    start: usize,
+    node_name: &str,
+    instruction_name: &str,
+) -> Result<(LoopControlExpr, usize), String> {
+    let Some(token) = args.get(start).map(String::as_str) else {
+        return Err(format!(
+            "cpu.{instruction_name} `{}` is missing control metadata during LLVM lowering",
+            node_name
+        ));
+    };
+    if token == "and" {
+        let (lhs, after_lhs) =
+            parse_loop_control_expr_for_llvm(args, start + 1, node_name, instruction_name)?;
+        let (rhs, after_rhs) =
+            parse_loop_control_expr_for_llvm(args, after_lhs, node_name, instruction_name)?;
+        Ok((LoopControlExpr::And(Box::new(lhs), Box::new(rhs)), after_rhs))
+    } else if token == "or" {
+        let (lhs, after_lhs) =
+            parse_loop_control_expr_for_llvm(args, start + 1, node_name, instruction_name)?;
+        let (rhs, after_rhs) =
+            parse_loop_control_expr_for_llvm(args, after_lhs, node_name, instruction_name)?;
+        Ok((LoopControlExpr::Or(Box::new(lhs), Box::new(rhs)), after_rhs))
+    } else {
+        let Some(rhs_name) = args.get(start + 1) else {
+            return Err(format!(
+                "cpu.{instruction_name} `{}` is missing control rhs during LLVM lowering",
+                node_name
+            ));
+        };
+        Ok((
+            LoopControlExpr::Cond {
+                kind: token.to_owned(),
+                rhs_name: rhs_name.clone(),
+            },
+            start + 2,
+        ))
+    }
+}
+
+fn parse_loop_flow_expr_for_llvm(
+    args: &[String],
+    start: usize,
+    node_name: &str,
+    instruction_name: &str,
+) -> Result<(LoopFlowExpr, usize), String> {
+    let Some(token) = args.get(start).map(String::as_str) else {
+        return Err(format!(
+            "cpu.{instruction_name} `{}` is missing control metadata during LLVM lowering",
+            node_name
+        ));
+    };
+    match token {
+        "flow_or" => {
+            let (lhs, after_lhs) =
+                parse_loop_flow_expr_for_llvm(args, start + 1, node_name, instruction_name)?;
+            let (rhs, after_rhs) =
+                parse_loop_flow_expr_for_llvm(args, after_lhs, node_name, instruction_name)?;
+            Ok((LoopFlowExpr::Or(Box::new(lhs), Box::new(rhs)), after_rhs))
+        }
+        "flow_break" | "flow_continue" => {
+            let (condition, after_condition) =
+                parse_loop_control_expr_for_llvm(args, start + 1, node_name, instruction_name)?;
+            Ok((
+                LoopFlowExpr::Terminal {
+                    action: token.trim_start_matches("flow_").to_owned(),
+                    condition,
+                },
+                after_condition,
+            ))
+        }
+        "flow_and" => Err(format!(
+            "cpu.{instruction_name} `{}` does not support `flow_and` during LLVM lowering yet",
+            node_name
+        )),
+        _ => {
+            let (condition, action_index) =
+                parse_loop_control_expr_for_llvm(args, start, node_name, instruction_name)?;
+            let Some(action) = args.get(action_index) else {
+                return Err(format!(
+                    "cpu.{instruction_name} `{}` is missing control action during LLVM lowering",
+                    node_name
+                ));
+            };
+            Ok((
+                LoopFlowExpr::Legacy {
+                    condition,
+                    action: action.clone(),
+                },
+                action_index + 1,
+            ))
+        }
+    }
+}
+
+fn resolve_loop_control_expr_for_llvm(
+    expr: &LoopControlExpr,
+    registers: &BTreeMap<String, LlvmValueRef>,
+    body: &mut Vec<String>,
+    next_reg: &mut usize,
+    node_name: &str,
+    instruction_name: &str,
+) -> Option<ResolvedLoopControlExpr> {
+    match expr {
+        LoopControlExpr::Cond { kind, rhs_name } => {
+            let Some(value) = registers.get(rhs_name).cloned() else {
+                body.push(format!("  ; deferred lowering for cpu.{instruction_name} `{}` because one or more control rhs values are outside the current CPU LLVM slice", node_name));
+                return None;
+            };
+            let Some(rhs) = coerce_to_i64(&value, body, next_reg) else {
+                body.push(format!("  ; deferred lowering for cpu.{instruction_name} `{}` because one or more control rhs values are not coercible to i64", node_name));
+                return None;
+            };
+            Some(ResolvedLoopControlExpr::Cond {
+                kind: kind.clone(),
+                rhs,
+            })
+        }
+        LoopControlExpr::And(lhs, rhs) => Some(ResolvedLoopControlExpr::And(
+            Box::new(resolve_loop_control_expr_for_llvm(
+                lhs,
+                registers,
+                body,
+                next_reg,
+                node_name,
+                instruction_name,
+            )?),
+            Box::new(resolve_loop_control_expr_for_llvm(
+                rhs,
+                registers,
+                body,
+                next_reg,
+                node_name,
+                instruction_name,
+            )?),
+        )),
+        LoopControlExpr::Or(lhs, rhs) => Some(ResolvedLoopControlExpr::Or(
+            Box::new(resolve_loop_control_expr_for_llvm(
+                lhs,
+                registers,
+                body,
+                next_reg,
+                node_name,
+                instruction_name,
+            )?),
+            Box::new(resolve_loop_control_expr_for_llvm(
+                rhs,
+                registers,
+                body,
+                next_reg,
+                node_name,
+                instruction_name,
+            )?),
+        )),
+    }
+}
+
+fn resolve_loop_flow_expr_for_llvm(
+    expr: &LoopFlowExpr,
+    registers: &BTreeMap<String, LlvmValueRef>,
+    body: &mut Vec<String>,
+    next_reg: &mut usize,
+    node_name: &str,
+    instruction_name: &str,
+) -> Option<ResolvedLoopFlowExpr> {
+    match expr {
+        LoopFlowExpr::Legacy { condition, action } => Some(ResolvedLoopFlowExpr::Legacy {
+            condition: resolve_loop_control_expr_for_llvm(
+                condition,
+                registers,
+                body,
+                next_reg,
+                node_name,
+                instruction_name,
+            )?,
+            action: action.clone(),
+        }),
+        LoopFlowExpr::Terminal { action, condition } => Some(ResolvedLoopFlowExpr::Terminal {
+            action: action.clone(),
+            condition: resolve_loop_control_expr_for_llvm(
+                condition,
+                registers,
+                body,
+                next_reg,
+                node_name,
+                instruction_name,
+            )?,
+        }),
+        LoopFlowExpr::Or(lhs, rhs) => Some(ResolvedLoopFlowExpr::Or(
+            Box::new(resolve_loop_flow_expr_for_llvm(
+                lhs,
+                registers,
+                body,
+                next_reg,
+                node_name,
+                instruction_name,
+            )?),
+            Box::new(resolve_loop_flow_expr_for_llvm(
+                rhs,
+                registers,
+                body,
+                next_reg,
+                node_name,
+                instruction_name,
+            )?),
+        )),
+    }
+}
+
+fn collect_resolved_loop_flow_leaves<'a>(
+    expr: &'a ResolvedLoopFlowExpr,
+    leaves: &mut Vec<(&'a ResolvedLoopControlExpr, &'a str)>,
+) {
+    match expr {
+        ResolvedLoopFlowExpr::Legacy { condition, action }
+        | ResolvedLoopFlowExpr::Terminal { condition, action } => {
+            leaves.push((condition, action.as_str()));
+        }
+        ResolvedLoopFlowExpr::Or(lhs, rhs) => {
+            collect_resolved_loop_flow_leaves(lhs, leaves);
+            collect_resolved_loop_flow_leaves(rhs, leaves);
+        }
+    }
+}
+
 fn canonical_loop_instruction(instruction: &str) -> &str {
     match instruction {
         "loop_while_i64_chain" | "loop_while_scalar_chain" => "loop_while_scalar_chain",
@@ -4851,91 +5117,6 @@ fn emit_cpu_function(
             ) => {
                 let loop_instruction = canonical_loop_instruction(&node.op.instruction);
                 let loop_block_prefix = canonical_loop_block_prefix(&node.op.instruction);
-                enum ControlExpr {
-                    Cond { kind: String, rhs_name: String },
-                    And(Box<ControlExpr>, Box<ControlExpr>),
-                    Or(Box<ControlExpr>, Box<ControlExpr>),
-                }
-                enum ResolvedControlExpr {
-                    Cond { kind: String, rhs: String },
-                    And(Box<ResolvedControlExpr>, Box<ResolvedControlExpr>),
-                    Or(Box<ResolvedControlExpr>, Box<ResolvedControlExpr>),
-                }
-                fn parse_control_expr(
-                    args: &[String],
-                    start: usize,
-                    node_name: &str,
-                ) -> Result<(ControlExpr, usize), String> {
-                    let Some(token) = args.get(start).map(String::as_str) else {
-                        return Err(format!(
-                            "cpu.loop_while_scalar_async_flow_cond_chain `{}` is missing control metadata during LLVM lowering",
-                            node_name
-                        ));
-                    };
-                    if token == "and" {
-                        let (lhs, after_lhs) = parse_control_expr(args, start + 1, node_name)?;
-                        let (rhs, after_rhs) = parse_control_expr(args, after_lhs, node_name)?;
-                        Ok((ControlExpr::And(Box::new(lhs), Box::new(rhs)), after_rhs))
-                    } else if token == "or" {
-                        let (lhs, after_lhs) = parse_control_expr(args, start + 1, node_name)?;
-                        let (rhs, after_rhs) = parse_control_expr(args, after_lhs, node_name)?;
-                        Ok((ControlExpr::Or(Box::new(lhs), Box::new(rhs)), after_rhs))
-                    } else {
-                        let Some(rhs_name) = args.get(start + 1) else {
-                            return Err(format!(
-                                "cpu.loop_while_scalar_async_flow_cond_chain `{}` is missing control rhs during LLVM lowering",
-                                node_name
-                            ));
-                        };
-                        Ok((
-                            ControlExpr::Cond {
-                                kind: token.to_owned(),
-                                rhs_name: rhs_name.clone(),
-                            },
-                            start + 2,
-                        ))
-                    }
-                }
-                fn resolve_control_expr(
-                    expr: &ControlExpr,
-                    registers: &BTreeMap<String, LlvmValueRef>,
-                    body: &mut Vec<String>,
-                    next_reg: &mut usize,
-                    node_name: &str,
-                ) -> Option<ResolvedControlExpr> {
-                    match expr {
-                        ControlExpr::Cond { kind, rhs_name } => {
-                            let Some(value) = registers.get(rhs_name).cloned() else {
-                                body.push(format!("  ; deferred lowering for cpu.loop_while_scalar_async_flow_cond_chain `{}` because one or more control rhs values are outside the current CPU LLVM slice", node_name));
-                                return None;
-                            };
-                            let Some(rhs) = coerce_to_i64(&value, body, next_reg) else {
-                                body.push(format!("  ; deferred lowering for cpu.loop_while_scalar_async_flow_cond_chain `{}` because one or more control rhs values are not coercible to i64", node_name));
-                                return None;
-                            };
-                            Some(ResolvedControlExpr::Cond {
-                                kind: kind.clone(),
-                                rhs,
-                            })
-                        }
-                        ControlExpr::And(lhs, rhs) => Some(ResolvedControlExpr::And(
-                            Box::new(resolve_control_expr(
-                                lhs, registers, body, next_reg, node_name,
-                            )?),
-                            Box::new(resolve_control_expr(
-                                rhs, registers, body, next_reg, node_name,
-                            )?),
-                        )),
-                        ControlExpr::Or(lhs, rhs) => Some(ResolvedControlExpr::Or(
-                            Box::new(resolve_control_expr(
-                                lhs, registers, body, next_reg, node_name,
-                            )?),
-                            Box::new(resolve_control_expr(
-                                rhs, registers, body, next_reg, node_name,
-                            )?),
-                        )),
-                    }
-                }
                 fn resolve_control_operand(
                     kind: &str,
                     next_current: &String,
@@ -4977,7 +5158,7 @@ fn emit_cpu_function(
                     }
                 }
                 fn eval_control_expr(
-                    expr: &ResolvedControlExpr,
+                    expr: &ResolvedLoopControlExpr,
                     next_current: &String,
                     current_carries: &Vec<String>,
                     body: &mut Vec<String>,
@@ -4985,7 +5166,7 @@ fn emit_cpu_function(
                     node_name: &str,
                 ) -> Result<String, String> {
                     match expr {
-                        ResolvedControlExpr::Cond { kind, rhs } => {
+                        ResolvedLoopControlExpr::Cond { kind, rhs } => {
                             let (lhs, pred) = resolve_control_operand(
                                 kind,
                                 next_current,
@@ -4996,7 +5177,7 @@ fn emit_cpu_function(
                             body.push(format!("  {reg} = icmp {pred} i64 {lhs}, {rhs}"));
                             Ok(reg)
                         }
-                        ResolvedControlExpr::And(lhs, rhs) => {
+                        ResolvedLoopControlExpr::And(lhs, rhs) => {
                             let lhs_reg = eval_control_expr(
                                 lhs,
                                 next_current,
@@ -5017,7 +5198,7 @@ fn emit_cpu_function(
                             body.push(format!("  {reg} = and i1 {lhs_reg}, {rhs_reg}"));
                             Ok(reg)
                         }
-                        ResolvedControlExpr::Or(lhs, rhs) => {
+                        ResolvedLoopControlExpr::Or(lhs, rhs) => {
                             let lhs_reg = eval_control_expr(
                                 lhs,
                                 next_current,
@@ -5042,15 +5223,8 @@ fn emit_cpu_function(
                 }
                 let initial_value = registers.get(&node.op.args[0]).cloned();
                 let limit_value = registers.get(&node.op.args[1]).cloned();
-                let (control_expr, control_action_index) =
-                    parse_control_expr(&node.op.args, 4, &node.name)?;
-                let Some(control_action) = node.op.args.get(control_action_index).cloned() else {
-                    return Err(format!(
-                        "cpu.{loop_instruction} `{}` is missing control action during LLVM lowering",
-                        node.name,
-                    ));
-                };
-                let carry_start_index = control_action_index + 1;
+                let (flow_expr, carry_start_index) =
+                    parse_loop_flow_expr_for_llvm(&node.op.args, 4, &node.name, loop_instruction)?;
                 let callee = &node.op.args[2];
                 let Some(signature) = helper_signatures.get(callee) else {
                     body.push(format!("  ; deferred lowering for cpu.{loop_instruction} `{}` because helper signature `{}` is unavailable", node.name, callee));
@@ -5075,12 +5249,13 @@ fn emit_cpu_function(
                     continue;
                 };
                 let cmp_kind = node.op.args[3].as_str();
-                let Some(resolved_control_expr) = resolve_control_expr(
-                    &control_expr,
+                let Some(resolved_flow_expr) = resolve_loop_flow_expr_for_llvm(
+                    &flow_expr,
                     &registers,
                     &mut body,
                     &mut next_reg,
                     &node.name,
+                    loop_instruction,
                 ) else {
                     continue;
                 };
@@ -5142,8 +5317,6 @@ fn emit_cpu_function(
                 let loop_body = fresh_block(&mut next_block, &format!("{loop_block_prefix}_body"));
                 let loop_update =
                     fresh_block(&mut next_block, &format!("{loop_block_prefix}_update"));
-                let loop_action =
-                    fresh_block(&mut next_block, &format!("{loop_block_prefix}_action"));
                 let loop_exit = fresh_block(&mut next_block, &format!("{loop_block_prefix}_exit"));
                 body.push(format!("  br label %{loop_cond}"));
                 body.push(format!("{loop_cond}:"));
@@ -5166,20 +5339,47 @@ fn emit_cpu_function(
                     body.push(format!("  {r} = load i64, ptr {slot}"));
                     current_carries.push(r);
                 }
-                let control_cond = eval_control_expr(
-                    &resolved_control_expr,
-                    &next_current,
-                    &current_carries,
-                    &mut body,
-                    &mut next_reg,
-                    &node.name,
-                )?;
-                body.push(format!(
-                    "  br i1 {control_cond}, label %{loop_action}, label %{loop_update}"
-                ));
-                body.push(format!("{loop_action}:"));
-                body.push(format!("  store i64 {next_current}, ptr {current_slot}"));
-                match control_action.as_str() { "break"=>body.push(format!("  br label %{loop_exit}")), "continue"=>body.push(format!("  br label %{loop_cond}")), other=>return Err(format!("cpu.{loop_instruction} `{}` has unsupported control action `{other}` during LLVM lowering", node.name)), }
+                let mut flow_leaves: Vec<(&ResolvedLoopControlExpr, &str)> = Vec::new();
+                collect_resolved_loop_flow_leaves(&resolved_flow_expr, &mut flow_leaves);
+                let mut no_match_block = loop_update.clone();
+                for (index, (condition, action)) in flow_leaves.iter().enumerate().rev() {
+                    let leaf_block = if index == 0 {
+                        None
+                    } else {
+                        Some(fresh_block(&mut next_block, "loop_async_flow_rhs"))
+                    };
+                    if let Some(block) = &leaf_block {
+                        body.push(format!("{block}:"));
+                    }
+                    let control_cond = eval_control_expr(
+                        condition,
+                        &next_current,
+                        &current_carries,
+                        &mut body,
+                        &mut next_reg,
+                        &node.name,
+                    )?;
+                    let action_block = fresh_block(&mut next_block, "loop_async_flow_action");
+                    body.push(format!(
+                        "  br i1 {control_cond}, label %{action_block}, label %{no_match_block}"
+                    ));
+                    body.push(format!("{action_block}:"));
+                    body.push(format!("  store i64 {next_current}, ptr {current_slot}"));
+                    match *action {
+                        "break" => body.push(format!("  br label %{loop_exit}")),
+                        "continue" => body.push(format!("  br label %{loop_cond}")),
+                        other => {
+                            return Err(format!(
+                                "cpu.{loop_instruction} `{}` has unsupported flow action `{other}` during LLVM lowering",
+                                node.name,
+                            ));
+                        }
+                    }
+                    if let Some(block) = leaf_block {
+                        no_match_block = block;
+                    }
+                }
+                body.push(format!("  br label %{no_match_block}"));
                 body.push(format!("{loop_update}:"));
                 let mut next_carries = Vec::new();
                 for (index, (cond_kind, cond_rhs, then_kind, else_kind)) in
@@ -6002,91 +6202,6 @@ fn emit_cpu_function(
             ) => {
                 let loop_instruction = canonical_loop_instruction(&node.op.instruction);
                 let loop_block_prefix = canonical_loop_block_prefix(&node.op.instruction);
-                enum ControlExpr {
-                    Cond { kind: String, rhs_name: String },
-                    And(Box<ControlExpr>, Box<ControlExpr>),
-                    Or(Box<ControlExpr>, Box<ControlExpr>),
-                }
-                enum ResolvedControlExpr {
-                    Cond { kind: String, rhs: String },
-                    And(Box<ResolvedControlExpr>, Box<ResolvedControlExpr>),
-                    Or(Box<ResolvedControlExpr>, Box<ResolvedControlExpr>),
-                }
-                fn parse_control_expr(
-                    args: &[String],
-                    start: usize,
-                    node_name: &str,
-                ) -> Result<(ControlExpr, usize), String> {
-                    let Some(token) = args.get(start).map(String::as_str) else {
-                        return Err(format!(
-                            "cpu.loop_while_scalar_async_post_flow_cond_chain `{}` is missing control metadata during LLVM lowering",
-                            node_name
-                        ));
-                    };
-                    if token == "and" {
-                        let (lhs, after_lhs) = parse_control_expr(args, start + 1, node_name)?;
-                        let (rhs, after_rhs) = parse_control_expr(args, after_lhs, node_name)?;
-                        Ok((ControlExpr::And(Box::new(lhs), Box::new(rhs)), after_rhs))
-                    } else if token == "or" {
-                        let (lhs, after_lhs) = parse_control_expr(args, start + 1, node_name)?;
-                        let (rhs, after_rhs) = parse_control_expr(args, after_lhs, node_name)?;
-                        Ok((ControlExpr::Or(Box::new(lhs), Box::new(rhs)), after_rhs))
-                    } else {
-                        let Some(rhs_name) = args.get(start + 1) else {
-                            return Err(format!(
-                                "cpu.loop_while_scalar_async_post_flow_cond_chain `{}` is missing control rhs during LLVM lowering",
-                                node_name
-                            ));
-                        };
-                        Ok((
-                            ControlExpr::Cond {
-                                kind: token.to_owned(),
-                                rhs_name: rhs_name.clone(),
-                            },
-                            start + 2,
-                        ))
-                    }
-                }
-                fn resolve_control_expr(
-                    expr: &ControlExpr,
-                    registers: &BTreeMap<String, LlvmValueRef>,
-                    body: &mut Vec<String>,
-                    next_reg: &mut usize,
-                    node_name: &str,
-                ) -> Option<ResolvedControlExpr> {
-                    match expr {
-                        ControlExpr::Cond { kind, rhs_name } => {
-                            let Some(value) = registers.get(rhs_name).cloned() else {
-                                body.push(format!("  ; deferred lowering for cpu.loop_while_scalar_async_post_flow_cond_chain `{}` because one or more control rhs values are outside the current CPU LLVM slice", node_name));
-                                return None;
-                            };
-                            let Some(rhs) = coerce_to_i64(&value, body, next_reg) else {
-                                body.push(format!("  ; deferred lowering for cpu.loop_while_scalar_async_post_flow_cond_chain `{}` because one or more control rhs values are not coercible to i64", node_name));
-                                return None;
-                            };
-                            Some(ResolvedControlExpr::Cond {
-                                kind: kind.clone(),
-                                rhs,
-                            })
-                        }
-                        ControlExpr::And(lhs, rhs) => Some(ResolvedControlExpr::And(
-                            Box::new(resolve_control_expr(
-                                lhs, registers, body, next_reg, node_name,
-                            )?),
-                            Box::new(resolve_control_expr(
-                                rhs, registers, body, next_reg, node_name,
-                            )?),
-                        )),
-                        ControlExpr::Or(lhs, rhs) => Some(ResolvedControlExpr::Or(
-                            Box::new(resolve_control_expr(
-                                lhs, registers, body, next_reg, node_name,
-                            )?),
-                            Box::new(resolve_control_expr(
-                                rhs, registers, body, next_reg, node_name,
-                            )?),
-                        )),
-                    }
-                }
                 fn resolve_control_operand(
                     kind: &str,
                     next_current: &String,
@@ -6128,7 +6243,7 @@ fn emit_cpu_function(
                     }
                 }
                 fn eval_control_expr(
-                    expr: &ResolvedControlExpr,
+                    expr: &ResolvedLoopControlExpr,
                     next_current: &String,
                     next_carries: &Vec<String>,
                     body: &mut Vec<String>,
@@ -6136,7 +6251,7 @@ fn emit_cpu_function(
                     node_name: &str,
                 ) -> Result<String, String> {
                     match expr {
-                        ResolvedControlExpr::Cond { kind, rhs } => {
+                        ResolvedLoopControlExpr::Cond { kind, rhs } => {
                             let (lhs, pred) = resolve_control_operand(
                                 kind,
                                 next_current,
@@ -6147,7 +6262,7 @@ fn emit_cpu_function(
                             body.push(format!("  {reg} = icmp {pred} i64 {lhs}, {rhs}"));
                             Ok(reg)
                         }
-                        ResolvedControlExpr::And(lhs, rhs) => {
+                        ResolvedLoopControlExpr::And(lhs, rhs) => {
                             let lhs_reg = eval_control_expr(
                                 lhs,
                                 next_current,
@@ -6168,7 +6283,7 @@ fn emit_cpu_function(
                             body.push(format!("  {reg} = and i1 {lhs_reg}, {rhs_reg}"));
                             Ok(reg)
                         }
-                        ResolvedControlExpr::Or(lhs, rhs) => {
+                        ResolvedLoopControlExpr::Or(lhs, rhs) => {
                             let lhs_reg = eval_control_expr(
                                 lhs,
                                 next_current,
@@ -6193,15 +6308,12 @@ fn emit_cpu_function(
                 }
                 let initial_value = registers.get(&node.op.args[0]).cloned();
                 let limit_value = registers.get(&node.op.args[1]).cloned();
-                let (control_expr, control_action_index) =
-                    parse_control_expr(&node.op.args, 4, &node.name)?;
-                let Some(control_action) = node.op.args.get(control_action_index).cloned() else {
-                    return Err(format!(
-                        "cpu.{loop_instruction} `{}` is missing control action during LLVM lowering",
-                        node.name,
-                    ));
-                };
-                let carry_start_index = control_action_index + 1;
+                let (flow_expr, carry_start_index) = parse_loop_flow_expr_for_llvm(
+                    &node.op.args,
+                    4,
+                    &node.name,
+                    loop_instruction,
+                )?;
                 let callee = &node.op.args[2];
                 let Some(signature) = helper_signatures.get(callee) else {
                     body.push(format!("  ; deferred lowering for cpu.{loop_instruction} `{}` because helper signature `{}` is unavailable", node.name, callee));
@@ -6226,12 +6338,13 @@ fn emit_cpu_function(
                     continue;
                 };
                 let cmp_kind = node.op.args[3].as_str();
-                let Some(resolved_control_expr) = resolve_control_expr(
-                    &control_expr,
+                let Some(resolved_flow_expr) = resolve_loop_flow_expr_for_llvm(
+                    &flow_expr,
                     &registers,
                     &mut body,
                     &mut next_reg,
                     &node.name,
+                    loop_instruction,
                 ) else {
                     continue;
                 };
@@ -6289,8 +6402,6 @@ fn emit_cpu_function(
                     .collect::<Vec<_>>();
                 let loop_cond = fresh_block(&mut next_block, &format!("{loop_block_prefix}_cond"));
                 let loop_body = fresh_block(&mut next_block, &format!("{loop_block_prefix}_body"));
-                let loop_action =
-                    fresh_block(&mut next_block, &format!("{loop_block_prefix}_action"));
                 let loop_continue =
                     fresh_block(&mut next_block, &format!("{loop_block_prefix}_continue"));
                 let loop_exit = fresh_block(&mut next_block, &format!("{loop_block_prefix}_exit"));
@@ -6387,23 +6498,51 @@ fn emit_cpu_function(
                     };
                     next_carries.push(next_carry);
                 }
-                let control_cond = eval_control_expr(
-                    &resolved_control_expr,
-                    &next_current,
-                    &next_carries,
-                    &mut body,
-                    &mut next_reg,
-                    &node.name,
-                )?;
-                body.push(format!(
-                    "  br i1 {control_cond}, label %{loop_action}, label %{loop_continue}"
-                ));
-                body.push(format!("{loop_action}:"));
-                body.push(format!("  store i64 {next_current}, ptr {current_slot}"));
-                for (slot, val) in carry_slots.iter().zip(next_carries.iter()) {
-                    body.push(format!("  store i64 {val}, ptr {slot}"));
+                let mut flow_leaves: Vec<(&ResolvedLoopControlExpr, &str)> = Vec::new();
+                collect_resolved_loop_flow_leaves(&resolved_flow_expr, &mut flow_leaves);
+                let mut no_match_block = loop_continue.clone();
+                for (index, (condition, action)) in flow_leaves.iter().enumerate().rev() {
+                    let leaf_block = if index == 0 {
+                        None
+                    } else {
+                        Some(fresh_block(&mut next_block, "loop_async_post_flow_rhs"))
+                    };
+                    if let Some(block) = &leaf_block {
+                        body.push(format!("{block}:"));
+                    }
+                    let control_cond = eval_control_expr(
+                        condition,
+                        &next_current,
+                        &next_carries,
+                        &mut body,
+                        &mut next_reg,
+                        &node.name,
+                    )?;
+                    let action_block =
+                        fresh_block(&mut next_block, "loop_async_post_flow_action");
+                    body.push(format!(
+                        "  br i1 {control_cond}, label %{action_block}, label %{no_match_block}"
+                    ));
+                    body.push(format!("{action_block}:"));
+                    body.push(format!("  store i64 {next_current}, ptr {current_slot}"));
+                    for (slot, val) in carry_slots.iter().zip(next_carries.iter()) {
+                        body.push(format!("  store i64 {val}, ptr {slot}"));
+                    }
+                    match *action {
+                        "break" => body.push(format!("  br label %{loop_exit}")),
+                        "continue" => body.push(format!("  br label %{loop_cond}")),
+                        other => {
+                            return Err(format!(
+                                "cpu.{loop_instruction} `{}` has unsupported flow action `{other}` during LLVM lowering",
+                                node.name,
+                            ));
+                        }
+                    }
+                    if let Some(block) = leaf_block {
+                        no_match_block = block;
+                    }
                 }
-                match control_action.as_str() { "break"=>body.push(format!("  br label %{loop_exit}")), "continue"=>body.push(format!("  br label %{loop_cond}")), other=>return Err(format!("cpu.{loop_instruction} `{}` has unsupported control action `{other}` during LLVM lowering", node.name)), }
+                body.push(format!("  br label %{no_match_block}"));
                 body.push(format!("{loop_continue}:"));
                 body.push(format!("  store i64 {next_current}, ptr {current_slot}"));
                 for (slot, val) in carry_slots.iter().zip(next_carries.iter()) {
@@ -6446,13 +6585,14 @@ fn emit_cpu_function(
                 let initial_value = registers.get(&node.op.args[0]).cloned();
                 let limit_value = registers.get(&node.op.args[1]).cloned();
                 let step_value = registers.get(&node.op.args[2]).cloned();
-                let control_rhs_value = registers.get(&node.op.args[6]).cloned();
-                let (
-                    Some(initial_value),
-                    Some(limit_value),
-                    Some(step_value),
-                    Some(control_rhs_value),
-                ) = (initial_value, limit_value, step_value, control_rhs_value)
+                let (flow_expr, carry_start_index) = parse_loop_flow_expr_for_llvm(
+                    &node.op.args,
+                    5,
+                    &node.name,
+                    loop_instruction,
+                )?;
+                let (Some(initial_value), Some(limit_value), Some(step_value)) =
+                    (initial_value, limit_value, step_value)
                 else {
                     body.push(format!(
                         "  ; deferred lowering for cpu.{loop_instruction} `{}` because one or more inputs are outside the current CPU LLVM slice",
@@ -6481,22 +6621,22 @@ fn emit_cpu_function(
                     ));
                     continue;
                 };
-                let Some(control_rhs) = coerce_to_i64(&control_rhs_value, &mut body, &mut next_reg)
-                else {
-                    body.push(format!(
-                        "  ; deferred lowering for cpu.{loop_instruction} `{}` because its control rhs is not coercible to i64",
-                        node.name,
-                    ));
-                    continue;
-                };
                 let cmp_kind = node.op.args[3].as_str();
                 let step_kind = node.op.args[4].as_str();
-                let control_kind = node.op.args[5].as_str();
-                let control_action = node.op.args[7].as_str();
+                let Some(resolved_flow_expr) = resolve_loop_flow_expr_for_llvm(
+                    &flow_expr,
+                    &registers,
+                    &mut body,
+                    &mut next_reg,
+                    &node.name,
+                    loop_instruction,
+                ) else {
+                    continue;
+                };
                 let mut carry_initials = Vec::new();
                 let mut carry_specs = Vec::new();
                 let mut deferred = false;
-                for chunk in node.op.args[8..].chunks(5) {
+                for chunk in node.op.args[carry_start_index..].chunks(5) {
                     let carry_initial_value = registers.get(&chunk[0]).cloned();
                     let Some(carry_initial_value) = carry_initial_value else {
                         body.push(format!(
@@ -6565,8 +6705,6 @@ fn emit_cpu_function(
                     .collect::<Vec<_>>();
                 let loop_cond = fresh_block(&mut next_block, &format!("{loop_block_prefix}_cond"));
                 let loop_body = fresh_block(&mut next_block, &format!("{loop_block_prefix}_body"));
-                let loop_action =
-                    fresh_block(&mut next_block, &format!("{loop_block_prefix}_action"));
                 let loop_continue =
                     fresh_block(&mut next_block, &format!("{loop_block_prefix}_continue"));
                 let loop_exit = fresh_block(&mut next_block, &format!("{loop_block_prefix}_exit"));
@@ -6810,144 +6948,165 @@ fn emit_cpu_function(
                     };
                     next_carries.push(next_carry);
                 }
-                let (control_lhs, control_pred) = match control_kind {
-                    "current_eq" => (next_current.clone(), "eq"),
-                    "current_ne" => (next_current.clone(), "ne"),
-                    "current_lt" => (next_current.clone(), "slt"),
-                    "current_le" => (next_current.clone(), "sle"),
-                    "current_gt" => (next_current.clone(), "sgt"),
-                    "current_ge" => (next_current.clone(), "sge"),
-                    other if other.starts_with("carry") && other.ends_with("_eq") => {
-                        let source_index = other[5..other.len() - 3].parse::<usize>().map_err(
-                            |_| {
-                                format!(
-                                    "cpu.{loop_instruction} `{}` has unsupported control kind `{other}` during LLVM lowering",
-                                    node.name,
-                                )
-                            },
-                        )?;
-                        let lhs = next_carries.get(source_index).cloned().ok_or_else(|| {
-                            format!(
-                                "cpu.{loop_instruction} `{}` references unavailable control source `{other}` during LLVM lowering",
+                let resolve_control_operand =
+                    |kind: &str, next_current: &String, next_carries: &Vec<String>| {
+                        match kind {
+                            "current_eq" => Ok((next_current.clone(), "eq")),
+                            "current_ne" => Ok((next_current.clone(), "ne")),
+                            "current_lt" => Ok((next_current.clone(), "slt")),
+                            "current_le" => Ok((next_current.clone(), "sle")),
+                            "current_gt" => Ok((next_current.clone(), "sgt")),
+                            "current_ge" => Ok((next_current.clone(), "sge")),
+                            other if other.starts_with("carry") && other.ends_with("_eq") => {
+                                let i = other[5..other.len() - 3].parse::<usize>().map_err(|_| format!("cpu.{loop_instruction} `{}` has unsupported control kind `{other}` during LLVM lowering", node.name))?;
+                                Ok((next_carries.get(i).cloned().ok_or_else(|| format!("cpu.{loop_instruction} `{}` references unavailable control source `{other}` during LLVM lowering", node.name))?, "eq"))
+                            }
+                            other if other.starts_with("carry") && other.ends_with("_ne") => {
+                                let i = other[5..other.len() - 3].parse::<usize>().map_err(|_| format!("cpu.{loop_instruction} `{}` has unsupported control kind `{other}` during LLVM lowering", node.name))?;
+                                Ok((next_carries.get(i).cloned().ok_or_else(|| format!("cpu.{loop_instruction} `{}` references unavailable control source `{other}` during LLVM lowering", node.name))?, "ne"))
+                            }
+                            other if other.starts_with("carry") && other.ends_with("_lt") => {
+                                let i = other[5..other.len() - 3].parse::<usize>().map_err(|_| format!("cpu.{loop_instruction} `{}` has unsupported control kind `{other}` during LLVM lowering", node.name))?;
+                                Ok((next_carries.get(i).cloned().ok_or_else(|| format!("cpu.{loop_instruction} `{}` references unavailable control source `{other}` during LLVM lowering", node.name))?, "slt"))
+                            }
+                            other if other.starts_with("carry") && other.ends_with("_le") => {
+                                let i = other[5..other.len() - 3].parse::<usize>().map_err(|_| format!("cpu.{loop_instruction} `{}` has unsupported control kind `{other}` during LLVM lowering", node.name))?;
+                                Ok((next_carries.get(i).cloned().ok_or_else(|| format!("cpu.{loop_instruction} `{}` references unavailable control source `{other}` during LLVM lowering", node.name))?, "sle"))
+                            }
+                            other if other.starts_with("carry") && other.ends_with("_gt") => {
+                                let i = other[5..other.len() - 3].parse::<usize>().map_err(|_| format!("cpu.{loop_instruction} `{}` has unsupported control kind `{other}` during LLVM lowering", node.name))?;
+                                Ok((next_carries.get(i).cloned().ok_or_else(|| format!("cpu.{loop_instruction} `{}` references unavailable control source `{other}` during LLVM lowering", node.name))?, "sgt"))
+                            }
+                            other if other.starts_with("carry") && other.ends_with("_ge") => {
+                                let i = other[5..other.len() - 3].parse::<usize>().map_err(|_| format!("cpu.{loop_instruction} `{}` has unsupported control kind `{other}` during LLVM lowering", node.name))?;
+                                Ok((next_carries.get(i).cloned().ok_or_else(|| format!("cpu.{loop_instruction} `{}` references unavailable control source `{other}` during LLVM lowering", node.name))?, "sge"))
+                            }
+                            other => Err(format!("cpu.{loop_instruction} `{}` has unsupported control kind `{other}` during LLVM lowering", node.name)),
+                        }
+                    };
+                let eval_control_expr =
+                    |expr: &ResolvedLoopControlExpr,
+                     next_current: &String,
+                     next_carries: &Vec<String>,
+                     body: &mut Vec<String>,
+                     next_reg: &mut usize|
+                     -> Result<String, String> {
+                        fn eval(
+                            expr: &ResolvedLoopControlExpr,
+                            next_current: &String,
+                            next_carries: &Vec<String>,
+                            body: &mut Vec<String>,
+                            next_reg: &mut usize,
+                            resolve_control_operand: &impl Fn(
+                                &str,
+                                &String,
+                                &Vec<String>,
+                            ) -> Result<(String, &'static str), String>,
+                        ) -> Result<String, String> {
+                            match expr {
+                                ResolvedLoopControlExpr::Cond { kind, rhs } => {
+                                    let (lhs, pred) =
+                                        resolve_control_operand(kind, next_current, next_carries)?;
+                                    let reg = fresh_reg(next_reg);
+                                    body.push(format!("  {reg} = icmp {pred} i64 {lhs}, {rhs}"));
+                                    Ok(reg)
+                                }
+                                ResolvedLoopControlExpr::And(lhs, rhs) => {
+                                    let lhs_reg = eval(
+                                        lhs,
+                                        next_current,
+                                        next_carries,
+                                        body,
+                                        next_reg,
+                                        resolve_control_operand,
+                                    )?;
+                                    let rhs_reg = eval(
+                                        rhs,
+                                        next_current,
+                                        next_carries,
+                                        body,
+                                        next_reg,
+                                        resolve_control_operand,
+                                    )?;
+                                    let reg = fresh_reg(next_reg);
+                                    body.push(format!("  {reg} = and i1 {lhs_reg}, {rhs_reg}"));
+                                    Ok(reg)
+                                }
+                                ResolvedLoopControlExpr::Or(lhs, rhs) => {
+                                    let lhs_reg = eval(
+                                        lhs,
+                                        next_current,
+                                        next_carries,
+                                        body,
+                                        next_reg,
+                                        resolve_control_operand,
+                                    )?;
+                                    let rhs_reg = eval(
+                                        rhs,
+                                        next_current,
+                                        next_carries,
+                                        body,
+                                        next_reg,
+                                        resolve_control_operand,
+                                    )?;
+                                    let reg = fresh_reg(next_reg);
+                                    body.push(format!("  {reg} = or i1 {lhs_reg}, {rhs_reg}"));
+                                    Ok(reg)
+                                }
+                            }
+                        }
+                        eval(
+                            expr,
+                            next_current,
+                            next_carries,
+                            body,
+                            next_reg,
+                            &resolve_control_operand,
+                        )
+                    };
+                let mut flow_leaves: Vec<(&ResolvedLoopControlExpr, &str)> = Vec::new();
+                collect_resolved_loop_flow_leaves(&resolved_flow_expr, &mut flow_leaves);
+                let mut no_match_block = loop_continue.clone();
+                for (index, (condition, action)) in flow_leaves.iter().enumerate().rev() {
+                    let leaf_block = if index == 0 {
+                        None
+                    } else {
+                        Some(fresh_block(&mut next_block, "loop_post_flow_rhs"))
+                    };
+                    if let Some(block) = &leaf_block {
+                        body.push(format!("{block}:"));
+                    }
+                    let control_cond = eval_control_expr(
+                        condition,
+                        &next_current,
+                        &next_carries,
+                        &mut body,
+                        &mut next_reg,
+                    )?;
+                    let action_block = fresh_block(&mut next_block, "loop_post_flow_action");
+                    body.push(format!(
+                        "  br i1 {control_cond}, label %{action_block}, label %{no_match_block}"
+                    ));
+                    body.push(format!("{action_block}:"));
+                    body.push(format!("  store i64 {next_current}, ptr {current_slot}"));
+                    for (carry_slot, next_carry) in carry_slots.iter().zip(next_carries.iter()) {
+                        body.push(format!("  store i64 {next_carry}, ptr {carry_slot}"));
+                    }
+                    match *action {
+                        "break" => body.push(format!("  br label %{loop_exit}")),
+                        "continue" => body.push(format!("  br label %{loop_cond}")),
+                        other => {
+                            return Err(format!(
+                                "cpu.{loop_instruction} `{}` has unsupported flow action `{other}` during LLVM lowering",
                                 node.name,
-                            )
-                        })?;
-                        (lhs, "eq")
+                            ));
+                        }
                     }
-                    other if other.starts_with("carry") && other.ends_with("_ne") => {
-                        let source_index = other[5..other.len() - 3].parse::<usize>().map_err(
-                            |_| {
-                                format!(
-                                    "cpu.{loop_instruction} `{}` has unsupported control kind `{other}` during LLVM lowering",
-                                    node.name,
-                                )
-                            },
-                        )?;
-                        let lhs = next_carries.get(source_index).cloned().ok_or_else(|| {
-                            format!(
-                                "cpu.{loop_instruction} `{}` references unavailable control source `{other}` during LLVM lowering",
-                                node.name,
-                            )
-                        })?;
-                        (lhs, "ne")
+                    if let Some(block) = leaf_block {
+                        no_match_block = block;
                     }
-                    other if other.starts_with("carry") && other.ends_with("_lt") => {
-                        let source_index = other[5..other.len() - 3].parse::<usize>().map_err(
-                            |_| {
-                                format!(
-                                    "cpu.{loop_instruction} `{}` has unsupported control kind `{other}` during LLVM lowering",
-                                    node.name,
-                                )
-                            },
-                        )?;
-                        let lhs = next_carries.get(source_index).cloned().ok_or_else(|| {
-                            format!(
-                                "cpu.{loop_instruction} `{}` references unavailable control source `{other}` during LLVM lowering",
-                                node.name,
-                            )
-                        })?;
-                        (lhs, "slt")
-                    }
-                    other if other.starts_with("carry") && other.ends_with("_le") => {
-                        let source_index = other[5..other.len() - 3].parse::<usize>().map_err(
-                            |_| {
-                                format!(
-                                    "cpu.{loop_instruction} `{}` has unsupported control kind `{other}` during LLVM lowering",
-                                    node.name,
-                                )
-                            },
-                        )?;
-                        let lhs = next_carries.get(source_index).cloned().ok_or_else(|| {
-                            format!(
-                                "cpu.{loop_instruction} `{}` references unavailable control source `{other}` during LLVM lowering",
-                                node.name,
-                            )
-                        })?;
-                        (lhs, "sle")
-                    }
-                    other if other.starts_with("carry") && other.ends_with("_gt") => {
-                        let source_index = other[5..other.len() - 3].parse::<usize>().map_err(
-                            |_| {
-                                format!(
-                                    "cpu.{loop_instruction} `{}` has unsupported control kind `{other}` during LLVM lowering",
-                                    node.name,
-                                )
-                            },
-                        )?;
-                        let lhs = next_carries.get(source_index).cloned().ok_or_else(|| {
-                            format!(
-                                "cpu.{loop_instruction} `{}` references unavailable control source `{other}` during LLVM lowering",
-                                node.name,
-                            )
-                        })?;
-                        (lhs, "sgt")
-                    }
-                    other if other.starts_with("carry") && other.ends_with("_ge") => {
-                        let source_index = other[5..other.len() - 3].parse::<usize>().map_err(
-                            |_| {
-                                format!(
-                                    "cpu.{loop_instruction} `{}` has unsupported control kind `{other}` during LLVM lowering",
-                                    node.name,
-                                )
-                            },
-                        )?;
-                        let lhs = next_carries.get(source_index).cloned().ok_or_else(|| {
-                            format!(
-                                "cpu.{loop_instruction} `{}` references unavailable control source `{other}` during LLVM lowering",
-                                node.name,
-                            )
-                        })?;
-                        (lhs, "sge")
-                    }
-                    other => {
-                        return Err(format!(
-                            "cpu.{loop_instruction} `{}` has unsupported control kind `{other}` during LLVM lowering",
-                            node.name,
-                        ));
-                    }
-                };
-                let control_cond = fresh_reg(&mut next_reg);
-                body.push(format!(
-                    "  {control_cond} = icmp {control_pred} i64 {control_lhs}, {control_rhs}"
-                ));
-                body.push(format!(
-                    "  br i1 {control_cond}, label %{loop_action}, label %{loop_continue}"
-                ));
-                body.push(format!("{loop_action}:"));
-                body.push(format!("  store i64 {next_current}, ptr {current_slot}"));
-                for (carry_slot, next_carry) in carry_slots.iter().zip(next_carries.iter()) {
-                    body.push(format!("  store i64 {next_carry}, ptr {carry_slot}"));
                 }
-                match control_action {
-                    "break" => body.push(format!("  br label %{loop_exit}")),
-                    "continue" => body.push(format!("  br label %{loop_cond}")),
-                    other => {
-                        return Err(format!(
-                            "cpu.{loop_instruction} `{}` has unsupported control action `{other}` during LLVM lowering",
-                            node.name,
-                        ));
-                    }
-                }
+                body.push(format!("  br label %{no_match_block}"));
                 body.push(format!("{loop_continue}:"));
                 body.push(format!("  store i64 {next_current}, ptr {current_slot}"));
                 for (carry_slot, next_carry) in carry_slots.iter().zip(next_carries.iter()) {
@@ -6990,22 +7149,8 @@ fn emit_cpu_function(
                 let initial_value = registers.get(&node.op.args[0]).cloned();
                 let limit_value = registers.get(&node.op.args[1]).cloned();
                 let step_value = registers.get(&node.op.args[2]).cloned();
-                let (control_specs, control_action, carry_start_index) =
-                    match node.op.args[5].as_str() {
-                        "and" | "or" => (
-                            vec![
-                                (node.op.args[6].clone(), node.op.args[7].clone()),
-                                (node.op.args[8].clone(), node.op.args[9].clone()),
-                            ],
-                            node.op.args[10].clone(),
-                            11usize,
-                        ),
-                        _ => (
-                            vec![(node.op.args[5].clone(), node.op.args[6].clone())],
-                            node.op.args[7].clone(),
-                            8usize,
-                        ),
-                    };
+                let (flow_expr, carry_start_index) =
+                    parse_loop_flow_expr_for_llvm(&node.op.args, 5, &node.name, loop_instruction)?;
                 let Some(initial_value) = initial_value else {
                     body.push(format!(
                         "  ; deferred lowering for cpu.{loop_instruction} `{}` because one or more inputs are outside the current CPU LLVM slice",
@@ -7048,33 +7193,16 @@ fn emit_cpu_function(
                     ));
                     continue;
                 };
-                let mut control_rhs_values = Vec::new();
-                let mut deferred_control = false;
-                for (_, rhs_name) in &control_specs {
-                    let control_rhs_value = registers.get(rhs_name).cloned();
-                    let Some(control_rhs_value) = control_rhs_value else {
-                        body.push(format!(
-                            "  ; deferred lowering for cpu.{loop_instruction} `{}` because one or more control rhs values are outside the current CPU LLVM slice",
-                            node.name,
-                        ));
-                        deferred_control = true;
-                        break;
-                    };
-                    let Some(control_rhs) =
-                        coerce_to_i64(&control_rhs_value, &mut body, &mut next_reg)
-                    else {
-                        body.push(format!(
-                            "  ; deferred lowering for cpu.{loop_instruction} `{}` because one or more control rhs values are not coercible to i64",
-                            node.name,
-                        ));
-                        deferred_control = true;
-                        break;
-                    };
-                    control_rhs_values.push(control_rhs);
-                }
-                if deferred_control {
+                let Some(resolved_flow_expr) = resolve_loop_flow_expr_for_llvm(
+                    &flow_expr,
+                    &registers,
+                    &mut body,
+                    &mut next_reg,
+                    &node.name,
+                    loop_instruction,
+                ) else {
                     continue;
-                }
+                };
                 let cmp_kind = node.op.args[3].as_str();
                 let step_kind = node.op.args[4].as_str();
                 let mut carry_initials = Vec::new();
@@ -7151,8 +7279,6 @@ fn emit_cpu_function(
                 let loop_body = fresh_block(&mut next_block, &format!("{loop_block_prefix}_body"));
                 let loop_update =
                     fresh_block(&mut next_block, &format!("{loop_block_prefix}_update"));
-                let loop_action =
-                    fresh_block(&mut next_block, &format!("{loop_block_prefix}_action"));
                 let loop_exit = fresh_block(&mut next_block, &format!("{loop_block_prefix}_exit"));
                 body.push(format!("  br label %{loop_cond}"));
                 body.push(format!("{loop_cond}:"));
@@ -7317,48 +7443,128 @@ fn emit_cpu_function(
                             )),
                         }
                     };
-                let mut control_cmp_regs = Vec::new();
-                for ((control_kind, _), control_rhs) in
-                    control_specs.iter().zip(control_rhs_values.iter())
-                {
-                    let (control_lhs, control_pred) =
-                        resolve_control_operand(control_kind, &next_current, &current_carries)?;
-                    let control_cmp = fresh_reg(&mut next_reg);
-                    body.push(format!(
-                        "  {control_cmp} = icmp {control_pred} i64 {control_lhs}, {control_rhs}"
-                    ));
-                    control_cmp_regs.push(control_cmp);
-                }
-                let control_cond = if control_specs.len() == 1 {
-                    control_cmp_regs[0].clone()
-                } else {
-                    let combined = fresh_reg(&mut next_reg);
-                    let logic_op = if node.op.args[5] == "and" {
-                        "and"
-                    } else {
-                        "or"
+                let eval_control_expr =
+                    |expr: &ResolvedLoopControlExpr,
+                     next_current: &String,
+                     current_carries: &Vec<String>,
+                     body: &mut Vec<String>,
+                     next_reg: &mut usize|
+                     -> Result<String, String> {
+                        fn eval(
+                            expr: &ResolvedLoopControlExpr,
+                            next_current: &String,
+                            current_carries: &Vec<String>,
+                            body: &mut Vec<String>,
+                            next_reg: &mut usize,
+                            resolve_control_operand: &impl Fn(
+                                &str,
+                                &String,
+                                &Vec<String>,
+                            ) -> Result<(String, &'static str), String>,
+                        ) -> Result<String, String> {
+                            match expr {
+                                ResolvedLoopControlExpr::Cond { kind, rhs } => {
+                                    let (lhs, pred) = resolve_control_operand(
+                                        kind,
+                                        next_current,
+                                        current_carries,
+                                    )?;
+                                    let reg = fresh_reg(next_reg);
+                                    body.push(format!("  {reg} = icmp {pred} i64 {lhs}, {rhs}"));
+                                    Ok(reg)
+                                }
+                                ResolvedLoopControlExpr::And(lhs, rhs) => {
+                                    let lhs_reg = eval(
+                                        lhs,
+                                        next_current,
+                                        current_carries,
+                                        body,
+                                        next_reg,
+                                        resolve_control_operand,
+                                    )?;
+                                    let rhs_reg = eval(
+                                        rhs,
+                                        next_current,
+                                        current_carries,
+                                        body,
+                                        next_reg,
+                                        resolve_control_operand,
+                                    )?;
+                                    let reg = fresh_reg(next_reg);
+                                    body.push(format!("  {reg} = and i1 {lhs_reg}, {rhs_reg}"));
+                                    Ok(reg)
+                                }
+                                ResolvedLoopControlExpr::Or(lhs, rhs) => {
+                                    let lhs_reg = eval(
+                                        lhs,
+                                        next_current,
+                                        current_carries,
+                                        body,
+                                        next_reg,
+                                        resolve_control_operand,
+                                    )?;
+                                    let rhs_reg = eval(
+                                        rhs,
+                                        next_current,
+                                        current_carries,
+                                        body,
+                                        next_reg,
+                                        resolve_control_operand,
+                                    )?;
+                                    let reg = fresh_reg(next_reg);
+                                    body.push(format!("  {reg} = or i1 {lhs_reg}, {rhs_reg}"));
+                                    Ok(reg)
+                                }
+                            }
+                        }
+                        eval(
+                            expr,
+                            next_current,
+                            current_carries,
+                            body,
+                            next_reg,
+                            &resolve_control_operand,
+                        )
                     };
+                let mut flow_leaves: Vec<(&ResolvedLoopControlExpr, &str)> = Vec::new();
+                collect_resolved_loop_flow_leaves(&resolved_flow_expr, &mut flow_leaves);
+                let mut no_match_block = loop_update.clone();
+                for (index, (condition, action)) in flow_leaves.iter().enumerate().rev() {
+                    let leaf_block = if index == 0 {
+                        None
+                    } else {
+                        Some(fresh_block(&mut next_block, "loop_flow_rhs"))
+                    };
+                    if let Some(block) = &leaf_block {
+                        body.push(format!("{block}:"));
+                    }
+                    let control_cond = eval_control_expr(
+                        condition,
+                        &next_current,
+                        &current_carries,
+                        &mut body,
+                        &mut next_reg,
+                    )?;
+                    let action_block = fresh_block(&mut next_block, "loop_flow_action");
                     body.push(format!(
-                        "  {combined} = {logic_op} i1 {}, {}",
-                        control_cmp_regs[0], control_cmp_regs[1]
+                        "  br i1 {control_cond}, label %{action_block}, label %{no_match_block}"
                     ));
-                    combined
-                };
-                body.push(format!(
-                    "  br i1 {control_cond}, label %{loop_action}, label %{loop_update}"
-                ));
-                body.push(format!("{loop_action}:"));
-                body.push(format!("  store i64 {next_current}, ptr {current_slot}"));
-                match control_action.as_str() {
-                    "break" => body.push(format!("  br label %{loop_exit}")),
-                    "continue" => body.push(format!("  br label %{loop_cond}")),
-                    other => {
-                        return Err(format!(
-                            "cpu.{loop_instruction} `{}` has unsupported control action `{other}` during LLVM lowering",
-                            node.name,
-                        ));
+                    body.push(format!("{action_block}:"));
+                    body.push(format!("  store i64 {next_current}, ptr {current_slot}"));
+                    match *action {
+                        "break" => body.push(format!("  br label %{loop_exit}")),
+                        "continue" => body.push(format!("  br label %{loop_cond}")),
+                        other => {
+                            return Err(format!(
+                                "unsupported flow action `{other}` during LLVM lowering"
+                            ));
+                        }
+                    }
+                    if let Some(block) = leaf_block {
+                        no_match_block = block;
                     }
                 }
+                body.push(format!("  br label %{no_match_block}"));
                 body.push(format!("{loop_update}:"));
                 let resolve_source = |kind: &str,
                                       next_current: &String,

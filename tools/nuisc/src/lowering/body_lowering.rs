@@ -291,6 +291,15 @@ pub(super) fn lower_while_stmt(
         return Err(diagnostic);
     }
 
+    if let Some(diagnostic) = super::loop_preparation::diagnose_unstructured_while_shape(
+        condition,
+        body,
+        &state.pure_helpers,
+        &state.inlineable_pure_helpers,
+    ) {
+        return Err(diagnostic);
+    }
+
     if expr_contains_async_loop_primitive(condition) || stmts_contain_async_loop_primitive(body) {
         return Err(unsupported_async_while_message());
     }
