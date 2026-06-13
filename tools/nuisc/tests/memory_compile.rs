@@ -543,6 +543,133 @@ fn compiles_parse_header_line_intrinsic() {
         .contains("call i64 @host_parse_header_line"));
 }
 
+#[test]
+fn compiles_find_header_value_intrinsic() {
+    let artifacts = nuisc::pipeline::compile_source(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let buffer: ref Buffer = alloc_buffer(256, 0);
+            let written: i64 = serialize_text_into("Host: example.com\r\nContent-Type: text/plain\r\n\r\n", buffer, 0);
+            let value: String = find_header_value(buffer, 0, written, "Content-Type");
+            return if text_len(value) > 0 { 1 } else { 0 };
+          }
+        }
+        "#,
+    )
+    .expect("find header value intrinsic source should compile");
+
+    assert!(nir_contains_host_callee(
+        &artifacts.nir,
+        "host_find_header_value"
+    ));
+    assert!(artifacts
+        .llvm_ir
+        .contains("call i64 @host_find_header_value"));
+}
+
+#[test]
+fn compiles_find_status_line_reason_intrinsic() {
+    let artifacts = nuisc::pipeline::compile_source(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let buffer: ref Buffer = alloc_buffer(256, 0);
+            let written: i64 = serialize_text_into("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n", buffer, 0);
+            let reason: String = find_status_line_reason(buffer, 0, written);
+            return if text_len(reason) > 0 { 1 } else { 0 };
+          }
+        }
+        "#,
+    )
+    .expect("find status line reason intrinsic source should compile");
+
+    assert!(nir_contains_host_callee(
+        &artifacts.nir,
+        "host_find_status_line_reason"
+    ));
+    assert!(artifacts
+        .llvm_ir
+        .contains("call i64 @host_find_status_line_reason"));
+}
+
+#[test]
+fn compiles_parse_http_response_summary_intrinsic() {
+    let artifacts = nuisc::pipeline::compile_source(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let buffer: ref Buffer = alloc_buffer(512, 0);
+            let written: i64 = serialize_text_into("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\n", buffer, 0);
+            let summary: String = parse_http_response_summary(buffer, 0, written);
+            return if text_len(summary) > 0 { 1 } else { 0 };
+          }
+        }
+        "#,
+    )
+    .expect("parse http response summary intrinsic source should compile");
+
+    assert!(nir_contains_host_callee(
+        &artifacts.nir,
+        "host_parse_http_response_summary"
+    ));
+    assert!(artifacts
+        .llvm_ir
+        .contains("call i64 @host_parse_http_response_summary"));
+}
+
+#[test]
+fn compiles_parse_http_request_summary_intrinsic() {
+    let artifacts = nuisc::pipeline::compile_source(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let buffer: ref Buffer = alloc_buffer(512, 0);
+            let written: i64 = serialize_text_into("GET /hello HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n", buffer, 0);
+            let summary: String = parse_http_request_summary(buffer, 0, written);
+            return if text_len(summary) > 0 { 1 } else { 0 };
+          }
+        }
+        "#,
+    )
+    .expect("parse http request summary intrinsic source should compile");
+
+    assert!(nir_contains_host_callee(
+        &artifacts.nir,
+        "host_parse_http_request_summary"
+    ));
+    assert!(artifacts
+        .llvm_ir
+        .contains("call i64 @host_parse_http_request_summary"));
+}
+
+#[test]
+fn compiles_parse_http_roundtrip_summary_intrinsic() {
+    let artifacts = nuisc::pipeline::compile_source(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let request: ref Buffer = alloc_buffer(512, 0);
+            let response: ref Buffer = alloc_buffer(512, 0);
+            let request_len: i64 = serialize_text_into("GET /hello HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n", request, 0);
+            let response_len: i64 = serialize_text_into("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\n", response, 0);
+            let summary: String = parse_http_roundtrip_summary(request, 0, request_len, response, 0, response_len);
+            return if text_len(summary) > 0 { 1 } else { 0 };
+          }
+        }
+        "#,
+    )
+    .expect("parse http roundtrip summary intrinsic source should compile");
+
+    assert!(nir_contains_host_callee(
+        &artifacts.nir,
+        "host_parse_http_roundtrip_summary"
+    ));
+    assert!(artifacts
+        .llvm_ir
+        .contains("call i64 @host_parse_http_roundtrip_summary"));
+}
+
 fn contains_serialize_intrinsic(expr: &NirExpr) -> bool {
     match expr {
         NirExpr::CpuExternCall { callee, .. } => {

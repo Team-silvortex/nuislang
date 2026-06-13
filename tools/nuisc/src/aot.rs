@@ -1268,6 +1268,289 @@ static int64_t nuis_host_parse_header_line(int64_t buffer_handle, int64_t offset
     return handle;
 }
 
+static int64_t nuis_host_find_header_value(int64_t buffer_handle, int64_t offset, int64_t len, int64_t expected_name_handle) {
+    if (buffer_handle == 0 || offset < 0 || len < 0) return 0;
+    int64_t cursor = offset;
+    int64_t limit = offset + len;
+    while (cursor < limit) {
+        int64_t line_end = cursor;
+        while (line_end < limit) {
+            int64_t value = ((int64_t*)(intptr_t)buffer_handle)[line_end];
+            if (value == 13 || value == 10) break;
+            line_end += 1;
+        }
+        int64_t line_len = line_end - cursor;
+        if (line_len == 0) return 0;
+        int64_t parsed = nuis_host_parse_header_line(
+            buffer_handle,
+            cursor,
+            line_end < limit ? (line_end - cursor + 1) : line_len,
+            expected_name_handle
+        );
+        if (parsed != 0) return parsed;
+        if (line_end >= limit) break;
+        if (((int64_t*)(intptr_t)buffer_handle)[line_end] == 13
+            && line_end + 1 < limit
+            && ((int64_t*)(intptr_t)buffer_handle)[line_end + 1] == 10) {
+            cursor = line_end + 2;
+        } else {
+            cursor = line_end + 1;
+        }
+    }
+    return 0;
+}
+
+static int64_t nuis_host_find_status_line_reason(int64_t buffer_handle, int64_t offset, int64_t len) {
+    if (buffer_handle == 0 || offset < 0 || len < 0) return 0;
+    int64_t* buffer = (int64_t*)(intptr_t)buffer_handle;
+    int64_t limit = offset + len;
+    int64_t line_end = offset;
+    while (line_end < limit) {
+        int64_t value = buffer[line_end];
+        if (value == 13 || value == 10) break;
+        line_end += 1;
+    }
+    if (line_end <= offset) return 0;
+    int64_t first_space = -1;
+    for (int64_t index = offset; index < line_end; ++index) {
+        if (buffer[index] == 32) {
+            first_space = index;
+            break;
+        }
+    }
+    if (first_space < offset) return 0;
+    int64_t second_space = -1;
+    for (int64_t index = first_space + 1; index < line_end; ++index) {
+        if (buffer[index] == 32) {
+            second_space = index;
+            break;
+        }
+    }
+    if (second_space < first_space + 1) return 0;
+    int64_t reason_offset = second_space + 1;
+    while (reason_offset < line_end) {
+        int64_t value = buffer[reason_offset];
+        if (value != 32 && value != 9) break;
+        reason_offset += 1;
+    }
+    int64_t reason_len = line_end - reason_offset;
+    char* text = (char*)malloc((size_t)reason_len + 1);
+    if (text == NULL) return 0;
+    for (int64_t index = 0; index < reason_len; ++index) {
+        int64_t value = buffer[reason_offset + index];
+        if (value < 0 || value > 255) {
+            free(text);
+            return 0;
+        }
+        text[index] = (char)value;
+    }
+    text[reason_len] = '\0';
+    int64_t handle = nuis_host_text_register(text);
+    free(text);
+    return handle;
+}
+
+static int64_t nuis_host_parse_http_response_summary(int64_t buffer_handle, int64_t offset, int64_t len) {
+    if (buffer_handle == 0 || offset < 0 || len < 0) return 0;
+    int64_t* buffer = (int64_t*)(intptr_t)buffer_handle;
+    int64_t limit = offset + len;
+    int64_t line_end = offset;
+    while (line_end < limit) {
+        int64_t value = buffer[line_end];
+        if (value == 13 || value == 10) break;
+        line_end += 1;
+    }
+    if (line_end <= offset) return 0;
+    int64_t first_space = -1;
+    for (int64_t index = offset; index < line_end; ++index) {
+        if (buffer[index] == 32) {
+            first_space = index;
+            break;
+        }
+    }
+    if (first_space < offset) return 0;
+    int64_t second_space = -1;
+    for (int64_t index = first_space + 1; index < line_end; ++index) {
+        if (buffer[index] == 32) {
+            second_space = index;
+            break;
+        }
+    }
+    if (second_space < first_space + 1) return 0;
+    int64_t status_offset = first_space + 1;
+    int64_t status_len = second_space - status_offset;
+
+    int64_t reason_handle = nuis_host_find_status_line_reason(buffer_handle, offset, len);
+    const char* reason = nuis_host_text_lookup(reason_handle);
+    int64_t content_type_name = nuis_host_text_register("Content-Type");
+    int64_t content_length_name = nuis_host_text_register("Content-Length");
+    const char* content_type = nuis_host_text_lookup(
+        nuis_host_find_header_value(buffer_handle, offset, len, content_type_name)
+    );
+    const char* content_length = nuis_host_text_lookup(
+        nuis_host_find_header_value(buffer_handle, offset, len, content_length_name)
+    );
+
+    int has_reason = reason != NULL && reason[0] != '\0';
+    int has_content_type = content_type != NULL && content_type[0] != '\0';
+    int has_content_length = content_length != NULL && content_length[0] != '\0';
+    size_t reason_len = has_reason ? strlen(reason) : 0;
+    size_t content_type_len = has_content_type ? strlen(content_type) : 0;
+    size_t content_length_len = has_content_length ? strlen(content_length) : 0;
+    size_t total = (size_t)status_len + 1;
+    if (has_reason) total += 1 + reason_len;
+    if (has_content_type) total += strlen(" | content-type=") + content_type_len;
+    if (has_content_length) total += strlen(" | content-length=") + content_length_len;
+
+    char* text = (char*)malloc(total);
+    if (text == NULL) return 0;
+    size_t cursor = 0;
+    for (int64_t index = 0; index < status_len; ++index) {
+        int64_t value = buffer[status_offset + index];
+        if (value < 0 || value > 255) {
+            free(text);
+            return 0;
+        }
+        text[cursor++] = (char)value;
+    }
+    if (has_reason) {
+        text[cursor++] = ' ';
+        memcpy(text + cursor, reason, reason_len);
+        cursor += reason_len;
+    }
+    if (has_content_type) {
+        memcpy(text + cursor, " | content-type=", strlen(" | content-type="));
+        cursor += strlen(" | content-type=");
+        memcpy(text + cursor, content_type, content_type_len);
+        cursor += content_type_len;
+    }
+    if (has_content_length) {
+        memcpy(text + cursor, " | content-length=", strlen(" | content-length="));
+        cursor += strlen(" | content-length=");
+        memcpy(text + cursor, content_length, content_length_len);
+        cursor += content_length_len;
+    }
+    text[cursor] = '\0';
+    int64_t handle = nuis_host_text_register(text);
+    free(text);
+    return handle;
+}
+
+static int64_t nuis_host_parse_http_request_summary(int64_t buffer_handle, int64_t offset, int64_t len) {
+    if (buffer_handle == 0 || offset < 0 || len < 0) return 0;
+    int64_t* buffer = (int64_t*)(intptr_t)buffer_handle;
+    int64_t limit = offset + len;
+    int64_t line_end = offset;
+    while (line_end < limit) {
+        int64_t value = buffer[line_end];
+        if (value == 13 || value == 10) break;
+        line_end += 1;
+    }
+    if (line_end <= offset) return 0;
+    int64_t first_space = -1;
+    for (int64_t index = offset; index < line_end; ++index) {
+        if (buffer[index] == 32) {
+            first_space = index;
+            break;
+        }
+    }
+    if (first_space < offset) return 0;
+    int64_t second_space = -1;
+    for (int64_t index = first_space + 1; index < line_end; ++index) {
+        if (buffer[index] == 32) {
+            second_space = index;
+            break;
+        }
+    }
+    if (second_space < first_space + 1) return 0;
+    int64_t method_len = first_space - offset;
+    int64_t path_offset = first_space + 1;
+    int64_t path_len = second_space - path_offset;
+
+    int64_t host_name = nuis_host_text_register("Host");
+    int64_t connection_name = nuis_host_text_register("Connection");
+    const char* host = nuis_host_text_lookup(
+        nuis_host_find_header_value(buffer_handle, offset, len, host_name)
+    );
+    const char* connection = nuis_host_text_lookup(
+        nuis_host_find_header_value(buffer_handle, offset, len, connection_name)
+    );
+    int has_host = host != NULL && host[0] != '\0';
+    int has_connection = connection != NULL && connection[0] != '\0';
+    size_t host_len = has_host ? strlen(host) : 0;
+    size_t connection_len = has_connection ? strlen(connection) : 0;
+    size_t total = (size_t)method_len + 1 + (size_t)path_len + 1;
+    if (has_host) total += strlen(" | host=") + host_len;
+    if (has_connection) total += strlen(" | connection=") + connection_len;
+
+    char* text = (char*)malloc(total);
+    if (text == NULL) return 0;
+    size_t cursor = 0;
+    for (int64_t index = 0; index < method_len; ++index) {
+        int64_t value = buffer[offset + index];
+        if (value < 0 || value > 255) {
+            free(text);
+            return 0;
+        }
+        text[cursor++] = (char)value;
+    }
+    text[cursor++] = ' ';
+    for (int64_t index = 0; index < path_len; ++index) {
+        int64_t value = buffer[path_offset + index];
+        if (value < 0 || value > 255) {
+            free(text);
+            return 0;
+        }
+        text[cursor++] = (char)value;
+    }
+    if (has_host) {
+        memcpy(text + cursor, " | host=", strlen(" | host="));
+        cursor += strlen(" | host=");
+        memcpy(text + cursor, host, host_len);
+        cursor += host_len;
+    }
+    if (has_connection) {
+        memcpy(text + cursor, " | connection=", strlen(" | connection="));
+        cursor += strlen(" | connection=");
+        memcpy(text + cursor, connection, connection_len);
+        cursor += connection_len;
+    }
+    text[cursor] = '\0';
+    int64_t handle = nuis_host_text_register(text);
+    free(text);
+    return handle;
+}
+
+static int64_t nuis_host_parse_http_roundtrip_summary(
+    int64_t request_buffer_handle,
+    int64_t request_offset,
+    int64_t request_len,
+    int64_t response_buffer_handle,
+    int64_t response_offset,
+    int64_t response_len
+) {
+    int64_t request_handle =
+        nuis_host_parse_http_request_summary(request_buffer_handle, request_offset, request_len);
+    int64_t response_handle =
+        nuis_host_parse_http_response_summary(response_buffer_handle, response_offset, response_len);
+    const char* request = nuis_host_text_lookup(request_handle);
+    const char* response = nuis_host_text_lookup(response_handle);
+    if (request == NULL) request = "";
+    if (response == NULL) response = "";
+    size_t request_len_text = strlen(request);
+    size_t response_len_text = strlen(response);
+    size_t total = request_len_text + strlen(" -> ") + response_len_text + 1;
+    char* text = (char*)malloc(total);
+    if (text == NULL) return 0;
+    memcpy(text, request, request_len_text);
+    memcpy(text + request_len_text, " -> ", strlen(" -> "));
+    memcpy(text + request_len_text + strlen(" -> "), response, response_len_text);
+    text[total - 1] = '\0';
+    int64_t handle = nuis_host_text_register(text);
+    free(text);
+    return handle;
+}
+
 static int64_t nuis_host_deserialize_text_equals(int64_t buffer_handle, int64_t offset, int64_t len, int64_t expected_handle) {
     if (buffer_handle == 0 || offset < 0 || len < 0) return 0;
     int64_t* buffer = (int64_t*)(intptr_t)buffer_handle;
@@ -2903,6 +3186,45 @@ fn render_host_ffi_stub(symbol: &str, function: AstExternFunction) -> String {
             arg_name(2, &function),
             arg_name(3, &function)
         )
+    } else if symbol == "host_find_header_value" {
+        format!(
+            "    return nuis_host_find_header_value({}, {}, {}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function),
+            arg_name(2, &function),
+            arg_name(3, &function)
+        )
+    } else if symbol == "host_find_status_line_reason" {
+        format!(
+            "    return nuis_host_find_status_line_reason({}, {}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function),
+            arg_name(2, &function)
+        )
+    } else if symbol == "host_parse_http_response_summary" {
+        format!(
+            "    return nuis_host_parse_http_response_summary({}, {}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function),
+            arg_name(2, &function)
+        )
+    } else if symbol == "host_parse_http_request_summary" {
+        format!(
+            "    return nuis_host_parse_http_request_summary({}, {}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function),
+            arg_name(2, &function)
+        )
+    } else if symbol == "host_parse_http_roundtrip_summary" {
+        format!(
+            "    return nuis_host_parse_http_roundtrip_summary({}, {}, {}, {}, {}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function),
+            arg_name(2, &function),
+            arg_name(3, &function),
+            arg_name(4, &function),
+            arg_name(5, &function)
+        )
     } else if symbol == "host_deserialize_text_equals" {
         format!(
             "    return nuis_host_deserialize_text_equals({}, {}, {}, {});",
@@ -3726,6 +4048,132 @@ mod tests {
                         },
                         nuis_semantics::model::AstParam {
                             name: "expected_name_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                    host_symbol: None,
+                },
+                AstExternFunction {
+                    visibility: AstVisibility::Private,
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_find_header_value".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "buffer_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "offset".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "len".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "expected_name_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                    host_symbol: None,
+                },
+                AstExternFunction {
+                    visibility: AstVisibility::Private,
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_find_status_line_reason".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "buffer_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "offset".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "len".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                    host_symbol: None,
+                },
+                AstExternFunction {
+                    visibility: AstVisibility::Private,
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_parse_http_response_summary".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "buffer_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "offset".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "len".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                    host_symbol: None,
+                },
+                AstExternFunction {
+                    visibility: AstVisibility::Private,
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_parse_http_request_summary".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "buffer_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "offset".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "len".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                    host_symbol: None,
+                },
+                AstExternFunction {
+                    visibility: AstVisibility::Private,
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_parse_http_roundtrip_summary".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "request_buffer_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "request_offset".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "request_len".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "response_buffer_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "response_offset".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "response_len".to_owned(),
                             ty: i64_ty(),
                         },
                     ],
@@ -5493,6 +5941,11 @@ mod tests {
         assert!(shim.contains("static int64_t nuis_host_deserialize_bool_from("));
         assert!(shim.contains("static int64_t nuis_host_deserialize_text_from("));
         assert!(shim.contains("static int64_t nuis_host_parse_header_line("));
+        assert!(shim.contains("static int64_t nuis_host_find_header_value("));
+        assert!(shim.contains("static int64_t nuis_host_find_status_line_reason("));
+        assert!(shim.contains("static int64_t nuis_host_parse_http_response_summary("));
+        assert!(shim.contains("static int64_t nuis_host_parse_http_request_summary("));
+        assert!(shim.contains("static int64_t nuis_host_parse_http_roundtrip_summary("));
         assert!(shim.contains("static int64_t nuis_host_deserialize_text_equals("));
         assert!(shim.contains("static int64_t nuis_host_deserialize_text_starts_with("));
         assert!(shim.contains("static int64_t nuis_host_deserialize_text_contains("));

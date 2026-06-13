@@ -357,7 +357,13 @@ pub(crate) fn infer_nir_expr_type(
             Some(i64_type())
         }
         NirExpr::CpuExternCall { callee, .. }
-            if callee == "host_deserialize_text_from" || callee == "host_parse_header_line" =>
+            if callee == "host_deserialize_text_from"
+                || callee == "host_parse_header_line"
+                || callee == "host_find_header_value"
+                || callee == "host_find_status_line_reason"
+                || callee == "host_parse_http_response_summary"
+                || callee == "host_parse_http_request_summary"
+                || callee == "host_parse_http_roundtrip_summary" =>
         {
             Some(string_type())
         }

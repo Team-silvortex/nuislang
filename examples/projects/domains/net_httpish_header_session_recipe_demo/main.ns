@@ -307,6 +307,7 @@ mod cpu Main {
     let recv_window: i64 = network_profile_recv_window("NetworkUnit");
     let send_window: i64 = network_profile_send_window("NetworkUnit");
     let remote_port: i64 = network_profile_remote_port("NetworkUnit");
+    let tick_ns: i64 = host_monotonic_time_ns();
     let request_plan: NetHttpishRequestPlan = build_request_plan(
       protocol_kind,
       protocol_version,
@@ -332,23 +333,15 @@ mod cpu Main {
       recv_session_status(open_handle, stream_window, recv_window);
     let recv_result: NetworkResult<i64> =
       recv_session_body(open_handle, stream_window, recv_window);
-    let status_code: i64 = encode_value(status_result);
-    let request_header_code: i64 =
-      select_request_header_code(request_headers, send_result, status_result);
-    let response_header_code: i64 =
-      select_response_header_code(request_plan, recv_window, status_result);
-    let body_code: i64 = select_body_code(recv_result, send_result, retry_budget);
-    let retry_code: i64 = select_retry_code(request_plan, send_result, recv_result);
     let packet: NetHttpishHeaderSessionPacket = stage_header_session_packet(
       request_headers,
-      status_code,
-      request_header_code,
-      response_header_code,
-      body_code,
-      retry_code
+      encode_value(status_result),
+      select_request_header_code(request_headers, send_result, status_result),
+      select_response_header_code(request_plan, recv_window, status_result),
+      select_body_code(recv_result, send_result, retry_budget),
+      select_retry_code(request_plan, send_result, recv_result)
     );
     let close_value: i64 = close_session_handle(open_handle);
-    let tick_ns: i64 = host_monotonic_time_ns();
 
     return NetHttpishHeaderSessionSummary {
       argv_count: argv_count,

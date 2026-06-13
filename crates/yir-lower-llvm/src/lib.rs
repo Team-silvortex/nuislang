@@ -2268,6 +2268,9 @@ fn emit_cpu_function(
                     [a0, a1, a2, a3] => {
                         format!("call i64 @{symbol}(i64 {a0}, i64 {a1}, i64 {a2}, i64 {a3})")
                     }
+                    [a0, a1, a2, a3, a4, a5] => format!(
+                        "call i64 @{symbol}(i64 {a0}, i64 {a1}, i64 {a2}, i64 {a3}, i64 {a4}, i64 {a5})"
+                    ),
                     _ => {
                         body.push(format!(
                             "  ; deferred lowering for cpu.extern_call_i64 `{}` because symbol `{}` has unsupported arity {}",
@@ -2279,7 +2282,14 @@ fn emit_cpu_function(
                     }
                 };
                 body.push(format!("  {reg} = {call}"));
-                if symbol == "host_deserialize_text_from" || symbol == "host_parse_header_line" {
+                if symbol == "host_deserialize_text_from"
+                    || symbol == "host_parse_header_line"
+                    || symbol == "host_find_header_value"
+                    || symbol == "host_find_status_line_reason"
+                    || symbol == "host_parse_http_response_summary"
+                    || symbol == "host_parse_http_request_summary"
+                    || symbol == "host_parse_http_roundtrip_summary"
+                {
                     let ptr = fresh_reg(&mut next_reg);
                     body.push(format!("  {ptr} = call ptr @nuis_host_text_ptr(i64 {reg})"));
                     registers.insert(

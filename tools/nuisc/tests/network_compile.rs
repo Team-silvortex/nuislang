@@ -7,6 +7,61 @@ fn compiled_project(path: &str) -> nuisc::pipeline::PipelineArtifacts {
         .unwrap_or_else(|error| panic!("project `{path}` should compile: {error}"))
 }
 
+fn stmt_contains_host_callee(stmt: &NirStmt, callee: &str) -> bool {
+    match stmt {
+        NirStmt::Let { value, .. }
+        | NirStmt::Const { value, .. }
+        | NirStmt::Print(value)
+        | NirStmt::Await(value)
+        | NirStmt::Expr(value)
+        | NirStmt::Return(Some(value)) => expr_contains_host_callee(value, callee),
+        NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            expr_contains_host_callee(condition, callee)
+                || then_body.iter().any(|stmt| stmt_contains_host_callee(stmt, callee))
+                || else_body.iter().any(|stmt| stmt_contains_host_callee(stmt, callee))
+        }
+        NirStmt::While { condition, body } => {
+            expr_contains_host_callee(condition, callee)
+                || body.iter().any(|stmt| stmt_contains_host_callee(stmt, callee))
+        }
+        NirStmt::Break | NirStmt::Continue | NirStmt::Return(None) => false,
+    }
+}
+
+fn expr_contains_host_callee(expr: &NirExpr, callee: &str) -> bool {
+    match expr {
+        NirExpr::CpuExternCall {
+            callee: found,
+            args,
+            ..
+        } => found == callee || args.iter().any(|arg| expr_contains_host_callee(arg, callee)),
+        NirExpr::Call { callee: found, args } => {
+            found == callee || args.iter().any(|arg| expr_contains_host_callee(arg, callee))
+        }
+        NirExpr::Binary { lhs, rhs, .. } => {
+            expr_contains_host_callee(lhs, callee) || expr_contains_host_callee(rhs, callee)
+        }
+        NirExpr::StructLiteral { fields, .. } => fields
+            .iter()
+            .any(|(_, value)| expr_contains_host_callee(value, callee)),
+        NirExpr::FieldAccess { base, .. }
+        | NirExpr::Borrow(base)
+        | NirExpr::Move(base)
+        | NirExpr::Await(base)
+        | NirExpr::NetworkValue(base)
+        | NirExpr::NetworkConfigReady(base)
+        | NirExpr::NetworkSendReady(base)
+        | NirExpr::NetworkRecvReady(base)
+        | NirExpr::NetworkAcceptReady(base) => expr_contains_host_callee(base, callee),
+        NirExpr::NetworkResult { value, .. } => expr_contains_host_callee(value, callee),
+        _ => false,
+    }
+}
+
 #[test]
 fn compiles_httpish_protocol_recipe_project() {
     let project = Path::new(
@@ -162,6 +217,24 @@ fn compiles_http_status_runtime_probe_project() {
     );
     nuisc::pipeline::compile_project(project)
         .expect("http status runtime probe project should compile");
+}
+
+#[test]
+fn compiles_http_roundtrip_summary_demo_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_roundtrip_summary_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("http roundtrip summary demo project should compile");
+}
+
+#[test]
+fn compiles_http_roundtrip_runtime_probe_demo_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_roundtrip_runtime_probe_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("http roundtrip runtime probe project should compile");
 }
 
 #[test]
@@ -340,6 +413,74 @@ fn lowers_http_request_recipe_project_with_expected_request_shape() {
             ..
         }) if name == "summary" && callee == "capture_net_http_request_summary"
     ));
+}
+
+#[test]
+fn lowers_http_roundtrip_summary_demo_with_expected_summary_call() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_roundtrip_summary_demo",
+    );
+
+    let capture = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "capture_net_http_roundtrip_summary")
+        .unwrap();
+    assert!(matches!(
+        capture.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "String"
+    ));
+    assert!(capture
+        .body
+        .iter()
+        .any(|stmt| matches!(
+            stmt,
+            NirStmt::Return(Some(NirExpr::CpuExternCall { callee, .. }))
+            if callee == "host_parse_http_roundtrip_summary"
+        )));
+
+    let summarize = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "summarize_net_http_roundtrip_summary_demo")
+        .unwrap();
+    assert!(matches!(
+        summarize.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "i64"
+    ));
+}
+
+#[test]
+fn lowers_http_roundtrip_runtime_probe_demo_with_expected_network_and_summary_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_roundtrip_runtime_probe_demo",
+    );
+
+    let capture = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "capture_net_http_roundtrip_runtime_probe_summary")
+        .unwrap();
+    assert!(matches!(
+        capture.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "NetHttpRoundtripRuntimeProbeSummary"
+    ));
+    for callee in [
+        "host_network_open_tcp_stream",
+        "host_network_send_owned",
+        "host_network_recv_http_status_owned",
+        "host_network_recv_owned",
+        "host_network_close_owned",
+        "host_parse_http_roundtrip_summary",
+    ] {
+        assert!(capture
+            .body
+            .iter()
+            .any(|stmt| stmt_contains_host_callee(stmt, callee)));
+    }
 }
 
 #[test]

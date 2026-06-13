@@ -1,0 +1,34 @@
+mod cpu Main {
+  fn capture_net_http_roundtrip_summary() -> String {
+    let request: ref Buffer = alloc_buffer(512, 0);
+    let response: ref Buffer = alloc_buffer(512, 0);
+    let request_len: i64 = serialize_text_into(
+      "GET /hello HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n",
+      request,
+      0
+    );
+    let response_len: i64 = serialize_text_into(
+      "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\n",
+      response,
+      0
+    );
+    return parse_http_roundtrip_summary(
+      request,
+      0,
+      request_len,
+      response,
+      0,
+      response_len
+    );
+  }
+
+  fn summarize_net_http_roundtrip_summary_demo() -> i64 {
+    let summary: String = capture_net_http_roundtrip_summary();
+    return text_len(summary);
+  }
+
+  fn main() {
+    print(capture_net_http_roundtrip_summary());
+    print(summarize_net_http_roundtrip_summary_demo());
+  }
+}
