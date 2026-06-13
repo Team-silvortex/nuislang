@@ -220,6 +220,67 @@ fn lowers_guarded_branching_while_into_select_plus_guard_return() {
 }
 
 #[test]
+fn rejects_bare_break_with_structured_loop_control_diagnostic() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            break;
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let error = lower_nir_to_yir_builtin_cpu(&module).unwrap_err();
+    assert!(error.contains("`break` is currently lowered only as terminal loop control"));
+    assert!(error.contains("recognized `while` flow shapes"));
+}
+
+#[test]
+fn rejects_bare_continue_with_structured_loop_control_diagnostic() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            continue;
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let error = lower_nir_to_yir_builtin_cpu(&module).unwrap_err();
+    assert!(error.contains("`continue` is currently lowered only as terminal loop control"));
+    assert!(error.contains("recognized `while` flow shapes"));
+}
+
+#[test]
+fn rejects_general_sync_while_with_structured_shape_diagnostic() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let value: i64 = 0;
+            while value < 3 {
+              let value: i64 = value + 1;
+              print(value);
+            }
+            return value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let error = lower_nir_to_yir_builtin_cpu(&module).unwrap_err();
+    assert!(error.contains("structured `while` lowering currently recognizes guard, counted, chained-carry, flow, and post-flow loop shapes"));
+    assert!(error.contains("general iterative backedge execution with arbitrary synchronous loop bodies is not lowered yet"));
+}
+
+#[test]
 fn lowers_guarded_branching_while_into_select_plus_guard_print_return() {
     let module = parse_nuis_module(
         r#"

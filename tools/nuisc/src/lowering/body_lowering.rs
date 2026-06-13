@@ -49,6 +49,22 @@ fn chain_nonpure_expr_stmt(expr: &NirExpr, lowered: &str, state: &mut LoweringSt
     }
 }
 
+fn unsupported_loop_control_stmt_message(keyword: &str) -> String {
+    format!(
+        "`{keyword}` is currently lowered only as terminal loop control inside recognized `while` flow shapes (for example guard, flow, or post-flow loop bodies); bare `{keyword}` here has no structured loop lowering target yet"
+    )
+}
+
+fn unsupported_async_while_message() -> String {
+    "async/task-driven `while` lowering currently recognizes only structured async loop shapes such as `await` step + chained carries, flow control, or post-flow control; general async backedge execution with task primitives inside arbitrary loop conditions/bodies is not lowered yet"
+        .to_owned()
+}
+
+fn unsupported_sync_while_message() -> String {
+    "structured `while` lowering currently recognizes guard, counted, chained-carry, flow, and post-flow loop shapes; general iterative backedge execution with arbitrary synchronous loop bodies is not lowered yet"
+        .to_owned()
+}
+
 pub(super) fn lower_function_body(
     function: &NirFunction,
     state: &mut LoweringState<'_>,
@@ -124,17 +140,11 @@ pub(super) fn lower_function_body(
             }
             NirStmt::Break => {
                 state.last_effect_anchor = saved_effect_anchor.clone();
-                return Err(
-                    "`break` parsed successfully, but loop execution lowering is not implemented yet"
-                        .to_owned(),
-                );
+                return Err(unsupported_loop_control_stmt_message("break"));
             }
             NirStmt::Continue => {
                 state.last_effect_anchor = saved_effect_anchor.clone();
-                return Err(
-                    "`continue` parsed successfully, but loop execution lowering is not implemented yet"
-                        .to_owned(),
-                );
+                return Err(unsupported_loop_control_stmt_message("continue"));
             }
             NirStmt::Expr(expr) => {
                 let lowered = lower_expr(expr, state, bindings)?;
@@ -282,16 +292,10 @@ pub(super) fn lower_while_stmt(
     }
 
     if expr_contains_async_loop_primitive(condition) || stmts_contain_async_loop_primitive(body) {
-        return Err(
-            "async/task-driven `while` loops are not supported yet in lowering; iterative backedge lowering for `await`, `spawn`, `join`, `timeout`, and related task primitives inside loop conditions/bodies is still not implemented"
-                .to_owned(),
-        );
+        return Err(unsupported_async_while_message());
     }
 
-    Err(
-        "minimal nuisc lowering can currently execute only guard-style `while` loops or simple counted `while` loops like `let i = 0; while i < limit { let i = i + 1; }`; general iterative loop/backedge lowering is still not implemented"
-            .to_owned(),
-    )
+    Err(unsupported_sync_while_message())
 }
 
 fn stmts_contain_async_loop_primitive(stmts: &[NirStmt]) -> bool {

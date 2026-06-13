@@ -114,7 +114,21 @@ mod cpu Main {
       + summary.tick_ns;
   }
 
+  fn print_net_http_request_recipe() -> i64 {
+    let request: ref Buffer = alloc_buffer(512, 0);
+    let request_len: i64 = serialize_text_into(
+      "GET /hello HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n",
+      request,
+      0
+    );
+    let request_summary: String = parse_http_request_summary(request, 0, request_len);
+    print("request:");
+    print(request_summary);
+    return 0;
+  }
+
   fn main() {
+    print_net_http_request_recipe();
     print(summarize_net_http_request_recipe());
   }
 }

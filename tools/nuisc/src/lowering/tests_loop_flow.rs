@@ -1016,6 +1016,44 @@ fn lowers_flow_breaking_while_on_carried_state_into_loop_while_scalar_flow_chain
 }
 
 #[test]
+fn lowers_flow_breaking_while_with_pure_control_temp_chain_into_loop_while_scalar_flow_chain() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            while value < 8 {
+              let value: i64 = value + 1;
+              let stop_now: bool = value > 4;
+              let should_break: bool = stop_now;
+              if should_break {
+                break;
+              }
+              let acc: i64 = acc + value;
+            }
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_flow_chain"
+        })
+        .expect("expected loop_while_scalar_flow_chain node");
+    assert_eq!(loop_node.op.args[5], "current_gt");
+    assert_eq!(loop_node.op.args[7], "break");
+    assert_eq!(loop_node.op.args[9], "add_current");
+}
+
+#[test]
 fn lowers_flow_breaking_then_branching_carry_while_into_loop_while_scalar_flow_cond_chain() {
     let mut module = parse_nuis_module(
         r#"

@@ -1784,7 +1784,12 @@ fn rejects_async_while_with_await_step_and_task_observer_flow_control() {
     .unwrap();
     let error = lower_nir_to_yir_builtin_cpu(&module).unwrap_err();
 
-    assert!(error.contains("async/task-driven `while` loops are not supported yet in lowering"));
+    assert!(error.contains(
+        "async/task-driven `while` lowering currently recognizes only structured async loop shapes"
+    ));
+    assert!(error.contains(
+        "general async backedge execution with task primitives inside arbitrary loop conditions/bodies is not lowered yet"
+    ));
 }
 
 #[test]

@@ -1,4 +1,24 @@
 mod cpu Main {
+  fn capture_net_http_request_summary() -> String {
+    let request: ref Buffer = alloc_buffer(512, 0);
+    let request_len: i64 = serialize_text_into(
+      "GET /hello HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n",
+      request,
+      0
+    );
+    return parse_http_request_summary(request, 0, request_len);
+  }
+
+  fn capture_net_http_response_summary() -> String {
+    let response: ref Buffer = alloc_buffer(512, 0);
+    let response_len: i64 = serialize_text_into(
+      "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\n",
+      response,
+      0
+    );
+    return parse_http_response_summary(response, 0, response_len);
+  }
+
   fn capture_net_http_roundtrip_summary() -> String {
     let request: ref Buffer = alloc_buffer(512, 0);
     let response: ref Buffer = alloc_buffer(512, 0);
@@ -27,8 +47,21 @@ mod cpu Main {
     return text_len(summary);
   }
 
+  fn print_net_http_roundtrip_summary_demo() -> i64 {
+    let request_summary: String = capture_net_http_request_summary();
+    let response_summary: String = capture_net_http_response_summary();
+    let roundtrip_summary: String = capture_net_http_roundtrip_summary();
+    print("request:");
+    print(request_summary);
+    print("response:");
+    print(response_summary);
+    print("roundtrip:");
+    print(roundtrip_summary);
+    return 0;
+  }
+
   fn main() {
-    print(capture_net_http_roundtrip_summary());
+    print_net_http_roundtrip_summary_demo();
     print(summarize_net_http_roundtrip_summary_demo());
   }
 }

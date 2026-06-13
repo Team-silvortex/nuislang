@@ -1110,6 +1110,46 @@ fn extract_loop_match_scrutinee_temp_binding(
     }
 }
 
+fn extract_loop_control_temp_binding(
+    stmt: &NirStmt,
+    consumer_stmts: &[&NirStmt],
+    pure_helpers: &BTreeSet<String>,
+) -> Option<(String, NirExpr)> {
+    let (name, expr) = extract_pure_branch_binding(stmt, pure_helpers)?;
+    if is_loop_match_scrutinee_temp_binding(&name) {
+        return Some((name, expr));
+    }
+    let declares_bool_temp = match stmt {
+        NirStmt::Let { ty, .. } => ty.as_ref().is_some_and(|ty| ty.is_bool_scalar()),
+        NirStmt::Const { ty, .. } => ty.is_bool_scalar(),
+        _ => false,
+    };
+    if !declares_bool_temp {
+        return None;
+    }
+    if consumer_stmts
+        .iter()
+        .any(|consumer| stmt_references_any_name(consumer, &BTreeSet::from([name.clone()])))
+    {
+        Some((name, expr))
+    } else {
+        None
+    }
+}
+
+fn normalize_loop_control_temp_bindings(
+    bindings: Vec<(String, NirExpr)>,
+) -> Vec<(String, NirExpr)> {
+    let mut normalized = Vec::<(String, NirExpr)>::new();
+    for (name, expr) in bindings {
+        let normalized_expr = normalized.iter().fold(expr, |current, (binding_name, binding_expr)| {
+            substitute_branch_binding(&current, binding_name, binding_expr)
+        });
+        normalized.push((name, normalized_expr));
+    }
+    normalized
+}
+
 fn prepare_loop_carry_sequence(
     stmts: &[NirStmt],
     binding_name: &str,
@@ -1235,15 +1275,43 @@ fn split_temp_prefixed_loop_flow_control<'a>(
 ) -> Option<(Vec<(String, NirExpr)>, &'a NirStmt, &'a [NirStmt])> {
     let mut temp_bindings = Vec::<(String, NirExpr)>::new();
     for (index, stmt) in stmts.iter().enumerate() {
+        let remaining = &stmts[index + 1..];
+        let consumer_stmts = remaining.iter().collect::<Vec<_>>();
         if let Some((temp_name, temp_expr)) =
-            extract_loop_match_scrutinee_temp_binding(stmt, pure_helpers)
+            extract_loop_control_temp_binding(stmt, &consumer_stmts, pure_helpers)
         {
             temp_bindings.push((temp_name, temp_expr));
             continue;
         }
-        return Some((temp_bindings, stmt, &stmts[index + 1..]));
+        return Some((
+            normalize_loop_control_temp_bindings(temp_bindings),
+            stmt,
+            &stmts[index + 1..],
+        ));
     }
     None
+}
+
+fn split_trailing_loop_control_temp_bindings<'a>(
+    stmts: &'a [NirStmt],
+    control_stmt: &'a NirStmt,
+    pure_helpers: &BTreeSet<String>,
+) -> Option<(&'a [NirStmt], Vec<(String, NirExpr)>)> {
+    let mut accepted = Vec::<(String, NirExpr)>::new();
+    let mut consumer_stmts = vec![control_stmt];
+    let mut split_index = stmts.len();
+    for stmt in stmts.iter().rev() {
+        let Some((temp_name, temp_expr)) =
+            extract_loop_control_temp_binding(stmt, &consumer_stmts, pure_helpers)
+        else {
+            break;
+        };
+        accepted.push((temp_name, temp_expr));
+        consumer_stmts.push(stmt);
+        split_index -= 1;
+    }
+    accepted.reverse();
+    Some((&stmts[..split_index], normalize_loop_control_temp_bindings(accepted)))
 }
 
 pub(super) fn prepare_counted_while(
@@ -1628,13 +1696,8 @@ pub(super) fn prepare_post_flow_while(
         inlineable_pure_helpers,
     )?;
 
-    let trailing_temp_count = middle
-        .iter()
-        .rev()
-        .take_while(|stmt| extract_loop_match_scrutinee_temp_binding(stmt, pure_helpers).is_some())
-        .count();
-    let split_index = middle.len().saturating_sub(trailing_temp_count);
-    let (carry_bindings, control_temp_stmts) = middle.split_at(split_index);
+    let (carry_bindings, control_temp_bindings) =
+        split_trailing_loop_control_temp_bindings(middle, control_stmt, pure_helpers)?;
     let prepared_carries = prepare_loop_carry_sequence(
         carry_bindings,
         &binding_name,
@@ -1642,10 +1705,6 @@ pub(super) fn prepare_post_flow_while(
         inlineable_pure_helpers,
         pure_helper_blocks,
     )?;
-    let control_temp_bindings = control_temp_stmts
-        .iter()
-        .map(|stmt| extract_loop_match_scrutinee_temp_binding(stmt, pure_helpers))
-        .collect::<Option<Vec<_>>>()?;
     let substituted_control_stmt = substitute_stmt_bindings(control_stmt, &control_temp_bindings);
     let control = parse_loop_flow_control(
         &substituted_control_stmt,
@@ -1685,13 +1744,8 @@ pub(super) fn prepare_async_post_flow_while(
     }
     let step_callee = parse_prepared_async_loop_step(step_binding, &binding_name)?;
 
-    let trailing_temp_count = middle
-        .iter()
-        .rev()
-        .take_while(|stmt| extract_loop_match_scrutinee_temp_binding(stmt, pure_helpers).is_some())
-        .count();
-    let split_index = middle.len().saturating_sub(trailing_temp_count);
-    let (carry_bindings, control_temp_stmts) = middle.split_at(split_index);
+    let (carry_bindings, control_temp_bindings) =
+        split_trailing_loop_control_temp_bindings(middle, control_stmt, pure_helpers)?;
     let prepared_carries = prepare_loop_carry_sequence(
         carry_bindings,
         &binding_name,
@@ -1699,10 +1753,6 @@ pub(super) fn prepare_async_post_flow_while(
         inlineable_pure_helpers,
         pure_helper_blocks,
     )?;
-    let control_temp_bindings = control_temp_stmts
-        .iter()
-        .map(|stmt| extract_loop_match_scrutinee_temp_binding(stmt, pure_helpers))
-        .collect::<Option<Vec<_>>>()?;
     let substituted_control_stmt = substitute_stmt_bindings(control_stmt, &control_temp_bindings);
     let control = parse_loop_flow_control(
         &substituted_control_stmt,

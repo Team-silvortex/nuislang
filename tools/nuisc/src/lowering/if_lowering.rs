@@ -73,6 +73,19 @@ pub(super) fn lower_if_pair(
             let selected = lower_select(condition_name, lhs, rhs, state)?;
             return Ok(LoweredIfOutcome::Returned(selected));
         }
+        let pure_helpers = state.pure_helpers.clone();
+        if let (Some((lhs_name, lhs_value)), Some((rhs_name, rhs_value))) = (
+            lower_binding_if_chain(then_body, state, bindings, &pure_helpers)?,
+            lower_binding_if_chain(else_body, state, bindings, &pure_helpers)?,
+        ) {
+            if lhs_name == rhs_name {
+                let selected = lower_select(condition_name, lhs_value, rhs_value, state)?;
+                return Ok(LoweredIfOutcome::Bind {
+                    name: lhs_name,
+                    value: selected,
+                });
+            }
+        }
         return Err(
             "minimal nuisc lowering currently only supports `if` as matching `print`, matching `let/const`, `return <expr>`, or small terminal branches like `print(...); return ...`"
                 .to_owned(),
@@ -87,9 +100,10 @@ pub(super) fn lower_if_pair(
         return Ok(LoweredIfOutcome::Returned(selected));
     }
 
+    let pure_helpers = state.pure_helpers.clone();
     if let (Some((lhs_name, lhs_value)), Some((rhs_name, rhs_value))) = (
-        lower_binding_if_chain(then_body, state, bindings)?,
-        lower_binding_if_chain(else_body, state, bindings)?,
+        lower_binding_if_chain(then_body, state, bindings, &pure_helpers)?,
+        lower_binding_if_chain(else_body, state, bindings, &pure_helpers)?,
     ) {
         if lhs_name == rhs_name {
             let selected = lower_select(condition_name, lhs_value, rhs_value, state)?;
@@ -198,10 +212,26 @@ fn lower_binding_if_chain(
     stmts: &[NirStmt],
     state: &mut LoweringState<'_>,
     bindings: &BTreeMap<String, String>,
+    pure_helpers: &BTreeSet<String>,
 ) -> Result<Option<(String, String)>, String> {
     match stmts {
         [NirStmt::Let { name, value, .. }] | [NirStmt::Const { name, value, .. }] => {
             Ok(Some((name.clone(), lower_expr(value, state, bindings)?)))
+        }
+        [binding @ (NirStmt::Let { .. } | NirStmt::Const { .. }), tail @ ..] => {
+            let Some((name, value)) = extract_pure_branch_binding(binding, pure_helpers) else {
+                return Ok(None);
+            };
+            let substituted: Vec<NirStmt> = tail
+                .iter()
+                .map(|stmt| {
+                    super::loop_purity::substitute_stmt_bindings(
+                        stmt,
+                        &[(name.clone(), value.clone())],
+                    )
+                })
+                .collect();
+            lower_binding_if_chain(&substituted, state, bindings, pure_helpers)
         }
         [NirStmt::If {
             condition,
@@ -209,11 +239,13 @@ fn lower_binding_if_chain(
             else_body,
         }] => {
             let condition_name = lower_expr(condition, state, bindings)?;
-            let Some((lhs_name, lhs_value)) = lower_binding_if_chain(then_body, state, bindings)?
+            let Some((lhs_name, lhs_value)) =
+                lower_binding_if_chain(then_body, state, bindings, pure_helpers)?
             else {
                 return Ok(None);
             };
-            let Some((rhs_name, rhs_value)) = lower_binding_if_chain(else_body, state, bindings)?
+            let Some((rhs_name, rhs_value)) =
+                lower_binding_if_chain(else_body, state, bindings, pure_helpers)?
             else {
                 return Ok(None);
             };

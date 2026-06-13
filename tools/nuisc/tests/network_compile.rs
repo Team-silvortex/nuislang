@@ -79,11 +79,35 @@ fn compiles_http_request_recipe_project() {
 }
 
 #[test]
+fn compiles_http_response_recipe_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_response_recipe_demo",
+    );
+    nuisc::pipeline::compile_project(project).expect("http response project should compile");
+}
+
+#[test]
 fn compiles_http_client_exchange_recipe_project() {
     let project = Path::new(
         "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_exchange_recipe_demo",
     );
     nuisc::pipeline::compile_project(project).expect("http client exchange project should compile");
+}
+
+#[test]
+fn compiles_http_client_get_recipe_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_get_recipe_demo",
+    );
+    nuisc::pipeline::compile_project(project).expect("http client get project should compile");
+}
+
+#[test]
+fn compiles_http_client_post_recipe_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_post_recipe_demo",
+    );
+    nuisc::pipeline::compile_project(project).expect("http client post project should compile");
 }
 
 #[test]
@@ -328,6 +352,62 @@ fn lowers_http_client_exchange_recipe_project_with_expected_summary_shape() {
 }
 
 #[test]
+fn lowers_http_client_get_recipe_project_with_expected_print_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_get_recipe_demo",
+    );
+
+    let print_display = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "print_net_http_client_get_recipe")
+        .unwrap();
+    assert!(print_display
+        .body
+        .iter()
+        .any(|stmt| stmt_contains_host_callee(stmt, "host_parse_http_request_summary")));
+    assert!(print_display
+        .body
+        .iter()
+        .any(|stmt| stmt_contains_host_callee(stmt, "host_parse_http_response_summary")));
+    let print_count = print_display
+        .body
+        .iter()
+        .filter(|stmt| matches!(stmt, NirStmt::Print(_)))
+        .count();
+    assert!(print_count >= 4);
+}
+
+#[test]
+fn lowers_http_client_post_recipe_project_with_expected_print_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_post_recipe_demo",
+    );
+
+    let print_display = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "print_net_http_client_post_recipe")
+        .unwrap();
+    assert!(print_display
+        .body
+        .iter()
+        .any(|stmt| stmt_contains_host_callee(stmt, "host_parse_http_request_summary")));
+    assert!(print_display
+        .body
+        .iter()
+        .any(|stmt| stmt_contains_host_callee(stmt, "host_parse_http_response_summary")));
+    let print_count = print_display
+        .body
+        .iter()
+        .filter(|stmt| matches!(stmt, NirStmt::Print(_)))
+        .count();
+    assert!(print_count >= 4);
+}
+
+#[test]
 fn lowers_http_request_recipe_project_with_expected_request_shape() {
     let artifacts = compiled_project(
         "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_request_recipe_demo",
@@ -413,6 +493,104 @@ fn lowers_http_request_recipe_project_with_expected_request_shape() {
             ..
         }) if name == "summary" && callee == "capture_net_http_request_summary"
     ));
+
+    let print_display = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "print_net_http_request_recipe")
+        .unwrap();
+    assert!(print_display
+        .body
+        .iter()
+        .any(|stmt| stmt_contains_host_callee(stmt, "host_parse_http_request_summary")));
+    let print_count = print_display
+        .body
+        .iter()
+        .filter(|stmt| matches!(stmt, NirStmt::Print(_)))
+        .count();
+    assert!(print_count >= 2);
+}
+
+#[test]
+fn lowers_http_response_recipe_project_with_expected_response_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_response_recipe_demo",
+    );
+
+    let capture = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "capture_net_http_response_summary")
+        .unwrap();
+    assert!(matches!(
+        capture.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "NetHttpResponseSummary"
+    ));
+    for (name, callee) in [
+        ("open_handle", "host_network_open_tcp_stream"),
+        ("close_value", "host_network_close_owned"),
+    ] {
+        assert!(capture.body.iter().any(|stmt| {
+            matches!(
+                stmt,
+                NirStmt::Let {
+                    name: stmt_name,
+                    value: NirExpr::CpuExternCall { callee: stmt_callee, .. },
+                    ..
+                } if stmt_name == name && stmt_callee == callee
+            )
+        }));
+    }
+    for name in ["status_result", "recv_result"] {
+        assert!(capture.body.iter().any(|stmt| {
+            matches!(
+                stmt,
+                NirStmt::Let {
+                    name: stmt_name,
+                    value: NirExpr::NetworkResult { .. },
+                    ..
+                } if stmt_name == name
+            )
+        }));
+    }
+
+    let summarize = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "summarize_net_http_response_recipe")
+        .unwrap();
+    assert!(matches!(
+        summarize.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "i64"
+    ));
+    assert!(matches!(
+        summarize.body.first(),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::Call { callee, .. },
+            ..
+        }) if name == "summary" && callee == "capture_net_http_response_summary"
+    ));
+
+    let print_display = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "print_net_http_response_recipe")
+        .unwrap();
+    assert!(print_display
+        .body
+        .iter()
+        .any(|stmt| stmt_contains_host_callee(stmt, "host_parse_http_response_summary")));
+    let print_count = print_display
+        .body
+        .iter()
+        .filter(|stmt| matches!(stmt, NirStmt::Print(_)))
+        .count();
+    assert!(print_count >= 2);
 }
 
 #[test]
@@ -450,6 +628,29 @@ fn lowers_http_roundtrip_summary_demo_with_expected_summary_call() {
         summarize.return_type.as_ref().map(|ty| ty.render()),
         Some(rendered) if rendered == "i64"
     ));
+
+    let print_display = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "print_net_http_roundtrip_summary_demo")
+        .unwrap();
+    for callee in [
+        "capture_net_http_request_summary",
+        "capture_net_http_response_summary",
+        "capture_net_http_roundtrip_summary",
+    ] {
+        assert!(print_display
+            .body
+            .iter()
+            .any(|stmt| stmt_contains_host_callee(stmt, callee)));
+    }
+    let print_count = print_display
+        .body
+        .iter()
+        .filter(|stmt| matches!(stmt, NirStmt::Print(_)))
+        .count();
+    assert!(print_count >= 6);
 }
 
 #[test]
@@ -474,6 +675,8 @@ fn lowers_http_roundtrip_runtime_probe_demo_with_expected_network_and_summary_sh
         "host_network_recv_http_status_owned",
         "host_network_recv_owned",
         "host_network_close_owned",
+        "host_parse_http_request_summary",
+        "host_parse_http_response_summary",
         "host_parse_http_roundtrip_summary",
     ] {
         assert!(capture
@@ -481,6 +684,39 @@ fn lowers_http_roundtrip_runtime_probe_demo_with_expected_network_and_summary_sh
             .iter()
             .any(|stmt| stmt_contains_host_callee(stmt, callee)));
     }
+
+    assert!(capture.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Return(Some(NirExpr::StructLiteral { fields, .. }))
+                if fields.iter().any(|(field, _)| field == "request_summary_len")
+                    && fields.iter().any(|(field, _)| field == "response_summary_len")
+                    && fields.iter().any(|(field, _)| field == "summary_text_len")
+        )
+    }));
+
+    let display = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "print_net_http_roundtrip_runtime_probe_display")
+        .unwrap();
+    for callee in [
+        "host_parse_http_request_summary",
+        "host_parse_http_response_summary",
+        "host_parse_http_roundtrip_summary",
+    ] {
+        assert!(display
+            .body
+            .iter()
+            .any(|stmt| stmt_contains_host_callee(stmt, callee)));
+    }
+    let print_count = display
+        .body
+        .iter()
+        .filter(|stmt| matches!(stmt, NirStmt::Print(_)))
+        .count();
+    assert!(print_count >= 3);
 }
 
 #[test]

@@ -315,6 +315,44 @@ fn lowers_post_flow_breaking_after_branching_carry_into_loop_while_scalar_post_f
 }
 
 #[test]
+fn lowers_post_flow_continue_with_pure_control_temp_chain_into_loop_while_scalar_post_flow_chain() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            while value < 6 {
+              let value: i64 = value + 1;
+              let acc: i64 = acc + value;
+              let hold_acc: bool = acc < 3;
+              let should_continue: bool = hold_acc;
+              if should_continue {
+                continue;
+              }
+            }
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_post_flow_chain"
+        })
+        .expect("expected loop_while_scalar_post_flow_chain node");
+    assert_eq!(loop_node.op.args[5], "carry0_lt");
+    assert_eq!(loop_node.op.args[7], "continue");
+    assert_eq!(loop_node.op.args[9], "add_current");
+}
+
+#[test]
 fn lowers_post_flow_breaking_after_fixed_structural_read_branching_carry_into_loop_while_scalar_post_flow_cond_chain(
 ) {
     let mut module = parse_nuis_module(

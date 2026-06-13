@@ -33,6 +33,8 @@ mod cpu Main {
     status_value: i64,
     recv_value: i64,
     close_value: i64,
+    request_summary_len: i64,
+    response_summary_len: i64,
     summary_text_len: i64,
     probe_total: i64
   }
@@ -71,6 +73,9 @@ mod cpu Main {
       response,
       0
     );
+    let request_summary: String = parse_http_request_summary(request, 0, request_len);
+    let response_summary: String =
+      parse_http_response_summary(response, 0, response_len);
     let summary: String = parse_http_roundtrip_summary(
       request,
       0,
@@ -79,6 +84,8 @@ mod cpu Main {
       0,
       response_len
     );
+    let request_summary_len: i64 = text_len(request_summary);
+    let response_summary_len: i64 = text_len(response_summary);
     let summary_text_len: i64 = text_len(summary);
     let send_value: i64 = network_value(send_result);
     let status_value: i64 = network_value(status_result);
@@ -95,6 +102,8 @@ mod cpu Main {
       status_value: status_value,
       recv_value: recv_value,
       close_value: close_value,
+      request_summary_len: request_summary_len,
+      response_summary_len: response_summary_len,
       summary_text_len: summary_text_len,
       probe_total: remote_port
         + connect_timeout_ms
@@ -106,13 +115,49 @@ mod cpu Main {
         + status_value
         + recv_value
         + close_value
+        + request_summary_len
+        + response_summary_len
         + summary_text_len
     };
+  }
+
+  fn print_net_http_roundtrip_runtime_probe_display() -> i64 {
+    let request: ref Buffer = alloc_buffer(512, 0);
+    let response: ref Buffer = alloc_buffer(512, 0);
+    let request_len: i64 = serialize_text_into(
+      "GET /hello HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n",
+      request,
+      0
+    );
+    let response_len: i64 = serialize_text_into(
+      "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\n",
+      response,
+      0
+    );
+    let request_summary: String = parse_http_request_summary(request, 0, request_len);
+    let response_summary: String =
+      parse_http_response_summary(response, 0, response_len);
+    let roundtrip_summary: String = parse_http_roundtrip_summary(
+      request,
+      0,
+      request_len,
+      response,
+      0,
+      response_len
+    );
+    print("request:");
+    print(request_summary);
+    print("response:");
+    print(response_summary);
+    print("roundtrip:");
+    print(roundtrip_summary);
+    return 0;
   }
 
   fn main() {
     let summary: NetHttpRoundtripRuntimeProbeSummary =
       capture_net_http_roundtrip_runtime_probe_summary();
+    print_net_http_roundtrip_runtime_probe_display();
     print(summary.remote_port);
     print(summary.connect_timeout_ms);
     print(summary.stream_window);
@@ -123,6 +168,8 @@ mod cpu Main {
     print(summary.status_value);
     print(summary.recv_value);
     print(summary.close_value);
+    print(summary.request_summary_len);
+    print(summary.response_summary_len);
     print(summary.summary_text_len);
     print(summary.probe_total);
   }

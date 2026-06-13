@@ -203,6 +203,37 @@ fn lowers_pure_struct_helper_call_binding_into_branch_print_return() {
 }
 
 #[test]
+fn lowers_pure_binding_chain_into_shared_branch_binding_select() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let seed: i64 = 1;
+            let result: i64 = 0;
+            if seed < 2 {
+              let base: i64 = 40;
+              let result: i64 = base + 2;
+            } else {
+              let base: i64 = 10;
+              let result: i64 = base + 5;
+            }
+            return result;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let select_node = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .expect("expected select node for shared branch binding");
+    assert_eq!(select_node.op.args.len(), 3);
+}
+
+#[test]
 fn lowers_nested_pure_helper_call_chain_into_branch_print_return() {
     let module = parse_nuis_module(
         r#"
