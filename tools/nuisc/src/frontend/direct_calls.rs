@@ -1,10 +1,11 @@
 use std::collections::BTreeMap;
 
-use nuis_semantics::model::{AstExpr, NirExpr, NirStructDef, NirTypeRef};
+use nuis_semantics::model::{AstExpr, NirBinaryOp, NirExpr, NirStructDef, NirTypeRef};
 
 use super::call_helpers::ensure_call_arg_matches_param;
 use super::{
-    ensure_ref_like, lower_expr, lower_nested_expr_with_async, FunctionSignature, ModuleConstValue,
+    ensure_ref_like, i64_type, lower_expr, lower_nested_expr_with_async, ref_type,
+    FunctionSignature, ModuleConstValue,
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -20,6 +21,752 @@ pub(super) fn lower_direct_call_builtin_or_named_call(
     allow_async_calls: bool,
 ) -> Result<Option<NirExpr>, String> {
     match callee {
+        "text_len" => {
+            if current_domain != "cpu" {
+                return Err(
+                    "text_len(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let [value] = args else {
+                return Err("text_len(...) expects 1 arg".to_owned());
+            };
+            let lowered = lower_expr(
+                value,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            Ok(Some(NirExpr::CpuExternCall {
+                abi: "c".to_owned(),
+                interface: None,
+                callee: "host_text_len".to_owned(),
+                args: vec![lowered],
+            }))
+        }
+        "serialize_text_into" => {
+            if current_domain != "cpu" {
+                return Err(
+                    "serialize_text_into(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let [text, buffer, offset] = args else {
+                return Err("serialize_text_into(...) expects 3 args".to_owned());
+            };
+            let lowered_text =
+                lower_expr(text, current_domain, bindings, signatures, struct_table, None)?;
+            let lowered_buffer = lower_expr(
+                buffer,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&ref_type("Buffer")),
+            )?;
+            let lowered_offset = lower_expr(
+                offset,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(Some(NirExpr::CpuExternCall {
+                abi: "c".to_owned(),
+                interface: None,
+                callee: "host_serialize_text_into".to_owned(),
+                args: vec![
+                    lowered_text,
+                    NirExpr::HostBufferHandle(Box::new(lowered_buffer)),
+                    lowered_offset,
+                ],
+            }))
+        }
+        "serialize_i64_into" => {
+            if current_domain != "cpu" {
+                return Err(
+                    "serialize_i64_into(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let [value, buffer, offset] = args else {
+                return Err("serialize_i64_into(...) expects 3 args".to_owned());
+            };
+            let lowered_value = lower_expr(
+                value,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let lowered_buffer = lower_expr(
+                buffer,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&ref_type("Buffer")),
+            )?;
+            let lowered_offset = lower_expr(
+                offset,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(Some(NirExpr::CpuExternCall {
+                abi: "c".to_owned(),
+                interface: None,
+                callee: "host_serialize_i64_into".to_owned(),
+                args: vec![
+                    lowered_value,
+                    NirExpr::HostBufferHandle(Box::new(lowered_buffer)),
+                    lowered_offset,
+                ],
+            }))
+        }
+        "serialize_bool_into" => {
+            if current_domain != "cpu" {
+                return Err(
+                    "serialize_bool_into(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let [value, buffer, offset] = args else {
+                return Err("serialize_bool_into(...) expects 3 args".to_owned());
+            };
+            let lowered_value =
+                lower_expr(value, current_domain, bindings, signatures, struct_table, None)?;
+            let lowered_buffer = lower_expr(
+                buffer,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&ref_type("Buffer")),
+            )?;
+            let lowered_offset = lower_expr(
+                offset,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(Some(NirExpr::CpuExternCall {
+                abi: "c".to_owned(),
+                interface: None,
+                callee: "host_serialize_bool_into".to_owned(),
+                args: vec![
+                    lowered_value,
+                    NirExpr::HostBufferHandle(Box::new(lowered_buffer)),
+                    lowered_offset,
+                ],
+            }))
+        }
+        "deserialize_i64_from" => {
+            if current_domain != "cpu" {
+                return Err(
+                    "deserialize_i64_from(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let [buffer, offset, len] = args else {
+                return Err("deserialize_i64_from(...) expects 3 args".to_owned());
+            };
+            let lowered_buffer = lower_expr(
+                buffer,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&ref_type("Buffer")),
+            )?;
+            let lowered_offset = lower_expr(
+                offset,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let lowered_len = lower_expr(
+                len,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(Some(NirExpr::CpuExternCall {
+                abi: "c".to_owned(),
+                interface: None,
+                callee: "host_deserialize_i64_from".to_owned(),
+                args: vec![
+                    NirExpr::HostBufferHandle(Box::new(lowered_buffer)),
+                    lowered_offset,
+                    lowered_len,
+                ],
+            }))
+        }
+        "deserialize_bool_from" => {
+            if current_domain != "cpu" {
+                return Err(
+                    "deserialize_bool_from(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let [buffer, offset, len] = args else {
+                return Err("deserialize_bool_from(...) expects 3 args".to_owned());
+            };
+            let lowered_buffer = lower_expr(
+                buffer,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&ref_type("Buffer")),
+            )?;
+            let lowered_offset = lower_expr(
+                offset,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let lowered_len = lower_expr(
+                len,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let raw = NirExpr::CpuExternCall {
+                abi: "c".to_owned(),
+                interface: None,
+                callee: "host_deserialize_bool_from".to_owned(),
+                args: vec![
+                    NirExpr::HostBufferHandle(Box::new(lowered_buffer)),
+                    lowered_offset,
+                    lowered_len,
+                ],
+            };
+            Ok(Some(NirExpr::Binary {
+                op: NirBinaryOp::Ne,
+                lhs: Box::new(raw),
+                rhs: Box::new(NirExpr::Int(0)),
+            }))
+        }
+        "deserialize_text_from" => {
+            if current_domain != "cpu" {
+                return Err(
+                    "deserialize_text_from(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let [buffer, offset, len] = args else {
+                return Err("deserialize_text_from(...) expects 3 args".to_owned());
+            };
+            let lowered_buffer = lower_expr(
+                buffer,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&ref_type("Buffer")),
+            )?;
+            let lowered_offset = lower_expr(
+                offset,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let lowered_len = lower_expr(
+                len,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(Some(NirExpr::CpuExternCall {
+                abi: "c".to_owned(),
+                interface: None,
+                callee: "host_deserialize_text_from".to_owned(),
+                args: vec![
+                    NirExpr::HostBufferHandle(Box::new(lowered_buffer)),
+                    lowered_offset,
+                    lowered_len,
+                ],
+            }))
+        }
+        "parse_header_line" => {
+            if current_domain != "cpu" {
+                return Err(
+                    "parse_header_line(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let [buffer, offset, len, expected_name] = args else {
+                return Err("parse_header_line(...) expects 4 args".to_owned());
+            };
+            let lowered_buffer = lower_expr(
+                buffer,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&ref_type("Buffer")),
+            )?;
+            let lowered_offset = lower_expr(
+                offset,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let lowered_len = lower_expr(
+                len,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let lowered_expected_name = lower_expr(
+                expected_name,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            Ok(Some(NirExpr::CpuExternCall {
+                abi: "c".to_owned(),
+                interface: None,
+                callee: "host_parse_header_line".to_owned(),
+                args: vec![
+                    NirExpr::HostBufferHandle(Box::new(lowered_buffer)),
+                    lowered_offset,
+                    lowered_len,
+                    lowered_expected_name,
+                ],
+            }))
+        }
+        "deserialize_text_equals" => {
+            if current_domain != "cpu" {
+                return Err(
+                    "deserialize_text_equals(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let [buffer, offset, len, expected] = args else {
+                return Err("deserialize_text_equals(...) expects 4 args".to_owned());
+            };
+            let lowered_buffer = lower_expr(
+                buffer,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&ref_type("Buffer")),
+            )?;
+            let lowered_offset = lower_expr(
+                offset,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let lowered_len = lower_expr(
+                len,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let lowered_expected =
+                lower_expr(expected, current_domain, bindings, signatures, struct_table, None)?;
+            let raw = NirExpr::CpuExternCall {
+                abi: "c".to_owned(),
+                interface: None,
+                callee: "host_deserialize_text_equals".to_owned(),
+                args: vec![
+                    NirExpr::HostBufferHandle(Box::new(lowered_buffer)),
+                    lowered_offset,
+                    lowered_len,
+                    lowered_expected,
+                ],
+            };
+            Ok(Some(NirExpr::Binary {
+                op: NirBinaryOp::Ne,
+                lhs: Box::new(raw),
+                rhs: Box::new(NirExpr::Int(0)),
+            }))
+        }
+        "deserialize_text_starts_with" => {
+            if current_domain != "cpu" {
+                return Err(
+                    "deserialize_text_starts_with(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let [buffer, offset, len, prefix] = args else {
+                return Err("deserialize_text_starts_with(...) expects 4 args".to_owned());
+            };
+            let lowered_buffer = lower_expr(
+                buffer,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&ref_type("Buffer")),
+            )?;
+            let lowered_offset = lower_expr(
+                offset,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let lowered_len = lower_expr(
+                len,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let lowered_prefix =
+                lower_expr(prefix, current_domain, bindings, signatures, struct_table, None)?;
+            let raw = NirExpr::CpuExternCall {
+                abi: "c".to_owned(),
+                interface: None,
+                callee: "host_deserialize_text_starts_with".to_owned(),
+                args: vec![
+                    NirExpr::HostBufferHandle(Box::new(lowered_buffer)),
+                    lowered_offset,
+                    lowered_len,
+                    lowered_prefix,
+                ],
+            };
+            Ok(Some(NirExpr::Binary {
+                op: NirBinaryOp::Ne,
+                lhs: Box::new(raw),
+                rhs: Box::new(NirExpr::Int(0)),
+            }))
+        }
+        "deserialize_text_contains" => {
+            if current_domain != "cpu" {
+                return Err(
+                    "deserialize_text_contains(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let [buffer, offset, len, needle] = args else {
+                return Err("deserialize_text_contains(...) expects 4 args".to_owned());
+            };
+            let lowered_buffer = lower_expr(
+                buffer,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&ref_type("Buffer")),
+            )?;
+            let lowered_offset = lower_expr(
+                offset,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let lowered_len = lower_expr(
+                len,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let lowered_needle =
+                lower_expr(needle, current_domain, bindings, signatures, struct_table, None)?;
+            let raw = NirExpr::CpuExternCall {
+                abi: "c".to_owned(),
+                interface: None,
+                callee: "host_deserialize_text_contains".to_owned(),
+                args: vec![
+                    NirExpr::HostBufferHandle(Box::new(lowered_buffer)),
+                    lowered_offset,
+                    lowered_len,
+                    lowered_needle,
+                ],
+            };
+            Ok(Some(NirExpr::Binary {
+                op: NirBinaryOp::Ne,
+                lhs: Box::new(raw),
+                rhs: Box::new(NirExpr::Int(0)),
+            }))
+        }
+        "deserialize_text_ends_with" => {
+            if current_domain != "cpu" {
+                return Err(
+                    "deserialize_text_ends_with(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let [buffer, offset, len, suffix] = args else {
+                return Err("deserialize_text_ends_with(...) expects 4 args".to_owned());
+            };
+            let lowered_buffer = lower_expr(
+                buffer,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&ref_type("Buffer")),
+            )?;
+            let lowered_offset = lower_expr(
+                offset,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let lowered_len = lower_expr(
+                len,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let lowered_suffix =
+                lower_expr(suffix, current_domain, bindings, signatures, struct_table, None)?;
+            let raw = NirExpr::CpuExternCall {
+                abi: "c".to_owned(),
+                interface: None,
+                callee: "host_deserialize_text_ends_with".to_owned(),
+                args: vec![
+                    NirExpr::HostBufferHandle(Box::new(lowered_buffer)),
+                    lowered_offset,
+                    lowered_len,
+                    lowered_suffix,
+                ],
+            };
+            Ok(Some(NirExpr::Binary {
+                op: NirBinaryOp::Ne,
+                lhs: Box::new(raw),
+                rhs: Box::new(NirExpr::Int(0)),
+            }))
+        }
+        "buffer_find_byte" => {
+            if current_domain != "cpu" {
+                return Err(
+                    "buffer_find_byte(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let [buffer, offset, len, needle] = args else {
+                return Err("buffer_find_byte(...) expects 4 args".to_owned());
+            };
+            let lowered_buffer = lower_expr(
+                buffer,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&ref_type("Buffer")),
+            )?;
+            let lowered_offset = lower_expr(
+                offset,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let lowered_len = lower_expr(
+                len,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let lowered_needle = lower_expr(
+                needle,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(Some(NirExpr::CpuExternCall {
+                abi: "c".to_owned(),
+                interface: None,
+                callee: "host_buffer_find_byte".to_owned(),
+                args: vec![
+                    NirExpr::HostBufferHandle(Box::new(lowered_buffer)),
+                    lowered_offset,
+                    lowered_len,
+                    lowered_needle,
+                ],
+            }))
+        }
+        "buffer_find_text" => {
+            if current_domain != "cpu" {
+                return Err(
+                    "buffer_find_text(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let [buffer, offset, len, needle] = args else {
+                return Err("buffer_find_text(...) expects 4 args".to_owned());
+            };
+            let lowered_buffer = lower_expr(
+                buffer,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&ref_type("Buffer")),
+            )?;
+            let lowered_offset = lower_expr(
+                offset,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let lowered_len = lower_expr(
+                len,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let lowered_needle =
+                lower_expr(needle, current_domain, bindings, signatures, struct_table, None)?;
+            Ok(Some(NirExpr::CpuExternCall {
+                abi: "c".to_owned(),
+                interface: None,
+                callee: "host_buffer_find_text".to_owned(),
+                args: vec![
+                    NirExpr::HostBufferHandle(Box::new(lowered_buffer)),
+                    lowered_offset,
+                    lowered_len,
+                    lowered_needle,
+                ],
+            }))
+        }
+        "buffer_find_line_end" => {
+            if current_domain != "cpu" {
+                return Err(
+                    "buffer_find_line_end(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let [buffer, offset, len] = args else {
+                return Err("buffer_find_line_end(...) expects 3 args".to_owned());
+            };
+            let lowered_buffer = lower_expr(
+                buffer,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&ref_type("Buffer")),
+            )?;
+            let lowered_offset = lower_expr(
+                offset,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let lowered_len = lower_expr(
+                len,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(Some(NirExpr::CpuExternCall {
+                abi: "c".to_owned(),
+                interface: None,
+                callee: "host_buffer_find_line_end".to_owned(),
+                args: vec![
+                    NirExpr::HostBufferHandle(Box::new(lowered_buffer)),
+                    lowered_offset,
+                    lowered_len,
+                ],
+            }))
+        }
+        "buffer_trim_line_end" => {
+            if current_domain != "cpu" {
+                return Err(
+                    "buffer_trim_line_end(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let [buffer, offset, len] = args else {
+                return Err("buffer_trim_line_end(...) expects 3 args".to_owned());
+            };
+            let lowered_buffer = lower_expr(
+                buffer,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&ref_type("Buffer")),
+            )?;
+            let lowered_offset = lower_expr(
+                offset,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let lowered_len = lower_expr(
+                len,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(Some(NirExpr::CpuExternCall {
+                abi: "c".to_owned(),
+                interface: None,
+                callee: "host_buffer_trim_line_end".to_owned(),
+                args: vec![
+                    NirExpr::HostBufferHandle(Box::new(lowered_buffer)),
+                    lowered_offset,
+                    lowered_len,
+                ],
+            }))
+        }
         "free" => {
             let [value] = args else {
                 return Err("free(...) expects 1 arg".to_owned());

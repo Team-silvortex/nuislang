@@ -1,0 +1,3 @@
+name = "task_recursive_async_keep_prev_carry_demo"
+version = "0.1.0"
+entry = "main.ns"

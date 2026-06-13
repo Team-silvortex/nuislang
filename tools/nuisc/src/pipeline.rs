@@ -1,7 +1,13 @@
-use std::{collections::BTreeSet, fs, path::Path};
+use std::{
+    collections::BTreeSet,
+    fs,
+    path::{Path, PathBuf},
+};
 
 use nuis_semantics::model::{AstModule, NirExpr, NirModule, NirStmt};
 use yir_core::YirModule;
+
+const NUSTAR_REGISTRY_ROOT: &str = "nustar-packages";
 
 pub struct PipelineArtifacts {
     pub ast: AstModule,
@@ -11,11 +17,52 @@ pub struct PipelineArtifacts {
     pub loaded_nustar: Vec<String>,
 }
 
-pub fn compile_source_path(path: &Path) -> Result<PipelineArtifacts, String> {
+pub struct ResolvedCompileInput {
+    pub input_path: PathBuf,
+    pub effective_input_path: PathBuf,
+    pub project: Option<crate::project::LoadedProject>,
+    pub project_plan: Option<crate::project::ProjectCompilationPlan>,
+}
+
+struct PreparedPipeline {
+    ast: AstModule,
+    nir: NirModule,
+    lowering_manifest: crate::registry::NustarPackageManifest,
+}
+
+impl ResolvedCompileInput {
+    pub fn compile(&self) -> Result<PipelineArtifacts, String> {
+        if let (Some(project), Some(plan)) = (&self.project, &self.project_plan) {
+            compile_project_plan(project, plan)
+        } else {
+            compile_source_path(&self.input_path)
+        }
+    }
+}
+
+pub fn resolve_compile_input(path: &Path) -> Result<ResolvedCompileInput, String> {
     if crate::project::is_project_input(path) {
         let project = crate::project::load_project(path)?;
         let plan = crate::project::build_project_compilation_plan(&project)?;
-        return compile_project_plan(&project, &plan);
+        return Ok(ResolvedCompileInput {
+            input_path: path.to_path_buf(),
+            effective_input_path: plan.effective_input_path.clone(),
+            project: Some(project),
+            project_plan: Some(plan),
+        });
+    }
+    Ok(ResolvedCompileInput {
+        input_path: path.to_path_buf(),
+        effective_input_path: path.to_path_buf(),
+        project: None,
+        project_plan: None,
+    })
+}
+
+pub fn compile_source_path(path: &Path) -> Result<PipelineArtifacts, String> {
+    let resolved = resolve_compile_input(path)?;
+    if resolved.project.is_some() {
+        return resolved.compile();
     }
     let source = fs::read_to_string(path)
         .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
@@ -32,6 +79,34 @@ pub fn compile_project_plan(
     project: &crate::project::LoadedProject,
     _plan: &crate::project::ProjectCompilationPlan,
 ) -> Result<PipelineArtifacts, String> {
+    let (ast, nir, local_units) = prepare_project_nir(project)?;
+    let prepared = prepare_pipeline(ast, nir, &local_units, |_, nir, _| {
+        crate::project::validate_project_links_against_nir(project, nir)
+    })?;
+    let mut artifacts = lower_prepared_pipeline(prepared)?;
+    crate::project::apply_project_support_modules_to_yir(project, &mut artifacts.yir)?;
+    crate::project::apply_project_links_to_yir(project, &mut artifacts.yir)?;
+    crate::project::validate_project_links_against_yir(project, &artifacts.yir)?;
+    crate::project::validate_project_abi_against_yir(project, &artifacts.yir)?;
+    artifacts.llvm_ir = yir_lower_llvm::emit_module(&artifacts.yir)?;
+    refresh_loaded_nustar(&mut artifacts)?;
+    Ok(artifacts)
+}
+
+pub fn compile_source(source: &str) -> Result<PipelineArtifacts, String> {
+    let ast = crate::frontend::parse_nuis_ast(source)?;
+    compile_ast(ast)
+}
+
+pub fn compile_ast(ast: AstModule) -> Result<PipelineArtifacts, String> {
+    let nir = crate::frontend::lower_ast_to_nir(&ast)?;
+    let prepared = prepare_pipeline(ast, nir, &BTreeSet::new(), |_, _, _| Ok(()))?;
+    lower_prepared_pipeline(prepared)
+}
+
+fn prepare_project_nir(
+    project: &crate::project::LoadedProject,
+) -> Result<(AstModule, NirModule, BTreeSet<(String, String)>), String> {
     let local_units = project
         .modules
         .iter()
@@ -52,36 +127,56 @@ pub fn compile_project_plan(
         .filter(|module| module.path != project.entry_path)
         .map(|module| module.ast.clone())
         .collect::<Vec<_>>();
-    let mut nir = crate::frontend::lower_project_ast_to_nir(&ast, &helper_modules)?;
+    let nir = crate::frontend::lower_project_ast_to_nir(&ast, &helper_modules)?;
+    Ok((ast, nir, local_units))
+}
+
+fn prepare_pipeline<F>(
+    ast: AstModule,
+    mut nir: NirModule,
+    local_units: &BTreeSet<(String, String)>,
+    validate_nir_hook: F,
+) -> Result<PreparedPipeline, String>
+where
+    F: FnOnce(&AstModule, &NirModule, &crate::registry::NustarPackageManifest) -> Result<(), String>,
+{
     crate::optimize::simplify_nir_module(&mut nir);
     crate::nir_verify::verify_nir_module(&nir)?;
     let lowering_manifest =
-        crate::registry::load_manifest_for_domain(Path::new("nustar-packages"), &nir.domain)?;
+        crate::registry::load_manifest_for_domain(Path::new(NUSTAR_REGISTRY_ROOT), &nir.domain)?;
     validate_externs(&ast, &lowering_manifest)?;
     crate::registry::validate_unit_binding(
         std::slice::from_ref(&lowering_manifest),
         &ast.domain,
         &ast.unit,
     )?;
-    validate_used_units_with_local_units(&nir, &local_units)?;
+    validate_used_units_with_local_units(&nir, local_units)?;
     validate_instantiated_units(&nir)?;
-    crate::project::validate_project_links_against_nir(project, &nir)?;
-    let yir = crate::lowering::lower_nir_to_yir(&nir, &lowering_manifest)?;
-    let mut loaded_nustar = collect_loaded_nustar(&nir, &yir, &lowering_manifest.package_id)?;
-    let mut artifacts = PipelineArtifacts {
+    validate_nir_hook(&ast, &nir, &lowering_manifest)?;
+    Ok(PreparedPipeline {
         ast,
         nir,
+        lowering_manifest,
+    })
+}
+
+fn lower_prepared_pipeline(prepared: PreparedPipeline) -> Result<PipelineArtifacts, String> {
+    let yir = crate::lowering::lower_nir_to_yir(&prepared.nir, &prepared.lowering_manifest)?;
+    let llvm_ir = yir_lower_llvm::emit_module(&yir)?;
+    let loaded_nustar =
+        collect_loaded_nustar(&prepared.nir, &yir, &prepared.lowering_manifest.package_id)?;
+    Ok(PipelineArtifacts {
+        ast: prepared.ast,
+        nir: prepared.nir,
         yir,
-        llvm_ir: String::new(),
-        loaded_nustar: std::mem::take(&mut loaded_nustar),
-    };
-    crate::project::apply_project_support_modules_to_yir(project, &mut artifacts.yir)?;
-    crate::project::apply_project_links_to_yir(project, &mut artifacts.yir)?;
-    crate::project::validate_project_links_against_yir(project, &artifacts.yir)?;
-    crate::project::validate_project_abi_against_yir(project, &artifacts.yir)?;
-    artifacts.llvm_ir = yir_lower_llvm::emit_module(&artifacts.yir)?;
+        llvm_ir,
+        loaded_nustar,
+    })
+}
+
+fn refresh_loaded_nustar(artifacts: &mut PipelineArtifacts) -> Result<(), String> {
     let lowering_manifest = crate::registry::load_manifest_for_domain(
-        Path::new("nustar-packages"),
+        Path::new(NUSTAR_REGISTRY_ROOT),
         &artifacts.nir.domain,
     )?;
     artifacts.loaded_nustar = collect_loaded_nustar(
@@ -89,38 +184,7 @@ pub fn compile_project_plan(
         &artifacts.yir,
         &lowering_manifest.package_id,
     )?;
-    Ok(artifacts)
-}
-
-pub fn compile_source(source: &str) -> Result<PipelineArtifacts, String> {
-    let ast = crate::frontend::parse_nuis_ast(source)?;
-    compile_ast(ast)
-}
-
-pub fn compile_ast(ast: AstModule) -> Result<PipelineArtifacts, String> {
-    let mut nir = crate::frontend::lower_ast_to_nir(&ast)?;
-    crate::optimize::simplify_nir_module(&mut nir);
-    crate::nir_verify::verify_nir_module(&nir)?;
-    let lowering_manifest =
-        crate::registry::load_manifest_for_domain(Path::new("nustar-packages"), &nir.domain)?;
-    validate_externs(&ast, &lowering_manifest)?;
-    crate::registry::validate_unit_binding(
-        std::slice::from_ref(&lowering_manifest),
-        &ast.domain,
-        &ast.unit,
-    )?;
-    validate_used_units(&nir)?;
-    validate_instantiated_units(&nir)?;
-    let yir = crate::lowering::lower_nir_to_yir(&nir, &lowering_manifest)?;
-    let llvm_ir = yir_lower_llvm::emit_module(&yir)?;
-    let loaded_nustar = collect_loaded_nustar(&nir, &yir, &lowering_manifest.package_id)?;
-    Ok(PipelineArtifacts {
-        ast,
-        nir,
-        yir,
-        llvm_ir,
-        loaded_nustar,
-    })
+    Ok(())
 }
 
 fn validate_externs(
@@ -157,14 +221,10 @@ fn validate_externs(
 fn validate_instantiated_units(module: &NirModule) -> Result<(), String> {
     for (domain, unit) in collect_instantiated_units(module) {
         let manifest =
-            crate::registry::load_manifest_for_domain(Path::new("nustar-packages"), &domain)?;
+            crate::registry::load_manifest_for_domain(Path::new(NUSTAR_REGISTRY_ROOT), &domain)?;
         crate::registry::validate_unit_binding(&[manifest], &domain, &unit)?;
     }
     Ok(())
-}
-
-fn validate_used_units(module: &NirModule) -> Result<(), String> {
-    validate_used_units_with_local_units(module, &BTreeSet::new())
 }
 
 fn validate_used_units_with_local_units(
@@ -176,7 +236,10 @@ fn validate_used_units_with_local_units(
             continue;
         }
         let manifest =
-            crate::registry::load_manifest_for_domain(Path::new("nustar-packages"), &item.domain)?;
+            crate::registry::load_manifest_for_domain(
+                Path::new(NUSTAR_REGISTRY_ROOT),
+                &item.domain,
+            )?;
         crate::registry::validate_unit_binding(&[manifest], &item.domain, &item.unit)?;
     }
     Ok(())
@@ -191,12 +254,15 @@ fn collect_loaded_nustar(
     loaded.push(root_package.to_owned());
     for item in &module.uses {
         let manifest =
-            crate::registry::load_manifest_for_domain(Path::new("nustar-packages"), &item.domain)?;
+            crate::registry::load_manifest_for_domain(
+                Path::new(NUSTAR_REGISTRY_ROOT),
+                &item.domain,
+            )?;
         loaded.push(manifest.package_id);
     }
     for (domain, _) in collect_instantiated_units(module) {
         let manifest =
-            crate::registry::load_manifest_for_domain(Path::new("nustar-packages"), &domain)?;
+            crate::registry::load_manifest_for_domain(Path::new(NUSTAR_REGISTRY_ROOT), &domain)?;
         loaded.push(manifest.package_id);
     }
     loaded.sort();

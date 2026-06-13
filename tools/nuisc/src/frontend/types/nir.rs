@@ -341,9 +341,29 @@ pub(crate) fn infer_nir_expr_type(
                 None
             }
         }
-        NirExpr::CpuExternCall { callee, .. } => signatures
-            .get(callee)
-            .and_then(|sig| sig.return_type.clone()),
+        NirExpr::CpuExternCall { callee, .. }
+            if callee == "host_text_len"
+                || callee == "host_serialize_text_into"
+                || callee == "host_serialize_bool_into"
+                || callee == "host_serialize_i64_into"
+                || callee == "host_buffer_find_text"
+                || callee == "host_buffer_find_byte"
+                || callee == "host_buffer_find_line_end"
+                || callee == "host_buffer_trim_line_end" =>
+        {
+            Some(i64_type())
+        }
+        NirExpr::CpuExternCall { callee, .. } if callee == "host_deserialize_i64_from" => {
+            Some(i64_type())
+        }
+        NirExpr::CpuExternCall { callee, .. }
+            if callee == "host_deserialize_text_from" || callee == "host_parse_header_line" =>
+        {
+            Some(string_type())
+        }
+        NirExpr::CpuExternCall { callee, .. } => {
+            signatures.get(callee).and_then(|sig| sig.return_type.clone())
+        }
         NirExpr::DataMarker(_) => Some(named_type("Marker")),
         NirExpr::DataHandleTable(_) => Some(named_type("HandleTable")),
         NirExpr::ShaderTarget { .. } => Some(named_type("Target")),

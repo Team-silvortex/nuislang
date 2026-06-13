@@ -1,0 +1,19 @@
+mod cpu Main {
+  async fn sum_until(current: i64, acc: i64, flag: i64) -> i64 {
+    if current == 0 {
+      return acc;
+    }
+    if acc + current > 5 {
+      return acc + current;
+    }
+    if current > 2 {
+      return await sum_until(current - 1, acc + current, flag + current);
+    } else {
+      return await sum_until(current - 1, acc + current, flag);
+    }
+  }
+
+  async fn main() -> i64 {
+    return await sum_until(4, 0, 0);
+  }
+}

@@ -746,6 +746,60 @@ fn lowers_branching_cross_prev_carry_self_tail_recursive_async_function_into_loo
 }
 
 #[test]
+fn lowers_identity_branching_self_tail_recursive_async_function_into_loop_while_i64_cond_chain_with_keep_prev_carry(
+) {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn accumulate(current: i64, acc: i64) -> i64 {
+            if current <= 1 {
+              return acc;
+            }
+            if current > 2 {
+              return await accumulate(current - 1, acc + current);
+            } else {
+              return await accumulate(current - 1, acc);
+            }
+          }
+
+          async fn main() -> i64 {
+            return await accumulate(4, 0);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_cond_chain"
+        })
+        .expect("expected loop_while_scalar_cond_chain node");
+    assert_eq!(loop_node.op.args[3], "gt");
+    assert_eq!(loop_node.op.args[4], "sub");
+    assert_eq!(loop_node.op.args[6], "prev_current_gt");
+    assert_eq!(loop_node.op.args[8], "add_prev_current");
+    assert_eq!(loop_node.op.args[9], "keep_prev_carry");
+    let self_async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "async_call"
+                && node
+                    .op
+                    .args
+                    .first()
+                    .is_some_and(|name| name == "accumulate")
+        })
+        .count();
+    assert_eq!(self_async_call_count, 1);
+}
+
+#[test]
 fn lowers_early_break_self_tail_recursive_async_function_into_loop_while_scalar_flow_chain() {
     let module = parse_nuis_module(
         r#"
@@ -952,6 +1006,62 @@ fn lowers_post_flow_break_branching_aux_carry_self_tail_recursive_async_function
     assert_eq!(loop_node.op.args[14], "prev_current_gt");
     assert_eq!(loop_node.op.args[16], "add_prev_current");
     assert_eq!(loop_node.op.args[17], "keep");
+    let self_async_call_count = yir
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "async_call"
+                && node.op.args.first().is_some_and(|name| name == "sum_until")
+        })
+        .count();
+    assert_eq!(self_async_call_count, 1);
+}
+
+#[test]
+fn lowers_post_flow_break_identity_branching_aux_carry_self_tail_recursive_async_function_into_loop_while_scalar_post_flow_cond_chain_with_keep_prev_carry(
+) {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn sum_until(current: i64, acc: i64, flag: i64) -> i64 {
+            if current == 0 {
+              return acc;
+            }
+            if acc + current > 5 {
+              return acc + current;
+            }
+            if current > 2 {
+              return await sum_until(current - 1, acc + current, flag + current);
+            } else {
+              return await sum_until(current - 1, acc + current, flag);
+            }
+          }
+
+          async fn main() -> i64 {
+            return await sum_until(4, 0, 0);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "loop_while_scalar_post_flow_cond_chain"
+        })
+        .expect("expected loop_while_scalar_post_flow_cond_chain node");
+    assert_eq!(loop_node.op.args[3], "ne");
+    assert_eq!(loop_node.op.args[4], "sub");
+    assert_eq!(loop_node.op.args[5], "carry0_gt");
+    assert_eq!(loop_node.op.args[7], "break");
+    assert!(loop_node.op.args.iter().any(|arg| arg == "prev_current_gt"));
+    assert!(loop_node.op.args.iter().any(|arg| arg == "add_prev_current"));
+    assert!(loop_node.op.args.iter().any(|arg| arg == "keep_prev_carry"));
     let self_async_call_count = yir
         .nodes
         .iter()

@@ -2246,7 +2246,11 @@ fn emit_cpu_function(
                 }
                 let lowered_args = node.op.args[2..]
                     .iter()
-                    .map(|arg| get_i64(&registers, arg).map(str::to_owned))
+                    .map(|arg| {
+                        registers
+                            .get(arg)
+                            .and_then(|value| coerce_to_i64(value, &mut body, &mut next_reg))
+                    })
                     .collect::<Option<Vec<_>>>();
                 let Some(lowered_args) = lowered_args else {
                     body.push(format!(
@@ -2261,6 +2265,9 @@ fn emit_cpu_function(
                     [a0] => format!("call i64 @{symbol}(i64 {a0})"),
                     [a0, a1] => format!("call i64 @{symbol}(i64 {a0}, i64 {a1})"),
                     [a0, a1, a2] => format!("call i64 @{symbol}(i64 {a0}, i64 {a1}, i64 {a2})"),
+                    [a0, a1, a2, a3] => {
+                        format!("call i64 @{symbol}(i64 {a0}, i64 {a1}, i64 {a2}, i64 {a3})")
+                    }
                     _ => {
                         body.push(format!(
                             "  ; deferred lowering for cpu.extern_call_i64 `{}` because symbol `{}` has unsupported arity {}",
@@ -2272,8 +2279,21 @@ fn emit_cpu_function(
                     }
                 };
                 body.push(format!("  {reg} = {call}"));
-                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
-                *last_cpu_value = Some(reg);
+                if symbol == "host_deserialize_text_from" || symbol == "host_parse_header_line" {
+                    let ptr = fresh_reg(&mut next_reg);
+                    body.push(format!("  {ptr} = call ptr @nuis_host_text_ptr(i64 {reg})"));
+                    registers.insert(
+                        node.name.clone(),
+                        LlvmValueRef::TextHandle {
+                            ptr,
+                            handle: reg.clone(),
+                        },
+                    );
+                    *last_cpu_value = Some(reg);
+                } else {
+                    registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                    *last_cpu_value = Some(reg);
+                }
             }
             ("cpu", "call_bool")
             | ("cpu", "call_i32")
@@ -6598,6 +6618,23 @@ fn emit_cpu_function(
                     if kind == "add_current" {
                         return Ok(next_current.clone());
                     }
+                    if kind == "add_prev_current" {
+                        return Ok(current.clone());
+                    }
+                    if let Some(rest) = kind.strip_prefix("add_prev_carry") {
+                        let source_index = rest.parse::<usize>().map_err(|_| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` has unsupported carry kind `{kind}` during LLVM lowering",
+                                node.name,
+                            )
+                        })?;
+                        return current_carries.get(source_index).cloned().ok_or_else(|| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` references unavailable carry source `{kind}` during LLVM lowering",
+                                node.name,
+                            )
+                        });
+                    }
                     if let Some(rest) = kind.strip_prefix("add_carry") {
                         let source_index = rest.parse::<usize>().map_err(|_| {
                             format!(
@@ -6656,6 +6693,47 @@ fn emit_cpu_function(
                                 | "current_ge"
                         ) {
                             next_current.clone()
+                        } else if matches!(
+                            cond_kind.as_str(),
+                            "prev_current_eq"
+                                | "prev_current_ne"
+                                | "prev_current_lt"
+                                | "prev_current_le"
+                                | "prev_current_gt"
+                                | "prev_current_ge"
+                        ) {
+                            current.clone()
+                        } else if let Some(rest) = cond_kind.strip_prefix("prev_carry") {
+                            let (index_text, suffix) = rest.split_once('_').ok_or_else(|| {
+                                format!(
+                                    "cpu.{loop_instruction} `{}` has unsupported conditional carry kind `{cond_kind}` during LLVM lowering",
+                                    node.name,
+                                )
+                            })?;
+                            let source_index = index_text.parse::<usize>().map_err(|_| {
+                                format!(
+                                    "cpu.{loop_instruction} `{}` has unsupported conditional carry kind `{cond_kind}` during LLVM lowering",
+                                    node.name,
+                                )
+                            })?;
+                            if suffix != "eq"
+                                && suffix != "ne"
+                                && suffix != "lt"
+                                && suffix != "le"
+                                && suffix != "gt"
+                                && suffix != "ge"
+                            {
+                                return Err(format!(
+                                    "cpu.{loop_instruction} `{}` has unsupported conditional carry kind `{cond_kind}` during LLVM lowering",
+                                    node.name,
+                                ));
+                            }
+                            current_carries.get(source_index).cloned().ok_or_else(|| {
+                                format!(
+                                    "cpu.{loop_instruction} `{}` references unavailable conditional carry source `{cond_kind}` during LLVM lowering",
+                                    node.name,
+                                )
+                            })?
                         } else if let Some(rest) = cond_kind.strip_prefix("carry") {
                             let (index_text, suffix) = rest.split_once('_').ok_or_else(|| {
                                 format!(
@@ -7282,6 +7360,23 @@ fn emit_cpu_function(
                     if kind == "add_current" {
                         return Ok(next_current.clone());
                     }
+                    if kind == "add_prev_current" {
+                        return Ok(current.clone());
+                    }
+                    if let Some(rest) = kind.strip_prefix("add_prev_carry") {
+                        let source_index = rest.parse::<usize>().map_err(|_| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` has unsupported carry kind `{kind}` during LLVM lowering",
+                                node.name,
+                            )
+                        })?;
+                        return current_carries.get(source_index).cloned().ok_or_else(|| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` references unavailable carry source `{kind}` during LLVM lowering",
+                                node.name,
+                            )
+                        });
+                    }
                     if let Some(rest) = kind.strip_prefix("add_carry") {
                         let source_index = rest.parse::<usize>().map_err(|_| {
                                 format!(
@@ -7340,6 +7435,47 @@ fn emit_cpu_function(
                                 | "current_ge"
                         ) {
                             next_current.clone()
+                        } else if matches!(
+                            cond_kind.as_str(),
+                            "prev_current_eq"
+                                | "prev_current_ne"
+                                | "prev_current_lt"
+                                | "prev_current_le"
+                                | "prev_current_gt"
+                                | "prev_current_ge"
+                        ) {
+                            current.clone()
+                        } else if let Some(rest) = cond_kind.strip_prefix("prev_carry") {
+                            let (index_text, suffix) = rest.split_once('_').ok_or_else(|| {
+                                format!(
+                                    "cpu.{loop_instruction} `{}` has unsupported conditional carry kind `{cond_kind}` during LLVM lowering",
+                                    node.name,
+                                )
+                            })?;
+                            let source_index = index_text.parse::<usize>().map_err(|_| {
+                                format!(
+                                    "cpu.{loop_instruction} `{}` has unsupported conditional carry kind `{cond_kind}` during LLVM lowering",
+                                    node.name,
+                                )
+                            })?;
+                            if suffix != "eq"
+                                && suffix != "ne"
+                                && suffix != "lt"
+                                && suffix != "le"
+                                && suffix != "gt"
+                                && suffix != "ge"
+                            {
+                                return Err(format!(
+                                    "cpu.{loop_instruction} `{}` has unsupported conditional carry kind `{cond_kind}` during LLVM lowering",
+                                    node.name,
+                                ));
+                            }
+                            current_carries.get(source_index).cloned().ok_or_else(|| {
+                                format!(
+                                    "cpu.{loop_instruction} `{}` references unavailable conditional carry source `{cond_kind}` during LLVM lowering",
+                                    node.name,
+                                )
+                            })?
                         } else if let Some(rest) = cond_kind.strip_prefix("carry") {
                             let (index_text, suffix) = rest.split_once('_').ok_or_else(|| {
                                 format!(
@@ -7942,6 +8078,7 @@ declare ptr @malloc(i64)\n\
 declare void @free(ptr)\n\
 declare i32 @puts(ptr)\n\
 declare i64 @nuis_host_text_lift(ptr)\n\
+declare ptr @nuis_host_text_ptr(i64)\n\
 declare void @nuis_debug_print_bool(i32)\n\
 declare void @nuis_debug_print_i32(i32)\n\
 declare void @nuis_debug_print_i64(i64)\n\n\
@@ -8089,6 +8226,11 @@ fn coerce_to_i64(
     match value {
         LlvmValueRef::I64(value) => Some(value.clone()),
         LlvmValueRef::TextHandle { handle, .. } => Some(handle.clone()),
+        LlvmValueRef::Ptr(value) => {
+            let reg = fresh_reg(next_reg);
+            body.push(format!("  {reg} = ptrtoint ptr {value} to i64"));
+            Some(reg)
+        }
         LlvmValueRef::I32(value) => {
             let reg = fresh_reg(next_reg);
             body.push(format!("  {reg} = sext i32 {value} to i64"));

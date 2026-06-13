@@ -19,6 +19,13 @@ use std::path::Path;
 
 pub use cli::CommandKind;
 
+const NUSTAR_REGISTRY_ROOT: &str = "nustar-packages";
+
+struct CompiledCommandInput {
+    resolved: pipeline::ResolvedCompileInput,
+    artifacts: pipeline::PipelineArtifacts,
+}
+
 fn json_escape(value: &str) -> String {
     let mut out = String::new();
     for ch in value.chars() {
@@ -125,6 +132,37 @@ pub fn project_test_workflow_brief() -> &'static str {
 
 pub fn project_galaxy_workflow_brief() -> &'static str {
     "galaxy=nuis galaxy init <project-dir> -> nuis galaxy check <project-dir> -> nuis galaxy lock-deps <project-dir> -> nuis galaxy sync-deps <project-dir> -> nuis project-doctor <project-dir>"
+}
+
+fn resolve_compile_input(input: &Path) -> Result<pipeline::ResolvedCompileInput, String> {
+    pipeline::resolve_compile_input(input)
+}
+
+fn compile_command_input(input: &Path) -> Result<CompiledCommandInput, String> {
+    let resolved = resolve_compile_input(input)?;
+    let artifacts = resolved.compile()?;
+    Ok(CompiledCommandInput { resolved, artifacts })
+}
+
+fn print_project_context(resolved: &pipeline::ResolvedCompileInput) {
+    if let Some(project) = &resolved.project {
+        eprintln!("nuisc: {}", project::describe_project(project));
+    }
+}
+
+fn print_required_nustar_context(artifacts: &pipeline::PipelineArtifacts) -> Result<(), String> {
+    let required =
+        registry::load_required_manifests(Path::new(NUSTAR_REGISTRY_ROOT), &artifacts.yir)?;
+    registry::validate_unit_binding(&required, &artifacts.ast.domain, &artifacts.ast.unit)?;
+    eprintln!(
+        "nuisc: lazily loaded nustar = {}",
+        required
+            .iter()
+            .map(|manifest| manifest.package_id.as_str())
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+    Ok(())
 }
 
 pub fn run(command: CommandKind) -> Result<(), String> {
@@ -271,12 +309,8 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             }
         }
         CommandKind::Bindings { input } => {
-            let project = if project::is_project_input(&input) {
-                Some(project::load_project(&input)?)
-            } else {
-                None
-            };
-            let artifacts = pipeline::compile_source_path(&input)?;
+            let compiled = compile_command_input(&input)?;
+            let artifacts = &compiled.artifacts;
             let declared_used_units = artifacts
                 .ast
                 .uses
@@ -313,7 +347,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 &declared_externs,
             )?;
             println!("binding plan for: {}", input.display());
-            if let Some(project) = &project {
+            if let Some(project) = &compiled.resolved.project {
                 println!("project: {}", project::describe_project(project));
             }
             for binding in plan.bindings {
@@ -744,20 +778,11 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 }
             } else {
                 let input = input.expect("cache-status input must exist when --all is not set");
-                let project = if project::is_project_input(&input) {
-                    Some(project::load_project(&input)?)
-                } else {
-                    None
-                };
-                let project_plan = if let Some(project) = &project {
-                    Some(project::build_project_compilation_plan(project)?)
-                } else {
-                    None
-                };
+                let resolved = resolve_compile_input(&input)?;
                 let status = cache::compile_cache_status_with_plan(
                     &input,
-                    project.as_ref(),
-                    project_plan.as_ref(),
+                    resolved.project.as_ref(),
+                    resolved.project_plan.as_ref(),
                 )?;
                 if json {
                     print!(
@@ -845,20 +870,11 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 }
             } else {
                 let input = input.expect("clean-cache input must exist when --all is not set");
-                let project = if project::is_project_input(&input) {
-                    Some(project::load_project(&input)?)
-                } else {
-                    None
-                };
-                let project_plan = if let Some(project) = &project {
-                    Some(project::build_project_compilation_plan(project)?)
-                } else {
-                    None
-                };
+                let resolved = resolve_compile_input(&input)?;
                 let cleaned = cache::clean_compile_cache_with_plan(
                     &input,
-                    project.as_ref(),
-                    project_plan.as_ref(),
+                    resolved.project.as_ref(),
+                    resolved.project_plan.as_ref(),
                 )?;
                 if json {
                     println!(
@@ -926,20 +942,11 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 }
             } else {
                 let input = input.expect("cache-prune input must exist when --all is not set");
-                let project = if project::is_project_input(&input) {
-                    Some(project::load_project(&input)?)
-                } else {
-                    None
-                };
-                let project_plan = if let Some(project) = &project {
-                    Some(project::build_project_compilation_plan(project)?)
-                } else {
-                    None
-                };
+                let resolved = resolve_compile_input(&input)?;
                 let pruned = cache::prune_compile_cache_with_plan(
                     &input,
-                    project.as_ref(),
-                    project_plan.as_ref(),
+                    resolved.project.as_ref(),
+                    resolved.project_plan.as_ref(),
                     keep,
                 )?;
                 if json {
@@ -963,72 +970,30 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             }
         }
         CommandKind::DumpAst { input } => {
-            if project::is_project_input(&input) {
-                let project = project::load_project(&input)?;
-                eprintln!("nuisc: {}", project::describe_project(&project));
-            }
-            let artifacts = pipeline::compile_source_path(&input)?;
-            print!("{}", render::render_ast(&artifacts.ast));
+            let compiled = compile_command_input(&input)?;
+            print_project_context(&compiled.resolved);
+            print!("{}", render::render_ast(&compiled.artifacts.ast));
         }
         CommandKind::DumpNir { input } => {
-            if project::is_project_input(&input) {
-                let project = project::load_project(&input)?;
-                eprintln!("nuisc: {}", project::describe_project(&project));
-            }
-            let artifacts = pipeline::compile_source_path(&input)?;
-            let required =
-                registry::load_required_manifests(Path::new("nustar-packages"), &artifacts.yir)?;
-            registry::validate_unit_binding(&required, &artifacts.ast.domain, &artifacts.ast.unit)?;
-            eprintln!(
-                "nuisc: lazily loaded nustar = {}",
-                required
-                    .iter()
-                    .map(|manifest| manifest.package_id.as_str())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            );
-            print!("{}", render::render_nir(&artifacts.nir));
+            let compiled = compile_command_input(&input)?;
+            print_project_context(&compiled.resolved);
+            print_required_nustar_context(&compiled.artifacts)?;
+            print!("{}", render::render_nir(&compiled.artifacts.nir));
         }
         CommandKind::DumpYir { input } => {
-            if project::is_project_input(&input) {
-                let project = project::load_project(&input)?;
-                eprintln!("nuisc: {}", project::describe_project(&project));
-            }
-            let artifacts = pipeline::compile_source_path(&input)?;
-            let required =
-                registry::load_required_manifests(Path::new("nustar-packages"), &artifacts.yir)?;
-            registry::validate_unit_binding(&required, &artifacts.ast.domain, &artifacts.ast.unit)?;
-            eprintln!(
-                "nuisc: lazily loaded nustar = {}",
-                required
-                    .iter()
-                    .map(|manifest| manifest.package_id.as_str())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            );
-            print!("{}", render::render_yir(&artifacts.yir));
+            let compiled = compile_command_input(&input)?;
+            print_project_context(&compiled.resolved);
+            print_required_nustar_context(&compiled.artifacts)?;
+            print!("{}", render::render_yir(&compiled.artifacts.yir));
         }
         CommandKind::Check { input } => {
-            let project = if project::is_project_input(&input) {
-                Some(project::load_project(&input)?)
-            } else {
-                None
-            };
-            let project_plan = if let Some(project) = &project {
-                Some(project::build_project_compilation_plan(project)?)
-            } else {
-                None
-            };
-            let artifacts = if let (Some(project), Some(plan)) = (&project, &project_plan) {
-                pipeline::compile_project_plan(project, plan)?
-            } else {
-                pipeline::compile_source_path(&input)?
-            };
+            let resolved = resolve_compile_input(&input)?;
+            let artifacts = resolved.compile()?;
             println!("checked nuis source: {}", input.display());
-            if let Some(project) = &project {
+            if let Some(project) = &resolved.project {
                 println!("project: {}", project::describe_project(project));
             }
-            if let Some(plan) = &project_plan {
+            if let Some(plan) = &resolved.project_plan {
                 println!(
                     "project_plan: {}",
                     project::describe_project_compilation_plan(plan)
@@ -1055,48 +1020,30 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             cpu_abi,
             target,
         } => {
-            let project = if project::is_project_input(&input) {
-                Some(project::load_project(&input)?)
-            } else {
-                None
-            };
-            let project_plan = if let Some(project) = &project {
-                Some(project::build_project_compilation_plan(project)?)
-            } else {
-                None
-            };
+            let resolved = resolve_compile_input(&input)?;
             let cpu_target = aot::resolve_cpu_build_target(
                 Path::new("nustar-packages"),
-                project_plan.as_ref().map(|plan| &plan.abi_resolution),
+                resolved.project_plan.as_ref().map(|plan| &plan.abi_resolution),
                 cpu_abi.as_deref(),
                 target.as_deref(),
             )?;
-            let effective_input = if let Some(plan) = &project_plan {
-                plan.effective_input_path.clone()
-            } else {
-                input.clone()
-            };
             let cache_key = cache::compute_compile_cache_key_with_plan(
                 &input,
-                project.as_ref(),
-                project_plan.as_ref(),
+                resolved.project.as_ref(),
+                resolved.project_plan.as_ref(),
             )?;
             let cache_hit = cache::lookup_compile_cache(&cache_key)?;
-            let artifacts = if let (Some(project), Some(plan)) = (&project, &project_plan) {
-                pipeline::compile_project_plan(project, plan)?
-            } else {
-                pipeline::compile_source_path(&input)?
-            };
+            let artifacts = resolved.compile()?;
             let written = if let Some(entry) = &cache_hit {
                 cache::restore_compile_cache(entry, &output_dir)?;
                 aot::compile_artifacts_for_output_dir(
-                    &effective_input,
+                    &resolved.effective_input_path,
                     &output_dir,
                     &artifacts.yir,
                 )?
             } else {
                 let written = aot::write_and_link(
-                    &effective_input,
+                    &resolved.effective_input_path,
                     &output_dir,
                     &artifacts.ast,
                     &artifacts.nir,
@@ -1107,11 +1054,12 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                 let _ = cache::store_compile_cache(&cache_key, &output_dir)?;
                 written
             };
-            let project_metadata = if let (Some(project), Some(plan)) = (&project, &project_plan) {
-                Some(project::write_project_metadata(&output_dir, project, plan)?)
-            } else {
-                None
-            };
+            let project_metadata =
+                if let (Some(project), Some(plan)) = (&resolved.project, &resolved.project_plan) {
+                    Some(project::write_project_metadata(&output_dir, project, plan)?)
+                } else {
+                    None
+                };
             let build_manifest = aot::write_build_manifest(
                 &output_dir,
                 &written,
@@ -1128,9 +1076,10 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                         key: cache_key.key.clone(),
                         root: cache_key.root.display().to_string(),
                     }),
-                    project: project
+                    project: resolved
+                        .project
                         .as_ref()
-                        .zip(project_plan.as_ref())
+                        .zip(resolved.project_plan.as_ref())
                         .map(|(project, plan)| aot::BuildManifestProjectInfo {
                             name: project.manifest.name.clone(),
                             abi_mode: if plan.abi_resolution.explicit {
@@ -1189,10 +1138,10 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     println!("  compile_cache_input: {}", label);
                 }
             }
-            if let Some(project) = &project {
+            if let Some(project) = &resolved.project {
                 println!("project: {}", project::describe_project(project));
             }
-            if let Some(plan) = &project_plan {
+            if let Some(plan) = &resolved.project_plan {
                 println!(
                     "project_plan: {}",
                     project::describe_project_compilation_plan(plan)
@@ -1221,7 +1170,7 @@ pub fn run(command: CommandKind) -> Result<(), String> {
                     "false"
                 }
             );
-            if let Some(plan) = &project_plan {
+            if let Some(plan) = &resolved.project_plan {
                 for item in &plan.abi_resolution.requirements {
                     println!("abi: {}={}", item.domain, item.abi);
                     if let Ok(manifest) = registry::load_manifest_for_domain(

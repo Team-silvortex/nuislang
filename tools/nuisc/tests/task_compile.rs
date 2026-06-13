@@ -16,6 +16,15 @@ fn compiles_task_recursive_async_project() {
 }
 
 #[test]
+fn compiles_task_recursive_async_keep_prev_carry_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_recursive_async_keep_prev_carry_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("task recursive async keep-prev-carry project should compile");
+}
+
+#[test]
 fn compiles_task_mutual_recursive_async_project() {
     let project = Path::new(
         "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_mutual_recursive_async_demo",
@@ -31,6 +40,27 @@ fn compiles_task_generic_recursive_async_project() {
     );
     nuisc::pipeline::compile_project(project)
         .expect("task generic recursive async project should compile");
+}
+
+#[test]
+fn lowers_task_recursive_async_keep_prev_carry_project_with_cond_chain_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_recursive_async_keep_prev_carry_demo",
+    );
+
+    let loop_node = artifacts
+        .yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_cond_chain"
+        })
+        .expect("expected loop_while_scalar_cond_chain node");
+    assert_eq!(loop_node.op.args[3], "gt");
+    assert_eq!(loop_node.op.args[4], "sub");
+    assert_eq!(loop_node.op.args[6], "prev_current_gt");
+    assert_eq!(loop_node.op.args[8], "add_prev_current");
+    assert_eq!(loop_node.op.args[9], "keep_prev_carry");
 }
 
 #[test]
@@ -1047,6 +1077,15 @@ fn compiles_task_async_post_flow_recursive_branching_project() {
 }
 
 #[test]
+fn compiles_task_async_post_flow_keep_prev_carry_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_post_flow_keep_prev_carry_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("task async post-flow keep-prev-carry project should compile");
+}
+
+#[test]
 fn rejects_task_async_memory_project_with_precise_sibling_carry_diagnostic() {
     let project = Path::new(
         "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_post_flow_memory_unsupported_demo",
@@ -1090,6 +1129,30 @@ fn lowers_task_async_post_flow_recursive_branching_project_with_post_flow_recurs
         .iter()
         .any(|arg| arg == "add_prev_current"));
     assert!(loop_node.op.args.iter().any(|arg| arg == "keep"));
+}
+
+#[test]
+fn lowers_task_async_post_flow_keep_prev_carry_project_with_post_flow_recursive_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_post_flow_keep_prev_carry_demo",
+    );
+
+    let loop_node = artifacts
+        .yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "loop_while_scalar_post_flow_cond_chain"
+        })
+        .expect("expected loop_while_scalar_post_flow_cond_chain node");
+    assert_eq!(loop_node.op.args[3], "ne");
+    assert_eq!(loop_node.op.args[4], "sub");
+    assert_eq!(loop_node.op.args[5], "carry0_gt");
+    assert_eq!(loop_node.op.args[7], "break");
+    assert!(loop_node.op.args.iter().any(|arg| arg == "prev_current_gt"));
+    assert!(loop_node.op.args.iter().any(|arg| arg == "add_prev_current"));
+    assert!(loop_node.op.args.iter().any(|arg| arg == "keep_prev_carry"));
 }
 
 #[test]
