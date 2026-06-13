@@ -94,6 +94,1337 @@ fn compiles_task_recursive_async_payload_alias_hof_project() {
 }
 
 #[test]
+fn compiles_task_async_observer_bridge_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_observer_bridge_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("task async observer bridge project should compile");
+}
+
+#[test]
+fn lowers_task_async_observer_bridge_project_with_await_and_task_observer_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_observer_bridge_demo",
+    );
+
+    let orchestrate = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "orchestrate")
+        .expect("expected orchestrate function");
+    assert!(orchestrate.is_async);
+    assert!(orchestrate.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::Await(inner),
+            } if name == "base"
+                && ty.render() == "i64"
+                && matches!(inner.as_ref(), NirExpr::Call { callee, .. } if callee == "sum_down")
+        )
+    }));
+    assert!(orchestrate.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::CpuJoinResult(_),
+            } if name == "completed_result" && ty.render() == "TaskResult<i64>"
+        )
+    }));
+    assert!(orchestrate.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::CpuJoinResult(_),
+            } if name == "timed_result" && ty.render() == "TaskResult<i64>"
+        )
+    }));
+    assert!(orchestrate.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::If {
+                condition: NirExpr::Binary { .. },
+                then_body,
+                ..
+            } if matches!(
+                then_body.as_slice(),
+                [NirStmt::Return(Some(NirExpr::Binary { .. }))]
+            )
+        )
+    }));
+    assert!(orchestrate.body.iter().any(|stmt| {
+        matches!(stmt, NirStmt::Return(Some(NirExpr::Var(name))) if name == "base")
+    }));
+
+    let main = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .expect("expected main function");
+    assert!(main.is_async);
+    assert!(matches!(
+        main.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Await(inner))))
+            if matches!(inner.as_ref(), NirExpr::Call { callee, .. } if callee == "orchestrate")
+    ));
+}
+
+#[test]
+fn compiles_task_async_if_expression_positions_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_if_expression_positions_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("task async if-expression positions project should compile");
+}
+
+#[test]
+fn lowers_task_async_if_expression_positions_project_with_async_if_expression_family() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_if_expression_positions_demo",
+    );
+
+    let branch_pick = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "branch_pick")
+        .expect("expected branch_pick function");
+    assert!(branch_pick.is_async);
+    assert!(branch_pick.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::If { then_body, else_body, .. }
+                if matches!(
+                    then_body.as_slice(),
+                    [NirStmt::Let {
+                        name,
+                        value: NirExpr::Await(inner),
+                        ..
+                    }] if name == "value"
+                        && matches!(inner.as_ref(), NirExpr::Call { callee, .. } if callee == "one")
+                ) && matches!(
+                    else_body.as_slice(),
+                    [NirStmt::Let {
+                        name,
+                        value: NirExpr::Await(inner),
+                        ..
+                    }] if name == "value"
+                        && matches!(inner.as_ref(), NirExpr::Call { callee, .. } if callee == "two")
+                )
+        )
+    }));
+
+    let call_pick = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "call_pick")
+        .expect("expected call_pick function");
+    assert!(call_pick.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::If { then_body, else_body, .. }
+                if matches!(
+                    then_body.as_slice(),
+                    [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+                        if callee == "add_pair"
+                            && args.len() == 2
+                            && matches!(
+                                &args[0],
+                                NirExpr::Await(inner)
+                                    if matches!(inner.as_ref(), NirExpr::Call { callee, .. } if callee == "one")
+                            )
+                            && matches!(&args[1], NirExpr::Int(5))
+                ) && matches!(
+                    else_body.as_slice(),
+                    [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+                        if callee == "add_pair"
+                            && args.len() == 2
+                            && matches!(
+                                &args[0],
+                                NirExpr::Await(inner)
+                                    if matches!(inner.as_ref(), NirExpr::Call { callee, .. } if callee == "two")
+                            )
+                            && matches!(&args[1], NirExpr::Int(5))
+                )
+        )
+    }));
+
+    let packetize = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "packetize")
+        .expect("expected packetize function");
+    assert!(packetize.is_async);
+    assert!(packetize.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::If { then_body, else_body, .. }
+                if matches!(then_body.as_slice(), [NirStmt::If { .. }])
+                    && matches!(else_body.as_slice(), [NirStmt::If { .. }])
+        )
+    }));
+    assert!(matches!(
+        packetize.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Var(name)))) if name == "packet"
+    ));
+
+    let apply = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "apply")
+        .expect("expected apply function");
+    assert!(apply.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::If { then_body, else_body, .. }
+                if matches!(
+                    then_body.as_slice(),
+                    [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+                        if callee == "impl.Addable.for.i64.add"
+                            && args.len() == 2
+                            && matches!(
+                                &args[0],
+                                NirExpr::Await(inner)
+                                    if matches!(inner.as_ref(), NirExpr::Call { callee, .. } if callee == "one")
+                            )
+                            && matches!(&args[1], NirExpr::Int(3))
+                ) && matches!(
+                    else_body.as_slice(),
+                    [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+                        if callee == "impl.Addable.for.i64.add"
+                            && args.len() == 2
+                            && matches!(
+                                &args[0],
+                                NirExpr::Await(inner)
+                                    if matches!(inner.as_ref(), NirExpr::Call { callee, .. } if callee == "two")
+                            )
+                            && matches!(&args[1], NirExpr::Int(3))
+                )
+        )
+    }));
+
+    let expand = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "expand")
+        .expect("expected expand function");
+    assert!(expand.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::If { then_body, else_body, .. }
+                if matches!(
+                    then_body.as_slice(),
+                    [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+                        if callee == "relay"
+                            && args.len() == 1
+                            && matches!(
+                                &args[0],
+                                NirExpr::Await(inner)
+                                    if matches!(inner.as_ref(), NirExpr::Call { callee, .. } if callee == "one")
+                            )
+                ) && matches!(
+                    else_body.as_slice(),
+                    [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+                        if callee == "relay"
+                            && args.len() == 1
+                            && matches!(
+                                &args[0],
+                                NirExpr::Await(inner)
+                                    if matches!(inner.as_ref(), NirExpr::Call { callee, .. } if callee == "two")
+                            )
+                )
+        )
+    }));
+
+    let main = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .expect("expected main function");
+    assert!(main.is_async);
+    assert!(main.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::Await(inner),
+            } if name == "packet"
+                && ty.render() == "Packet"
+                && matches!(inner.as_ref(), NirExpr::Call { callee, .. } if callee == "packetize")
+        )
+    }));
+}
+
+#[test]
+fn compiles_task_async_await_match_operand_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_await_match_operand_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("task async await-match operand project should compile");
+}
+
+#[test]
+fn lowers_task_async_await_match_operand_project_with_expression_position_async_control_flow() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_await_match_operand_demo",
+    );
+
+    let branch_pick = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "branch_pick")
+        .expect("expected branch_pick function");
+    assert!(branch_pick.is_async);
+    assert!(branch_pick.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::If {
+                then_body,
+                else_body,
+                ..
+            } if matches!(
+                then_body.as_slice(),
+                [NirStmt::Let {
+                    name,
+                    value: NirExpr::Await(inner),
+                    ..
+                }] if name == "value"
+                    && matches!(inner.as_ref(), NirExpr::Call { callee, .. } if callee == "one")
+            ) && matches!(
+                else_body.as_slice(),
+                [NirStmt::Let {
+                    name,
+                    value: NirExpr::Await(inner),
+                    ..
+                }] if name == "value"
+                    && matches!(inner.as_ref(), NirExpr::Call { callee, .. } if callee == "two")
+            )
+        )
+    }));
+    assert!(matches!(
+        branch_pick.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Var(name)))) if name == "value"
+    ));
+
+    let classify = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "classify")
+        .expect("expected classify function");
+    assert!(classify.is_async);
+    assert!(classify.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::Await(inner),
+            } if name == "value"
+                && ty.render() == "i64"
+                && matches!(inner.as_ref(), NirExpr::Call { callee, .. } if callee == "branch_pick")
+        )
+    }));
+    assert!(classify.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::If { then_body, else_body, .. }
+                if matches!(then_body.as_slice(), [NirStmt::Return(Some(NirExpr::Binary { .. }))])
+                && matches!(else_body.as_slice(), [NirStmt::Return(Some(NirExpr::Binary { .. }))])
+        )
+    }));
+
+    let async_call_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let await_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "await")
+        .count();
+    assert_eq!(async_call_count, 4);
+    assert_eq!(await_count, 4);
+
+    let main = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .expect("expected main function");
+    assert!(main.is_async);
+    assert!(matches!(
+        main.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Await(inner))))
+            if matches!(inner.as_ref(), NirExpr::Call { callee, .. } if callee == "classify")
+    ));
+}
+
+#[test]
+fn compiles_task_async_match_call_argument_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_match_call_argument_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("task async match call-argument project should compile");
+}
+
+#[test]
+fn lowers_task_async_match_call_argument_project_with_async_call_argument_control_flow() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_match_call_argument_demo",
+    );
+
+    let call_pick = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "call_pick")
+        .expect("expected call_pick function");
+    assert!(call_pick.is_async);
+    assert!(call_pick.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::If {
+                then_body,
+                else_body,
+                ..
+            } if matches!(
+                then_body.as_slice(),
+                [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+                    if callee == "add"
+                    && args.len() == 2
+                    && matches!(
+                        &args[0],
+                        NirExpr::Await(inner)
+                            if matches!(inner.as_ref(), NirExpr::Call { callee, .. } if callee == "one")
+                    )
+                    && matches!(&args[1], NirExpr::Int(5))
+            ) && matches!(
+                else_body.as_slice(),
+                [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+                    if callee == "add"
+                    && args.len() == 2
+                    && matches!(
+                        &args[0],
+                        NirExpr::Await(inner)
+                            if matches!(inner.as_ref(), NirExpr::Call { callee, .. } if callee == "two")
+                    )
+                    && matches!(&args[1], NirExpr::Int(5))
+            )
+        )
+    }));
+
+    let async_call_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let await_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "await")
+        .count();
+    assert_eq!(async_call_count, 3);
+    assert_eq!(await_count, 3);
+
+    let main = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .expect("expected main function");
+    assert!(main.is_async);
+    assert!(matches!(
+        main.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Await(inner))))
+            if matches!(inner.as_ref(), NirExpr::Call { callee, .. } if callee == "call_pick")
+    ));
+}
+
+#[test]
+fn compiles_task_async_struct_field_match_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_struct_field_match_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("task async struct-field match project should compile");
+}
+
+#[test]
+fn lowers_task_async_struct_field_match_project_with_async_struct_field_control_flow() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_struct_field_match_demo",
+    );
+
+    let packetize = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "packetize")
+        .expect("expected packetize function");
+    assert!(packetize.is_async);
+    assert!(packetize.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::If {
+                then_body,
+                else_body,
+                ..
+            } if matches!(
+                then_body.as_slice(),
+                [NirStmt::Let {
+                    name,
+                    ty: Some(ty),
+                    value: NirExpr::StructLiteral { type_name, fields, .. },
+                }] if name == "packet"
+                    && ty.render() == "Packet"
+                    && type_name == "Packet"
+                    && fields.iter().any(|(field, value)| {
+                        field == "value"
+                            && matches!(
+                                value,
+                                NirExpr::Await(inner)
+                                    if matches!(inner.as_ref(), NirExpr::Call { callee, .. } if callee == "one")
+                            )
+                    })
+                    && fields.iter().any(|(field, value)| field == "tag" && matches!(value, NirExpr::Var(name) if name == "seed"))
+            ) && matches!(
+                else_body.as_slice(),
+                [NirStmt::Let {
+                    name,
+                    ty: Some(ty),
+                    value: NirExpr::StructLiteral { type_name, fields, .. },
+                }] if name == "packet"
+                    && ty.render() == "Packet"
+                    && type_name == "Packet"
+                    && fields.iter().any(|(field, value)| {
+                        field == "value"
+                            && matches!(
+                                value,
+                                NirExpr::Await(inner)
+                                    if matches!(inner.as_ref(), NirExpr::Call { callee, .. } if callee == "two")
+                            )
+                    })
+                    && fields.iter().any(|(field, value)| field == "tag" && matches!(value, NirExpr::Var(name) if name == "seed"))
+            )
+        )
+    }));
+    assert!(matches!(
+        packetize.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Var(name)))) if name == "packet"
+    ));
+
+    let async_call_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let await_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "await")
+        .count();
+    assert_eq!(async_call_count, 3);
+    assert_eq!(await_count, 3);
+
+    let main = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .expect("expected main function");
+    assert!(main.is_async);
+    assert!(main.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::Await(inner),
+            } if name == "packet"
+                && ty.render() == "Packet"
+                && matches!(inner.as_ref(), NirExpr::Call { callee, .. } if callee == "packetize")
+        )
+    }));
+    assert!(matches!(
+        main.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::FieldAccess { field, .. }))) if field == "value"
+    ));
+}
+
+#[test]
+fn compiles_task_async_method_receiver_match_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_method_receiver_match_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("task async method-receiver match project should compile");
+}
+
+#[test]
+fn lowers_task_async_method_receiver_match_project_with_async_method_receiver_control_flow() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_method_receiver_match_demo",
+    );
+
+    let apply = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "apply")
+        .expect("expected apply function");
+    assert!(apply.is_async);
+    assert!(apply.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::If {
+                then_body,
+                else_body,
+                ..
+            } if matches!(
+                then_body.as_slice(),
+                [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+                    if callee == "impl.Addable.for.i64.add"
+                    && args.len() == 2
+                    && matches!(
+                        &args[0],
+                        NirExpr::Await(inner)
+                            if matches!(inner.as_ref(), NirExpr::Call { callee, .. } if callee == "one")
+                    )
+                    && matches!(&args[1], NirExpr::Int(3))
+            ) && matches!(
+                else_body.as_slice(),
+                [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+                    if callee == "impl.Addable.for.i64.add"
+                    && args.len() == 2
+                    && matches!(
+                        &args[0],
+                        NirExpr::Await(inner)
+                            if matches!(inner.as_ref(), NirExpr::Call { callee, .. } if callee == "two")
+                    )
+                    && matches!(&args[1], NirExpr::Int(3))
+            )
+        )
+    }));
+
+    let async_call_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let await_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "await")
+        .count();
+    assert_eq!(async_call_count, 3);
+    assert_eq!(await_count, 3);
+
+    let main = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .expect("expected main function");
+    assert!(main.is_async);
+    assert!(matches!(
+        main.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Await(inner))))
+            if matches!(inner.as_ref(), NirExpr::Call { callee, .. } if callee == "apply")
+    ));
+}
+
+#[test]
+fn compiles_task_async_helper_expanded_match_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_helper_expanded_match_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("task async helper-expanded match project should compile");
+}
+
+#[test]
+fn lowers_task_async_helper_expanded_match_project_with_nested_helper_expanded_control_flow() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_helper_expanded_match_demo",
+    );
+
+    let expand = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "expand")
+        .expect("expected expand function");
+    assert!(expand.is_async);
+    assert!(expand.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::If {
+                then_body,
+                else_body,
+                ..
+            } if matches!(
+                then_body.as_slice(),
+                [NirStmt::Return(Some(NirExpr::Call { callee, args }))] if callee == "relay"
+                    && args.len() == 1
+                    && matches!(
+                        &args[0],
+                        NirExpr::Await(inner)
+                            if matches!(inner.as_ref(), NirExpr::Call { callee, .. } if callee == "one")
+                    )
+            ) && matches!(
+                else_body.as_slice(),
+                [NirStmt::Return(Some(NirExpr::Call { callee, args }))] if callee == "relay"
+                    && args.len() == 1
+                    && matches!(
+                        &args[0],
+                        NirExpr::Await(inner)
+                            if matches!(inner.as_ref(), NirExpr::Call { callee, .. } if callee == "two")
+                    )
+            )
+        )
+    }));
+
+    let relay = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "relay")
+        .expect("expected relay function");
+    assert!(matches!(
+        relay.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Call { callee, args })))
+            if callee == "wrap"
+                && args.len() == 1
+                && matches!(&args[0], NirExpr::Call { callee, .. } if callee == "project")
+    ));
+
+    let async_call_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "async_call")
+        .count();
+    let await_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "await")
+        .count();
+    assert_eq!(async_call_count, 3);
+    assert_eq!(await_count, 3);
+
+    let main = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .expect("expected main function");
+    assert!(main.is_async);
+    assert!(matches!(
+        main.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Await(inner))))
+            if matches!(inner.as_ref(), NirExpr::Call { callee, .. } if callee == "expand")
+    ));
+}
+
+#[test]
+fn compiles_task_async_while_flow_cond_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_flow_cond_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("task async while flow-cond project should compile");
+}
+
+#[test]
+fn lowers_task_async_while_flow_cond_project_with_async_flow_cond_loop_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_flow_cond_demo",
+    );
+
+    let accumulate = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "accumulate")
+        .expect("expected accumulate function");
+    assert!(accumulate.is_async);
+    assert!(accumulate
+        .body
+        .iter()
+        .any(|stmt| { matches!(stmt, NirStmt::While { .. }) }));
+
+    let loop_node = artifacts
+        .yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "loop_while_scalar_async_flow_cond_chain"
+        })
+        .expect("expected loop_while_scalar_async_flow_cond_chain node");
+    assert_eq!(loop_node.op.args[2], "step");
+    assert_eq!(loop_node.op.args[3], "lt");
+    assert_eq!(loop_node.op.args[4], "current_gt");
+    assert_eq!(loop_node.op.args[6], "continue");
+    assert_eq!(loop_node.op.args[8], "current_gt");
+    assert_eq!(loop_node.op.args[10], "add_current");
+    assert_eq!(loop_node.op.args[11], "keep");
+
+    let main = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .expect("expected main function");
+    assert!(main.is_async);
+    assert!(matches!(
+        main.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Await(inner))))
+            if matches!(inner.as_ref(), NirExpr::Call { callee, .. } if callee == "accumulate")
+    ));
+}
+
+#[test]
+fn compiles_task_async_while_post_flow_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_post_flow_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("task async while post-flow project should compile");
+}
+
+#[test]
+fn lowers_task_async_while_post_flow_project_with_async_post_flow_loop_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_post_flow_demo",
+    );
+
+    let accumulate = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "accumulate")
+        .expect("expected accumulate function");
+    assert!(accumulate.is_async);
+    assert!(accumulate
+        .body
+        .iter()
+        .any(|stmt| matches!(stmt, NirStmt::While { .. })));
+
+    let loop_node = artifacts
+        .yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "loop_while_scalar_async_post_flow_chain"
+        })
+        .expect("expected loop_while_scalar_async_post_flow_chain node");
+    assert_eq!(loop_node.op.args[2], "step");
+    assert_eq!(loop_node.op.args[3], "lt");
+    assert_eq!(loop_node.op.args[4], "carry0_gt");
+    assert_eq!(loop_node.op.args[6], "break");
+    assert_eq!(loop_node.op.args[8], "add_current");
+
+    let main = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .expect("expected main function");
+    assert!(main.is_async);
+    assert!(matches!(
+        main.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Await(inner))))
+            if matches!(inner.as_ref(), NirExpr::Call { callee, .. } if callee == "accumulate")
+    ));
+}
+
+#[test]
+fn compiles_task_async_while_post_flow_cond_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_post_flow_cond_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("task async while post-flow cond project should compile");
+}
+
+#[test]
+fn lowers_task_async_while_post_flow_cond_project_with_async_post_flow_cond_loop_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_post_flow_cond_demo",
+    );
+
+    let accumulate = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "accumulate")
+        .expect("expected accumulate function");
+    assert!(accumulate.is_async);
+    assert!(accumulate
+        .body
+        .iter()
+        .any(|stmt| matches!(stmt, NirStmt::While { .. })));
+
+    let loop_node = artifacts
+        .yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "loop_while_scalar_async_post_flow_cond_chain"
+        })
+        .expect("expected loop_while_scalar_async_post_flow_cond_chain node");
+    assert_eq!(loop_node.op.args[2], "step");
+    assert_eq!(loop_node.op.args[3], "lt");
+    assert_eq!(loop_node.op.args[4], "carry0_gt");
+    assert_eq!(loop_node.op.args[6], "break");
+    assert_eq!(loop_node.op.args[8], "current_gt");
+    assert_eq!(loop_node.op.args[10], "add_current");
+    assert_eq!(loop_node.op.args[11], "keep");
+
+    let main = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .expect("expected main function");
+    assert!(main.is_async);
+    assert!(matches!(
+        main.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Await(inner))))
+            if matches!(inner.as_ref(), NirExpr::Call { callee, .. } if callee == "accumulate")
+    ));
+}
+
+#[test]
+fn compiles_task_async_while_post_flow_compound_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_post_flow_compound_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("task async while post-flow compound project should compile");
+}
+
+#[test]
+fn compiles_task_async_post_flow_recursive_branching_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_post_flow_recursive_branching_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("task async post-flow recursive branching project should compile");
+}
+
+#[test]
+fn rejects_task_async_memory_project_with_precise_sibling_carry_diagnostic() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_post_flow_memory_unsupported_demo",
+    );
+    let error = nuisc::pipeline::compile_project(project)
+        .err()
+        .expect("task async memory project should fail until lowering exists");
+    assert!(error.contains(
+        "references sibling carry `slot` before that carry is updated in the loop body"
+    ));
+}
+
+#[test]
+fn lowers_task_async_post_flow_recursive_branching_project_with_post_flow_recursive_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_post_flow_recursive_branching_demo",
+    );
+
+    let loop_node = artifacts
+        .yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "loop_while_scalar_post_flow_cond_chain"
+        })
+        .expect("expected loop_while_scalar_post_flow_cond_chain node");
+    assert_eq!(loop_node.op.args[3], "ne");
+    assert_eq!(loop_node.op.args[4], "sub");
+    assert_eq!(loop_node.op.args[5], "carry0_gt");
+    assert_eq!(loop_node.op.args[7], "break");
+    assert!(loop_node.op.args.iter().any(|arg| arg == "or"));
+    assert!(loop_node
+        .op
+        .args
+        .iter()
+        .any(|arg| arg == "prev_current_gt"));
+    assert!(loop_node
+        .op
+        .args
+        .iter()
+        .any(|arg| arg == "add_prev_current"));
+    assert!(loop_node.op.args.iter().any(|arg| arg == "keep"));
+}
+
+#[test]
+fn lowers_task_async_while_post_flow_compound_project_with_async_post_flow_compound_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_post_flow_compound_demo",
+    );
+
+    let accumulate = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "accumulate")
+        .expect("expected accumulate function");
+    assert!(accumulate.is_async);
+    assert!(accumulate
+        .body
+        .iter()
+        .any(|stmt| matches!(stmt, NirStmt::While { .. })));
+
+    let loop_node = artifacts
+        .yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "loop_while_scalar_async_post_flow_cond_chain"
+        })
+        .expect("expected loop_while_scalar_async_post_flow_cond_chain node");
+    assert_eq!(loop_node.op.args[2], "step");
+    assert_eq!(loop_node.op.args[3], "lt");
+    assert_eq!(loop_node.op.args[4], "or");
+    assert_eq!(loop_node.op.args[5], "carry0_eq");
+    assert_eq!(loop_node.op.args[7], "carry0_lt");
+    assert_eq!(loop_node.op.args[9], "continue");
+    assert_eq!(loop_node.op.args[11], "current_gt");
+    assert_eq!(loop_node.op.args[13], "add_current");
+    assert_eq!(loop_node.op.args[14], "keep");
+
+    let main = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .expect("expected main function");
+    assert!(main.is_async);
+    assert!(matches!(
+        main.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Await(inner))))
+            if matches!(inner.as_ref(), NirExpr::Call { callee, .. } if callee == "accumulate")
+    ));
+}
+
+#[test]
+fn compiles_task_runtime_project() {
+    let project =
+        Path::new("/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_runtime_demo");
+    nuisc::pipeline::compile_project(project).expect("task runtime project should compile");
+}
+
+#[test]
+fn lowers_task_runtime_project_with_completed_timeout_and_cancelled_shapes() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_runtime_demo",
+    );
+
+    let capture_lifecycle = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "capture_task_lifecycle")
+        .expect("expected capture_task_lifecycle function");
+    assert!(capture_lifecycle.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::CpuJoinResult(task),
+            } if name == "completed_result"
+                && ty.render() == "TaskResult<i64>"
+                && matches!(task.as_ref(), NirExpr::Var(task_name) if task_name == "completed_task")
+        )
+    }));
+    assert!(capture_lifecycle.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::CpuTimeout { task, .. },
+            } if name == "timed_task"
+                && ty.render() == "Task<i64>"
+                && matches!(task.as_ref(), NirExpr::CpuSpawn { callee, .. } if callee == "ping")
+        )
+    }));
+    assert!(capture_lifecycle.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::CpuCancel(inner),
+            } if name == "cancelled_task"
+                && ty.render() == "Task<i64>"
+                && matches!(inner.as_ref(), NirExpr::CpuSpawn { callee, .. } if callee == "ping")
+        )
+    }));
+
+    let encode_timed_out = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "encode_timed_out")
+        .expect("expected encode_timed_out function");
+    assert!(matches!(
+        encode_timed_out.body.first(),
+        Some(NirStmt::If {
+            condition: NirExpr::CpuTaskTimedOut(_),
+            ..
+        })
+    ));
+
+    let encode_cancelled = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "encode_cancelled")
+        .expect("expected encode_cancelled function");
+    assert!(matches!(
+        encode_cancelled.body.first(),
+        Some(NirStmt::If {
+            condition: NirExpr::CpuTaskCancelled(_),
+            ..
+        })
+    ));
+}
+
+#[test]
+fn compiles_task_status_observe_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_status_observe_demo",
+    );
+    nuisc::pipeline::compile_project(project).expect("task status observe project should compile");
+}
+
+#[test]
+fn lowers_task_status_observe_project_with_status_observer_shapes() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_status_observe_demo",
+    );
+
+    for (name, predicate) in [
+        ("capture_completed", "completed"),
+        ("capture_timed_out", "timed_out"),
+        ("capture_cancelled", "cancelled"),
+    ] {
+        let function = artifacts
+            .nir
+            .functions
+            .iter()
+            .find(|function| function.name == name)
+            .unwrap_or_else(|| panic!("expected {name} function"));
+        match predicate {
+            "completed" => assert!(matches!(
+                function.body.first(),
+                Some(NirStmt::If {
+                    condition: NirExpr::CpuTaskCompleted(_),
+                    ..
+                })
+            )),
+            "timed_out" => assert!(matches!(
+                function.body.first(),
+                Some(NirStmt::If {
+                    condition: NirExpr::CpuTaskTimedOut(_),
+                    ..
+                })
+            )),
+            "cancelled" => assert!(matches!(
+                function.body.first(),
+                Some(NirStmt::If {
+                    condition: NirExpr::CpuTaskCancelled(_),
+                    ..
+                })
+            )),
+            _ => unreachable!(),
+        }
+    }
+
+    let main = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .expect("expected main function");
+    assert!(main.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::CpuJoinResult(_),
+            } if name == "completed_result" && ty.render() == "TaskResult<i64>"
+        )
+    }));
+    assert!(main.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::CpuJoinResult(_),
+            } if name == "timed_result" && ty.render() == "TaskResult<i64>"
+        )
+    }));
+    assert!(main.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::CpuJoinResult(_),
+            } if name == "cancelled_result" && ty.render() == "TaskResult<i64>"
+        )
+    }));
+}
+
+#[test]
+fn compiles_task_completed_observe_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_completed_observe_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("task completed observe project should compile");
+}
+
+#[test]
+fn lowers_task_completed_observe_project_with_join_result_and_task_value_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_completed_observe_demo",
+    );
+
+    let main = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .expect("expected main function");
+    assert!(main.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::CpuJoinResult(task),
+            } if name == "result"
+                && ty.render() == "TaskResult<i64>"
+                && matches!(task.as_ref(), NirExpr::Var(task_name) if task_name == "task")
+        )
+    }));
+    assert!(main.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::If {
+                condition: NirExpr::CpuTaskCompleted(_),
+                then_body,
+                ..
+            } if matches!(
+                then_body.as_slice(),
+                [NirStmt::Return(Some(NirExpr::CpuTaskValue(_)))]
+            )
+        )
+    }));
+}
+
+#[test]
+fn compiles_task_compare_observe_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_compare_observe_demo",
+    );
+    nuisc::pipeline::compile_project(project).expect("task compare observe project should compile");
+}
+
+#[test]
+fn lowers_task_compare_observe_project_with_direct_and_observed_join_shapes() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_compare_observe_demo",
+    );
+
+    let capture_direct = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "capture_direct_value")
+        .expect("expected capture_direct_value function");
+    assert!(capture_direct.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Return(Some(NirExpr::CpuJoin(task)))
+                if matches!(task.as_ref(), NirExpr::Var(task_name) if task_name == "task")
+        )
+    }));
+
+    let capture_observed = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "capture_observed_value")
+        .expect("expected capture_observed_value function");
+    assert!(capture_observed.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::CpuJoinResult(_),
+            } if name == "result" && ty.render() == "TaskResult<i64>"
+        )
+    }));
+    assert!(capture_observed.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::If {
+                condition: NirExpr::CpuTaskCompleted(_),
+                then_body,
+                ..
+            } if matches!(
+                then_body.as_slice(),
+                [NirStmt::Return(Some(NirExpr::CpuTaskValue(_)))]
+            )
+        )
+    }));
+}
+
+#[test]
 fn compiles_task_memory_roundtrip_project() {
     let project = Path::new(
         "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_memory_roundtrip_demo",
@@ -871,6 +2202,302 @@ fn lowers_task_lifecycle_branch_project_with_timeout_branch_shape() {
                     NirStmt::Return(Some(_))
                 ] if name == "summary"
             )
+        )
+    }));
+}
+
+#[test]
+fn compiles_task_cancel_branch_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_cancel_branch_demo",
+    );
+    nuisc::pipeline::compile_project(project).expect("task cancel branch project should compile");
+}
+
+#[test]
+fn lowers_task_cancel_branch_project_with_cancelled_branch_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_cancel_branch_demo",
+    );
+
+    let main = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .expect("expected main function");
+    assert!(main.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::CpuCancel(inner),
+            } if name == "task"
+                && ty.render() == "Task<i64>"
+                && matches!(inner.as_ref(), NirExpr::CpuSpawn { callee, .. } if callee == "ping")
+        )
+    }));
+    assert!(main.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::CpuJoinResult(task),
+            } if name == "result"
+                && ty.render() == "TaskResult<i64>"
+                && matches!(task.as_ref(), NirExpr::Var(task_name) if task_name == "task")
+        )
+    }));
+    assert!(main.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::If {
+                condition: NirExpr::CpuTaskCancelled(_),
+                then_body,
+                else_body,
+            } if matches!(
+                then_body.as_slice(),
+                [
+                    NirStmt::Let { name, .. },
+                    NirStmt::Print(_),
+                    NirStmt::Return(Some(_))
+                ] if name == "summary"
+            ) && matches!(
+                else_body.as_slice(),
+                [
+                    NirStmt::Let { name, .. },
+                    NirStmt::Print(_),
+                    NirStmt::Return(Some(_))
+                ] if name == "summary"
+            )
+        )
+    }));
+}
+
+#[test]
+fn compiles_task_cli_tooling_project() {
+    let project =
+        Path::new("/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_cli_tooling_demo");
+    nuisc::pipeline::compile_project(project).expect("task cli tooling project should compile");
+}
+
+#[test]
+fn lowers_task_cli_tooling_project_with_timeout_and_host_io_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_cli_tooling_demo",
+    );
+
+    let main = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .expect("expected main function");
+    assert!(main.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::CpuExternCall { callee, .. },
+            } if name == "argv_count"
+                && ty.render() == "i64"
+                && callee == "host_argv_count"
+        )
+    }));
+    assert!(main.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::CpuTimeout { task, .. },
+            } if name == "task"
+                && ty.render() == "Task<i64>"
+                && matches!(task.as_ref(), NirExpr::CpuSpawn { callee, .. } if callee == "ping")
+        )
+    }));
+    assert!(main.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::If {
+                condition: NirExpr::CpuTaskCompleted(_),
+                then_body,
+                ..
+            } if matches!(
+                then_body.as_slice(),
+                [NirStmt::Return(Some(NirExpr::Call { callee, .. }))]
+                    if callee == "emit_completed_cli"
+            )
+        )
+    }));
+    assert!(matches!(
+        main.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
+            if callee == "emit_timeout_cli"
+    ));
+
+    let emit_completed = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "emit_completed_cli")
+        .expect("expected emit_completed_cli function");
+    assert!(emit_completed.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::CpuExternCall { callee, .. },
+            } if name == "stdout_code"
+                && ty.render() == "i64"
+                && callee == "host_stdout_write"
+        )
+    }));
+
+    let emit_timeout = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "emit_timeout_cli")
+        .expect("expected emit_timeout_cli function");
+    assert!(emit_timeout.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::CpuExternCall { callee, .. },
+            } if name == "stderr_code"
+                && ty.render() == "i64"
+                && callee == "host_stderr_write"
+        )
+    }));
+}
+
+#[test]
+fn compiles_task_scheduler_observe_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_scheduler_observe_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("task scheduler observe project should compile");
+}
+
+#[test]
+fn lowers_task_scheduler_observe_project_with_scheduler_and_timeout_shapes() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_scheduler_observe_demo",
+    );
+
+    let capture = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "capture_task_scheduler_project")
+        .expect("expected capture_task_scheduler_project function");
+    assert!(capture
+        .body
+        .iter()
+        .any(|stmt| matches!(stmt, NirStmt::Expr(NirExpr::CpuBindCore(0)))));
+    assert!(capture.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::CpuTimeout { task, .. },
+            } if name == "task"
+                && ty.render() == "Task<i64>"
+                && matches!(task.as_ref(), NirExpr::CpuSpawn { callee, .. } if callee == "ping")
+        )
+    }));
+    assert!(capture.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::CpuTickI64 { .. },
+            } if name == "scheduler_tick" && ty.render() == "i64"
+        )
+    }));
+    assert!(capture.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::CpuExternCall { callee, .. },
+            } if name == "monotonic_ns"
+                && ty.render() == "i64"
+                && callee == "host_monotonic_time_ns"
+        )
+    }));
+}
+
+#[test]
+fn compiles_task_clock_observe_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_clock_observe_demo",
+    );
+    nuisc::pipeline::compile_project(project).expect("task clock observe project should compile");
+}
+
+#[test]
+fn lowers_task_clock_observe_project_with_clock_host_observer_shapes() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_clock_observe_demo",
+    );
+
+    let capture = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "capture_task_clock_project")
+        .expect("expected capture_task_clock_project function");
+    assert!(capture.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::CpuTimeout { task, .. },
+            } if name == "task"
+                && ty.render() == "Task<i64>"
+                && matches!(task.as_ref(), NirExpr::CpuSpawn { callee, .. } if callee == "ping")
+        )
+    }));
+    assert!(capture.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Return(Some(NirExpr::StructLiteral { fields, .. }))
+                if fields.iter().any(|(field, value)| {
+                    field == "global_domain_id" && matches!(value, NirExpr::Binary { .. })
+                }) && fields.iter().any(|(field, value)| {
+                    field == "global_epoch_ns"
+                        && matches!(
+                            value,
+                            NirExpr::CpuExternCall { callee, .. } if callee == "host_clock_epoch_ns"
+                        )
+                }) && fields.iter().any(|(field, value)| {
+                    field == "monotonic_ns"
+                        && matches!(
+                            value,
+                            NirExpr::CpuExternCall { callee, .. } if callee == "host_monotonic_time_ns"
+                        )
+                }) && fields.iter().any(|(field, value)| {
+                    field == "global_tick" && matches!(value, NirExpr::CpuTickI64 { .. })
+                }) && fields.iter().any(|(field, value)| {
+                    field == "global_scale_ppm"
+                        && matches!(
+                            value,
+                            NirExpr::CpuExternCall { callee, .. } if callee == "host_clock_scale_ppm"
+                        )
+                })
         )
     }));
 }

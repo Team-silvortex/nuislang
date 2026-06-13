@@ -1,0 +1,8 @@
+version = 1
+
+[project]
+name = "task_async_while_post_flow_compound_demo"
+entry = "main.ns"
+
+[abi]
+cpu = "cpu.arm64.apple_aapcs64"

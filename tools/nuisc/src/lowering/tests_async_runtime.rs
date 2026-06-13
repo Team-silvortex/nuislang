@@ -1067,6 +1067,45 @@ fn lowers_async_while_with_await_step_and_pure_carry_into_async_loop_chain() {
 }
 
 #[test]
+fn lowers_async_while_with_await_step_and_dynamic_buffer_index_read_carry() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn step(value: i64) -> i64 {
+            return value + 1;
+          }
+
+          async fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            let buffer: ref Buffer = alloc_buffer(8, 9);
+            while value < 3 {
+              let value: i64 = await step(value);
+              let acc: i64 = acc + load_at(buffer, value);
+            }
+            free(buffer);
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_async_chain"
+        })
+        .expect("expected loop_while_scalar_async_chain node");
+    assert_eq!(loop_node.op.args[2], "step");
+    assert_eq!(loop_node.op.args[3], "lt");
+    assert_eq!(loop_node.op.args[5], "add_read_at_dynamic_current");
+}
+
+#[test]
 fn lowers_async_while_with_await_step_and_break_flow_control() {
     let mut module = parse_nuis_module(
         r#"
@@ -1455,6 +1494,46 @@ fn lowers_async_while_with_compound_post_flow_control_and_conditional_carry() {
     assert_eq!(loop_node.op.args[11], "current_gt");
     assert_eq!(loop_node.op.args[13], "add_current");
     assert_eq!(loop_node.op.args[14], "keep");
+}
+
+#[test]
+fn rejects_async_chained_while_with_future_sibling_carry_dependency() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn step(value: i64) -> i64 {
+            return value + 1;
+          }
+
+          async fn seed_slot() -> i64 {
+            return 0;
+          }
+
+          async fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            let slot: i64 = await seed_slot();
+            let buffer: ref Buffer = alloc_buffer(4, 9);
+            while value < 3 {
+              let value: i64 = await step(value);
+              let acc: i64 = acc + load_at(buffer, slot);
+              if value > 1 {
+                let slot: i64 = slot + value;
+              } else {
+                let slot: i64 = slot + 0;
+              }
+            }
+            return acc + slot;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let error = lower_nir_to_yir_builtin_cpu(&module).unwrap_err();
+    assert!(error.contains(
+        "references sibling carry `slot` before that carry is updated in the loop body"
+    ));
 }
 
 #[test]

@@ -61,6 +61,13 @@ The most important current truths for `0.18.0` are:
   - network/http/session anchors
   now all contribute to the current believable mainline instead of living as
   unrelated demos
+* the CLI compile frontdoor is now grouped and shared:
+  - `nuis status` and `nuis help` now present one default compile frontdoor
+  - `nuis workflow` classifies single-file vs project-facing routes
+  - `nuis project-doctor`, `nuis project-status`, and `nuis scheduler-view`
+    now expose the same grouped frontdoor summary family before deeper detail
+  - `check/test/build/release-check` remain the action spine instead of being
+    hidden behind a new opaque wrapper
 * repo-level stdlib smoke now agrees with the mainline story again:
   - `stdlib/std/net_session_recipe.ns` no longer wedges YIR cycle verification
   - helper-heavy network/session recipes survive the checked-in stdlib sweep
@@ -121,7 +128,11 @@ start with:
 For mainline project work:
 
 ```bash
+cargo run -p nuis -- status
+cargo run -p nuis -- workflow <input.ns|project-dir|nuis.toml>
 cargo run -p nuis -- project-doctor <project-dir|nuis.toml>
+cargo run -p nuis -- project-status <project-dir|nuis.toml>
+cargo run -p nuis -- scheduler-view <input.ns|project-dir|nuis.toml>
 cargo run -p nuis -- check <project-dir|nuis.toml>
 cargo run -p nuis -- test <project-dir|nuis.toml>
 cargo run -p nuis -- build <project-dir|nuis.toml> <output-dir>

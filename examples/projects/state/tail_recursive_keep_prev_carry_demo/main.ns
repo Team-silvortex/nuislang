@@ -1,0 +1,16 @@
+mod cpu Main {
+  fn accumulate(current: i64, acc: i64) -> i64 {
+    if current <= 1 {
+      return acc;
+    }
+    if current > 2 {
+      return accumulate(current - 1, acc + current);
+    } else {
+      return accumulate(current - 1, acc);
+    }
+  }
+
+  fn main() -> i64 {
+    return accumulate(4, 0);
+  }
+}

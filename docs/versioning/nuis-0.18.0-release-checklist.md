@@ -19,7 +19,8 @@ like the mainline-closure line it claims to be.
 * [ ] confirm [nuis-0.18.0-mainline-goals.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-mainline-goals.md)
   still describes the actual current push
 * [ ] confirm [nuis-0.18.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-compile-workflow.md)
-  still matches the real frontend/project/lowering story
+  still matches the real frontend/project/lowering story and the current CLI
+  frontdoor family
 * [ ] confirm [nuis-0.18.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-mainline-regression-matrix.md)
   still matches the practical release gate
 * [ ] confirm [nuis-0.18.0-address-pointer-mainline.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-address-pointer-mainline.md)
@@ -50,7 +51,11 @@ like the mainline-closure line it claims to be.
   `cargo test -q -p nuisc tests_async_runtime`
   `cargo test -q -p nuisc tests_async_network_runtime`
 * [ ] spot-check `nuis help`
+* [ ] spot-check `nuis status`
+* [ ] spot-check `nuis workflow <input.ns|project-dir|nuis.toml>`
 * [ ] spot-check `nuis project-doctor <project-dir>`
+* [ ] spot-check `nuis project-status <project-dir>`
+* [ ] spot-check `nuis scheduler-view <input.ns|project-dir|nuis.toml>`
 * [ ] spot-check `nuis check <project-dir|nuis.toml>`
 * [ ] spot-check `nuis build <project-dir|nuis.toml> <output-dir>`
 * [ ] spot-check `nuis release-check <project-dir|nuis.toml> <output-dir>`
@@ -79,6 +84,10 @@ like the mainline-closure line it claims to be.
   overstated as full runtime portability
 * [ ] compile truth vs runtime truth:
   docs still distinguish them clearly
+* [ ] CLI frontdoor family:
+  `status/help/workflow/project-doctor/project-status/scheduler-view` still
+  expose one grouped frontdoor summary instead of drifting into separate
+  command-local narratives
 * [ ] repo-wide stdlib smoke:
   `cargo test -q -p nuis stdlib_source_modules -- --nocapture` still passes,
   especially the helper-heavy network/session recipes

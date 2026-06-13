@@ -38,6 +38,15 @@ Current working anchors:
 * project:
   [task_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/task_compile.rs)
 
+Current frontdoor project routes:
+
+* sync control-flow route:
+  `chained_while_demo -> match_branching_while_demo -> flow_continuing_while_demo -> post_flow_breaking_while_demo -> post_flow_branching_continuing_while_demo`
+* async control-flow route:
+  `task_async_observer_bridge_demo -> task_async_if_expression_positions_demo -> task_async_await_match_operand_demo -> task_async_match_call_argument_demo -> task_async_struct_field_match_demo -> task_async_method_receiver_match_demo -> task_async_helper_expanded_match_demo -> task_async_while_flow_cond_demo -> task_async_while_post_flow_demo -> task_async_while_post_flow_cond_demo -> task_async_while_post_flow_compound_demo`
+* generic/control-flow route:
+  `generic_method_bound_if_binding_demo -> generic_method_bound_nested_match_demo -> generic_method_bound_guarded_nested_match_demo`
+
 First landed `0.18.0` control-flow project anchors:
 
 * state:
@@ -90,9 +99,51 @@ Important current families:
 * `loop_while_i64_async_post_flow_chain`
 * `loop_while_i64_async_post_flow_cond_chain`
 
+Current practical mapping:
+
+* ordinary `while + carry`:
+  `chained_while_demo`
+* `match`-driven branching inside `while`:
+  `match_branching_while_demo`
+* source `continue` before post-flow:
+  `flow_continuing_while_demo`
+* source `break` after post-flow:
+  `post_flow_breaking_while_demo`
+* source post-flow conditional `continue`:
+  `post_flow_branching_continuing_while_demo`
+* async observer bridge into async loop families:
+  `task_async_observer_bridge_demo`
+* async `await if` expression-position family:
+  `task_async_if_expression_positions_demo`
+* async `await match` operand in expression position:
+  `task_async_await_match_operand_demo`
+* async `await match` inside call argument:
+  `task_async_match_call_argument_demo`
+* async `await match` inside struct field initializer:
+  `task_async_struct_field_match_demo`
+* async `await match` inside method receiver:
+  `task_async_method_receiver_match_demo`
+* async `await match` inside nested helper-expanded values:
+  `task_async_helper_expanded_match_demo`
+* async source `continue` family:
+  `task_async_while_flow_cond_demo`
+* async source post-flow `break`:
+  `task_async_while_post_flow_demo`
+* async source post-flow conditional `break`:
+  `task_async_while_post_flow_cond_demo`
+* async source post-flow compound `continue`:
+  `task_async_while_post_flow_compound_demo`
+
 Goal:
 
 `the supported loop families should be explicit, stable, and easier to map from source shapes`
+
+Near-term closure rule:
+
+* new control-flow work should prefer extending one of the named families
+  above instead of adding isolated examples with no route position
+* when a lowering family gains a new meaningful source shape, it should gain a
+  project anchor and a place in one of the frontdoor routes
 
 ### 3. Branch-Local Carry Truth
 

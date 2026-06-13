@@ -1,0 +1,27 @@
+mod cpu Main {
+  async fn one() -> i64 {
+    return 1;
+  }
+
+  async fn two() -> i64 {
+    return 2;
+  }
+
+  fn add(value: i64, bias: i64) -> i64 {
+    return value + bias;
+  }
+
+  async fn call_pick(seed: i64) -> i64 {
+    return add(
+      await match seed {
+        1 => { one() },
+        _ => { two() }
+      },
+      5
+    );
+  }
+
+  async fn main() -> i64 {
+    return await call_pick(1);
+  }
+}

@@ -1,0 +1,24 @@
+mod cpu Main {
+  async fn sum_down(seed: i64, remaining: i64) -> i64 {
+    if remaining == 0 {
+      return seed;
+    }
+    return await sum_down(seed + 1, remaining - 1);
+  }
+
+  async fn orchestrate(seed: i64, remaining: i64, limit: i64) -> i64 {
+    let base: i64 = await sum_down(seed, remaining);
+    let completed_result: TaskResult<i64> = join_result(spawn(sum_down(base, 1)));
+    let timed_result: TaskResult<i64> =
+      join_result(timeout(spawn(sum_down(base, 1)), limit));
+
+    if task_completed(completed_result) && task_timed_out(timed_result) {
+      return base + task_value(completed_result);
+    }
+    return base;
+  }
+
+  async fn main() -> i64 {
+    return await orchestrate(7, 4, 0);
+  }
+}

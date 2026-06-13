@@ -1,0 +1,30 @@
+mod cpu Main {
+  struct Packet {
+    value: i64,
+    tag: i64,
+  }
+
+  async fn one() -> i64 {
+    return 1;
+  }
+
+  async fn two() -> i64 {
+    return 2;
+  }
+
+  async fn packetize(seed: i64) -> Packet {
+    let packet: Packet = Packet {
+      value: await match seed {
+        1 => { one() },
+        _ => { two() }
+      },
+      tag: seed,
+    };
+    return packet;
+  }
+
+  async fn main() -> i64 {
+    let packet: Packet = await packetize(1);
+    return packet.value;
+  }
+}

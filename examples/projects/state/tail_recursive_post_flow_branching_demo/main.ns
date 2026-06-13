@@ -1,0 +1,25 @@
+mod cpu Main {
+  fn sum_until(current: i64, acc: i64, flag: i64) -> i64 {
+    if current == 0 {
+      return acc;
+    }
+    if acc + current > 6 {
+      return acc + current;
+    }
+    if current > 3 {
+      return sum_until(current - 1, acc + current, flag + current);
+    } else {
+      if current > 1 {
+        return sum_until(current - 1, acc + current, flag + current);
+      } else {
+        return sum_until(current - 1, acc + current, flag + 0);
+      }
+    }
+  }
+
+  fn main() -> i64 {
+    let total: i64 = sum_until(5, 0, 0);
+    print(total);
+    return total;
+  }
+}

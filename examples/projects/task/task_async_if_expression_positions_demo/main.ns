@@ -1,0 +1,101 @@
+mod cpu Main {
+  trait Addable {
+    fn add(lhs: Self, rhs: Self) -> Self;
+  }
+
+  impl Addable for i64 {
+    fn add(lhs: i64, rhs: i64) -> i64 {
+      return lhs + rhs;
+    }
+  }
+
+  struct Packet {
+    value: i64,
+    tag: i64,
+  }
+
+  async fn one() -> i64 {
+    return 1;
+  }
+
+  async fn two() -> i64 {
+    return 2;
+  }
+
+  fn add_pair(value: i64, bias: i64) -> i64 {
+    return value + bias;
+  }
+
+  fn project(value: i64) -> i64 {
+    return value + 10;
+  }
+
+  fn wrap(value: i64) -> i64 {
+    return value + 20;
+  }
+
+  fn relay(value: i64) -> i64 {
+    return wrap(project(value));
+  }
+
+  async fn branch_pick(seed: bool) -> i64 {
+    let value: i64 = await if seed {
+      one()
+    } else {
+      two()
+    };
+    return value;
+  }
+
+  async fn call_pick(seed: bool) -> i64 {
+    return add_pair(
+      await if seed {
+        one()
+      } else {
+        two()
+      },
+      5
+    );
+  }
+
+  async fn packetize(seed: bool) -> Packet {
+    let packet: Packet = Packet {
+      value: await if seed {
+        one()
+      } else {
+        two()
+      },
+      tag: if seed {
+        1
+      } else {
+        0
+      },
+    };
+    return packet;
+  }
+
+  async fn apply(seed: bool) -> i64 {
+    return (await if seed {
+      one()
+    } else {
+      two()
+    }).add(3);
+  }
+
+  async fn expand(seed: bool) -> i64 {
+    return relay(await if seed {
+      one()
+    } else {
+      two()
+    });
+  }
+
+  async fn main() -> i64 {
+    let packet: Packet = await packetize(true);
+    return await branch_pick(true)
+      + await call_pick(true)
+      + await apply(true)
+      + await expand(true)
+      + packet.value;
+  }
+}

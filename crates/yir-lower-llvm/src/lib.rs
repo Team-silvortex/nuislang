@@ -3285,7 +3285,7 @@ fn emit_cpu_function(
                                       next_current: &String,
                                       next_carries: &Vec<String>|
                  -> Result<(String, &'static str), String> {
-                    if kind == "keep" {
+                    if matches!(kind, "keep" | "keep_prev_carry") {
                         return Ok((String::new(), "keep"));
                     }
                     if kind == "add_current" {
@@ -3541,7 +3541,7 @@ fn emit_cpu_function(
                     body.push(format!("{then_block}:"));
                     let (then_source, then_op) =
                         resolve_source(then_kind, &next_current, &next_carries)?;
-                    let then_value = if then_op == "keep" {
+                    let then_value = if matches!(then_op, "keep" | "keep_prev_carry") {
                         current_carries[index].clone()
                     } else {
                         let reg = fresh_reg(&mut next_reg);
@@ -3555,7 +3555,7 @@ fn emit_cpu_function(
                     body.push(format!("{else_block}:"));
                     let (else_source, else_op) =
                         resolve_source(else_kind, &next_current, &next_carries)?;
-                    let else_value = if else_op == "keep" {
+                    let else_value = if matches!(else_op, "keep" | "keep_prev_carry") {
                         current_carries[index].clone()
                     } else {
                         let reg = fresh_reg(&mut next_reg);
@@ -3822,7 +3822,7 @@ fn emit_cpu_function(
                                       next_current: &String,
                                       next_carries: &Vec<String>|
                  -> Result<(String, &'static str), String> {
-                    if kind == "keep" {
+                    if matches!(kind, "keep" | "keep_prev_carry") {
                         return Ok((String::new(), "keep"));
                     }
                     if kind == "add_current" {
@@ -3902,7 +3902,7 @@ fn emit_cpu_function(
                 for (index, (cond_kind, cond_rhs, then_kind, else_kind)) in
                     lowered_carry_specs.iter().enumerate()
                 {
-                    let then_value = if then_kind == "keep" {
+                    let then_value = if matches!(then_kind.as_str(), "keep" | "keep_prev_carry") {
                         current_carries[index].clone()
                     } else {
                         let (source, op) = resolve_source(then_kind, &next_current, &next_carries)?;
@@ -3921,7 +3921,7 @@ fn emit_cpu_function(
                             )
                         })?
                     };
-                    let else_value = if else_kind == "keep" {
+                    let else_value = if matches!(else_kind.as_str(), "keep" | "keep_prev_carry") {
                         current_carries[index].clone()
                     } else {
                         let (source, op) = resolve_source(else_kind, &next_current, &next_carries)?;
@@ -5158,7 +5158,7 @@ fn emit_cpu_function(
                     let resolve = |kind: &str,
                                    next_carries: &Vec<String>|
                      -> Result<(String, &'static str), String> {
-                        if kind == "keep" {
+                        if matches!(kind, "keep" | "keep_prev_carry") {
                             return Ok((String::new(), "keep"));
                         }
                         if kind == "add_current" {
@@ -5179,7 +5179,7 @@ fn emit_cpu_function(
                     };
                     let then_value = {
                         let (src, op) = resolve(then_kind, &next_carries)?;
-                        if op == "keep" {
+                        if matches!(op, "keep" | "keep_prev_carry") {
                             current_carries[index].clone()
                         } else {
                             let r = fresh_reg(&mut next_reg);
@@ -5192,7 +5192,7 @@ fn emit_cpu_function(
                     };
                     let else_value = {
                         let (src, op) = resolve(else_kind, &next_carries)?;
-                        if op == "keep" {
+                        if matches!(op, "keep" | "keep_prev_carry") {
                             current_carries[index].clone()
                         } else {
                             let r = fresh_reg(&mut next_reg);
@@ -6292,7 +6292,7 @@ fn emit_cpu_function(
                     let resolve = |kind: &str,
                                    next_carries: &Vec<String>|
                      -> Result<String, String> {
-                        if kind == "keep" {
+                        if matches!(kind, "keep" | "keep_prev_carry") {
                             return Ok(String::new());
                         }
                         if kind == "add_current" {
@@ -6304,7 +6304,7 @@ fn emit_cpu_function(
                         }
                         Err(format!("cpu.{loop_instruction} `{}` has unsupported carry kind `{kind}` during LLVM lowering", node.name))
                     };
-                    let then_value = if then_kind == "keep" {
+                    let then_value = if matches!(then_kind.as_str(), "keep" | "keep_prev_carry") {
                         current_carries[index].clone()
                     } else {
                         let src = resolve(then_kind, &next_carries)?;
@@ -6315,7 +6315,7 @@ fn emit_cpu_function(
                         ));
                         r
                     };
-                    let else_value = if else_kind == "keep" {
+                    let else_value = if matches!(else_kind.as_str(), "keep" | "keep_prev_carry") {
                         current_carries[index].clone()
                     } else {
                         let src = resolve(else_kind, &next_carries)?;
@@ -6592,7 +6592,7 @@ fn emit_cpu_function(
                                       next_current: &String,
                                       next_carries: &Vec<String>|
                  -> Result<String, String> {
-                    if kind == "keep" {
+                    if matches!(kind, "keep" | "keep_prev_carry") {
                         return Ok(String::new());
                     }
                     if kind == "add_current" {
@@ -6621,7 +6621,7 @@ fn emit_cpu_function(
                 for (index, (cond_kind, cond_rhs, then_kind, else_kind)) in
                     carry_specs.iter().enumerate()
                 {
-                    let then_value = if then_kind == "keep" {
+                    let then_value = if matches!(then_kind.as_str(), "keep" | "keep_prev_carry") {
                         current_carries[index].clone()
                     } else {
                         let source = resolve_source(then_kind, &next_current, &next_carries)?;
@@ -6632,7 +6632,7 @@ fn emit_cpu_function(
                         ));
                         reg
                     };
-                    let else_value = if else_kind == "keep" {
+                    let else_value = if matches!(else_kind.as_str(), "keep" | "keep_prev_carry") {
                         current_carries[index].clone()
                     } else {
                         let source = resolve_source(else_kind, &next_current, &next_carries)?;
@@ -7276,7 +7276,7 @@ fn emit_cpu_function(
                                       next_current: &String,
                                       next_carries: &Vec<String>|
                  -> Result<String, String> {
-                    if kind == "keep" {
+                    if matches!(kind, "keep" | "keep_prev_carry") {
                         return Ok(String::new());
                     }
                     if kind == "add_current" {
@@ -7305,7 +7305,7 @@ fn emit_cpu_function(
                 for (index, (cond_kind, cond_rhs, then_kind, else_kind)) in
                     carry_specs.iter().enumerate()
                 {
-                    let then_value = if then_kind == "keep" {
+                    let then_value = if matches!(then_kind.as_str(), "keep" | "keep_prev_carry") {
                         current_carries[index].clone()
                     } else {
                         let source = resolve_source(then_kind, &next_current, &next_carries)?;
@@ -7316,7 +7316,7 @@ fn emit_cpu_function(
                         ));
                         reg
                     };
-                    let else_value = if else_kind == "keep" {
+                    let else_value = if matches!(else_kind.as_str(), "keep" | "keep_prev_carry") {
                         current_carries[index].clone()
                     } else {
                         let source = resolve_source(else_kind, &next_current, &next_carries)?;

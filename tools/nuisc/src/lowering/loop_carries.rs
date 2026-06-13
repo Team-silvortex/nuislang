@@ -1,5 +1,4 @@
 use super::*;
-use crate::lowering::loop_purity::normalize_pure_bool_test_expr;
 
 pub(super) fn loop_compare_from_binary_op(op: NirBinaryOp) -> Option<PreparedLoopCompare> {
     match op {
@@ -99,8 +98,71 @@ pub(super) fn render_loop_logic_op(op: PreparedLoopLogicOp) -> &'static str {
     }
 }
 
-fn find_prepared_carry_index(carries: &[PreparedCarryUpdate], name: &str) -> Option<usize> {
-    carries.iter().position(|carry| carry.binding_name == name)
+pub(super) fn parse_prepared_loop_state_ref_name_from_carry_names(
+    name: &str,
+    binding_name: &str,
+    carry_binding_names: &[String],
+) -> Option<PreparedLoopStateRef> {
+    if name == binding_name {
+        Some(PreparedLoopStateRef::Current)
+    } else if name == TAIL_RECURSIVE_PREV_CURRENT_BINDING {
+        Some(PreparedLoopStateRef::PreviousCurrent)
+    } else if let Some(index) = name.strip_prefix(TAIL_RECURSIVE_PREV_CARRY_BINDING_PREFIX) {
+        index
+            .parse::<usize>()
+            .ok()
+            .map(PreparedLoopStateRef::PreviousCarry)
+    } else {
+        carry_binding_names
+            .iter()
+            .position(|carry_name| carry_name == name)
+            .map(PreparedLoopStateRef::Carry)
+    }
+}
+
+pub(super) fn parse_prepared_loop_state_ref_name(
+    name: &str,
+    binding_name: &str,
+    carries: &[PreparedCarryUpdate],
+) -> Option<PreparedLoopStateRef> {
+    let carry_binding_names = carries
+        .iter()
+        .map(|carry| carry.binding_name.clone())
+        .collect::<Vec<_>>();
+    parse_prepared_loop_state_ref_name_from_carry_names(name, binding_name, &carry_binding_names)
+}
+
+pub(super) fn parse_prepared_loop_state_ref_expr(
+    expr: &NirExpr,
+    binding_name: &str,
+    carries: &[PreparedCarryUpdate],
+) -> Option<PreparedLoopStateRef> {
+    let NirExpr::Var(name) = expr else {
+        return None;
+    };
+    parse_prepared_loop_state_ref_name(name, binding_name, carries)
+}
+
+pub(super) fn loop_state_ref_into_carry_source(
+    state_ref: PreparedLoopStateRef,
+) -> PreparedCarrySource {
+    match state_ref {
+        PreparedLoopStateRef::Current => PreparedCarrySource::Current,
+        PreparedLoopStateRef::PreviousCurrent => PreparedCarrySource::PreviousCurrent,
+        PreparedLoopStateRef::PreviousCarry(index) => PreparedCarrySource::PreviousCarry(index),
+        PreparedLoopStateRef::Carry(index) => PreparedCarrySource::Carry(index),
+    }
+}
+
+pub(super) fn loop_state_ref_into_cond_source(
+    state_ref: PreparedLoopStateRef,
+) -> PreparedCarryCondSource {
+    match state_ref {
+        PreparedLoopStateRef::Current => PreparedCarryCondSource::Current,
+        PreparedLoopStateRef::PreviousCurrent => PreparedCarryCondSource::PreviousCurrent,
+        PreparedLoopStateRef::PreviousCarry(index) => PreparedCarryCondSource::PreviousCarry(index),
+        PreparedLoopStateRef::Carry(index) => PreparedCarryCondSource::Carry(index),
+    }
 }
 
 fn expr_contains_loop_variant_name(
@@ -110,10 +172,7 @@ fn expr_contains_loop_variant_name(
 ) -> bool {
     match expr {
         NirExpr::Var(name) => {
-            name == binding_name
-                || name == TAIL_RECURSIVE_PREV_CURRENT_BINDING
-                || name.starts_with(TAIL_RECURSIVE_PREV_CARRY_BINDING_PREFIX)
-                || carries.iter().any(|carry| carry.binding_name == *name)
+            parse_prepared_loop_state_ref_name(name, binding_name, carries).is_some()
         }
         NirExpr::Await(inner)
         | NirExpr::Borrow(inner)
@@ -227,27 +286,22 @@ fn expr_is_loop_invariant(
     !expr_contains_loop_variant_name(expr, binding_name, carries)
 }
 
+fn parse_loop_variant_source_name(
+    rhs_name: &str,
+    binding_name: &str,
+    carries: &[PreparedCarryUpdate],
+) -> Option<PreparedCarrySource> {
+    parse_prepared_loop_state_ref_name(rhs_name, binding_name, carries)
+        .map(loop_state_ref_into_carry_source)
+}
+
 fn parse_linear_var_source(
     op: PreparedCarryLinearOp,
     rhs_name: &str,
     binding_name: &str,
     carries: &[PreparedCarryUpdate],
 ) -> Option<(PreparedCarryLinearOp, PreparedCarrySource)> {
-    if rhs_name == binding_name {
-        Some((op, PreparedCarrySource::Current))
-    } else if rhs_name == TAIL_RECURSIVE_PREV_CURRENT_BINDING {
-        Some((op, PreparedCarrySource::PreviousCurrent))
-    } else if let Some(index) = rhs_name.strip_prefix(TAIL_RECURSIVE_PREV_CARRY_BINDING_PREFIX) {
-        index
-            .parse::<usize>()
-            .ok()
-            .map(PreparedCarrySource::PreviousCarry)
-            .map(|source| (op, source))
-    } else {
-        find_prepared_carry_index(carries, rhs_name)
-            .map(PreparedCarrySource::Carry)
-            .map(|source| (op, source))
-    }
+    parse_loop_variant_source_name(rhs_name, binding_name, carries).map(|source| (op, source))
 }
 
 pub(super) fn parse_prepared_readable_carry_source_candidate(
@@ -301,6 +355,61 @@ pub(super) fn parse_prepared_fixed_read_carry_source(
     }
 }
 
+pub(super) fn parse_prepared_dynamic_read_carry_source(
+    rhs: &NirExpr,
+    binding_name: &str,
+    carries: &[PreparedCarryUpdate],
+) -> Option<PreparedCarrySource> {
+    let candidate = parse_prepared_readable_carry_source_candidate(rhs, binding_name, carries)?;
+    match candidate {
+        PreparedReadableCarrySourceCandidate::DynamicIndexAt { buffer, index } => {
+            let index_source = loop_state_ref_into_carry_source(parse_prepared_loop_state_ref_expr(
+                &index,
+                binding_name,
+                carries,
+            )?);
+            Some(PreparedCarrySource::DynamicReadAt {
+                buffer,
+                index_source: Box::new(index_source),
+            })
+        }
+        PreparedReadableCarrySourceCandidate::Fixed(_)
+        | PreparedReadableCarrySourceCandidate::TraversalNext { .. } => None,
+    }
+}
+
+fn unsupported_readable_carry_source_message(
+    candidate: &PreparedReadableCarrySourceCandidate,
+) -> Option<String> {
+    match candidate.family() {
+        PreparedReadableCarrySourceFamily::Fixed => None,
+        PreparedReadableCarrySourceFamily::DynamicIndexAt => Some(
+            "loop carry updates using dynamic `load_at(buffer, index)` reads currently support only direct loop-state index drivers like `current`, `prev_current`, `prev_carryN`, or earlier `carryN`; more general dynamic index expressions are not supported yet in lowering"
+                .to_owned(),
+        ),
+        PreparedReadableCarrySourceFamily::TraversalNext => Some(
+            "loop carry updates using `load_next(...)` traversal reads are recognized but not supported yet in lowering; only loop-invariant fixed carry reads are currently supported"
+                .to_owned(),
+        ),
+    }
+}
+
+pub(super) fn diagnose_unsupported_loop_carry_expr(
+    carry_name: &str,
+    expr: &NirExpr,
+    binding_name: &str,
+    carries: &[PreparedCarryUpdate],
+    inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
+) -> Option<String> {
+    let normalized = inline_pure_helper_calls(expr, inlineable_pure_helpers);
+    if parse_loop_carry_keep_source(carry_name, &normalized, carries).is_some() {
+        return None;
+    }
+    let (_, rhs) = parse_loop_carry_linear_shape(carry_name, &normalized)?;
+    let candidate = parse_prepared_readable_carry_source_candidate(rhs, binding_name, carries)?;
+    unsupported_readable_carry_source_message(&candidate)
+}
+
 pub(super) fn render_loop_carry_kind(
     op: PreparedCarryLinearOp,
     source: &PreparedCarrySource,
@@ -336,19 +445,25 @@ pub(super) fn encode_loop_carry_source_args(
     bindings: &mut BTreeMap<String, String>,
 ) -> Result<(Vec<String>, Vec<String>, Vec<String>), String> {
     let kind = render_loop_carry_kind(op, source);
-    if !source.is_fixed_read() {
+    if !source.is_fixed_read() && !source.is_dynamic_read_at() {
         return Ok((vec![kind], vec![], vec![]));
     }
-    match source.fixed_read() {
-        Some(fixed_read) => {
-            let (dep_inputs, effect_inputs) =
-                lower_prepared_fixed_read_carry_source_args(fixed_read, state, bindings)?;
-            let mut args = vec![kind];
-            args.extend(dep_inputs.iter().cloned());
-            Ok((args, dep_inputs, effect_inputs))
-        }
-        None => unreachable!("fixed-read carries must expose a fixed-read payload"),
+    if let Some(fixed_read) = source.fixed_read() {
+        let (dep_inputs, effect_inputs) =
+            lower_prepared_fixed_read_carry_source_args(fixed_read, state, bindings)?;
+        let mut args = vec![kind];
+        args.extend(dep_inputs.iter().cloned());
+        return Ok((args, dep_inputs, effect_inputs));
     }
+    if let Some((buffer, _)) = source.dynamic_read_at() {
+        let buffer_name = lower_expr(buffer, state, bindings)?;
+        return Ok((
+            vec![kind, buffer_name.clone()],
+            vec![buffer_name.clone()],
+            vec![buffer_name],
+        ));
+    }
+    unreachable!("carry source payload classification must be exhaustive")
 }
 
 pub(super) fn encode_loop_carry_branch_source_args(
@@ -356,17 +471,60 @@ pub(super) fn encode_loop_carry_branch_source_args(
     state: &mut LoweringState<'_>,
     bindings: &mut BTreeMap<String, String>,
 ) -> Result<(Vec<String>, Vec<String>, Vec<String>), String> {
-    if source.is_keep() {
-        return Ok((vec!["keep".to_owned()], vec![], vec![]));
+    match source.view() {
+        PreparedCarryBranchView::KeepCurrentValue => {
+            Ok((vec!["keep".to_owned()], vec![], vec![]))
+        }
+        PreparedCarryBranchView::KeepPreviousValue => {
+            Ok((vec!["keep_prev_carry".to_owned()], vec![], vec![]))
+        }
+        PreparedCarryBranchView::Source { op, source } => {
+            encode_loop_carry_source_args(op, source, state, bindings)
+        }
     }
-    let (op, carry_source) = source
-        .source_parts()
-        .expect("non-keep branch carry sources must expose source parts");
-    encode_loop_carry_source_args(op, carry_source, state, bindings)
+}
+
+pub(super) fn unsupported_loop_carry_branch_source_message(
+    source: &PreparedCarryBranchSource,
+) -> Option<String> {
+    match source.view() {
+        PreparedCarryBranchView::KeepCurrentValue
+        | PreparedCarryBranchView::KeepPreviousValue
+        | PreparedCarryBranchView::Source { .. } => None,
+    }
 }
 
 pub(super) fn tail_recursive_prev_carry_binding(index: usize) -> String {
     format!("{TAIL_RECURSIVE_PREV_CARRY_BINDING_PREFIX}{index}")
+}
+
+fn parse_loop_carry_linear_shape<'a>(
+    carry_name: &str,
+    expr: &'a NirExpr,
+) -> Option<(PreparedCarryLinearOp, &'a NirExpr)> {
+    match expr {
+        NirExpr::Binary {
+            op: NirBinaryOp::Add,
+            lhs,
+            rhs,
+        } => match lhs.as_ref() {
+            NirExpr::Var(lhs_name) if lhs_name == carry_name => {
+                Some((PreparedCarryLinearOp::Add, rhs.as_ref()))
+            }
+            _ => None,
+        },
+        NirExpr::Binary {
+            op: NirBinaryOp::Mul,
+            lhs,
+            rhs,
+        } => match lhs.as_ref() {
+            NirExpr::Var(lhs_name) if lhs_name == carry_name => {
+                Some((PreparedCarryLinearOp::Mul, rhs.as_ref()))
+            }
+            _ => None,
+        },
+        _ => None,
+    }
 }
 
 pub(super) fn parse_loop_carry_linear(
@@ -377,37 +535,33 @@ pub(super) fn parse_loop_carry_linear(
     inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
 ) -> Option<(PreparedCarryLinearOp, PreparedCarrySource)> {
     let normalized = inline_pure_helper_calls(expr, inlineable_pure_helpers);
-    match &normalized {
-        NirExpr::Binary {
-            op: NirBinaryOp::Add,
-            lhs,
-            rhs,
-        } => match (lhs.as_ref(), rhs.as_ref()) {
-            (NirExpr::Var(lhs_name), NirExpr::Var(rhs_name)) if lhs_name == carry_name => {
-                parse_linear_var_source(PreparedCarryLinearOp::Add, rhs_name, binding_name, carries)
-            }
-            (NirExpr::Var(lhs_name), rhs) if lhs_name == carry_name => {
-                parse_prepared_fixed_read_carry_source(rhs, binding_name, carries)
-                    .map(PreparedCarrySource::FixedRead)
-                    .map(|source| (PreparedCarryLinearOp::Add, source))
-            }
-            _ => None,
-        },
-        NirExpr::Binary {
-            op: NirBinaryOp::Mul,
-            lhs,
-            rhs,
-        } => match (lhs.as_ref(), rhs.as_ref()) {
-            (NirExpr::Var(lhs_name), NirExpr::Var(rhs_name)) if lhs_name == carry_name => {
-                parse_linear_var_source(PreparedCarryLinearOp::Mul, rhs_name, binding_name, carries)
-            }
-            (NirExpr::Var(lhs_name), rhs) if lhs_name == carry_name => {
-                parse_prepared_fixed_read_carry_source(rhs, binding_name, carries)
-                    .map(PreparedCarrySource::FixedRead)
-                    .map(|source| (PreparedCarryLinearOp::Mul, source))
-            }
-            _ => None,
-        },
+    let (op, rhs) = parse_loop_carry_linear_shape(carry_name, &normalized)?;
+    match rhs {
+        NirExpr::Var(rhs_name) => parse_linear_var_source(op, rhs_name, binding_name, carries),
+        _ => parse_prepared_fixed_read_carry_source(rhs, binding_name, carries)
+            .map(PreparedCarrySource::FixedRead)
+            .or_else(|| parse_prepared_dynamic_read_carry_source(rhs, binding_name, carries))
+            .map(|source| (op, source)),
+    }
+}
+
+fn parse_loop_carry_keep_source(
+    carry_name: &str,
+    expr: &NirExpr,
+    carries: &[PreparedCarryUpdate],
+) -> Option<PreparedCarryBranchSource> {
+    match expr {
+        NirExpr::Var(name) if name == carry_name => Some(PreparedCarryBranchSource::keep()),
+        NirExpr::Var(name) if *name == tail_recursive_prev_carry_binding(carries.len()) => {
+            Some(PreparedCarryBranchSource::keep_previous_value())
+        }
+        _ if matches!(
+            parse_loop_carry_linear_shape(carry_name, expr),
+            Some((PreparedCarryLinearOp::Add, NirExpr::Int(0)))
+        ) =>
+        {
+            Some(PreparedCarryBranchSource::keep())
+        }
         _ => None,
     }
 }
@@ -420,34 +574,16 @@ pub(super) fn parse_loop_carry_branch_source(
     inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
 ) -> Option<PreparedCarryBranchSource> {
     let normalized = inline_pure_helper_calls(expr, inlineable_pure_helpers);
-    match &normalized {
-        NirExpr::Var(name) if name == carry_name => Some(PreparedCarryBranchSource::Keep),
-        NirExpr::Binary {
-            op: NirBinaryOp::Add,
-            lhs,
-            rhs,
-        } => match (lhs.as_ref(), rhs.as_ref()) {
-            (NirExpr::Var(lhs_name), NirExpr::Int(0)) if lhs_name == carry_name => {
-                Some(PreparedCarryBranchSource::Keep)
-            }
-            _ => parse_loop_carry_linear(
-                carry_name,
-                &normalized,
-                binding_name,
-                carries,
-                inlineable_pure_helpers,
-            )
-            .map(|(op, source)| PreparedCarryBranchSource::Source { op, source }),
-        },
-        _ => parse_loop_carry_linear(
+    parse_loop_carry_keep_source(carry_name, &normalized, carries).or_else(|| {
+        parse_loop_carry_linear(
             carry_name,
             &normalized,
             binding_name,
             carries,
             inlineable_pure_helpers,
         )
-        .map(|(op, source)| PreparedCarryBranchSource::Source { op, source }),
-    }
+        .map(|(op, source)| PreparedCarryBranchSource::from_linear_source(op, source))
+    })
 }
 
 #[cfg(test)]
@@ -501,78 +637,340 @@ mod tests {
         assert_eq!(candidate.family_name(), "traversal_next");
         assert!(candidate.fixed_read().is_none());
     }
-}
 
-pub(super) fn parse_loop_carry_condition(
-    expr: &NirExpr,
-    binding_name: &str,
-    carries: &[PreparedCarryUpdate],
-    pure_helpers: &BTreeSet<String>,
-    inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
-) -> Option<PreparedLoopCarryCondition> {
-    let normalized =
-        normalize_pure_bool_test_expr(inline_pure_helper_calls(expr, inlineable_pure_helpers));
-    let (lhs, compare, rhs) = match &normalized {
-        NirExpr::Binary {
-            op: NirBinaryOp::Eq,
-            lhs,
-            rhs,
-        } if is_terminal_branch_pure_expr(rhs, pure_helpers) => {
-            (lhs.as_ref(), PreparedLoopCompare::Eq, rhs.as_ref().clone())
+    #[test]
+    fn parse_prepared_dynamic_read_carry_source_accepts_current_index_driver() {
+        let expr = NirExpr::LoadAt {
+            buffer: Box::new(NirExpr::Var("buffer".to_owned())),
+            index: Box::new(NirExpr::Var("current".to_owned())),
+        };
+        let source = parse_prepared_dynamic_read_carry_source(&expr, "current", &[])
+            .expect("expected dynamic read carry source");
+        assert_eq!(
+            source.contract_kind(PreparedCarryLinearOp::Add),
+            "add_read_at_dynamic_current"
+        );
+    }
+
+    #[test]
+    fn parse_prepared_dynamic_read_carry_source_accepts_prior_carry_index_driver() {
+        let expr = NirExpr::LoadAt {
+            buffer: Box::new(NirExpr::Var("buffer".to_owned())),
+            index: Box::new(NirExpr::Var("slot".to_owned())),
+        };
+        let carries = vec![PreparedCarryUpdate {
+            binding_name: "slot".to_owned(),
+            kind: PreparedCarryUpdateKind::Linear {
+                op: PreparedCarryLinearOp::Add,
+                source: PreparedCarrySource::Current,
+            },
+        }];
+        let source = parse_prepared_dynamic_read_carry_source(&expr, "current", &carries)
+            .expect("expected dynamic read carry source");
+        assert_eq!(
+            source.contract_kind(PreparedCarryLinearOp::Add),
+            "add_read_at_dynamic_carry0"
+        );
+    }
+
+    #[test]
+    fn parse_prepared_dynamic_read_carry_source_rejects_non_direct_index_expr() {
+        let expr = NirExpr::LoadAt {
+            buffer: Box::new(NirExpr::Var("buffer".to_owned())),
+            index: Box::new(NirExpr::Binary {
+                op: NirBinaryOp::Add,
+                lhs: Box::new(NirExpr::Var("current".to_owned())),
+                rhs: Box::new(NirExpr::Int(1)),
+            }),
+        };
+        assert!(parse_prepared_dynamic_read_carry_source(&expr, "current", &[]).is_none());
+    }
+
+    #[test]
+    fn dynamic_read_contract_kind_supports_prev_current_and_prev_carry_index_drivers() {
+        let prev_current = PreparedCarrySource::DynamicReadAt {
+            buffer: NirExpr::Var("buffer".to_owned()),
+            index_source: Box::new(PreparedCarrySource::PreviousCurrent),
+        };
+        let prev_carry = PreparedCarrySource::DynamicReadAt {
+            buffer: NirExpr::Var("buffer".to_owned()),
+            index_source: Box::new(PreparedCarrySource::PreviousCarry(0)),
+        };
+        assert_eq!(
+            prev_current.contract_kind(PreparedCarryLinearOp::Add),
+            "add_read_at_dynamic_prev_current"
+        );
+        assert_eq!(
+            prev_carry.contract_kind(PreparedCarryLinearOp::Add),
+            "add_read_at_dynamic_prev_carry0"
+        );
+    }
+
+    #[test]
+    fn parses_loop_state_refs_for_current_prev_and_carry_slots() {
+        let carries = vec![PreparedCarryUpdate {
+            binding_name: "slot".to_owned(),
+            kind: PreparedCarryUpdateKind::Linear {
+                op: PreparedCarryLinearOp::Add,
+                source: PreparedCarrySource::Current,
+            },
+        }];
+        assert_eq!(
+            parse_prepared_loop_state_ref_name("current", "current", &carries),
+            Some(PreparedLoopStateRef::Current)
+        );
+        assert_eq!(
+            parse_prepared_loop_state_ref_name("__tailrec_prev_current", "current", &carries),
+            Some(PreparedLoopStateRef::PreviousCurrent)
+        );
+        assert_eq!(
+            parse_prepared_loop_state_ref_name("__tailrec_prev_carry_0", "current", &carries),
+            Some(PreparedLoopStateRef::PreviousCarry(0))
+        );
+        assert_eq!(
+            parse_prepared_loop_state_ref_name("slot", "current", &carries),
+            Some(PreparedLoopStateRef::Carry(0))
+        );
+    }
+
+    #[test]
+    fn parses_loop_state_refs_directly_from_carry_binding_names() {
+        let carry_binding_names = vec!["slot".to_owned(), "acc".to_owned()];
+        assert_eq!(
+            parse_prepared_loop_state_ref_name_from_carry_names(
+                "current",
+                "current",
+                &carry_binding_names,
+            ),
+            Some(PreparedLoopStateRef::Current)
+        );
+        assert_eq!(
+            parse_prepared_loop_state_ref_name_from_carry_names(
+                "slot",
+                "current",
+                &carry_binding_names,
+            ),
+            Some(PreparedLoopStateRef::Carry(0))
+        );
+        assert_eq!(
+            parse_prepared_loop_state_ref_name_from_carry_names(
+                "acc",
+                "current",
+                &carry_binding_names,
+            ),
+            Some(PreparedLoopStateRef::Carry(1))
+        );
+    }
+
+    #[test]
+    fn parses_loop_state_refs_directly_from_var_exprs() {
+        let carries = vec![PreparedCarryUpdate {
+            binding_name: "slot".to_owned(),
+            kind: PreparedCarryUpdateKind::Linear {
+                op: PreparedCarryLinearOp::Add,
+                source: PreparedCarrySource::Current,
+            },
+        }];
+        assert_eq!(
+            parse_prepared_loop_state_ref_expr(
+                &NirExpr::Var("__tailrec_prev_current".to_owned()),
+                "current",
+                &carries,
+            ),
+            Some(PreparedLoopStateRef::PreviousCurrent)
+        );
+        assert_eq!(
+            parse_prepared_loop_state_ref_expr(
+                &NirExpr::Var("slot".to_owned()),
+                "current",
+                &carries,
+            ),
+            Some(PreparedLoopStateRef::Carry(0))
+        );
+        assert_eq!(
+            parse_prepared_loop_state_ref_expr(&NirExpr::Int(1), "current", &carries),
+            None
+        );
+    }
+
+    #[test]
+    fn parses_loop_carry_keep_source_for_identity_and_add_zero_forms() {
+        assert!(matches!(
+            parse_loop_carry_keep_source("acc", &NirExpr::Var("acc".to_owned()), &[]),
+            Some(source) if matches!(source.view(), PreparedCarryBranchView::KeepCurrentValue)
+        ));
+        assert!(matches!(
+            parse_loop_carry_keep_source(
+                "acc",
+                &NirExpr::Binary {
+                    op: NirBinaryOp::Add,
+                    lhs: Box::new(NirExpr::Var("acc".to_owned())),
+                    rhs: Box::new(NirExpr::Int(0)),
+                }
+            , &[]),
+            Some(source) if matches!(source.view(), PreparedCarryBranchView::KeepCurrentValue)
+        ));
+        assert!(parse_loop_carry_keep_source(
+            "acc",
+            &NirExpr::Binary {
+                op: NirBinaryOp::Add,
+                lhs: Box::new(NirExpr::Var("acc".to_owned())),
+                rhs: Box::new(NirExpr::Int(1)),
+            },
+            &[],
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn parses_loop_carry_keep_source_for_explicit_previous_value_placeholder() {
+        let carries = vec![PreparedCarryUpdate {
+            binding_name: "acc".to_owned(),
+            kind: PreparedCarryUpdateKind::Linear {
+                op: PreparedCarryLinearOp::Add,
+                source: PreparedCarrySource::Current,
+            },
+        }];
+        let previous_name = tail_recursive_prev_carry_binding(carries.len());
+        assert!(matches!(
+            parse_loop_carry_keep_source("slot", &NirExpr::Var(previous_name), &carries),
+            Some(source) if matches!(source.view(), PreparedCarryBranchView::KeepPreviousValue)
+        ));
+    }
+
+    #[test]
+    fn prepared_carry_branch_source_helpers_round_trip_keep_and_source_variants() {
+        let keep = PreparedCarryBranchSource::keep();
+        assert!(matches!(
+            keep.view(),
+            PreparedCarryBranchView::KeepCurrentValue
+        ));
+        assert_eq!(encode_branch_view_name(keep.view()), "keep_current_value");
+        assert!(matches!(
+            keep.value_kind(),
+            PreparedCarryBranchValueKind::KeepCurrentValue
+        ));
+
+        let keep_previous = PreparedCarryBranchSource::keep_previous_value();
+        assert!(matches!(
+            keep_previous.view(),
+            PreparedCarryBranchView::KeepPreviousValue
+        ));
+        assert_eq!(
+            encode_branch_view_name(keep_previous.view()),
+            "keep_previous_value"
+        );
+        assert!(matches!(
+            keep_previous.value_kind(),
+            PreparedCarryBranchValueKind::KeepPreviousValue
+        ));
+
+        let source = PreparedCarryBranchSource::from_linear_source(
+            PreparedCarryLinearOp::Add,
+            PreparedCarrySource::Current,
+        );
+        assert!(matches!(
+            source.value_kind(),
+            PreparedCarryBranchValueKind::LinearSource {
+                op: PreparedCarryLinearOp::Add,
+                source: PreparedCarrySource::Current
+            }
+        ));
+        assert!(matches!(
+            source.view(),
+            PreparedCarryBranchView::Source {
+                op: PreparedCarryLinearOp::Add,
+                source: PreparedCarrySource::Current
+            }
+        ));
+    }
+
+    #[test]
+    fn previous_value_branch_view_is_constructible_and_distinct_from_current_keep() {
+        let source = PreparedCarryBranchSource::keep_previous_value();
+        assert!(matches!(
+            source.value_kind(),
+            PreparedCarryBranchValueKind::KeepPreviousValue
+        ));
+        assert!(matches!(
+            source.view(),
+            PreparedCarryBranchView::KeepPreviousValue
+        ));
+        assert!(parse_loop_carry_keep_source("acc", &NirExpr::Var("acc".to_owned()), &[])
+            .is_some_and(|parsed| matches!(
+                parsed.value_kind(),
+                PreparedCarryBranchValueKind::KeepCurrentValue
+            )));
+    }
+
+    fn encode_branch_view_name(view: PreparedCarryBranchView<'_>) -> &'static str {
+        match view {
+            PreparedCarryBranchView::KeepCurrentValue => "keep_current_value",
+            PreparedCarryBranchView::KeepPreviousValue => "keep_previous_value",
+            PreparedCarryBranchView::Source { .. } => "source",
         }
-        NirExpr::Binary {
-            op: NirBinaryOp::Ne,
-            lhs,
-            rhs,
-        } if is_terminal_branch_pure_expr(rhs, pure_helpers) => {
-            (lhs.as_ref(), PreparedLoopCompare::Ne, rhs.as_ref().clone())
-        }
-        NirExpr::Binary {
-            op: NirBinaryOp::Lt,
-            lhs,
-            rhs,
-        } if is_terminal_branch_pure_expr(rhs, pure_helpers) => {
-            (lhs.as_ref(), PreparedLoopCompare::Lt, rhs.as_ref().clone())
-        }
-        NirExpr::Binary {
-            op: NirBinaryOp::Le,
-            lhs,
-            rhs,
-        } if is_terminal_branch_pure_expr(rhs, pure_helpers) => {
-            (lhs.as_ref(), PreparedLoopCompare::Le, rhs.as_ref().clone())
-        }
-        NirExpr::Binary {
-            op: NirBinaryOp::Gt,
-            lhs,
-            rhs,
-        } if is_terminal_branch_pure_expr(rhs, pure_helpers) => {
-            (lhs.as_ref(), PreparedLoopCompare::Gt, rhs.as_ref().clone())
-        }
-        NirExpr::Binary {
-            op: NirBinaryOp::Ge,
-            lhs,
-            rhs,
-        } if is_terminal_branch_pure_expr(rhs, pure_helpers) => {
-            (lhs.as_ref(), PreparedLoopCompare::Ge, rhs.as_ref().clone())
-        }
-        _ => return None,
-    };
-    let lhs = match lhs {
-        NirExpr::Var(name) if name == binding_name => PreparedCarryCondSource::Current,
-        NirExpr::Var(name) if name == TAIL_RECURSIVE_PREV_CURRENT_BINDING => {
-            PreparedCarryCondSource::PreviousCurrent
-        }
-        NirExpr::Var(name) if name.starts_with(TAIL_RECURSIVE_PREV_CARRY_BINDING_PREFIX) => {
-            PreparedCarryCondSource::PreviousCarry(
-                name[TAIL_RECURSIVE_PREV_CARRY_BINDING_PREFIX.len()..]
-                    .parse::<usize>()
-                    .ok()?,
+    }
+
+    #[test]
+    fn keep_like_loop_carry_exprs_do_not_report_unsupported_diagnostics() {
+        assert!(
+            diagnose_unsupported_loop_carry_expr(
+                "acc",
+                &NirExpr::Var("acc".to_owned()),
+                "current",
+                &[],
+                &BTreeMap::new(),
             )
-        }
-        NirExpr::Var(name) => {
-            PreparedCarryCondSource::Carry(find_prepared_carry_index(carries, name)?)
-        }
-        _ => return None,
-    };
-    Some(PreparedLoopCarryCondition { lhs, compare, rhs })
+            .is_none()
+        );
+        assert!(
+            diagnose_unsupported_loop_carry_expr(
+                "acc",
+                &NirExpr::Binary {
+                    op: NirBinaryOp::Add,
+                    lhs: Box::new(NirExpr::Var("acc".to_owned())),
+                    rhs: Box::new(NirExpr::Int(0)),
+                },
+                "current",
+                &[],
+                &BTreeMap::new(),
+            )
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn diagnose_unsupported_loop_carry_expr_reports_non_direct_dynamic_index_reads() {
+        let expr = NirExpr::Binary {
+            op: NirBinaryOp::Add,
+            lhs: Box::new(NirExpr::Var("acc".to_owned())),
+            rhs: Box::new(NirExpr::LoadAt {
+                buffer: Box::new(NirExpr::Var("buffer".to_owned())),
+                index: Box::new(NirExpr::Binary {
+                    op: NirBinaryOp::Add,
+                    lhs: Box::new(NirExpr::Var("current".to_owned())),
+                    rhs: Box::new(NirExpr::Int(1)),
+                }),
+            }),
+        };
+        let diagnostic =
+            diagnose_unsupported_loop_carry_expr("acc", &expr, "current", &[], &BTreeMap::new())
+                .expect("expected unsupported carry diagnostic");
+        assert!(diagnostic.contains("dynamic `load_at(buffer, index)` reads currently support only direct loop-state index drivers"));
+    }
+
+    #[test]
+    fn diagnose_unsupported_loop_carry_expr_reports_traversal_next_reads() {
+        let expr = NirExpr::Binary {
+            op: NirBinaryOp::Add,
+            lhs: Box::new(NirExpr::Var("acc".to_owned())),
+            rhs: Box::new(NirExpr::LoadNext(Box::new(NirExpr::Var(
+                "head_ref".to_owned(),
+            )))),
+        };
+        let diagnostic =
+            diagnose_unsupported_loop_carry_expr("acc", &expr, "current", &[], &BTreeMap::new())
+                .expect("expected unsupported carry diagnostic");
+        assert!(diagnostic.contains("`load_next(...)` traversal reads"));
+    }
 }

@@ -102,8 +102,9 @@ use loop_flow_nodes::{
 };
 use loop_nodes::{lower_async_chained_while, lower_chained_while, lower_counted_while};
 use loop_preparation::{
-    prepare_async_chained_while, prepare_async_flow_while, prepare_async_post_flow_while,
-    prepare_chained_while, prepare_counted_while, prepare_flow_while, prepare_post_flow_while,
+    diagnose_unsupported_prepared_while_carry, prepare_async_chained_while,
+    prepare_async_flow_while, prepare_async_post_flow_while, prepare_chained_while,
+    prepare_counted_while, prepare_flow_while, prepare_post_flow_while,
 };
 use loop_purity::{
     collect_inlineable_pure_helper_exprs, collect_pure_helper_blocks,

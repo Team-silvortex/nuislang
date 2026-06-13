@@ -77,6 +77,10 @@ pub(super) fn push_lifetime_edge(state: &mut LoweringState<'_>, from: &str, to: 
     push_unique_edge(state, EdgeKind::Lifetime, from, to);
 }
 
+pub(super) fn push_effect_edge(state: &mut LoweringState<'_>, from: &str, to: &str) {
+    push_unique_edge(state, EdgeKind::Effect, from, to);
+}
+
 fn push_unique_edge(state: &mut LoweringState<'_>, kind: EdgeKind, from: &str, to: &str) {
     let exists = state
         .yir

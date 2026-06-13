@@ -39,7 +39,10 @@ fn run() -> Result<(), String> {
             let frontdoor = toolchain_frontdoor_surface();
             println!("nuis toolchain frontdoor");
             print_workflow_frontdoor_surface(&frontdoor);
-            println!("  recommended_next_step: {}", frontdoor.recommended_next_step);
+            println!(
+                "  recommended_next_step: {}",
+                frontdoor.recommended_next_step
+            );
             println!("  recommended_command: {}", frontdoor.recommended_command);
             println!("  recommended_reason: {}", frontdoor.recommended_reason);
             println!("  tool: nuis");
@@ -1142,7 +1145,10 @@ fn handle_workflow(input: std::path::PathBuf, json: bool) -> Result<(), String> 
         println!("  root: {}", project.root.display());
         println!("  entry: {}", project.manifest.entry);
         print_workflow_frontdoor_surface(&frontdoor);
-        println!("  recommended_next_step: {}", frontdoor.recommended_next_step);
+        println!(
+            "  recommended_next_step: {}",
+            frontdoor.recommended_next_step
+        );
         println!("  recommended_command: {}", frontdoor.recommended_command);
         println!("  recommended_reason: {}", frontdoor.recommended_reason);
         print_project_management_hints(include_galaxy_flow);
@@ -1204,10 +1210,16 @@ fn handle_workflow(input: std::path::PathBuf, json: bool) -> Result<(), String> 
     println!("workflow: single-file");
     println!("  input: {}", input.display());
     print_workflow_frontdoor_surface(&frontdoor);
-    println!("  recommended_next_step: {}", frontdoor.recommended_next_step);
+    println!(
+        "  recommended_next_step: {}",
+        frontdoor.recommended_next_step
+    );
     println!("  recommended_command: {}", frontdoor.recommended_command);
     println!("  recommended_reason: {}", frontdoor.recommended_reason);
-    println!("  single_source_compile_workflow: {}", frontdoor.workflow_brief);
+    println!(
+        "  single_source_compile_workflow: {}",
+        frontdoor.workflow_brief
+    );
     print_scheduler_sample_field("single_source_compile_samples", frontdoor.workflow_samples);
     println!("  debug_workflow: {}", debug_workflow_brief());
     print_scheduler_sample_field("debug_samples", debug_workflow_samples_brief());
@@ -1716,7 +1728,10 @@ fn handle_scheduler_view(input: std::path::PathBuf, json: bool) -> Result<(), St
         println!("  source_kind: project");
         println!("  project: {}", project.manifest.name);
         print_workflow_frontdoor_surface(&frontdoor);
-        println!("  recommended_next_step: {}", frontdoor.recommended_next_step);
+        println!(
+            "  recommended_next_step: {}",
+            frontdoor.recommended_next_step
+        );
         println!("  recommended_command: {}", frontdoor.recommended_command);
         println!("  recommended_reason: {}", frontdoor.recommended_reason);
         println!(
@@ -1788,7 +1803,10 @@ fn handle_scheduler_view(input: std::path::PathBuf, json: bool) -> Result<(), St
     println!("  ast_domain: {}", artifacts.ast.domain);
     println!("  ast_unit: {}", artifacts.ast.unit);
     print_workflow_frontdoor_surface(&frontdoor);
-    println!("  recommended_next_step: {}", frontdoor.recommended_next_step);
+    println!(
+        "  recommended_next_step: {}",
+        frontdoor.recommended_next_step
+    );
     println!("  recommended_command: {}", frontdoor.recommended_command);
     println!("  recommended_reason: {}", frontdoor.recommended_reason);
     println!("  resolved_domains: {}", manifests.len());
@@ -1971,7 +1989,10 @@ fn handle_project_status(input: std::path::PathBuf, json: bool) -> Result<(), St
     println!("  manifest: {}", project.manifest_path.display());
     println!("  entry: {}", project.manifest.entry);
     print_workflow_frontdoor_surface(&frontdoor);
-    println!("  recommended_next_step: {}", frontdoor.recommended_next_step);
+    println!(
+        "  recommended_next_step: {}",
+        frontdoor.recommended_next_step
+    );
     println!("  recommended_command: {}", frontdoor.recommended_command);
     println!("  recommended_reason: {}", frontdoor.recommended_reason);
     println!("  modules: {}", project.modules.len());
@@ -2209,7 +2230,10 @@ fn handle_project_status_json(input: std::path::PathBuf) -> Result<(), String> {
     ];
     fields.extend(project_plan_json_fields(&plan));
     fields.push(json_usize_field("tests_declared", declared_tests.len()));
-    fields.extend(project_workflow_json_fields(&frontdoor, include_galaxy_flow));
+    fields.extend(project_workflow_json_fields(
+        &frontdoor,
+        include_galaxy_flow,
+    ));
     fields.push(json_field(
         "abi_mode",
         if plan.abi_resolution.explicit {
@@ -2347,7 +2371,10 @@ fn handle_project_doctor(input: std::path::PathBuf, json: bool) -> Result<(), St
     println!("  manifest: {}", project.manifest_path.display());
     println!("  entry: {}", project.manifest.entry);
     print_workflow_frontdoor_surface(&frontdoor);
-    println!("  recommended_next_step: {}", frontdoor.recommended_next_step);
+    println!(
+        "  recommended_next_step: {}",
+        frontdoor.recommended_next_step
+    );
     println!("  recommended_command: {}", frontdoor.recommended_command);
     println!("  recommended_reason: {}", frontdoor.recommended_reason);
     println!("  modules: {}", project.modules.len());
@@ -2902,7 +2929,10 @@ fn handle_project_doctor_json(input: std::path::PathBuf) -> Result<(), String> {
     fields.extend(project_plan_json_fields(&plan));
     fields.push(json_usize_field("tests_declared", declared_tests.len()));
     fields.push(json_usize_field("tests_missing", missing_tests.len()));
-    fields.extend(project_workflow_json_fields(&frontdoor, include_galaxy_flow));
+    fields.extend(project_workflow_json_fields(
+        &frontdoor,
+        include_galaxy_flow,
+    ));
     fields.push(json_field(
         "abi_mode",
         if plan.abi_resolution.explicit {
@@ -3342,7 +3372,10 @@ fn print_help() {
     let frontdoor = toolchain_frontdoor_surface();
     println!("nuis toolchain frontdoor");
     print_workflow_frontdoor_surface(&frontdoor);
-    println!("  recommended_next_step: {}", frontdoor.recommended_next_step);
+    println!(
+        "  recommended_next_step: {}",
+        frontdoor.recommended_next_step
+    );
     println!("  recommended_command: {}", frontdoor.recommended_command);
     println!("  recommended_reason: {}", frontdoor.recommended_reason);
     println!("usage:");
@@ -3624,7 +3657,9 @@ mod tests {
             frontdoor.workflow_brief,
             "check -> test -> build -> release_check"
         );
-        assert!(frontdoor.workflow_samples.contains("nuis build <input.ns> <output-dir>"));
+        assert!(frontdoor
+            .workflow_samples
+            .contains("nuis build <input.ns> <output-dir>"));
         assert_eq!(frontdoor.recommended_next_step, "check");
     }
 

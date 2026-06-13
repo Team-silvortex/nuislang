@@ -3,6 +3,7 @@ use crate::lowering::loop_carries::tail_recursive_prev_carry_binding;
 use crate::lowering::loop_purity::{
     collect_inlineable_pure_helper_exprs, extract_pure_branch_binding, substitute_branch_binding,
 };
+use nuis_semantics::model::NirParam;
 
 pub(super) fn rewrite_self_tail_recursive_functions(module: &NirModule) -> NirModule {
     let pure_helpers = collect_pure_helper_functions(module);
@@ -455,10 +456,12 @@ fn rewrite_self_tail_recursive_loop_body(
     function: &NirFunction,
     recursive_step: SelfTailRecursiveStep,
 ) -> Option<Vec<NirStmt>> {
-    let non_current_param_names = function
+    let invariant_param_names = tail_recursive_invariant_param_names(function, &recursive_step)?;
+    let carry_param_names = function
         .params
         .iter()
         .skip(1)
+        .filter(|param| !invariant_param_names.contains(&param.name))
         .map(|param| param.name.clone())
         .collect::<Vec<_>>();
     match recursive_step {
@@ -475,23 +478,20 @@ fn rewrite_self_tail_recursive_loop_body(
                     .iter()
                     .zip(recursive_args.iter())
                     .enumerate()
-                    .map(|(index, (param, arg))| {
+                    .filter_map(|(index, (param, arg))| {
                         let value = if index == 0 {
                             arg.clone()
                         } else {
                             canonicalize_tail_recursive_loop_arg(
                                 arg,
                                 &function.params[0].name,
-                                &non_current_param_names,
+                                &carry_param_names,
+                                &invariant_param_names,
                                 Some(&param.name),
                                 &next_current_expr,
                             )
                         };
-                        NirStmt::Let {
-                            name: param.name.clone(),
-                            ty: Some(param.ty.clone()),
-                            value,
-                        }
+                        tail_recursive_param_update_stmt(index, param, value)
                     })
                     .collect(),
             )
@@ -511,16 +511,16 @@ fn rewrite_self_tail_recursive_loop_body(
                         .iter()
                         .enumerate()
                         .skip(1)
-                        .map(|(index, param)| NirStmt::Let {
-                            name: param.name.clone(),
-                            ty: Some(param.ty.clone()),
-                            value: canonicalize_tail_recursive_loop_arg(
+                        .filter_map(|(index, param)| {
+                            let value = canonicalize_tail_recursive_loop_arg(
                                 &recursive_args[index],
                                 &function.params[0].name,
-                                &non_current_param_names,
+                                &carry_param_names,
+                                &invariant_param_names,
                                 Some(&param.name),
                                 &next_current_expr,
-                            ),
+                            );
+                            tail_recursive_param_update_stmt(index, param, value)
                         })
                         .collect::<Vec<_>>();
                     (next_current_expr, tail_stmts)
@@ -542,37 +542,38 @@ fn rewrite_self_tail_recursive_loop_body(
                     let branch_condition = canonicalize_tail_recursive_condition_expr(
                         branch_condition,
                         &function.params[0].name,
-                        &non_current_param_names,
+                        &carry_param_names,
+                        &invariant_param_names,
                     );
                     let tail_stmts = function
                         .params
                         .iter()
                         .enumerate()
                         .skip(1)
-                        .map(|(index, param)| NirStmt::If {
-                            condition: branch_condition.clone(),
-                            then_body: vec![NirStmt::Let {
-                                name: param.name.clone(),
-                                ty: Some(param.ty.clone()),
-                                value: canonicalize_tail_recursive_loop_arg(
-                                    &then_args[index],
-                                    &function.params[0].name,
-                                    &non_current_param_names,
-                                    Some(&param.name),
-                                    &next_current_expr,
-                                ),
-                            }],
-                            else_body: vec![NirStmt::Let {
-                                name: param.name.clone(),
-                                ty: Some(param.ty.clone()),
-                                value: canonicalize_tail_recursive_loop_arg(
-                                    &else_args[index],
-                                    &function.params[0].name,
-                                    &non_current_param_names,
-                                    Some(&param.name),
-                                    &next_current_expr,
-                                ),
-                            }],
+                        .filter_map(|(index, param)| {
+                            let then_value = canonicalize_tail_recursive_loop_arg(
+                                &then_args[index],
+                                &function.params[0].name,
+                                &carry_param_names,
+                                &invariant_param_names,
+                                Some(&param.name),
+                                &next_current_expr,
+                            );
+                            let else_value = canonicalize_tail_recursive_loop_arg(
+                                &else_args[index],
+                                &function.params[0].name,
+                                &carry_param_names,
+                                &invariant_param_names,
+                                Some(&param.name),
+                                &next_current_expr,
+                            );
+                            tail_recursive_param_branch_update_stmt(
+                                index,
+                                param,
+                                branch_condition.clone(),
+                                then_value,
+                                else_value,
+                            )
                         })
                         .collect::<Vec<_>>();
                     (next_current_expr, tail_stmts)
@@ -589,7 +590,8 @@ fn rewrite_self_tail_recursive_loop_body(
                 condition: canonicalize_tail_recursive_condition_expr(
                     &condition,
                     &function.params[0].name,
-                    &non_current_param_names,
+                    &carry_param_names,
+                    &invariant_param_names,
                 ),
                 then_body: vec![NirStmt::Break],
                 else_body: vec![],
@@ -616,16 +618,16 @@ fn rewrite_self_tail_recursive_loop_body(
                         .enumerate()
                         .skip(1)
                         .filter(|(index, _)| *index != control_carry_index)
-                        .map(|(index, param)| NirStmt::Let {
-                            name: param.name.clone(),
-                            ty: Some(param.ty.clone()),
-                            value: canonicalize_tail_recursive_loop_arg(
+                        .filter_map(|(index, param)| {
+                            let value = canonicalize_tail_recursive_loop_arg(
                                 &recursive_args[index],
                                 &function.params[0].name,
-                                &non_current_param_names,
+                                &carry_param_names,
+                                &invariant_param_names,
                                 Some(&param.name),
                                 &next_current_expr,
-                            ),
+                            );
+                            tail_recursive_param_update_stmt(index, param, value)
                         })
                         .collect::<Vec<_>>();
                     (
@@ -654,7 +656,8 @@ fn rewrite_self_tail_recursive_loop_body(
                     branch_condition = canonicalize_tail_recursive_condition_expr(
                         inner_condition,
                         &function.params[0].name,
-                        &non_current_param_names,
+                        &carry_param_names,
+                        &invariant_param_names,
                     );
                     let tail_stmts = function
                         .params
@@ -662,30 +665,30 @@ fn rewrite_self_tail_recursive_loop_body(
                         .enumerate()
                         .skip(1)
                         .filter(|(index, _)| *index != control_carry_index)
-                        .map(|(index, param)| NirStmt::If {
-                            condition: branch_condition.clone(),
-                            then_body: vec![NirStmt::Let {
-                                name: param.name.clone(),
-                                ty: Some(param.ty.clone()),
-                                value: canonicalize_tail_recursive_loop_arg(
-                                    &then_args[index],
-                                    &function.params[0].name,
-                                    &non_current_param_names,
-                                    Some(&param.name),
-                                    &next_current_expr,
-                                ),
-                            }],
-                            else_body: vec![NirStmt::Let {
-                                name: param.name.clone(),
-                                ty: Some(param.ty.clone()),
-                                value: canonicalize_tail_recursive_loop_arg(
-                                    &else_args[index],
-                                    &function.params[0].name,
-                                    &non_current_param_names,
-                                    Some(&param.name),
-                                    &next_current_expr,
-                                ),
-                            }],
+                        .filter_map(|(index, param)| {
+                            let then_value = canonicalize_tail_recursive_loop_arg(
+                                &then_args[index],
+                                &function.params[0].name,
+                                &carry_param_names,
+                                &invariant_param_names,
+                                Some(&param.name),
+                                &next_current_expr,
+                            );
+                            let else_value = canonicalize_tail_recursive_loop_arg(
+                                &else_args[index],
+                                &function.params[0].name,
+                                &carry_param_names,
+                                &invariant_param_names,
+                                Some(&param.name),
+                                &next_current_expr,
+                            );
+                            tail_recursive_param_branch_update_stmt(
+                                index,
+                                param,
+                                branch_condition.clone(),
+                                then_value,
+                                else_value,
+                            )
                         })
                         .collect::<Vec<_>>();
                     (
@@ -703,17 +706,19 @@ fn rewrite_self_tail_recursive_loop_body(
                 value: next_current_expr.clone(),
             }];
             let control_param = &function.params[control_carry_index];
-            body.push(NirStmt::Let {
-                name: control_param.name.clone(),
-                ty: Some(control_param.ty.clone()),
-                value: canonicalize_tail_recursive_loop_arg(
-                    &control_carry_expr,
-                    &function.params[0].name,
-                    &non_current_param_names,
-                    Some(&control_param.name),
-                    &next_current_expr,
-                ),
-            });
+            let control_value = canonicalize_tail_recursive_loop_arg(
+                &control_carry_expr,
+                &function.params[0].name,
+                &carry_param_names,
+                &invariant_param_names,
+                Some(&control_param.name),
+                &next_current_expr,
+            );
+            if let Some(stmt) =
+                tail_recursive_param_update_stmt(control_carry_index, control_param, control_value)
+            {
+                body.push(stmt);
+            }
             body.extend(tail_stmts);
             body.push(NirStmt::If {
                 condition: rewrite_post_flow_break_condition(
@@ -721,7 +726,8 @@ fn rewrite_self_tail_recursive_loop_body(
                     &control_carry_expr,
                     &control_param.name,
                     &function.params[0].name,
-                    &non_current_param_names,
+                    &carry_param_names,
+                    &invariant_param_names,
                 )?,
                 then_body: vec![NirStmt::Break],
                 else_body: vec![],
@@ -743,7 +749,8 @@ fn rewrite_self_tail_recursive_loop_body(
             let branch_condition = canonicalize_tail_recursive_condition_expr(
                 &condition,
                 &function.params[0].name,
-                &non_current_param_names,
+                &carry_param_names,
+                &invariant_param_names,
             );
             let next_current_expr = then_args[0].clone();
             let mut body = vec![NirStmt::Let {
@@ -755,34 +762,130 @@ fn rewrite_self_tail_recursive_loop_body(
                 let then_value = canonicalize_tail_recursive_loop_arg(
                     &then_args[index],
                     &function.params[0].name,
-                    &non_current_param_names,
+                    &carry_param_names,
+                    &invariant_param_names,
                     Some(&param.name),
                     &next_current_expr,
                 );
                 let else_value = canonicalize_tail_recursive_loop_arg(
                     &else_args[index],
                     &function.params[0].name,
-                    &non_current_param_names,
+                    &carry_param_names,
+                    &invariant_param_names,
                     Some(&param.name),
                     &next_current_expr,
                 );
-                body.push(NirStmt::If {
-                    condition: branch_condition.clone(),
-                    then_body: vec![NirStmt::Let {
-                        name: param.name.clone(),
-                        ty: Some(param.ty.clone()),
-                        value: then_value,
-                    }],
-                    else_body: vec![NirStmt::Let {
-                        name: param.name.clone(),
-                        ty: Some(param.ty.clone()),
-                        value: else_value,
-                    }],
-                });
+                if let Some(stmt) = tail_recursive_param_branch_update_stmt(
+                    index,
+                    param,
+                    branch_condition.clone(),
+                    then_value,
+                    else_value,
+                ) {
+                    body.push(stmt);
+                }
             }
             Some(body)
         }
     }
+}
+
+fn tail_recursive_invariant_param_names(
+    function: &NirFunction,
+    recursive_step: &SelfTailRecursiveStep,
+) -> Option<BTreeSet<String>> {
+    fn step_args<'a>(
+        step: &'a SelfTailRecursiveStep,
+    ) -> Option<(&'a [NirExpr], Option<&'a [NirExpr]>)> {
+        match step {
+            SelfTailRecursiveStep::Linear(args) => Some((args.as_slice(), None)),
+            SelfTailRecursiveStep::Branch {
+                then_args,
+                else_args,
+                ..
+            } => Some((then_args.as_slice(), Some(else_args.as_slice()))),
+            SelfTailRecursiveStep::FlowBreak { recursive_step, .. }
+            | SelfTailRecursiveStep::PostFlowBreak { recursive_step, .. } => {
+                step_args(recursive_step)
+            }
+        }
+    }
+
+    let (primary_args, alternate_args) = step_args(recursive_step)?;
+    if primary_args.len() != function.params.len() {
+        return None;
+    }
+    if let Some(alternate_args) = alternate_args {
+        if alternate_args.len() != function.params.len() {
+            return None;
+        }
+    }
+
+    let mut invariants = BTreeSet::new();
+    for (index, param) in function.params.iter().enumerate().skip(1) {
+        let primary_matches =
+            matches!(&primary_args[index], NirExpr::Var(name) if name == &param.name);
+        let alternate_matches = alternate_args
+            .map(|args| matches!(&args[index], NirExpr::Var(name) if name == &param.name))
+            .unwrap_or(true);
+        if primary_matches && alternate_matches {
+            invariants.insert(param.name.clone());
+        }
+    }
+    Some(invariants)
+}
+
+fn tail_recursive_param_update_stmt(
+    index: usize,
+    param: &NirParam,
+    value: NirExpr,
+) -> Option<NirStmt> {
+    if index != 0 && value == NirExpr::Var(param.name.clone()) {
+        return None;
+    }
+    Some(NirStmt::Let {
+        name: param.name.clone(),
+        ty: Some(param.ty.clone()),
+        value,
+    })
+}
+
+fn tail_recursive_param_branch_update_stmt(
+    index: usize,
+    param: &NirParam,
+    condition: NirExpr,
+    then_value: NirExpr,
+    else_value: NirExpr,
+) -> Option<NirStmt> {
+    fn branch_keep_previous_placeholder(index: usize, param: &NirParam, value: NirExpr) -> NirExpr {
+        if index != 0 && value == NirExpr::Var(param.name.clone()) {
+            NirExpr::Var(tail_recursive_prev_carry_binding(index - 1))
+        } else {
+            value
+        }
+    }
+
+    if index != 0
+        && then_value == NirExpr::Var(param.name.clone())
+        && else_value == NirExpr::Var(param.name.clone())
+    {
+        return None;
+    }
+    let then_value = branch_keep_previous_placeholder(index, param, then_value);
+    let else_value = branch_keep_previous_placeholder(index, param, else_value);
+    Some(NirStmt::If {
+        condition,
+        then_body: vec![NirStmt::Let {
+            name: param.name.clone(),
+            ty: Some(param.ty.clone()),
+            value: then_value,
+        }],
+        else_body: vec![NirStmt::Let {
+            name: param.name.clone(),
+            ty: Some(param.ty.clone()),
+            value: else_value,
+        }],
+    })
 }
 
 fn rewrite_post_flow_break_condition(
@@ -791,6 +894,7 @@ fn rewrite_post_flow_break_condition(
     updated_binding: &str,
     current_name: &str,
     non_current_param_names: &[String],
+    invariant_param_names: &BTreeSet<String>,
 ) -> Option<NirExpr> {
     let NirExpr::Binary { op, lhs, rhs } = condition else {
         return None;
@@ -805,6 +909,7 @@ fn rewrite_post_flow_break_condition(
             rhs,
             current_name,
             non_current_param_names,
+            invariant_param_names,
         )),
     })
 }
@@ -936,6 +1041,7 @@ fn canonicalize_tail_recursive_loop_arg(
     expr: &NirExpr,
     current_name: &str,
     non_current_param_names: &[String],
+    invariant_param_names: &BTreeSet<String>,
     target_carry_name: Option<&str>,
     next_current_expr: &NirExpr,
 ) -> NirExpr {
@@ -948,6 +1054,8 @@ fn canonicalize_tail_recursive_loop_arg(
         }
         NirExpr::Var(name) => {
             if target_carry_name.is_some() && Some(name.as_str()) == target_carry_name {
+                expr.clone()
+            } else if invariant_param_names.contains(name) {
                 expr.clone()
             } else {
                 non_current_param_names
@@ -969,6 +1077,7 @@ fn canonicalize_tail_recursive_loop_arg(
                 inner,
                 current_name,
                 non_current_param_names,
+                invariant_param_names,
                 target_carry_name,
                 next_current_expr,
             )))
@@ -977,6 +1086,7 @@ fn canonicalize_tail_recursive_loop_arg(
             inner,
             current_name,
             non_current_param_names,
+            invariant_param_names,
             target_carry_name,
             next_current_expr,
         ))),
@@ -989,6 +1099,7 @@ fn canonicalize_tail_recursive_loop_arg(
                         arg,
                         current_name,
                         non_current_param_names,
+                        invariant_param_names,
                         target_carry_name,
                         next_current_expr,
                     )
@@ -1004,6 +1115,7 @@ fn canonicalize_tail_recursive_loop_arg(
                 receiver,
                 current_name,
                 non_current_param_names,
+                invariant_param_names,
                 target_carry_name,
                 next_current_expr,
             )),
@@ -1015,6 +1127,7 @@ fn canonicalize_tail_recursive_loop_arg(
                         arg,
                         current_name,
                         non_current_param_names,
+                        invariant_param_names,
                         target_carry_name,
                         next_current_expr,
                     )
@@ -1037,6 +1150,7 @@ fn canonicalize_tail_recursive_loop_arg(
                             value,
                             current_name,
                             non_current_param_names,
+                            invariant_param_names,
                             target_carry_name,
                             next_current_expr,
                         ),
@@ -1049,10 +1163,67 @@ fn canonicalize_tail_recursive_loop_arg(
                 base,
                 current_name,
                 non_current_param_names,
+                invariant_param_names,
                 target_carry_name,
                 next_current_expr,
             )),
             field: field.clone(),
+        },
+        NirExpr::IsNull(inner) => NirExpr::IsNull(Box::new(canonicalize_tail_recursive_loop_arg(
+            inner,
+            current_name,
+            non_current_param_names,
+            invariant_param_names,
+            target_carry_name,
+            next_current_expr,
+        ))),
+        NirExpr::LoadValue(inner) => {
+            NirExpr::LoadValue(Box::new(canonicalize_tail_recursive_loop_arg(
+                inner,
+                current_name,
+                non_current_param_names,
+                invariant_param_names,
+                target_carry_name,
+                next_current_expr,
+            )))
+        }
+        NirExpr::LoadNext(inner) => {
+            NirExpr::LoadNext(Box::new(canonicalize_tail_recursive_loop_arg(
+                inner,
+                current_name,
+                non_current_param_names,
+                invariant_param_names,
+                target_carry_name,
+                next_current_expr,
+            )))
+        }
+        NirExpr::BufferLen(inner) => {
+            NirExpr::BufferLen(Box::new(canonicalize_tail_recursive_loop_arg(
+                inner,
+                current_name,
+                non_current_param_names,
+                invariant_param_names,
+                target_carry_name,
+                next_current_expr,
+            )))
+        }
+        NirExpr::LoadAt { buffer, index } => NirExpr::LoadAt {
+            buffer: Box::new(canonicalize_tail_recursive_loop_arg(
+                buffer,
+                current_name,
+                non_current_param_names,
+                invariant_param_names,
+                target_carry_name,
+                next_current_expr,
+            )),
+            index: Box::new(canonicalize_tail_recursive_loop_arg(
+                index,
+                current_name,
+                non_current_param_names,
+                invariant_param_names,
+                target_carry_name,
+                next_current_expr,
+            )),
         },
         NirExpr::Binary { op, lhs, rhs } => NirExpr::Binary {
             op: *op,
@@ -1060,6 +1231,7 @@ fn canonicalize_tail_recursive_loop_arg(
                 lhs,
                 current_name,
                 non_current_param_names,
+                invariant_param_names,
                 target_carry_name,
                 next_current_expr,
             )),
@@ -1067,6 +1239,7 @@ fn canonicalize_tail_recursive_loop_arg(
                 rhs,
                 current_name,
                 non_current_param_names,
+                invariant_param_names,
                 target_carry_name,
                 next_current_expr,
             )),
@@ -1079,17 +1252,24 @@ fn canonicalize_tail_recursive_condition_expr(
     expr: &NirExpr,
     current_name: &str,
     non_current_param_names: &[String],
+    invariant_param_names: &BTreeSet<String>,
 ) -> NirExpr {
     match expr {
         NirExpr::Var(name) if name == current_name => {
             NirExpr::Var(TAIL_RECURSIVE_PREV_CURRENT_BINDING.to_owned())
         }
-        NirExpr::Var(name) => non_current_param_names
-            .iter()
-            .position(|param_name| param_name == name)
-            .map(tail_recursive_prev_carry_binding)
-            .map(NirExpr::Var)
-            .unwrap_or_else(|| expr.clone()),
+        NirExpr::Var(name) => {
+            if invariant_param_names.contains(name) {
+                expr.clone()
+            } else {
+                non_current_param_names
+                    .iter()
+                    .position(|param_name| param_name == name)
+                    .map(tail_recursive_prev_carry_binding)
+                    .map(NirExpr::Var)
+                    .unwrap_or_else(|| expr.clone())
+            }
+        }
         NirExpr::Bool(_)
         | NirExpr::Text(_)
         | NirExpr::Int(_)
@@ -1101,6 +1281,7 @@ fn canonicalize_tail_recursive_condition_expr(
                 inner,
                 current_name,
                 non_current_param_names,
+                invariant_param_names,
             )))
         }
         NirExpr::Await(inner) => {
@@ -1108,6 +1289,7 @@ fn canonicalize_tail_recursive_condition_expr(
                 inner,
                 current_name,
                 non_current_param_names,
+                invariant_param_names,
             )))
         }
         NirExpr::Call { callee, args } => NirExpr::Call {
@@ -1119,6 +1301,7 @@ fn canonicalize_tail_recursive_condition_expr(
                         arg,
                         current_name,
                         non_current_param_names,
+                        invariant_param_names,
                     )
                 })
                 .collect(),
@@ -1132,6 +1315,7 @@ fn canonicalize_tail_recursive_condition_expr(
                 receiver,
                 current_name,
                 non_current_param_names,
+                invariant_param_names,
             )),
             method: method.clone(),
             args: args
@@ -1141,6 +1325,7 @@ fn canonicalize_tail_recursive_condition_expr(
                         arg,
                         current_name,
                         non_current_param_names,
+                        invariant_param_names,
                     )
                 })
                 .collect(),
@@ -1161,6 +1346,7 @@ fn canonicalize_tail_recursive_condition_expr(
                             value,
                             current_name,
                             non_current_param_names,
+                            invariant_param_names,
                         ),
                     )
                 })
@@ -1171,8 +1357,55 @@ fn canonicalize_tail_recursive_condition_expr(
                 base,
                 current_name,
                 non_current_param_names,
+                invariant_param_names,
             )),
             field: field.clone(),
+        },
+        NirExpr::IsNull(inner) => {
+            NirExpr::IsNull(Box::new(canonicalize_tail_recursive_condition_expr(
+                inner,
+                current_name,
+                non_current_param_names,
+                invariant_param_names,
+            )))
+        }
+        NirExpr::LoadValue(inner) => {
+            NirExpr::LoadValue(Box::new(canonicalize_tail_recursive_condition_expr(
+                inner,
+                current_name,
+                non_current_param_names,
+                invariant_param_names,
+            )))
+        }
+        NirExpr::LoadNext(inner) => {
+            NirExpr::LoadNext(Box::new(canonicalize_tail_recursive_condition_expr(
+                inner,
+                current_name,
+                non_current_param_names,
+                invariant_param_names,
+            )))
+        }
+        NirExpr::BufferLen(inner) => {
+            NirExpr::BufferLen(Box::new(canonicalize_tail_recursive_condition_expr(
+                inner,
+                current_name,
+                non_current_param_names,
+                invariant_param_names,
+            )))
+        }
+        NirExpr::LoadAt { buffer, index } => NirExpr::LoadAt {
+            buffer: Box::new(canonicalize_tail_recursive_condition_expr(
+                buffer,
+                current_name,
+                non_current_param_names,
+                invariant_param_names,
+            )),
+            index: Box::new(canonicalize_tail_recursive_condition_expr(
+                index,
+                current_name,
+                non_current_param_names,
+                invariant_param_names,
+            )),
         },
         NirExpr::Binary { op, lhs, rhs } => NirExpr::Binary {
             op: *op,
@@ -1180,13 +1413,89 @@ fn canonicalize_tail_recursive_condition_expr(
                 lhs,
                 current_name,
                 non_current_param_names,
+                invariant_param_names,
             )),
             rhs: Box::new(canonicalize_tail_recursive_condition_expr(
                 rhs,
                 current_name,
                 non_current_param_names,
+                invariant_param_names,
             )),
         },
         _ => expr.clone(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::frontend::parse_nuis_module;
+
+    #[test]
+    fn rewrites_async_nested_post_flow_branching_tail_recursion_into_while() {
+        let module = parse_nuis_module(
+            r#"
+            mod cpu Main {
+              async fn sum_until(current: i64, acc: i64, flag: i64) -> i64 {
+                if current == 0 {
+                  return acc;
+                }
+                if acc + current > 6 {
+                  return acc + current;
+                }
+                if current > 3 {
+                  return await sum_until(current - 1, acc + current, flag + current);
+                } else {
+                  if current > 1 {
+                    return await sum_until(current - 1, acc + current, flag + current);
+                  } else {
+                    return await sum_until(current - 1, acc + current, flag + 0);
+                  }
+                }
+              }
+
+              async fn main() -> i64 {
+                return await sum_until(5, 0, 0);
+              }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let pure_helpers = collect_pure_helper_functions(&module);
+        let inlineable_pure_helpers = collect_inlineable_pure_helper_exprs(&module);
+        let pure_helper_blocks = collect_pure_helper_blocks(&module);
+        let original = module
+            .functions
+            .iter()
+            .find(|function| function.name == "sum_until")
+            .expect("expected sum_until");
+        let (recurse_condition, base_return, recursive_step) =
+            extract_self_tail_recursive_shape(original, &pure_helpers)
+                .expect("expected recursive shape to be recognized");
+        let loop_body = rewrite_self_tail_recursive_loop_body(original, recursive_step)
+            .expect("expected recursive loop body rewrite");
+        assert!(
+            is_self_tail_recursive_loop_shape(
+                &recurse_condition,
+                &loop_body,
+                &pure_helpers,
+                &inlineable_pure_helpers,
+                &pure_helper_blocks,
+            ),
+            "expected rewritten loop body to satisfy self-tail-recursive loop shape; base_return={base_return:?}, body={loop_body:?}"
+        );
+
+        let rewritten = rewrite_self_tail_recursive_functions(&module);
+        let sum_until = rewritten
+            .functions
+            .iter()
+            .find(|function| function.name == "sum_until")
+            .expect("expected sum_until");
+        assert!(
+            matches!(sum_until.body.first(), Some(NirStmt::While { .. })),
+            "expected self tail recursion rewrite to produce a while loop, got {:?}",
+            sum_until.body
+        );
     }
 }

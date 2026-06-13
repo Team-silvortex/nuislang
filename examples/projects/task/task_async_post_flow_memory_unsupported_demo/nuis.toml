@@ -1,0 +1,6 @@
+[package]
+name = "task_async_post_flow_memory_unsupported_demo"
+version = "0.1.0"
+
+[build]
+entry = "main.ns"

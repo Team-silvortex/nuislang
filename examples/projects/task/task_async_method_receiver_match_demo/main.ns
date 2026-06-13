@@ -1,0 +1,30 @@
+mod cpu Main {
+  trait Addable {
+    fn add(lhs: Self, rhs: Self) -> Self;
+  }
+
+  impl Addable for i64 {
+    fn add(lhs: i64, rhs: i64) -> i64 {
+      return lhs + rhs;
+    }
+  }
+
+  async fn one() -> i64 {
+    return 1;
+  }
+
+  async fn two() -> i64 {
+    return 2;
+  }
+
+  async fn apply(seed: i64) -> i64 {
+    return (await match seed {
+      1 => { one() },
+      _ => { two() }
+    }).add(3);
+  }
+
+  async fn main() -> i64 {
+    return await apply(1);
+  }
+}

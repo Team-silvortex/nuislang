@@ -1,472 +1,171 @@
 # `nuis` Projects
 
-This folder contains multi-file `nuis` project examples driven by `nuis.toml`.
-This is the current canonical route for reading real `.ns` programs in this repo.
+This folder contains multi-file `nuis` project examples driven by
+`nuis.toml`.
 
-Current layout:
+The important reading rule now is:
 
-* showcase projects stay at the root of this folder
-* narrow one-file companions now live under:
+* not every project here is meant to be a first-stop example
+* this folder mixes:
+  - frontdoor showcase projects
+  - narrow feature/regression companions
+  - probe/validation routes
+  - domain recipe ladders
+* if you want the current shortest mainline path first, start with
+  [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
+* if you want the current cleanup/status board for project routes, use
+  [docs/examples-freshness-audit.md](/Users/Shared/chroot/dev/nuislang/docs/examples-freshness-audit.md)
+
+## What This Folder Is For
+
+Project mode is still the main checked-in route for real end-to-end source
+programs in this repository.
+
+Compared with a single `.ns` file, project mode currently gives you:
+
+* `nuis.toml` manifests
+* multi-file `cpu / data / shader / kernel` splits
+* project-level `links`
+* ABI locking or auto-resolution
+* project-level compiler and build metadata outputs
+
+Current practical rule:
+
+* use projects to understand the real compile workflow
+* use single-file `.ns` examples for narrow language surface reading
+* use handwritten `YIR` only when you want the lower semantic layer directly
+
+## Start Here
+
+These are the best current first-entry projects:
+
+* [window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo)
+  current `cpu + data + shader` showcase and the main documented project flow
+* [kernel_tensor_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/kernel_tensor_demo)
+  current `cpu + data + kernel` showcase for the project pipeline
+
+Useful first commands:
+
+```bash
+cargo run -p nuis -- project-doctor examples/projects/window_controls_demo
+cargo run -p nuis -- check examples/projects/window_controls_demo
+cargo run -p nuis -- test examples/projects/window_controls_demo
+cargo run -p nuis -- build examples/projects/window_controls_demo examples/bins/window_controls_demo_project
+```
+
+## Current Layout
+
+The folder is intentionally split by role:
+
+* showcase projects stay at the root:
+  - [window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo)
+  - [kernel_tensor_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/kernel_tensor_demo)
+* grouped companions live under:
   - [task](/Users/Shared/chroot/dev/nuislang/examples/projects/task)
   - [tooling](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling)
   - [state](/Users/Shared/chroot/dev/nuislang/examples/projects/state)
   - [filesystem](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem)
   - [domains](/Users/Shared/chroot/dev/nuislang/examples/projects/domains)
-* shared domain-local helper modules now live under:
+* shared domain helper modules live under:
   - [domains/shared](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shared)
 
-## What A Project Gives You
+## Pick By Goal
 
-Compared with a single `.ns` file, project mode currently adds:
+If you are trying to orient quickly, use one representative route instead of
+reading an entire subtree.
 
-* `nuis.toml` manifest
-* multi-file `mod cpu / mod data / mod shader / mod kernel` split
-* project-level `links`
-* project-level ABI locking or auto-resolution
-* project metadata outputs during `build`
-* compile-cache identity based on the whole project input set
-* a normalized compiler-side project plan view, now also emitted as
-  `nuis.project.plan.txt` during `build`
-* a normalized compiler-side project organization view, now also emitted as
-  `nuis.project.organization.txt` during `build`
-* a normalized project exchange view, now also emitted as
-  `nuis.project.exchange.txt` during `build`
-
-Current project `links` are not only manifest hints anymore. They are checked
-against final `YIR` as real `source -> data -> target` exchange structure.
-
-Projects can lock required `nustar` ABI profiles per domain via:
-
-```toml
-abi = [
-  "cpu=cpu.arm64.apple_aapcs64",
-  "data=data.fabric.macos.arm64.v1",
-  "shader=shader.metal.msl2_4",
-]
-```
-
-If `abi` is omitted, `nuisc/nuis` now auto-resolve a host-matching ABI set per
-involved domain from the `abi_targets` registered by each `nustar` package.
-
-Per-domain lane defaults are also declared by each `nustar` package through
-`default_lanes = ["op.name=lane"]`, so project/profile lowering stays mod-owned
-and `nuisc` only applies declared policy plus narrow fallback rules.
-
-## Core Commands
-
-Recommended project-management flow:
-
-```text
-project-doctor
-  -> project-status
-  -> scheduler-view
-  -> project-lock-abi
-  -> check
-  -> test
-  -> build
-```
-
-Current project-aware front doors now also converge on the same compiler-side
-summary line:
-
-```text
-project_plan: entry=<entry> domains=<...> exchanges=<n> abi_mode=<...>
-```
-
-That summary is now printed by:
-
-* `project-status`
-* `project-doctor`
-* `scheduler-view`
-* `project-lock-abi`
-* `galaxy check`
-* `galaxy doctor`
-* `galaxy lock-deps`
-* `galaxy verify-lock`
-* `galaxy sync-deps`
-
-`project-status` and `project-doctor` now also accept `--json`, so the same
-project-plan structure can be consumed directly by tools instead of being read
-back out of text output.
-
-The emitted [nuis.project.plan.txt](/private/tmp/net_session_recipe_demo_out/nuis.project.plan.txt)
-now also captures three plan-local structure layers:
-
-* `dependencies`
-* `synthetic_input_kind` / `synthetic_input`
-* `output_intents`
-
-Useful test splits:
-
-```text
-nuis test --list <project-dir>
-nuis test --exact <project-dir> <test-name>
-nuis test --ignored <project-dir>
-nuis test --include-ignored <project-dir>
-```
-
-Inspect project state:
-
-```bash
-cargo run -p nuis -- project-status examples/projects/window_controls_demo
-cargo run -p nuis -- project-lock-abi examples/projects/window_controls_demo
-```
-
-Validate and build:
-
-```bash
-cargo run -p nuis -- check examples/projects/window_controls_demo
-cargo run -p nuis -- build examples/projects/window_controls_demo examples/bins/window_controls_demo_project
-
-cargo run -p nuis -- check examples/projects/kernel_tensor_demo
-cargo run -p nuis -- build examples/projects/kernel_tensor_demo examples/bins/kernel_tensor_demo_project
-```
-
-Inspect cache and artifact metadata:
-
-```bash
-cargo run -p nuis -- cache-status examples/projects/window_controls_demo
-cargo run -p nuis -- verify-build-manifest examples/bins/window_controls_demo_project/nuis.build.manifest.toml
-```
-
-Override CPU target when needed:
-
-```bash
-cargo run -p nuis -- build --cpu-abi cpu.arm64.apple_aapcs64 \
-  examples/projects/kernel_tensor_demo \
-  examples/bins/kernel_tensor_demo_project
-
-cargo run -p nuis -- build --target aarch64-apple-darwin \
-  examples/projects/kernel_tensor_demo \
-  examples/bins/kernel_tensor_demo_project
-```
-
-Recommended starting point:
-
-* [window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo)
-  three-file real-time ball demo:
-  `main.ns`, `surface_shader.ns`, `fabric_plane.ns`
-  with project links:
-  `cpu.Main -> shader.SurfaceShader via data.FabricPlane`
-  `shader.SurfaceShader -> cpu.Main via data.FabricPlane`
-  and per-mod `profile()` hooks in shader/data files that now also emit
-  concrete `YIR` setup nodes during project compilation.
-  `SurfaceShader` now contributes target/viewport/pipeline plus draw budget constants,
-  plus inline WGSL source blocks via:
-  `shader_inline_wgsl("entry", wgsl { ... })`
-  while `FabricPlane` contributes bind-core, handle table, sync markers, and
-  explicit uplink/downlink window policy nodes that are stitched into the final
-  data-plane graph. The data profile markers are now validated per link
-  direction, so a `cpu <-> shader` fabric only needs its own sync pair.
-
-`window_controls_demo` is also the current migration source for the first
-checked-in `ns-nova` stdlib recipes. The relationship today is:
-
-* runtime orchestration patterns are being extracted into
-  [stdlib/ns-nova/core/window_controls_runtime_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/core/window_controls_runtime_recipe.ns)
-* UI/selection/control assembly patterns are being extracted into
-  [stdlib/ns-nova/ui/window_controls_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/ui/window_controls_recipe.ns)
-* scene/render-world assembly patterns are being extracted into
-  [stdlib/ns-nova/scene/window_controls_scene_recipe.ns](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/scene/window_controls_scene_recipe.ns)
-
-What still remains demo-local on purpose:
-
-* the full end-to-end one-file assembly of all those routes together
-* project-specific host/window wiring
-* the exact demo tuning constants and packet mixes used to stress the current
-  `ns -> NIR -> YIR -> build` chain
-
-Core companion routes:
-
-* [kernel_tensor_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/kernel_tensor_demo)
-  the main `cpu + data + kernel` project route alongside
-  [window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo)
-* domain-profile companions:
-  shared helpers:
-  [domains/shared](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shared),
-  [shader_task_async_shapes.ns](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shared/shader_task_async_shapes.ns),
-  [kernel_task_async_shapes.ns](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shared/kernel_task_async_shapes.ns)
-  and
-  [shader_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_profile_demo),
-  [shader_surface_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_profile_demo),
-  [shader_surface_material_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_profile_demo),
-  [shader_surface_material_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_pass_profile_demo),
-  [shader_surface_material_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_packet_profile_demo),
-  [shader_surface_material_panel_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_panel_profile_demo),
-  [shader_surface_state_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_state_profile_demo),
-  [shader_surface_state_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_state_packet_profile_demo),
-  [shader_surface_state_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_state_pass_profile_demo),
-  [shader_surface_state_flow_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_state_flow_profile_demo),
-  [shader_surface_material_flow_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_material_flow_profile_demo),
-  [shader_surface_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_packet_profile_demo),
-  [shader_surface_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_surface_pass_profile_demo),
-  [shader_packet_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_packet_profile_demo),
-  [shader_packet_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_packet_bridge_demo),
-  [shader_pass_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_pass_profile_demo),
-  [shader_frame_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_frame_profile_demo),
-  [shader_async_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_result_profile_demo),
-  [shader_async_fanin_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_fanin_profile_demo),
-  [shader_async_schedule_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_schedule_profile_demo),
-  [shader_async_policy_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_policy_profile_demo),
-  [shader_async_fallback_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_fallback_profile_demo),
-  [shader_async_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_batch_profile_demo),
-  [shader_async_windowed_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_async_windowed_batch_profile_demo),
-  [shader_result_family_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_result_family_profile_demo),
-  [shader_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_result_profile_demo),
-  [shader_draw_render_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_draw_render_profile_demo),
-  [shader_draw_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_draw_profile_demo),
-  [shader_render_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_render_profile_demo),
-  [network_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_demo),
-  [network_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_result_profile_demo),
-  [network_result_task_policy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_result_task_policy_demo),
-  [network_result_task_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_result_task_batch_demo),
-  [network_result_task_windowed_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_result_task_windowed_batch_demo),
-  [network_result_session_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_result_session_bridge_demo),
-  [network_profile_summary_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_summary_demo),
-  [network_profile_session_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_session_demo),
-  [network_profile_task_policy_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_task_policy_demo),
-  [network_profile_task_fallback_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_task_fallback_demo),
-  [network_profile_task_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_task_batch_demo),
-  [network_profile_task_windowed_batch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_task_windowed_batch_demo),
-  [multidomain_profile_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/multidomain_profile_probe_demo),
-  [multidomain_async_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/multidomain_async_probe_demo),
-  [multidomain_async_orchestration_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/multidomain_async_orchestration_demo),
-  [kernel_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_profile_demo),
-  [kernel_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_result_profile_demo),
-  [kernel_async_result_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_result_profile_demo),
-  [kernel_async_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_batch_profile_demo),
-  [kernel_async_tensor_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_batch_profile_demo),
-  [kernel_async_tensor_policy_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_policy_profile_demo),
-  [kernel_async_tensor_fallback_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_fallback_profile_demo),
-  [kernel_async_tensor_windowed_batch_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_windowed_batch_profile_demo),
-  [kernel_async_tensor_roundtrip_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_tensor_roundtrip_profile_demo),
-  [kernel_async_roundtrip_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_async_roundtrip_profile_demo),
-  [kernel_tensor_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_profile_demo),
-  [kernel_tensor_inspect_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_inspect_demo),
-  [kernel_tensor_slice_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_slice_demo),
-  [kernel_tensor_reshape_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_reshape_demo),
-  [kernel_tensor_broadcast_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_broadcast_demo),
-  [kernel_tensor_reduce_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_reduce_demo),
-  [kernel_tensor_select_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_select_demo),
-  [kernel_tensor_order_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_order_demo),
-  [kernel_tensor_axis_reduce_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_reduce_demo),
-  [kernel_tensor_axis_family_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_family_demo),
-  [kernel_tensor_axis_select_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_select_demo),
-  [kernel_tensor_axis_sort_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_sort_demo),
-  [kernel_tensor_axis_order_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_order_demo),
-  [kernel_tensor_axis_map_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_map_demo),
-  [kernel_tensor_axis_pipeline_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_pipeline_demo),
-  [kernel_tensor_axis_roundtrip_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_axis_roundtrip_demo),
-  [kernel_tensor_map_zip_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_tensor_map_zip_demo),
-  [kernel_roundtrip_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_roundtrip_profile_demo)
-* task-facing companions:
+* control flow / recursion / generics:
+  [state](/Users/Shared/chroot/dev/nuislang/examples/projects/state)
+  Start with:
+  [chained_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/chained_while_demo),
+  [match_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_branching_while_demo),
+  [tail_recursive_sum_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_sum_demo),
+  [generic_method_bound_if_binding_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_if_binding_demo)
+* async tasks / task-result control:
+  [task](/Users/Shared/chroot/dev/nuislang/examples/projects/task)
+  Start with:
   [task_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_runtime_demo),
-  [task_status_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_status_observe_demo),
-  [task_completed_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_completed_observe_demo),
-  [task_compare_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_compare_observe_demo),
-  [task_clock_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_clock_observe_demo),
-  [task_scheduler_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_scheduler_observe_demo),
-  [task_lifecycle_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_lifecycle_branch_demo),
-  [task_fallback_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_fallback_branch_demo),
-  [task_policy_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_policy_branch_demo),
-  [task_batch_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_batch_branch_demo),
-  [task_windowed_batch_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_windowed_batch_branch_demo),
-  [task_result_family_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_family_branch_demo),
-  [task_result_policy_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_policy_branch_demo),
-  [task_result_batch_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_batch_branch_demo),
-  [task_result_windowed_batch_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_windowed_batch_branch_demo),
-  [task_cli_tooling_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_cli_tooling_demo)
-* tooling/runtime companions:
-  [argv_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/argv_runtime_demo),
-  [env_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/env_runtime_demo),
-  [process_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/process_runtime_demo),
+  [task_recursive_async_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_recursive_async_demo),
+  [task_result_policy_branch_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_result_policy_branch_demo)
+* CLI / workflow / host tooling:
+  [tooling](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling)
+  Start with:
+  [cli_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_runtime_demo),
   [command_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/command_runtime_demo),
-  [subprocess_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/subprocess_runtime_demo),
-  [host_text_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/host_text_runtime_demo),
-  [json_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/json_runtime_demo),
-  [text_format_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/text_format_runtime_demo),
-  [error_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/error_runtime_demo),
-  [result_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/result_runtime_demo),
-  [diagnostic_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/diagnostic_runtime_demo),
-  [time_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/time_runtime_demo),
-  [sleep_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/sleep_runtime_demo),
-  [clock_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/clock_runtime_demo),
-  [clock_domain_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/clock_domain_runtime_demo),
-  [stdin_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/stdin_runtime_demo),
-  [tty_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/tty_runtime_demo),
-  [input_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/input_runtime_demo),
-  [io_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/io_runtime_demo),
-  [command_shell_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/command_shell_demo),
-  [workflow_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/workflow_runtime_demo),
-  [cli_session_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_session_demo),
-  [cli_shell_session_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_shell_session_demo),
-  [cli_report_session_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_report_session_demo),
-  [cli_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_runtime_demo)
-* state/persistence companions:
-  [cwd_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/cwd_runtime_demo),
-  [temp_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/temp_runtime_demo),
-  [home_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/home_runtime_demo),
-  [location_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/location_runtime_demo),
-  [config_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/config_runtime_demo),
-  [config_cache_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/config_cache_demo)
-* filesystem companions:
-  [window_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/window_runtime_demo),
-  [pipe_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/pipe_runtime_demo),
-  [fabric_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/fabric_runtime_demo),
-  [handle_table_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/handle_table_runtime_demo),
-  [directory_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/directory_runtime_demo),
-  [stat_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/stat_runtime_demo),
-  [fs_metadata_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/fs_metadata_runtime_demo),
-  [file_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_runtime_demo),
+  [workflow_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/workflow_runtime_demo)
+* path / file / directory surfaces:
+  [filesystem](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem)
+  Start with:
   [path_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/path_runtime_demo),
-  [file_output_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_output_demo),
-  [directory_create_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/directory_create_demo),
-  [directory_stat_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/directory_stat_demo)
+  [file_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/file_runtime_demo),
+  [directory_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/filesystem/directory_runtime_demo)
+* profile and recipe ladders across domains:
+  [domains](/Users/Shared/chroot/dev/nuislang/examples/projects/domains)
+  Start with:
+  [shader_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/shader_profile_demo),
+  [kernel_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/kernel_profile_demo),
+  [network_profile_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/network_profile_demo),
+  [net_http_client_get_recipe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/domains/net_http_client_get_recipe_demo)
 
-Reading rule:
+## Control-Flow Mainline
 
-* use this README for project-mode meaning plus the smallest current anchor set
-* use [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
-  for the shortest repo-level route
-* use [stdlib/std/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/std/README.md)
-  when you want the recipe-side grouping
-* treat deeper project inventories as secondary unless you are actively working
-  in that subsystem
+If you want the current project-backed control-flow story specifically, use
+this order instead of browsing the whole tree.
 
-## Migration Map
+* sync control-flow frontdoor:
+  [chained_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/chained_while_demo) ->
+  [match_branching_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/match_branching_while_demo) ->
+  [flow_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/flow_continuing_while_demo) ->
+  [post_flow_breaking_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_breaking_while_demo) ->
+  [post_flow_branching_continuing_while_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/post_flow_branching_continuing_while_demo)
+* async control-flow frontdoor:
+  [task_async_observer_bridge_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_observer_bridge_demo) ->
+  [task_async_while_flow_cond_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_flow_cond_demo) ->
+  [task_async_while_post_flow_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_post_flow_demo) ->
+  [task_async_while_post_flow_cond_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_post_flow_cond_demo) ->
+  [task_async_while_post_flow_compound_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_async_while_post_flow_compound_demo)
+* generic/control-flow crossover:
+  [generic_method_bound_if_binding_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_if_binding_demo) ->
+  [generic_method_bound_nested_match_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_nested_match_demo) ->
+  [generic_method_bound_guarded_nested_match_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/state/generic_method_bound_guarded_nested_match_demo)
 
-Current project examples and `stdlib/ns-nova` play different roles:
+Practical reading rule:
 
-* `examples/projects/*`
-  canonical end-to-end project workflow and the most realistic current build
-  path
-* `stdlib/ns-nova/*`
-  the first reusable builder/helper/recipe source assets being extracted from
-  those projects
+* use the sync route to understand the ordinary lowering families first
+* use the async route immediately after if you want to see the same ideas
+  survive `await`, observer values, and async carries
+* use the generic route after that when the question is binding visibility or
+  method-bound validation rather than loop form alone
 
-Read them together like this:
+## Freshness Rule
 
-* start with [window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/window_controls_demo)
-  when you want the current real project route
-* jump to [stdlib/ns-nova/README.md](/Users/Shared/chroot/dev/nuislang/stdlib/ns-nova/README.md)
-  when you want to see which pieces have already started to move out of the
-  demo and into reusable source assets
+This folder has grown large enough that “present in the tree” no longer means
+“equally recommended”.
 
-Use:
+Use this rule:
 
-```bash
-cargo run -p nuis -- check examples/projects/window_controls_demo
-cargo run -p nuis -- project-status examples/projects/window_controls_demo
-cargo run -p nuis -- dump-ast examples/projects/window_controls_demo
-cargo run -p nuis -- dump-nir examples/projects/window_controls_demo
-cargo run -p nuis -- dump-yir examples/projects/window_controls_demo
-cargo run -p nuis -- build examples/projects/window_controls_demo examples/bins/window_controls_demo_project
-cargo run -p nuis -- check examples/projects/kernel_tensor_demo
-cargo run -p nuis -- build examples/projects/kernel_tensor_demo examples/bins/kernel_tensor_demo_project
-cargo run -p nuis -- check examples/projects/tooling/command_shell_demo
-cargo run -p nuis -- build examples/projects/tooling/command_shell_demo /private/tmp/command_shell_demo_out
-cargo run -p nuis -- check examples/projects/tooling/workflow_runtime_demo
-cargo run -p nuis -- build examples/projects/tooling/workflow_runtime_demo /private/tmp/workflow_runtime_demo_out
-cargo run -p nuis -- check examples/projects/tooling/cli_session_demo
-cargo run -p nuis -- build examples/projects/tooling/cli_session_demo /private/tmp/cli_session_demo_out
-cargo run -p nuis -- check examples/projects/tooling/cli_shell_session_demo
-cargo run -p nuis -- build examples/projects/tooling/cli_shell_session_demo /private/tmp/cli_shell_session_demo_out
-cargo run -p nuis -- check examples/projects/tooling/cli_report_session_demo
-cargo run -p nuis -- build examples/projects/tooling/cli_report_session_demo /private/tmp/cli_report_session_demo_out
-cargo run -p nuis -- check examples/projects/tooling/report_runtime_demo
-cargo run -p nuis -- build examples/projects/tooling/report_runtime_demo /private/tmp/report_runtime_demo_out
-cargo run -p nuis -- check examples/projects/tooling/automation_runtime_demo
-cargo run -p nuis -- build examples/projects/tooling/automation_runtime_demo /private/tmp/automation_runtime_demo_out
-cargo run -p nuis -- check examples/projects/tooling/cli_runtime_demo
-cargo run -p nuis -- build examples/projects/tooling/cli_runtime_demo /private/tmp/cli_runtime_demo_out
-cargo run -p nuis -- check examples/projects/tooling/input_runtime_demo
-cargo run -p nuis -- build examples/projects/tooling/input_runtime_demo /private/tmp/input_runtime_demo_out
-cargo run -p nuis -- check examples/projects/tooling/io_runtime_demo
-cargo run -p nuis -- build examples/projects/tooling/io_runtime_demo /private/tmp/io_runtime_demo_out
-cargo run -p nuis -- check examples/projects/tooling/command_runtime_demo
-cargo run -p nuis -- build examples/projects/tooling/command_runtime_demo /private/tmp/command_runtime_demo_out
-cargo run -p nuis -- check examples/projects/tooling/subprocess_runtime_demo
-cargo run -p nuis -- build examples/projects/tooling/subprocess_runtime_demo /private/tmp/subprocess_runtime_demo_out
-cargo run -p nuis -- check examples/projects/tooling/host_text_runtime_demo
-cargo run -p nuis -- build examples/projects/tooling/host_text_runtime_demo /private/tmp/host_text_runtime_demo_out
-cargo run -p nuis -- check examples/projects/tooling/json_runtime_demo
-cargo run -p nuis -- build examples/projects/tooling/json_runtime_demo /private/tmp/json_runtime_demo_out
-cargo run -p nuis -- check examples/projects/tooling/text_format_runtime_demo
-cargo run -p nuis -- build examples/projects/tooling/text_format_runtime_demo /private/tmp/text_format_runtime_demo_out
-cargo run -p nuis -- check examples/projects/tooling/error_runtime_demo
-cargo run -p nuis -- build examples/projects/tooling/error_runtime_demo /private/tmp/error_runtime_demo_out
-cargo run -p nuis -- check examples/projects/tooling/result_runtime_demo
-cargo run -p nuis -- build examples/projects/tooling/result_runtime_demo /private/tmp/result_runtime_demo_out
-cargo run -p nuis -- check examples/projects/tooling/diagnostic_runtime_demo
-cargo run -p nuis -- build examples/projects/tooling/diagnostic_runtime_demo /private/tmp/diagnostic_runtime_demo_out
-cargo run -p nuis -- check examples/projects/tooling/sleep_runtime_demo
-cargo run -p nuis -- build examples/projects/tooling/sleep_runtime_demo /private/tmp/sleep_runtime_demo_out
-cargo run -p nuis -- check examples/projects/task/task_lifecycle_branch_demo
-cargo run -p nuis -- check examples/projects/task/task_fallback_branch_demo
-cargo run -p nuis -- build examples/projects/task/task_lifecycle_branch_demo /private/tmp/task_lifecycle_branch_demo_out
-cargo run -p nuis -- build examples/projects/task/task_fallback_branch_demo /private/tmp/task_fallback_branch_demo_out
-cargo run -p nuis -- check examples/projects/task/task_policy_branch_demo
-cargo run -p nuis -- check examples/projects/task/task_batch_branch_demo
-cargo run -p nuis -- check examples/projects/task/task_windowed_batch_branch_demo
-cargo run -p nuis -- check examples/projects/task/task_result_family_branch_demo
-cargo run -p nuis -- check examples/projects/task/task_result_policy_branch_demo
-cargo run -p nuis -- check examples/projects/task/task_result_batch_branch_demo
-cargo run -p nuis -- check examples/projects/task/task_result_windowed_batch_branch_demo
-cargo run -p nuis -- build examples/projects/task/task_policy_branch_demo /private/tmp/task_policy_branch_demo_out
-cargo run -p nuis -- build examples/projects/task/task_batch_branch_demo /private/tmp/task_batch_branch_demo_out
-cargo run -p nuis -- build examples/projects/task/task_windowed_batch_branch_demo /private/tmp/task_windowed_batch_branch_demo_out
-cargo run -p nuis -- build examples/projects/task/task_result_family_branch_demo /private/tmp/task_result_family_branch_demo_out
-cargo run -p nuis -- build examples/projects/task/task_result_policy_branch_demo /private/tmp/task_result_policy_branch_demo_out
-cargo run -p nuis -- build examples/projects/task/task_result_batch_branch_demo /private/tmp/task_result_batch_branch_demo_out
-cargo run -p nuis -- build examples/projects/task/task_result_windowed_batch_branch_demo /private/tmp/task_result_windowed_batch_branch_demo_out
-cargo run -p nuis -- check examples/projects/task/task_runtime_demo
-cargo run -p nuis -- build examples/projects/task/task_runtime_demo /private/tmp/task_runtime_demo_out
-cargo run -p nuis -- check examples/projects/task/task_completed_observe_demo
-cargo run -p nuis -- build examples/projects/task/task_completed_observe_demo /private/tmp/task_completed_observe_demo_out
-cargo run -p nuis -- check examples/projects/task/task_compare_observe_demo
-cargo run -p nuis -- build examples/projects/task/task_compare_observe_demo /private/tmp/task_compare_observe_demo_out
-cargo run -p nuis -- check examples/projects/task/task_clock_observe_demo
-cargo run -p nuis -- build examples/projects/task/task_clock_observe_demo /private/tmp/task_clock_observe_demo_out
-cargo run -p nuis -- check examples/projects/task/task_scheduler_observe_demo
-cargo run -p nuis -- build examples/projects/task/task_scheduler_observe_demo /private/tmp/task_scheduler_observe_demo_out
-cargo run -p nuis -- check examples/projects/task/task_status_observe_demo
-cargo run -p nuis -- build examples/projects/task/task_status_observe_demo /private/tmp/task_status_observe_demo_out
-cargo run -p nuis -- check examples/projects/task/task_cli_tooling_demo
-cargo run -p nuis -- build examples/projects/task/task_cli_tooling_demo /private/tmp/task_cli_tooling_demo_out
-cargo run -p nuis -- check examples/projects/task/task_cancel_branch_demo
-cargo run -p nuis -- build examples/projects/task/task_cancel_branch_demo /private/tmp/task_cancel_branch_demo_out
-# expected failure: join(task) followed by join_result(task) now violates
-# task-handle consume semantics
-cargo run -p nuis -- check examples/projects/task/task_join_nonconsuming_probe_demo
-cargo run -p nuis -- build examples/projects/task/task_join_nonconsuming_probe_demo /private/tmp/task_join_nonconsuming_probe_demo_out
-cargo run -p nuis -- check examples/projects/filesystem/fs_metadata_runtime_demo
-cargo run -p nuis -- build examples/projects/filesystem/fs_metadata_runtime_demo /private/tmp/fs_metadata_runtime_demo_out
-cargo run -p nuis -- check examples/projects/filesystem/directory_runtime_demo
-cargo run -p nuis -- build examples/projects/filesystem/directory_runtime_demo /private/tmp/directory_runtime_demo_out
-cargo run -p nuis -- check examples/projects/filesystem/window_runtime_demo
-cargo run -p nuis -- build examples/projects/filesystem/window_runtime_demo /private/tmp/window_runtime_demo_out
-cargo run -p nuis -- check examples/projects/filesystem/pipe_runtime_demo
-cargo run -p nuis -- build examples/projects/filesystem/pipe_runtime_demo /private/tmp/pipe_runtime_demo_out
-cargo run -p nuis -- check examples/projects/filesystem/fabric_runtime_demo
-cargo run -p nuis -- build examples/projects/filesystem/fabric_runtime_demo /private/tmp/fabric_runtime_demo_out
-cargo run -p nuis -- check examples/projects/filesystem/handle_table_runtime_demo
-cargo run -p nuis -- build examples/projects/filesystem/handle_table_runtime_demo /private/tmp/handle_table_runtime_demo_out
-cargo run -p nuis -- check examples/projects/filesystem/stat_runtime_demo
-cargo run -p nuis -- build examples/projects/filesystem/stat_runtime_demo /private/tmp/stat_runtime_demo_out
-cargo run -p nuis -- check examples/projects/filesystem/file_runtime_demo
-cargo run -p nuis -- build examples/projects/filesystem/file_runtime_demo /private/tmp/file_runtime_demo_out
-```
+* root showcase projects are the strongest current frontdoor entrypoints
+* one example from each grouped subtree is usually better than reading a dozen
+  nearby companions
+* many grouped demos are intentionally narrow compile or regression anchors
+* some grouped demos are better read as probes or validation routes rather than
+  as standard onboarding examples
+* if a local README and the current mainline map feel different, prefer the
+  current mainline map first
 
-Generated outputs to expect from a project build:
+Practical consequence:
 
-* [examples/bins/window_controls_demo_project/window_controls_demo](/Users/Shared/chroot/dev/nuislang/examples/bins/window_controls_demo_project/window_controls_demo)
-* [examples/bins/window_controls_demo_project/nuis.project.host_ffi.txt](/Users/Shared/chroot/dev/nuislang/examples/bins/window_controls_demo_project/nuis.project.host_ffi.txt)
-  generated host-ffi contract index (abi/interface/symbol/signature) consumed by the project route
-* `nuis.project.modules.txt`
-  module index emitted by the project route
-* `nuis.project.links.txt`
-  link index emitted by the project route
-* `nuis.project.abi.txt`
-  effective ABI lock/auto-resolution summary
-* `nuis.build.manifest.toml`
-  build manifest including per-domain target/backend details
+* keep old-but-still-useful companions when they still carry regression value
+* keep probe routes when they still support runtime validation or design docs
+* stop treating long directory inventories as the first reading route
+
+## Artifact Bundles
+
+Checked-in canonical build outputs still live under:
+
+* [examples/bins](/Users/Shared/chroot/dev/nuislang/examples/bins)
+
+The two current canonical checked-in bundles remain:
+
+* [window_controls_demo_project](/Users/Shared/chroot/dev/nuislang/examples/bins/window_controls_demo_project/window_controls_demo)
+* [kernel_tensor_demo_project](/Users/Shared/chroot/dev/nuislang/examples/bins/kernel_tensor_demo_project/kernel_tensor_demo)

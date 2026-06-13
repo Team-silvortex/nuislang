@@ -85,6 +85,45 @@ fn lowers_post_flow_breaking_while_on_updated_carry_into_loop_while_scalar_post_
 }
 
 #[test]
+fn lowers_post_flow_breaking_while_on_dynamic_buffer_index_read_carry_into_loop_while_scalar_post_flow_chain(
+) {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            let buffer: ref Buffer = alloc_buffer(8, 9);
+            while value < 8 {
+              let value: i64 = value + 1;
+              let acc: i64 = acc + load_at(buffer, value);
+              if acc > 6 {
+                break;
+              }
+            }
+            free(buffer);
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_post_flow_chain"
+        })
+        .expect("expected loop_while_scalar_post_flow_chain node");
+    assert_eq!(loop_node.op.args[5], "carry0_gt");
+    assert_eq!(loop_node.op.args[7], "break");
+    assert_eq!(loop_node.op.args[9], "add_read_at_dynamic_current");
+}
+
+#[test]
 fn lowers_post_flow_breaking_while_with_le_ge_into_loop_while_scalar_post_flow_chain() {
     let mut module = parse_nuis_module(
         r#"
@@ -267,11 +306,187 @@ fn lowers_post_flow_breaking_after_branching_carry_into_loop_while_scalar_post_f
                 && node.op.instruction == "loop_while_scalar_post_flow_cond_chain"
         })
         .expect("expected loop_while_scalar_post_flow_cond_chain node");
+    dbg!(&loop_node.op.args);
     assert_eq!(loop_node.op.args[5], "carry0_gt");
     assert_eq!(loop_node.op.args[7], "break");
     assert_eq!(loop_node.op.args[9], "current_gt");
     assert_eq!(loop_node.op.args[11], "add_current");
     assert_eq!(loop_node.op.args[12], "keep");
+}
+
+#[test]
+fn lowers_post_flow_breaking_after_fixed_structural_read_branching_carry_into_loop_while_scalar_post_flow_cond_chain(
+) {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            let head: ref Node = move(alloc_node(7, null()));
+            while value < 6 {
+              let value: i64 = value + 1;
+              if value > 2 {
+                let acc: i64 = acc + load_value(head);
+              } else {
+                let acc: i64 = acc + 0;
+              }
+              if acc > 6 {
+                break;
+              }
+            }
+            free(head);
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "loop_while_scalar_post_flow_cond_chain"
+        })
+        .expect("expected loop_while_scalar_post_flow_cond_chain node");
+    assert_eq!(loop_node.op.args[5], "carry0_gt");
+    assert_eq!(loop_node.op.args[7], "break");
+    assert_eq!(loop_node.op.args[9], "current_gt");
+    assert!(loop_node
+        .op
+        .args
+        .iter()
+        .any(|arg| arg == "add_read_value_fixed"));
+    assert!(
+        loop_node.op.args.iter().any(|arg| arg.starts_with("move_")),
+        "expected fixed structural read payload node in {:?}",
+        loop_node.op.args
+    );
+    assert!(loop_node.op.args.iter().any(|arg| arg == "keep"));
+}
+
+#[test]
+fn lowers_post_flow_breaking_after_fixed_buffer_read_branching_carry_into_loop_while_scalar_post_flow_cond_chain(
+) {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            let buffer: ref Buffer = alloc_buffer(2, 9);
+            while value < 6 {
+              let value: i64 = value + 1;
+              if value > 2 {
+                let acc: i64 = acc + load_at(buffer, 0);
+              } else {
+                let acc: i64 = acc + 0;
+              }
+              if acc > 6 {
+                break;
+              }
+            }
+            free(buffer);
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "loop_while_scalar_post_flow_cond_chain"
+        })
+        .expect("expected loop_while_scalar_post_flow_cond_chain node");
+    assert_eq!(loop_node.op.args[5], "carry0_gt");
+    assert_eq!(loop_node.op.args[7], "break");
+    assert_eq!(loop_node.op.args[9], "current_gt");
+    assert!(loop_node
+        .op
+        .args
+        .iter()
+        .any(|arg| arg == "add_read_at_fixed"));
+    let fixed_payload_count = loop_node
+        .op
+        .args
+        .iter()
+        .filter(|arg| arg.starts_with("alloc_buffer_") || arg.starts_with("int_"))
+        .count();
+    assert!(
+        fixed_payload_count >= 2,
+        "expected fixed buffer read payload args in {:?}",
+        loop_node.op.args
+    );
+    assert!(loop_node.op.args.iter().any(|arg| arg == "keep"));
+}
+
+#[test]
+fn lowers_post_flow_breaking_after_dynamic_buffer_index_read_branching_carry_into_loop_while_scalar_post_flow_cond_chain(
+) {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            let buffer: ref Buffer = alloc_buffer(8, 9);
+            while value < 6 {
+              let value: i64 = value + 1;
+              if value > 2 {
+                let acc: i64 = acc + load_at(buffer, value);
+              } else {
+                let acc: i64 = acc + 0;
+              }
+              if acc > 6 {
+                break;
+              }
+            }
+            free(buffer);
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "loop_while_scalar_post_flow_cond_chain"
+        })
+        .expect("expected loop_while_scalar_post_flow_cond_chain node");
+    assert_eq!(loop_node.op.args[5], "carry0_gt");
+    assert_eq!(loop_node.op.args[7], "break");
+    assert_eq!(loop_node.op.args[9], "current_gt");
+    assert!(loop_node
+        .op
+        .args
+        .iter()
+        .any(|arg| arg == "add_read_at_dynamic_current"));
+    assert!(
+        loop_node
+            .op
+            .args
+            .iter()
+            .any(|arg| arg.starts_with("alloc_buffer_")),
+        "expected dynamic buffer read payload arg in {:?}",
+        loop_node.op.args
+    );
+    assert!(loop_node.op.args.iter().any(|arg| arg == "keep"));
 }
 
 #[test]
@@ -768,4 +983,36 @@ fn rejects_memory_address_backedge_while_until_general_loop_lowering_exists() {
 
     let error = lower_nir_to_yir_builtin_cpu(&module).unwrap_err();
     assert!(error.contains("guard-style `while` loops or simple counted `while` loops"));
+}
+
+#[test]
+fn rejects_sync_chained_while_with_future_sibling_carry_dependency() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            let slot: i64 = 1;
+            let buffer: ref Buffer = alloc_buffer(4, 9);
+            while value < 3 {
+              let value: i64 = value + 1;
+              let acc: i64 = acc + load_at(buffer, slot);
+              if value > 1 {
+                let slot: i64 = slot + value;
+              } else {
+                let slot: i64 = slot + 0;
+              }
+            }
+            return acc + slot;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let error = lower_nir_to_yir_builtin_cpu(&module).unwrap_err();
+    assert!(error.contains(
+        "references sibling carry `slot` before that carry is updated in the loop body"
+    ));
 }

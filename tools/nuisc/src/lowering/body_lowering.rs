@@ -271,6 +271,16 @@ pub(super) fn lower_while_stmt(
         return lower_prepared_loop_body(condition_name, &prepared, state, bindings);
     }
 
+    if let Some(diagnostic) = diagnose_unsupported_prepared_while_carry(
+        condition,
+        body,
+        &state.pure_helpers,
+        &state.inlineable_pure_helpers,
+        &state.pure_helper_blocks,
+    ) {
+        return Err(diagnostic);
+    }
+
     if expr_contains_async_loop_primitive(condition) || stmts_contain_async_loop_primitive(body) {
         return Err(
             "async/task-driven `while` loops are not supported yet in lowering; iterative backedge lowering for `await`, `spawn`, `join`, `timeout`, and related task primitives inside loop conditions/bodies is still not implemented"

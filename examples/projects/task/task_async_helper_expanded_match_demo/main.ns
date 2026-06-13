@@ -1,0 +1,32 @@
+mod cpu Main {
+  async fn one() -> i64 {
+    return 1;
+  }
+
+  async fn two() -> i64 {
+    return 2;
+  }
+
+  fn project(value: i64) -> i64 {
+    return value + 10;
+  }
+
+  fn wrap(value: i64) -> i64 {
+    return value + 20;
+  }
+
+  fn relay(value: i64) -> i64 {
+    return wrap(project(value));
+  }
+
+  async fn expand(seed: i64) -> i64 {
+    return relay(await match seed {
+      1 => { one() },
+      _ => { two() }
+    });
+  }
+
+  async fn main() -> i64 {
+    return await expand(1);
+  }
+}

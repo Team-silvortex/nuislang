@@ -11,6 +11,7 @@ Start with:
 * [nuis-0.18.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-release-checklist.md)
 * [nuis-0.18.0-mainline-goals.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-mainline-goals.md)
 * [nuis-0.18.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-compile-workflow.md)
+* [nuis-0.18.0-example-routing-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-example-routing-snapshot.md)
 * [nuis-0.18.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-mainline-regression-matrix.md)
 * [nuis-0.18.0-address-pointer-mainline.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-address-pointer-mainline.md)
 * [nuis-0.13.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.13.0-snapshot.md)
@@ -96,6 +97,10 @@ must keep those stories aligned rather than only adding more features.
 The `0.18.0` compile workflow file is the current compiler-facing explanation
 of how frontend ordering, project-aware lowering, loop-family truth, and
 address/pointer validation now fit together.
+
+The `0.18.0` example-routing snapshot is the short history anchor for when the
+example tree started reading as one explicit frontdoor/companion/probe/legacy
+system instead of one flat inventory.
 
 The `0.18.0` mainline regression matrix is the compact answer to which checked
 test families currently defend that story.

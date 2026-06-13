@@ -1,0 +1,22 @@
+mod cpu Main {
+  async fn step(value: i64) -> i64 {
+    return value + 1;
+  }
+
+  async fn accumulate(limit: i64, stop_after: i64) -> i64 {
+    let value: i64 = 0;
+    let acc: i64 = 0;
+    while value < limit {
+      let value: i64 = await step(value);
+      let acc: i64 = acc + value;
+      if acc > stop_after {
+        break;
+      }
+    }
+    return acc;
+  }
+
+  async fn main() -> i64 {
+    return await accumulate(8, 6);
+  }
+}

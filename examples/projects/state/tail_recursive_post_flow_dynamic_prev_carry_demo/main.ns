@@ -1,0 +1,26 @@
+mod cpu Main {
+  fn sum_until(current: i64, buffer: ref Buffer, acc: i64, slot: i64) -> i64 {
+    if current == 0 {
+      return acc;
+    }
+    if acc + load_at(buffer, slot) > 6 {
+      return acc + load_at(buffer, slot);
+    }
+    if current > 3 {
+      return sum_until(current - 1, buffer, acc + load_at(buffer, slot), slot + current);
+    } else {
+      if current > 1 {
+        return sum_until(current - 1, buffer, acc + load_at(buffer, slot), slot + current);
+      } else {
+        return sum_until(current - 1, buffer, acc + load_at(buffer, slot), slot + 0);
+      }
+    }
+  }
+
+  fn main() -> i64 {
+    let buffer: ref Buffer = alloc_buffer(8, 9);
+    let acc: i64 = sum_until(5, buffer, 0, 1);
+    free(buffer);
+    return acc;
+  }
+}

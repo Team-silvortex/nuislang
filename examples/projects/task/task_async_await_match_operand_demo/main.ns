@@ -1,0 +1,33 @@
+mod cpu Main {
+  async fn one() -> i64 {
+    return 1;
+  }
+
+  async fn two() -> i64 {
+    return 2;
+  }
+
+  async fn branch_pick(seed: i64) -> i64 {
+    let value: i64 = await match seed {
+      1 => { one() },
+      _ => { two() }
+    };
+    return value;
+  }
+
+  async fn classify(seed: i64) -> i64 {
+    let value: i64 = await branch_pick(seed);
+    match value {
+      1 => {
+        return value + 10;
+      }
+      _ => {
+        return value + 20;
+      }
+    }
+  }
+
+  async fn main() -> i64 {
+    return await classify(1);
+  }
+}

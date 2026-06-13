@@ -130,6 +130,14 @@ pub(super) struct PreparedCarryUpdate {
 pub(super) const TAIL_RECURSIVE_PREV_CURRENT_BINDING: &str = "__tailrec_prev_current";
 pub(super) const TAIL_RECURSIVE_PREV_CARRY_BINDING_PREFIX: &str = "__tailrec_prev_carry_";
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum PreparedLoopStateRef {
+    Current,
+    PreviousCurrent,
+    PreviousCarry(usize),
+    Carry(usize),
+}
+
 #[derive(Clone, PartialEq, Eq)]
 pub(super) enum PreparedCarrySource {
     Current,
@@ -137,6 +145,10 @@ pub(super) enum PreparedCarrySource {
     PreviousCarry(usize),
     Carry(usize),
     FixedRead(PreparedFixedReadCarrySource),
+    DynamicReadAt {
+        buffer: NirExpr,
+        index_source: Box<PreparedCarrySource>,
+    },
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -191,9 +203,23 @@ impl PreparedCarrySource {
         matches!(self, Self::FixedRead(_))
     }
 
+    pub(super) fn is_dynamic_read_at(&self) -> bool {
+        matches!(self, Self::DynamicReadAt { .. })
+    }
+
     pub(super) fn fixed_read(&self) -> Option<&PreparedFixedReadCarrySource> {
         match self {
             Self::FixedRead(source) => Some(source),
+            _ => None,
+        }
+    }
+
+    pub(super) fn dynamic_read_at(&self) -> Option<(&NirExpr, &PreparedCarrySource)> {
+        match self {
+            Self::DynamicReadAt {
+                buffer,
+                index_source,
+            } => Some((buffer, index_source.as_ref())),
             _ => None,
         }
     }
@@ -214,6 +240,17 @@ impl PreparedCarrySource {
                 PreparedCarryLinearOp::Add,
                 Self::FixedRead(PreparedFixedReadCarrySource::At { .. }),
             ) => "add_read_at_fixed".to_owned(),
+            (PreparedCarryLinearOp::Add, Self::DynamicReadAt { index_source, .. }) => {
+                match index_source.as_ref() {
+                    Self::Current => "add_read_at_dynamic_current".to_owned(),
+                    Self::PreviousCurrent => "add_read_at_dynamic_prev_current".to_owned(),
+                    Self::PreviousCarry(index) => format!("add_read_at_dynamic_prev_carry{index}"),
+                    Self::Carry(index) => format!("add_read_at_dynamic_carry{index}"),
+                    Self::FixedRead(_) | Self::DynamicReadAt { .. } => {
+                        unreachable!("dynamic read index sources must be simple loop-state sources")
+                    }
+                }
+            }
             (PreparedCarryLinearOp::Mul, Self::Current) => "mul_current".to_owned(),
             (PreparedCarryLinearOp::Mul, Self::PreviousCurrent) => "mul_prev_current".to_owned(),
             (PreparedCarryLinearOp::Mul, Self::PreviousCarry(index)) => {
@@ -228,6 +265,17 @@ impl PreparedCarrySource {
                 PreparedCarryLinearOp::Mul,
                 Self::FixedRead(PreparedFixedReadCarrySource::At { .. }),
             ) => "mul_read_at_fixed".to_owned(),
+            (PreparedCarryLinearOp::Mul, Self::DynamicReadAt { index_source, .. }) => {
+                match index_source.as_ref() {
+                    Self::Current => "mul_read_at_dynamic_current".to_owned(),
+                    Self::PreviousCurrent => "mul_read_at_dynamic_prev_current".to_owned(),
+                    Self::PreviousCarry(index) => format!("mul_read_at_dynamic_prev_carry{index}"),
+                    Self::Carry(index) => format!("mul_read_at_dynamic_carry{index}"),
+                    Self::FixedRead(_) | Self::DynamicReadAt { .. } => {
+                        unreachable!("dynamic read index sources must be simple loop-state sources")
+                    }
+                }
+            }
         }
     }
 }
@@ -267,22 +315,76 @@ pub(super) enum PreparedCarryCondSource {
 
 #[derive(Clone, PartialEq, Eq)]
 pub(super) enum PreparedCarryBranchSource {
-    Keep,
+    KeepCurrentValue,
+    KeepPreviousValue,
     Source {
         op: PreparedCarryLinearOp,
         source: PreparedCarrySource,
     },
 }
 
+pub(super) enum PreparedCarryBranchValueKind {
+    KeepCurrentValue,
+    KeepPreviousValue,
+    #[allow(dead_code)]
+    LinearSource {
+        op: PreparedCarryLinearOp,
+        source: PreparedCarrySource,
+    },
+}
+
+pub(super) enum PreparedCarryBranchView<'a> {
+    KeepCurrentValue,
+    KeepPreviousValue,
+    Source {
+        op: PreparedCarryLinearOp,
+        source: &'a PreparedCarrySource,
+    },
+}
+
 impl PreparedCarryBranchSource {
-    pub(super) fn is_keep(&self) -> bool {
-        matches!(self, Self::Keep)
+    pub(super) fn keep() -> Self {
+        Self::KeepCurrentValue
     }
 
-    pub(super) fn source_parts(&self) -> Option<(PreparedCarryLinearOp, &PreparedCarrySource)> {
+    pub(super) fn keep_previous_value() -> Self {
+        Self::KeepPreviousValue
+    }
+
+    pub(super) fn from_linear_source(op: PreparedCarryLinearOp, source: PreparedCarrySource) -> Self {
+        Self::Source { op, source }
+    }
+
+    pub(super) fn value_kind(&self) -> PreparedCarryBranchValueKind {
         match self {
-            Self::Keep => None,
-            Self::Source { op, source } => Some((*op, source)),
+            Self::KeepCurrentValue => PreparedCarryBranchValueKind::KeepCurrentValue,
+            Self::KeepPreviousValue => PreparedCarryBranchValueKind::KeepPreviousValue,
+            Self::Source { op, source } => PreparedCarryBranchValueKind::LinearSource {
+                op: *op,
+                source: source.clone(),
+            },
+        }
+    }
+
+    pub(super) fn view(&self) -> PreparedCarryBranchView<'_> {
+        match self.value_kind() {
+            PreparedCarryBranchValueKind::KeepCurrentValue => {
+                PreparedCarryBranchView::KeepCurrentValue
+            }
+            PreparedCarryBranchValueKind::KeepPreviousValue => {
+                PreparedCarryBranchView::KeepPreviousValue
+            }
+            PreparedCarryBranchValueKind::LinearSource { op, source: _ } => {
+                PreparedCarryBranchView::Source {
+                    op,
+                    source: match self {
+                        Self::Source { source, .. } => source,
+                        Self::KeepCurrentValue | Self::KeepPreviousValue => {
+                            unreachable!("keep branch cannot expose source view")
+                        }
+                    },
+                }
+            }
         }
     }
 }

@@ -5,7 +5,7 @@ mod cpu Main {
   extern "c" fn host_monotonic_time_ns() -> i64;
 
   struct TaskCliSummary {
-    message: String,
+    message_handle: i64,
     code: i64
   }
 
@@ -13,12 +13,12 @@ mod cpu Main {
     return seed + 9;
   }
 
-  fn completed_message() -> String {
-    return "task_cli_tooling_demo: completed";
+  fn completed_message_handle() -> i64 {
+    return 1901;
   }
 
-  fn timeout_message() -> String {
-    return "task_cli_tooling_demo: timed out";
+  fn timeout_message_handle() -> i64 {
+    return 1903;
   }
 
   fn completed_code(base: i64) -> i64 {
@@ -29,31 +29,31 @@ mod cpu Main {
     return base + 70 + 4;
   }
 
-  fn render_summary(message: String, code: i64) -> TaskCliSummary {
+  fn render_summary(message_handle: i64, code: i64) -> TaskCliSummary {
     return TaskCliSummary {
-      message: message,
+      message_handle: message_handle,
       code: code
     };
   }
 
   fn completed_summary(base: i64) -> TaskCliSummary {
-    return render_summary(completed_message(), completed_code(base));
+    return render_summary(completed_message_handle(), completed_code(base));
   }
 
   fn timeout_summary(base: i64) -> TaskCliSummary {
-    return render_summary(timeout_message(), timeout_code(base));
+    return render_summary(timeout_message_handle(), timeout_code(base));
   }
 
   fn emit_completed_cli(result: TaskResult<i64>, argv_count: i64, tick_ns: i64) -> i64 {
     let summary: TaskCliSummary = completed_summary(argv_count);
     let payload: i64 = task_value(result);
-    let stdout_code: i64 = host_stdout_write(summary.message);
+    let stdout_code: i64 = host_stdout_write(summary.message_handle);
     return summary.code + payload + stdout_code + tick_ns;
   }
 
   fn emit_timeout_cli(argv_count: i64, tick_ns: i64) -> i64 {
     let summary: TaskCliSummary = timeout_summary(argv_count);
-    let stderr_code: i64 = host_stderr_write(summary.message);
+    let stderr_code: i64 = host_stderr_write(summary.message_handle);
     return summary.code + stderr_code + tick_ns;
   }
 

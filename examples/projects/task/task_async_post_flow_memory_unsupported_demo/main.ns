@@ -1,0 +1,30 @@
+mod cpu Main {
+  async fn step(value: i64) -> i64 {
+    return value + 1;
+  }
+
+  async fn seed_slot() -> i64 {
+    return 0;
+  }
+
+  async fn accumulate(limit: i64, threshold: i64) -> i64 {
+    let value: i64 = 0;
+    let acc: i64 = 0;
+    let slot: i64 = await seed_slot();
+    let buffer: ref Buffer = alloc_buffer(8, 9);
+    while value < limit {
+      let value: i64 = await step(value);
+      let acc: i64 = acc + load_at(buffer, slot);
+      if value > 3 {
+        let slot: i64 = slot + value;
+      } else {
+        let slot: i64 = slot + 0;
+      }
+    }
+    return acc + slot + threshold;
+  }
+
+  async fn main() -> i64 {
+    return await accumulate(6, 6);
+  }
+}

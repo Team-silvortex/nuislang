@@ -113,6 +113,17 @@ The current sample ladder is:
 
 That target still implies four source-level value families.
 
+Current example routing for this lane:
+
+* frontdoor project route:
+  [cli_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/cli_runtime_demo),
+  [command_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/command_runtime_demo),
+  [workflow_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/workflow_runtime_demo)
+* companion router:
+  [examples/projects/tooling/README.md](/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/README.md)
+* archived historical probes:
+  [examples/legacy/tooling](/Users/Shared/chroot/dev/nuislang/examples/legacy/tooling)
+
 ## 1. Command Request
 
 The command layer should stop at a typed request value before it reaches the
@@ -340,6 +351,31 @@ The three current reference samples occupy different points on that ladder:
   front-door compile workflow naming with nested project build plan/report and
   recommendation-style workflow hints plus source-kind workflow profiles and
   debug-workflow mirror fields grouped as one front-door surface
+
+At the examples layer, the same reading rule should hold:
+
+* prefer the three frontdoor project routes first
+* drop to the tooling companion router only when auditing a narrower host lane
+* treat `examples/legacy/tooling/` as historical bridge material, not current
+  recommended entrypoints
+
+That grouped surface is no longer only a `std` authoring pattern.
+
+The repository’s current `nuis` entrypoints now consume the same idea directly:
+
+* `nuis status`
+* `nuis help`
+* `nuis workflow`
+* `nuis project-status`
+* `nuis project-doctor`
+* `nuis scheduler-view`
+
+In each case, the command now exposes one grouped frontdoor summary before its
+deeper status, project, or scheduler details.
+
+Short rule:
+
+`the checked-in std tooling surface and the checked-in nuis CLI frontdoor now describe the same family instead of merely resembling each other`
 
 Short rule:
 

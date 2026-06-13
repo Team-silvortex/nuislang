@@ -1272,6 +1272,36 @@ fn lowers_tail_recursive_branching_state_project_with_branching_cond_loop_shape(
 }
 
 #[test]
+fn compiles_tail_recursive_keep_prev_carry_state_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_keep_prev_carry_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("tail recursive keep-prev-carry state project should compile");
+}
+
+#[test]
+fn lowers_tail_recursive_keep_prev_carry_state_project_with_branching_cond_loop_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_keep_prev_carry_demo",
+    );
+
+    let loop_node = artifacts
+        .yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_cond_chain"
+        })
+        .expect("expected loop_while_scalar_cond_chain node");
+    assert_eq!(loop_node.op.args[3], "gt");
+    assert_eq!(loop_node.op.args[4], "sub");
+    assert_eq!(loop_node.op.args[6], "prev_current_gt");
+    assert_eq!(loop_node.op.args[8], "add_prev_current");
+    assert_eq!(loop_node.op.args[9], "keep_prev_carry");
+}
+
+#[test]
 fn compiles_tail_recursive_multi_carry_state_project() {
     let project = Path::new(
         "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_multi_carry_demo",
@@ -1835,6 +1865,106 @@ fn compiles_post_flow_branching_while_state_project() {
     );
     nuisc::pipeline::compile_project(project)
         .expect("post-flow branching while state project should compile");
+}
+
+#[test]
+fn compiles_tail_recursive_post_flow_branching_state_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_post_flow_branching_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("tail recursive post-flow branching state project should compile");
+}
+
+#[test]
+fn compiles_tail_recursive_post_flow_dynamic_prev_carry_state_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_post_flow_dynamic_prev_carry_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("tail recursive post-flow dynamic prev-carry state project should compile");
+}
+
+#[test]
+fn lowers_tail_recursive_post_flow_dynamic_prev_carry_state_project_with_recursive_post_flow_cond_loop_shape(
+) {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_post_flow_dynamic_prev_carry_demo",
+    );
+
+    let loop_node = artifacts
+        .yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "loop_while_scalar_post_flow_cond_chain"
+        })
+        .expect("expected loop_while_scalar_post_flow_cond_chain node");
+    assert_eq!(loop_node.op.args[3], "ne");
+    assert_eq!(loop_node.op.args[4], "sub");
+    assert_eq!(loop_node.op.args[5], "carry0_gt");
+    assert_eq!(loop_node.op.args[7], "break");
+    assert!(loop_node.op.args.iter().any(|arg| arg == "or"));
+    assert!(loop_node
+        .op
+        .args
+        .iter()
+        .any(|arg| arg == "add_read_at_dynamic_prev_carry1"));
+    assert!(loop_node
+        .op
+        .args
+        .iter()
+        .any(|arg| arg.starts_with("alloc_buffer_")));
+    assert!(loop_node.op.args.iter().any(|arg| arg == "prev_current_gt"));
+    assert!(loop_node
+        .op
+        .args
+        .iter()
+        .any(|arg| arg == "add_prev_current"));
+    assert!(loop_node.op.args.iter().any(|arg| arg == "keep"));
+}
+
+#[test]
+fn lowers_tail_recursive_post_flow_branching_state_project_with_recursive_post_flow_cond_loop_shape(
+) {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_post_flow_branching_demo",
+    );
+
+    let loop_node = artifacts
+        .yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "loop_while_scalar_post_flow_cond_chain"
+        })
+        .expect("expected loop_while_scalar_post_flow_cond_chain node");
+    assert_eq!(loop_node.op.args[3], "ne");
+    assert_eq!(loop_node.op.args[4], "sub");
+    assert_eq!(loop_node.op.args[5], "carry0_gt");
+    assert_eq!(loop_node.op.args[7], "break");
+    assert!(
+        loop_node.op.args.iter().any(|arg| arg == "or"),
+        "expected recursive boolean carry condition"
+    );
+    assert!(
+        loop_node.op.args.iter().any(|arg| arg == "prev_current_gt"),
+        "expected nested branch to reference previous current"
+    );
+    assert!(
+        loop_node
+            .op
+            .args
+            .iter()
+            .any(|arg| arg == "add_prev_current"),
+        "expected carry update to use previous current"
+    );
+    assert!(
+        loop_node.op.args.iter().any(|arg| arg == "keep"),
+        "expected fallback carry branch to keep prior value"
+    );
 }
 
 #[test]

@@ -48,6 +48,36 @@ Short rule:
 
 `0.18.0` compile truth is no longer only “frontend integration works”; it is “frontend integration plus project-backed control-flow truth survives into lowering families we can name directly”
 
+## Current CLI Frontdoor
+
+At the tool level, the current `0.18.0` compile workflow should now be taught
+through one grouped frontdoor route instead of several unrelated commands.
+
+Today the honest outermost reading order is:
+
+```text
+nuis status / nuis help
+  -> nuis workflow
+  -> nuis project-doctor / nuis project-status / nuis scheduler-view
+  -> nuis check
+  -> nuis test
+  -> nuis build
+  -> nuis release-check
+```
+
+The practical reason is simple:
+
+* `status` and `help` now present the default compile frontdoor
+* `workflow` classifies the input into single-file vs project-facing routes
+* `project-doctor`, `project-status`, and `scheduler-view` now all expose the
+  same grouped frontdoor summary shape before their deeper detail payloads
+* `check/test/build/release-check` remain the action spine rather than being
+  replaced by a new hidden orchestration layer
+
+Short rule:
+
+`the current CLI story is now one frontdoor family with deeper detail commands, not several disconnected command descriptions`
+
 ## What Changed In `0.18.0`
 
 The practical change in this line is not that control flow suddenly appeared.

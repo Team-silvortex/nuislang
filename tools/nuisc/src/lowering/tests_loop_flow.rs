@@ -108,8 +108,8 @@ fn lowers_chained_while_with_fixed_buffer_read_carry_into_loop_node_contract() {
 }
 
 #[test]
-fn rejects_chained_while_with_dynamic_buffer_index_read_carry_until_contract_expands() {
-    let module = parse_nuis_module(
+fn lowers_chained_while_with_dynamic_buffer_index_read_carry_into_loop_node_contract() {
+    let mut module = parse_nuis_module(
         r#"
         mod cpu Main {
           fn main() -> i64 {
@@ -127,9 +127,53 @@ fn rejects_chained_while_with_dynamic_buffer_index_read_carry_until_contract_exp
         "#,
     )
     .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
 
-    let error = lower_nir_to_yir_builtin_cpu(&module).unwrap_err();
-    assert!(error.contains("guard-style `while` loops or simple counted `while` loops"));
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_chain")
+        .expect("expected loop_while_scalar_chain node");
+    assert_eq!(loop_node.op.args[6], "add_read_at_dynamic_current");
+    assert!(
+        loop_node.op.args.len() >= 8,
+        "expected dynamic buffer read payload args"
+    );
+}
+
+#[test]
+fn lowers_chained_while_with_dynamic_buffer_index_read_from_prior_carry_into_loop_node_contract() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let value: i64 = 0;
+            let slot: i64 = 0;
+            let acc: i64 = 0;
+            let buffer: ref Buffer = alloc_buffer(8, 9);
+            while value < 3 {
+              let value: i64 = value + 1;
+              let slot: i64 = slot + value;
+              let acc: i64 = acc + load_at(buffer, slot);
+            }
+            free(buffer);
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_chain")
+        .expect("expected loop_while_scalar_chain node");
+    assert_eq!(loop_node.op.args[6], "add_current");
+    assert_eq!(loop_node.op.args[8], "add_read_at_dynamic_carry0");
 }
 
 #[test]
@@ -167,6 +211,49 @@ fn lowers_branching_chained_while_into_loop_while_scalar_cond_chain() {
     assert_eq!(loop_node.op.args[6], "current_gt");
     assert_eq!(loop_node.op.args[8], "add_current");
     assert_eq!(loop_node.op.args[9], "keep");
+}
+
+#[test]
+fn lowers_nested_if_branching_carry_into_loop_while_scalar_cond_chain() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            while value < 5 {
+              let value: i64 = value + 1;
+              if value > 3 {
+                let acc: i64 = acc + value;
+              } else {
+                if value > 1 {
+                  let acc: i64 = acc + value;
+                } else {
+                  let acc: i64 = acc + 0;
+                }
+              }
+            }
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_cond_chain"
+        })
+        .expect("expected loop_while_scalar_cond_chain node");
+    assert_eq!(loop_node.op.args[6], "or");
+    assert_eq!(loop_node.op.args[7], "current_gt");
+    assert_eq!(loop_node.op.args[9], "current_gt");
+    assert_eq!(loop_node.op.args[11], "add_current");
+    assert_eq!(loop_node.op.args[12], "keep");
 }
 
 #[test]
@@ -214,8 +301,9 @@ fn lowers_branching_chained_while_with_fixed_structural_read_carry_into_loop_whi
 }
 
 #[test]
-fn rejects_branching_chained_while_with_dynamic_buffer_index_read_carry_until_contract_expands() {
-    let module = parse_nuis_module(
+fn lowers_branching_chained_while_with_dynamic_buffer_index_read_carry_into_loop_while_scalar_cond_chain(
+) {
+    let mut module = parse_nuis_module(
         r#"
         mod cpu Main {
           fn main() -> i64 {
@@ -237,9 +325,50 @@ fn rejects_branching_chained_while_with_dynamic_buffer_index_read_carry_until_co
         "#,
     )
     .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_cond_chain"
+        })
+        .expect("expected loop_while_scalar_cond_chain node");
+    assert_eq!(loop_node.op.args[6], "current_gt");
+    assert!(loop_node
+        .op
+        .args
+        .iter()
+        .any(|arg| arg == "add_read_at_dynamic_current"));
+    assert!(loop_node.op.args.iter().any(|arg| arg == "keep"));
+}
+
+#[test]
+fn rejects_chained_while_with_non_direct_dynamic_buffer_index_read_carry_until_contract_expands() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            let buffer: ref Buffer = alloc_buffer(2, 9);
+            while value < 3 {
+              let value: i64 = value + 1;
+              let acc: i64 = acc + load_at(buffer, value + 1);
+            }
+            free(buffer);
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
 
     let error = lower_nir_to_yir_builtin_cpu(&module).unwrap_err();
-    assert!(error.contains("guard-style `while` loops or simple counted `while` loops"));
+    assert!(error.contains(
+        "dynamic `load_at(buffer, index)` reads currently support only direct loop-state index drivers"
+    ));
 }
 
 #[test]
@@ -330,6 +459,58 @@ fn lowers_match_flow_control_then_fixed_buffer_read_carry_into_loop_while_scalar
         .args
         .iter()
         .any(|arg| arg == "add_read_at_fixed"));
+    assert!(loop_node.op.args.iter().any(|arg| arg == "keep"));
+}
+
+#[test]
+fn lowers_match_flow_control_then_dynamic_buffer_index_read_carry_into_loop_while_scalar_flow_cond_chain(
+) {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let value: i64 = 0;
+            let acc: i64 = 0;
+            let buffer: ref Buffer = alloc_buffer(8, 9);
+            while value < 6 {
+              let value: i64 = value + 1;
+              match value {
+                1 => {
+                  continue;
+                }
+                _ => {
+                  if value > 4 {
+                    let acc: i64 = acc + load_at(buffer, value);
+                  } else {
+                    let acc: i64 = acc + 0;
+                  }
+                }
+              }
+            }
+            free(buffer);
+            return acc;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let loop_node = yir
+        .nodes
+        .iter()
+        .find(|node| {
+            node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_flow_cond_chain"
+        })
+        .expect("expected loop_while_scalar_flow_cond_chain node");
+    assert_eq!(loop_node.op.args[5], "current_eq");
+    assert!(loop_node.op.args.iter().any(|arg| arg == "continue"));
+    assert!(loop_node
+        .op
+        .args
+        .iter()
+        .any(|arg| arg == "add_read_at_dynamic_current"));
     assert!(loop_node.op.args.iter().any(|arg| arg == "keep"));
 }
 

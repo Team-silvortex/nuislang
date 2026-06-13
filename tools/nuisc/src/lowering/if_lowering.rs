@@ -87,6 +87,19 @@ pub(super) fn lower_if_pair(
         return Ok(LoweredIfOutcome::Returned(selected));
     }
 
+    if let (Some((lhs_name, lhs_value)), Some((rhs_name, rhs_value))) = (
+        lower_binding_if_chain(then_body, state, bindings)?,
+        lower_binding_if_chain(else_body, state, bindings)?,
+    ) {
+        if lhs_name == rhs_name {
+            let selected = lower_select(condition_name, lhs_value, rhs_value, state)?;
+            return Ok(LoweredIfOutcome::Bind {
+                name: lhs_name,
+                value: selected,
+            });
+        }
+    }
+
     match (&then_body[0], &else_body[0]) {
         (NirStmt::Print(lhs), NirStmt::Print(rhs)) => {
             let lhs_name = lower_expr(lhs, state, bindings)?;
@@ -176,6 +189,41 @@ fn lower_return_if_chain(
                 return Ok(None);
             };
             Ok(Some(lower_select(condition_name, lhs, rhs, state)?))
+        }
+        _ => Ok(None),
+    }
+}
+
+fn lower_binding_if_chain(
+    stmts: &[NirStmt],
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<Option<(String, String)>, String> {
+    match stmts {
+        [NirStmt::Let { name, value, .. }] | [NirStmt::Const { name, value, .. }] => {
+            Ok(Some((name.clone(), lower_expr(value, state, bindings)?)))
+        }
+        [NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+        }] => {
+            let condition_name = lower_expr(condition, state, bindings)?;
+            let Some((lhs_name, lhs_value)) = lower_binding_if_chain(then_body, state, bindings)?
+            else {
+                return Ok(None);
+            };
+            let Some((rhs_name, rhs_value)) = lower_binding_if_chain(else_body, state, bindings)?
+            else {
+                return Ok(None);
+            };
+            if lhs_name != rhs_name {
+                return Ok(None);
+            }
+            Ok(Some((
+                lhs_name,
+                lower_select(condition_name, lhs_value, rhs_value, state)?,
+            )))
         }
         _ => Ok(None),
     }

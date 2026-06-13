@@ -77,7 +77,7 @@ pub(crate) fn infer_ast_expr_type_inner(
     }
     let inferred = match expr {
         AstExpr::Bool(_) => Some(ast_named_type("bool")),
-        AstExpr::Text(_) => Some(ast_named_type("Text")),
+        AstExpr::Text(_) => Some(ast_named_type("String")),
         AstExpr::Int(_) => Some(ast_named_type("i64")),
         AstExpr::Float(_) => Some(ast_named_type("f64")),
         AstExpr::Var(name) => env.get(name).cloned(),

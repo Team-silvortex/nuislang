@@ -1,4 +1,6 @@
 use super::*;
+use crate::lowering::edge_helpers::push_effect_edge;
+use crate::lowering::edge_helpers::push_lifetime_edge;
 
 fn encode_carry_condition_args(
     condition: &PreparedLoopFlowCondition,
@@ -398,29 +400,14 @@ pub(super) fn lower_async_chained_while(
     for extra_dep_input in &extra_dep_inputs {
         push_dep_edges(state, extra_dep_input, &name);
     }
-    state.yir.edges.push(Edge {
-        kind: EdgeKind::Effect,
-        from: initial_name.clone(),
-        to: name.clone(),
-    });
-    state.yir.edges.push(Edge {
-        kind: EdgeKind::Effect,
-        from: limit_name.clone(),
-        to: name.clone(),
-    });
+    push_effect_edge(state, &initial_name, &name);
+    push_effect_edge(state, &limit_name, &name);
     for carry_initial_name in &carry_initial_names {
-        state.yir.edges.push(Edge {
-            kind: EdgeKind::Effect,
-            from: carry_initial_name.clone(),
-            to: name.clone(),
-        });
+        push_effect_edge(state, carry_initial_name, &name);
     }
     for extra_effect_input in &extra_effect_inputs {
-        state.yir.edges.push(Edge {
-            kind: EdgeKind::Effect,
-            from: extra_effect_input.clone(),
-            to: name.clone(),
-        });
+        push_effect_edge(state, extra_effect_input, &name);
+        push_lifetime_edge(state, extra_effect_input, &name);
     }
 
     let current_name = next_name(state, "loop_current");

@@ -1,7 +1,8 @@
 use super::*;
 use crate::lowering::loop_carries::{
-    loop_compare_from_binary_op, parse_loop_carry_branch_source, parse_loop_carry_condition,
-    parse_loop_carry_linear,
+    diagnose_unsupported_loop_carry_expr, loop_compare_from_binary_op,
+    loop_state_ref_into_cond_source, parse_loop_carry_branch_source, parse_loop_carry_linear,
+    parse_prepared_loop_state_ref_expr, unsupported_loop_carry_branch_source_message,
 };
 use crate::lowering::loop_purity::{
     normalize_pure_bool_test_expr, substitute_branch_binding, substitute_stmt_bindings,
@@ -10,7 +11,7 @@ use crate::lowering::loop_purity::{
 fn parse_loop_flow_condition_atom(
     expr: &NirExpr,
     binding_name: &str,
-    carry_binding_names: &[String],
+    carries: &[PreparedCarryUpdate],
     pure_helpers: &BTreeSet<String>,
     inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
 ) -> Option<PreparedLoopCarryCondition> {
@@ -62,23 +63,11 @@ fn parse_loop_flow_condition_atom(
         _ => return None,
     };
     let lhs = match lhs {
-        NirExpr::Var(name) if name == binding_name => PreparedCarryCondSource::Current,
-        NirExpr::Var(name) if name == TAIL_RECURSIVE_PREV_CURRENT_BINDING => {
-            PreparedCarryCondSource::PreviousCurrent
-        }
-        NirExpr::Var(name) if name.starts_with(TAIL_RECURSIVE_PREV_CARRY_BINDING_PREFIX) => {
-            PreparedCarryCondSource::PreviousCarry(
-                name[TAIL_RECURSIVE_PREV_CARRY_BINDING_PREFIX.len()..]
-                    .parse::<usize>()
-                    .ok()?,
-            )
-        }
-        NirExpr::Var(name) => PreparedCarryCondSource::Carry(
-            carry_binding_names
-                .iter()
-                .position(|carry_name| carry_name == name)?,
-        ),
-        _ => return None,
+        _ => loop_state_ref_into_cond_source(parse_prepared_loop_state_ref_expr(
+            lhs,
+            binding_name,
+            carries,
+        )?),
     };
     Some(PreparedLoopCarryCondition { lhs, compare, rhs })
 }
@@ -86,7 +75,7 @@ fn parse_loop_flow_condition_atom(
 fn parse_loop_flow_condition(
     expr: &NirExpr,
     binding_name: &str,
-    carry_binding_names: &[String],
+    carries: &[PreparedCarryUpdate],
     pure_helpers: &BTreeSet<String>,
     inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
 ) -> Option<PreparedLoopFlowCondition> {
@@ -100,14 +89,14 @@ fn parse_loop_flow_condition(
             lhs: Box::new(parse_loop_flow_condition(
                 lhs,
                 binding_name,
-                carry_binding_names,
+                carries,
                 pure_helpers,
                 inlineable_pure_helpers,
             )?),
             rhs: Box::new(parse_loop_flow_condition(
                 rhs,
                 binding_name,
-                carry_binding_names,
+                carries,
                 pure_helpers,
                 inlineable_pure_helpers,
             )?),
@@ -121,14 +110,14 @@ fn parse_loop_flow_condition(
             lhs: Box::new(parse_loop_flow_condition(
                 lhs,
                 binding_name,
-                carry_binding_names,
+                carries,
                 pure_helpers,
                 inlineable_pure_helpers,
             )?),
             rhs: Box::new(parse_loop_flow_condition(
                 rhs,
                 binding_name,
-                carry_binding_names,
+                carries,
                 pure_helpers,
                 inlineable_pure_helpers,
             )?),
@@ -137,7 +126,7 @@ fn parse_loop_flow_condition(
             parse_loop_flow_condition_atom(
                 expr,
                 binding_name,
-                carry_binding_names,
+                carries,
                 pure_helpers,
                 inlineable_pure_helpers,
             )?,
@@ -239,7 +228,7 @@ fn combine_loop_flow_conditions(
 fn parse_loop_flow_control(
     stmt: &NirStmt,
     binding_name: &str,
-    carry_binding_names: &[String],
+    carries: &[PreparedCarryUpdate],
     pure_helpers: &BTreeSet<String>,
     inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
 ) -> Option<PreparedLoopFlowControl> {
@@ -254,7 +243,7 @@ fn parse_loop_flow_control(
     let outer_condition = parse_loop_flow_condition(
         condition,
         binding_name,
-        carry_binding_names,
+        carries,
         pure_helpers,
         inlineable_pure_helpers,
     )?;
@@ -279,7 +268,7 @@ fn parse_loop_flow_control(
                 let nested = parse_loop_flow_control(
                     action_stmt,
                     binding_name,
-                    carry_binding_names,
+                    carries,
                     pure_helpers,
                     inlineable_pure_helpers,
                 )?;
@@ -310,7 +299,7 @@ fn parse_loop_flow_control(
     let nested = parse_loop_flow_control(
         else_stmt,
         binding_name,
-        carry_binding_names,
+        carries,
         pure_helpers,
         inlineable_pure_helpers,
     )?;
@@ -344,7 +333,7 @@ enum PreparedReturnDecisionTree {
 enum PreparedCarryDecisionTree {
     Leaf(PreparedCarryBranchSource),
     Branch {
-        condition: PreparedLoopCarryCondition,
+        condition: PreparedLoopFlowCondition,
         then_tree: Box<PreparedCarryDecisionTree>,
         else_tree: Box<PreparedCarryDecisionTree>,
     },
@@ -495,7 +484,7 @@ fn lower_helper_return_tree_to_carry_tree(
             then_tree,
             else_tree,
         } => Some(PreparedCarryDecisionTree::Branch {
-            condition: parse_loop_carry_condition(
+            condition: parse_loop_flow_condition(
                 &condition,
                 binding_name,
                 carries,
@@ -546,11 +535,7 @@ fn collapse_carry_decision_tree(
             if let (Some(then_source), Some(else_source)) =
                 (leaf_source(then_tree), leaf_source(else_tree))
             {
-                return Some((
-                    PreparedLoopFlowCondition::Simple(condition.clone()),
-                    then_source,
-                    else_source,
-                ));
+                return Some((condition.clone(), then_source, else_source));
             }
 
             if let Some(then_source) = leaf_source(then_tree) {
@@ -561,7 +546,7 @@ fn collapse_carry_decision_tree(
                         return Some((
                             PreparedLoopFlowCondition::Compound {
                                 op: PreparedLoopLogicOp::Or,
-                                lhs: Box::new(PreparedLoopFlowCondition::Simple(condition.clone())),
+                                lhs: Box::new(condition.clone()),
                                 rhs: Box::new(nested_condition),
                             },
                             then_source,
@@ -579,7 +564,7 @@ fn collapse_carry_decision_tree(
                         return Some((
                             PreparedLoopFlowCondition::Compound {
                                 op: PreparedLoopLogicOp::And,
-                                lhs: Box::new(PreparedLoopFlowCondition::Simple(condition.clone())),
+                                lhs: Box::new(condition.clone()),
                                 rhs: Box::new(nested_condition),
                             },
                             nested_then,
@@ -623,6 +608,329 @@ fn parse_helper_conditional_carry_update(
     })
 }
 
+fn extract_single_stmt_carry_name(
+    stmt: &NirStmt,
+    pure_helpers: &BTreeSet<String>,
+) -> Option<String> {
+    match stmt {
+        NirStmt::Let { .. } | NirStmt::Const { .. } => {
+            let (name, _) = extract_pure_branch_binding(stmt, pure_helpers)?;
+            Some(name)
+        }
+        NirStmt::If {
+            then_body,
+            else_body,
+            ..
+        } => {
+            let [then_stmt] = then_body.as_slice() else {
+                return None;
+            };
+            let [else_stmt] = else_body.as_slice() else {
+                return None;
+            };
+            let then_name = extract_single_stmt_carry_name(then_stmt, pure_helpers)?;
+            let else_name = extract_single_stmt_carry_name(else_stmt, pure_helpers)?;
+            if then_name == else_name {
+                Some(then_name)
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+fn extract_non_temp_loop_carry_name(
+    stmt: &NirStmt,
+    pure_helpers: &BTreeSet<String>,
+) -> Option<String> {
+    let name = extract_single_stmt_carry_name(stmt, pure_helpers)?;
+    if is_loop_match_scrutinee_temp_binding(&name) {
+        None
+    } else {
+        Some(name)
+    }
+}
+
+fn expr_references_any_name(expr: &NirExpr, names: &BTreeSet<String>) -> bool {
+    match expr {
+        NirExpr::Var(name) => names.contains(name),
+        NirExpr::Await(inner)
+        | NirExpr::Borrow(inner)
+        | NirExpr::BorrowEnd(inner)
+        | NirExpr::Move(inner)
+        | NirExpr::CastI64ToI32(inner)
+        | NirExpr::LoadValue(inner)
+        | NirExpr::LoadNext(inner)
+        | NirExpr::BufferLen(inner)
+        | NirExpr::CpuJoin(inner)
+        | NirExpr::CpuCancel(inner)
+        | NirExpr::CpuJoinResult(inner)
+        | NirExpr::CpuTaskCompleted(inner)
+        | NirExpr::CpuTaskTimedOut(inner)
+        | NirExpr::CpuTaskCancelled(inner)
+        | NirExpr::CpuTaskValue(inner)
+        | NirExpr::DataReady(inner)
+        | NirExpr::DataMoved(inner)
+        | NirExpr::DataWindowed(inner)
+        | NirExpr::DataValue(inner)
+        | NirExpr::DataOutputPipe(inner)
+        | NirExpr::DataInputPipe(inner)
+        | NirExpr::DataFreezeWindow(inner)
+        | NirExpr::ShaderPassReady(inner)
+        | NirExpr::ShaderFrameReady(inner)
+        | NirExpr::ShaderValue(inner)
+        | NirExpr::NetworkConfigReady(inner)
+        | NirExpr::NetworkSendReady(inner)
+        | NirExpr::NetworkRecvReady(inner)
+        | NirExpr::NetworkAcceptReady(inner)
+        | NirExpr::NetworkValue(inner)
+        | NirExpr::KernelConfigReady(inner)
+        | NirExpr::KernelValue(inner)
+        | NirExpr::CpuPresentFrame(inner)
+        | NirExpr::Free(inner)
+        | NirExpr::IsNull(inner)
+        | NirExpr::FieldAccess { base: inner, .. } => expr_references_any_name(inner, names),
+        NirExpr::Binary { lhs, rhs, .. } => {
+            expr_references_any_name(lhs, names) || expr_references_any_name(rhs, names)
+        }
+        NirExpr::LoadAt { buffer, index }
+        | NirExpr::DataReadWindow {
+            window: buffer,
+            index,
+        } => expr_references_any_name(buffer, names) || expr_references_any_name(index, names),
+        NirExpr::StoreValue { target, value }
+        | NirExpr::StoreNext {
+            target,
+            next: value,
+        } => expr_references_any_name(target, names) || expr_references_any_name(value, names),
+        NirExpr::StoreAt {
+            buffer,
+            index,
+            value,
+        }
+        | NirExpr::DataWriteWindow {
+            window: buffer,
+            index,
+            value,
+        } => {
+            expr_references_any_name(buffer, names)
+                || expr_references_any_name(index, names)
+                || expr_references_any_name(value, names)
+        }
+        NirExpr::AllocNode { value, next } => {
+            expr_references_any_name(value, names) || expr_references_any_name(next, names)
+        }
+        NirExpr::AllocBuffer { len, fill } => {
+            expr_references_any_name(len, names) || expr_references_any_name(fill, names)
+        }
+        NirExpr::Call { args, .. }
+        | NirExpr::CpuExternCall { args, .. }
+        | NirExpr::CpuSpawn { args, .. } => {
+            args.iter().any(|arg| expr_references_any_name(arg, names))
+        }
+        NirExpr::MethodCall { receiver, args, .. } => {
+            expr_references_any_name(receiver, names)
+                || args.iter().any(|arg| expr_references_any_name(arg, names))
+        }
+        NirExpr::StructLiteral { fields, .. } => fields
+            .iter()
+            .any(|(_, value)| expr_references_any_name(value, names)),
+        NirExpr::DataResult { value, .. }
+        | NirExpr::ShaderResult { value, .. }
+        | NirExpr::NetworkResult { value, .. }
+        | NirExpr::KernelResult { value, .. } => expr_references_any_name(value, names),
+        _ => false,
+    }
+}
+
+fn stmt_references_any_name(stmt: &NirStmt, names: &BTreeSet<String>) -> bool {
+    match stmt {
+        NirStmt::Let { value, .. }
+        | NirStmt::Const { value, .. }
+        | NirStmt::Print(value)
+        | NirStmt::Expr(value)
+        | NirStmt::Await(value) => expr_references_any_name(value, names),
+        NirStmt::Return(Some(value)) => expr_references_any_name(value, names),
+        NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            expr_references_any_name(condition, names)
+                || then_body
+                    .iter()
+                    .any(|stmt| stmt_references_any_name(stmt, names))
+                || else_body
+                    .iter()
+                    .any(|stmt| stmt_references_any_name(stmt, names))
+        }
+        NirStmt::While { condition, body } => {
+            expr_references_any_name(condition, names)
+                || body.iter().any(|stmt| stmt_references_any_name(stmt, names))
+        }
+        NirStmt::Return(None) | NirStmt::Break | NirStmt::Continue => false,
+    }
+}
+
+fn collect_loop_carry_binding_names(
+    stmts: &[NirStmt],
+    pure_helpers: &BTreeSet<String>,
+) -> Option<Vec<String>> {
+    let mut names = Vec::new();
+    for stmt in stmts {
+        if extract_loop_match_scrutinee_temp_binding(stmt, pure_helpers).is_some() {
+            continue;
+        }
+        names.push(extract_non_temp_loop_carry_name(stmt, pure_helpers)?);
+    }
+    Some(names)
+}
+
+fn diagnose_future_carry_reference(
+    stmt: &NirStmt,
+    current_carry_name: &str,
+    future_carry_names: &[String],
+) -> Option<String> {
+    let referenced_name = future_carry_names
+        .iter()
+        .find(|name| stmt_references_any_name(stmt, &BTreeSet::from([(*name).clone()])))?;
+    Some(format!(
+        "loop carry update `{current_carry_name}` references sibling carry `{referenced_name}` before that carry is updated in the loop body; reorder the carry bindings or make the previous-state dependency explicit"
+    ))
+}
+
+fn parse_stmt_carry_decision_tree(
+    stmt: &NirStmt,
+    carry_name: &str,
+    binding_name: &str,
+    carries: &[PreparedCarryUpdate],
+    pure_helpers: &BTreeSet<String>,
+    inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
+) -> Option<PreparedCarryDecisionTree> {
+    match stmt {
+        NirStmt::Let { .. } | NirStmt::Const { .. } => {
+            let (branch_name, branch_expr) = extract_pure_branch_binding(stmt, pure_helpers)?;
+            if branch_name != carry_name {
+                return None;
+            }
+            Some(PreparedCarryDecisionTree::Leaf(
+                parse_loop_carry_branch_source(
+                    &branch_name,
+                    &branch_expr,
+                    binding_name,
+                    carries,
+                    inlineable_pure_helpers,
+                )?,
+            ))
+        }
+        NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            let [then_stmt] = then_body.as_slice() else {
+                return None;
+            };
+            let [else_stmt] = else_body.as_slice() else {
+                return None;
+            };
+            Some(PreparedCarryDecisionTree::Branch {
+                condition: parse_loop_flow_condition(
+                    condition,
+                    binding_name,
+                    carries,
+                    pure_helpers,
+                    inlineable_pure_helpers,
+                )?,
+                then_tree: Box::new(parse_stmt_carry_decision_tree(
+                    then_stmt,
+                    carry_name,
+                    binding_name,
+                    carries,
+                    pure_helpers,
+                    inlineable_pure_helpers,
+                )?),
+                else_tree: Box::new(parse_stmt_carry_decision_tree(
+                    else_stmt,
+                    carry_name,
+                    binding_name,
+                    carries,
+                    pure_helpers,
+                    inlineable_pure_helpers,
+                )?),
+            })
+        }
+        _ => None,
+    }
+}
+
+fn diagnose_unsupported_stmt_carry_tree(
+    stmt: &NirStmt,
+    carry_name: &str,
+    binding_name: &str,
+    carries: &[PreparedCarryUpdate],
+    pure_helpers: &BTreeSet<String>,
+    inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
+) -> Option<String> {
+    match stmt {
+        NirStmt::Let { .. } | NirStmt::Const { .. } => {
+            let (branch_name, branch_expr) = extract_pure_branch_binding(stmt, pure_helpers)?;
+            if branch_name != carry_name {
+                return None;
+            }
+            diagnose_unsupported_loop_carry_expr(
+                &branch_name,
+                &branch_expr,
+                binding_name,
+                carries,
+                inlineable_pure_helpers,
+            )
+            .or_else(|| {
+                parse_loop_carry_branch_source(
+                    &branch_name,
+                    &branch_expr,
+                    binding_name,
+                    carries,
+                    inlineable_pure_helpers,
+                )
+                .and_then(|source| unsupported_loop_carry_branch_source_message(&source))
+            })
+        }
+        NirStmt::If {
+            then_body,
+            else_body,
+            ..
+        } => {
+            let [then_stmt] = then_body.as_slice() else {
+                return None;
+            };
+            let [else_stmt] = else_body.as_slice() else {
+                return None;
+            };
+            diagnose_unsupported_stmt_carry_tree(
+                then_stmt,
+                carry_name,
+                binding_name,
+                carries,
+                pure_helpers,
+                inlineable_pure_helpers,
+            )
+            .or_else(|| {
+                diagnose_unsupported_stmt_carry_tree(
+                    else_stmt,
+                    carry_name,
+                    binding_name,
+                    carries,
+                    pure_helpers,
+                    inlineable_pure_helpers,
+                )
+            })
+        }
+        _ => None,
+    }
+}
+
 fn parse_loop_carry_update(
     stmt: &NirStmt,
     binding_name: &str,
@@ -648,6 +956,72 @@ fn parse_loop_carry_update(
             inlineable_pure_helpers,
         )
     })
+}
+
+fn diagnose_unsupported_loop_carry_update(
+    stmt: &NirStmt,
+    binding_name: &str,
+    carries: &[PreparedCarryUpdate],
+    pure_helpers: &BTreeSet<String>,
+    inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
+    pure_helper_blocks: &BTreeMap<String, PureHelperBlock>,
+) -> Option<String> {
+    match stmt {
+        NirStmt::Let { .. } | NirStmt::Const { .. } => {
+            let (carry_name, carry_expr) = extract_pure_branch_binding(stmt, pure_helpers)?;
+            diagnose_unsupported_loop_carry_expr(
+                &carry_name,
+                &carry_expr,
+                binding_name,
+                carries,
+                inlineable_pure_helpers,
+            )
+            .or_else(|| {
+                parse_helper_conditional_carry_update(
+                    &carry_name,
+                    &carry_expr,
+                    binding_name,
+                    carries,
+                    pure_helpers,
+                    inlineable_pure_helpers,
+                    pure_helper_blocks,
+                )
+                .and_then(|kind| match kind {
+                    PreparedCarryUpdateKind::Linear { .. } => None,
+                    PreparedCarryUpdateKind::Conditional {
+                        then_source,
+                        else_source,
+                        ..
+                    } => unsupported_loop_carry_branch_source_message(&then_source)
+                        .or_else(|| unsupported_loop_carry_branch_source_message(&else_source)),
+                })
+            })
+        }
+        NirStmt::If { .. } => {
+            let carry_name = extract_single_stmt_carry_name(stmt, pure_helpers)?;
+            if parse_stmt_carry_decision_tree(
+                stmt,
+                &carry_name,
+                binding_name,
+                carries,
+                pure_helpers,
+                inlineable_pure_helpers,
+            )
+            .is_none()
+            {
+                return None;
+            }
+            diagnose_unsupported_stmt_carry_tree(
+                stmt,
+                &carry_name,
+                binding_name,
+                carries,
+                pure_helpers,
+                inlineable_pure_helpers,
+            )
+        }
+        _ => None,
+    }
 }
 
 fn parse_linear_loop_carry_update_stmt(
@@ -697,54 +1071,21 @@ fn parse_conditional_loop_carry_update_stmt(
     pure_helpers: &BTreeSet<String>,
     inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
 ) -> Option<PreparedCarryUpdate> {
-    let NirStmt::If {
-        condition,
-        then_body,
-        else_body,
-    } = stmt
-    else {
+    let NirStmt::If { .. } = stmt else {
         return None;
     };
-    let [then_binding @ (NirStmt::Let { .. } | NirStmt::Const { .. })] = then_body.as_slice()
-    else {
-        return None;
-    };
-    let [else_binding @ (NirStmt::Let { .. } | NirStmt::Const { .. })] = else_body.as_slice()
-    else {
-        return None;
-    };
-    let (then_name, then_expr) = extract_pure_branch_binding(then_binding, pure_helpers)?;
-    let (else_name, else_expr) = extract_pure_branch_binding(else_binding, pure_helpers)?;
-    if then_name != else_name {
-        return None;
-    }
-    let carry_binding_names = carries
-        .iter()
-        .map(|carry| carry.binding_name.clone())
-        .collect::<Vec<_>>();
-    let condition = parse_loop_flow_condition(
-        condition,
+    let carry_name = extract_single_stmt_carry_name(stmt, pure_helpers)?;
+    let carry_tree = parse_stmt_carry_decision_tree(
+        stmt,
+        &carry_name,
         binding_name,
-        &carry_binding_names,
+        carries,
         pure_helpers,
         inlineable_pure_helpers,
     )?;
-    let then_source = parse_loop_carry_branch_source(
-        &then_name,
-        &then_expr,
-        binding_name,
-        carries,
-        inlineable_pure_helpers,
-    )?;
-    let else_source = parse_loop_carry_branch_source(
-        &else_name,
-        &else_expr,
-        binding_name,
-        carries,
-        inlineable_pure_helpers,
-    )?;
+    let (condition, then_source, else_source) = collapse_carry_decision_tree(&carry_tree)?;
     Some(PreparedCarryUpdate {
-        binding_name: then_name,
+        binding_name: carry_name,
         kind: PreparedCarryUpdateKind::Conditional {
             condition,
             then_source,
@@ -776,10 +1117,24 @@ fn prepare_loop_carry_sequence(
     inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
     pure_helper_blocks: &BTreeMap<String, PureHelperBlock>,
 ) -> Option<Vec<PreparedCarryUpdate>> {
+    let carry_names = collect_loop_carry_binding_names(stmts, pure_helpers)?;
     let mut carries = Vec::<PreparedCarryUpdate>::new();
     let mut temp_bindings = Vec::<(String, NirExpr)>::new();
+    let mut carry_index = 0usize;
     for stmt in stmts {
         let substituted = substitute_stmt_bindings(stmt, &temp_bindings);
+        if let Some(current_carry_name) = extract_non_temp_loop_carry_name(stmt, pure_helpers) {
+            if diagnose_future_carry_reference(
+                &substituted,
+                &current_carry_name,
+                &carry_names[carry_index + 1..],
+            )
+            .is_some()
+            {
+                return None;
+            }
+            carry_index += 1;
+        }
         if let Some(prepared) = parse_loop_carry_update(
             &substituted,
             binding_name,
@@ -798,6 +1153,80 @@ fn prepare_loop_carry_sequence(
         temp_bindings.push((temp_name, temp_expr));
     }
     Some(carries)
+}
+
+pub(super) fn diagnose_unsupported_prepared_while_carry(
+    condition: &NirExpr,
+    body: &[NirStmt],
+    pure_helpers: &BTreeSet<String>,
+    inlineable_pure_helpers: &BTreeMap<String, InlineablePureHelper>,
+    pure_helper_blocks: &BTreeMap<String, PureHelperBlock>,
+) -> Option<String> {
+    let (binding_name, _, _) =
+        parse_prepared_loop_header(condition, pure_helpers, inlineable_pure_helpers)?;
+
+    let [step_binding @ (NirStmt::Let { .. } | NirStmt::Const { .. }), carry_bindings @ ..] = body
+    else {
+        return None;
+    };
+    if carry_bindings.is_empty() {
+        return None;
+    }
+    let sync_step = parse_prepared_loop_step(
+        step_binding,
+        &binding_name,
+        pure_helpers,
+        inlineable_pure_helpers,
+    );
+    let async_step = parse_prepared_async_loop_step(step_binding, &binding_name);
+    if sync_step.is_none() && async_step.is_none() {
+        return None;
+    }
+
+    let carry_names = collect_loop_carry_binding_names(carry_bindings, pure_helpers)?;
+    let mut carries = Vec::<PreparedCarryUpdate>::new();
+    let mut temp_bindings = Vec::<(String, NirExpr)>::new();
+    let mut carry_index = 0usize;
+    for stmt in carry_bindings {
+        let substituted = substitute_stmt_bindings(stmt, &temp_bindings);
+        if let Some(current_carry_name) = extract_non_temp_loop_carry_name(stmt, pure_helpers) {
+            if let Some(diagnostic) = diagnose_future_carry_reference(
+                &substituted,
+                &current_carry_name,
+                &carry_names[carry_index + 1..],
+            ) {
+                return Some(diagnostic);
+            }
+            carry_index += 1;
+        }
+        if let Some(diagnostic) = diagnose_unsupported_loop_carry_update(
+            &substituted,
+            &binding_name,
+            &carries,
+            pure_helpers,
+            inlineable_pure_helpers,
+            pure_helper_blocks,
+        ) {
+            return Some(diagnostic);
+        }
+        if let Some(prepared) = parse_loop_carry_update(
+            &substituted,
+            &binding_name,
+            &carries,
+            pure_helpers,
+            inlineable_pure_helpers,
+            pure_helper_blocks,
+        ) {
+            carries.push(prepared);
+            continue;
+        }
+        let (temp_name, temp_expr) = extract_pure_branch_binding(&substituted, pure_helpers)?;
+        if !is_loop_match_scrutinee_temp_binding(&temp_name) {
+            return None;
+        }
+        temp_bindings.push((temp_name, temp_expr));
+    }
+    None
 }
 
 fn split_temp_prefixed_loop_flow_control<'a>(
@@ -974,14 +1403,10 @@ pub(super) fn prepare_async_flow_while(
                     inlineable_pure_helpers,
                     pure_helper_blocks,
                 )?;
-                let carry_binding_names = prepared_carries
-                    .iter()
-                    .map(|carry| carry.binding_name.clone())
-                    .collect::<Vec<_>>();
                 let control_condition = parse_loop_flow_condition(
                     condition,
                     &binding_name,
-                    &carry_binding_names,
+                    &prepared_carries,
                     pure_helpers,
                     inlineable_pure_helpers,
                 )?;
@@ -1000,14 +1425,10 @@ pub(super) fn prepare_async_flow_while(
                     inlineable_pure_helpers,
                     pure_helper_blocks,
                 )?;
-                let carry_binding_names = prepared_carries
-                    .iter()
-                    .map(|carry| carry.binding_name.clone())
-                    .collect::<Vec<_>>();
                 let control = parse_loop_flow_control(
                     &substituted_control_stmt,
                     &binding_name,
-                    &carry_binding_names,
+                    &prepared_carries,
                     pure_helpers,
                     inlineable_pure_helpers,
                 )?;
@@ -1021,14 +1442,10 @@ pub(super) fn prepare_async_flow_while(
                 inlineable_pure_helpers,
                 pure_helper_blocks,
             )?;
-            let carry_binding_names = prepared_carries
-                .iter()
-                .map(|carry| carry.binding_name.clone())
-                .collect::<Vec<_>>();
             let control = parse_loop_flow_control(
                 &substituted_control_stmt,
                 &binding_name,
-                &carry_binding_names,
+                &prepared_carries,
                 pure_helpers,
                 inlineable_pure_helpers,
             )?;
@@ -1042,14 +1459,10 @@ pub(super) fn prepare_async_flow_while(
             inlineable_pure_helpers,
             pure_helper_blocks,
         )?;
-        let carry_binding_names = prepared_carries
-            .iter()
-            .map(|carry| carry.binding_name.clone())
-            .collect::<Vec<_>>();
         let control = parse_loop_flow_control(
             &substituted_control_stmt,
             &binding_name,
-            &carry_binding_names,
+            &prepared_carries,
             pure_helpers,
             inlineable_pure_helpers,
         )?;
@@ -1114,14 +1527,10 @@ pub(super) fn prepare_flow_while(
                     inlineable_pure_helpers,
                     pure_helper_blocks,
                 )?;
-                let carry_binding_names = prepared_carries
-                    .iter()
-                    .map(|carry| carry.binding_name.clone())
-                    .collect::<Vec<_>>();
                 let control_condition = parse_loop_flow_condition(
                     condition,
                     &binding_name,
-                    &carry_binding_names,
+                    &prepared_carries,
                     pure_helpers,
                     inlineable_pure_helpers,
                 )?;
@@ -1140,14 +1549,10 @@ pub(super) fn prepare_flow_while(
                     inlineable_pure_helpers,
                     pure_helper_blocks,
                 )?;
-                let carry_binding_names = prepared_carries
-                    .iter()
-                    .map(|carry| carry.binding_name.clone())
-                    .collect::<Vec<_>>();
                 let control = parse_loop_flow_control(
                     &substituted_control_stmt,
                     &binding_name,
-                    &carry_binding_names,
+                    &prepared_carries,
                     pure_helpers,
                     inlineable_pure_helpers,
                 )?;
@@ -1161,14 +1566,10 @@ pub(super) fn prepare_flow_while(
                 inlineable_pure_helpers,
                 pure_helper_blocks,
             )?;
-            let carry_binding_names = prepared_carries
-                .iter()
-                .map(|carry| carry.binding_name.clone())
-                .collect::<Vec<_>>();
             let control = parse_loop_flow_control(
                 &substituted_control_stmt,
                 &binding_name,
-                &carry_binding_names,
+                &prepared_carries,
                 pure_helpers,
                 inlineable_pure_helpers,
             )?;
@@ -1182,14 +1583,10 @@ pub(super) fn prepare_flow_while(
             inlineable_pure_helpers,
             pure_helper_blocks,
         )?;
-        let carry_binding_names = prepared_carries
-            .iter()
-            .map(|carry| carry.binding_name.clone())
-            .collect::<Vec<_>>();
         let control = parse_loop_flow_control(
             &substituted_control_stmt,
             &binding_name,
-            &carry_binding_names,
+            &prepared_carries,
             pure_helpers,
             inlineable_pure_helpers,
         )?;
@@ -1245,10 +1642,6 @@ pub(super) fn prepare_post_flow_while(
         inlineable_pure_helpers,
         pure_helper_blocks,
     )?;
-    let carry_binding_names = prepared_carries
-        .iter()
-        .map(|carry| carry.binding_name.clone())
-        .collect::<Vec<_>>();
     let control_temp_bindings = control_temp_stmts
         .iter()
         .map(|stmt| extract_loop_match_scrutinee_temp_binding(stmt, pure_helpers))
@@ -1257,7 +1650,7 @@ pub(super) fn prepare_post_flow_while(
     let control = parse_loop_flow_control(
         &substituted_control_stmt,
         &binding_name,
-        &carry_binding_names,
+        &prepared_carries,
         pure_helpers,
         inlineable_pure_helpers,
     )?;
@@ -1306,10 +1699,6 @@ pub(super) fn prepare_async_post_flow_while(
         inlineable_pure_helpers,
         pure_helper_blocks,
     )?;
-    let carry_binding_names = prepared_carries
-        .iter()
-        .map(|carry| carry.binding_name.clone())
-        .collect::<Vec<_>>();
     let control_temp_bindings = control_temp_stmts
         .iter()
         .map(|stmt| extract_loop_match_scrutinee_temp_binding(stmt, pure_helpers))
@@ -1318,7 +1707,7 @@ pub(super) fn prepare_async_post_flow_while(
     let control = parse_loop_flow_control(
         &substituted_control_stmt,
         &binding_name,
-        &carry_binding_names,
+        &prepared_carries,
         pure_helpers,
         inlineable_pure_helpers,
     )?;
@@ -1330,4 +1719,45 @@ pub(super) fn prepare_async_post_flow_while(
         carries: prepared_carries,
         control,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lowering::loop_carries::tail_recursive_prev_carry_binding;
+
+    #[test]
+    fn diagnose_unsupported_stmt_carry_tree_allows_previous_value_keep_branch() {
+        let stmt = NirStmt::If {
+            condition: NirExpr::Binary {
+                op: NirBinaryOp::Gt,
+                lhs: Box::new(NirExpr::Var("current".to_owned())),
+                rhs: Box::new(NirExpr::Int(1)),
+            },
+            then_body: vec![NirStmt::Let {
+                name: "acc".to_owned(),
+                ty: None,
+                value: NirExpr::Binary {
+                    op: NirBinaryOp::Add,
+                    lhs: Box::new(NirExpr::Var("acc".to_owned())),
+                    rhs: Box::new(NirExpr::Int(1)),
+                },
+            }],
+            else_body: vec![NirStmt::Let {
+                name: "acc".to_owned(),
+                ty: None,
+                value: NirExpr::Var(tail_recursive_prev_carry_binding(0)),
+            }],
+        };
+
+        let diagnostic = diagnose_unsupported_stmt_carry_tree(
+            &stmt,
+            "acc",
+            "current",
+            &[],
+            &BTreeSet::new(),
+            &BTreeMap::new(),
+        );
+        assert!(diagnostic.is_none());
+    }
 }

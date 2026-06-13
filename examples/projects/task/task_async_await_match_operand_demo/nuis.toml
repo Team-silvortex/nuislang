@@ -1,0 +1,8 @@
+version = 1
+
+[project]
+name = "task_async_await_match_operand_demo"
+entry = "main.ns"
+
+[abi]
+cpu = "cpu.arm64.apple_aapcs64"
