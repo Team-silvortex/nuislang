@@ -21,6 +21,7 @@ mod match_hoist;
 mod match_lowering;
 mod metadata;
 mod module_assembly;
+mod name_suggestions;
 mod network_builtins;
 mod nova_builtins;
 mod parser;
@@ -79,6 +80,7 @@ mod tests_test_functions;
 #[cfg(test)]
 mod tests_types_async_window;
 mod types;
+mod unary_lowering;
 mod validation;
 mod validation_binding_env;
 mod validation_generic_constraints;

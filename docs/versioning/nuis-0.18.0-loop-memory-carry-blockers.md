@@ -6,6 +6,13 @@ step.
 It exists so future work can start from explicit compiler boundaries instead of
 re-deriving them from tests and lowering failures.
 
+The examples in this file intentionally use builtin memory helper names such as
+`load_at(...)` and `load_next(...)` because the blocker discussion is framed at
+the carry-recognition / lowering-contract layer.
+
+For source-facing address spelling, see
+[../reference/address-surface-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/address-surface-contract.md).
+
 Current implementation truth:
 
 * verifier now names `load_value(...)` / `load_at(...)` as fixed readable

@@ -128,7 +128,11 @@ local README for the area you are actively touching.
 * current address/pointer anchor:
   [versioning/nuis-0.18.0-address-pointer-mainline.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-address-pointer-mainline.md)
   shortest rule:
-  `current pointer core = ref Node + ref Buffer + borrow/borrow_end + structural and indexed loads/stores`
+  `current pointer core = ref Node + ref Buffer + borrow/borrow_end + field/index surface syntax lowering to the verified builtin core`
+  current surface syntax contract:
+  [reference/address-surface-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/address-surface-contract.md)
+  shortest rule:
+  `ordinary .ns source should use .value/.next/.len and [index]; builtin names are lowering truth, not the recommended source spelling`
   current host-boundary ABI rule:
   [versioning/nuis-0.18.0-host-boundary-address-abi.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-host-boundary-address-abi.md)
   shortest rule:

@@ -84,6 +84,7 @@ fn validate_const_safe_expr(expr: &AstExpr) -> Result<(), &'static str> {
             Ok(())
         }
         AstExpr::Lambda { .. } => Err("lambda expressions are not const-safe"),
+        AstExpr::Unary { operand, .. } => validate_const_safe_expr(operand),
         AstExpr::Binary { lhs, rhs, .. } => {
             validate_const_safe_expr(lhs)?;
             validate_const_safe_expr(rhs)

@@ -217,21 +217,21 @@ mod cpu Main {
     timeout_budget: i64
   ) -> ExchangeBlocks {
     let scratch: ref Buffer = alloc_buffer(8, 0);
-    store_at(scratch, 0, request_line_code);
-    store_at(scratch, 1, request_header_block_code);
-    store_at(scratch, 2, request_body_block_code);
-    store_at(scratch, 3, status_line_code);
-    store_at(scratch, 4, response_header_block_code);
-    store_at(scratch, 5, response_body_block_code);
-    store_at(scratch, 6, retry_block_code);
-    store_at(scratch, 7, timeout_budget);
-    let staged_request_line: i64 = load_at(scratch, 0);
-    let staged_request_headers: i64 = load_at(scratch, 1);
-    let staged_request_body: i64 = load_at(scratch, 2);
-    let staged_status: i64 = load_at(scratch, 3);
-    let staged_response_headers: i64 = load_at(scratch, 4);
-    let staged_response_body: i64 = load_at(scratch, 5);
-    let staged_retry: i64 = load_at(scratch, 6);
+    scratch[0] = request_line_code;
+    scratch[1] = request_header_block_code;
+    scratch[2] = request_body_block_code;
+    scratch[3] = status_line_code;
+    scratch[4] = response_header_block_code;
+    scratch[5] = response_body_block_code;
+    scratch[6] = retry_block_code;
+    scratch[7] = timeout_budget;
+    let staged_request_line: i64 = scratch[0];
+    let staged_request_headers: i64 = scratch[1];
+    let staged_request_body: i64 = scratch[2];
+    let staged_status: i64 = scratch[3];
+    let staged_response_headers: i64 = scratch[4];
+    let staged_response_body: i64 = scratch[5];
+    let staged_retry: i64 = scratch[6];
     let exchange_total: i64 =
       staged_request_line
       + staged_request_headers
@@ -240,7 +240,7 @@ mod cpu Main {
       + staged_response_headers
       + staged_response_body
       + staged_retry
-      + load_at(scratch, 7);
+      + scratch[7];
     free(scratch);
     return ExchangeBlocks {
       request_line_code: staged_request_line,

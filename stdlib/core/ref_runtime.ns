@@ -10,11 +10,11 @@ mod cpu Main {
     let tail: ref Node = move(tail_raw);
     let head: ref Node = alloc_node(head_value, tail);
     let head_ref: ref Node = borrow(head);
-    let tail_ref: ref Node = load_next(head_ref);
+    let tail_ref: ref Node = head_ref.next;
 
     return RefSummary {
-      head: load_value(head_ref),
-      tail: load_value(tail_ref)
+      head: head_ref.value,
+      tail: tail_ref.value
     };
   }
 

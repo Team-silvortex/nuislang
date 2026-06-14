@@ -36,6 +36,15 @@ Current phase snapshots and current minor-line anchor:
 If you want the current minor-line history anchor first, start with
 [`0.18.0` snapshot](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-snapshot.md).
 
+Current source-style note:
+
+* ordinary `.ns` examples and `std` modules now prefer address surface syntax
+  such as `ptr.value`, `ptr.next`, `buffer.len`, and `buffer[index]`
+* builtin names like `load_value(...)` and `store_at(...)` remain the lowered
+  implementation truth in NIR/YIR-facing docs
+* source-facing contract:
+  [docs/reference/address-surface-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/address-surface-contract.md)
+
 ## Toolchain
 
 ```text

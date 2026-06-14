@@ -831,6 +831,17 @@ fn expand_nested_control_expr_as_stmt(
             kind,
             true,
         ),
+        super::AstExpr::Unary { op, operand } => expand_nested_control_expr_as_stmt(
+            operand,
+            &|rewritten| {
+                wrap(super::AstExpr::Unary {
+                    op: *op,
+                    operand: Box::new(rewritten),
+                })
+            },
+            kind,
+            true,
+        ),
         super::AstExpr::Invoke { callee, args } => {
             if let Some(expanded) = expand_nested_control_expr_as_stmt(
                 callee,

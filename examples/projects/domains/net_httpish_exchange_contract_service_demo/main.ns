@@ -200,21 +200,21 @@ mod cpu Main {
     retry_code: i64
   ) -> ResponsePacket {
     let scratch: ref Buffer = alloc_buffer(8, 0);
-    store_at(scratch, 0, plan.method_code);
-    store_at(scratch, 1, plan.path_code);
-    store_at(scratch, 2, request_header_code);
-    store_at(scratch, 3, accept_code);
-    store_at(scratch, 4, response_header_code);
-    store_at(scratch, 5, body_code);
-    store_at(scratch, 6, retry_code);
-    store_at(scratch, 7, plan.timeout_budget);
-    let staged_method: i64 = load_at(scratch, 0);
-    let staged_path: i64 = load_at(scratch, 1);
-    let staged_request_header: i64 = load_at(scratch, 2);
-    let staged_accept: i64 = load_at(scratch, 3);
-    let staged_response_header: i64 = load_at(scratch, 4);
-    let staged_body: i64 = load_at(scratch, 5);
-    let staged_retry: i64 = load_at(scratch, 6);
+    scratch[0] = plan.method_code;
+    scratch[1] = plan.path_code;
+    scratch[2] = request_header_code;
+    scratch[3] = accept_code;
+    scratch[4] = response_header_code;
+    scratch[5] = body_code;
+    scratch[6] = retry_code;
+    scratch[7] = plan.timeout_budget;
+    let staged_method: i64 = scratch[0];
+    let staged_path: i64 = scratch[1];
+    let staged_request_header: i64 = scratch[2];
+    let staged_accept: i64 = scratch[3];
+    let staged_response_header: i64 = scratch[4];
+    let staged_body: i64 = scratch[5];
+    let staged_retry: i64 = scratch[6];
     let exchange_total: i64 =
       staged_method
       + staged_path
@@ -223,7 +223,7 @@ mod cpu Main {
       + staged_response_header
       + staged_body
       + staged_retry
-      + load_at(scratch, 7);
+      + scratch[7];
     free(scratch);
     return ResponsePacket {
       method_code: staged_method,

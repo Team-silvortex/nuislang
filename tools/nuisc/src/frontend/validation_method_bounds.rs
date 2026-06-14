@@ -1,15 +1,16 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{
-    AstExpr, AstImplDef, AstMatchArm, AstModule, AstParam, AstStmt, AstStructDef, AstTraitDef,
-    AstTypeAlias, AstTypeRef,
+    AstBinaryOp, AstExpr, AstImplDef, AstMatchArm, AstModule, AstParam, AstStmt, AstStructDef,
+    AstTraitDef, AstTypeAlias, AstTypeRef, AstUnaryOp,
 };
 
 use super::validation_binding_env::{
     bind_destructure_fields_for_type, bind_match_pattern_for_type, simple_match_value_type,
 };
 use super::{
-    infer_ast_expr_type, lower_type_ref, resolve_ast_type_ref_aliases,
+    infer_ast_expr_type, lower_type_ref, name_suggestions::suggest_similar_name,
+    resolve_ast_type_ref_aliases,
     substitute_ast_type_alias_target,
 };
 
@@ -190,6 +191,41 @@ pub(super) fn validate_expr_generic_method_bounds(
                 context,
             )?;
         }
+        AstExpr::Unary { op, operand } => {
+            validate_expr_generic_method_bounds(
+                operand,
+                visible_type_aliases,
+                impl_lookup,
+                visible_structs,
+                function_return_types,
+                trait_methods,
+                generic_param_names,
+                generic_bounds,
+                local_type_env,
+                context,
+            )?;
+            if let Some((operator, method, required_bound)) = unary_operator_trait_requirement(*op) {
+                if let Some(operand_ty) = infer_ast_expr_type(
+                    operand,
+                    local_type_env,
+                    impl_lookup,
+                    visible_structs,
+                    function_return_types,
+                ) {
+                    validate_generic_receiver_operator_bound(
+                        &operand_ty,
+                        operator,
+                        method,
+                        required_bound,
+                        visible_type_aliases,
+                        trait_methods,
+                        generic_param_names,
+                        generic_bounds,
+                        context,
+                    )?;
+                }
+            }
+        }
         AstExpr::Call { callee, args, .. } => {
             for arg in args {
                 validate_expr_generic_method_bounds(
@@ -342,7 +378,7 @@ pub(super) fn validate_expr_generic_method_bounds(
                 )?;
             }
         }
-        AstExpr::Binary { lhs, rhs, .. } => {
+        AstExpr::Binary { op, lhs, rhs } => {
             validate_expr_generic_method_bounds(
                 lhs,
                 visible_type_aliases,
@@ -367,9 +403,58 @@ pub(super) fn validate_expr_generic_method_bounds(
                 local_type_env,
                 context,
             )?;
+            if let Some((operator, method, required_bound)) = binary_operator_trait_requirement(*op) {
+                if let Some(lhs_ty) = infer_ast_expr_type(
+                    lhs,
+                    local_type_env,
+                    impl_lookup,
+                    visible_structs,
+                    function_return_types,
+                ) {
+                    validate_generic_receiver_operator_bound(
+                        &lhs_ty,
+                        operator,
+                        method,
+                        required_bound,
+                        visible_type_aliases,
+                        trait_methods,
+                        generic_param_names,
+                        generic_bounds,
+                        context,
+                    )?;
+                }
+            }
         }
     }
     Ok(())
+}
+
+fn unary_operator_trait_requirement(
+    op: AstUnaryOp,
+) -> Option<(&'static str, &'static str, &'static str)> {
+    match op {
+        AstUnaryOp::Not => Some(("!", "not", "Notable")),
+        AstUnaryOp::Neg => Some(("-", "neg", "Negatable")),
+        AstUnaryOp::Deref => None,
+    }
+}
+
+fn binary_operator_trait_requirement(
+    op: AstBinaryOp,
+) -> Option<(&'static str, &'static str, &'static str)> {
+    match op {
+        AstBinaryOp::Add => Some(("+", "add", "Addable")),
+        AstBinaryOp::Sub => Some(("-", "sub", "Subtractable")),
+        AstBinaryOp::Mul => Some(("*", "mul", "Multipliable")),
+        AstBinaryOp::Div => Some(("/", "div", "Dividable")),
+        AstBinaryOp::Eq => Some(("==", "eq", "Equatable")),
+        AstBinaryOp::Ne => Some(("!=", "eq", "Equatable")),
+        AstBinaryOp::Lt => Some(("<", "lt", "Orderable")),
+        AstBinaryOp::Le => Some(("<=", "le", "Orderable")),
+        AstBinaryOp::Gt => Some((">", "gt", "Orderable")),
+        AstBinaryOp::Ge => Some((">=", "ge", "Orderable")),
+        _ => None,
+    }
 }
 
 fn validate_stmt_generic_method_bounds_block(
@@ -687,6 +772,15 @@ fn validate_generic_receiver_method_bound(
         {
             return Ok(());
         }
+        if let Some(suggested_method) = trait_methods
+            .get(bound)
+            .and_then(|methods| suggest_trait_method_name(method, methods))
+        {
+            return Err(format!(
+                "{context} calls method `{method}` on generic parameter `{generic_name}` but bound `{bound}` does not define that method; did you mean `{}`?",
+                suggested_method
+            ));
+        }
         if candidates.is_empty() {
             return Err(format!(
                 "{context} calls method `{method}` on generic parameter `{generic_name}` but bound `{bound}` does not define that method"
@@ -720,6 +814,47 @@ fn validate_generic_receiver_method_bound(
 }
 
 #[allow(clippy::too_many_arguments)]
+fn validate_generic_receiver_operator_bound(
+    receiver_ty: &AstTypeRef,
+    operator: &str,
+    method: &str,
+    required_bound: &str,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+    trait_methods: &BTreeMap<String, BTreeSet<String>>,
+    generic_param_names: &BTreeSet<String>,
+    generic_bounds: &BTreeMap<String, String>,
+    context: &str,
+) -> Result<(), String> {
+    let Some((generic_name, receiver_context)) = resolve_generic_receiver_context(
+        receiver_ty,
+        visible_type_aliases,
+        generic_param_names,
+        &mut BTreeSet::new(),
+    )?
+    else {
+        return Ok(());
+    };
+    let context = format!("{context}{receiver_context}");
+
+    if let Some(bound) = generic_bounds.get(&generic_name) {
+        if bound == required_bound
+            && trait_methods
+                .get(bound)
+                .is_some_and(|methods| methods.contains(method))
+        {
+            return Ok(());
+        }
+        return Err(format!(
+            "{context} calls operator `{operator}` on generic parameter `{generic_name}` but bound `{bound}` does not satisfy required trait `{required_bound}`"
+        ));
+    }
+
+    Err(format!(
+        "{context} calls operator `{operator}` on generic parameter `{generic_name}` without required bound `{required_bound}`"
+    ))
+}
+
+#[allow(clippy::too_many_arguments)]
 fn validate_explicit_trait_call_bound(
     trait_name: &str,
     method: &str,
@@ -741,6 +876,15 @@ fn validate_explicit_trait_call_bound(
         .get(trait_name)
         .is_some_and(|methods| methods.contains(method))
     {
+        if let Some(suggested_method) = trait_methods
+            .get(trait_name)
+            .and_then(|methods| suggest_trait_method_name(method, methods))
+        {
+            return Err(format!(
+                "{context} calls trait method `{trait_name}.{method}`, but trait `{trait_name}` does not define method `{method}`; did you mean `{}.{}`?",
+                trait_name, suggested_method
+            ));
+        }
         let variants = collect_trait_name_variants(trait_name, trait_methods);
         if variants.len() == 1
             && trait_methods
@@ -831,6 +975,10 @@ fn collect_receiver_trait_impl_candidates(
         .filter(|(_, for_type)| for_type == receiver_rendered)
         .map(|(trait_name, _)| trait_name.clone())
         .collect()
+}
+
+fn suggest_trait_method_name(method: &str, methods: &BTreeSet<String>) -> Option<String> {
+    suggest_similar_name(method, methods)
 }
 
 fn resolve_generic_receiver_context(

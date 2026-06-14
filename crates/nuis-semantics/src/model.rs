@@ -335,11 +335,22 @@ pub enum AstExpr {
         base: Box<AstExpr>,
         field: String,
     },
+    Unary {
+        op: AstUnaryOp,
+        operand: Box<AstExpr>,
+    },
     Binary {
         op: AstBinaryOp,
         lhs: Box<AstExpr>,
         rhs: Box<AstExpr>,
     },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AstUnaryOp {
+    Not,
+    Neg,
+    Deref,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

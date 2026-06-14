@@ -10,7 +10,7 @@ mod cpu Main {
     let copy: WindowMut<i64> = data_copy_window(backing, 1, 2);
     let updated: WindowMut<i64> = data_write_window(copy, 0, 123);
     let frozen: Window<i64> = data_freeze_window(updated);
-    let slot_one: i64 = load_at(backing, 1);
+    let slot_one: i64 = backing[1];
     print(source);
     print(slot_one);
   }

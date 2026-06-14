@@ -56,12 +56,12 @@ mod cpu Main {
 
   fn stage_session_packet(seed: i64, status_code: i64, payload: i64) -> TaskSessionPacket {
     let scratch: ref Buffer = alloc_buffer(3, 0);
-    store_at(scratch, 0, seed);
-    store_at(scratch, 1, status_code);
-    store_at(scratch, 2, payload);
-    let staged_status: i64 = load_at(scratch, 1);
-    let staged_payload: i64 = load_at(scratch, 2);
-    let staged_total: i64 = load_at(scratch, 0) + staged_status + staged_payload;
+    scratch[0] = seed;
+    scratch[1] = status_code;
+    scratch[2] = payload;
+    let staged_status: i64 = scratch[1];
+    let staged_payload: i64 = scratch[2];
+    let staged_total: i64 = scratch[0] + staged_status + staged_payload;
     free(scratch);
     return TaskSessionPacket {
       status_code: staged_status,
@@ -82,7 +82,7 @@ mod cpu Main {
   fn main() -> i64 {
     let head: ref Node = move(alloc_node(7, null()));
     let head_ref: ref Node = borrow(head);
-    let seed: i64 = load_value(head_ref);
+    let seed: i64 = head_ref.value;
     borrow_end(head_ref);
     free(head);
 

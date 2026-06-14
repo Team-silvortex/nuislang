@@ -16,6 +16,13 @@ The important reading rule now is:
 * if you want the current cleanup/status board for project routes, use
   [docs/examples-freshness-audit.md](/Users/Shared/chroot/dev/nuislang/docs/examples-freshness-audit.md)
 
+Current source-style rule:
+
+* project `.ns` modules now follow the same address surface spelling as the
+  single-file examples: `ptr.value`, `ptr.next`, `buffer.len`, `buffer[index]`
+* explicit builtin helper names are now mainly reserved for lowering/NIR/YIR
+  discussion and implementation-facing docs
+
 ## What This Folder Is For
 
 Project mode is still the main checked-in route for real end-to-end source

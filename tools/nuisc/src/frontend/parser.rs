@@ -1129,6 +1129,12 @@ impl Parser {
         }
 
         let expr = self.parse_expr()?;
+        if self.peek_symbol('=') {
+            self.expect_symbol('=')?;
+            let value = self.parse_expr()?;
+            self.expect_symbol(';')?;
+            return self.rewrite_assignment_stmt(expr, value);
+        }
         self.expect_symbol(';')?;
         match expr {
             AstExpr::Call {
@@ -1147,6 +1153,50 @@ impl Parser {
             }
             other => Ok(AstStmt::Expr(other)),
         }
+    }
+
+    fn rewrite_assignment_stmt(&self, target: AstExpr, value: AstExpr) -> Result<AstStmt, String> {
+        let expr = match target {
+            AstExpr::Call {
+                callee,
+                generic_args,
+                mut args,
+            } if callee == "load_at" && generic_args.is_empty() && args.len() == 2 => {
+                args.push(value);
+                AstExpr::Call {
+                    callee: "store_at".to_owned(),
+                    generic_args: Vec::new(),
+                    args,
+                }
+            }
+            AstExpr::FieldAccess { base, field } => match field.as_str() {
+                "value" => AstExpr::Call {
+                    callee: "store_value".to_owned(),
+                    generic_args: Vec::new(),
+                    args: vec![*base, value],
+                },
+                "next" => AstExpr::Call {
+                    callee: "store_next".to_owned(),
+                    generic_args: Vec::new(),
+                    args: vec![*base, value],
+                },
+                "len" => {
+                    return Err("`buffer.len` is read-only; assignment currently supports `buffer[index]`, `ref Node.value`, and `ref Node.next`".to_owned())
+                }
+                _ => {
+                    return Err(format!(
+                        "assignment target `.{field}` is not supported yet; current assignment sugar supports `buffer[index]`, `ref Node.value`, and `ref Node.next`"
+                    ))
+                }
+            },
+            _ => {
+                return Err(
+                    "assignment target is not supported yet; current assignment sugar supports `buffer[index]`, `ref Node.value`, and `ref Node.next`"
+                        .to_owned(),
+                )
+            }
+        };
+        Ok(AstStmt::Expr(expr))
     }
 
     fn parse_return_stmt(&mut self) -> Result<AstStmt, String> {
@@ -1479,6 +1529,30 @@ impl Parser {
             let value = self.parse_unary()?;
             return Ok(AstExpr::Await(Box::new(value)));
         }
+        if self.peek_symbol('!') {
+            self.expect_symbol('!')?;
+            let operand = self.parse_unary()?;
+            return Ok(AstExpr::Unary {
+                op: nuis_semantics::model::AstUnaryOp::Not,
+                operand: Box::new(operand),
+            });
+        }
+        if self.peek_symbol('-') {
+            self.expect_symbol('-')?;
+            let operand = self.parse_unary()?;
+            return Ok(AstExpr::Unary {
+                op: nuis_semantics::model::AstUnaryOp::Neg,
+                operand: Box::new(operand),
+            });
+        }
+        if self.peek_symbol('*') {
+            self.expect_symbol('*')?;
+            let operand = self.parse_unary()?;
+            return Ok(AstExpr::Unary {
+                op: nuis_semantics::model::AstUnaryOp::Deref,
+                operand: Box::new(operand),
+            });
+        }
         self.parse_postfix()
     }
 
@@ -1518,6 +1592,15 @@ impl Parser {
                         field: member,
                     };
                 }
+            } else if self.peek_symbol('[') {
+                self.expect_symbol('[')?;
+                let index = self.parse_expr()?;
+                self.expect_symbol(']')?;
+                expr = AstExpr::Call {
+                    callee: "load_at".to_owned(),
+                    generic_args: Vec::new(),
+                    args: vec![expr, index],
+                };
             } else {
                 break;
             }

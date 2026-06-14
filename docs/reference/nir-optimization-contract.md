@@ -7,6 +7,10 @@ It is intentionally narrower than a future optimizer design document. Right now
 it defines what the repository treats as safe transformation territory for the
 front-door compiler pipeline.
 
+When this file names operations such as `load_value(...)`, `load_at(...)`, or
+`store_*`, it is referring to the lowered implementation forms seen by NIR
+passes, not recommending those names as the preferred `.ns` source spelling.
+
 ## Current Rule of Thumb
 
 Optimization must not invent memory or runtime semantics.

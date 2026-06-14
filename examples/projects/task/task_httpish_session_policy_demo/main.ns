@@ -34,7 +34,7 @@ mod cpu Main {
   fn load_seed() -> i64 {
     let head: ref Node = move(alloc_node(9, null()));
     let head_ref: ref Node = borrow(head);
-    let seed: i64 = load_value(head_ref);
+    let seed: i64 = head_ref.value;
     borrow_end(head_ref);
     free(head);
     return seed;
@@ -125,17 +125,17 @@ mod cpu Main {
     retry_code: i64
   ) -> ResponsePacket {
     let scratch: ref Buffer = alloc_buffer(5, 0);
-    store_at(scratch, 0, plan.method_code);
-    store_at(scratch, 1, plan.path_code);
-    store_at(scratch, 2, status_code);
-    store_at(scratch, 3, body_code);
-    store_at(scratch, 4, retry_code);
-    let staged_status: i64 = load_at(scratch, 2);
-    let staged_body: i64 = load_at(scratch, 3);
-    let staged_retry: i64 = load_at(scratch, 4);
+    scratch[0] = plan.method_code;
+    scratch[1] = plan.path_code;
+    scratch[2] = status_code;
+    scratch[3] = body_code;
+    scratch[4] = retry_code;
+    let staged_status: i64 = scratch[2];
+    let staged_body: i64 = scratch[3];
+    let staged_retry: i64 = scratch[4];
     let staged_total: i64 =
-      load_at(scratch, 0)
-      + load_at(scratch, 1)
+      scratch[0]
+      + scratch[1]
       + staged_status
       + staged_body
       + staged_retry;

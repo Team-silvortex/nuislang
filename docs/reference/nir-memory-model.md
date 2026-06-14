@@ -4,6 +4,13 @@ This file is the current implementation-facing reference for the `ref /
 borrow / move / free` rules enforced by
 [tools/nuisc/src/nir_verify.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/nir_verify.rs).
 
+It intentionally names builtin read/write forms such as `load_value(...)` and
+`store_at(...)` because this document describes verifier/NIR truth after
+surface-syntax lowering.
+
+For preferred ordinary `.ns` source spelling, see
+[address-surface-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/address-surface-contract.md).
+
 It is intentionally narrower than a future full runtime memory model. Right now
 it describes the verifier contract that optimization and front-door tooling
 should treat as real.

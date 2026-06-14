@@ -2,7 +2,8 @@ use super::lower_type_ref;
 use super::parse_nuis_ast;
 use super::parse_nuis_module;
 use nuis_semantics::model::{
-    AstDestructureBinding, AstDestructureField, AstStmt, AstVisibility, NirExpr, NirStmt,
+    AstDestructureBinding, AstDestructureField, AstStmt, AstVisibility, NirBinaryOp, NirExpr,
+    NirStmt,
 };
 use std::fs;
 use std::path::PathBuf;
@@ -242,6 +243,421 @@ fn rejects_private_local_cpu_helper_calls_across_modules() {
 }
 
 #[test]
+fn suggests_similar_local_function_name_for_unknown_call() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn task_policy_completed(value: i64) -> i64 {
+            return value + 1;
+          }
+
+          fn main() -> i64 {
+            return task_policy_complted(7);
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(error.contains("unknown function `task_policy_complted`"), "{error}");
+    assert!(error.contains("did you mean `task_policy_completed`?"), "{error}");
+}
+
+#[test]
+fn suggests_similar_imported_helper_function_name_for_unknown_call() {
+    let entry = parse_nuis_ast(
+        r#"
+        use cpu TaskHelpers;
+
+        mod cpu Main {
+          fn main() -> i64 {
+            return task_policy_complted(7);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let helper = parse_nuis_ast(
+        r#"
+        mod cpu TaskHelpers {
+          pub fn task_policy_completed(value: i64) -> i64 {
+            return value + 1;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let error = super::lower_project_ast_to_nir(&entry, &[helper]).unwrap_err();
+    assert!(error.contains("unknown function `task_policy_complted`"), "{error}");
+    assert!(error.contains("did you mean `task_policy_completed`?"), "{error}");
+}
+
+#[test]
+fn lowers_non_numeric_binary_add_via_addable_impl() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          struct Pair {
+            value: i64,
+          }
+
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for Pair {
+            fn add(lhs: Pair, rhs: Pair) -> Pair {
+              return Pair { value: lhs.value + rhs.value };
+            }
+          }
+
+          fn main() -> i64 {
+            let sum: Pair = Pair { value: 1 } + Pair { value: 2 };
+            return sum.value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.first(),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::Call { callee, .. },
+            ..
+        }) if name == "sum" && callee == "impl.Addable.for.Pair.add"
+    ));
+}
+
+#[test]
+fn lowers_non_numeric_binary_sub_mul_div_via_trait_impls() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          struct Pair {
+            value: i64,
+          }
+
+          trait Subtractable {
+            fn sub(lhs: Self, rhs: Self) -> Self;
+          }
+
+          trait Multipliable {
+            fn mul(lhs: Self, rhs: Self) -> Self;
+          }
+
+          trait Dividable {
+            fn div(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Subtractable for Pair {
+            fn sub(lhs: Pair, rhs: Pair) -> Pair {
+              return Pair { value: lhs.value - rhs.value };
+            }
+          }
+
+          impl Multipliable for Pair {
+            fn mul(lhs: Pair, rhs: Pair) -> Pair {
+              return Pair { value: lhs.value * rhs.value };
+            }
+          }
+
+          impl Dividable for Pair {
+            fn div(lhs: Pair, rhs: Pair) -> Pair {
+              return Pair { value: lhs.value / rhs.value };
+            }
+          }
+
+          fn main() -> i64 {
+            let diff: Pair = Pair { value: 6 } - Pair { value: 2 };
+            let prod: Pair = Pair { value: 3 } * Pair { value: 4 };
+            let quot: Pair = Pair { value: 8 } / Pair { value: 2 };
+            return diff.value + prod.value + quot.value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.first(),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::Call { callee, .. },
+            ..
+        }) if name == "diff" && callee == "impl.Subtractable.for.Pair.sub"
+    ));
+    assert!(matches!(
+        main.body.get(1),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::Call { callee, .. },
+            ..
+        }) if name == "prod" && callee == "impl.Multipliable.for.Pair.mul"
+    ));
+    assert!(matches!(
+        main.body.get(2),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::Call { callee, .. },
+            ..
+        }) if name == "quot" && callee == "impl.Dividable.for.Pair.div"
+    ));
+}
+
+#[test]
+fn lowers_non_numeric_binary_comparisons_via_trait_impls() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          struct Pair {
+            value: i64,
+          }
+
+          trait Equatable {
+            fn eq(lhs: Self, rhs: Self) -> bool;
+          }
+
+          trait Orderable {
+            fn lt(lhs: Self, rhs: Self) -> bool;
+            fn le(lhs: Self, rhs: Self) -> bool;
+            fn gt(lhs: Self, rhs: Self) -> bool;
+            fn ge(lhs: Self, rhs: Self) -> bool;
+          }
+
+          impl Equatable for Pair {
+            fn eq(lhs: Pair, rhs: Pair) -> bool {
+              return lhs.value == rhs.value;
+            }
+          }
+
+          impl Orderable for Pair {
+            fn lt(lhs: Pair, rhs: Pair) -> bool {
+              return lhs.value < rhs.value;
+            }
+
+            fn le(lhs: Pair, rhs: Pair) -> bool {
+              return lhs.value <= rhs.value;
+            }
+
+            fn gt(lhs: Pair, rhs: Pair) -> bool {
+              return lhs.value > rhs.value;
+            }
+
+            fn ge(lhs: Pair, rhs: Pair) -> bool {
+              return lhs.value >= rhs.value;
+            }
+          }
+
+          fn main() -> i64 {
+            let same: bool = Pair { value: 1 } == Pair { value: 1 };
+            let different: bool = Pair { value: 1 } != Pair { value: 2 };
+            let less: bool = Pair { value: 1 } < Pair { value: 2 };
+            let less_eq: bool = Pair { value: 1 } <= Pair { value: 2 };
+            let greater: bool = Pair { value: 3 } > Pair { value: 2 };
+            let greater_eq: bool = Pair { value: 3 } >= Pair { value: 2 };
+            if same && different && less && less_eq && greater && greater_eq {
+              return 1;
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.first(),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::Call { callee, .. },
+            ..
+        }) if name == "same" && callee == "impl.Equatable.for.Pair.eq"
+    ));
+    assert!(matches!(
+        main.body.get(1),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::Binary {
+                op: NirBinaryOp::Eq,
+                lhs,
+                rhs,
+            },
+            ..
+        }) if name == "different"
+            && matches!(lhs.as_ref(), NirExpr::Call { callee, .. } if callee == "impl.Equatable.for.Pair.eq")
+            && matches!(rhs.as_ref(), NirExpr::Bool(false))
+    ));
+    assert!(matches!(
+        main.body.get(2),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::Call { callee, .. },
+            ..
+        }) if name == "less" && callee == "impl.Orderable.for.Pair.lt"
+    ));
+    assert!(matches!(
+        main.body.get(3),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::Call { callee, .. },
+            ..
+        }) if name == "less_eq" && callee == "impl.Orderable.for.Pair.le"
+    ));
+    assert!(matches!(
+        main.body.get(4),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::Call { callee, .. },
+            ..
+        }) if name == "greater" && callee == "impl.Orderable.for.Pair.gt"
+    ));
+    assert!(matches!(
+        main.body.get(5),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::Call { callee, .. },
+            ..
+        }) if name == "greater_eq" && callee == "impl.Orderable.for.Pair.ge"
+    ));
+}
+
+#[test]
+fn lowers_builtin_unary_not_and_neg() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let toggled: bool = !false;
+            let negated: i64 = -7;
+            if toggled {
+              return negated;
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.first(),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::Binary {
+                op: NirBinaryOp::Eq,
+                lhs,
+                rhs,
+            },
+            ..
+        }) if name == "toggled"
+            && matches!(lhs.as_ref(), NirExpr::Bool(false))
+            && matches!(rhs.as_ref(), NirExpr::Bool(false))
+    ));
+    assert!(matches!(
+        main.body.get(1),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::Binary {
+                op: NirBinaryOp::Sub,
+                lhs,
+                rhs,
+            },
+            ..
+        }) if name == "negated"
+            && matches!(lhs.as_ref(), NirExpr::Int(0))
+            && matches!(rhs.as_ref(), NirExpr::Int(7))
+    ));
+}
+
+#[test]
+fn lowers_non_builtin_unary_not_and_neg_via_trait_impls() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          struct Pair {
+            value: i64,
+          }
+
+          trait Notable {
+            fn not(value: Self) -> bool;
+          }
+
+          trait Negatable {
+            fn neg(value: Self) -> Self;
+          }
+
+          impl Notable for Pair {
+            fn not(value: Pair) -> bool {
+              return value.value == 0;
+            }
+          }
+
+          impl Negatable for Pair {
+            fn neg(value: Pair) -> Pair {
+              return Pair { value: 0 - value.value };
+            }
+          }
+
+          fn main() -> i64 {
+            let empty: bool = !Pair { value: 0 };
+            let flipped: Pair = -Pair { value: 7 };
+            if empty {
+              return flipped.value;
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.first(),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::Call { callee, .. },
+            ..
+        }) if name == "empty" && callee == "impl.Notable.for.Pair.not"
+    ));
+    assert!(matches!(
+        main.body.get(1),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::Call { callee, .. },
+            ..
+        }) if name == "flipped" && callee == "impl.Negatable.for.Pair.neg"
+    ));
+}
+
+#[test]
 fn lowers_project_local_cpu_helper_calls_with_shader_and_data_modules_present() {
     let entry = parse_nuis_ast(
         r#"
@@ -387,6 +803,29 @@ fn rejects_private_helper_field_access_across_modules() {
         error.contains("type `Config` has no field `secret`"),
         "unexpected error: {error}"
     );
+}
+
+#[test]
+fn suggests_similar_visible_field_name_for_field_access() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          struct Config {
+            count: i64,
+            label: String,
+          }
+
+          fn main() -> i64 {
+            let cfg: Config = Config { count: 7, label: "ok" };
+            return cfg.cout;
+          }
+        }
+        "#,
+    );
+
+    let error = module.unwrap_err();
+    assert!(error.contains("type `Config` has no field `cout`"), "{error}");
+    assert!(error.contains("did you mean `count`?"), "{error}");
 }
 
 #[test]
@@ -780,4 +1219,40 @@ fn reports_missing_impl_for_explicit_qualified_trait_call_on_concrete_type() {
     let error = super::lower_project_ast_to_nir(&main_ast, &[helper_ast]).unwrap_err();
     assert!(error.contains("trait `Helper.Addable` has no impl for `i64`"), "{error}");
     assert!(error.contains("Helper.Addable.add"), "{error}");
+}
+
+#[test]
+fn suggests_trait_method_name_for_explicit_qualified_trait_call() {
+    let main_ast = parse_nuis_ast(
+        r#"
+        use cpu Helper;
+
+        mod cpu Main {
+          impl Helper.Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          fn main() -> i64 {
+            return Helper.Addable.ad(7, 8);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let helper_ast = parse_nuis_ast(
+        r#"
+        mod cpu Helper {
+          pub trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let error = super::lower_project_ast_to_nir(&main_ast, &[helper_ast]).unwrap_err();
+    assert!(error.contains("does not define method `ad`"), "{error}");
+    assert!(error.contains("did you mean `Helper.Addable.add`?"), "{error}");
 }

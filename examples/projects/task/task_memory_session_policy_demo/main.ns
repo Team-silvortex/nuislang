@@ -55,9 +55,9 @@ mod cpu Main {
 
   fn stage_session_value(seed: i64, selected_value: i64) -> i64 {
     let scratch: ref Buffer = alloc_buffer(2, 0);
-    store_at(scratch, 0, seed);
-    store_at(scratch, 1, selected_value);
-    let staged_total: i64 = load_at(scratch, 0) + load_at(scratch, 1);
+    scratch[0] = seed;
+    scratch[1] = selected_value;
+    let staged_total: i64 = scratch[0] + scratch[1];
     free(scratch);
     return staged_total;
   }
@@ -84,7 +84,7 @@ mod cpu Main {
   fn main() -> i64 {
     let head: ref Node = move(alloc_node(7, null()));
     let head_ref: ref Node = borrow(head);
-    let seed: i64 = load_value(head_ref);
+    let seed: i64 = head_ref.value;
     borrow_end(head_ref);
     free(head);
 

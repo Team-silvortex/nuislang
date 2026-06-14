@@ -450,6 +450,10 @@ fn specialize_expr_types(
             base: Box::new(specialize_expr_types(base, substitutions)?),
             field: field.clone(),
         },
+        AstExpr::Unary { op, operand } => AstExpr::Unary {
+            op: *op,
+            operand: Box::new(specialize_expr_types(operand, substitutions)?),
+        },
         AstExpr::Binary { op, lhs, rhs } => AstExpr::Binary {
             op: *op,
             lhs: Box::new(specialize_expr_types(lhs, substitutions)?),

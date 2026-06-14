@@ -7,6 +7,7 @@ For the design comparison behind this current choice, also see:
 
 * [nuis-0.18.0-address-surface-options.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-address-surface-options.md)
 * [nuis-0.18.0-owned-borrowed-address-draft.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-owned-borrowed-address-draft.md)
+* [../reference/address-surface-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/address-surface-contract.md)
 
 The key rule is simple:
 
@@ -25,17 +26,17 @@ Structural addresses:
 * `null()`
 * `is_null(...)`
 * `alloc_node(value, next)`
-* `load_value(ptr)`
-* `store_value(ptr, value)`
-* `load_next(ptr)`
-* `store_next(ptr, next)`
+* source surface: `ptr.value`, `ptr.next`, `ptr.value = value`, `ptr.next = next`
+* builtin lowering core: `load_value(ptr)`, `store_value(ptr, value)`
+* builtin lowering core: `load_next(ptr)`, `store_next(ptr, next)`
 
 Buffer addresses:
 
 * `ref Buffer`
 * `alloc_buffer(len, fill)`
-* `load_at(buffer, index)`
-* `store_at(buffer, index, value)`
+* source surface: `buffer.len`, `buffer[index]`, `buffer[index] = value`
+* builtin lowering core: `buffer_len(buffer)`, `load_at(buffer, index)`
+* builtin lowering core: `store_at(buffer, index, value)`
 
 ## Ownership Rule
 
@@ -63,6 +64,8 @@ Current surface-syntax rule is still intentionally narrow:
 * the distinction is currently verifier/state driven, not surface-type driven
 * `borrow(ptr)` keeps the same `ref T` surface type
 * `borrow_end(alias)` returns `Unit`, not a new pointer wrapper type
+* ordinary `.ns` source should now prefer field/index surface syntax instead of
+  spelling the builtin load/store helpers directly
 
 This is the current pointer-safety contract:
 
@@ -75,6 +78,14 @@ More concretely, current read/write policy is:
 * `load_at(buffer, index)` and `buffer_len(buffer)` may read from owned or borrowed buffer addresses
 * `store_value`, `store_next`, `store_at`, `move`, and `free` require owner authority
 
+Current front-end sugar now lives in:
+
+* [../reference/address-surface-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/address-surface-contract.md)
+
+Shortest current rule:
+
+* `ref` surface syntax is preferred where it lowers cleanly to the existing builtin address core
+
 ## Current Front-Door Examples
 
 Smallest structural pointer route:
@@ -86,6 +97,12 @@ Smallest structural pointer route:
 Smallest buffer address route:
 
 * [hello_buffer_addressing.ns](/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_buffer_addressing.ns)
+
+Current repository source-level truth:
+
+* checked-in `.ns` examples and stdlib routes now use the surface spellings
+* builtin helper names remain the implementation-facing contract for lowering,
+  verifier rules, NIR discussion, and YIR/CPU documentation
 
 ## 0.18.0 Mainline Rule
 

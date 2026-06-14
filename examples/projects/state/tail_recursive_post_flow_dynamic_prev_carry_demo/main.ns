@@ -3,16 +3,16 @@ mod cpu Main {
     if current == 0 {
       return acc;
     }
-    if acc + load_at(buffer, slot) > 6 {
-      return acc + load_at(buffer, slot);
+    if acc + buffer[slot] > 6 {
+      return acc + buffer[slot];
     }
     if current > 3 {
-      return sum_until(current - 1, buffer, acc + load_at(buffer, slot), slot + current);
+      return sum_until(current - 1, buffer, acc + buffer[slot], slot + current);
     } else {
       if current > 1 {
-        return sum_until(current - 1, buffer, acc + load_at(buffer, slot), slot + current);
+        return sum_until(current - 1, buffer, acc + buffer[slot], slot + current);
       } else {
-        return sum_until(current - 1, buffer, acc + load_at(buffer, slot), slot + 0);
+        return sum_until(current - 1, buffer, acc + buffer[slot], slot + 0);
       }
     }
   }

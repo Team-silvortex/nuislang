@@ -26,6 +26,7 @@ fn ast_expr_requires_match_hoist(expr: &AstExpr) -> bool {
                 })
         }
         AstExpr::FieldAccess { base, .. } => ast_expr_requires_match_hoist(base),
+        AstExpr::Unary { operand, .. } => ast_expr_requires_match_hoist(operand),
         AstExpr::Binary { lhs, rhs, .. } => {
             ast_expr_requires_match_hoist(lhs) || ast_expr_requires_match_hoist(rhs)
         }

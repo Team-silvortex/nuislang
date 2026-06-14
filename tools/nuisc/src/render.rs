@@ -10,9 +10,10 @@ use self::render_struct_helpers::{
 use nuis_semantics::model::{
     AstAttribute, AstAttributeArg, AstAttributeValue, AstBinaryOp, AstExpr, AstExternInterface,
     AstFunction, AstGenericParam, AstImplDef, AstImplMethod, AstMatchPattern, AstModule, AstStmt,
-    AstTraitDef, AstTraitMethodSig, AstTypeRef, AstVisibility, NirAnnotation, NirAttributeArg,
-    NirAttributeValue, NirBinaryOp, NirExpr, NirExternInterface, NirFunction, NirGenericParam,
-    NirImplDef, NirImplMethod, NirModule, NirStmt, NirTraitDef, NirTraitMethodSig, NirVisibility,
+    AstTraitDef, AstTraitMethodSig, AstTypeRef, AstUnaryOp, AstVisibility, NirAnnotation,
+    NirAttributeArg, NirAttributeValue, NirBinaryOp, NirExpr, NirExternInterface, NirFunction,
+    NirGenericParam, NirImplDef, NirImplMethod, NirModule, NirStmt, NirTraitDef,
+    NirTraitMethodSig, NirVisibility,
 };
 use yir_core::YirModule;
 
@@ -496,12 +497,23 @@ fn render_ast_expr(value: &AstExpr) -> String {
                 .join(", ")
         ),
         AstExpr::FieldAccess { base, field } => format!("{}.{}", render_ast_expr(base), field),
+        AstExpr::Unary { op, operand } => {
+            format!("({}{})", render_ast_unary_op(*op), render_ast_expr(operand))
+        }
         AstExpr::Binary { op, lhs, rhs } => format!(
             "({} {} {})",
             render_ast_expr(lhs),
             render_ast_binary_op(*op),
             render_ast_expr(rhs)
         ),
+    }
+}
+
+fn render_ast_unary_op(op: AstUnaryOp) -> &'static str {
+    match op {
+        AstUnaryOp::Not => "!",
+        AstUnaryOp::Neg => "-",
+        AstUnaryOp::Deref => "*",
     }
 }
 

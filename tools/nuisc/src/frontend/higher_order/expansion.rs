@@ -404,6 +404,18 @@ pub(crate) fn rewrite_higher_order_calls_in_expr(
             specialized_cache,
             specialized_functions,
         )?)),
+        AstExpr::Unary { op, operand } => AstExpr::Unary {
+            op: *op,
+            operand: Box::new(rewrite_higher_order_calls_in_expr(
+                operand,
+                expected,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?),
+        },
         AstExpr::Call {
             callee,
             generic_args,

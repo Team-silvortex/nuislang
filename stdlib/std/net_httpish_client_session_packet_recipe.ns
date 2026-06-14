@@ -98,12 +98,12 @@ mod cpu Main {
     body_code: i64
   ) -> NetHttpishResponsePacket {
     let scratch: ref Buffer = alloc_buffer(4, 0);
-    store_at(scratch, 0, plan.method_code);
-    store_at(scratch, 1, plan.path_code);
-    store_at(scratch, 2, status_code);
-    store_at(scratch, 3, body_code);
+    scratch[0] = plan.method_code;
+    scratch[1] = plan.path_code;
+    scratch[2] = status_code;
+    scratch[3] = body_code;
     let staged_total: i64 =
-      load_at(scratch, 0) + load_at(scratch, 1) + load_at(scratch, 2) + load_at(scratch, 3);
+      scratch[0] + scratch[1] + scratch[2] + scratch[3];
     free(scratch);
     return NetHttpishResponsePacket {
       status_code: status_code,

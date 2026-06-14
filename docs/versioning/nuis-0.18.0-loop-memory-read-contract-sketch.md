@@ -13,6 +13,13 @@ The goal is:
 
 `let counted/chained loop carries consume a constrained class of read-only address observations before general loop-body memory lowering exists`
 
+This sketch intentionally names lowered helper forms such as `load_value(...)`
+and `load_at(...)` because it is specifying loop-contract shape, not the
+preferred ordinary `.ns` source spelling.
+
+For source-facing address spelling, see
+[../reference/address-surface-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/address-surface-contract.md).
+
 ## Why This Exists
 
 Current `while` support is split across layers:

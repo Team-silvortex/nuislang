@@ -5,7 +5,7 @@ mod cpu Main {
     let head: ref Node = move(head_raw);
     let head_ref: ref Node = borrow(head);
     let bad_move: ref Node = move(head);
-    print(load_value(head_ref));
-    print(load_value(bad_move));
+    print(head_ref.value);
+    print(bad_move.value);
   }
 }

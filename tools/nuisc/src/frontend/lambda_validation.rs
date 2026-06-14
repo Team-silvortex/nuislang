@@ -143,6 +143,9 @@ pub(super) fn validate_lambda_expr_no_capture(
         AstExpr::FieldAccess { base, .. } => {
             validate_lambda_expr_no_capture(base, visible_locals, outer_locals)
         }
+        AstExpr::Unary { operand, .. } => {
+            validate_lambda_expr_no_capture(operand, visible_locals, outer_locals)
+        }
         AstExpr::Binary { lhs, rhs, .. } => {
             validate_lambda_expr_no_capture(lhs, visible_locals, outer_locals)?;
             validate_lambda_expr_no_capture(rhs, visible_locals, outer_locals)

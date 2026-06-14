@@ -14,7 +14,7 @@ mod cpu Main {
     let buffer: ref Buffer = alloc_buffer(8, 9);
     while value < limit {
       let value: i64 = await step(value);
-      let acc: i64 = acc + load_at(buffer, slot);
+      let acc: i64 = acc + buffer[slot];
       if value > 3 {
         let slot: i64 = slot + value;
       } else {

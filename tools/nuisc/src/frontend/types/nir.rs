@@ -441,6 +441,19 @@ pub(crate) fn infer_nir_expr_type(
         } => Some(generic_named_type(type_name, type_args.clone())),
         NirExpr::FieldAccess { base, field } => {
             let base_ty = infer_nir_expr_type(base, bindings, signatures, struct_table)?;
+            if base_ty.is_ref && !base_ty.is_optional && base_ty.name == "Node" {
+                return match field.as_str() {
+                    "value" => Some(i64_type()),
+                    "next" => Some(ref_type("Node")),
+                    _ => None,
+                };
+            }
+            if base_ty.is_ref && !base_ty.is_optional && base_ty.name == "Buffer" {
+                return match field.as_str() {
+                    "len" => Some(i64_type()),
+                    _ => None,
+                };
+            }
             struct_field_type(&base_ty, field, struct_table)
         }
         NirExpr::Binary { op, lhs, rhs } => {

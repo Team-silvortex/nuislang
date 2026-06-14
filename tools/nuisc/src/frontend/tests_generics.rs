@@ -167,6 +167,54 @@ fn monomorphizes_zero_arg_generic_call_used_as_method_receiver() {
 }
 
 #[test]
+fn monomorphizes_generic_binary_add_with_addable_bound() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          fn sum_two<T: Addable>(lhs: T, rhs: T) -> T {
+            return lhs + rhs;
+          }
+
+          fn main() -> i64 {
+            return sum_two(1, 2);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Call { callee, .. }))) if callee == "sum_two__i64"
+    ));
+
+    let specialized = module
+        .functions
+        .iter()
+        .find(|function| function.name == "sum_two__i64")
+        .unwrap();
+    assert!(matches!(
+        specialized.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Binary { op, .. }))) if *op == nuis_semantics::model::NirBinaryOp::Add
+    ));
+}
+
+#[test]
 fn monomorphizes_branch_local_payload_reconstruction_before_generic_call() {
     let module = parse_nuis_module(
         r#"

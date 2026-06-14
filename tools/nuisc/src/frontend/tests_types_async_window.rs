@@ -366,6 +366,246 @@ fn classifies_load_next_from_borrowed_source_as_borrowed_address() {
 }
 
 #[test]
+fn lowers_unary_pointer_null_check_and_node_deref() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let nil: ref Node? = null();
+            let head: ref Node = alloc_node(7, nil);
+            let empty: bool = !head;
+            let value: i64 = *head;
+            if empty {
+              return 0;
+            }
+            return value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let function = &module.functions[0];
+    assert!(matches!(
+        function.body.get(2),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::IsNull(inner),
+            ..
+        }) if name == "empty" && matches!(inner.as_ref(), NirExpr::Var(var) if var == "head")
+    ));
+    assert!(matches!(
+        function.body.get(3),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::LoadValue(inner),
+            ..
+        }) if name == "value" && matches!(inner.as_ref(), NirExpr::Var(var) if var == "head")
+    ));
+}
+
+#[test]
+fn rejects_unary_deref_for_non_node_address_types() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let backing: ref Buffer = alloc_buffer(4, 0);
+            let value: i64 = *backing;
+            return value;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(error.contains("unary `*` currently expects `ref Node` operand"), "{error}");
+    assert!(error.contains("ref Buffer"), "{error}");
+}
+
+#[test]
+fn lowers_node_pointer_field_access_sugar() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let nil: ref Node? = null();
+            let tail: ref Node = move(alloc_node(30, nil));
+            let head: ref Node = alloc_node(10, tail);
+            let value: i64 = head.value;
+            let next_ptr: ref Node = head.next;
+            return value + load_value(next_ptr);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let function = &module.functions[0];
+    assert!(matches!(
+        function.body.get(3),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::LoadValue(inner),
+            ..
+        }) if name == "value" && matches!(inner.as_ref(), NirExpr::Var(var) if var == "head")
+    ));
+    assert!(matches!(
+        function.body.get(4),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::LoadNext(inner),
+            ..
+        }) if name == "next_ptr" && matches!(inner.as_ref(), NirExpr::Var(var) if var == "head")
+    ));
+}
+
+#[test]
+fn rejects_unknown_node_pointer_field_access_sugar() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let nil: ref Node? = null();
+            let head: ref Node = alloc_node(10, nil);
+            return head.missing;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(error.contains("pointer field sugar currently supports only `value` and `next`"), "{error}");
+    assert!(error.contains("ref Node"), "{error}");
+}
+
+#[test]
+fn lowers_buffer_index_and_len_sugar() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let backing: ref Buffer = alloc_buffer(4, 9);
+            let len: i64 = backing.len;
+            let first: i64 = backing[0];
+            return len + first;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let function = &module.functions[0];
+    assert!(matches!(
+        function.body.get(1),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::BufferLen(inner),
+            ..
+        }) if name == "len" && matches!(inner.as_ref(), NirExpr::Var(var) if var == "backing")
+    ));
+    assert!(matches!(
+        function.body.get(2),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::LoadAt { buffer, index },
+            ..
+        }) if name == "first"
+            && matches!(buffer.as_ref(), NirExpr::Var(var) if var == "backing")
+            && matches!(index.as_ref(), NirExpr::Int(0))
+    ));
+}
+
+#[test]
+fn rejects_unknown_buffer_field_access_sugar() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let backing: ref Buffer = alloc_buffer(4, 0);
+            return backing.value;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(error.contains("buffer field sugar currently supports only `len`"), "{error}");
+    assert!(error.contains("ref Buffer"), "{error}");
+}
+
+#[test]
+fn lowers_buffer_index_assignment_sugar() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() {
+            let backing: ref Buffer = alloc_buffer(4, 0);
+            backing[1] = 9;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    assert!(matches!(
+        module.functions[0].body.get(1),
+        Some(NirStmt::Expr(NirExpr::StoreAt { buffer, index, value }))
+            if matches!(buffer.as_ref(), NirExpr::Var(name) if name == "backing")
+                && matches!(index.as_ref(), NirExpr::Int(1))
+                && matches!(value.as_ref(), NirExpr::Int(9))
+    ));
+}
+
+#[test]
+fn lowers_node_pointer_field_assignment_sugar() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() {
+            let nil: ref Node? = null();
+            let tail: ref Node = move(alloc_node(30, nil));
+            let head: ref Node = alloc_node(10, tail);
+            head.value = 77;
+            head.next = tail;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    assert!(matches!(
+        module.functions[0].body.get(3),
+        Some(NirStmt::Expr(NirExpr::StoreValue { target, value }))
+            if matches!(target.as_ref(), NirExpr::Var(name) if name == "head")
+                && matches!(value.as_ref(), NirExpr::Int(77))
+    ));
+    assert!(matches!(
+        module.functions[0].body.get(4),
+        Some(NirStmt::Expr(NirExpr::StoreNext { target, next }))
+            if matches!(target.as_ref(), NirExpr::Var(name) if name == "head")
+                && matches!(next.as_ref(), NirExpr::Var(name) if name == "tail")
+    ));
+}
+
+#[test]
+fn rejects_read_only_buffer_len_assignment() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() {
+            let backing: ref Buffer = alloc_buffer(4, 0);
+            backing.len = 3;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(error.contains("`buffer.len` is read-only"), "{error}");
+}
+
+#[test]
 fn infers_read_window_payload_type() {
     let module = parse_nuis_module(
         r#"

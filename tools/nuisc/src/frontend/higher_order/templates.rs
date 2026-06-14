@@ -520,6 +520,18 @@ pub(crate) fn rewrite_higher_order_template_expr(
             )?),
             field: field.clone(),
         },
+        AstExpr::Unary { op, operand } => AstExpr::Unary {
+            op: *op,
+            operand: Box::new(rewrite_higher_order_template_expr(
+                operand,
+                callable_bindings,
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?),
+        },
         AstExpr::Binary { op, lhs, rhs } => AstExpr::Binary {
             op: *op,
             lhs: Box::new(rewrite_higher_order_template_expr(

@@ -12,6 +12,13 @@ Canonical short map:
 * [docs/current-mainline-map.md](/Users/Shared/chroot/dev/nuislang/docs/current-mainline-map.md)
   Use that file first when you want the shortest current route.
 
+Current source-style rule:
+
+* checked-in `.ns` examples now prefer `ptr.value`, `ptr.next`, `buffer.len`,
+  and `buffer[index]`
+* if you need the lowering/builtin explanation behind that surface, use
+  [docs/reference/address-surface-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/address-surface-contract.md)
+
 Subdirectories:
 
 * [core](/Users/Shared/chroot/dev/nuislang/examples/ns/core/README.md)

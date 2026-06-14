@@ -54,6 +54,8 @@ The most important current truths for `0.18.0` are:
   - `ref Node` and `ref Buffer` are the current pointer core
   - `borrow(...)` / `borrow_end(...)` are part of the verified ownership story
   - read-vs-write authority is intentionally conservative and test-backed
+  - checked-in `.ns` source now consistently prefers field/index address
+    surface syntax over spelling builtin load/store helpers directly
 * compile truth increasingly means project truth:
   - state/control-flow anchors
   - task/control-flow anchors

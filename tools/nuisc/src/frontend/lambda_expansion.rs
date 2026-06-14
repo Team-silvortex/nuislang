@@ -676,6 +676,19 @@ fn rewrite_lambda_expr(
             )?),
             field: field.clone(),
         },
+        AstExpr::Unary { op, operand } => AstExpr::Unary {
+            op: *op,
+            operand: Box::new(rewrite_lambda_expr(
+                operand,
+                inherited_generic_params,
+                lambda_aliases,
+                visible_locals,
+                module_const_names,
+                owning_function_name,
+                counter,
+                synthesized,
+            )?),
+        },
         AstExpr::Binary { op, lhs, rhs } => AstExpr::Binary {
             op: *op,
             lhs: Box::new(rewrite_lambda_expr(

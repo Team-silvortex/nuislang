@@ -76,12 +76,12 @@ mod cpu NetHttpishPacketShapes {
 
   pub fn staged_packet_total(slot0: i64, slot1: i64, slot2: i64, slot3: i64) -> i64 {
     let scratch: ref Buffer = alloc_buffer(4, 0);
-    store_at(scratch, 0, slot0);
-    store_at(scratch, 1, slot1);
-    store_at(scratch, 2, slot2);
-    store_at(scratch, 3, slot3);
+    scratch[0] = slot0;
+    scratch[1] = slot1;
+    scratch[2] = slot2;
+    scratch[3] = slot3;
     let staged_total: i64 =
-      load_at(scratch, 0) + load_at(scratch, 1) + load_at(scratch, 2) + load_at(scratch, 3);
+      scratch[0] + scratch[1] + scratch[2] + scratch[3];
     free(scratch);
     return staged_total;
   }

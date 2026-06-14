@@ -3,6 +3,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use super::binary_lowering::lower_binary_expr_with_async;
 use super::call_helpers::ensure_call_arg_matches_param;
 use super::metadata::{hidden_private_field_count, ModuleConstValue};
+use super::name_suggestions::suggest_similar_name;
+use super::unary_lowering::lower_unary_expr_with_async;
 use super::validation_helpers::render_type_name;
 use super::{
     infer_nir_expr_type, instantiate_struct_field_type, lower_call_expr_with_async, named_type,
@@ -497,7 +499,42 @@ pub(super) fn lower_expr_with_async(
             )?;
             let base_ty = infer_nir_expr_type(&lowered_base, bindings, signatures, struct_table)
                 .ok_or_else(|| format!("cannot infer base type for field access `.{} `", field))?;
+            if base_ty.is_ref && !base_ty.is_optional && base_ty.name == "Node" {
+                return Ok(match field.as_str() {
+                    "value" => NirExpr::LoadValue(Box::new(lowered_base)),
+                    "next" => NirExpr::LoadNext(Box::new(lowered_base)),
+                    _ => {
+                        return Err(format!(
+                            "type `{}` has no field `{}`; pointer field sugar currently supports only `value` and `next`",
+                            render_type_name(&base_ty),
+                            field
+                        ))
+                    }
+                });
+            }
+            if base_ty.is_ref && !base_ty.is_optional && base_ty.name == "Buffer" {
+                return Ok(match field.as_str() {
+                    "len" => NirExpr::BufferLen(Box::new(lowered_base)),
+                    _ => {
+                        return Err(format!(
+                            "type `{}` has no field `{}`; buffer field sugar currently supports only `len`",
+                            render_type_name(&base_ty),
+                            field
+                        ))
+                    }
+                });
+            }
             if struct_field_type(&base_ty, field, struct_table).is_none() {
+                if let Some(suggested_field) =
+                    suggest_struct_field_name(&base_ty, field, struct_table)
+                {
+                    return Err(format!(
+                        "type `{}` has no field `{}`; did you mean `{}`?",
+                        render_type_name(&base_ty),
+                        field,
+                        suggested_field
+                    ));
+                }
                 return Err(format!(
                     "type `{}` has no field `{}`",
                     render_type_name(&base_ty),
@@ -509,6 +546,17 @@ pub(super) fn lower_expr_with_async(
                 field: field.clone(),
             }
         }
+        AstExpr::Unary { op, operand } => lower_unary_expr_with_async(
+            op,
+            operand,
+            current_domain,
+            current_function_is_async,
+            bindings,
+            module_consts,
+            signatures,
+            struct_table,
+            expected,
+        )?,
         AstExpr::Binary { op, lhs, rhs } => lower_binary_expr_with_async(
             op,
             lhs,
@@ -522,6 +570,20 @@ pub(super) fn lower_expr_with_async(
             expected,
         )?,
     })
+}
+
+fn suggest_struct_field_name(
+    base_ty: &NirTypeRef,
+    field: &str,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> Option<String> {
+    let definition = struct_table.get(&base_ty.name)?;
+    let candidates = definition
+        .fields
+        .iter()
+        .map(|item| item.name.clone())
+        .collect::<BTreeSet<_>>();
+    suggest_similar_name(field, &candidates)
 }
 
 #[allow(clippy::too_many_arguments)]

@@ -13,6 +13,6 @@ mod cpu Main {
     let pair: Pair = Pair { left: left, right: right };
     let left_ref: ref Node = borrow(pair.left);
     let right_ref: ref Node = borrow(pair.right);
-    print(load_value(left_ref) + load_value(right_ref));
+    print(left_ref.value + right_ref.value);
   }
 }

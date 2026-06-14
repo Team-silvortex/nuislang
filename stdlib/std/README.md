@@ -8,6 +8,13 @@ Canonical short map:
   Use that file for the shortest current reading path across task, host I/O,
   persistence, and filesystem surfaces. Use this README for local detail only.
 
+Current source-style rule:
+
+* checked-in `std` `.ns` modules now prefer the address surface spellings
+  `ptr.value`, `ptr.next`, `buffer.len`, and `buffer[index]`
+* builtin helper names remain relevant as lowering/runtime vocabulary, not as
+  the preferred source-level style
+
 ## Current Status
 
 At the current repository stage, `std` is also still mostly a layout/contract

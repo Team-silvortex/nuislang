@@ -3,8 +3,8 @@ use std::collections::BTreeMap;
 use nuis_semantics::model::{AstBinaryOp, AstExpr, NirBinaryOp, NirExpr, NirStructDef, NirTypeRef};
 
 use super::{
-    bool_type, compatible_types, infer_nir_expr_type, lower_nested_expr_with_async_and_consts,
-    FunctionSignature, ModuleConstValue,
+    bool_type, compatible_types, impl_method_symbol_name, infer_nir_expr_type,
+    lower_nested_expr_with_async_and_consts, FunctionSignature, ModuleConstValue,
 };
 
 pub(super) fn lower_binary_expr_with_async(
@@ -77,6 +77,16 @@ pub(super) fn lower_binary_expr_with_async(
                 .ok_or_else(|| "cannot infer binary rhs type".to_owned())?;
         }
     }
+    if let Some(overloaded) = lower_overloaded_binary_operator(
+        *op,
+        lowered_lhs.clone(),
+        lowered_rhs.clone(),
+        &lhs_ty,
+        &rhs_ty,
+        signatures,
+    )? {
+        return Ok(overloaded);
+    }
     let result_ty = binary_result_type(*op, &lhs_ty, &rhs_ty)?;
     if matches!(
         op,
@@ -112,6 +122,85 @@ pub(super) fn lower_binary_expr_with_async(
         lhs: Box::new(lowered_lhs),
         rhs: Box::new(lowered_rhs),
     })
+}
+
+fn lower_overloaded_binary_operator(
+    op: AstBinaryOp,
+    lowered_lhs: NirExpr,
+    lowered_rhs: NirExpr,
+    lhs_ty: &NirTypeRef,
+    rhs_ty: &NirTypeRef,
+    signatures: &BTreeMap<String, FunctionSignature>,
+) -> Result<Option<NirExpr>, String> {
+    let Some((trait_name, method_name)) = overloaded_binary_trait(op) else {
+        return Ok(None);
+    };
+    if builtin_binary_supported(op, lhs_ty, rhs_ty) {
+        return Ok(None);
+    }
+    if !compatible_types(lhs_ty, rhs_ty) {
+        return Ok(None);
+    }
+    let symbol_name = impl_method_symbol_name(trait_name, lhs_ty, method_name);
+    let Some(signature) = signatures.get(&symbol_name) else {
+        return Ok(None);
+    };
+    if signature.params.len() != 2 {
+        return Err(format!(
+            "trait method `{}.{}` for `{}` expects {} args, found 2",
+            trait_name,
+            method_name,
+            lhs_ty.render(),
+            signature.params.len()
+        ));
+    }
+    let call = NirExpr::Call {
+        callee: signature.symbol_name.clone(),
+        args: vec![lowered_lhs, lowered_rhs],
+    };
+    Ok(Some(match op {
+        AstBinaryOp::Ne => NirExpr::Binary {
+            op: NirBinaryOp::Eq,
+            lhs: Box::new(call),
+            rhs: Box::new(NirExpr::Bool(false)),
+        },
+        _ => call,
+    }))
+}
+
+fn overloaded_binary_trait(op: AstBinaryOp) -> Option<(&'static str, &'static str)> {
+    match op {
+        AstBinaryOp::Add => Some(("Addable", "add")),
+        AstBinaryOp::Sub => Some(("Subtractable", "sub")),
+        AstBinaryOp::Mul => Some(("Multipliable", "mul")),
+        AstBinaryOp::Div => Some(("Dividable", "div")),
+        AstBinaryOp::Eq | AstBinaryOp::Ne => Some(("Equatable", "eq")),
+        AstBinaryOp::Lt => Some(("Orderable", "lt")),
+        AstBinaryOp::Le => Some(("Orderable", "le")),
+        AstBinaryOp::Gt => Some(("Orderable", "gt")),
+        AstBinaryOp::Ge => Some(("Orderable", "ge")),
+        _ => None,
+    }
+}
+
+fn builtin_binary_supported(op: AstBinaryOp, lhs_ty: &NirTypeRef, rhs_ty: &NirTypeRef) -> bool {
+    if !compatible_types(lhs_ty, rhs_ty) {
+        return false;
+    }
+    match op {
+        AstBinaryOp::And | AstBinaryOp::Or => lhs_ty.is_bool_scalar() && rhs_ty.is_bool_scalar(),
+        AstBinaryOp::Add | AstBinaryOp::Sub | AstBinaryOp::Mul | AstBinaryOp::Div => {
+            lhs_ty.is_numeric_scalar() && rhs_ty.is_numeric_scalar()
+        }
+        AstBinaryOp::Eq | AstBinaryOp::Ne => {
+            (lhs_ty.is_integer_scalar() && rhs_ty.is_integer_scalar())
+                || (lhs_ty.is_float_scalar() && rhs_ty.is_float_scalar())
+                || (lhs_ty.is_bool_scalar() && rhs_ty.is_bool_scalar())
+        }
+        AstBinaryOp::Lt | AstBinaryOp::Le | AstBinaryOp::Gt | AstBinaryOp::Ge => {
+            lhs_ty.is_numeric_scalar() && rhs_ty.is_numeric_scalar()
+        }
+    }
 }
 
 fn binary_result_type(

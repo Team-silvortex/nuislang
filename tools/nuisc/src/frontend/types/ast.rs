@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{
-    AstBinaryOp, AstExpr, AstImplDef, AstStmt, AstStructDef, AstTypeRef, NirResultFamily,
-    NirTypeRef,
+    AstBinaryOp, AstExpr, AstImplDef, AstStmt, AstStructDef, AstTypeRef, AstUnaryOp,
+    NirResultFamily, NirTypeRef,
 };
 
 use super::super::lower_type_ref;
@@ -321,6 +321,8 @@ pub(crate) fn infer_ast_expr_type_inner(
                 };
                 Some(ast_generic_named_type("WindowMut", vec![payload]))
             }
+            "buffer_len" => Some(ast_named_type("i64")),
+            "load_at" => Some(ast_named_type("i64")),
             "data_freeze_window" => {
                 let [input] = args.as_slice() else {
                     return None;
@@ -504,6 +506,24 @@ pub(crate) fn infer_ast_expr_type_inner(
                 function_return_types,
                 active_exprs,
             )?;
+            if base_ty.is_ref && !base_ty.is_optional && base_ty.name == "Node" {
+                return match field.as_str() {
+                    "value" => Some(ast_named_type("i64")),
+                    "next" => Some(AstTypeRef {
+                        name: "Node".to_owned(),
+                        generic_args: vec![],
+                        is_optional: false,
+                        is_ref: true,
+                    }),
+                    _ => None,
+                };
+            }
+            if base_ty.is_ref && !base_ty.is_optional && base_ty.name == "Buffer" {
+                return match field.as_str() {
+                    "len" => Some(ast_named_type("i64")),
+                    _ => None,
+                };
+            }
             let definition = struct_table.get(&base_ty.name)?;
             definition
                 .fields
@@ -511,6 +531,32 @@ pub(crate) fn infer_ast_expr_type_inner(
                 .find(|item| item.name == *field)
                 .map(|field| instantiate_ast_struct_field_type(&base_ty, definition, &field.ty))
         }
+        AstExpr::Unary { op, operand } => match op {
+            AstUnaryOp::Not => Some(ast_named_type("bool")),
+            AstUnaryOp::Neg => infer_ast_expr_type_inner(
+                operand,
+                env,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                active_exprs,
+            ),
+            AstUnaryOp::Deref => {
+                let operand_ty = infer_ast_expr_type_inner(
+                    operand,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                if operand_ty.is_ref && !operand_ty.is_optional && operand_ty.name == "Node" {
+                    Some(ast_named_type("i64"))
+                } else {
+                    None
+                }
+            }
+        },
         AstExpr::Binary { op, lhs, rhs } => match op {
             AstBinaryOp::Eq
             | AstBinaryOp::Ne
