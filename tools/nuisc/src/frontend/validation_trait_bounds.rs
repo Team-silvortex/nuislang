@@ -135,10 +135,53 @@ pub(super) fn validate_generic_bound_satisfaction(
     if impl_lookup.contains_key(&(required_bound.to_owned(), rendered.clone())) {
         return Ok(());
     }
+    let short_name = required_bound.rsplit('.').next().unwrap_or(required_bound);
+    let matching_variants = impl_lookup
+        .keys()
+        .filter(|(_, for_type)| for_type == &rendered)
+        .map(|(trait_name, _)| trait_name)
+        .filter(|trait_name| {
+            trait_name.as_str() != required_bound
+                && trait_name
+                    .rsplit('.')
+                    .next()
+                    .is_some_and(|name| name == short_name)
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    if matching_variants.len() == 1 {
+        return Ok(());
+    }
+    if matching_variants.len() > 1 {
+        return Err(format!(
+            "type `{}` ambiguously satisfies bound `{}` for {}; matching visible trait variants: {}",
+            rendered,
+            required_bound,
+            context,
+            matching_variants.join(", ")
+        ));
+    }
     Err(format!(
         "type `{}` does not satisfy bound `{}` for {}",
         rendered, required_bound, context
     ))
+}
+
+pub(super) fn validate_generic_parameter_use_site_bound(
+    generic_name: &str,
+    ty: &AstTypeRef,
+    required_bound: &str,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+    impl_lookup: &BTreeMap<(String, String), AstImplDef>,
+) -> Result<(), String> {
+    validate_generic_bound_satisfaction(
+        ty,
+        required_bound,
+        visible_type_aliases,
+        impl_lookup,
+        &BTreeMap::new(),
+        &format!("generic parameter `{generic_name}`"),
+    )
 }
 
 pub(super) fn alias_param_context(

@@ -6,6 +6,7 @@ use nuis_semantics::model::{
 };
 
 use super::types::{ast_type_from_nir, infer_ast_expr_type};
+use super::validation_trait_bounds::validate_generic_parameter_use_site_bound;
 use super::validation_binding_env::instantiate_ast_struct_field_type;
 use super::{lower_type_ref, resolve_ast_type_ref_aliases};
 
@@ -90,15 +91,14 @@ pub(crate) fn infer_generic_substitutions(
             ));
         };
         if let Some(bound) = &generic.bound {
-            let bound_key = (bound.name.clone(), concrete.render());
-            if !impl_lookup.contains_key(&bound_key) {
-                return Err(format!(
-                    "type `{}` does not satisfy bound `{}` for generic parameter `{}`",
-                    concrete.render(),
-                    bound.name,
-                    generic.name
-                ));
-            }
+            let concrete_ast = ast_type_from_nir(concrete);
+            validate_generic_parameter_use_site_bound(
+                &generic.name,
+                &concrete_ast,
+                &bound.name,
+                visible_type_aliases,
+                impl_lookup,
+            )?;
         }
     }
     Ok(lowered_substitutions)

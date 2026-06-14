@@ -761,6 +761,49 @@ fn insert_trait_methods(
     );
 }
 
+fn resolve_generic_receiver_bound_context(
+    receiver_ty: &AstTypeRef,
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+    generic_param_names: &BTreeSet<String>,
+    generic_bounds: &BTreeMap<String, String>,
+    context: &str,
+) -> Result<Option<(String, String, Option<String>)>, String> {
+    let Some((generic_name, receiver_context)) = resolve_generic_receiver_context(
+        receiver_ty,
+        visible_type_aliases,
+        generic_param_names,
+        &mut BTreeSet::new(),
+    )?
+    else {
+        return Ok(None);
+    };
+    Ok(Some((
+        generic_name.clone(),
+        format!("{context}{receiver_context}"),
+        generic_bounds.get(&generic_name).cloned(),
+    )))
+}
+
+fn bound_matches_required_trait(
+    bound: &str,
+    required_trait: &str,
+    required_method: &str,
+    trait_methods: &BTreeMap<String, BTreeSet<String>>,
+) -> bool {
+    if bound == required_trait
+        && trait_methods
+            .get(bound)
+            .is_some_and(|methods| methods.contains(required_method))
+    {
+        return true;
+    }
+    let variants = collect_trait_name_variants(required_trait, trait_methods);
+    variants.iter().any(|candidate| candidate == bound)
+        && trait_methods
+            .get(bound)
+            .is_some_and(|methods| methods.contains(required_method))
+}
+
 fn validate_generic_receiver_method_bound(
     receiver_ty: &AstTypeRef,
     method: &str,
@@ -770,16 +813,15 @@ fn validate_generic_receiver_method_bound(
     generic_bounds: &BTreeMap<String, String>,
     context: &str,
 ) -> Result<(), String> {
-    let Some((generic_name, receiver_context)) = resolve_generic_receiver_context(
+    let Some((generic_name, context, bound)) = resolve_generic_receiver_bound_context(
         receiver_ty,
         visible_type_aliases,
         generic_param_names,
-        &mut BTreeSet::new(),
-    )?
-    else {
+        generic_bounds,
+        context,
+    )? else {
         return Ok(());
     };
-    let context = format!("{context}{receiver_context}");
 
     let candidates = trait_methods
         .iter()
@@ -787,15 +829,15 @@ fn validate_generic_receiver_method_bound(
         .map(|(trait_name, _)| trait_name.clone())
         .collect::<Vec<_>>();
 
-    if let Some(bound) = generic_bounds.get(&generic_name) {
+    if let Some(bound) = bound {
         if trait_methods
-            .get(bound)
+            .get(&bound)
             .is_some_and(|methods| methods.contains(method))
         {
             return Ok(());
         }
         if let Some(suggested_method) = trait_methods
-            .get(bound)
+            .get(&bound)
             .and_then(|methods| suggest_trait_method_name(method, methods))
         {
             return Err(format!(
@@ -847,31 +889,18 @@ fn validate_generic_receiver_operator_bound(
     generic_bounds: &BTreeMap<String, String>,
     context: &str,
 ) -> Result<(), String> {
-    let Some((generic_name, receiver_context)) = resolve_generic_receiver_context(
+    let Some((generic_name, context, bound)) = resolve_generic_receiver_bound_context(
         receiver_ty,
         visible_type_aliases,
         generic_param_names,
-        &mut BTreeSet::new(),
-    )?
-    else {
+        generic_bounds,
+        context,
+    )? else {
         return Ok(());
     };
-    let context = format!("{context}{receiver_context}");
 
-    if let Some(bound) = generic_bounds.get(&generic_name) {
-        if bound == required_bound
-            && trait_methods
-                .get(bound)
-                .is_some_and(|methods| methods.contains(method))
-        {
-            return Ok(());
-        }
-        let variants = collect_trait_name_variants(required_bound, trait_methods);
-        if variants.iter().any(|candidate| candidate == bound)
-            && trait_methods
-                .get(bound)
-                .is_some_and(|methods| methods.contains(method))
-        {
+    if let Some(bound) = bound {
+        if bound_matches_required_trait(&bound, required_bound, method, trait_methods) {
             return Ok(());
         }
         return Err(format!(
@@ -940,13 +969,13 @@ fn validate_explicit_trait_call_bound(
         return Ok(());
     };
     let receiver_rendered = lower_type_ref(&receiver_ty).render();
-    let Some((generic_name, receiver_context)) = resolve_generic_receiver_context(
+    let Some((generic_name, context, bound)) = resolve_generic_receiver_bound_context(
         &receiver_ty,
         visible_type_aliases,
         generic_param_names,
-        &mut BTreeSet::new(),
-    )?
-    else {
+        generic_bounds,
+        context,
+    )? else {
         if impl_lookup.contains_key(&(trait_name.to_owned(), receiver_rendered.clone())) {
             return Ok(());
         }
@@ -962,14 +991,13 @@ fn validate_explicit_trait_call_bound(
             available_impls.join(", ")
         ));
     };
-    let context = format!("{context}{receiver_context}");
 
-    if let Some(bound) = generic_bounds.get(&generic_name) {
+    if let Some(bound) = bound {
         if bound == trait_name {
             return Ok(());
         }
         let variants = collect_trait_name_variants(trait_name, trait_methods);
-        if variants.iter().any(|candidate| candidate == bound) {
+        if variants.iter().any(|candidate| candidate == &bound) {
             return Err(format!(
                 "{context} calls trait method `{trait_name}.{method}` on generic parameter `{generic_name}` but bound `{bound}` uses a different visible name for the same trait; use `{trait_name}` consistently"
             ));
