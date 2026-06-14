@@ -1032,8 +1032,8 @@ impl RegisteredMod for CpuMod {
 
                 Ok(InstructionSemantics::pure(node.op.args.clone()))
             }
-            "cast_i32_to_i64" | "cast_i64_to_i32" | "cast_i32_to_f32" | "cast_i32_to_f64"
-            | "cast_f32_to_f64" | "cast_f64_to_f32" => {
+            "cast_bool_to_i64" | "cast_i32_to_i64" | "cast_i64_to_bool" | "cast_i64_to_i32"
+            | "cast_i32_to_f32" | "cast_i32_to_f64" | "cast_f32_to_f64" | "cast_f64_to_f32" => {
                 if node.op.args.len() != 1 {
                     return Err(format!(
                         "node `{}` expects `cpu.{} <name> <resource> <input>`",
@@ -2811,7 +2811,13 @@ impl RegisteredMod for CpuMod {
                 let else_value = state.expect_int(&node.op.args[2])?;
                 Ok(Value::Int(if cond != 0 { then_value } else { else_value }))
             }
+            "cast_bool_to_i64" => Ok(Value::Int(if state.expect_bool(&node.op.args[0])? {
+                1
+            } else {
+                0
+            })),
             "cast_i32_to_i64" => Ok(Value::Int(state.expect_i32(&node.op.args[0])? as i64)),
+            "cast_i64_to_bool" => Ok(Value::Bool(state.expect_int(&node.op.args[0])? != 0)),
             "cast_i64_to_i32" => Ok(Value::I32(state.expect_int(&node.op.args[0])? as i32)),
             "cast_i32_to_f32" => Ok(Value::F32(state.expect_i32(&node.op.args[0])? as f32)),
             "cast_i32_to_f64" => Ok(Value::F64(state.expect_i32(&node.op.args[0])? as f64)),

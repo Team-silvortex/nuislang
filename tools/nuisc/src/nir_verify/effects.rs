@@ -93,6 +93,7 @@ pub(super) fn note_binding_effects(
     borrows: &mut BTreeMap<String, usize>,
     borrow_bindings: &mut BorrowBindings,
 ) {
+    note_nested_expr_effects(expr, moved, borrows, borrow_bindings);
     match expr {
         NirExpr::Move(inner)
         | NirExpr::Free(inner)
@@ -152,6 +153,87 @@ pub(super) fn note_binding_effects(
                     borrow_bindings.remove(binding_name);
                 }
             }
+        }
+        _ => {}
+    }
+}
+
+fn note_nested_expr_effects(
+    expr: &NirExpr,
+    moved: &mut BTreeSet<String>,
+    borrows: &mut BTreeMap<String, usize>,
+    borrow_bindings: &mut BorrowBindings,
+) {
+    match expr {
+        NirExpr::Binary { lhs, rhs, .. } => {
+            note_binding_effects(lhs, "_", moved, borrows, borrow_bindings);
+            note_binding_effects(rhs, "_", moved, borrows, borrow_bindings);
+        }
+        NirExpr::Await(inner)
+        | NirExpr::Borrow(inner)
+        | NirExpr::BorrowEnd(inner)
+        | NirExpr::HostBufferHandle(inner)
+        | NirExpr::Move(inner)
+        | NirExpr::CastI64ToI32(inner)
+        | NirExpr::CastI32ToI64(inner)
+        | NirExpr::CastI64ToBool(inner)
+        | NirExpr::CastBoolToI64(inner)
+        | NirExpr::CastI64ToF32(inner)
+        | NirExpr::CastF32ToI64(inner)
+        | NirExpr::CastI64ToF64(inner)
+        | NirExpr::CastF64ToI64(inner)
+        | NirExpr::LoadValue(inner)
+        | NirExpr::LoadNext(inner)
+        | NirExpr::BufferLen(inner)
+        | NirExpr::Free(inner)
+        | NirExpr::IsNull(inner) => note_binding_effects(inner, "_", moved, borrows, borrow_bindings),
+        NirExpr::AllocNode { value, next } => {
+            note_binding_effects(value, "_", moved, borrows, borrow_bindings);
+            note_binding_effects(next, "_", moved, borrows, borrow_bindings);
+        }
+        NirExpr::AllocBuffer { len, fill } => {
+            note_binding_effects(len, "_", moved, borrows, borrow_bindings);
+            note_binding_effects(fill, "_", moved, borrows, borrow_bindings);
+        }
+        NirExpr::LoadAt { buffer, index } => {
+            note_binding_effects(buffer, "_", moved, borrows, borrow_bindings);
+            note_binding_effects(index, "_", moved, borrows, borrow_bindings);
+        }
+        NirExpr::StoreValue { target, value } => {
+            note_binding_effects(target, "_", moved, borrows, borrow_bindings);
+            note_binding_effects(value, "_", moved, borrows, borrow_bindings);
+        }
+        NirExpr::StoreNext { target, next } => {
+            note_binding_effects(target, "_", moved, borrows, borrow_bindings);
+            note_binding_effects(next, "_", moved, borrows, borrow_bindings);
+        }
+        NirExpr::StoreAt {
+            buffer,
+            index,
+            value,
+        } => {
+            note_binding_effects(buffer, "_", moved, borrows, borrow_bindings);
+            note_binding_effects(index, "_", moved, borrows, borrow_bindings);
+            note_binding_effects(value, "_", moved, borrows, borrow_bindings);
+        }
+        NirExpr::Call { args, .. } => {
+            for arg in args {
+                note_binding_effects(arg, "_", moved, borrows, borrow_bindings);
+            }
+        }
+        NirExpr::MethodCall { receiver, args, .. } => {
+            note_binding_effects(receiver, "_", moved, borrows, borrow_bindings);
+            for arg in args {
+                note_binding_effects(arg, "_", moved, borrows, borrow_bindings);
+            }
+        }
+        NirExpr::StructLiteral { fields, .. } => {
+            for (_, value) in fields {
+                note_binding_effects(value, "_", moved, borrows, borrow_bindings);
+            }
+        }
+        NirExpr::FieldAccess { base, .. } => {
+            note_binding_effects(base, "_", moved, borrows, borrow_bindings);
         }
         _ => {}
     }

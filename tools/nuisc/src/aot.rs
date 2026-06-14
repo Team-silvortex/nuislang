@@ -1647,6 +1647,54 @@ static int64_t nuis_host_buffer_find_byte(int64_t buffer_handle, int64_t offset,
     return -1;
 }
 
+static int64_t nuis_host_fill_bytes(int64_t buffer_handle, int64_t offset, int64_t len, int64_t value) {
+    if (buffer_handle == 0 || offset < 0 || len < 0 || value < 0 || value > 255) return 0;
+    int64_t* buffer = (int64_t*)(intptr_t)buffer_handle;
+    for (int64_t index = 0; index < len; ++index) {
+        buffer[offset + index] = value;
+    }
+    return len;
+}
+
+static int64_t nuis_host_copy_bytes(int64_t dst_handle, int64_t dst_offset, int64_t dst_len, int64_t src_handle, int64_t src_offset, int64_t src_len) {
+    if (dst_handle == 0 || src_handle == 0 || dst_offset < 0 || src_offset < 0 || dst_len < 0 || src_len < 0) return 0;
+    int64_t copy_len = dst_len < src_len ? dst_len : src_len;
+    int64_t* dst = (int64_t*)(intptr_t)dst_handle;
+    int64_t* src = (int64_t*)(intptr_t)src_handle;
+    if (copy_len <= 0) return 0;
+    if (dst == src && dst_offset > src_offset && dst_offset < src_offset + copy_len) {
+        for (int64_t index = copy_len; index > 0; --index) {
+            int64_t value = src[src_offset + index - 1];
+            if (value < 0 || value > 255) return 0;
+            dst[dst_offset + index - 1] = value;
+        }
+    } else {
+        for (int64_t index = 0; index < copy_len; ++index) {
+            int64_t value = src[src_offset + index];
+            if (value < 0 || value > 255) return 0;
+            dst[dst_offset + index] = value;
+        }
+    }
+    return copy_len;
+}
+
+static int64_t nuis_host_compare_bytes(int64_t lhs_handle, int64_t lhs_offset, int64_t lhs_len, int64_t rhs_handle, int64_t rhs_offset, int64_t rhs_len) {
+    if (lhs_handle == 0 || rhs_handle == 0 || lhs_offset < 0 || rhs_offset < 0 || lhs_len < 0 || rhs_len < 0) return 0;
+    int64_t* lhs = (int64_t*)(intptr_t)lhs_handle;
+    int64_t* rhs = (int64_t*)(intptr_t)rhs_handle;
+    int64_t shared_len = lhs_len < rhs_len ? lhs_len : rhs_len;
+    for (int64_t index = 0; index < shared_len; ++index) {
+        int64_t lhs_value = lhs[lhs_offset + index];
+        int64_t rhs_value = rhs[rhs_offset + index];
+        if (lhs_value < 0 || lhs_value > 255 || rhs_value < 0 || rhs_value > 255) return 0;
+        if (lhs_value < rhs_value) return -1;
+        if (lhs_value > rhs_value) return 1;
+    }
+    if (lhs_len < rhs_len) return -1;
+    if (lhs_len > rhs_len) return 1;
+    return 0;
+}
+
 static int64_t nuis_host_buffer_find_text(int64_t buffer_handle, int64_t offset, int64_t len, int64_t needle_handle) {
     if (buffer_handle == 0 || offset < 0 || len < 0) return -1;
     int64_t* buffer = (int64_t*)(intptr_t)buffer_handle;
@@ -3294,6 +3342,34 @@ fn render_host_ffi_stub(symbol: &str, function: AstExternFunction) -> String {
             arg_name(2, &function),
             arg_name(3, &function)
         )
+    } else if symbol == "host_fill_bytes" {
+        format!(
+            "    return nuis_host_fill_bytes({}, {}, {}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function),
+            arg_name(2, &function),
+            arg_name(3, &function)
+        )
+    } else if symbol == "host_copy_bytes" {
+        format!(
+            "    return nuis_host_copy_bytes({}, {}, {}, {}, {}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function),
+            arg_name(2, &function),
+            arg_name(3, &function),
+            arg_name(4, &function),
+            arg_name(5, &function)
+        )
+    } else if symbol == "host_compare_bytes" {
+        format!(
+            "    return nuis_host_compare_bytes({}, {}, {}, {}, {}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function),
+            arg_name(2, &function),
+            arg_name(3, &function),
+            arg_name(4, &function),
+            arg_name(5, &function)
+        )
     } else if symbol == "host_buffer_find_text" {
         format!(
             "    return nuis_host_buffer_find_text({}, {}, {}, {});",
@@ -4575,6 +4651,100 @@ mod tests {
                     visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
+                    name: "host_fill_bytes".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "buffer_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "offset".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "len".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "value".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                    host_symbol: None,
+                },
+                AstExternFunction {
+                    visibility: AstVisibility::Private,
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_copy_bytes".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "dst_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "dst_offset".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "dst_len".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "src_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "src_offset".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "src_len".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                    host_symbol: None,
+                },
+                AstExternFunction {
+                    visibility: AstVisibility::Private,
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_compare_bytes".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "lhs_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "lhs_offset".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "lhs_len".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "rhs_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "rhs_offset".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "rhs_len".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                    host_symbol: None,
+                },
+                AstExternFunction {
+                    visibility: AstVisibility::Private,
+                    abi: "c".to_owned(),
+                    interface: None,
                     name: "host_buffer_find_text".to_owned(),
                     params: vec![
                         nuis_semantics::model::AstParam {
@@ -4687,6 +4857,382 @@ mod tests {
                         },
                         nuis_semantics::model::AstParam {
                             name: "len".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                    host_symbol: None,
+                },
+                AstExternFunction {
+                    visibility: AstVisibility::Private,
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_fill_bytes".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "buffer_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "offset".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "len".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "value".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                    host_symbol: None,
+                },
+                AstExternFunction {
+                    visibility: AstVisibility::Private,
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_copy_bytes".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "dst_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "dst_offset".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "dst_len".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "src_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "src_offset".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "src_len".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                    host_symbol: None,
+                },
+                AstExternFunction {
+                    visibility: AstVisibility::Private,
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_compare_bytes".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "lhs_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "lhs_offset".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "lhs_len".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "rhs_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "rhs_offset".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "rhs_len".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                    host_symbol: None,
+                },
+                AstExternFunction {
+                    visibility: AstVisibility::Private,
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_fill_bytes".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "buffer_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "offset".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "len".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "value".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                    host_symbol: None,
+                },
+                AstExternFunction {
+                    visibility: AstVisibility::Private,
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_copy_bytes".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "dst_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "dst_offset".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "dst_len".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "src_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "src_offset".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "src_len".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                    host_symbol: None,
+                },
+                AstExternFunction {
+                    visibility: AstVisibility::Private,
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_compare_bytes".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "lhs_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "lhs_offset".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "lhs_len".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "rhs_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "rhs_offset".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "rhs_len".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                    host_symbol: None,
+                },
+                AstExternFunction {
+                    visibility: AstVisibility::Private,
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_fill_bytes".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "buffer_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "offset".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "len".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "value".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                    host_symbol: None,
+                },
+                AstExternFunction {
+                    visibility: AstVisibility::Private,
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_copy_bytes".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "dst_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "dst_offset".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "dst_len".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "src_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "src_offset".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "src_len".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                    host_symbol: None,
+                },
+                AstExternFunction {
+                    visibility: AstVisibility::Private,
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_compare_bytes".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "lhs_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "lhs_offset".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "lhs_len".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "rhs_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "rhs_offset".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "rhs_len".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                    host_symbol: None,
+                },
+                AstExternFunction {
+                    visibility: AstVisibility::Private,
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_fill_bytes".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "buffer_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "offset".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "len".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "value".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                    host_symbol: None,
+                },
+                AstExternFunction {
+                    visibility: AstVisibility::Private,
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_copy_bytes".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "dst_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "dst_offset".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "dst_len".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "src_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "src_offset".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "src_len".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                    host_symbol: None,
+                },
+                AstExternFunction {
+                    visibility: AstVisibility::Private,
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_compare_bytes".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "lhs_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "lhs_offset".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "lhs_len".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "rhs_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "rhs_offset".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "rhs_len".to_owned(),
                             ty: i64_ty(),
                         },
                     ],
@@ -5816,183 +6362,46 @@ mod tests {
             }
         }
 
+        fn host_extern(name: &str, params: &[&str]) -> AstExternFunction {
+            AstExternFunction {
+                visibility: AstVisibility::Private,
+                abi: "c".to_owned(),
+                interface: None,
+                name: name.to_owned(),
+                params: params
+                    .iter()
+                    .map(|param| nuis_semantics::model::AstParam {
+                        name: (*param).to_owned(),
+                        ty: i64_ty(),
+                    })
+                    .collect(),
+                return_type: i64_ty(),
+                host_symbol: None,
+            }
+        }
+
         let ast = AstModule {
             uses: Vec::new(),
             domain: "cpu".to_owned(),
             unit: "Main".to_owned(),
             externs: vec![
-                AstExternFunction {
-                    visibility: AstVisibility::Private,
-                    abi: "c".to_owned(),
-                    interface: None,
-                    name: "host_serialize_text_into".to_owned(),
-                    params: vec![
-                        nuis_semantics::model::AstParam {
-                            name: "text_handle".to_owned(),
-                            ty: i64_ty(),
-                        },
-                        nuis_semantics::model::AstParam {
-                            name: "buffer_handle".to_owned(),
-                            ty: i64_ty(),
-                        },
-                        nuis_semantics::model::AstParam {
-                            name: "offset".to_owned(),
-                            ty: i64_ty(),
-                        },
-                    ],
-                    return_type: i64_ty(),
-                    host_symbol: None,
-                },
-                AstExternFunction {
-                    visibility: AstVisibility::Private,
-                    abi: "c".to_owned(),
-                    interface: None,
-                    name: "host_serialize_i64_into".to_owned(),
-                    params: vec![
-                        nuis_semantics::model::AstParam {
-                            name: "value".to_owned(),
-                            ty: i64_ty(),
-                        },
-                        nuis_semantics::model::AstParam {
-                            name: "buffer_handle".to_owned(),
-                            ty: i64_ty(),
-                        },
-                        nuis_semantics::model::AstParam {
-                            name: "offset".to_owned(),
-                            ty: i64_ty(),
-                        },
-                    ],
-                    return_type: i64_ty(),
-                    host_symbol: None,
-                },
-                AstExternFunction {
-                    visibility: AstVisibility::Private,
-                    abi: "c".to_owned(),
-                    interface: None,
-                    name: "host_serialize_bool_into".to_owned(),
-                    params: vec![
-                        nuis_semantics::model::AstParam {
-                            name: "value".to_owned(),
-                            ty: i64_ty(),
-                        },
-                        nuis_semantics::model::AstParam {
-                            name: "buffer_handle".to_owned(),
-                            ty: i64_ty(),
-                        },
-                        nuis_semantics::model::AstParam {
-                            name: "offset".to_owned(),
-                            ty: i64_ty(),
-                        },
-                    ],
-                    return_type: i64_ty(),
-                    host_symbol: None,
-                },
-                AstExternFunction {
-                    visibility: AstVisibility::Private,
-                    abi: "c".to_owned(),
-                    interface: None,
-                    name: "host_serialize_byte_into".to_owned(),
-                    params: vec![
-                        nuis_semantics::model::AstParam {
-                            name: "value".to_owned(),
-                            ty: i64_ty(),
-                        },
-                        nuis_semantics::model::AstParam {
-                            name: "buffer_handle".to_owned(),
-                            ty: i64_ty(),
-                        },
-                        nuis_semantics::model::AstParam {
-                            name: "offset".to_owned(),
-                            ty: i64_ty(),
-                        },
-                    ],
-                    return_type: i64_ty(),
-                    host_symbol: None,
-                },
-                AstExternFunction {
-                    visibility: AstVisibility::Private,
-                    abi: "c".to_owned(),
-                    interface: None,
-                    name: "host_deserialize_i64_from".to_owned(),
-                    params: vec![
-                        nuis_semantics::model::AstParam {
-                            name: "buffer_handle".to_owned(),
-                            ty: i64_ty(),
-                        },
-                        nuis_semantics::model::AstParam {
-                            name: "offset".to_owned(),
-                            ty: i64_ty(),
-                        },
-                        nuis_semantics::model::AstParam {
-                            name: "len".to_owned(),
-                            ty: i64_ty(),
-                        },
-                    ],
-                    return_type: i64_ty(),
-                    host_symbol: None,
-                },
-                AstExternFunction {
-                    visibility: AstVisibility::Private,
-                    abi: "c".to_owned(),
-                    interface: None,
-                    name: "host_deserialize_byte_from".to_owned(),
-                    params: vec![
-                        nuis_semantics::model::AstParam {
-                            name: "buffer_handle".to_owned(),
-                            ty: i64_ty(),
-                        },
-                        nuis_semantics::model::AstParam {
-                            name: "offset".to_owned(),
-                            ty: i64_ty(),
-                        },
-                    ],
-                    return_type: i64_ty(),
-                    host_symbol: None,
-                },
-                AstExternFunction {
-                    visibility: AstVisibility::Private,
-                    abi: "c".to_owned(),
-                    interface: None,
-                    name: "host_deserialize_bool_from".to_owned(),
-                    params: vec![
-                        nuis_semantics::model::AstParam {
-                            name: "buffer_handle".to_owned(),
-                            ty: i64_ty(),
-                        },
-                        nuis_semantics::model::AstParam {
-                            name: "offset".to_owned(),
-                            ty: i64_ty(),
-                        },
-                        nuis_semantics::model::AstParam {
-                            name: "len".to_owned(),
-                            ty: i64_ty(),
-                        },
-                    ],
-                    return_type: i64_ty(),
-                    host_symbol: None,
-                },
-                AstExternFunction {
-                    visibility: AstVisibility::Private,
-                    abi: "c".to_owned(),
-                    interface: None,
-                    name: "host_deserialize_text_from".to_owned(),
-                    params: vec![
-                        nuis_semantics::model::AstParam {
-                            name: "buffer_handle".to_owned(),
-                            ty: i64_ty(),
-                        },
-                        nuis_semantics::model::AstParam {
-                            name: "offset".to_owned(),
-                            ty: i64_ty(),
-                        },
-                        nuis_semantics::model::AstParam {
-                            name: "len".to_owned(),
-                            ty: i64_ty(),
-                        },
-                    ],
-                    return_type: i64_ty(),
-                    host_symbol: None,
-                },
+                host_extern("host_serialize_text_into", &["text_handle", "buffer_handle", "offset"]),
+                host_extern("host_serialize_i64_into", &["value", "buffer_handle", "offset"]),
+                host_extern("host_serialize_bool_into", &["value", "buffer_handle", "offset"]),
+                host_extern("host_serialize_byte_into", &["value", "buffer_handle", "offset"]),
+                host_extern("host_deserialize_i64_from", &["buffer_handle", "offset", "len"]),
+                host_extern("host_deserialize_byte_from", &["buffer_handle", "offset"]),
+                host_extern("host_deserialize_bool_from", &["buffer_handle", "offset", "len"]),
+                host_extern("host_deserialize_text_from", &["buffer_handle", "offset", "len"]),
+                host_extern("host_fill_bytes", &["buffer_handle", "offset", "len", "value"]),
+                host_extern(
+                    "host_copy_bytes",
+                    &["dst_handle", "dst_offset", "dst_len", "src_handle", "src_offset", "src_len"],
+                ),
+                host_extern(
+                    "host_compare_bytes",
+                    &["lhs_handle", "lhs_offset", "lhs_len", "rhs_handle", "rhs_offset", "rhs_len"],
+                ),
             ],
             extern_interfaces: Vec::new(),
             consts: Vec::new(),
@@ -6022,11 +6431,15 @@ mod tests {
         assert!(shim.contains("static int64_t nuis_host_deserialize_text_contains("));
         assert!(shim.contains("static int64_t nuis_host_deserialize_text_ends_with("));
         assert!(shim.contains("static int64_t nuis_host_buffer_find_byte("));
+        assert!(shim.contains("static int64_t nuis_host_fill_bytes("));
+        assert!(shim.contains("static int64_t nuis_host_copy_bytes("));
+        assert!(shim.contains("static int64_t nuis_host_compare_bytes("));
         assert!(shim.contains("static int64_t nuis_host_buffer_find_text("));
         assert!(shim.contains("static int64_t nuis_host_buffer_find_line_end("));
         assert!(shim.contains("static int64_t nuis_host_buffer_trim_line_end("));
-        assert!(shim
-            .contains("return nuis_host_serialize_text_into(text_handle, buffer_handle, offset);"));
+        assert!(
+            shim.contains("return nuis_host_serialize_text_into(text_handle, buffer_handle, offset);")
+        );
         assert!(shim.contains("return nuis_host_serialize_i64_into(value, buffer_handle, offset);"));
         assert!(
             shim.contains("return nuis_host_serialize_bool_into(value, buffer_handle, offset);")
@@ -6036,6 +6449,9 @@ mod tests {
         assert!(shim.contains("return nuis_host_deserialize_byte_from(buffer_handle, offset);"));
         assert!(shim.contains("return nuis_host_deserialize_bool_from("));
         assert!(shim.contains("return nuis_host_deserialize_text_from("));
+        assert!(shim.contains("return nuis_host_fill_bytes("));
+        assert!(shim.contains("return nuis_host_copy_bytes("));
+        assert!(shim.contains("return nuis_host_compare_bytes("));
     }
 
     #[test]

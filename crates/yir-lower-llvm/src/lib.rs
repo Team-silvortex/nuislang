@@ -2218,6 +2218,34 @@ fn emit_cpu_function(
                 registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
                 *last_cpu_value = Some(reg);
             }
+            ("cpu", "cast_bool_to_i64") => {
+                let Some(input) = get_bool(&registers, &node.op.args[0]) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.cast_bool_to_i64 `{}` because its input is outside the current CPU LLVM slice",
+                        node.name
+                    ));
+                    continue;
+                };
+                let reg = fresh_reg(&mut next_reg);
+                body.push(format!("  {reg} = zext i1 {input} to i64"));
+                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                *last_cpu_value = Some(reg);
+            }
+            ("cpu", "cast_i64_to_bool") => {
+                let Some(input) = get_i64(&registers, &node.op.args[0]) else {
+                    body.push(format!(
+                        "  ; deferred lowering for cpu.cast_i64_to_bool `{}` because its input is outside the current CPU LLVM slice",
+                        node.name
+                    ));
+                    continue;
+                };
+                let i1 = fresh_reg(&mut next_reg);
+                body.push(format!("  {i1} = icmp ne i64 {input}, 0"));
+                let i64 = fresh_reg(&mut next_reg);
+                body.push(format!("  {i64} = zext i1 {i1} to i64"));
+                registers.insert(node.name.clone(), LlvmValueRef::Bool { i1, i64: i64.clone() });
+                *last_cpu_value = Some(i64);
+            }
             ("cpu", "cast_i64_to_i32") => {
                 let Some(input) = get_i64(&registers, &node.op.args[0]) else {
                     body.push(format!(

@@ -6,6 +6,11 @@ If you want to understand what is true in the repository today, this is usually
 the best documentation layer to read first after the top-level
 [README.md](/Users/Shared/chroot/dev/nuislang/README.md).
 
+If your immediate question is "what is `GLM` trying to be beyond the current
+task/pointer rules?", read:
+
+* [../glm-spec/glm-heterogeneous-flow-graph-positioning.md](/Users/Shared/chroot/dev/nuislang/docs/glm-spec/glm-heterogeneous-flow-graph-positioning.md)
+
 If you want a short phase summary before drilling into individual
 contracts, start with:
 

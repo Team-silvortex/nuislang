@@ -7,6 +7,7 @@ pub(super) enum TaskResultStateFact {
     Completed,
     TimedOut,
     Cancelled,
+    NotCompleted,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -43,20 +44,96 @@ fn task_result_condition_fact(expr: &NirExpr) -> Option<(String, TaskResultState
     super::expr_resource_key(inner).map(|name| (name, fact))
 }
 
+fn apply_direct_truth_fact(
+    condition: &NirExpr,
+    facts: &mut BTreeMap<String, TaskResultStateFact>,
+) -> bool {
+    if let Some((name, fact)) = task_result_condition_fact(condition) {
+        facts.insert(name, fact);
+        true
+    } else {
+        false
+    }
+}
+
+fn apply_direct_false_fact(
+    condition: &NirExpr,
+    facts: &mut BTreeMap<String, TaskResultStateFact>,
+) -> bool {
+    if let Some((name, fact)) = task_result_condition_fact(condition) {
+        match fact {
+            TaskResultStateFact::Completed => {
+                facts.insert(name, TaskResultStateFact::NotCompleted);
+            }
+            TaskResultStateFact::TimedOut
+            | TaskResultStateFact::Cancelled
+            | TaskResultStateFact::NotCompleted => {}
+        }
+        true
+    } else {
+        false
+    }
+}
+
+pub(super) fn apply_truthy_task_result_condition_facts(
+    condition: &NirExpr,
+    facts: &mut BTreeMap<String, TaskResultStateFact>,
+) {
+    if apply_direct_truth_fact(condition, facts) {
+        return;
+    }
+    if let NirExpr::Binary { op, lhs, rhs } = condition {
+        match op {
+            nuis_semantics::model::NirBinaryOp::And => {
+                apply_truthy_task_result_condition_facts(lhs, facts);
+                apply_truthy_task_result_condition_facts(rhs, facts);
+            }
+            nuis_semantics::model::NirBinaryOp::Or => {}
+            _ => {}
+        }
+    }
+}
+
+pub(super) fn apply_falsy_task_result_condition_facts(
+    condition: &NirExpr,
+    facts: &mut BTreeMap<String, TaskResultStateFact>,
+) {
+    if apply_direct_false_fact(condition, facts) {
+        return;
+    }
+    if let NirExpr::Binary { op, lhs, rhs } = condition {
+        match op {
+            nuis_semantics::model::NirBinaryOp::Or => {
+                apply_falsy_task_result_condition_facts(lhs, facts);
+                apply_falsy_task_result_condition_facts(rhs, facts);
+            }
+            nuis_semantics::model::NirBinaryOp::And => {}
+            _ => {}
+        }
+    }
+}
+
 pub(super) fn apply_task_result_condition_facts(
     condition: &NirExpr,
     then_facts: &mut BTreeMap<String, TaskResultStateFact>,
     else_facts: &mut BTreeMap<String, TaskResultStateFact>,
 ) {
-    if let Some((name, fact)) = task_result_condition_fact(condition) {
-        then_facts.insert(name.clone(), fact);
-        match fact {
-            TaskResultStateFact::Completed => {
-                else_facts.remove(&name);
-            }
-            TaskResultStateFact::TimedOut | TaskResultStateFact::Cancelled => {}
-        }
+    apply_truthy_task_result_condition_facts(condition, then_facts);
+    apply_falsy_task_result_condition_facts(condition, else_facts);
+}
+
+pub(super) fn task_result_facts_for_short_circuit_rhs(
+    condition: &NirExpr,
+    rhs_is_for_and: bool,
+    facts: &BTreeMap<String, TaskResultStateFact>,
+) -> BTreeMap<String, TaskResultStateFact> {
+    let mut derived = facts.clone();
+    if rhs_is_for_and {
+        apply_truthy_task_result_condition_facts(condition, &mut derived);
+    } else {
+        apply_falsy_task_result_condition_facts(condition, &mut derived);
     }
+    derived
 }
 
 pub(super) fn merge_control_flow_task_result_facts(

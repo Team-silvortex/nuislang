@@ -497,6 +497,221 @@ fn compiles_byte_buffer_alias_workflow_intrinsics() {
 }
 
 #[test]
+fn compiles_byte_slice_fill_copy_compare_intrinsics() {
+    let artifacts = nuisc::pipeline::compile_source(
+        r#"
+        mod cpu Main {
+          type ByteSlice = Slice<i64>;
+
+          fn main() -> i64 {
+            let lhs_buffer: ref Buffer = alloc_buffer(8, 0);
+            let rhs_buffer: ref Buffer = alloc_buffer(8, 0);
+            let lhs: ByteSlice = bytes(lhs_buffer, 0, 4);
+            let rhs: ByteSlice = bytes(rhs_buffer, 2, 4);
+            let filled: i64 = fillbytes(lhs, 65);
+            let copied: i64 = copybytes(rhs, lhs);
+            let cmp: i64 = comparebytes(lhs, rhs);
+            return filled + copied + cmp + rhs[0];
+          }
+        }
+        "#,
+    )
+    .expect("byte slice fill/copy/compare source should compile");
+
+    assert!(artifacts.llvm_ir.contains("call i64 @host_fill_bytes"));
+    assert!(artifacts.llvm_ir.contains("call i64 @host_copy_bytes"));
+    assert!(artifacts.llvm_ir.contains("call i64 @host_compare_bytes"));
+}
+
+#[test]
+fn compiles_standardized_byte_slice_helper_api() {
+    let artifacts = nuisc::pipeline::compile_source(
+        r#"
+        mod cpu Main {
+          type ByteSlice = Slice<i64>;
+
+          fn main() -> i64 {
+            let lhs_buffer: ref Buffer = alloc_buffer(8, 0);
+            let rhs_buffer: ref Buffer = alloc_buffer(8, 0);
+            let lhs: ByteSlice = bytes(lhs_buffer, 0, 4);
+            let rhs: ByteSlice = bytes(rhs_buffer, 1, 3);
+            let filled: i64 = bytes_fill(lhs, 65);
+            let copied: i64 = bytes_copy_from(lhs, rhs);
+            let cmp: i64 = bytes_compare(lhs, rhs);
+            let eq: bool = bytes_eq(lhs, rhs);
+            let starts: bool = bytes_starts_with(lhs, rhs);
+            let ends: bool = bytes_ends_with(lhs, rhs);
+            return filled
+              + copied
+              + cmp
+              + if eq { 1 } else { 0 }
+              + if starts { 1 } else { 0 }
+              + if ends { 1 } else { 0 };
+          }
+        }
+        "#,
+    )
+    .expect("standardized byte helper API source should compile");
+
+    assert!(artifacts.llvm_ir.contains("call i64 @host_fill_bytes"));
+    assert!(artifacts.llvm_ir.contains("call i64 @host_copy_bytes"));
+    assert!(artifacts.llvm_ir.contains("call i64 @host_compare_bytes"));
+    assert!(artifacts.llvm_ir.contains("icmp eq i64"));
+    assert!(artifacts
+        .llvm_ir
+        .matches("call i64 @host_compare_bytes")
+        .count()
+        >= 3);
+}
+
+#[test]
+fn compiles_standardized_byte_slice_search_api() {
+    let artifacts = nuisc::pipeline::compile_source(
+        r#"
+        mod cpu Main {
+          type ByteSlice = Slice<i64>;
+
+          fn main() -> i64 {
+            let buffer: ref Buffer = alloc_buffer(64, 0);
+            let written: i64 = serialize_text_into("Header: value\r\n", buffer, 0);
+            let view: ByteSlice = bytes(buffer, 0, written);
+            let colon: i64 = bytes_find_byte(view, 58);
+            let value: i64 = bytes_find_text(view, "value");
+            let line_end: i64 = bytes_find_line_end(view);
+            let trimmed: i64 = bytes_trim_line_end(view);
+            return colon + value + line_end + trimmed;
+          }
+        }
+        "#,
+    )
+    .expect("standardized byte search API source should compile");
+
+    assert!(nir_contains_host_callee(
+        &artifacts.nir,
+        "host_buffer_find_byte"
+    ));
+    assert!(nir_contains_host_callee(
+        &artifacts.nir,
+        "host_buffer_find_text"
+    ));
+    assert!(nir_contains_host_callee(
+        &artifacts.nir,
+        "host_buffer_find_line_end"
+    ));
+    assert!(nir_contains_host_callee(
+        &artifacts.nir,
+        "host_buffer_trim_line_end"
+    ));
+}
+
+#[test]
+fn compiles_standardized_byte_slice_contains_api() {
+    let artifacts = nuisc::pipeline::compile_source(
+        r#"
+        mod cpu Main {
+          type ByteSlice = Slice<i64>;
+
+          fn main() -> i64 {
+            let buffer: ref Buffer = alloc_buffer(64, 0);
+            let written: i64 = serialize_text_into("Header: value\r\n", buffer, 0);
+            let view: ByteSlice = bytes(buffer, 0, written);
+            let has_colon: bool = bytes_contains_byte(view, 58);
+            let has_value: bool = bytes_contains_text(view, "value");
+            return if has_colon && has_value { 1 } else { 0 };
+          }
+        }
+        "#,
+    )
+    .expect("standardized byte contains API source should compile");
+
+    assert!(nir_contains_host_callee(
+        &artifacts.nir,
+        "host_buffer_find_byte"
+    ));
+    assert!(nir_contains_host_callee(
+        &artifacts.nir,
+        "host_buffer_find_text"
+    ));
+    assert!(artifacts.llvm_ir.contains("icmp ne i64"));
+}
+
+#[test]
+fn compiles_standardized_byte_slice_partition_api() {
+    let artifacts = nuisc::pipeline::compile_source(
+        r#"
+        mod cpu Main {
+          type ByteSlice = Slice<i64>;
+
+          fn main() -> i64 {
+            let buffer: ref Buffer = alloc_buffer(64, 0);
+            let written: i64 = serialize_text_into("Header: value\r\n", buffer, 0);
+            let view: ByteSlice = bytes(buffer, 0, written);
+            let colon: i64 = bytes_find_byte(view, 58);
+            let name: ByteSlice = bytes_slice_before(view, colon);
+            let value: ByteSlice = bytes_slice_after(view, colon);
+            return name.len + value.len + value[0];
+          }
+        }
+        "#,
+    )
+    .expect("standardized byte partition API source should compile");
+
+    let struct_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "struct")
+        .count();
+    assert!(struct_count >= 3, "expected bytes + before + after struct nodes");
+    assert!(artifacts
+        .yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "load_at"));
+}
+
+#[test]
+fn compiles_standardized_byte_split_once_api() {
+    let artifacts = nuisc::pipeline::compile_source(
+        r#"
+        mod cpu Main {
+          type ByteSlice = Slice<i64>;
+
+          fn main() -> i64 {
+            let buffer: ref Buffer = alloc_buffer(64, 0);
+            let written: i64 = serialize_text_into("Header: value\r\n", buffer, 0);
+            let view: ByteSlice = bytes(buffer, 0, written);
+            let colon_split = bytes_split_once_byte(view, 58);
+            let value_split = bytes_split_once_text(view, "value");
+            return colon_split.index
+              + value_split.index
+              + colon_split.before.len
+              + value_split.after.len
+              + if colon_split.found { 1 } else { 0 };
+          }
+        }
+        "#,
+    )
+    .expect("standardized byte split-once API source should compile");
+
+    let struct_count = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "struct")
+        .count();
+    assert!(struct_count >= 5, "expected bytes + byte split + text split + nested slice structs");
+    assert!(nir_contains_host_callee(
+        &artifacts.nir,
+        "host_buffer_find_byte"
+    ));
+    assert!(nir_contains_host_callee(
+        &artifacts.nir,
+        "host_buffer_find_text"
+    ));
+}
+
+#[test]
 fn compiles_text_deserialization_intrinsics() {
     let artifacts = nuisc::pipeline::compile_source(
         r#"
@@ -862,9 +1077,59 @@ fn stmt_contains_host_callee(stmt: &NirStmt, callee: &str) -> bool {
 
 fn expr_contains_host_callee(expr: &NirExpr, callee: &str) -> bool {
     match expr {
-        NirExpr::CpuExternCall { callee: found, .. } => found == callee,
+        NirExpr::CpuExternCall {
+            callee: found,
+            args,
+            ..
+        } => {
+            found == callee || args.iter().any(|arg| expr_contains_host_callee(arg, callee))
+        }
+        NirExpr::Call { args, .. } | NirExpr::MethodCall { args, .. } => {
+            args.iter().any(|arg| expr_contains_host_callee(arg, callee))
+        }
+        NirExpr::StructLiteral { fields, .. } => fields
+            .iter()
+            .any(|(_, value)| expr_contains_host_callee(value, callee)),
+        NirExpr::FieldAccess { base, .. }
+        | NirExpr::Borrow(base)
+        | NirExpr::Move(base)
+        | NirExpr::Await(base)
+        | NirExpr::LoadValue(base)
+        | NirExpr::LoadNext(base)
+        | NirExpr::BufferLen(base)
+        | NirExpr::Free(base)
+        | NirExpr::CastI64ToI32(base)
+        | NirExpr::CastI32ToI64(base)
+        | NirExpr::CastI64ToBool(base)
+        | NirExpr::CastBoolToI64(base)
+        | NirExpr::CastI64ToF32(base)
+        | NirExpr::CastF32ToI64(base)
+        | NirExpr::CastI64ToF64(base)
+        | NirExpr::CastF64ToI64(base) => expr_contains_host_callee(base, callee),
         NirExpr::Binary { lhs, rhs, .. } => {
             expr_contains_host_callee(lhs, callee) || expr_contains_host_callee(rhs, callee)
+        }
+        NirExpr::AllocNode { value, next }
+        | NirExpr::StoreValue {
+            target: value,
+            value: next,
+        } => expr_contains_host_callee(value, callee) || expr_contains_host_callee(next, callee),
+        NirExpr::StoreNext { target, next } => {
+            expr_contains_host_callee(target, callee) || expr_contains_host_callee(next, callee)
+        }
+        NirExpr::AllocBuffer { len: value, fill: next }
+        | NirExpr::LoadAt {
+            buffer: value,
+            index: next,
+        } => expr_contains_host_callee(value, callee) || expr_contains_host_callee(next, callee),
+        NirExpr::StoreAt {
+            buffer,
+            index,
+            value,
+        } => {
+            expr_contains_host_callee(buffer, callee)
+                || expr_contains_host_callee(index, callee)
+                || expr_contains_host_callee(value, callee)
         }
         _ => false,
     }

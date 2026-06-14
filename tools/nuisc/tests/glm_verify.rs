@@ -489,6 +489,484 @@ fn glm_verifier_rejects_task_value_inside_cancelled_branch() {
 }
 
 #[test]
+fn glm_verifier_accepts_task_value_on_rhs_of_completed_and_condition() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "task".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::Let {
+            name: "result".to_owned(),
+            ty: None,
+            value: NirExpr::CpuJoinResult(Box::new(NirExpr::Var("task".to_owned()))),
+        },
+        NirStmt::If {
+            condition: NirExpr::Binary {
+                op: nuis_semantics::model::NirBinaryOp::And,
+                lhs: Box::new(NirExpr::CpuTaskCompleted(Box::new(NirExpr::Var(
+                    "result".to_owned(),
+                )))),
+                rhs: Box::new(NirExpr::Binary {
+                    op: nuis_semantics::model::NirBinaryOp::Gt,
+                    lhs: Box::new(NirExpr::CpuTaskValue(Box::new(NirExpr::Var(
+                        "result".to_owned(),
+                    )))),
+                    rhs: Box::new(NirExpr::Int(0)),
+                }),
+            },
+            then_body: vec![],
+            else_body: vec![],
+        },
+    ]);
+
+    verify_nir_module(&module).unwrap();
+}
+
+#[test]
+fn glm_verifier_rejects_task_value_inside_else_of_completed_branch() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "task".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::Let {
+            name: "result".to_owned(),
+            ty: None,
+            value: NirExpr::CpuJoinResult(Box::new(NirExpr::Var("task".to_owned()))),
+        },
+        NirStmt::If {
+            condition: NirExpr::CpuTaskCompleted(Box::new(NirExpr::Var("result".to_owned()))),
+            then_body: vec![],
+            else_body: vec![NirStmt::Expr(NirExpr::CpuTaskValue(Box::new(
+                NirExpr::Var("result".to_owned()),
+            )))],
+        },
+    ]);
+
+    let error = verify_nir_module(&module).unwrap_err();
+    assert!(
+        error.contains("cannot extract task_value from `result` on a non-completed lifecycle path")
+    );
+}
+
+#[test]
+fn glm_verifier_rejects_task_value_on_rhs_of_completed_or_condition() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "task".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::Let {
+            name: "result".to_owned(),
+            ty: None,
+            value: NirExpr::CpuJoinResult(Box::new(NirExpr::Var("task".to_owned()))),
+        },
+        NirStmt::If {
+            condition: NirExpr::Binary {
+                op: nuis_semantics::model::NirBinaryOp::Or,
+                lhs: Box::new(NirExpr::CpuTaskCompleted(Box::new(NirExpr::Var(
+                    "result".to_owned(),
+                )))),
+                rhs: Box::new(NirExpr::Binary {
+                    op: nuis_semantics::model::NirBinaryOp::Gt,
+                    lhs: Box::new(NirExpr::CpuTaskValue(Box::new(NirExpr::Var(
+                        "result".to_owned(),
+                    )))),
+                    rhs: Box::new(NirExpr::Int(0)),
+                }),
+            },
+            then_body: vec![],
+            else_body: vec![],
+        },
+    ]);
+
+    let error = verify_nir_module(&module).unwrap_err();
+    assert!(
+        error.contains("cannot extract task_value from `result` on a non-completed lifecycle path")
+    );
+}
+
+#[test]
+fn glm_verifier_accepts_task_value_on_rhs_of_completed_and_while_condition() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "task".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::Let {
+            name: "result".to_owned(),
+            ty: None,
+            value: NirExpr::CpuJoinResult(Box::new(NirExpr::Var("task".to_owned()))),
+        },
+        NirStmt::While {
+            condition: NirExpr::Binary {
+                op: nuis_semantics::model::NirBinaryOp::And,
+                lhs: Box::new(NirExpr::CpuTaskCompleted(Box::new(NirExpr::Var(
+                    "result".to_owned(),
+                )))),
+                rhs: Box::new(NirExpr::Binary {
+                    op: nuis_semantics::model::NirBinaryOp::Gt,
+                    lhs: Box::new(NirExpr::CpuTaskValue(Box::new(NirExpr::Var(
+                        "result".to_owned(),
+                    )))),
+                    rhs: Box::new(NirExpr::Int(0)),
+                }),
+            },
+            body: vec![NirStmt::Break],
+        },
+    ]);
+
+    verify_nir_module(&module).unwrap();
+}
+
+#[test]
+fn glm_verifier_rejects_task_value_on_rhs_of_completed_or_while_condition() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "task".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::Let {
+            name: "result".to_owned(),
+            ty: None,
+            value: NirExpr::CpuJoinResult(Box::new(NirExpr::Var("task".to_owned()))),
+        },
+        NirStmt::While {
+            condition: NirExpr::Binary {
+                op: nuis_semantics::model::NirBinaryOp::Or,
+                lhs: Box::new(NirExpr::CpuTaskCompleted(Box::new(NirExpr::Var(
+                    "result".to_owned(),
+                )))),
+                rhs: Box::new(NirExpr::Binary {
+                    op: nuis_semantics::model::NirBinaryOp::Gt,
+                    lhs: Box::new(NirExpr::CpuTaskValue(Box::new(NirExpr::Var(
+                        "result".to_owned(),
+                    )))),
+                    rhs: Box::new(NirExpr::Int(0)),
+                }),
+            },
+            body: vec![NirStmt::Break],
+        },
+    ]);
+
+    let error = verify_nir_module(&module).unwrap_err();
+    assert!(
+        error.contains("cannot extract task_value from `result` on a non-completed lifecycle path")
+    );
+}
+
+#[test]
+fn glm_verifier_rejects_use_of_moved_value_on_rhs_of_and_condition() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "head".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::If {
+            condition: NirExpr::Binary {
+                op: nuis_semantics::model::NirBinaryOp::And,
+                lhs: Box::new(NirExpr::IsNull(Box::new(NirExpr::Move(Box::new(
+                    NirExpr::Var("head".to_owned()),
+                ))))),
+                rhs: Box::new(NirExpr::IsNull(Box::new(NirExpr::Var("head".to_owned())))),
+            },
+            then_body: vec![],
+            else_body: vec![],
+        },
+    ]);
+
+    let error = verify_nir_module(&module).unwrap_err();
+    assert!(error.contains("use of moved value `head`"));
+}
+
+#[test]
+fn glm_verifier_rejects_use_after_move_in_if_condition() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "head".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::If {
+            condition: NirExpr::IsNull(Box::new(NirExpr::Move(Box::new(NirExpr::Var(
+                "head".to_owned(),
+            ))))),
+            then_body: vec![],
+            else_body: vec![],
+        },
+        NirStmt::Expr(NirExpr::LoadValue(Box::new(NirExpr::Var(
+            "head".to_owned(),
+        )))),
+    ]);
+
+    let error = verify_nir_module(&module).unwrap_err();
+    assert!(error.contains("use of moved value `head`"));
+}
+
+#[test]
+fn glm_verifier_rejects_consume_on_rhs_when_lhs_creates_temporary_borrow() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "head".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::If {
+            condition: NirExpr::Binary {
+                op: nuis_semantics::model::NirBinaryOp::And,
+                lhs: Box::new(NirExpr::IsNull(Box::new(NirExpr::Borrow(Box::new(
+                    NirExpr::Var("head".to_owned()),
+                ))))),
+                rhs: Box::new(NirExpr::IsNull(Box::new(NirExpr::Move(Box::new(
+                    NirExpr::Var("head".to_owned()),
+                ))))),
+            },
+            then_body: vec![],
+            else_body: vec![],
+        },
+    ]);
+
+    let error = verify_nir_module(&module).unwrap_err();
+    assert!(error.contains("cannot consume `head` while borrow(s) are active"));
+}
+
+#[test]
+fn glm_verifier_rejects_use_of_moved_value_on_rhs_of_plain_binary_expr() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "head".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::Expr(NirExpr::Binary {
+            op: nuis_semantics::model::NirBinaryOp::Add,
+            lhs: Box::new(NirExpr::LoadValue(Box::new(NirExpr::Move(Box::new(
+                NirExpr::Var("head".to_owned()),
+            ))))),
+            rhs: Box::new(NirExpr::LoadValue(Box::new(NirExpr::Var(
+                "head".to_owned(),
+            )))),
+        }),
+    ]);
+
+    let error = verify_nir_module(&module).unwrap_err();
+    assert!(error.contains("use of moved value `head`"));
+}
+
+#[test]
+fn glm_verifier_rejects_use_after_nested_move_expression_statement() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "head".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::Expr(NirExpr::IsNull(Box::new(NirExpr::Move(Box::new(
+            NirExpr::Var("head".to_owned()),
+        ))))),
+        NirStmt::Expr(NirExpr::LoadValue(Box::new(NirExpr::Var(
+            "head".to_owned(),
+        )))),
+    ]);
+
+    let error = verify_nir_module(&module).unwrap_err();
+    assert!(error.contains("use of moved value `head`"));
+}
+
+#[test]
+fn glm_verifier_rejects_use_of_moved_value_in_later_call_argument() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "head".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::Expr(NirExpr::Call {
+            callee: "sum".to_owned(),
+            args: vec![
+                NirExpr::LoadValue(Box::new(NirExpr::Move(Box::new(NirExpr::Var(
+                    "head".to_owned(),
+                ))))),
+                NirExpr::LoadValue(Box::new(NirExpr::Var("head".to_owned()))),
+            ],
+        }),
+    ]);
+
+    let error = verify_nir_module(&module).unwrap_err();
+    assert!(error.contains("use of moved value `head`"));
+}
+
+#[test]
+fn glm_verifier_rejects_use_of_moved_value_in_later_struct_field() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "head".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::Expr(NirExpr::StructLiteral {
+            type_name: "Pair".to_owned(),
+            type_args: vec![],
+            fields: vec![
+                (
+                    "lhs".to_owned(),
+                    NirExpr::LoadValue(Box::new(NirExpr::Move(Box::new(NirExpr::Var(
+                        "head".to_owned(),
+                    ))))),
+                ),
+                (
+                    "rhs".to_owned(),
+                    NirExpr::LoadValue(Box::new(NirExpr::Var("head".to_owned()))),
+                ),
+            ],
+        }),
+    ]);
+
+    let error = verify_nir_module(&module).unwrap_err();
+    assert!(error.contains("use of moved value `head`"));
+}
+
+#[test]
+fn glm_verifier_rejects_consume_in_later_call_argument_after_temporary_borrow() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "head".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::Expr(NirExpr::Call {
+            callee: "sum".to_owned(),
+            args: vec![
+                NirExpr::IsNull(Box::new(NirExpr::Borrow(Box::new(NirExpr::Var(
+                    "head".to_owned(),
+                ))))),
+                NirExpr::IsNull(Box::new(NirExpr::Move(Box::new(NirExpr::Var(
+                    "head".to_owned(),
+                ))))),
+            ],
+        }),
+    ]);
+
+    let error = verify_nir_module(&module).unwrap_err();
+    assert!(error.contains("cannot consume `head` while borrow(s) are active"));
+}
+
+#[test]
+fn glm_verifier_rejects_consume_in_later_struct_field_after_temporary_borrow() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "head".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::Expr(NirExpr::StructLiteral {
+            type_name: "Pair".to_owned(),
+            type_args: vec![],
+            fields: vec![
+                (
+                    "lhs".to_owned(),
+                    NirExpr::IsNull(Box::new(NirExpr::Borrow(Box::new(NirExpr::Var(
+                        "head".to_owned(),
+                    ))))),
+                ),
+                (
+                    "rhs".to_owned(),
+                    NirExpr::IsNull(Box::new(NirExpr::Move(Box::new(NirExpr::Var(
+                        "head".to_owned(),
+                    ))))),
+                ),
+            ],
+        }),
+    ]);
+
+    let error = verify_nir_module(&module).unwrap_err();
+    assert!(error.contains("cannot consume `head` while borrow(s) are active"));
+}
+
+#[test]
+fn glm_verifier_rejects_store_at_value_consume_after_buffer_temporary_borrow() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "head".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::Let {
+            name: "scratch".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocBuffer {
+                len: Box::new(NirExpr::Int(2)),
+                fill: Box::new(NirExpr::Int(0)),
+            })),
+        },
+        NirStmt::Expr(NirExpr::StoreAt {
+            buffer: Box::new(NirExpr::Borrow(Box::new(NirExpr::Var(
+                "head".to_owned(),
+            )))),
+            index: Box::new(NirExpr::Int(0)),
+            value: Box::new(NirExpr::Move(Box::new(NirExpr::Var(
+                "head".to_owned(),
+            )))),
+        }),
+        NirStmt::Expr(NirExpr::Free(Box::new(NirExpr::Var("scratch".to_owned())))),
+    ]);
+
+    let error = verify_nir_module(&module).unwrap_err();
+    assert!(error.contains("cannot consume `head` while borrow(s) are active"));
+}
+
+#[test]
 fn glm_verifier_rejects_use_after_free_in_expr_statements() {
     let module = module_with_body(vec![
         NirStmt::Let {

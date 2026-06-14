@@ -1,16 +1,17 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{
-    AstExpr, AstFunction, AstMatchArm, AstStmt, AstTypeAlias, AstVisibility,
+    AstExpr, AstFunction, AstMatchArm, AstParam, AstStmt, AstTypeAlias, AstVisibility,
 };
 
 use super::callables::is_callable_type_with_aliases;
-use super::expansion::specialize_higher_order_call;
+use super::expansion::{specialize_higher_order_call, BoundCallable};
+use super::super::resolve_ast_type_ref_aliases;
 
 pub(crate) fn specialize_higher_order_template(
     template: &AstFunction,
     specialized_name: &str,
-    callable_bindings: &BTreeMap<String, String>,
+    callable_bindings: &BTreeMap<String, BoundCallable>,
     templates: &BTreeMap<String, AstFunction>,
     function_table: &BTreeMap<String, AstFunction>,
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
@@ -26,6 +27,40 @@ pub(crate) fn specialize_higher_order_template(
         specialized_cache,
         specialized_functions,
     )?;
+    let extra_capture_params = template
+        .params
+        .iter()
+        .filter(|param| {
+            is_callable_type_with_aliases(&param.ty, visible_type_aliases).unwrap_or(false)
+        })
+        .flat_map(|param| {
+            let Some(bound) = callable_bindings.get(&param.name) else {
+                return Vec::<AstParam>::new();
+            };
+            let Ok(resolved_callable_ty) = resolve_ast_type_ref_aliases(&param.ty, visible_type_aliases) else {
+                return Vec::<AstParam>::new();
+            };
+            let Some(callable_arity) = super::callables::callable_type_arity(&resolved_callable_ty) else {
+                return Vec::<AstParam>::new();
+            };
+            let Some(callable_function) = function_table.get(&bound.symbol) else {
+                return Vec::<AstParam>::new();
+            };
+            callable_function
+                .params
+                .iter()
+                .skip(callable_arity)
+                .zip(bound.capture_args.iter())
+                .filter_map(|(capture_param, capture_arg)| match capture_arg {
+                    AstExpr::Var(name) => Some(AstParam {
+                        name: name.clone(),
+                        ty: capture_param.ty.clone(),
+                    }),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
     Ok(AstFunction {
         name: specialized_name.to_owned(),
         visibility: AstVisibility::Private,
@@ -46,6 +81,7 @@ pub(crate) fn specialize_higher_order_template(
                 !is_callable_type_with_aliases(&param.ty, visible_type_aliases).unwrap_or(false)
             })
             .cloned()
+            .chain(extra_capture_params)
             .collect(),
         return_type: template.return_type.clone(),
         body,
@@ -54,7 +90,7 @@ pub(crate) fn specialize_higher_order_template(
 
 pub(crate) fn rewrite_higher_order_template_block(
     body: &[AstStmt],
-    callable_bindings: &BTreeMap<String, String>,
+    callable_bindings: &BTreeMap<String, BoundCallable>,
     templates: &BTreeMap<String, AstFunction>,
     function_table: &BTreeMap<String, AstFunction>,
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
@@ -78,7 +114,7 @@ pub(crate) fn rewrite_higher_order_template_block(
 
 pub(crate) fn rewrite_higher_order_template_stmt(
     stmt: &AstStmt,
-    callable_bindings: &BTreeMap<String, String>,
+    callable_bindings: &BTreeMap<String, BoundCallable>,
     templates: &BTreeMap<String, AstFunction>,
     function_table: &BTreeMap<String, AstFunction>,
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
@@ -287,7 +323,7 @@ pub(crate) fn rewrite_higher_order_template_stmt(
 
 pub(crate) fn rewrite_higher_order_template_expr(
     expr: &AstExpr,
-    callable_bindings: &BTreeMap<String, String>,
+    callable_bindings: &BTreeMap<String, BoundCallable>,
     templates: &BTreeMap<String, AstFunction>,
     function_table: &BTreeMap<String, AstFunction>,
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
@@ -295,12 +331,24 @@ pub(crate) fn rewrite_higher_order_template_expr(
     specialized_functions: &mut Vec<AstFunction>,
 ) -> Result<AstExpr, String> {
     Ok(match expr {
-        AstExpr::Var(name) if callable_bindings.contains_key(name) => AstExpr::Var(
-            callable_bindings
+        AstExpr::Var(name) if callable_bindings.contains_key(name) => {
+            let bound = callable_bindings
                 .get(name)
                 .cloned()
-                .unwrap_or_else(|| name.clone()),
-        ),
+                .unwrap_or_else(|| BoundCallable {
+                    symbol: name.clone(),
+                    capture_args: Vec::new(),
+                });
+            if bound.capture_args.is_empty() {
+                AstExpr::Var(bound.symbol)
+            } else {
+                AstExpr::Call {
+                    callee: bound.symbol,
+                    generic_args: Vec::new(),
+                    args: bound.capture_args,
+                }
+            }
+        }
         AstExpr::If {
             condition,
             then_body,
@@ -378,13 +426,8 @@ pub(crate) fn rewrite_higher_order_template_expr(
             callee,
             generic_args,
             args,
-        } if callable_bindings.contains_key(callee) => AstExpr::Call {
-            callee: callable_bindings
-                .get(callee)
-                .cloned()
-                .unwrap_or_else(|| callee.clone()),
-            generic_args: generic_args.clone(),
-            args: args
+        } if callable_bindings.contains_key(callee) => {
+            let mut rewritten_args = args
                 .iter()
                 .map(|arg| {
                     rewrite_higher_order_template_expr(
@@ -397,8 +440,21 @@ pub(crate) fn rewrite_higher_order_template_expr(
                         specialized_functions,
                     )
                 })
-                .collect::<Result<Vec<_>, _>>()?,
-        },
+                .collect::<Result<Vec<_>, _>>()?;
+            let bound = callable_bindings
+                .get(callee)
+                .cloned()
+                .unwrap_or_else(|| BoundCallable {
+                    symbol: callee.clone(),
+                    capture_args: Vec::new(),
+                });
+            rewritten_args.extend(bound.capture_args);
+            AstExpr::Call {
+                callee: bound.symbol,
+                generic_args: generic_args.clone(),
+                args: rewritten_args,
+            }
+        }
         AstExpr::Call {
             callee,
             generic_args,

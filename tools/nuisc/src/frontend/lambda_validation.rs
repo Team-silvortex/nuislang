@@ -2,56 +2,72 @@ use std::collections::BTreeSet;
 
 use nuis_semantics::model::{AstDestructureBinding, AstDestructureField, AstExpr, AstStmt};
 
-pub(super) fn validate_lambda_block_no_capture(
+pub(super) fn collect_lambda_block_captures(
     body: &[AstStmt],
     visible_locals: &mut BTreeSet<String>,
     outer_locals: &BTreeSet<String>,
+    captures: &mut BTreeSet<String>,
 ) -> Result<(), String> {
     for stmt in body {
         match stmt {
             AstStmt::Let { name, value, .. } => {
-                validate_lambda_expr_no_capture(value, visible_locals, outer_locals)?;
+                collect_lambda_expr_captures(value, visible_locals, outer_locals, captures)?;
                 visible_locals.insert(name.clone());
             }
             AstStmt::DestructureLet { fields, value, .. } => {
-                validate_lambda_expr_no_capture(value, visible_locals, outer_locals)?;
+                collect_lambda_expr_captures(value, visible_locals, outer_locals, captures)?;
                 collect_destructure_binding_names(fields, visible_locals);
             }
             AstStmt::Const { name, value, .. } => {
-                validate_lambda_expr_no_capture(value, visible_locals, outer_locals)?;
+                collect_lambda_expr_captures(value, visible_locals, outer_locals, captures)?;
                 visible_locals.insert(name.clone());
             }
             AstStmt::AssignLocal { value, .. } => {
-                validate_lambda_expr_no_capture(value, visible_locals, outer_locals)?;
+                collect_lambda_expr_captures(value, visible_locals, outer_locals, captures)?;
             }
             AstStmt::Print(value) | AstStmt::Await(value) | AstStmt::Expr(value) => {
-                validate_lambda_expr_no_capture(value, visible_locals, outer_locals)?;
+                collect_lambda_expr_captures(value, visible_locals, outer_locals, captures)?;
             }
             AstStmt::If {
                 condition,
                 then_body,
                 else_body,
             } => {
-                validate_lambda_expr_no_capture(condition, visible_locals, outer_locals)?;
+                collect_lambda_expr_captures(condition, visible_locals, outer_locals, captures)?;
                 let mut then_locals = visible_locals.clone();
                 let mut else_locals = visible_locals.clone();
-                validate_lambda_block_no_capture(then_body, &mut then_locals, outer_locals)?;
-                validate_lambda_block_no_capture(else_body, &mut else_locals, outer_locals)?;
+                collect_lambda_block_captures(
+                    then_body,
+                    &mut then_locals,
+                    outer_locals,
+                    captures,
+                )?;
+                collect_lambda_block_captures(
+                    else_body,
+                    &mut else_locals,
+                    outer_locals,
+                    captures,
+                )?;
             }
             AstStmt::Match { value, arms } => {
-                validate_lambda_expr_no_capture(value, visible_locals, outer_locals)?;
+                collect_lambda_expr_captures(value, visible_locals, outer_locals, captures)?;
                 for arm in arms {
                     let mut arm_locals = visible_locals.clone();
-                    validate_lambda_block_no_capture(&arm.body, &mut arm_locals, outer_locals)?;
+                    collect_lambda_block_captures(
+                        &arm.body,
+                        &mut arm_locals,
+                        outer_locals,
+                        captures,
+                    )?;
                 }
             }
             AstStmt::While { condition, body } => {
-                validate_lambda_expr_no_capture(condition, visible_locals, outer_locals)?;
+                collect_lambda_expr_captures(condition, visible_locals, outer_locals, captures)?;
                 let mut loop_locals = visible_locals.clone();
-                validate_lambda_block_no_capture(body, &mut loop_locals, outer_locals)?;
+                collect_lambda_block_captures(body, &mut loop_locals, outer_locals, captures)?;
             }
             AstStmt::Return(Some(value)) => {
-                validate_lambda_expr_no_capture(value, visible_locals, outer_locals)?;
+                collect_lambda_expr_captures(value, visible_locals, outer_locals, captures)?;
             }
             AstStmt::Return(None) | AstStmt::Break | AstStmt::Continue => {}
         }
@@ -76,37 +92,37 @@ fn collect_destructure_binding_names(
     }
 }
 
-pub(super) fn validate_lambda_expr_no_capture(
+pub(super) fn collect_lambda_expr_captures(
     expr: &AstExpr,
     visible_locals: &BTreeSet<String>,
     outer_locals: &BTreeSet<String>,
+    captures: &mut BTreeSet<String>,
 ) -> Result<(), String> {
     match expr {
         AstExpr::Var(name) if outer_locals.contains(name) && !visible_locals.contains(name) => {
-            Err(format!(
-                "lambda currently does not support capturing outer local `{name}`"
-            ))
+            captures.insert(name.clone());
+            Ok(())
         }
         AstExpr::If {
             condition,
             then_body,
             else_body,
         } => {
-            validate_lambda_expr_no_capture(condition, visible_locals, outer_locals)?;
+            collect_lambda_expr_captures(condition, visible_locals, outer_locals, captures)?;
             let mut then_locals = visible_locals.clone();
             let mut else_locals = visible_locals.clone();
-            validate_lambda_block_no_capture(then_body, &mut then_locals, outer_locals)?;
-            validate_lambda_block_no_capture(else_body, &mut else_locals, outer_locals)?;
+            collect_lambda_block_captures(then_body, &mut then_locals, outer_locals, captures)?;
+            collect_lambda_block_captures(else_body, &mut else_locals, outer_locals, captures)?;
             Ok(())
         }
         AstExpr::Match { value, arms } => {
-            validate_lambda_expr_no_capture(value, visible_locals, outer_locals)?;
+            collect_lambda_expr_captures(value, visible_locals, outer_locals, captures)?;
             for arm in arms {
                 if let Some(guard) = &arm.guard {
-                    validate_lambda_expr_no_capture(guard, visible_locals, outer_locals)?;
+                    collect_lambda_expr_captures(guard, visible_locals, outer_locals, captures)?;
                 }
                 let mut arm_locals = visible_locals.clone();
-                validate_lambda_block_no_capture(&arm.body, &mut arm_locals, outer_locals)?;
+                collect_lambda_block_captures(&arm.body, &mut arm_locals, outer_locals, captures)?;
             }
             Ok(())
         }
@@ -115,43 +131,43 @@ pub(super) fn validate_lambda_expr_no_capture(
                 .to_owned(),
         ),
         AstExpr::Await(value) => {
-            validate_lambda_expr_no_capture(value, visible_locals, outer_locals)
+            collect_lambda_expr_captures(value, visible_locals, outer_locals, captures)
         }
         AstExpr::Invoke { callee, args } => {
-            validate_lambda_expr_no_capture(callee, visible_locals, outer_locals)?;
+            collect_lambda_expr_captures(callee, visible_locals, outer_locals, captures)?;
             for arg in args {
-                validate_lambda_expr_no_capture(arg, visible_locals, outer_locals)?;
+                collect_lambda_expr_captures(arg, visible_locals, outer_locals, captures)?;
             }
             Ok(())
         }
         AstExpr::Call { args, .. } => {
             for arg in args {
-                validate_lambda_expr_no_capture(arg, visible_locals, outer_locals)?;
+                collect_lambda_expr_captures(arg, visible_locals, outer_locals, captures)?;
             }
             Ok(())
         }
         AstExpr::MethodCall { receiver, args, .. } => {
-            validate_lambda_expr_no_capture(receiver, visible_locals, outer_locals)?;
+            collect_lambda_expr_captures(receiver, visible_locals, outer_locals, captures)?;
             for arg in args {
-                validate_lambda_expr_no_capture(arg, visible_locals, outer_locals)?;
+                collect_lambda_expr_captures(arg, visible_locals, outer_locals, captures)?;
             }
             Ok(())
         }
         AstExpr::StructLiteral { fields, .. } => {
             for (_, value) in fields {
-                validate_lambda_expr_no_capture(value, visible_locals, outer_locals)?;
+                collect_lambda_expr_captures(value, visible_locals, outer_locals, captures)?;
             }
             Ok(())
         }
         AstExpr::FieldAccess { base, .. } => {
-            validate_lambda_expr_no_capture(base, visible_locals, outer_locals)
+            collect_lambda_expr_captures(base, visible_locals, outer_locals, captures)
         }
         AstExpr::Unary { operand, .. } => {
-            validate_lambda_expr_no_capture(operand, visible_locals, outer_locals)
+            collect_lambda_expr_captures(operand, visible_locals, outer_locals, captures)
         }
         AstExpr::Binary { lhs, rhs, .. } => {
-            validate_lambda_expr_no_capture(lhs, visible_locals, outer_locals)?;
-            validate_lambda_expr_no_capture(rhs, visible_locals, outer_locals)
+            collect_lambda_expr_captures(lhs, visible_locals, outer_locals, captures)?;
+            collect_lambda_expr_captures(rhs, visible_locals, outer_locals, captures)
         }
         AstExpr::Bool(_)
         | AstExpr::Text(_)

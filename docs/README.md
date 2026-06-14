@@ -78,6 +78,12 @@ Important current reading rule:
 * `fabric-spec/DFIR.md` is historical draft material, not a current verifier
   contract
 
+If your immediate question is "how do `GLM`, compiler-native `YIR` verification,
+and the future `vulpoya` analyzer fit together?", start with:
+
+* [glm-spec/glm-heterogeneous-flow-graph-positioning.md](/Users/Shared/chroot/dev/nuislang/docs/glm-spec/glm-heterogeneous-flow-graph-positioning.md)
+* [glm-spec/vulpoya-yir-secondary-review-positioning.md](/Users/Shared/chroot/dev/nuislang/docs/glm-spec/vulpoya-yir-secondary-review-positioning.md)
+
 ## Historical Archive
 
 These files are kept on purpose, but they are no longer part of the shortest

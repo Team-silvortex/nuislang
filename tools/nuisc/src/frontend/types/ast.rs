@@ -494,6 +494,206 @@ pub(crate) fn infer_ast_expr_type_inner(
                     None
                 }
             }
+            "fillbytes" | "copybytes" | "comparebytes" | "bytes_fill" | "bytes_copy_from"
+            | "bytes_compare" => {
+                let views = match callee.as_str() {
+                    "fillbytes" | "bytes_fill" => {
+                        let [base, _] = args.as_slice() else {
+                            return None;
+                        };
+                        vec![base]
+                    }
+                    "copybytes" | "comparebytes" | "bytes_copy_from" | "bytes_compare" => {
+                        let [lhs, rhs] = args.as_slice() else {
+                            return None;
+                        };
+                        vec![lhs, rhs]
+                    }
+                    _ => return None,
+                };
+                if !generic_args.is_empty() {
+                    return None;
+                }
+                for view in views {
+                    let view_ty = infer_ast_expr_type_inner(
+                        view,
+                        env,
+                        impl_lookup,
+                        struct_table,
+                        function_return_types,
+                        active_exprs,
+                    )?;
+                    if view_ty.name != "Slice"
+                        || view_ty.is_ref
+                        || view_ty.is_optional
+                        || view_ty.generic_args.len() != 1
+                        || view_ty.generic_args[0] != ast_named_type("i64")
+                    {
+                        return None;
+                    }
+                }
+                Some(ast_named_type("i64"))
+            }
+            "bytes_eq" | "bytes_starts_with" | "bytes_ends_with" => {
+                let [lhs, rhs] = args.as_slice() else {
+                    return None;
+                };
+                if !generic_args.is_empty() {
+                    return None;
+                }
+                for view in [lhs, rhs] {
+                    let view_ty = infer_ast_expr_type_inner(
+                        view,
+                        env,
+                        impl_lookup,
+                        struct_table,
+                        function_return_types,
+                        active_exprs,
+                    )?;
+                    if view_ty.name != "Slice"
+                        || view_ty.is_ref
+                        || view_ty.is_optional
+                        || view_ty.generic_args.len() != 1
+                        || view_ty.generic_args[0] != ast_named_type("i64")
+                    {
+                        return None;
+                    }
+                }
+                Some(ast_named_type("bool"))
+            }
+            "bytes_find_byte" | "bytes_find_text" => {
+                let view = match args.as_slice() {
+                    [view, _] => view,
+                    _ => return None,
+                };
+                if !generic_args.is_empty() {
+                    return None;
+                }
+                let view_ty = infer_ast_expr_type_inner(
+                    view,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                if view_ty.name == "Slice"
+                    && !view_ty.is_ref
+                    && !view_ty.is_optional
+                    && view_ty.generic_args.len() == 1
+                    && view_ty.generic_args[0] == ast_named_type("i64")
+                {
+                    Some(ast_named_type("i64"))
+                } else {
+                    None
+                }
+            }
+            "bytes_contains_byte" | "bytes_contains_text" => {
+                let view = match args.as_slice() {
+                    [view, _] => view,
+                    _ => return None,
+                };
+                if !generic_args.is_empty() {
+                    return None;
+                }
+                let view_ty = infer_ast_expr_type_inner(
+                    view,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                if view_ty.name == "Slice"
+                    && !view_ty.is_ref
+                    && !view_ty.is_optional
+                    && view_ty.generic_args.len() == 1
+                    && view_ty.generic_args[0] == ast_named_type("i64")
+                {
+                    Some(ast_named_type("bool"))
+                } else {
+                    None
+                }
+            }
+            "bytes_find_line_end" | "bytes_trim_line_end" => {
+                let [view] = args.as_slice() else {
+                    return None;
+                };
+                if !generic_args.is_empty() {
+                    return None;
+                }
+                let view_ty = infer_ast_expr_type_inner(
+                    view,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                if view_ty.name == "Slice"
+                    && !view_ty.is_ref
+                    && !view_ty.is_optional
+                    && view_ty.generic_args.len() == 1
+                    && view_ty.generic_args[0] == ast_named_type("i64")
+                {
+                    Some(ast_named_type("i64"))
+                } else {
+                    None
+                }
+            }
+            "bytes_slice_before" | "bytes_slice_after" => {
+                let [view, _] = args.as_slice() else {
+                    return None;
+                };
+                if !generic_args.is_empty() {
+                    return None;
+                }
+                let view_ty = infer_ast_expr_type_inner(
+                    view,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                if view_ty.name == "Slice"
+                    && !view_ty.is_ref
+                    && !view_ty.is_optional
+                    && view_ty.generic_args.len() == 1
+                    && view_ty.generic_args[0] == ast_named_type("i64")
+                {
+                    Some(view_ty)
+                } else {
+                    None
+                }
+            }
+            "bytes_split_once_byte" | "bytes_split_once_text" => {
+                let view = match args.as_slice() {
+                    [view, _] => view,
+                    _ => return None,
+                };
+                if !generic_args.is_empty() {
+                    return None;
+                }
+                let view_ty = infer_ast_expr_type_inner(
+                    view,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                if view_ty.name == "Slice"
+                    && !view_ty.is_ref
+                    && !view_ty.is_optional
+                    && view_ty.generic_args.len() == 1
+                    && view_ty.generic_args[0] == ast_named_type("i64")
+                {
+                    Some(ast_named_type("ByteSplit"))
+                } else {
+                    None
+                }
+            }
             "load_at" => {
                 let [target, _] = args.as_slice() else {
                     return None;
@@ -727,6 +927,16 @@ pub(crate) fn infer_ast_expr_type_inner(
                         is_ref: true,
                     }),
                     "start" | "len" => Some(ast_named_type("i64")),
+                    _ => None,
+                };
+            }
+            if !base_ty.is_ref && !base_ty.is_optional && base_ty.name == "ByteSplit" {
+                return match field.as_str() {
+                    "before" | "after" => {
+                        Some(ast_generic_named_type("Slice", vec![ast_named_type("i64")]))
+                    }
+                    "index" => Some(ast_named_type("i64")),
+                    "found" => Some(ast_named_type("bool")),
                     _ => None,
                 };
             }

@@ -49,7 +49,7 @@ pub(crate) fn function_type_matches_callable(
     let Some(arity) = callable_type_arity(&expected) else {
         return Ok(false);
     };
-    if callable.params.len() != arity {
+    if callable.params.len() < arity {
         return Ok(false);
     }
     let Some(callable_return_type) = &callable.return_type else {
@@ -65,6 +65,7 @@ pub(crate) fn function_type_matches_callable(
     let callable_parts = callable
         .params
         .iter()
+        .take(arity)
         .map(|param| {
             lower_type_ref_with_aliases(&param.ty, visible_type_aliases)
                 .map(|ty| ast_type_from_nir(&ty))

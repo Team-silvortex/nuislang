@@ -13,8 +13,8 @@ use self::effects::{
 };
 use self::task_result_facts::{
     apply_task_result_condition_facts, borrowed_address_alias_source, borrowed_address_binding,
-    expr_is_borrowed_pointer, merge_control_flow_task_result_facts, BorrowBindings,
-    TaskResultStateFact,
+    expr_is_borrowed_pointer, merge_control_flow_task_result_facts,
+    task_result_facts_for_short_circuit_rhs, BorrowBindings, TaskResultStateFact,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -278,7 +278,7 @@ fn verify_stmt(
             then_body,
             else_body,
         } => {
-            verify_expr(
+            verify_condition_expr(
                 condition,
                 moved,
                 borrows,
@@ -286,6 +286,7 @@ fn verify_stmt(
                 data_bindings,
                 task_result_facts,
             )?;
+            apply_guaranteed_expr_effects(condition, moved, borrows, borrow_bindings, false);
             let mut then_moved = moved.clone();
             let mut then_borrows = borrows.clone();
             let mut then_borrow_bindings = borrow_bindings.clone();
@@ -346,7 +347,7 @@ fn verify_stmt(
             );
         }
         NirStmt::While { condition, body } => {
-            verify_expr(
+            verify_condition_expr(
                 condition,
                 moved,
                 borrows,
@@ -354,6 +355,7 @@ fn verify_stmt(
                 data_bindings,
                 task_result_facts,
             )?;
+            apply_guaranteed_expr_effects(condition, moved, borrows, borrow_bindings, false);
             let pre_loop_moved = moved.clone();
             let pre_loop_borrows = borrows.clone();
             let pre_loop_borrow_bindings = borrow_bindings.clone();
@@ -415,6 +417,342 @@ fn verify_stmt(
     Ok(())
 }
 
+fn verify_condition_expr(
+    expr: &NirExpr,
+    moved: &BTreeSet<String>,
+    borrows: &BTreeMap<String, usize>,
+    borrow_bindings: &BorrowBindings,
+    data_bindings: &BTreeMap<String, NirDataKind>,
+    task_result_facts: &BTreeMap<String, TaskResultStateFact>,
+) -> Result<(), String> {
+    match expr {
+        NirExpr::Binary { op, lhs, rhs } => match op {
+            nuis_semantics::model::NirBinaryOp::And => {
+                verify_condition_expr(
+                    lhs,
+                    moved,
+                    borrows,
+                    borrow_bindings,
+                    data_bindings,
+                    task_result_facts,
+                )?;
+                let mut rhs_moved = moved.clone();
+                let mut rhs_borrows = borrows.clone();
+                let mut rhs_borrow_bindings = borrow_bindings.clone();
+                apply_guaranteed_expr_effects(
+                    lhs,
+                    &mut rhs_moved,
+                    &mut rhs_borrows,
+                    &mut rhs_borrow_bindings,
+                    true,
+                );
+                let rhs_facts = task_result_facts_for_short_circuit_rhs(lhs, true, task_result_facts);
+                verify_condition_expr(
+                    rhs,
+                    &rhs_moved,
+                    &rhs_borrows,
+                    &rhs_borrow_bindings,
+                    data_bindings,
+                    &rhs_facts,
+                )
+            }
+            nuis_semantics::model::NirBinaryOp::Or => {
+                verify_condition_expr(
+                    lhs,
+                    moved,
+                    borrows,
+                    borrow_bindings,
+                    data_bindings,
+                    task_result_facts,
+                )?;
+                let mut rhs_moved = moved.clone();
+                let mut rhs_borrows = borrows.clone();
+                let mut rhs_borrow_bindings = borrow_bindings.clone();
+                apply_guaranteed_expr_effects(
+                    lhs,
+                    &mut rhs_moved,
+                    &mut rhs_borrows,
+                    &mut rhs_borrow_bindings,
+                    true,
+                );
+                let rhs_facts =
+                    task_result_facts_for_short_circuit_rhs(lhs, false, task_result_facts);
+                verify_condition_expr(
+                    rhs,
+                    &rhs_moved,
+                    &rhs_borrows,
+                    &rhs_borrow_bindings,
+                    data_bindings,
+                    &rhs_facts,
+                )
+            }
+            _ => verify_expr(
+                expr,
+                moved,
+                borrows,
+                borrow_bindings,
+                data_bindings,
+                task_result_facts,
+            ),
+        },
+        _ => verify_expr(
+            expr,
+            moved,
+            borrows,
+            borrow_bindings,
+            data_bindings,
+            task_result_facts,
+        ),
+    }
+}
+
+fn apply_guaranteed_expr_effects(
+    expr: &NirExpr,
+    moved: &mut BTreeSet<String>,
+    borrows: &mut BTreeMap<String, usize>,
+    borrow_bindings: &mut BorrowBindings,
+    include_temporary_borrows: bool,
+) {
+    match expr {
+        NirExpr::Binary { op, lhs, rhs } => match op {
+            nuis_semantics::model::NirBinaryOp::And | nuis_semantics::model::NirBinaryOp::Or => {
+                apply_guaranteed_expr_effects(
+                    lhs,
+                    moved,
+                    borrows,
+                    borrow_bindings,
+                    include_temporary_borrows,
+                );
+            }
+            _ => {
+                apply_guaranteed_expr_effects(
+                    lhs,
+                    moved,
+                    borrows,
+                    borrow_bindings,
+                    include_temporary_borrows,
+                );
+                apply_guaranteed_expr_effects(
+                    rhs,
+                    moved,
+                    borrows,
+                    borrow_bindings,
+                    include_temporary_borrows,
+                );
+            }
+        },
+        NirExpr::Await(inner)
+        | NirExpr::Borrow(inner)
+        | NirExpr::BorrowEnd(inner)
+        | NirExpr::HostBufferHandle(inner)
+        | NirExpr::Move(inner)
+        | NirExpr::CastI64ToI32(inner)
+        | NirExpr::CastI32ToI64(inner)
+        | NirExpr::CastI64ToBool(inner)
+        | NirExpr::CastBoolToI64(inner)
+        | NirExpr::CastI64ToF32(inner)
+        | NirExpr::CastF32ToI64(inner)
+        | NirExpr::CastI64ToF64(inner)
+        | NirExpr::CastF64ToI64(inner)
+        | NirExpr::LoadValue(inner)
+        | NirExpr::LoadNext(inner)
+        | NirExpr::BufferLen(inner)
+        | NirExpr::Free(inner)
+        | NirExpr::IsNull(inner) => apply_guaranteed_expr_effects(
+            inner,
+            moved,
+            borrows,
+            borrow_bindings,
+            include_temporary_borrows,
+        ),
+        NirExpr::AllocNode { value, next } => {
+            apply_guaranteed_expr_effects(
+                value,
+                moved,
+                borrows,
+                borrow_bindings,
+                include_temporary_borrows,
+            );
+            apply_guaranteed_expr_effects(
+                next,
+                moved,
+                borrows,
+                borrow_bindings,
+                include_temporary_borrows,
+            );
+        }
+        NirExpr::AllocBuffer { len, fill } => {
+            apply_guaranteed_expr_effects(
+                len,
+                moved,
+                borrows,
+                borrow_bindings,
+                include_temporary_borrows,
+            );
+            apply_guaranteed_expr_effects(
+                fill,
+                moved,
+                borrows,
+                borrow_bindings,
+                include_temporary_borrows,
+            );
+        }
+        NirExpr::StoreValue { target, value } => {
+            apply_guaranteed_expr_effects(
+                target,
+                moved,
+                borrows,
+                borrow_bindings,
+                include_temporary_borrows,
+            );
+            apply_guaranteed_expr_effects(
+                value,
+                moved,
+                borrows,
+                borrow_bindings,
+                include_temporary_borrows,
+            );
+        }
+        NirExpr::StoreNext { target, next } => {
+            apply_guaranteed_expr_effects(
+                target,
+                moved,
+                borrows,
+                borrow_bindings,
+                include_temporary_borrows,
+            );
+            apply_guaranteed_expr_effects(
+                next,
+                moved,
+                borrows,
+                borrow_bindings,
+                include_temporary_borrows,
+            );
+        }
+        NirExpr::LoadAt { buffer, index } => {
+            apply_guaranteed_expr_effects(
+                buffer,
+                moved,
+                borrows,
+                borrow_bindings,
+                include_temporary_borrows,
+            );
+            apply_guaranteed_expr_effects(
+                index,
+                moved,
+                borrows,
+                borrow_bindings,
+                include_temporary_borrows,
+            );
+        }
+        NirExpr::StoreAt {
+            buffer,
+            index,
+            value,
+        } => {
+            apply_guaranteed_expr_effects(
+                buffer,
+                moved,
+                borrows,
+                borrow_bindings,
+                include_temporary_borrows,
+            );
+            apply_guaranteed_expr_effects(
+                index,
+                moved,
+                borrows,
+                borrow_bindings,
+                include_temporary_borrows,
+            );
+            apply_guaranteed_expr_effects(
+                value,
+                moved,
+                borrows,
+                borrow_bindings,
+                include_temporary_borrows,
+            );
+        }
+        NirExpr::Call { args, .. } | NirExpr::MethodCall { args, .. } => {
+            for arg in args {
+                apply_guaranteed_expr_effects(
+                    arg,
+                    moved,
+                    borrows,
+                    borrow_bindings,
+                    include_temporary_borrows,
+                );
+            }
+        }
+        NirExpr::StructLiteral { fields, .. } => {
+            for (_, value) in fields {
+                apply_guaranteed_expr_effects(
+                    value,
+                    moved,
+                    borrows,
+                    borrow_bindings,
+                    include_temporary_borrows,
+                );
+            }
+        }
+        NirExpr::FieldAccess { base, .. } => apply_guaranteed_expr_effects(
+            base,
+            moved,
+            borrows,
+            borrow_bindings,
+            include_temporary_borrows,
+        ),
+        _ => {}
+    }
+
+    match expr {
+        NirExpr::Move(_)
+        | NirExpr::Free(_)
+        | NirExpr::CpuJoin(_)
+        | NirExpr::CpuCancel(_)
+        | NirExpr::CpuJoinResult(_)
+        | NirExpr::CpuTimeout { .. }
+        | NirExpr::BorrowEnd(_) => note_binding_effects(expr, "_", moved, borrows, borrow_bindings),
+        NirExpr::Borrow(_) | NirExpr::LoadNext(_) if include_temporary_borrows => {
+            note_binding_effects(expr, "_", moved, borrows, borrow_bindings)
+        }
+        _ => {}
+    }
+}
+
+fn verify_expr_sequence<'a, I>(
+    exprs: I,
+    moved: &BTreeSet<String>,
+    borrows: &BTreeMap<String, usize>,
+    borrow_bindings: &BorrowBindings,
+    data_bindings: &BTreeMap<String, NirDataKind>,
+    task_result_facts: &BTreeMap<String, TaskResultStateFact>,
+) -> Result<(), String>
+where
+    I: IntoIterator<Item = &'a NirExpr>,
+{
+    let mut current_moved = moved.clone();
+    let mut current_borrows = borrows.clone();
+    let mut current_borrow_bindings = borrow_bindings.clone();
+    for expr in exprs {
+        verify_expr(
+            expr,
+            &current_moved,
+            &current_borrows,
+            &current_borrow_bindings,
+            data_bindings,
+            task_result_facts,
+        )?;
+        apply_guaranteed_expr_effects(
+            expr,
+            &mut current_moved,
+            &mut current_borrows,
+            &mut current_borrow_bindings,
+            true,
+        );
+    }
+    Ok(())
+}
+
 fn verify_expr(
     expr: &NirExpr,
     moved: &BTreeSet<String>,
@@ -440,7 +778,11 @@ fn verify_expr(
         if let Some(source) = expr_resource_key(inner) {
             if matches!(
                 task_result_facts.get(&source),
-                Some(TaskResultStateFact::TimedOut | TaskResultStateFact::Cancelled)
+                Some(
+                    TaskResultStateFact::TimedOut
+                        | TaskResultStateFact::Cancelled
+                        | TaskResultStateFact::NotCompleted
+                )
             ) {
                 return Err(format!(
                     "nir verify: cannot extract task_value from `{}` on a non-completed lifecycle path",
@@ -829,18 +1171,14 @@ fn verify_expr(
             data_bindings,
             task_result_facts,
         )?,
-        NirExpr::CpuSpawn { args, .. } | NirExpr::CpuExternCall { args, .. } => {
-            for arg in args {
-                verify_expr(
-                    arg,
-                    moved,
-                    borrows,
-                    borrow_bindings,
-                    data_bindings,
-                    task_result_facts,
-                )?;
-            }
-        }
+        NirExpr::CpuSpawn { args, .. } | NirExpr::CpuExternCall { args, .. } => verify_expr_sequence(
+            args.iter(),
+            moved,
+            borrows,
+            borrow_bindings,
+            data_bindings,
+            task_result_facts,
+        )?,
         NirExpr::CpuTimeout { task, limit } => {
             verify_expr(
                 task,
@@ -850,11 +1188,21 @@ fn verify_expr(
                 data_bindings,
                 task_result_facts,
             )?;
+            let mut next_moved = moved.clone();
+            let mut next_borrows = borrows.clone();
+            let mut next_borrow_bindings = borrow_bindings.clone();
+            apply_guaranteed_expr_effects(
+                task,
+                &mut next_moved,
+                &mut next_borrows,
+                &mut next_borrow_bindings,
+                true,
+            );
             verify_expr(
                 limit,
-                moved,
-                borrows,
-                borrow_bindings,
+                &next_moved,
+                &next_borrows,
+                &next_borrow_bindings,
                 data_bindings,
                 task_result_facts,
             )?;
@@ -1413,15 +1761,29 @@ fn verify_expr(
                 data_bindings,
                 task_result_facts,
             )?;
+            let mut next_moved = moved.clone();
+            let mut next_borrows = borrows.clone();
+            let mut next_borrow_bindings = borrow_bindings.clone();
+            apply_guaranteed_expr_effects(
+                target,
+                &mut next_moved,
+                &mut next_borrows,
+                &mut next_borrow_bindings,
+                true,
+            );
             verify_expr(
                 value,
-                moved,
-                borrows,
-                borrow_bindings,
+                &next_moved,
+                &next_borrows,
+                &next_borrow_bindings,
                 data_bindings,
                 task_result_facts,
             )?;
-            ensure_owned_address_target("store_value(..., target)", target, borrow_bindings)?;
+            ensure_owned_address_target(
+                "store_value(..., target)",
+                target,
+                &next_borrow_bindings,
+            )?;
         }
         NirExpr::StoreNext { target, next } => {
             verify_expr(
@@ -1432,20 +1794,30 @@ fn verify_expr(
                 data_bindings,
                 task_result_facts,
             )?;
+            let mut next_moved = moved.clone();
+            let mut next_borrows = borrows.clone();
+            let mut next_borrow_bindings = borrow_bindings.clone();
+            apply_guaranteed_expr_effects(
+                target,
+                &mut next_moved,
+                &mut next_borrows,
+                &mut next_borrow_bindings,
+                true,
+            );
             verify_expr(
                 next,
-                moved,
-                borrows,
-                borrow_bindings,
+                &next_moved,
+                &next_borrows,
+                &next_borrow_bindings,
                 data_bindings,
                 task_result_facts,
             )?;
-            ensure_owned_address_target("store_next(..., target)", target, borrow_bindings)?;
-            if borrowed_address_alias_source(next, borrow_bindings).is_some() {
+            ensure_owned_address_target("store_next(..., target)", target, &next_borrow_bindings)?;
+            if borrowed_address_alias_source(next, &next_borrow_bindings).is_some() {
                 return Err(owned_structural_address_error(
                     "store_next(..., next)",
                     next,
-                    borrow_bindings,
+                    &next_borrow_bindings,
                 ));
             }
         }
@@ -1462,68 +1834,72 @@ fn verify_expr(
                 data_bindings,
                 task_result_facts,
             )?;
+            let mut current_moved = moved.clone();
+            let mut current_borrows = borrows.clone();
+            let mut current_borrow_bindings = borrow_bindings.clone();
+            apply_guaranteed_expr_effects(
+                buffer,
+                &mut current_moved,
+                &mut current_borrows,
+                &mut current_borrow_bindings,
+                true,
+            );
             verify_expr(
                 index,
-                moved,
-                borrows,
-                borrow_bindings,
+                &current_moved,
+                &current_borrows,
+                &current_borrow_bindings,
                 data_bindings,
                 task_result_facts,
             )?;
+            apply_guaranteed_expr_effects(
+                index,
+                &mut current_moved,
+                &mut current_borrows,
+                &mut current_borrow_bindings,
+                true,
+            );
             verify_expr(
                 value,
-                moved,
-                borrows,
-                borrow_bindings,
+                &current_moved,
+                &current_borrows,
+                &current_borrow_bindings,
                 data_bindings,
                 task_result_facts,
             )?;
-            ensure_owned_address_target("store_at(..., buffer)", buffer, borrow_bindings)?;
+            ensure_owned_address_target(
+                "store_at(..., buffer)",
+                buffer,
+                &current_borrow_bindings,
+            )?;
         }
-        NirExpr::Call { args, .. } => {
-            for arg in args {
-                verify_expr(
-                    arg,
-                    moved,
-                    borrows,
-                    borrow_bindings,
-                    data_bindings,
-                    task_result_facts,
-                )?;
-            }
-        }
+        NirExpr::Call { args, .. } => verify_expr_sequence(
+            args.iter(),
+            moved,
+            borrows,
+            borrow_bindings,
+            data_bindings,
+            task_result_facts,
+        )?,
         NirExpr::MethodCall { receiver, args, .. } => {
-            verify_expr(
-                receiver,
+            let exprs = std::iter::once(receiver.as_ref()).chain(args.iter());
+            verify_expr_sequence(
+                exprs,
                 moved,
                 borrows,
                 borrow_bindings,
                 data_bindings,
                 task_result_facts,
             )?;
-            for arg in args {
-                verify_expr(
-                    arg,
-                    moved,
-                    borrows,
-                    borrow_bindings,
-                    data_bindings,
-                    task_result_facts,
-                )?;
-            }
         }
-        NirExpr::StructLiteral { fields, .. } => {
-            for (_, value) in fields {
-                verify_expr(
-                    value,
-                    moved,
-                    borrows,
-                    borrow_bindings,
-                    data_bindings,
-                    task_result_facts,
-                )?;
-            }
-        }
+        NirExpr::StructLiteral { fields, .. } => verify_expr_sequence(
+            fields.iter().map(|(_, value)| value),
+            moved,
+            borrows,
+            borrow_bindings,
+            data_bindings,
+            task_result_facts,
+        )?,
         NirExpr::FieldAccess { base, .. } => verify_expr(
             base,
             moved,
@@ -1541,11 +1917,21 @@ fn verify_expr(
                 data_bindings,
                 task_result_facts,
             )?;
+            let mut rhs_moved = moved.clone();
+            let mut rhs_borrows = borrows.clone();
+            let mut rhs_borrow_bindings = borrow_bindings.clone();
+            apply_guaranteed_expr_effects(
+                lhs,
+                &mut rhs_moved,
+                &mut rhs_borrows,
+                &mut rhs_borrow_bindings,
+                true,
+            );
             verify_expr(
                 rhs,
-                moved,
-                borrows,
-                borrow_bindings,
+                &rhs_moved,
+                &rhs_borrows,
+                &rhs_borrow_bindings,
                 data_bindings,
                 task_result_facts,
             )?;

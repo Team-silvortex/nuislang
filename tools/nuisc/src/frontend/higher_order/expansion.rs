@@ -11,6 +11,42 @@ use super::callables::{
 };
 use super::templates::{rewrite_higher_order_template_expr, specialize_higher_order_template};
 
+const LAMBDA_BIND_PREFIX: &str = "__lambda_bind.";
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct BoundCallable {
+    pub(crate) symbol: String,
+    pub(crate) capture_args: Vec<AstExpr>,
+}
+
+fn parse_bound_callable_expr(
+    expr: &AstExpr,
+    template_callable_bindings: Option<&BTreeMap<String, BoundCallable>>,
+) -> Option<BoundCallable> {
+    match expr {
+        AstExpr::Var(name) => Some(
+            template_callable_bindings
+                .and_then(|bindings| bindings.get(name))
+                .cloned()
+                .unwrap_or_else(|| BoundCallable {
+                    symbol: name.clone(),
+                    capture_args: Vec::new(),
+                }),
+        ),
+        AstExpr::Call {
+            callee,
+            generic_args,
+            args,
+        } if generic_args.is_empty() && callee.starts_with(LAMBDA_BIND_PREFIX) => Some(
+            BoundCallable {
+                symbol: callee[LAMBDA_BIND_PREFIX.len()..].to_owned(),
+                capture_args: args.to_vec(),
+            },
+        ),
+        _ => None,
+    }
+}
+
 pub(crate) fn expand_higher_order_functions(
     module: &AstModule,
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
@@ -577,7 +613,7 @@ pub(crate) fn specialize_higher_order_call(
     callee: &str,
     args: &[AstExpr],
     explicit_generic_args: &[AstTypeRef],
-    template_callable_bindings: Option<&BTreeMap<String, String>>,
+    template_callable_bindings: Option<&BTreeMap<String, BoundCallable>>,
     expected: Option<&AstTypeRef>,
     templates: &BTreeMap<String, AstFunction>,
     function_table: &BTreeMap<String, AstFunction>,
@@ -602,7 +638,7 @@ pub(crate) fn specialize_higher_order_call(
         explicit_generic_args,
         visible_type_aliases,
     )?;
-    let mut callable_bindings = BTreeMap::<String, String>::new();
+    let mut callable_bindings = BTreeMap::<String, BoundCallable>::new();
     let mut ordinary_args = Vec::new();
     let mut callable_fragments = Vec::new();
     let generic_names = template
@@ -621,31 +657,25 @@ pub(crate) fn specialize_higher_order_call(
             visible_type_aliases,
         );
         if callable_param {
-            let callable_name = match arg {
-                AstExpr::Var(name) => template_callable_bindings
-                    .and_then(|bindings| bindings.get(name))
-                    .cloned()
-                    .unwrap_or_else(|| name.clone()),
-                _ => {
-                    let rewritten_arg = rewrite_higher_order_argument_expr(
-                        arg,
-                        template_callable_bindings,
-                        ordinary_expected.as_ref(),
-                        templates,
-                        function_table,
-                        visible_type_aliases,
-                        specialized_cache,
-                        specialized_functions,
-                    )?;
-                    let AstExpr::Var(callable_name) = rewritten_arg else {
-                        return Err(format!(
-                            "higher-order parameter `{}` currently expects a no-capture lambda or named function symbol",
-                            param.name
-                        ));
-                    };
-                    callable_name
-                }
+            let rewritten_arg = rewrite_higher_order_argument_expr(
+                arg,
+                template_callable_bindings,
+                ordinary_expected.as_ref(),
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?;
+            let Some(bound_callable) =
+                parse_bound_callable_expr(&rewritten_arg, template_callable_bindings)
+            else {
+                return Err(format!(
+                    "higher-order parameter `{}` currently expects a lambda or named function symbol",
+                    param.name
+                ));
             };
+            let callable_name = bound_callable.symbol.clone();
             if !function_table.contains_key(&callable_name) {
                 return Err(format!(
                     "higher-order parameter `{}` references unknown callable `{}`",
@@ -669,7 +699,40 @@ pub(crate) fn specialize_higher_order_call(
                     callable_name, param.name, param.ty.name
                 ));
             }
-            callable_bindings.insert(param.name.clone(), callable_name.clone());
+            let resolved_callable_ty =
+                resolve_ast_type_ref_aliases(&param.ty, visible_type_aliases)?;
+            let callable_arity = super::callables::callable_type_arity(&resolved_callable_ty)
+                .ok_or_else(|| format!("higher-order parameter `{}` is not callable", param.name))?;
+            let capture_param_defs = callable.params.iter().skip(callable_arity).collect::<Vec<_>>();
+            if capture_param_defs.len() != bound_callable.capture_args.len() {
+                return Err(format!(
+                    "callable `{}` capture shape does not match higher-order binding `{}`",
+                    callable_name, param.name
+                ));
+            }
+            let helper_capture_args = capture_param_defs
+                .iter()
+                .enumerate()
+                .map(|(index, capture_param)| AstExpr::Var(format!(
+                    "__capture_{}_{}_{}",
+                    sanitize_symbol_fragment(&param.name),
+                    sanitize_symbol_fragment(&capture_param.name),
+                    index
+                )))
+                .collect::<Vec<_>>();
+            for capture_arg in &bound_callable.capture_args {
+                ordinary_args.push(annotate_expr_head_with_expected_type(
+                    capture_arg.clone(),
+                    None,
+                ));
+            }
+            callable_bindings.insert(
+                param.name.clone(),
+                BoundCallable {
+                    symbol: callable_name.clone(),
+                    capture_args: helper_capture_args,
+                },
+            );
             callable_fragments.push(sanitize_symbol_fragment(&callable_name));
         } else {
             let rewritten_arg = rewrite_higher_order_argument_expr(
@@ -713,7 +776,7 @@ pub(crate) fn specialize_higher_order_call(
 
 fn rewrite_higher_order_argument_expr(
     expr: &AstExpr,
-    template_callable_bindings: Option<&BTreeMap<String, String>>,
+    template_callable_bindings: Option<&BTreeMap<String, BoundCallable>>,
     expected: Option<&AstTypeRef>,
     templates: &BTreeMap<String, AstFunction>,
     function_table: &BTreeMap<String, AstFunction>,

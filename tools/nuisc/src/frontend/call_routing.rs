@@ -504,6 +504,832 @@ pub(super) fn lower_routed_call_or_core_builtin(
                 ],
             }
         }
+        "fillbytes" => {
+            let [target, value] = args else {
+                return Err("fillbytes(...) expects 2 args".to_owned());
+            };
+            if !generic_args.is_empty() {
+                return Err("fillbytes(...) does not accept explicit generic args".to_owned());
+            }
+            if current_domain != "cpu" {
+                return Err(
+                    "fillbytes(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let (buffer, start, len) = lower_byte_slice_parts(
+                target,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            let lowered_value = lower_expr(
+                value,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            NirExpr::CpuExternCall {
+                abi: "c".to_owned(),
+                interface: None,
+                callee: "host_fill_bytes".to_owned(),
+                args: vec![
+                    NirExpr::HostBufferHandle(Box::new(buffer)),
+                    start,
+                    len,
+                    lowered_value,
+                ],
+            }
+        }
+        "bytes_fill" => {
+            let [target, value] = args else {
+                return Err("bytes_fill(...) expects 2 args".to_owned());
+            };
+            if !generic_args.is_empty() {
+                return Err("bytes_fill(...) does not accept explicit generic args".to_owned());
+            }
+            if current_domain != "cpu" {
+                return Err(
+                    "bytes_fill(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let (buffer, start, len) = lower_byte_slice_parts(
+                target,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            let lowered_value = lower_expr(
+                value,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            NirExpr::CpuExternCall {
+                abi: "c".to_owned(),
+                interface: None,
+                callee: "host_fill_bytes".to_owned(),
+                args: vec![
+                    NirExpr::HostBufferHandle(Box::new(buffer)),
+                    start,
+                    len,
+                    lowered_value,
+                ],
+            }
+        }
+        "copybytes" => {
+            let [dst, src] = args else {
+                return Err("copybytes(...) expects 2 args".to_owned());
+            };
+            if !generic_args.is_empty() {
+                return Err("copybytes(...) does not accept explicit generic args".to_owned());
+            }
+            if current_domain != "cpu" {
+                return Err(
+                    "copybytes(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let (dst_buffer, dst_start, dst_len) = lower_byte_slice_parts(
+                dst,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            let (src_buffer, src_start, src_len) = lower_byte_slice_parts(
+                src,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            NirExpr::CpuExternCall {
+                abi: "c".to_owned(),
+                interface: None,
+                callee: "host_copy_bytes".to_owned(),
+                args: vec![
+                    NirExpr::HostBufferHandle(Box::new(dst_buffer)),
+                    dst_start,
+                    dst_len,
+                    NirExpr::HostBufferHandle(Box::new(src_buffer)),
+                    src_start,
+                    src_len,
+                ],
+            }
+        }
+        "bytes_copy_from" => {
+            let [dst, src] = args else {
+                return Err("bytes_copy_from(...) expects 2 args".to_owned());
+            };
+            if !generic_args.is_empty() {
+                return Err("bytes_copy_from(...) does not accept explicit generic args".to_owned());
+            }
+            if current_domain != "cpu" {
+                return Err(
+                    "bytes_copy_from(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let (dst_buffer, dst_start, dst_len) = lower_byte_slice_parts(
+                dst,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            let (src_buffer, src_start, src_len) = lower_byte_slice_parts(
+                src,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            lower_host_compare_or_copy_call(
+                "host_copy_bytes",
+                dst_buffer,
+                dst_start,
+                dst_len,
+                src_buffer,
+                src_start,
+                src_len,
+            )
+        }
+        "comparebytes" => {
+            let [lhs, rhs] = args else {
+                return Err("comparebytes(...) expects 2 args".to_owned());
+            };
+            if !generic_args.is_empty() {
+                return Err("comparebytes(...) does not accept explicit generic args".to_owned());
+            }
+            if current_domain != "cpu" {
+                return Err(
+                    "comparebytes(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let (lhs_buffer, lhs_start, lhs_len) = lower_byte_slice_parts(
+                lhs,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            let (rhs_buffer, rhs_start, rhs_len) = lower_byte_slice_parts(
+                rhs,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            NirExpr::CpuExternCall {
+                abi: "c".to_owned(),
+                interface: None,
+                callee: "host_compare_bytes".to_owned(),
+                args: vec![
+                    NirExpr::HostBufferHandle(Box::new(lhs_buffer)),
+                    lhs_start,
+                    lhs_len,
+                    NirExpr::HostBufferHandle(Box::new(rhs_buffer)),
+                    rhs_start,
+                    rhs_len,
+                ],
+            }
+        }
+        "bytes_compare" => {
+            let [lhs, rhs] = args else {
+                return Err("bytes_compare(...) expects 2 args".to_owned());
+            };
+            if !generic_args.is_empty() {
+                return Err("bytes_compare(...) does not accept explicit generic args".to_owned());
+            }
+            if current_domain != "cpu" {
+                return Err(
+                    "bytes_compare(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let (lhs_buffer, lhs_start, lhs_len) = lower_byte_slice_parts(
+                lhs,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            let (rhs_buffer, rhs_start, rhs_len) = lower_byte_slice_parts(
+                rhs,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            lower_host_compare_or_copy_call(
+                "host_compare_bytes",
+                lhs_buffer,
+                lhs_start,
+                lhs_len,
+                rhs_buffer,
+                rhs_start,
+                rhs_len,
+            )
+        }
+        "bytes_eq" => {
+            let [lhs, rhs] = args else {
+                return Err("bytes_eq(...) expects 2 args".to_owned());
+            };
+            if !generic_args.is_empty() {
+                return Err("bytes_eq(...) does not accept explicit generic args".to_owned());
+            }
+            if current_domain != "cpu" {
+                return Err(
+                    "bytes_eq(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let (lhs_buffer, lhs_start, lhs_len) = lower_byte_slice_parts(
+                lhs,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            let (rhs_buffer, rhs_start, rhs_len) = lower_byte_slice_parts(
+                rhs,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            NirExpr::Binary {
+                op: nuis_semantics::model::NirBinaryOp::Eq,
+                lhs: Box::new(lower_host_compare_or_copy_call(
+                    "host_compare_bytes",
+                    lhs_buffer,
+                    lhs_start,
+                    lhs_len,
+                    rhs_buffer,
+                    rhs_start,
+                    rhs_len,
+                )),
+                rhs: Box::new(NirExpr::Int(0)),
+            }
+        }
+        "bytes_starts_with" => {
+            let [base, prefix] = args else {
+                return Err("bytes_starts_with(...) expects 2 args".to_owned());
+            };
+            if !generic_args.is_empty() {
+                return Err("bytes_starts_with(...) does not accept explicit generic args".to_owned());
+            }
+            if current_domain != "cpu" {
+                return Err(
+                    "bytes_starts_with(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let (base_buffer, base_start, base_len) = lower_byte_slice_parts(
+                base,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            let (prefix_buffer, prefix_start, prefix_len) = lower_byte_slice_parts(
+                prefix,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            NirExpr::Binary {
+                op: nuis_semantics::model::NirBinaryOp::And,
+                lhs: Box::new(NirExpr::Binary {
+                    op: nuis_semantics::model::NirBinaryOp::Ge,
+                    lhs: Box::new(base_len.clone()),
+                    rhs: Box::new(prefix_len.clone()),
+                }),
+                rhs: Box::new(NirExpr::Binary {
+                    op: nuis_semantics::model::NirBinaryOp::Eq,
+                    lhs: Box::new(lower_host_compare_or_copy_call(
+                        "host_compare_bytes",
+                        base_buffer,
+                        base_start,
+                        prefix_len.clone(),
+                        prefix_buffer,
+                        prefix_start,
+                        prefix_len,
+                    )),
+                    rhs: Box::new(NirExpr::Int(0)),
+                }),
+            }
+        }
+        "bytes_ends_with" => {
+            let [base, suffix] = args else {
+                return Err("bytes_ends_with(...) expects 2 args".to_owned());
+            };
+            if !generic_args.is_empty() {
+                return Err("bytes_ends_with(...) does not accept explicit generic args".to_owned());
+            }
+            if current_domain != "cpu" {
+                return Err(
+                    "bytes_ends_with(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let (base_buffer, base_start, base_len) = lower_byte_slice_parts(
+                base,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            let (suffix_buffer, suffix_start, suffix_len) = lower_byte_slice_parts(
+                suffix,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            let suffix_base_start = NirExpr::Binary {
+                op: nuis_semantics::model::NirBinaryOp::Add,
+                lhs: Box::new(base_start),
+                rhs: Box::new(NirExpr::Binary {
+                    op: nuis_semantics::model::NirBinaryOp::Sub,
+                    lhs: Box::new(base_len.clone()),
+                    rhs: Box::new(suffix_len.clone()),
+                }),
+            };
+            NirExpr::Binary {
+                op: nuis_semantics::model::NirBinaryOp::And,
+                lhs: Box::new(NirExpr::Binary {
+                    op: nuis_semantics::model::NirBinaryOp::Ge,
+                    lhs: Box::new(base_len),
+                    rhs: Box::new(suffix_len.clone()),
+                }),
+                rhs: Box::new(NirExpr::Binary {
+                    op: nuis_semantics::model::NirBinaryOp::Eq,
+                    lhs: Box::new(lower_host_compare_or_copy_call(
+                        "host_compare_bytes",
+                        base_buffer,
+                        suffix_base_start,
+                        suffix_len.clone(),
+                        suffix_buffer,
+                        suffix_start,
+                        suffix_len,
+                    )),
+                    rhs: Box::new(NirExpr::Int(0)),
+                }),
+            }
+        }
+        "bytes_find_byte" => {
+            let [base, needle] = args else {
+                return Err("bytes_find_byte(...) expects 2 args".to_owned());
+            };
+            if !generic_args.is_empty() {
+                return Err("bytes_find_byte(...) does not accept explicit generic args".to_owned());
+            }
+            if current_domain != "cpu" {
+                return Err(
+                    "bytes_find_byte(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let (buffer, start, len) = lower_byte_slice_parts(
+                base,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            let lowered_needle = lower_expr(
+                needle,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            NirExpr::CpuExternCall {
+                abi: "c".to_owned(),
+                interface: None,
+                callee: "host_buffer_find_byte".to_owned(),
+                args: vec![
+                    NirExpr::HostBufferHandle(Box::new(buffer)),
+                    start,
+                    len,
+                    lowered_needle,
+                ],
+            }
+        }
+        "bytes_find_text" => {
+            let [base, needle] = args else {
+                return Err("bytes_find_text(...) expects 2 args".to_owned());
+            };
+            if !generic_args.is_empty() {
+                return Err("bytes_find_text(...) does not accept explicit generic args".to_owned());
+            }
+            if current_domain != "cpu" {
+                return Err(
+                    "bytes_find_text(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let (buffer, start, len) = lower_byte_slice_parts(
+                base,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            let lowered_needle = lower_expr(
+                needle,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            NirExpr::CpuExternCall {
+                abi: "c".to_owned(),
+                interface: None,
+                callee: "host_buffer_find_text".to_owned(),
+                args: vec![
+                    NirExpr::HostBufferHandle(Box::new(buffer)),
+                    start,
+                    len,
+                    lowered_needle,
+                ],
+            }
+        }
+        "bytes_contains_byte" => {
+            let [base, needle] = args else {
+                return Err("bytes_contains_byte(...) expects 2 args".to_owned());
+            };
+            if !generic_args.is_empty() {
+                return Err("bytes_contains_byte(...) does not accept explicit generic args".to_owned());
+            }
+            if current_domain != "cpu" {
+                return Err(
+                    "bytes_contains_byte(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let (buffer, start, len) = lower_byte_slice_parts(
+                base,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            let lowered_needle = lower_expr(
+                needle,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            NirExpr::Binary {
+                op: nuis_semantics::model::NirBinaryOp::Ne,
+                lhs: Box::new(NirExpr::CpuExternCall {
+                    abi: "c".to_owned(),
+                    interface: None,
+                    callee: "host_buffer_find_byte".to_owned(),
+                    args: vec![
+                        NirExpr::HostBufferHandle(Box::new(buffer)),
+                        start,
+                        len,
+                        lowered_needle,
+                    ],
+                }),
+                rhs: Box::new(NirExpr::Int(-1)),
+            }
+        }
+        "bytes_contains_text" => {
+            let [base, needle] = args else {
+                return Err("bytes_contains_text(...) expects 2 args".to_owned());
+            };
+            if !generic_args.is_empty() {
+                return Err("bytes_contains_text(...) does not accept explicit generic args".to_owned());
+            }
+            if current_domain != "cpu" {
+                return Err(
+                    "bytes_contains_text(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let (buffer, start, len) = lower_byte_slice_parts(
+                base,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            let lowered_needle = lower_expr(
+                needle,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            NirExpr::Binary {
+                op: nuis_semantics::model::NirBinaryOp::Ne,
+                lhs: Box::new(NirExpr::CpuExternCall {
+                    abi: "c".to_owned(),
+                    interface: None,
+                    callee: "host_buffer_find_text".to_owned(),
+                    args: vec![
+                        NirExpr::HostBufferHandle(Box::new(buffer)),
+                        start,
+                        len,
+                        lowered_needle,
+                    ],
+                }),
+                rhs: Box::new(NirExpr::Int(-1)),
+            }
+        }
+        "bytes_find_line_end" => {
+            let [base] = args else {
+                return Err("bytes_find_line_end(...) expects 1 arg".to_owned());
+            };
+            if !generic_args.is_empty() {
+                return Err("bytes_find_line_end(...) does not accept explicit generic args".to_owned());
+            }
+            if current_domain != "cpu" {
+                return Err(
+                    "bytes_find_line_end(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let (buffer, start, len) = lower_byte_slice_parts(
+                base,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            NirExpr::CpuExternCall {
+                abi: "c".to_owned(),
+                interface: None,
+                callee: "host_buffer_find_line_end".to_owned(),
+                args: vec![NirExpr::HostBufferHandle(Box::new(buffer)), start, len],
+            }
+        }
+        "bytes_trim_line_end" => {
+            let [base] = args else {
+                return Err("bytes_trim_line_end(...) expects 1 arg".to_owned());
+            };
+            if !generic_args.is_empty() {
+                return Err("bytes_trim_line_end(...) does not accept explicit generic args".to_owned());
+            }
+            if current_domain != "cpu" {
+                return Err(
+                    "bytes_trim_line_end(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let (buffer, start, len) = lower_byte_slice_parts(
+                base,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            NirExpr::CpuExternCall {
+                abi: "c".to_owned(),
+                interface: None,
+                callee: "host_buffer_trim_line_end".to_owned(),
+                args: vec![NirExpr::HostBufferHandle(Box::new(buffer)), start, len],
+            }
+        }
+        "bytes_slice_before" => {
+            let [base, index] = args else {
+                return Err("bytes_slice_before(...) expects 2 args".to_owned());
+            };
+            if !generic_args.is_empty() {
+                return Err("bytes_slice_before(...) does not accept explicit generic args".to_owned());
+            }
+            let lowered_base = lower_expr(
+                base,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            ensure_byte_slice_input("bytes_slice_before", &lowered_base, bindings, signatures, struct_table)?;
+            let lowered_index = lower_expr(
+                index,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            NirExpr::StructLiteral {
+                type_name: "Slice".to_owned(),
+                type_args: vec![i64_type()],
+                fields: vec![
+                    (
+                        "buffer".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(lowered_base.clone()),
+                            field: "buffer".to_owned(),
+                        },
+                    ),
+                    (
+                        "start".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(lowered_base.clone()),
+                            field: "start".to_owned(),
+                        },
+                    ),
+                    (
+                        "len".to_owned(),
+                        NirExpr::Binary {
+                            op: nuis_semantics::model::NirBinaryOp::Sub,
+                            lhs: Box::new(lowered_index),
+                            rhs: Box::new(NirExpr::FieldAccess {
+                                base: Box::new(lowered_base),
+                                field: "start".to_owned(),
+                            }),
+                        },
+                    ),
+                ],
+            }
+        }
+        "bytes_slice_after" => {
+            let [base, index] = args else {
+                return Err("bytes_slice_after(...) expects 2 args".to_owned());
+            };
+            if !generic_args.is_empty() {
+                return Err("bytes_slice_after(...) does not accept explicit generic args".to_owned());
+            }
+            let lowered_base = lower_expr(
+                base,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            ensure_byte_slice_input("bytes_slice_after", &lowered_base, bindings, signatures, struct_table)?;
+            let lowered_index = lower_expr(
+                index,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let after_start = NirExpr::Binary {
+                op: nuis_semantics::model::NirBinaryOp::Add,
+                lhs: Box::new(lowered_index),
+                rhs: Box::new(NirExpr::Int(1)),
+            };
+            let base_end = NirExpr::Binary {
+                op: nuis_semantics::model::NirBinaryOp::Add,
+                lhs: Box::new(NirExpr::FieldAccess {
+                    base: Box::new(lowered_base.clone()),
+                    field: "start".to_owned(),
+                }),
+                rhs: Box::new(NirExpr::FieldAccess {
+                    base: Box::new(lowered_base.clone()),
+                    field: "len".to_owned(),
+                }),
+            };
+            NirExpr::StructLiteral {
+                type_name: "Slice".to_owned(),
+                type_args: vec![i64_type()],
+                fields: vec![
+                    (
+                        "buffer".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(lowered_base),
+                            field: "buffer".to_owned(),
+                        },
+                    ),
+                    ("start".to_owned(), after_start.clone()),
+                    (
+                        "len".to_owned(),
+                        NirExpr::Binary {
+                            op: nuis_semantics::model::NirBinaryOp::Sub,
+                            lhs: Box::new(base_end),
+                            rhs: Box::new(after_start),
+                        },
+                    ),
+                ],
+            }
+        }
+        "bytes_split_once_byte" => {
+            let [base, needle] = args else {
+                return Err("bytes_split_once_byte(...) expects 2 args".to_owned());
+            };
+            if !generic_args.is_empty() {
+                return Err(
+                    "bytes_split_once_byte(...) does not accept explicit generic args".to_owned()
+                );
+            }
+            if current_domain != "cpu" {
+                return Err(
+                    "bytes_split_once_byte(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let (buffer, start, len) = lower_byte_slice_parts(
+                base,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            let lowered_needle = lower_expr(
+                needle,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            lower_byte_split_struct(
+                buffer.clone(),
+                start.clone(),
+                len.clone(),
+                NirExpr::Int(1),
+                NirExpr::CpuExternCall {
+                    abi: "c".to_owned(),
+                    interface: None,
+                    callee: "host_buffer_find_byte".to_owned(),
+                    args: vec![
+                        NirExpr::HostBufferHandle(Box::new(buffer)),
+                        start,
+                        len,
+                        lowered_needle,
+                    ],
+                },
+            )
+        }
+        "bytes_split_once_text" => {
+            let [base, needle] = args else {
+                return Err("bytes_split_once_text(...) expects 2 args".to_owned());
+            };
+            if !generic_args.is_empty() {
+                return Err(
+                    "bytes_split_once_text(...) does not accept explicit generic args".to_owned()
+                );
+            }
+            if current_domain != "cpu" {
+                return Err(
+                    "bytes_split_once_text(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let (buffer, start, len) = lower_byte_slice_parts(
+                base,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            let lowered_needle = lower_expr(
+                needle,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            lower_byte_split_struct(
+                buffer.clone(),
+                start.clone(),
+                len.clone(),
+                NirExpr::CpuExternCall {
+                    abi: "c".to_owned(),
+                    interface: None,
+                    callee: "host_text_len".to_owned(),
+                    args: vec![lowered_needle.clone()],
+                },
+                NirExpr::CpuExternCall {
+                    abi: "c".to_owned(),
+                    interface: None,
+                    callee: "host_buffer_find_text".to_owned(),
+                    args: vec![
+                        NirExpr::HostBufferHandle(Box::new(buffer)),
+                        start,
+                        len,
+                        lowered_needle,
+                    ],
+                },
+            )
+        }
         "slice_len" => {
             let [base] = args else {
                 return Err("slice_len(...) expects 1 arg".to_owned());
@@ -901,4 +1727,195 @@ fn lower_slice_or_buffer_access_target(
         "load/store target expects `ref Buffer` or `Slice<...>`, found `{}`",
         lowered_ty.render()
     ))
+}
+
+fn lower_byte_slice_parts(
+    target: &AstExpr,
+    current_domain: &str,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> Result<(NirExpr, NirExpr, NirExpr), String> {
+    let lowered = lower_expr(
+        target,
+        current_domain,
+        bindings,
+        signatures,
+        struct_table,
+        None,
+    )?;
+    let lowered_ty = infer_nir_expr_type(&lowered, bindings, signatures, struct_table)
+        .ok_or_else(|| "byte view builtin requires a typed `Slice<i64>` input".to_owned())?;
+    let payload_ty = slice_payload_type(&lowered_ty).ok_or_else(|| {
+        format!(
+            "byte view builtin expects `Slice<i64>`, found `{}`",
+            lowered_ty.render()
+        )
+    })?;
+    if payload_ty != i64_type() {
+        return Err(format!(
+            "byte view builtin expects `Slice<i64>`, found `Slice<{}>`",
+            payload_ty.render()
+        ));
+    }
+    Ok((
+        NirExpr::FieldAccess {
+            base: Box::new(lowered.clone()),
+            field: "buffer".to_owned(),
+        },
+        NirExpr::FieldAccess {
+            base: Box::new(lowered.clone()),
+            field: "start".to_owned(),
+        },
+        NirExpr::FieldAccess {
+            base: Box::new(lowered),
+            field: "len".to_owned(),
+        },
+    ))
+}
+
+fn ensure_byte_slice_input(
+    builtin: &str,
+    lowered: &NirExpr,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> Result<(), String> {
+    let lowered_ty = infer_nir_expr_type(lowered, bindings, signatures, struct_table)
+        .ok_or_else(|| format!("{builtin}(...) requires a typed `Slice<i64>` input"))?;
+    let payload_ty = slice_payload_type(&lowered_ty).ok_or_else(|| {
+        format!(
+            "{builtin}(...) expects `Slice<i64>`, found `{}`",
+            lowered_ty.render()
+        )
+    })?;
+    if payload_ty != i64_type() {
+        return Err(format!(
+            "{builtin}(...) expects `Slice<i64>`, found `Slice<{}>`",
+            payload_ty.render()
+        ));
+    }
+    Ok(())
+}
+
+fn lower_host_compare_or_copy_call(
+    callee: &str,
+    lhs_buffer: NirExpr,
+    lhs_start: NirExpr,
+    lhs_len: NirExpr,
+    rhs_buffer: NirExpr,
+    rhs_start: NirExpr,
+    rhs_len: NirExpr,
+) -> NirExpr {
+    NirExpr::CpuExternCall {
+        abi: "c".to_owned(),
+        interface: None,
+        callee: callee.to_owned(),
+        args: vec![
+            NirExpr::HostBufferHandle(Box::new(lhs_buffer)),
+            lhs_start,
+            lhs_len,
+            NirExpr::HostBufferHandle(Box::new(rhs_buffer)),
+            rhs_start,
+            rhs_len,
+        ],
+    }
+}
+
+fn lower_byte_split_struct(
+    buffer: NirExpr,
+    start: NirExpr,
+    len: NirExpr,
+    delimiter_len: NirExpr,
+    index: NirExpr,
+) -> NirExpr {
+    let found = NirExpr::Binary {
+        op: nuis_semantics::model::NirBinaryOp::Ne,
+        lhs: Box::new(index.clone()),
+        rhs: Box::new(NirExpr::Int(-1)),
+    };
+    let found_i64 = NirExpr::CastBoolToI64(Box::new(found.clone()));
+    let missing_i64 = NirExpr::Binary {
+        op: nuis_semantics::model::NirBinaryOp::Sub,
+        lhs: Box::new(NirExpr::Int(1)),
+        rhs: Box::new(found_i64.clone()),
+    };
+    let base_end = NirExpr::Binary {
+        op: nuis_semantics::model::NirBinaryOp::Add,
+        lhs: Box::new(start.clone()),
+        rhs: Box::new(len.clone()),
+    };
+    let split_after_start = NirExpr::Binary {
+        op: nuis_semantics::model::NirBinaryOp::Add,
+        lhs: Box::new(index.clone()),
+        rhs: Box::new(delimiter_len),
+    };
+    let before_len = NirExpr::Binary {
+        op: nuis_semantics::model::NirBinaryOp::Add,
+        lhs: Box::new(NirExpr::Binary {
+            op: nuis_semantics::model::NirBinaryOp::Mul,
+            lhs: Box::new(found_i64.clone()),
+            rhs: Box::new(NirExpr::Binary {
+                op: nuis_semantics::model::NirBinaryOp::Sub,
+                lhs: Box::new(index.clone()),
+                rhs: Box::new(start.clone()),
+            }),
+        }),
+        rhs: Box::new(NirExpr::Binary {
+            op: nuis_semantics::model::NirBinaryOp::Mul,
+            lhs: Box::new(missing_i64.clone()),
+            rhs: Box::new(len.clone()),
+        }),
+    };
+    let after_start = NirExpr::Binary {
+        op: nuis_semantics::model::NirBinaryOp::Add,
+        lhs: Box::new(NirExpr::Binary {
+            op: nuis_semantics::model::NirBinaryOp::Mul,
+            lhs: Box::new(found_i64.clone()),
+            rhs: Box::new(split_after_start.clone()),
+        }),
+        rhs: Box::new(NirExpr::Binary {
+            op: nuis_semantics::model::NirBinaryOp::Mul,
+            lhs: Box::new(missing_i64.clone()),
+            rhs: Box::new(base_end.clone()),
+        }),
+    };
+    let after_len = NirExpr::Binary {
+        op: nuis_semantics::model::NirBinaryOp::Mul,
+        lhs: Box::new(found_i64),
+        rhs: Box::new(NirExpr::Binary {
+            op: nuis_semantics::model::NirBinaryOp::Sub,
+            lhs: Box::new(base_end),
+            rhs: Box::new(split_after_start),
+        }),
+    };
+
+    NirExpr::StructLiteral {
+        type_name: "ByteSplit".to_owned(),
+        type_args: vec![],
+        fields: vec![
+            ("found".to_owned(), found),
+            ("index".to_owned(), index),
+            (
+                "before".to_owned(),
+                make_byte_slice_expr(buffer.clone(), start.clone(), before_len),
+            ),
+            (
+                "after".to_owned(),
+                make_byte_slice_expr(buffer, after_start, after_len),
+            ),
+        ],
+    }
+}
+
+fn make_byte_slice_expr(buffer: NirExpr, start: NirExpr, len: NirExpr) -> NirExpr {
+    NirExpr::StructLiteral {
+        type_name: "Slice".to_owned(),
+        type_args: vec![i64_type()],
+        fields: vec![
+            ("buffer".to_owned(), buffer),
+            ("start".to_owned(), start),
+            ("len".to_owned(), len),
+        ],
+    }
 }
