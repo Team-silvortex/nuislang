@@ -77,7 +77,12 @@ fn rewrite_generic_stmt_with_hoists(
     specialized_signatures: &mut Vec<(String, FunctionSignature)>,
 ) -> Result<Vec<AstStmt>, String> {
     match stmt {
-        AstStmt::Let { name, ty, value } => {
+        AstStmt::Let {
+            name,
+            ty,
+            value,
+            mutable,
+        } => {
             let AstExpr::Call {
                 callee,
                 generic_args,
@@ -176,6 +181,7 @@ fn rewrite_generic_stmt_with_hoists(
                 env.insert(name.clone(), inferred_ty.clone());
             }
             hoisted.push(AstStmt::Let {
+                mutable: *mutable,
                 name: name.clone(),
                 ty: inferred.or_else(|| ty.clone()),
                 value: rewritten_value,
@@ -268,7 +274,12 @@ fn rewrite_generic_calls_in_stmt(
     specialized_signatures: &mut Vec<(String, FunctionSignature)>,
 ) -> Result<AstStmt, String> {
     Ok(match stmt {
-        AstStmt::Let { name, ty, value } => {
+        AstStmt::Let {
+            name,
+            ty,
+            value,
+            mutable,
+        } => {
             let rewritten_value = rewrite_generic_calls_in_expr(
                 value,
                 ty.as_ref().or(let_fallback_expected),
@@ -301,11 +312,31 @@ fn rewrite_generic_calls_in_stmt(
                 env.insert(name.clone(), inferred_ty.clone());
             }
             AstStmt::Let {
+                mutable: *mutable,
                 name: name.clone(),
                 ty: inferred.or_else(|| ty.clone()),
                 value: rewritten_value,
             }
         }
+        AstStmt::AssignLocal { name, value } => AstStmt::AssignLocal {
+            name: name.clone(),
+            value: rewrite_generic_calls_in_expr(
+                value,
+                env.get(name),
+                env,
+                visible_type_aliases,
+                generic_templates,
+                higher_order_templates,
+                function_table,
+                signatures,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                specialization_cache,
+                specialized_functions,
+                specialized_signatures,
+            )?,
+        },
         AstStmt::DestructureLet {
             type_ref,
             fields,
@@ -632,6 +663,7 @@ fn expected_type_for_var_from_following_stmts(
         AstStmt::Let {
             name,
             ty,
+            mutable: _,
             value:
                 AstExpr::Call {
                     callee,

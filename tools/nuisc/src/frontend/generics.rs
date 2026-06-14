@@ -279,12 +279,22 @@ pub(crate) fn specialize_stmt_types(
     body.iter()
         .map(|stmt| {
             Ok(match stmt {
-                AstStmt::Let { name, ty, value } => AstStmt::Let {
+                AstStmt::Let {
+                    name,
+                    ty,
+                    value,
+                    mutable,
+                } => AstStmt::Let {
+                    mutable: *mutable,
                     name: name.clone(),
                     ty: ty
                         .as_ref()
                         .map(|ty| specialize_ast_type_ref(ty, substitutions))
                         .transpose()?,
+                    value: specialize_expr_types(value, substitutions)?,
+                },
+                AstStmt::AssignLocal { name, value } => AstStmt::AssignLocal {
+                    name: name.clone(),
                     value: specialize_expr_types(value, substitutions)?,
                 },
                 AstStmt::DestructureLet {

@@ -1,0 +1,13 @@
+mod cpu Main {
+  fn main() -> i64 {
+    let current: i64 = 4;
+    let sum: i64 = 0;
+    let prod: i64 = 1;
+    while current > 1 {
+      let current: i64 = current - 1;
+      let sum: i64 = sum + current;
+      let prod: i64 = prod * ((current + sum) * 2);
+    }
+    return sum + prod;
+  }
+}

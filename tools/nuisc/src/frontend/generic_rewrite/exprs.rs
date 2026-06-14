@@ -193,13 +193,17 @@ pub(super) fn rewrite_generic_calls_in_expr(
             generic_args,
             args,
         } => {
+            let rewritten_generic_args = generic_args
+                .iter()
+                .map(|arg| resolve_ast_type_ref_aliases(arg, visible_type_aliases))
+                .collect::<Result<Vec<_>, _>>()?;
             let rewritten_args = args
                 .iter()
                 .enumerate()
                 .map(|(index, arg)| {
                     let arg_expected = call_arg_expected_type(
                         callee,
-                        generic_args,
+                        &rewritten_generic_args,
                         index,
                         expected,
                         generic_templates,
@@ -228,7 +232,7 @@ pub(super) fn rewrite_generic_calls_in_expr(
             if let Some(template) = generic_templates.get(callee) {
                 let specialized_name = ensure_generic_specialization(
                     template,
-                    generic_args,
+                    &rewritten_generic_args,
                     &rewritten_args,
                     expected,
                     env,
@@ -252,7 +256,7 @@ pub(super) fn rewrite_generic_calls_in_expr(
             } else {
                 let rewritten_callee = resolved_struct_constructor_alias(
                     callee,
-                    generic_args,
+                    &rewritten_generic_args,
                     expected,
                     &rewritten_args,
                     env,
@@ -261,7 +265,7 @@ pub(super) fn rewrite_generic_calls_in_expr(
                     struct_table,
                     function_return_types,
                 )?
-                .unwrap_or_else(|| (callee.clone(), generic_args.clone()));
+                .unwrap_or_else(|| (callee.clone(), rewritten_generic_args.clone()));
                 AstExpr::Call {
                     callee: rewritten_callee.0,
                     generic_args: rewritten_callee.1,

@@ -322,7 +322,200 @@ pub(crate) fn infer_ast_expr_type_inner(
                 Some(ast_generic_named_type("WindowMut", vec![payload]))
             }
             "buffer_len" => Some(ast_named_type("i64")),
-            "load_at" => Some(ast_named_type("i64")),
+            "slice" => {
+                let [buffer, _, _] = args.as_slice() else {
+                    return None;
+                };
+                let payload = match generic_args.as_slice() {
+                    [] => ast_named_type("i64"),
+                    [payload]
+                        if *payload == ast_named_type("i64")
+                            || *payload == ast_named_type("i32")
+                            || *payload == ast_named_type("f32")
+                            || *payload == ast_named_type("f64") =>
+                    {
+                        payload.clone()
+                    }
+                    [payload] if *payload == ast_named_type("bool") => payload.clone(),
+                    [payload] => return Some(ast_generic_named_type("Slice", vec![payload.clone()])),
+                    _ => return None,
+                };
+                let buffer_ty = infer_ast_expr_type_inner(
+                    buffer,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                if buffer_ty.is_ref && buffer_ty.name == "Buffer" && !buffer_ty.is_optional {
+                    Some(ast_generic_named_type("Slice", vec![payload]))
+                } else {
+                    None
+                }
+            }
+            "bytes" => {
+                let [buffer, _, _] = args.as_slice() else {
+                    return None;
+                };
+                if !generic_args.is_empty() {
+                    return None;
+                }
+                let buffer_ty = infer_ast_expr_type_inner(
+                    buffer,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                if buffer_ty.is_ref && buffer_ty.name == "Buffer" && !buffer_ty.is_optional {
+                    Some(ast_generic_named_type("Slice", vec![ast_named_type("i64")]))
+                } else {
+                    None
+                }
+            }
+            "slice_len" => {
+                let [base] = args.as_slice() else {
+                    return None;
+                };
+                let base_ty = infer_ast_expr_type_inner(
+                    base,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                if base_ty.name == "Slice"
+                    && !base_ty.is_ref
+                    && !base_ty.is_optional
+                    && base_ty.generic_args.len() == 1
+                {
+                    Some(ast_named_type("i64"))
+                } else {
+                    None
+                }
+            }
+            "slice_start" => {
+                let [base] = args.as_slice() else {
+                    return None;
+                };
+                let base_ty = infer_ast_expr_type_inner(
+                    base,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                if base_ty.name == "Slice"
+                    && !base_ty.is_ref
+                    && !base_ty.is_optional
+                    && base_ty.generic_args.len() == 1
+                {
+                    Some(ast_named_type("i64"))
+                } else {
+                    None
+                }
+            }
+            "slice_buffer" => {
+                let [base] = args.as_slice() else {
+                    return None;
+                };
+                let base_ty = infer_ast_expr_type_inner(
+                    base,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                if base_ty.name == "Slice"
+                    && !base_ty.is_ref
+                    && !base_ty.is_optional
+                    && base_ty.generic_args.len() == 1
+                {
+                    Some(AstTypeRef {
+                        name: "Buffer".to_owned(),
+                        generic_args: vec![],
+                        is_optional: false,
+                        is_ref: true,
+                    })
+                } else {
+                    None
+                }
+            }
+            "subslice" => {
+                let [base, _, _] = args.as_slice() else {
+                    return None;
+                };
+                let base_ty = infer_ast_expr_type_inner(
+                    base,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                if base_ty.name == "Slice" && !base_ty.is_ref && !base_ty.is_optional && base_ty.generic_args.len() == 1 {
+                    match generic_args.as_slice() {
+                        [] => Some(base_ty),
+                        [payload] if *payload == base_ty.generic_args[0] => Some(base_ty),
+                        _ => None,
+                    }
+                } else {
+                    None
+                }
+            }
+            "subbytes" => {
+                let [base, _, _] = args.as_slice() else {
+                    return None;
+                };
+                if !generic_args.is_empty() {
+                    return None;
+                }
+                let base_ty = infer_ast_expr_type_inner(
+                    base,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                if base_ty.name == "Slice"
+                    && !base_ty.is_ref
+                    && !base_ty.is_optional
+                    && base_ty.generic_args.len() == 1
+                    && base_ty.generic_args[0] == ast_named_type("i64")
+                {
+                    Some(base_ty)
+                } else {
+                    None
+                }
+            }
+            "load_at" => {
+                let [target, _] = args.as_slice() else {
+                    return None;
+                };
+                let target_ty = infer_ast_expr_type_inner(
+                    target,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                    active_exprs,
+                )?;
+                if target_ty.name == "Slice"
+                    && !target_ty.is_ref
+                    && !target_ty.is_optional
+                    && target_ty.generic_args.len() == 1
+                {
+                    Some(target_ty.generic_args[0].clone())
+                } else {
+                    Some(ast_named_type("i64"))
+                }
+            }
             "data_freeze_window" => {
                 let [input] = args.as_slice() else {
                     return None;
@@ -525,6 +718,18 @@ pub(crate) fn infer_ast_expr_type_inner(
                     _ => None,
                 };
             }
+            if !base_ty.is_ref && !base_ty.is_optional && base_ty.name == "Slice" {
+                return match field.as_str() {
+                    "buffer" => Some(AstTypeRef {
+                        name: "Buffer".to_owned(),
+                        generic_args: vec![],
+                        is_optional: false,
+                        is_ref: true,
+                    }),
+                    "start" | "len" => Some(ast_named_type("i64")),
+                    _ => None,
+                };
+            }
             let definition = struct_table.get(&base_ty.name)?;
             definition
                 .fields
@@ -591,7 +796,11 @@ pub(crate) fn infer_ast_expr_type_inner(
                     None
                 }
             }
-            AstBinaryOp::Add | AstBinaryOp::Sub | AstBinaryOp::Mul | AstBinaryOp::Div => {
+            AstBinaryOp::Add
+            | AstBinaryOp::Sub
+            | AstBinaryOp::Mul
+            | AstBinaryOp::Div
+            | AstBinaryOp::Rem => {
                 let lhs_ty = infer_ast_expr_type_inner(
                     lhs,
                     env,

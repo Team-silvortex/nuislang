@@ -115,12 +115,30 @@ pub(crate) fn rewrite_higher_order_calls_in_stmt(
     specialized_functions: &mut Vec<AstFunction>,
 ) -> Result<AstStmt, String> {
     Ok(match stmt {
-        AstStmt::Let { name, ty, value } => AstStmt::Let {
+        AstStmt::Let {
+            name,
+            ty,
+            value,
+            mutable,
+        } => AstStmt::Let {
+            mutable: *mutable,
             name: name.clone(),
             ty: ty.clone(),
             value: rewrite_higher_order_calls_in_expr(
                 value,
                 ty.as_ref(),
+                templates,
+                function_table,
+                visible_type_aliases,
+                specialized_cache,
+                specialized_functions,
+            )?,
+        },
+        AstStmt::AssignLocal { name, value } => AstStmt::AssignLocal {
+            name: name.clone(),
+            value: rewrite_higher_order_calls_in_expr(
+                value,
+                current_return_type,
                 templates,
                 function_table,
                 visible_type_aliases,

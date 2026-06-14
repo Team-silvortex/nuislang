@@ -9,6 +9,13 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::F32(_)
         | NirExpr::F64(_)
         | NirExpr::CastI64ToI32(_)
+        | NirExpr::CastI32ToI64(_)
+        | NirExpr::CastI64ToBool(_)
+        | NirExpr::CastBoolToI64(_)
+        | NirExpr::CastI64ToF32(_)
+        | NirExpr::CastF32ToI64(_)
+        | NirExpr::CastI64ToF64(_)
+        | NirExpr::CastF64ToI64(_)
         | NirExpr::Var(_)
         | NirExpr::Await(_)
         | NirExpr::Instantiate { .. }

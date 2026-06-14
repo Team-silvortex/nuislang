@@ -1082,6 +1082,76 @@ fn canonicalize_tail_recursive_loop_arg(
                 next_current_expr,
             )))
         }
+        NirExpr::CastI32ToI64(inner) => {
+            NirExpr::CastI32ToI64(Box::new(canonicalize_tail_recursive_loop_arg(
+                inner,
+                current_name,
+                non_current_param_names,
+                invariant_param_names,
+                target_carry_name,
+                next_current_expr,
+            )))
+        }
+        NirExpr::CastI64ToBool(inner) => {
+            NirExpr::CastI64ToBool(Box::new(canonicalize_tail_recursive_loop_arg(
+                inner,
+                current_name,
+                non_current_param_names,
+                invariant_param_names,
+                target_carry_name,
+                next_current_expr,
+            )))
+        }
+        NirExpr::CastBoolToI64(inner) => {
+            NirExpr::CastBoolToI64(Box::new(canonicalize_tail_recursive_loop_arg(
+                inner,
+                current_name,
+                non_current_param_names,
+                invariant_param_names,
+                target_carry_name,
+                next_current_expr,
+            )))
+        }
+        NirExpr::CastI64ToF32(inner) => {
+            NirExpr::CastI64ToF32(Box::new(canonicalize_tail_recursive_loop_arg(
+                inner,
+                current_name,
+                non_current_param_names,
+                invariant_param_names,
+                target_carry_name,
+                next_current_expr,
+            )))
+        }
+        NirExpr::CastF32ToI64(inner) => {
+            NirExpr::CastF32ToI64(Box::new(canonicalize_tail_recursive_loop_arg(
+                inner,
+                current_name,
+                non_current_param_names,
+                invariant_param_names,
+                target_carry_name,
+                next_current_expr,
+            )))
+        }
+        NirExpr::CastI64ToF64(inner) => {
+            NirExpr::CastI64ToF64(Box::new(canonicalize_tail_recursive_loop_arg(
+                inner,
+                current_name,
+                non_current_param_names,
+                invariant_param_names,
+                target_carry_name,
+                next_current_expr,
+            )))
+        }
+        NirExpr::CastF64ToI64(inner) => {
+            NirExpr::CastF64ToI64(Box::new(canonicalize_tail_recursive_loop_arg(
+                inner,
+                current_name,
+                non_current_param_names,
+                invariant_param_names,
+                target_carry_name,
+                next_current_expr,
+            )))
+        }
         NirExpr::Await(inner) => NirExpr::Await(Box::new(canonicalize_tail_recursive_loop_arg(
             inner,
             current_name,
@@ -1278,6 +1348,62 @@ fn canonicalize_tail_recursive_condition_expr(
         | NirExpr::Null => expr.clone(),
         NirExpr::CastI64ToI32(inner) => {
             NirExpr::CastI64ToI32(Box::new(canonicalize_tail_recursive_condition_expr(
+                inner,
+                current_name,
+                non_current_param_names,
+                invariant_param_names,
+            )))
+        }
+        NirExpr::CastI32ToI64(inner) => {
+            NirExpr::CastI32ToI64(Box::new(canonicalize_tail_recursive_condition_expr(
+                inner,
+                current_name,
+                non_current_param_names,
+                invariant_param_names,
+            )))
+        }
+        NirExpr::CastI64ToBool(inner) => {
+            NirExpr::CastI64ToBool(Box::new(canonicalize_tail_recursive_condition_expr(
+                inner,
+                current_name,
+                non_current_param_names,
+                invariant_param_names,
+            )))
+        }
+        NirExpr::CastBoolToI64(inner) => {
+            NirExpr::CastBoolToI64(Box::new(canonicalize_tail_recursive_condition_expr(
+                inner,
+                current_name,
+                non_current_param_names,
+                invariant_param_names,
+            )))
+        }
+        NirExpr::CastI64ToF32(inner) => {
+            NirExpr::CastI64ToF32(Box::new(canonicalize_tail_recursive_condition_expr(
+                inner,
+                current_name,
+                non_current_param_names,
+                invariant_param_names,
+            )))
+        }
+        NirExpr::CastF32ToI64(inner) => {
+            NirExpr::CastF32ToI64(Box::new(canonicalize_tail_recursive_condition_expr(
+                inner,
+                current_name,
+                non_current_param_names,
+                invariant_param_names,
+            )))
+        }
+        NirExpr::CastI64ToF64(inner) => {
+            NirExpr::CastI64ToF64(Box::new(canonicalize_tail_recursive_condition_expr(
+                inner,
+                current_name,
+                non_current_param_names,
+                invariant_param_names,
+            )))
+        }
+        NirExpr::CastF64ToI64(inner) => {
+            NirExpr::CastF64ToI64(Box::new(canonicalize_tail_recursive_condition_expr(
                 inner,
                 current_name,
                 non_current_param_names,

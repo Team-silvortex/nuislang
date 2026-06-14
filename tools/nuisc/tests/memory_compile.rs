@@ -193,6 +193,75 @@ fn lowers_hello_buffer_addressing_memory_source_with_ref_buffer_nir_shape() {
 }
 
 #[test]
+fn compiles_hello_byte_buffer_memory_source() {
+    let source = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_byte_buffer.ns",
+    );
+    nuisc::pipeline::compile_source_path(source)
+        .expect("hello_byte_buffer memory source should compile");
+}
+
+#[test]
+fn lowers_hello_byte_buffer_memory_source_with_byte_intrinsic_shape() {
+    let artifacts =
+        compiled_source("/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_byte_buffer.ns");
+
+    assert!(
+        artifacts
+            .llvm_ir
+            .matches("call i64 @host_serialize_byte_into")
+            .count()
+            >= 2,
+        "expected byte serialization host intrinsic path"
+    );
+    assert!(
+        artifacts.yir.nodes.iter().filter(|node| {
+            node.op.module == "cpu" && node.op.instruction == "struct"
+        }).count()
+            >= 2,
+        "expected bytes/subbytes lowering to materialize byte slice struct nodes"
+    );
+    assert!(
+        artifacts.yir.nodes.iter().any(|node| {
+            node.op.module == "cpu" && node.op.instruction == "field"
+        }),
+        "expected byte subslice lowering to project slice fields"
+    );
+    assert!(
+        artifacts.yir.nodes.iter().any(|node| {
+            node.op.module == "cpu" && node.op.instruction == "load_at"
+        }),
+        "expected byte slice read path to lower through load_at"
+    );
+    assert!(artifacts
+        .llvm_ir
+        .contains("call i64 @host_buffer_find_byte"));
+}
+
+#[test]
+fn lowers_hello_byte_buffer_memory_source_with_alias_resolved_ref_buffer_type() {
+    let artifacts =
+        compiled_source("/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_byte_buffer.ns");
+
+    let main = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .expect("expected main function");
+    assert!(main.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::AllocBuffer { .. },
+            } if name == "buffer" && ty.render() == "ref Buffer"
+        )
+    }));
+}
+
+#[test]
 fn compiles_stdin_runtime_demo_project_with_host_buffer_handle_bridge() {
     compiled_project(
         "/Users/Shared/chroot/dev/nuislang/examples/projects/tooling/stdin_runtime_demo",
@@ -364,6 +433,67 @@ fn compiles_scalar_serialization_roundtrip_intrinsics() {
     assert!(artifacts
         .llvm_ir
         .contains("call i64 @host_deserialize_i64_from"));
+}
+
+#[test]
+fn compiles_byte_serialization_intrinsics() {
+    let artifacts = nuisc::pipeline::compile_source(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let buffer: ref Buffer = alloc_buffer(32, 0);
+            let wrote: i64 = serialize_byte_into(13, buffer, 2);
+            let byte: i64 = deserialize_byte_from(buffer, 2);
+            let missing: i64 = serialize_byte_into(999, buffer, 3);
+            return wrote + byte + missing + load_at(buffer, 2);
+          }
+        }
+        "#,
+    )
+    .expect("byte serialization source should compile");
+
+    assert!(artifacts
+        .llvm_ir
+        .contains("call i64 @host_serialize_byte_into"));
+    assert!(artifacts
+        .llvm_ir
+        .contains("call i64 @host_deserialize_byte_from"));
+}
+
+#[test]
+fn compiles_byte_buffer_alias_workflow_intrinsics() {
+    let artifacts = nuisc::pipeline::compile_source(
+        r#"
+        mod cpu Main {
+          type ByteBuffer = ref Buffer;
+
+          fn write_hi(bytes: ByteBuffer) -> i64 {
+            let wrote_h: i64 = serialize_byte_into(72, bytes, 0);
+            let wrote_i: i64 = serialize_byte_into(105, bytes, 1);
+            return wrote_h + wrote_i;
+          }
+
+          fn main() -> i64 {
+            let bytes: ByteBuffer = alloc_buffer(16, 0);
+            let wrote: i64 = write_hi(bytes);
+            let second: i64 = deserialize_byte_from(bytes, 1);
+            let marker: i64 = buffer_find_byte(bytes, 0, wrote, 105);
+            return wrote + second + marker;
+          }
+        }
+        "#,
+    )
+    .expect("byte buffer alias workflow source should compile");
+
+    assert!(artifacts
+        .llvm_ir
+        .contains("call i64 @host_serialize_byte_into"));
+    assert!(artifacts
+        .llvm_ir
+        .contains("call i64 @host_deserialize_byte_from"));
+    assert!(artifacts
+        .llvm_ir
+        .contains("call i64 @host_buffer_find_byte"));
 }
 
 #[test]
@@ -682,6 +812,7 @@ fn contains_serialize_intrinsic(expr: &NirExpr) -> bool {
             callee == "host_text_len"
                 || callee == "host_serialize_text_into"
                 || callee == "host_serialize_i64_into"
+                || callee == "host_serialize_byte_into"
         }
         NirExpr::Binary { lhs, rhs, .. } => {
             contains_serialize_intrinsic(lhs) || contains_serialize_intrinsic(rhs)

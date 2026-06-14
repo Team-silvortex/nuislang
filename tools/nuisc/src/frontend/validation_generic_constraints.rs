@@ -565,6 +565,31 @@ fn validate_stmt_generic_constraints(
                 local_type_env.insert(name, inferred_ty);
             }
         }
+        AstStmt::AssignLocal { name, value } => {
+            validate_expr_generic_method_bounds(
+                value,
+                visible_type_aliases,
+                impl_lookup,
+                visible_structs,
+                function_return_types,
+                visible_trait_methods,
+                generic_param_names,
+                generic_bounds,
+                local_type_env,
+                context,
+            )?;
+            if let Some(inferred_ty) = infer_ast_expr_type(
+                value,
+                local_type_env,
+                impl_lookup,
+                visible_structs,
+                function_return_types,
+            )
+            .or_else(|| local_type_env.get(name).cloned())
+            {
+                local_type_env.insert(name.clone(), inferred_ty);
+            }
+        }
         AstStmt::DestructureLet { type_ref, .. } => {
             let value = match stmt {
                 AstStmt::DestructureLet { value, .. } => value,

@@ -36,7 +36,14 @@ pub(super) fn is_terminal_branch_pure_expr(
         | NirExpr::NetworkRecvReady(inner)
         | NirExpr::NetworkAcceptReady(inner)
         | NirExpr::NetworkValue(inner)
-        | NirExpr::CastI64ToI32(inner) => is_terminal_branch_pure_expr(inner, pure_helpers),
+        | NirExpr::CastI64ToI32(inner)
+        | NirExpr::CastI32ToI64(inner)
+        | NirExpr::CastI64ToBool(inner)
+        | NirExpr::CastBoolToI64(inner)
+        | NirExpr::CastI64ToF32(inner)
+        | NirExpr::CastF32ToI64(inner)
+        | NirExpr::CastI64ToF64(inner)
+        | NirExpr::CastF64ToI64(inner) => is_terminal_branch_pure_expr(inner, pure_helpers),
         NirExpr::MethodCall { .. } => false,
         NirExpr::Await(_) | NirExpr::Instantiate { .. } => false,
         NirExpr::StructLiteral { fields, .. } => fields
@@ -239,6 +246,27 @@ pub(super) fn inline_pure_helper_calls(
             NirExpr::CastI64ToI32(inner) => {
                 NirExpr::CastI64ToI32(Box::new(inline_expr(inner, inlineable_helpers, visiting)))
             }
+            NirExpr::CastI32ToI64(inner) => {
+                NirExpr::CastI32ToI64(Box::new(inline_expr(inner, inlineable_helpers, visiting)))
+            }
+            NirExpr::CastI64ToBool(inner) => {
+                NirExpr::CastI64ToBool(Box::new(inline_expr(inner, inlineable_helpers, visiting)))
+            }
+            NirExpr::CastBoolToI64(inner) => {
+                NirExpr::CastBoolToI64(Box::new(inline_expr(inner, inlineable_helpers, visiting)))
+            }
+            NirExpr::CastI64ToF32(inner) => {
+                NirExpr::CastI64ToF32(Box::new(inline_expr(inner, inlineable_helpers, visiting)))
+            }
+            NirExpr::CastF32ToI64(inner) => {
+                NirExpr::CastF32ToI64(Box::new(inline_expr(inner, inlineable_helpers, visiting)))
+            }
+            NirExpr::CastI64ToF64(inner) => {
+                NirExpr::CastI64ToF64(Box::new(inline_expr(inner, inlineable_helpers, visiting)))
+            }
+            NirExpr::CastF64ToI64(inner) => {
+                NirExpr::CastF64ToI64(Box::new(inline_expr(inner, inlineable_helpers, visiting)))
+            }
             NirExpr::MethodCall {
                 receiver,
                 method,
@@ -433,7 +461,18 @@ fn is_pure_helper_expr(
         }
         NirExpr::MethodCall { .. } => false,
         NirExpr::Await(_) | NirExpr::Instantiate { .. } => false,
-        NirExpr::CastI64ToI32(inner) => is_pure_helper_expr(inner, function_map, memo, visiting),
+        NirExpr::CastI64ToI32(inner)
+        | NirExpr::CastI32ToI64(inner)
+        | NirExpr::CastI64ToBool(inner)
+        | NirExpr::CastBoolToI64(inner) => {
+            is_pure_helper_expr(inner, function_map, memo, visiting)
+        }
+        NirExpr::CastI64ToF32(inner) | NirExpr::CastF32ToI64(inner) => {
+            is_pure_helper_expr(inner, function_map, memo, visiting)
+        }
+        NirExpr::CastI64ToF64(inner) | NirExpr::CastF64ToI64(inner) => {
+            is_pure_helper_expr(inner, function_map, memo, visiting)
+        }
         NirExpr::StructLiteral { fields, .. } => fields
             .iter()
             .all(|(_, value)| is_pure_helper_expr(value, function_map, memo, visiting)),
@@ -465,6 +504,39 @@ pub(super) fn substitute_branch_binding(
             binding_name,
             binding_value,
         ))),
+        NirExpr::CastI32ToI64(inner) => NirExpr::CastI32ToI64(Box::new(
+            substitute_branch_binding(inner, binding_name, binding_value),
+        )),
+        NirExpr::CastI64ToBool(inner) => {
+            NirExpr::CastI64ToBool(Box::new(substitute_branch_binding(
+                inner,
+                binding_name,
+                binding_value,
+            )))
+        }
+        NirExpr::CastBoolToI64(inner) => NirExpr::CastBoolToI64(Box::new(
+            substitute_branch_binding(inner, binding_name, binding_value),
+        )),
+        NirExpr::CastI64ToF32(inner) => {
+            NirExpr::CastI64ToF32(Box::new(substitute_branch_binding(
+                inner,
+                binding_name,
+                binding_value,
+            )))
+        }
+        NirExpr::CastF32ToI64(inner) => NirExpr::CastF32ToI64(Box::new(
+            substitute_branch_binding(inner, binding_name, binding_value),
+        )),
+        NirExpr::CastI64ToF64(inner) => {
+            NirExpr::CastI64ToF64(Box::new(substitute_branch_binding(
+                inner,
+                binding_name,
+                binding_value,
+            )))
+        }
+        NirExpr::CastF64ToI64(inner) => NirExpr::CastF64ToI64(Box::new(
+            substitute_branch_binding(inner, binding_name, binding_value),
+        )),
         NirExpr::Call { callee, args } => NirExpr::Call {
             callee: callee.clone(),
             args: args

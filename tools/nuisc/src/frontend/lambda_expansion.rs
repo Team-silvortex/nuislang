@@ -123,6 +123,7 @@ fn expand_lambda_block(
             AstStmt::Let {
                 name,
                 ty,
+                mutable: _,
                 value:
                     AstExpr::Lambda {
                         params,
@@ -159,7 +160,12 @@ fn expand_lambda_block(
                 aliases.insert(name.clone(), synthesized_name);
                 locals.insert(name.clone());
             }
-            AstStmt::Let { name, ty, value } => {
+            AstStmt::Let {
+                name,
+                ty,
+                value,
+                mutable,
+            } => {
                 let rewritten_value = rewrite_lambda_expr(
                     value,
                     inherited_generic_params,
@@ -171,12 +177,29 @@ fn expand_lambda_block(
                     synthesized,
                 )?;
                 rewritten.push(AstStmt::Let {
+                    mutable: *mutable,
                     name: name.clone(),
                     ty: ty.clone(),
                     value: rewritten_value,
                 });
                 aliases.remove(name);
                 locals.insert(name.clone());
+            }
+            AstStmt::AssignLocal { name, value } => {
+                let rewritten_value = rewrite_lambda_expr(
+                    value,
+                    inherited_generic_params,
+                    &aliases,
+                    &locals,
+                    module_const_names,
+                    owning_function_name,
+                    counter,
+                    synthesized,
+                )?;
+                rewritten.push(AstStmt::AssignLocal {
+                    name: name.clone(),
+                    value: rewritten_value,
+                });
             }
             AstStmt::DestructureLet {
                 type_ref,

@@ -198,6 +198,12 @@ fn add_state_list_payload_len(kind: &str) -> Option<usize> {
         } else {
             (prefix, 0usize)
         }
+    } else if let Some(prefix) = kind.strip_prefix("mul_scaled_") {
+        if let Some(prefix) = prefix.strip_suffix("_plus_invariant") {
+            (prefix, 2usize)
+        } else {
+            (prefix, 1usize)
+        }
     } else if let Some(prefix) = kind.strip_prefix("mul_") {
         if let Some(prefix) = prefix.strip_suffix("_plus_invariant") {
             (prefix, 1usize)
@@ -298,6 +304,15 @@ fn validate_carry_condition_kind(
 }
 
 fn carry_source_payload_len(kind: &str) -> Option<usize> {
+    let carry_state_fragment_is_valid = |fragment: &str| match fragment {
+        "current" | "prev_current" => true,
+        other => {
+            other
+                .strip_prefix("prev_carry")
+                .or_else(|| other.strip_prefix("carry"))
+                .is_some_and(|index| index.parse::<usize>().is_ok())
+        }
+    };
     let zero_payload_indexed_prefixes =
         ["add_prev_carry", "mul_prev_carry", "add_carry", "mul_carry"];
     let one_payload_zero_payload_indexed_prefixes =
@@ -334,6 +349,45 @@ fn carry_source_payload_len(kind: &str) -> Option<usize> {
         })
     }) {
         Some(1)
+    } else if let Some(prefix) = kind.strip_prefix("mul_scaled_by_") {
+        if let Some((factor, terms_part)) = prefix.split_once("_plus_factor_invariant_") {
+            if !carry_state_fragment_is_valid(factor) {
+                return None;
+            }
+            let terms_part = terms_part
+                .strip_suffix("_plus_invariant")
+                .unwrap_or(terms_part);
+            let terms = terms_part.split("_plus_").collect::<Vec<_>>();
+            if !terms.is_empty() && terms.iter().all(|term| carry_state_fragment_is_valid(term)) {
+                Some(1 + usize::from(prefix.ends_with("_plus_invariant")))
+            } else {
+                None
+            }
+        } else {
+            let (factor, terms_part) = prefix.split_once('_')?;
+            if !carry_state_fragment_is_valid(factor) {
+                return None;
+            }
+            let terms_part = terms_part
+                .strip_suffix("_plus_invariant")
+                .unwrap_or(terms_part);
+            let terms = terms_part.split("_plus_").collect::<Vec<_>>();
+            if !terms.is_empty() && terms.iter().all(|term| carry_state_fragment_is_valid(term)) {
+                Some(usize::from(prefix.ends_with("_plus_invariant")))
+            } else {
+                None
+            }
+        }
+    } else if let Some(prefix) = kind.strip_prefix("mul_scaled_") {
+        let terms_part = prefix
+            .strip_suffix("_plus_invariant")
+            .unwrap_or(prefix);
+        let terms = terms_part.split("_plus_").collect::<Vec<_>>();
+        if !terms.is_empty() && terms.iter().all(|term| carry_state_fragment_is_valid(term)) {
+            Some(1 + usize::from(prefix.ends_with("_plus_invariant")))
+        } else {
+            None
+        }
     } else if let Some(payload_len) = add_state_list_payload_len(kind) {
         Some(payload_len)
     } else if matches!(
@@ -4039,6 +4093,63 @@ mod tests {
         assert_eq!(
             source.payload,
             vec!["factor_scale0".to_owned(), "rhs0".to_owned()]
+        );
+        assert_eq!(next, 3);
+    }
+
+    #[test]
+    fn parse_carry_branch_source_accepts_mul_scaled_additive_kind() {
+        let args = vec![
+            "mul_scaled_current_plus_current_plus_invariant".to_owned(),
+            "factor0".to_owned(),
+            "offset0".to_owned(),
+        ];
+        let (source, next) =
+            parse_carry_branch_source(&args, 0, "loop_node").expect("expected branch source");
+        assert_eq!(
+            source.kind,
+            "mul_scaled_current_plus_current_plus_invariant"
+        );
+        assert_eq!(
+            source.payload,
+            vec!["factor0".to_owned(), "offset0".to_owned()]
+        );
+        assert_eq!(next, 3);
+    }
+
+    #[test]
+    fn parse_carry_branch_source_accepts_mul_scaled_by_state_additive_kind() {
+        let args = vec![
+            "mul_scaled_by_current_current_plus_carry0_plus_invariant".to_owned(),
+            "offset0".to_owned(),
+        ];
+        let (source, next) =
+            parse_carry_branch_source(&args, 0, "loop_node").expect("expected branch source");
+        assert_eq!(
+            source.kind,
+            "mul_scaled_by_current_current_plus_carry0_plus_invariant"
+        );
+        assert_eq!(source.payload, vec!["offset0".to_owned()]);
+        assert_eq!(next, 2);
+    }
+
+    #[test]
+    fn parse_carry_branch_source_accepts_mul_scaled_by_state_plus_invariant_additive_kind() {
+        let args = vec![
+            "mul_scaled_by_current_plus_factor_invariant_current_plus_carry0_plus_invariant"
+                .to_owned(),
+            "factor0".to_owned(),
+            "offset0".to_owned(),
+        ];
+        let (source, next) =
+            parse_carry_branch_source(&args, 0, "loop_node").expect("expected branch source");
+        assert_eq!(
+            source.kind,
+            "mul_scaled_by_current_plus_factor_invariant_current_plus_carry0_plus_invariant"
+        );
+        assert_eq!(
+            source.payload,
+            vec!["factor0".to_owned(), "offset0".to_owned()]
         );
         assert_eq!(next, 3);
     }

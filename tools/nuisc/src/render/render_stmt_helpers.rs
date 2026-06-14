@@ -4,9 +4,18 @@ use nuis_semantics::model::{
 
 pub(super) fn render_ast_stmt_inline(stmt: &AstStmt) -> String {
     match stmt {
-        AstStmt::Let { name, ty, value } => {
+        AstStmt::Let {
+            name,
+            ty,
+            value,
+            mutable,
+        } => {
             let suffix = render_ast_type_suffix(ty.as_ref());
-            format!("let {}{} = {}", name, suffix, super::render_ast_expr(value))
+            let prefix = if *mutable { "let mut" } else { "let" };
+            format!("{prefix} {}{} = {}", name, suffix, super::render_ast_expr(value))
+        }
+        AstStmt::AssignLocal { name, value } => {
+            format!("{name} = {}", super::render_ast_expr(value))
         }
         AstStmt::DestructureLet {
             type_ref,

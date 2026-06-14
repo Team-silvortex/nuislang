@@ -448,6 +448,7 @@ fn binary_operator_trait_requirement(
         AstBinaryOp::Sub => Some(("-", "sub", "Subtractable")),
         AstBinaryOp::Mul => Some(("*", "mul", "Multipliable")),
         AstBinaryOp::Div => Some(("/", "div", "Dividable")),
+        AstBinaryOp::Rem => Some(("%", "rem", "Remainderable")),
         AstBinaryOp::Eq => Some(("==", "eq", "Equatable")),
         AstBinaryOp::Ne => Some(("!=", "eq", "Equatable")),
         AstBinaryOp::Lt => Some(("<", "lt", "Orderable")),
@@ -500,7 +501,7 @@ fn validate_stmt_generic_method_bounds(
     context: &str,
 ) -> Result<(), String> {
     match stmt {
-        AstStmt::Let { name, ty, value } | AstStmt::Const { name, ty, value } => {
+        AstStmt::Let { name, ty, value, .. } | AstStmt::Const { name, ty, value } => {
             validate_expr_generic_method_bounds(
                 value,
                 visible_type_aliases,
@@ -522,6 +523,23 @@ fn validate_stmt_generic_method_bounds(
                     function_return_types,
                 )
             }) {
+                local_type_env.insert(name.clone(), ty);
+            }
+        }
+        AstStmt::AssignLocal { name, value } => {
+            validate_expr_generic_method_bounds(
+                value,
+                visible_type_aliases,
+                impl_lookup,
+                visible_structs,
+                function_return_types,
+                trait_methods,
+                generic_param_names,
+                generic_bounds,
+                local_type_env,
+                context,
+            )?;
+            if let Some(ty) = local_type_env.get(name).cloned() {
                 local_type_env.insert(name.clone(), ty);
             }
         }

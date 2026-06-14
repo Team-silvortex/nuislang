@@ -1156,6 +1156,14 @@ static int64_t nuis_host_serialize_bool_into(int64_t value, int64_t buffer_handl
     return (int64_t)len;
 }
 
+static int64_t nuis_host_serialize_byte_into(int64_t value, int64_t buffer_handle, int64_t offset) {
+    if (buffer_handle == 0 || offset < 0) return 0;
+    if (value < 0 || value > 255) return 0;
+    int64_t* buffer = (int64_t*)(intptr_t)buffer_handle;
+    buffer[offset] = value;
+    return 1;
+}
+
 static int64_t nuis_host_deserialize_i64_from(int64_t buffer_handle, int64_t offset, int64_t len) {
     if (buffer_handle == 0 || offset < 0 || len <= 0) return 0;
     if (len > 63) len = 63;
@@ -1187,6 +1195,14 @@ static int64_t nuis_host_deserialize_bool_from(int64_t buffer_handle, int64_t of
     if (strcmp(text, "true") == 0 || strcmp(text, "1") == 0) return 1;
     if (strcmp(text, "false") == 0 || strcmp(text, "0") == 0) return 0;
     return 0;
+}
+
+static int64_t nuis_host_deserialize_byte_from(int64_t buffer_handle, int64_t offset) {
+    if (buffer_handle == 0 || offset < 0) return 0;
+    int64_t* buffer = (int64_t*)(intptr_t)buffer_handle;
+    int64_t value = buffer[offset];
+    if (value < 0 || value > 255) return 0;
+    return value;
 }
 
 static int64_t nuis_host_deserialize_text_from(int64_t buffer_handle, int64_t offset, int64_t len) {
@@ -3157,6 +3173,13 @@ fn render_host_ffi_stub(symbol: &str, function: AstExternFunction) -> String {
             arg_name(1, &function),
             arg_name(2, &function)
         )
+    } else if symbol == "host_serialize_byte_into" {
+        format!(
+            "    return nuis_host_serialize_byte_into({}, {}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function),
+            arg_name(2, &function)
+        )
     } else if symbol == "host_deserialize_i64_from" {
         format!(
             "    return nuis_host_deserialize_i64_from({}, {}, {});",
@@ -3170,6 +3193,12 @@ fn render_host_ffi_stub(symbol: &str, function: AstExternFunction) -> String {
             arg_name(0, &function),
             arg_name(1, &function),
             arg_name(2, &function)
+        )
+    } else if symbol == "host_deserialize_byte_from" {
+        format!(
+            "    return nuis_host_deserialize_byte_from({}, {});",
+            arg_name(0, &function),
+            arg_name(1, &function)
         )
     } else if symbol == "host_deserialize_text_from" {
         format!(
@@ -5862,6 +5891,28 @@ mod tests {
                     visibility: AstVisibility::Private,
                     abi: "c".to_owned(),
                     interface: None,
+                    name: "host_serialize_byte_into".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "value".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "buffer_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "offset".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                    host_symbol: None,
+                },
+                AstExternFunction {
+                    visibility: AstVisibility::Private,
+                    abi: "c".to_owned(),
+                    interface: None,
                     name: "host_deserialize_i64_from".to_owned(),
                     params: vec![
                         nuis_semantics::model::AstParam {
@@ -5874,6 +5925,24 @@ mod tests {
                         },
                         nuis_semantics::model::AstParam {
                             name: "len".to_owned(),
+                            ty: i64_ty(),
+                        },
+                    ],
+                    return_type: i64_ty(),
+                    host_symbol: None,
+                },
+                AstExternFunction {
+                    visibility: AstVisibility::Private,
+                    abi: "c".to_owned(),
+                    interface: None,
+                    name: "host_deserialize_byte_from".to_owned(),
+                    params: vec![
+                        nuis_semantics::model::AstParam {
+                            name: "buffer_handle".to_owned(),
+                            ty: i64_ty(),
+                        },
+                        nuis_semantics::model::AstParam {
+                            name: "offset".to_owned(),
                             ty: i64_ty(),
                         },
                     ],
@@ -5937,7 +6006,9 @@ mod tests {
         assert!(shim.contains("static int64_t nuis_host_serialize_text_into("));
         assert!(shim.contains("static int64_t nuis_host_serialize_i64_into("));
         assert!(shim.contains("static int64_t nuis_host_serialize_bool_into("));
+        assert!(shim.contains("static int64_t nuis_host_serialize_byte_into("));
         assert!(shim.contains("static int64_t nuis_host_deserialize_i64_from("));
+        assert!(shim.contains("static int64_t nuis_host_deserialize_byte_from("));
         assert!(shim.contains("static int64_t nuis_host_deserialize_bool_from("));
         assert!(shim.contains("static int64_t nuis_host_deserialize_text_from("));
         assert!(shim.contains("static int64_t nuis_host_parse_header_line("));
@@ -5960,7 +6031,9 @@ mod tests {
         assert!(
             shim.contains("return nuis_host_serialize_bool_into(value, buffer_handle, offset);")
         );
+        assert!(shim.contains("return nuis_host_serialize_byte_into(value, buffer_handle, offset);"));
         assert!(shim.contains("return nuis_host_deserialize_i64_from(buffer_handle, offset, len);"));
+        assert!(shim.contains("return nuis_host_deserialize_byte_from(buffer_handle, offset);"));
         assert!(shim.contains("return nuis_host_deserialize_bool_from("));
         assert!(shim.contains("return nuis_host_deserialize_text_from("));
     }

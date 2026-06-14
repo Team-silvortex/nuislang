@@ -19,6 +19,16 @@ pub struct Parser {
     allow_struct_literals: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AssignmentOp {
+    Assign,
+    AddAssign,
+    SubAssign,
+    MulAssign,
+    DivAssign,
+    RemAssign,
+}
+
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
         Self {
@@ -1128,6 +1138,10 @@ impl Parser {
             return Err("nested mod definitions are not allowed".to_owned());
         }
 
+        if let Some(stmt) = self.try_parse_assignment_stmt()? {
+            return Ok(stmt);
+        }
+
         let expr = self.parse_expr()?;
         if self.peek_symbol('=') {
             self.expect_symbol('=')?;
@@ -1155,8 +1169,48 @@ impl Parser {
         }
     }
 
+    fn try_parse_assignment_stmt(&mut self) -> Result<Option<AstStmt>, String> {
+        let checkpoint = self.cursor;
+        let target = match self.parse_postfix() {
+            Ok(target) => target,
+            Err(_) => {
+                self.cursor = checkpoint;
+                return Ok(None);
+            }
+        };
+        let Some(op) = self.peek_assignment_op() else {
+            self.cursor = checkpoint;
+            return Ok(None);
+        };
+        self.consume_assignment_op(op)?;
+        let value = self.parse_expr()?;
+        self.expect_symbol(';')?;
+        let stmt = match op {
+            AssignmentOp::Assign => self.rewrite_assignment_stmt(target, value)?,
+            AssignmentOp::AddAssign => {
+                self.rewrite_compound_assignment_stmt(target, AstBinaryOp::Add, value)?
+            }
+            AssignmentOp::SubAssign => {
+                self.rewrite_compound_assignment_stmt(target, AstBinaryOp::Sub, value)?
+            }
+            AssignmentOp::MulAssign => {
+                self.rewrite_compound_assignment_stmt(target, AstBinaryOp::Mul, value)?
+            }
+            AssignmentOp::DivAssign => {
+                self.rewrite_compound_assignment_stmt(target, AstBinaryOp::Div, value)?
+            }
+            AssignmentOp::RemAssign => {
+                self.rewrite_compound_assignment_stmt(target, AstBinaryOp::Rem, value)?
+            }
+        };
+        Ok(Some(stmt))
+    }
+
     fn rewrite_assignment_stmt(&self, target: AstExpr, value: AstExpr) -> Result<AstStmt, String> {
         let expr = match target {
+            AstExpr::Var(name) => {
+                return Ok(AstStmt::AssignLocal { name, value });
+            }
             AstExpr::Call {
                 callee,
                 generic_args,
@@ -1181,22 +1235,79 @@ impl Parser {
                     args: vec![*base, value],
                 },
                 "len" => {
-                    return Err("`buffer.len` is read-only; assignment currently supports `buffer[index]`, `ref Node.value`, and `ref Node.next`".to_owned())
+                    return Err("`.len` is read-only; assignment currently supports `buffer[index]`, `slice[index]`, `ref Node.value`, and `ref Node.next`".to_owned())
                 }
                 _ => {
                     return Err(format!(
-                        "assignment target `.{field}` is not supported yet; current assignment sugar supports `buffer[index]`, `ref Node.value`, and `ref Node.next`"
+                        "assignment target `.{field}` is not supported yet; current assignment sugar supports `buffer[index]`, `slice[index]`, `ref Node.value`, and `ref Node.next`"
                     ))
                 }
             },
             _ => {
                 return Err(
-                    "assignment target is not supported yet; current assignment sugar supports `buffer[index]`, `ref Node.value`, and `ref Node.next`"
+                    "assignment target is not supported yet; current assignment sugar supports `buffer[index]`, `slice[index]`, `ref Node.value`, and `ref Node.next`"
                         .to_owned(),
                 )
             }
         };
         Ok(AstStmt::Expr(expr))
+    }
+
+    fn rewrite_compound_assignment_stmt(
+        &self,
+        target: AstExpr,
+        op: AstBinaryOp,
+        value: AstExpr,
+    ) -> Result<AstStmt, String> {
+        let current = match &target {
+            AstExpr::Var(name) => AstExpr::Var(name.clone()),
+            AstExpr::Call {
+                callee,
+                generic_args,
+                args,
+            } if callee == "load_at" && generic_args.is_empty() && args.len() == 2 => AstExpr::Call {
+                callee: "load_at".to_owned(),
+                generic_args: Vec::new(),
+                args: args.clone(),
+            },
+            AstExpr::FieldAccess { base, field } => match field.as_str() {
+                "value" => AstExpr::FieldAccess {
+                    base: base.clone(),
+                    field: field.clone(),
+                },
+                "next" => {
+                    return Err(
+                        "compound assignment target `.next` is not supported yet; current compound assignment sugar supports `buffer[index]` and `ref Node.value`"
+                            .to_owned(),
+                    )
+                }
+                "len" => {
+                    return Err(
+                        "`.len` is read-only; compound assignment currently supports `buffer[index]`, `slice[index]`, and `ref Node.value`"
+                            .to_owned(),
+                    )
+                }
+                _ => {
+                    return Err(format!(
+                        "compound assignment target `.{field}` is not supported yet; current compound assignment sugar supports `buffer[index]`, `slice[index]`, and `ref Node.value`"
+                    ))
+                }
+            },
+            _ => {
+                return Err(
+                    "compound assignment target is not supported yet; current compound assignment sugar supports `buffer[index]`, `slice[index]`, and `ref Node.value`"
+                        .to_owned(),
+                )
+            }
+        };
+        self.rewrite_assignment_stmt(
+            target,
+            AstExpr::Binary {
+                op,
+                lhs: Box::new(current),
+                rhs: Box::new(value),
+            },
+        )
     }
 
     fn parse_return_stmt(&mut self) -> Result<AstStmt, String> {
@@ -1222,12 +1333,23 @@ impl Parser {
         if self.starts_destructure_let() {
             return self.parse_destructure_let_stmt();
         }
+        let mutable = if self.peek_word("mut") {
+            self.expect_word("mut")?;
+            true
+        } else {
+            false
+        };
         let name = self.expect_ident()?;
         let ty = self.parse_optional_type_annotation()?;
         self.expect_symbol('=')?;
         let value = self.parse_expr()?;
         self.expect_symbol(';')?;
-        Ok(AstStmt::Let { name, ty, value })
+        Ok(AstStmt::Let {
+            mutable,
+            name,
+            ty,
+            value,
+        })
     }
 
     fn parse_const_stmt(&mut self) -> Result<AstStmt, String> {
@@ -1276,7 +1398,12 @@ impl Parser {
             );
         };
         self.expect_symbol(';')?;
-        Ok(AstStmt::Let { name, ty, value })
+        Ok(AstStmt::Let {
+            mutable: false,
+            name,
+            ty,
+            value,
+        })
     }
 
     fn parse_if_stmt(&mut self) -> Result<AstStmt, String> {
@@ -1513,6 +1640,14 @@ impl Parser {
                 let rhs = self.parse_unary()?;
                 expr = AstExpr::Binary {
                     op: AstBinaryOp::Div,
+                    lhs: Box::new(expr),
+                    rhs: Box::new(rhs),
+                };
+            } else if self.peek_symbol('%') {
+                self.expect_symbol('%')?;
+                let rhs = self.parse_unary()?;
+                expr = AstExpr::Binary {
+                    op: AstBinaryOp::Rem,
                     lhs: Box::new(expr),
                     rhs: Box::new(rhs),
                 };
@@ -1879,6 +2014,52 @@ impl Parser {
     fn peek_double_symbol(&self, expected: char) -> bool {
         matches!(self.tokens.get(self.cursor), Some(Token::Symbol(actual)) if *actual == expected)
             && matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol(actual)) if *actual == expected)
+    }
+
+    fn peek_assignment_op(&self) -> Option<AssignmentOp> {
+        if self.peek_symbol('+') && matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol('='))) {
+            Some(AssignmentOp::AddAssign)
+        } else if self.peek_symbol('-') && matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol('='))) {
+            Some(AssignmentOp::SubAssign)
+        } else if self.peek_symbol('*') && matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol('='))) {
+            Some(AssignmentOp::MulAssign)
+        } else if self.peek_symbol('/') && matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol('='))) {
+            Some(AssignmentOp::DivAssign)
+        } else if self.peek_symbol('%') && matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol('='))) {
+            Some(AssignmentOp::RemAssign)
+        } else if self.peek_symbol('=')
+            && !matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol('=')))
+        {
+            Some(AssignmentOp::Assign)
+        } else {
+            None
+        }
+    }
+
+    fn consume_assignment_op(&mut self, op: AssignmentOp) -> Result<(), String> {
+        match op {
+            AssignmentOp::Assign => self.expect_symbol('='),
+            AssignmentOp::AddAssign => {
+                self.expect_symbol('+')?;
+                self.expect_symbol('=')
+            }
+            AssignmentOp::SubAssign => {
+                self.expect_symbol('-')?;
+                self.expect_symbol('=')
+            }
+            AssignmentOp::MulAssign => {
+                self.expect_symbol('*')?;
+                self.expect_symbol('=')
+            }
+            AssignmentOp::DivAssign => {
+                self.expect_symbol('/')?;
+                self.expect_symbol('=')
+            }
+            AssignmentOp::RemAssign => {
+                self.expect_symbol('%')?;
+                self.expect_symbol('=')
+            }
+        }
     }
 
     fn peek_symbol_pair(&self, first: char, second: char) -> bool {

@@ -341,11 +341,68 @@ pub(crate) fn infer_nir_expr_type(
                 None
             }
         }
+        NirExpr::CastI32ToI64(inner) => {
+            let inner_ty = infer_nir_expr_type(inner, bindings, signatures, struct_table)?;
+            if inner_ty == i32_type() {
+                Some(i64_type())
+            } else {
+                None
+            }
+        }
+        NirExpr::CastI64ToBool(inner) => {
+            let inner_ty = infer_nir_expr_type(inner, bindings, signatures, struct_table)?;
+            if inner_ty == i64_type() {
+                Some(bool_type())
+            } else {
+                None
+            }
+        }
+        NirExpr::CastBoolToI64(inner) => {
+            let inner_ty = infer_nir_expr_type(inner, bindings, signatures, struct_table)?;
+            if inner_ty == bool_type() {
+                Some(i64_type())
+            } else {
+                None
+            }
+        }
+        NirExpr::CastI64ToF32(inner) => {
+            let inner_ty = infer_nir_expr_type(inner, bindings, signatures, struct_table)?;
+            if inner_ty == i64_type() {
+                Some(f32_type())
+            } else {
+                None
+            }
+        }
+        NirExpr::CastF32ToI64(inner) => {
+            let inner_ty = infer_nir_expr_type(inner, bindings, signatures, struct_table)?;
+            if inner_ty == f32_type() {
+                Some(i64_type())
+            } else {
+                None
+            }
+        }
+        NirExpr::CastI64ToF64(inner) => {
+            let inner_ty = infer_nir_expr_type(inner, bindings, signatures, struct_table)?;
+            if inner_ty == i64_type() {
+                Some(f64_type())
+            } else {
+                None
+            }
+        }
+        NirExpr::CastF64ToI64(inner) => {
+            let inner_ty = infer_nir_expr_type(inner, bindings, signatures, struct_table)?;
+            if inner_ty == f64_type() {
+                Some(i64_type())
+            } else {
+                None
+            }
+        }
         NirExpr::CpuExternCall { callee, .. }
             if callee == "host_text_len"
                 || callee == "host_serialize_text_into"
                 || callee == "host_serialize_bool_into"
                 || callee == "host_serialize_i64_into"
+                || callee == "host_serialize_byte_into"
                 || callee == "host_buffer_find_text"
                 || callee == "host_buffer_find_byte"
                 || callee == "host_buffer_find_line_end"
@@ -353,7 +410,10 @@ pub(crate) fn infer_nir_expr_type(
         {
             Some(i64_type())
         }
-        NirExpr::CpuExternCall { callee, .. } if callee == "host_deserialize_i64_from" => {
+        NirExpr::CpuExternCall { callee, .. }
+            if callee == "host_deserialize_i64_from"
+                || callee == "host_deserialize_byte_from" =>
+        {
             Some(i64_type())
         }
         NirExpr::CpuExternCall { callee, .. }
@@ -424,7 +484,19 @@ pub(crate) fn infer_nir_expr_type(
             let pipe_ty = infer_nir_expr_type(value, bindings, signatures, struct_table)?;
             pipe_ty.generic_args.first().cloned()
         }
-        NirExpr::LoadValue(_) | NirExpr::LoadAt { .. } | NirExpr::BufferLen(_) => Some(i64_type()),
+        NirExpr::LoadValue(_) | NirExpr::BufferLen(_) => Some(i64_type()),
+        NirExpr::LoadAt { buffer, .. } => {
+            let target_ty = infer_nir_expr_type(buffer, bindings, signatures, struct_table)?;
+            if target_ty.name == "Slice"
+                && !target_ty.is_ref
+                && !target_ty.is_optional
+                && target_ty.generic_args.len() == 1
+            {
+                Some(target_ty.generic_args[0].clone())
+            } else {
+                Some(i64_type())
+            }
+        }
         NirExpr::LoadNext(_) => Some(ref_type("Node")),
         NirExpr::StoreValue { .. }
         | NirExpr::StoreNext { .. }
@@ -470,7 +542,11 @@ pub(crate) fn infer_nir_expr_type(
                         None
                     }
                 }
-                NirBinaryOp::Add | NirBinaryOp::Sub | NirBinaryOp::Mul | NirBinaryOp::Div => {
+                NirBinaryOp::Add
+                | NirBinaryOp::Sub
+                | NirBinaryOp::Mul
+                | NirBinaryOp::Div
+                | NirBinaryOp::Rem => {
                     if compatible_types(&lhs_ty, &rhs_ty) && lhs_ty.is_numeric_scalar() {
                         Some(lhs_ty)
                     } else {

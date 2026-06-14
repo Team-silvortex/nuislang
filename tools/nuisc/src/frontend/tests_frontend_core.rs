@@ -2,8 +2,8 @@ use super::lower_type_ref;
 use super::parse_nuis_ast;
 use super::parse_nuis_module;
 use nuis_semantics::model::{
-    AstDestructureBinding, AstDestructureField, AstStmt, AstVisibility, NirBinaryOp, NirExpr,
-    NirStmt,
+    AstBinaryOp, AstDestructureBinding, AstDestructureField, AstExpr, AstStmt, AstVisibility,
+    NirBinaryOp, NirExpr, NirStmt,
 };
 use std::fs;
 use std::path::PathBuf;
@@ -63,6 +63,659 @@ fn infers_binary_result_from_operand_scalar_type() {
         })
         .unwrap();
     assert_eq!(sum_stmt.render(), "i32");
+}
+
+#[test]
+fn lowers_mutable_local_reassignment_into_rebound_let() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let mut value: i64 = 1;
+            value = value + 2;
+            return value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.first(),
+        Some(NirStmt::Let { name, value, .. })
+            if name == "value" && matches!(value, NirExpr::Int(1))
+    ));
+    assert!(matches!(
+        main.body.get(1),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::Binary { op, lhs, rhs },
+            ..
+        }) if name == "value"
+            && *op == NirBinaryOp::Add
+            && matches!(lhs.as_ref(), NirExpr::Var(lhs_name) if lhs_name == "value")
+            && matches!(rhs.as_ref(), NirExpr::Int(2))
+    ));
+    assert!(matches!(
+        main.body.get(2),
+        Some(NirStmt::Return(Some(NirExpr::Var(name)))) if name == "value"
+    ));
+}
+
+#[test]
+fn lowers_mutable_local_compound_assignment() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let mut value: i64 = 9;
+            value %= 4;
+            return value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.get(1),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::Binary { op, lhs, rhs },
+            ..
+        }) if name == "value"
+            && *op == NirBinaryOp::Rem
+            && matches!(lhs.as_ref(), NirExpr::Var(lhs_name) if lhs_name == "value")
+            && matches!(rhs.as_ref(), NirExpr::Int(4))
+    ));
+}
+
+#[test]
+fn lowers_slice_i64_construction_and_index_access() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let buffer: ref Buffer = alloc_buffer(8, 0);
+            let view: Slice<i64> = slice(buffer, 2, 3);
+            view[1] = 9;
+            let value: i64 = view[1];
+            let size: i64 = view.len;
+            free(buffer);
+            return value + size;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.get(1),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::StructLiteral { type_name, type_args, fields },
+        }) if name == "view"
+            && ty.render() == "Slice<i64>"
+            && type_name == "Slice"
+            && type_args.len() == 1
+            && type_args[0].render() == "i64"
+            && fields.iter().map(|(field, _)| field.as_str()).collect::<Vec<_>>() == vec!["buffer", "start", "len"]
+    ));
+    assert!(matches!(
+        main.body.get(2),
+        Some(NirStmt::Expr(NirExpr::StoreAt { buffer, index, value }))
+            if matches!(buffer.as_ref(), NirExpr::FieldAccess { field, .. } if field == "buffer")
+                && matches!(index.as_ref(),
+                    NirExpr::Binary { op, lhs, rhs }
+                    if *op == NirBinaryOp::Add
+                        && matches!(lhs.as_ref(), NirExpr::FieldAccess { field, .. } if field == "start")
+                        && matches!(rhs.as_ref(), NirExpr::Int(1))
+                )
+                && matches!(value.as_ref(), NirExpr::Int(9))
+    ));
+    assert!(matches!(
+        main.body.get(3),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::LoadAt { buffer, index },
+        }) if name == "value"
+            && ty.render() == "i64"
+            && matches!(buffer.as_ref(), NirExpr::FieldAccess { field, .. } if field == "buffer")
+            && matches!(index.as_ref(),
+                NirExpr::Binary { op, lhs, rhs }
+                if *op == NirBinaryOp::Add
+                    && matches!(lhs.as_ref(), NirExpr::FieldAccess { field, .. } if field == "start")
+                    && matches!(rhs.as_ref(), NirExpr::Int(1))
+            )
+    ));
+    assert!(matches!(
+        main.body.get(4),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::FieldAccess { field, .. },
+        }) if name == "size" && ty.render() == "i64" && field == "len"
+    ));
+}
+
+#[test]
+fn lowers_explicit_slice_builtins() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let buffer: ref Buffer = alloc_buffer(8, 0);
+            let view: Slice<i64> = slice<i64>(buffer, 2, 3);
+            let raw: ref Buffer = slice_buffer(view);
+            let start: i64 = slice_start(view);
+            let size: i64 = slice_len(view);
+            free(buffer);
+            return buffer_len(raw) + start + size;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.get(1),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::StructLiteral { type_name, type_args, .. },
+        }) if name == "view"
+            && ty.render() == "Slice<i64>"
+            && type_name == "Slice"
+            && type_args.len() == 1
+            && type_args[0].render() == "i64"
+    ));
+    assert!(matches!(
+        main.body.get(2),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::FieldAccess { field, .. },
+        }) if name == "raw" && ty.render() == "ref Buffer" && field == "buffer"
+    ));
+    assert!(matches!(
+        main.body.get(3),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::FieldAccess { field, .. },
+        }) if name == "start" && ty.render() == "i64" && field == "start"
+    ));
+    assert!(matches!(
+        main.body.get(4),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::FieldAccess { field, .. },
+        }) if name == "size" && ty.render() == "i64" && field == "len"
+    ));
+}
+
+#[test]
+fn rejects_non_i64_explicit_slice_payload_for_buffer_view() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let buffer: ref Buffer = alloc_buffer(8, 0);
+            let view: Slice<String> = slice<String>(buffer, 2, 3);
+            free(buffer);
+            return view.len;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains(
+            "slice<...>(...) currently supports only `Slice<i64>`, `Slice<i32>`, `Slice<bool>`, `Slice<f32>`, and `Slice<f64>`"
+        ),
+        "{error}"
+    );
+}
+
+#[test]
+fn lowers_slice_i32_read_and_write_via_slot_casts() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i32 {
+            let buffer: ref Buffer = alloc_buffer(8, 0);
+            let view: Slice<i32> = slice<i32>(buffer, 1, 2);
+            let value: i32 = i32_from_i64(7);
+            view[0] = value;
+            let replay: i32 = view[0];
+            free(buffer);
+            return replay;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.get(1),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::StructLiteral { type_args, .. },
+        }) if name == "view" && ty.render() == "Slice<i32>" && type_args[0].render() == "i32"
+    ));
+    assert!(matches!(
+        main.body.get(3),
+        Some(NirStmt::Expr(NirExpr::StoreAt { value, .. }))
+            if matches!(value.as_ref(), NirExpr::CastI32ToI64(inner)
+                if matches!(inner.as_ref(), NirExpr::Var(name) if name == "value"))
+    ));
+    assert!(matches!(
+        main.body.get(4),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::CastI64ToI32(inner),
+        }) if name == "replay" && ty.render() == "i32"
+            && matches!(inner.as_ref(), NirExpr::LoadAt { .. })
+    ));
+}
+
+#[test]
+fn lowers_slice_bool_read_and_write_via_slot_casts() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> bool {
+            let buffer: ref Buffer = alloc_buffer(8, 0);
+            let view: Slice<bool> = slice<bool>(buffer, 1, 2);
+            let value: bool = true;
+            view[0] = value;
+            let replay: bool = view[0];
+            free(buffer);
+            return replay;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.get(1),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::StructLiteral { type_args, .. },
+        }) if name == "view" && ty.render() == "Slice<bool>" && type_args[0].render() == "bool"
+    ));
+    assert!(matches!(
+        main.body.get(3),
+        Some(NirStmt::Expr(NirExpr::StoreAt { value, .. }))
+            if matches!(value.as_ref(), NirExpr::CastBoolToI64(inner)
+                if matches!(inner.as_ref(), NirExpr::Var(name) if name == "value"))
+    ));
+    assert!(matches!(
+        main.body.get(4),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::CastI64ToBool(inner),
+        }) if name == "replay" && ty.render() == "bool"
+            && matches!(inner.as_ref(), NirExpr::LoadAt { .. })
+    ));
+}
+
+#[test]
+fn lowers_slice_f32_read_and_write_via_slot_casts() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> f32 {
+            let buffer: ref Buffer = alloc_buffer(8, 0);
+            let view: Slice<f32> = slice<f32>(buffer, 1, 2);
+            let value: f32 = 1.5;
+            view[0] = value;
+            let replay: f32 = view[0];
+            free(buffer);
+            return replay;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.get(1),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::StructLiteral { type_args, .. },
+        }) if name == "view" && ty.render() == "Slice<f32>" && type_args[0].render() == "f32"
+    ));
+    assert!(matches!(
+        main.body.get(3),
+        Some(NirStmt::Expr(NirExpr::StoreAt { value, .. }))
+            if matches!(value.as_ref(), NirExpr::CastF32ToI64(inner)
+                if matches!(inner.as_ref(), NirExpr::Var(name) if name == "value"))
+    ));
+    assert!(matches!(
+        main.body.get(4),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::CastI64ToF32(inner),
+        }) if name == "replay" && ty.render() == "f32"
+            && matches!(inner.as_ref(), NirExpr::LoadAt { .. })
+    ));
+}
+
+#[test]
+fn lowers_slice_f64_read_and_write_via_slot_casts() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> f64 {
+            let buffer: ref Buffer = alloc_buffer(8, 0);
+            let view: Slice<f64> = slice<f64>(buffer, 1, 2);
+            let value: f64 = 1.5;
+            view[0] = value;
+            let replay: f64 = view[0];
+            free(buffer);
+            return replay;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.get(1),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::StructLiteral { type_args, .. },
+        }) if name == "view" && ty.render() == "Slice<f64>" && type_args[0].render() == "f64"
+    ));
+    assert!(matches!(
+        main.body.get(3),
+        Some(NirStmt::Expr(NirExpr::StoreAt { value, .. }))
+            if matches!(value.as_ref(), NirExpr::CastF64ToI64(inner)
+                if matches!(inner.as_ref(), NirExpr::Var(name) if name == "value"))
+    ));
+    assert!(matches!(
+        main.body.get(4),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::CastI64ToF64(inner),
+        }) if name == "replay" && ty.render() == "f64"
+            && matches!(inner.as_ref(), NirExpr::LoadAt { .. })
+    ));
+}
+
+#[test]
+fn lowers_slice_alias_payload_byte_as_i64_view() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type Byte = i64;
+          type ByteSlice = Slice<Byte>;
+
+          fn main() -> i64 {
+            let buffer: ref Buffer = alloc_buffer(8, 0);
+            let view: ByteSlice = slice<Byte>(buffer, 1, 2);
+            view[0] = 72;
+            let replay: Byte = view[0];
+            free(buffer);
+            return replay;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.get(1),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::StructLiteral { type_args, .. },
+        }) if name == "view" && ty.render() == "Slice<i64>" && type_args[0].render() == "i64"
+    ));
+    assert!(matches!(
+        main.body.get(2),
+        Some(NirStmt::Expr(NirExpr::StoreAt { value, .. }))
+            if matches!(value.as_ref(), NirExpr::Int(72))
+    ));
+    assert!(matches!(
+        main.body.get(3),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::LoadAt { .. },
+        }) if name == "replay" && ty.render() == "i64"
+    ));
+}
+
+#[test]
+fn lowers_bytes_and_subbytes_builtins_as_i64_byte_views() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type Byte = i64;
+          type ByteSlice = Slice<Byte>;
+
+          fn main() -> i64 {
+            let buffer: ref Buffer = alloc_buffer(8, 0);
+            let view: ByteSlice = bytes(buffer, 1, 4);
+            let inner: ByteSlice = subbytes(view, 1, 2);
+            inner[0] = 72;
+            let replay: Byte = inner[0];
+            free(buffer);
+            return replay + inner.len;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.get(1),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::StructLiteral { type_args, .. },
+        }) if name == "view" && ty.render() == "Slice<i64>" && type_args[0].render() == "i64"
+    ));
+    assert!(matches!(
+        main.body.get(2),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::StructLiteral { type_args, fields, .. },
+        }) if name == "inner"
+            && ty.render() == "Slice<i64>"
+            && type_args[0].render() == "i64"
+            && matches!(fields.as_slice(),
+                [(buffer_field, NirExpr::FieldAccess { field: buffer_access, .. }),
+                 (start_field, NirExpr::Binary { op, lhs, rhs }),
+                 (len_field, NirExpr::Int(2))]
+                if buffer_field == "buffer"
+                    && buffer_access == "buffer"
+                    && start_field == "start"
+                    && *op == NirBinaryOp::Add
+                    && matches!(lhs.as_ref(), NirExpr::FieldAccess { field, .. } if field == "start")
+                    && matches!(rhs.as_ref(), NirExpr::Int(1))
+                    && len_field == "len"
+            )
+    ));
+    assert!(matches!(
+        main.body.get(3),
+        Some(NirStmt::Expr(NirExpr::StoreAt { value, .. }))
+            if matches!(value.as_ref(), NirExpr::Int(72))
+    ));
+    assert!(matches!(
+        main.body.get(4),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::LoadAt { .. },
+        }) if name == "replay" && ty.render() == "i64"
+    ));
+}
+
+#[test]
+fn lowers_subslice_i64_with_rebased_start() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let buffer: ref Buffer = alloc_buffer(8, 0);
+            let view: Slice<i64> = slice<i64>(buffer, 2, 5);
+            let inner: Slice<i64> = subslice<i64>(view, 1, 2);
+            inner[0] = 7;
+            let value: i64 = inner[0];
+            free(buffer);
+            return value + inner.len;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.get(2),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::StructLiteral { type_name, type_args, fields },
+        }) if name == "inner"
+            && ty.render() == "Slice<i64>"
+            && type_name == "Slice"
+            && type_args.len() == 1
+            && type_args[0].render() == "i64"
+            && matches!(fields.as_slice(),
+                [(buffer_field, NirExpr::FieldAccess { field: buffer_access, .. }),
+                 (start_field, NirExpr::Binary { op, lhs, rhs }),
+                 (len_field, NirExpr::Int(2))]
+                if buffer_field == "buffer"
+                    && buffer_access == "buffer"
+                    && start_field == "start"
+                    && *op == NirBinaryOp::Add
+                    && matches!(lhs.as_ref(), NirExpr::FieldAccess { field, .. } if field == "start")
+                    && matches!(rhs.as_ref(), NirExpr::Int(1))
+                    && len_field == "len"
+            )
+    ));
+    assert!(matches!(
+        main.body.get(3),
+        Some(NirStmt::Expr(NirExpr::StoreAt { index, value, .. }))
+            if matches!(index.as_ref(),
+                NirExpr::Binary { op, lhs, rhs }
+                if *op == NirBinaryOp::Add
+                    && matches!(lhs.as_ref(), NirExpr::FieldAccess { field, .. } if field == "start")
+                    && matches!(rhs.as_ref(), NirExpr::Int(0))
+            )
+            && matches!(value.as_ref(), NirExpr::Int(7))
+    ));
+}
+
+#[test]
+fn rejects_reassignment_of_immutable_local() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let value: i64 = 1;
+            value = 2;
+            return value;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains("cannot assign to immutable local `value`"),
+        "{error}"
+    );
+    assert!(error.contains("let mut"), "{error}");
+}
+
+#[test]
+fn rejects_reassignment_of_unknown_local() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            value = 2;
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(error.contains("cannot assign to unknown local `value`"), "{error}");
 }
 
 #[test]
@@ -208,6 +861,115 @@ fn lowers_payload_style_single_field_struct_constructor_sugar() {
         }
         other => panic!("expected lowered payload constructor let, found {other:?}"),
     }
+}
+
+#[test]
+fn parses_compound_buffer_assignment_into_store_at_sugar() {
+    let ast = parse_nuis_ast(
+        r#"
+        mod cpu Main {
+          fn main(scratch: ref Buffer, slot: i64, step: i64) -> i64 {
+            scratch[slot] += step;
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = ast
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.first(),
+        Some(AstStmt::Expr(AstExpr::Call { callee, generic_args, args }))
+            if callee == "store_at"
+                && generic_args.is_empty()
+                && matches!(
+                    args.as_slice(),
+                    [
+                        AstExpr::Var(buffer),
+                        AstExpr::Var(slot),
+                        AstExpr::Binary {
+                            op,
+                            lhs,
+                            rhs,
+                        }
+                    ] if buffer == "scratch"
+                        && slot == "slot"
+                        && *op == AstBinaryOp::Add
+                        && matches!(
+                            lhs.as_ref(),
+                            AstExpr::Call { callee: load_callee, generic_args: load_generics, args: load_args }
+                                if load_callee == "load_at"
+                                    && load_generics.is_empty()
+                                    && matches!(
+                                        load_args.as_slice(),
+                                        [AstExpr::Var(load_buffer), AstExpr::Var(load_slot)]
+                                            if load_buffer == "scratch" && load_slot == "slot"
+                                    )
+                        )
+                        && matches!(rhs.as_ref(), AstExpr::Var(step) if step == "step")
+                )
+    ));
+}
+
+#[test]
+fn lowers_compound_pointer_value_assignment_into_store_value_sugar() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main(head: ref Node) -> i64 {
+            head.value %= 2;
+            return head.value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.first(),
+        Some(NirStmt::Expr(NirExpr::StoreValue { target, value }))
+            if matches!(target.as_ref(), NirExpr::Var(name) if name == "head")
+                && matches!(
+                    value.as_ref(),
+                    NirExpr::Binary {
+                        op,
+                        lhs,
+                        rhs,
+                    } if *op == NirBinaryOp::Rem
+                        && matches!(lhs.as_ref(), NirExpr::LoadValue(inner) if matches!(inner.as_ref(), NirExpr::Var(name) if name == "head"))
+                        && matches!(rhs.as_ref(), NirExpr::Int(2))
+                )
+    ));
+}
+
+#[test]
+fn rejects_compound_pointer_next_assignment() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main(head: ref Node, next: ref Node) -> i64 {
+            head.next += next;
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains("compound assignment target `.next` is not supported yet"),
+        "{error}"
+    );
 }
 
 #[test]
@@ -369,6 +1131,10 @@ fn lowers_non_numeric_binary_sub_mul_div_via_trait_impls() {
             fn div(lhs: Self, rhs: Self) -> Self;
           }
 
+          trait Remainderable {
+            fn rem(lhs: Self, rhs: Self) -> Self;
+          }
+
           impl Subtractable for Pair {
             fn sub(lhs: Pair, rhs: Pair) -> Pair {
               return Pair { value: lhs.value - rhs.value };
@@ -387,11 +1153,18 @@ fn lowers_non_numeric_binary_sub_mul_div_via_trait_impls() {
             }
           }
 
+          impl Remainderable for Pair {
+            fn rem(lhs: Pair, rhs: Pair) -> Pair {
+              return Pair { value: lhs.value % rhs.value };
+            }
+          }
+
           fn main() -> i64 {
             let diff: Pair = Pair { value: 6 } - Pair { value: 2 };
             let prod: Pair = Pair { value: 3 } * Pair { value: 4 };
             let quot: Pair = Pair { value: 8 } / Pair { value: 2 };
-            return diff.value + prod.value + quot.value;
+            let rest: Pair = Pair { value: 9 } % Pair { value: 4 };
+            return diff.value + prod.value + quot.value + rest.value;
           }
         }
         "#,
@@ -426,6 +1199,489 @@ fn lowers_non_numeric_binary_sub_mul_div_via_trait_impls() {
             value: NirExpr::Call { callee, .. },
             ..
         }) if name == "quot" && callee == "impl.Dividable.for.Pair.div"
+    ));
+    assert!(matches!(
+        main.body.get(3),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::Call { callee, .. },
+            ..
+        }) if name == "rest" && callee == "impl.Remainderable.for.Pair.rem"
+    ));
+}
+
+#[test]
+fn parses_binary_operator_precedence_in_ast() {
+    let ast = parse_nuis_ast(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            return 1 + 2 * 3;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = ast
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.first(),
+        Some(AstStmt::Return(Some(AstExpr::Binary { op, lhs, rhs })))
+            if *op == AstBinaryOp::Add
+                && matches!(lhs.as_ref(), AstExpr::Int(1))
+                && matches!(
+                    rhs.as_ref(),
+                    AstExpr::Binary {
+                        op: inner_op,
+                        lhs: inner_lhs,
+                        rhs: inner_rhs,
+                    } if *inner_op == AstBinaryOp::Mul
+                        && matches!(inner_lhs.as_ref(), AstExpr::Int(2))
+                        && matches!(inner_rhs.as_ref(), AstExpr::Int(3))
+                )
+    ));
+}
+
+#[test]
+fn parses_logical_and_comparison_precedence_in_ast() {
+    let ast = parse_nuis_ast(
+        r#"
+        mod cpu Main {
+          fn main() -> bool {
+            return 1 == 1 || 2 == 3 && 4 < 5;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = ast
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.first(),
+        Some(AstStmt::Return(Some(AstExpr::Binary { op, lhs, rhs })))
+            if *op == AstBinaryOp::Or
+                && matches!(
+                    lhs.as_ref(),
+                    AstExpr::Binary {
+                        op: lhs_op,
+                        lhs: lhs_lhs,
+                        rhs: lhs_rhs,
+                    } if *lhs_op == AstBinaryOp::Eq
+                        && matches!(lhs_lhs.as_ref(), AstExpr::Int(1))
+                        && matches!(lhs_rhs.as_ref(), AstExpr::Int(1))
+                )
+                && matches!(
+                    rhs.as_ref(),
+                    AstExpr::Binary {
+                        op: rhs_op,
+                        lhs: rhs_lhs,
+                        rhs: rhs_rhs,
+                    } if *rhs_op == AstBinaryOp::And
+                        && matches!(
+                            rhs_lhs.as_ref(),
+                            AstExpr::Binary {
+                                op: inner_eq_op,
+                                lhs: inner_eq_lhs,
+                                rhs: inner_eq_rhs,
+                            } if *inner_eq_op == AstBinaryOp::Eq
+                                && matches!(inner_eq_lhs.as_ref(), AstExpr::Int(2))
+                                && matches!(inner_eq_rhs.as_ref(), AstExpr::Int(3))
+                        )
+                        && matches!(
+                            rhs_rhs.as_ref(),
+                            AstExpr::Binary {
+                                op: inner_lt_op,
+                                lhs: inner_lt_lhs,
+                                rhs: inner_lt_rhs,
+                            } if *inner_lt_op == AstBinaryOp::Lt
+                                && matches!(inner_lt_lhs.as_ref(), AstExpr::Int(4))
+                                && matches!(inner_lt_rhs.as_ref(), AstExpr::Int(5))
+                        )
+                )
+    ));
+}
+
+#[test]
+fn lowers_logical_and_comparison_precedence_in_nir() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let ready: bool = 1 == 1 || 2 == 3 && 4 < 5;
+            if ready {
+              return 1;
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.first(),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::Binary { op, lhs, rhs },
+            ..
+        }) if name == "ready"
+            && *op == NirBinaryOp::Or
+            && matches!(
+                lhs.as_ref(),
+                NirExpr::Binary {
+                    op: lhs_op,
+                    lhs: lhs_lhs,
+                    rhs: lhs_rhs,
+                } if *lhs_op == NirBinaryOp::Eq
+                    && matches!(lhs_lhs.as_ref(), NirExpr::Int(1))
+                    && matches!(lhs_rhs.as_ref(), NirExpr::Int(1))
+            )
+            && matches!(
+                rhs.as_ref(),
+                NirExpr::Binary {
+                    op: rhs_op,
+                    lhs: rhs_lhs,
+                    rhs: rhs_rhs,
+                } if *rhs_op == NirBinaryOp::And
+                    && matches!(
+                        rhs_lhs.as_ref(),
+                        NirExpr::Binary {
+                            op: inner_eq_op,
+                            lhs: inner_eq_lhs,
+                            rhs: inner_eq_rhs,
+                        } if *inner_eq_op == NirBinaryOp::Eq
+                            && matches!(inner_eq_lhs.as_ref(), NirExpr::Int(2))
+                            && matches!(inner_eq_rhs.as_ref(), NirExpr::Int(3))
+                    )
+                    && matches!(
+                        rhs_rhs.as_ref(),
+                        NirExpr::Binary {
+                            op: inner_lt_op,
+                            lhs: inner_lt_lhs,
+                            rhs: inner_lt_rhs,
+                        } if *inner_lt_op == NirBinaryOp::Lt
+                            && matches!(inner_lt_lhs.as_ref(), NirExpr::Int(4))
+                            && matches!(inner_lt_rhs.as_ref(), NirExpr::Int(5))
+                    )
+            )
+    ));
+}
+
+#[test]
+fn lowers_parenthesized_logical_precedence_in_nir() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let grouped: bool = (1 == 1 || 2 == 3) && 4 < 5;
+            if grouped {
+              return 1;
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.first(),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::Binary { op, lhs, rhs },
+            ..
+        }) if name == "grouped"
+            && *op == NirBinaryOp::And
+            && matches!(
+                lhs.as_ref(),
+                NirExpr::Binary {
+                    op: lhs_op,
+                    lhs: lhs_lhs,
+                    rhs: lhs_rhs,
+                } if *lhs_op == NirBinaryOp::Or
+                    && matches!(
+                        lhs_lhs.as_ref(),
+                        NirExpr::Binary { op: inner_op, .. } if *inner_op == NirBinaryOp::Eq
+                    )
+                    && matches!(
+                        lhs_rhs.as_ref(),
+                        NirExpr::Binary { op: inner_op, .. } if *inner_op == NirBinaryOp::Eq
+                    )
+            )
+            && matches!(
+                rhs.as_ref(),
+                NirExpr::Binary { op: rhs_op, .. } if *rhs_op == NirBinaryOp::Lt
+            )
+    ));
+}
+
+#[test]
+fn lowers_overloaded_binary_precedence_without_parentheses() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          struct Pair {
+            value: i64,
+          }
+
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          trait Multipliable {
+            fn mul(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for Pair {
+            fn add(lhs: Pair, rhs: Pair) -> Pair {
+              return Pair { value: lhs.value + rhs.value };
+            }
+          }
+
+          impl Multipliable for Pair {
+            fn mul(lhs: Pair, rhs: Pair) -> Pair {
+              return Pair { value: lhs.value * rhs.value };
+            }
+          }
+
+          fn main() -> i64 {
+            let mixed: Pair = Pair { value: 1 } + Pair { value: 2 } * Pair { value: 3 };
+            return mixed.value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.first(),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::Call { callee, args },
+            ..
+        }) if name == "mixed"
+            && callee == "impl.Addable.for.Pair.add"
+            && matches!(
+                args.as_slice(),
+                [
+                    NirExpr::StructLiteral { fields: lhs_fields, .. },
+                    NirExpr::Call { callee: rhs_callee, args: rhs_args }
+                ] if matches!(lhs_fields.as_slice(), [(field, NirExpr::Int(1))] if field == "value")
+                    && rhs_callee == "impl.Multipliable.for.Pair.mul"
+                    && matches!(
+                        rhs_args.as_slice(),
+                        [
+                            NirExpr::StructLiteral { fields: mul_lhs_fields, .. },
+                            NirExpr::StructLiteral { fields: mul_rhs_fields, .. }
+                        ] if matches!(mul_lhs_fields.as_slice(), [(field, NirExpr::Int(2))] if field == "value")
+                            && matches!(mul_rhs_fields.as_slice(), [(field, NirExpr::Int(3))] if field == "value")
+                    )
+            )
+    ));
+}
+
+#[test]
+fn lowers_builtin_remainder_with_multiplicative_precedence() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let value: i64 = 9 % 4 * 2;
+            return value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.first(),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::Binary { op, lhs, rhs },
+            ..
+        }) if name == "value"
+            && *op == NirBinaryOp::Mul
+            && matches!(
+                lhs.as_ref(),
+                NirExpr::Binary {
+                    op: lhs_op,
+                    lhs: lhs_lhs,
+                    rhs: lhs_rhs,
+                } if *lhs_op == NirBinaryOp::Rem
+                    && matches!(lhs_lhs.as_ref(), NirExpr::Int(9))
+                    && matches!(lhs_rhs.as_ref(), NirExpr::Int(4))
+            )
+            && matches!(rhs.as_ref(), NirExpr::Int(2))
+    ));
+}
+
+#[test]
+fn lowers_overloaded_binary_remainder_via_trait_impl() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          struct Pair {
+            value: i64,
+          }
+
+          trait Remainderable {
+            fn rem(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Remainderable for Pair {
+            fn rem(lhs: Pair, rhs: Pair) -> Pair {
+              return Pair { value: lhs.value % rhs.value };
+            }
+          }
+
+          fn main() -> i64 {
+            let rest: Pair = Pair { value: 9 } % Pair { value: 4 };
+            return rest.value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.first(),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::Call { callee, .. },
+            ..
+        }) if name == "rest" && callee == "impl.Remainderable.for.Pair.rem"
+    ));
+}
+
+#[test]
+fn lowers_overloaded_binary_parentheses_and_left_associativity() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          struct Pair {
+            value: i64,
+          }
+
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          trait Subtractable {
+            fn sub(lhs: Self, rhs: Self) -> Self;
+          }
+
+          trait Multipliable {
+            fn mul(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for Pair {
+            fn add(lhs: Pair, rhs: Pair) -> Pair {
+              return Pair { value: lhs.value + rhs.value };
+            }
+          }
+
+          impl Subtractable for Pair {
+            fn sub(lhs: Pair, rhs: Pair) -> Pair {
+              return Pair { value: lhs.value - rhs.value };
+            }
+          }
+
+          impl Multipliable for Pair {
+            fn mul(lhs: Pair, rhs: Pair) -> Pair {
+              return Pair { value: lhs.value * rhs.value };
+            }
+          }
+
+          fn main() -> i64 {
+            let grouped: Pair = (Pair { value: 1 } + Pair { value: 2 }) * Pair { value: 3 };
+            let folded: Pair = Pair { value: 9 } - Pair { value: 3 } - Pair { value: 1 };
+            return grouped.value + folded.value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.first(),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::Call { callee, args },
+            ..
+        }) if name == "grouped"
+            && callee == "impl.Multipliable.for.Pair.mul"
+            && matches!(
+                args.as_slice(),
+                [
+                    NirExpr::Call { callee: lhs_callee, .. },
+                    NirExpr::StructLiteral { fields: rhs_fields, .. }
+                ] if lhs_callee == "impl.Addable.for.Pair.add"
+                    && matches!(rhs_fields.as_slice(), [(field, NirExpr::Int(3))] if field == "value")
+            )
+    ));
+    assert!(matches!(
+        main.body.get(1),
+        Some(NirStmt::Let {
+            name,
+            value: NirExpr::Call { callee, args },
+            ..
+        }) if name == "folded"
+            && callee == "impl.Subtractable.for.Pair.sub"
+            && matches!(
+                args.as_slice(),
+                [
+                    NirExpr::Call { callee: lhs_callee, args: lhs_args },
+                    NirExpr::StructLiteral { fields: rhs_fields, .. }
+                ] if lhs_callee == "impl.Subtractable.for.Pair.sub"
+                    && matches!(
+                        lhs_args.as_slice(),
+                        [
+                            NirExpr::StructLiteral { fields: first_fields, .. },
+                            NirExpr::StructLiteral { fields: second_fields, .. }
+                        ] if matches!(first_fields.as_slice(), [(field, NirExpr::Int(9))] if field == "value")
+                            && matches!(second_fields.as_slice(), [(field, NirExpr::Int(3))] if field == "value")
+                    )
+                    && matches!(rhs_fields.as_slice(), [(field, NirExpr::Int(1))] if field == "value")
+            )
     ));
 }
 

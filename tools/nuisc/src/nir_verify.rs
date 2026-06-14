@@ -1324,6 +1324,13 @@ fn verify_expr(
         | NirExpr::HostBufferHandle(inner)
         | NirExpr::Move(inner)
         | NirExpr::CastI64ToI32(inner)
+        | NirExpr::CastI32ToI64(inner)
+        | NirExpr::CastI64ToBool(inner)
+        | NirExpr::CastBoolToI64(inner)
+        | NirExpr::CastI64ToF32(inner)
+        | NirExpr::CastF32ToI64(inner)
+        | NirExpr::CastI64ToF64(inner)
+        | NirExpr::CastF64ToI64(inner)
         | NirExpr::LoadValue(inner)
         | NirExpr::LoadNext(inner)
         | NirExpr::BufferLen(inner)
@@ -1558,7 +1565,18 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
             }
         }
         NirExpr::Instantiate { .. } => {}
-        NirExpr::CastI64ToI32(inner) => verify_expr_uses(inner, moved)?,
+        NirExpr::CastI64ToI32(inner)
+        | NirExpr::CastI32ToI64(inner)
+        | NirExpr::CastI64ToBool(inner)
+        | NirExpr::CastBoolToI64(inner) => {
+            verify_expr_uses(inner, moved)?
+        }
+        NirExpr::CastI64ToF32(inner) | NirExpr::CastF32ToI64(inner) => {
+            verify_expr_uses(inner, moved)?
+        }
+        NirExpr::CastI64ToF64(inner) | NirExpr::CastF64ToI64(inner) => {
+            verify_expr_uses(inner, moved)?
+        }
         NirExpr::DataBindCore(_)
         | NirExpr::DataMarker(_)
         | NirExpr::DataHandleTable(_)

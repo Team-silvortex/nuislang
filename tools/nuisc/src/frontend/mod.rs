@@ -81,6 +81,7 @@ mod tests_test_functions;
 mod tests_types_async_window;
 mod types;
 mod unary_lowering;
+mod validation_assignments;
 mod validation;
 mod validation_binding_env;
 mod validation_generic_constraints;
@@ -124,6 +125,7 @@ use self::return_inference::infer_missing_function_return_type;
 use self::signature_building::{build_initial_function_signatures, FunctionSignature};
 use self::specialization_pipeline::build_lowered_functions_and_impls;
 use self::validation::validate_declared_nir_types;
+use self::validation_assignments::validate_ast_assignments;
 use self::validation_generic_constraints::validate_ast_generic_constraints;
 use self::validation_helpers::{
     async_boundary_violation_detail, async_parameter_violation_detail, render_type_name,
@@ -193,6 +195,7 @@ pub fn lower_project_ast_to_nir(
     validate_export_annotations(module)?;
     validate_extern_host_symbols(module)?;
     validate_host_symbol_bridge_annotations(module)?;
+    validate_ast_assignments(module)?;
     for definition in &module.structs {
         validate_struct_annotations(definition)?;
     }

@@ -14,6 +14,13 @@ pub(super) fn lower_core_expr(
         NirExpr::F32(value) => Some(Ok(lower_f32(value, state))),
         NirExpr::F64(value) => Some(Ok(lower_f64(value, state))),
         NirExpr::CastI64ToI32(value) => Some(lower_cast_i64_to_i32(value, state, bindings)),
+        NirExpr::CastI32ToI64(value) => Some(lower_cast_i32_to_i64(value, state, bindings)),
+        NirExpr::CastI64ToBool(value) => Some(lower_cast_i64_to_bool(value, state, bindings)),
+        NirExpr::CastBoolToI64(value) => Some(lower_cast_bool_to_i64(value, state, bindings)),
+        NirExpr::CastI64ToF32(value) => Some(lower_cast_i64_to_f32(value, state, bindings)),
+        NirExpr::CastF32ToI64(value) => Some(lower_cast_f32_to_i64(value, state, bindings)),
+        NirExpr::CastI64ToF64(value) => Some(lower_cast_i64_to_f64(value, state, bindings)),
+        NirExpr::CastF64ToI64(value) => Some(lower_cast_f64_to_i64(value, state, bindings)),
         NirExpr::Var(name) => Some(
             bindings
                 .get(name)
@@ -148,6 +155,146 @@ fn lower_cast_i64_to_i32(
         op: Operation {
             module: "cpu".to_owned(),
             instruction: "cast_i64_to_i32".to_owned(),
+            args: vec![input.clone()],
+        },
+    });
+    push_dep_edges(state, &input, &name);
+    Ok(name)
+}
+
+fn lower_cast_i32_to_i64(
+    value: &NirExpr,
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<String, String> {
+    let input = lower_expr(value, state, bindings)?;
+    let name = next_name(state, "cast_i64");
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "cast_i32_to_i64".to_owned(),
+            args: vec![input.clone()],
+        },
+    });
+    push_dep_edges(state, &input, &name);
+    Ok(name)
+}
+
+fn lower_cast_i64_to_bool(
+    value: &NirExpr,
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<String, String> {
+    let input = lower_expr(value, state, bindings)?;
+    let name = next_name(state, "cast_bool");
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "cast_i64_to_bool".to_owned(),
+            args: vec![input.clone()],
+        },
+    });
+    push_dep_edges(state, &input, &name);
+    Ok(name)
+}
+
+fn lower_cast_bool_to_i64(
+    value: &NirExpr,
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<String, String> {
+    let input = lower_expr(value, state, bindings)?;
+    let name = next_name(state, "cast_i64");
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "cast_bool_to_i64".to_owned(),
+            args: vec![input.clone()],
+        },
+    });
+    push_dep_edges(state, &input, &name);
+    Ok(name)
+}
+
+fn lower_cast_i64_to_f32(
+    value: &NirExpr,
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<String, String> {
+    let input = lower_expr(value, state, bindings)?;
+    let name = next_name(state, "cast_f32");
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "cast_i64_to_f32".to_owned(),
+            args: vec![input.clone()],
+        },
+    });
+    push_dep_edges(state, &input, &name);
+    Ok(name)
+}
+
+fn lower_cast_f32_to_i64(
+    value: &NirExpr,
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<String, String> {
+    let input = lower_expr(value, state, bindings)?;
+    let name = next_name(state, "cast_i64");
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "cast_f32_to_i64".to_owned(),
+            args: vec![input.clone()],
+        },
+    });
+    push_dep_edges(state, &input, &name);
+    Ok(name)
+}
+
+fn lower_cast_i64_to_f64(
+    value: &NirExpr,
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<String, String> {
+    let input = lower_expr(value, state, bindings)?;
+    let name = next_name(state, "cast_f64");
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "cast_i64_to_f64".to_owned(),
+            args: vec![input.clone()],
+        },
+    });
+    push_dep_edges(state, &input, &name);
+    Ok(name)
+}
+
+fn lower_cast_f64_to_i64(
+    value: &NirExpr,
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<String, String> {
+    let input = lower_expr(value, state, bindings)?;
+    let name = next_name(state, "cast_i64");
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "cast_f64_to_i64".to_owned(),
             args: vec![input.clone()],
         },
     });
@@ -371,6 +518,7 @@ fn lower_binary(
         NirBinaryOp::Sub => "sub",
         NirBinaryOp::Mul => "mul",
         NirBinaryOp::Div => "div",
+        NirBinaryOp::Rem => "rem",
         NirBinaryOp::Eq => "eq",
         NirBinaryOp::Ne => "ne",
         NirBinaryOp::Lt => "lt",

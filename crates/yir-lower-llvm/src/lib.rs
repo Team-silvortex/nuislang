@@ -2911,7 +2911,15 @@ fn emit_cpu_function(
                 let cmp_kind = node.op.args[3].as_str();
                 let step_kind = node.op.args[4].as_str();
                 let carry_payload_len = |kind: &str| -> usize {
-                    if kind.ends_with("_plus_invariant")
+                    if kind.contains("_plus_factor_invariant_")
+                        && kind.starts_with("mul_scaled_by_")
+                    {
+                        1 + usize::from(kind.ends_with("_plus_invariant"))
+                    } else if kind.starts_with("mul_scaled_by_") {
+                        usize::from(kind.ends_with("_plus_invariant"))
+                    } else if kind.starts_with("mul_scaled_") {
+                        1 + usize::from(kind.ends_with("_plus_invariant"))
+                    } else if kind.ends_with("_plus_invariant")
                         && kind.starts_with("mul_")
                         && !matches!(
                             kind,
@@ -3198,6 +3206,372 @@ fn emit_cpu_function(
                             })?,
                             "mul",
                         )
+                    } else if let Some(prefix) = carry_kind
+                        .strip_prefix("mul_scaled_by_")
+                        .and_then(|prefix| prefix.split_once("_plus_factor_invariant_"))
+                    {
+                        let (factor_term, terms_part) = prefix;
+                        let (terms_part, has_invariant) = if let Some(terms_part) =
+                            terms_part.strip_suffix("_plus_invariant")
+                        {
+                            (terms_part, true)
+                        } else {
+                            (terms_part, false)
+                        };
+                        let resolve_term = |term: &str| -> Result<String, String> {
+                            match term {
+                                "current" => Ok(next_current.clone()),
+                                "prev_current" => Ok(current.clone()),
+                                other if other.starts_with("prev_carry") => {
+                                    let source_index = other[10..].parse::<usize>().map_err(|_| {
+                                        format!(
+                                            "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                            node.name,
+                                        )
+                                    })?;
+                                    current_carries.get(source_index).cloned().ok_or_else(|| {
+                                        format!(
+                                            "cpu.{loop_instruction} `{}` references unavailable carry source `{carry_kind}` during LLVM lowering",
+                                            node.name,
+                                        )
+                                    })
+                                }
+                                other if other.starts_with("carry") => {
+                                    let source_index = other[5..].parse::<usize>().map_err(|_| {
+                                        format!(
+                                            "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                            node.name,
+                                        )
+                                    })?;
+                                    next_carries.get(source_index).cloned().ok_or_else(|| {
+                                        format!(
+                                            "cpu.{loop_instruction} `{}` references unavailable carry source `{carry_kind}` during LLVM lowering",
+                                            node.name,
+                                        )
+                                    })
+                                }
+                                _ => Err(format!(
+                                    "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                    node.name,
+                                )),
+                            }
+                        };
+                        let factor = resolve_term(factor_term)?;
+                        let factor_offset = payloads.first().ok_or_else(|| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` is missing carry payload for `{carry_kind}` during LLVM lowering",
+                                node.name,
+                            )
+                        })?;
+                        let factor = emit_loop_numeric_op(
+                            &mut body,
+                            &mut next_reg,
+                            loop_scalar_kind,
+                            "add",
+                            &factor,
+                            factor_offset,
+                        )
+                        .map_err(|error| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` {error} during LLVM lowering",
+                                node.name,
+                            )
+                        })?;
+                        let mut terms = terms_part.split("_plus_");
+                        let first = terms.next().ok_or_else(|| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                node.name,
+                            )
+                        })?;
+                        let mut source = resolve_term(first)?;
+                        for term in terms {
+                            let rhs = resolve_term(term)?;
+                            source = emit_loop_numeric_op(
+                                &mut body,
+                                &mut next_reg,
+                                loop_scalar_kind,
+                                "add",
+                                &source,
+                                &rhs,
+                            )
+                            .map_err(|error| {
+                                format!(
+                                    "cpu.{loop_instruction} `{}` {error} during LLVM lowering",
+                                    node.name,
+                                )
+                            })?;
+                        }
+                        if has_invariant {
+                            let offset = payloads.get(1).ok_or_else(|| {
+                                format!(
+                                    "cpu.{loop_instruction} `{}` is missing carry payload for `{carry_kind}` during LLVM lowering",
+                                    node.name,
+                                )
+                            })?;
+                            source = emit_loop_numeric_op(
+                                &mut body,
+                                &mut next_reg,
+                                loop_scalar_kind,
+                                "add",
+                                &source,
+                                offset,
+                            )
+                            .map_err(|error| {
+                                format!(
+                                    "cpu.{loop_instruction} `{}` {error} during LLVM lowering",
+                                    node.name,
+                                )
+                            })?;
+                        }
+                        source = emit_loop_numeric_op(
+                            &mut body,
+                            &mut next_reg,
+                            loop_scalar_kind,
+                            "mul",
+                            &source,
+                            &factor,
+                        )
+                        .map_err(|error| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` {error} during LLVM lowering",
+                                node.name,
+                            )
+                        })?;
+                        (source, "mul")
+                    } else if let Some(prefix) = carry_kind.strip_prefix("mul_scaled_by_") {
+                        let (factor_term, terms_part) = prefix.split_once('_').ok_or_else(|| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                node.name,
+                            )
+                        })?;
+                        let (terms_part, has_invariant) = if let Some(terms_part) =
+                            terms_part.strip_suffix("_plus_invariant")
+                        {
+                            (terms_part, true)
+                        } else {
+                            (terms_part, false)
+                        };
+                        let resolve_term = |term: &str| -> Result<String, String> {
+                            match term {
+                                "current" => Ok(next_current.clone()),
+                                "prev_current" => Ok(current.clone()),
+                                other if other.starts_with("prev_carry") => {
+                                    let source_index = other[10..].parse::<usize>().map_err(|_| {
+                                        format!(
+                                            "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                            node.name,
+                                        )
+                                    })?;
+                                    current_carries.get(source_index).cloned().ok_or_else(|| {
+                                        format!(
+                                            "cpu.{loop_instruction} `{}` references unavailable carry source `{carry_kind}` during LLVM lowering",
+                                            node.name,
+                                        )
+                                    })
+                                }
+                                other if other.starts_with("carry") => {
+                                    let source_index = other[5..].parse::<usize>().map_err(|_| {
+                                        format!(
+                                            "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                            node.name,
+                                        )
+                                    })?;
+                                    next_carries.get(source_index).cloned().ok_or_else(|| {
+                                        format!(
+                                            "cpu.{loop_instruction} `{}` references unavailable carry source `{carry_kind}` during LLVM lowering",
+                                            node.name,
+                                        )
+                                    })
+                                }
+                                _ => Err(format!(
+                                    "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                    node.name,
+                                )),
+                            }
+                        };
+                        let factor = resolve_term(factor_term)?;
+                        let mut terms = terms_part.split("_plus_");
+                        let first = terms.next().ok_or_else(|| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                node.name,
+                            )
+                        })?;
+                        let mut source = resolve_term(first)?;
+                        for term in terms {
+                            let rhs = resolve_term(term)?;
+                            source = emit_loop_numeric_op(
+                                &mut body,
+                                &mut next_reg,
+                                loop_scalar_kind,
+                                "add",
+                                &source,
+                                &rhs,
+                            )
+                            .map_err(|error| {
+                                format!(
+                                    "cpu.{loop_instruction} `{}` {error} during LLVM lowering",
+                                    node.name,
+                                )
+                            })?;
+                        }
+                        if has_invariant {
+                            let offset = payloads.first().ok_or_else(|| {
+                                format!(
+                                    "cpu.{loop_instruction} `{}` is missing carry payload for `{carry_kind}` during LLVM lowering",
+                                    node.name,
+                                )
+                            })?;
+                            source = emit_loop_numeric_op(
+                                &mut body,
+                                &mut next_reg,
+                                loop_scalar_kind,
+                                "add",
+                                &source,
+                                offset,
+                            )
+                            .map_err(|error| {
+                                format!(
+                                    "cpu.{loop_instruction} `{}` {error} during LLVM lowering",
+                                    node.name,
+                                )
+                            })?;
+                        }
+                        source = emit_loop_numeric_op(
+                            &mut body,
+                            &mut next_reg,
+                            loop_scalar_kind,
+                            "mul",
+                            &source,
+                            &factor,
+                        )
+                        .map_err(|error| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` {error} during LLVM lowering",
+                                node.name,
+                            )
+                        })?;
+                        (source, "mul")
+                    } else if carry_kind.starts_with("mul_scaled_") {
+                        let (terms_part, has_invariant) =
+                            if let Some(terms_part) = carry_kind.strip_prefix("mul_scaled_") {
+                                if let Some(terms_part) = terms_part.strip_suffix("_plus_invariant")
+                                {
+                                    (terms_part, true)
+                                } else {
+                                    (terms_part, false)
+                                }
+                            } else {
+                                unreachable!()
+                            };
+                        let factor = payloads.first().ok_or_else(|| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` is missing carry payload for `{carry_kind}` during LLVM lowering",
+                                node.name,
+                            )
+                        })?;
+                        let resolve_term = |term: &str| -> Result<String, String> {
+                            match term {
+                                "current" => Ok(next_current.clone()),
+                                "prev_current" => Ok(current.clone()),
+                                other if other.starts_with("prev_carry") => {
+                                    let source_index = other[10..].parse::<usize>().map_err(|_| {
+                                        format!(
+                                            "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                            node.name,
+                                        )
+                                    })?;
+                                    current_carries.get(source_index).cloned().ok_or_else(|| {
+                                        format!(
+                                            "cpu.{loop_instruction} `{}` references unavailable carry source `{carry_kind}` during LLVM lowering",
+                                            node.name,
+                                        )
+                                    })
+                                }
+                                other if other.starts_with("carry") => {
+                                    let source_index = other[5..].parse::<usize>().map_err(|_| {
+                                        format!(
+                                            "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                            node.name,
+                                        )
+                                    })?;
+                                    next_carries.get(source_index).cloned().ok_or_else(|| {
+                                        format!(
+                                            "cpu.{loop_instruction} `{}` references unavailable carry source `{carry_kind}` during LLVM lowering",
+                                            node.name,
+                                        )
+                                    })
+                                }
+                                _ => Err(format!(
+                                    "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                    node.name,
+                                )),
+                            }
+                        };
+                        let mut terms = terms_part.split("_plus_");
+                        let first = terms.next().ok_or_else(|| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                node.name,
+                            )
+                        })?;
+                        let mut source = resolve_term(first)?;
+                        for term in terms {
+                            let rhs = resolve_term(term)?;
+                            source = emit_loop_numeric_op(
+                                &mut body,
+                                &mut next_reg,
+                                loop_scalar_kind,
+                                "add",
+                                &source,
+                                &rhs,
+                            )
+                            .map_err(|error| {
+                                format!(
+                                    "cpu.{loop_instruction} `{}` {error} during LLVM lowering",
+                                    node.name,
+                                )
+                            })?;
+                        }
+                        if has_invariant {
+                            let offset = payloads.get(1).ok_or_else(|| {
+                                format!(
+                                    "cpu.{loop_instruction} `{}` is missing carry payload for `{carry_kind}` during LLVM lowering",
+                                    node.name,
+                                )
+                            })?;
+                            source = emit_loop_numeric_op(
+                                &mut body,
+                                &mut next_reg,
+                                loop_scalar_kind,
+                                "add",
+                                &source,
+                                offset,
+                            )
+                            .map_err(|error| {
+                                format!(
+                                    "cpu.{loop_instruction} `{}` {error} during LLVM lowering",
+                                    node.name,
+                                )
+                            })?;
+                        }
+                        source = emit_loop_numeric_op(
+                            &mut body,
+                            &mut next_reg,
+                            loop_scalar_kind,
+                            "mul",
+                            &source,
+                            factor,
+                        )
+                        .map_err(|error| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` {error} during LLVM lowering",
+                                node.name,
+                            )
+                        })?;
+                        (source, "mul")
                     } else if carry_kind.starts_with("mul_") {
                         let (terms_part, has_invariant) =
                             if let Some(terms_part) = carry_kind.strip_prefix("mul_") {
@@ -3415,7 +3789,15 @@ fn emit_cpu_function(
                 };
                 let cmp_kind = node.op.args[3].as_str();
                 let carry_payload_len = |kind: &str| -> usize {
-                    if kind.starts_with("mul_") && kind.contains("_plus_") {
+                    if kind.contains("_plus_factor_invariant_")
+                        && kind.starts_with("mul_scaled_by_")
+                    {
+                        1 + usize::from(kind.ends_with("_plus_invariant"))
+                    } else if kind.starts_with("mul_scaled_by_") {
+                        usize::from(kind.ends_with("_plus_invariant"))
+                    } else if kind.starts_with("mul_scaled_") {
+                        1 + usize::from(kind.ends_with("_plus_invariant"))
+                    } else if kind.starts_with("mul_") && kind.contains("_plus_") {
                         usize::from(kind.ends_with("_plus_invariant"))
                     } else if matches!(
                         kind,
@@ -3607,6 +3989,258 @@ fn emit_cpu_function(
                             })?,
                             "mul",
                         )
+                    } else if let Some(prefix) = carry_kind
+                        .strip_prefix("mul_scaled_by_")
+                        .and_then(|prefix| prefix.split_once("_plus_factor_invariant_"))
+                    {
+                        let (factor_term, terms_part) = prefix;
+                        let (terms_part, has_invariant) = if let Some(terms_part) =
+                            terms_part.strip_suffix("_plus_invariant")
+                        {
+                            (terms_part, true)
+                        } else {
+                            (terms_part, false)
+                        };
+                        let resolve_term = |term: &str| -> Result<String, String> {
+                            match term {
+                                "current" => Ok(next_current.clone()),
+                                "prev_current" => Ok(current.clone()),
+                                other if other.starts_with("prev_carry") => {
+                                    let source_index = other[10..].parse::<usize>().map_err(|_| {
+                                        format!(
+                                            "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                            node.name,
+                                        )
+                                    })?;
+                                    current_carries.get(source_index).cloned().ok_or_else(|| {
+                                        format!(
+                                            "cpu.{loop_instruction} `{}` references unavailable carry source `{carry_kind}` during LLVM lowering",
+                                            node.name,
+                                        )
+                                    })
+                                }
+                                other if other.starts_with("carry") => {
+                                    let source_index = other[5..].parse::<usize>().map_err(|_| {
+                                        format!(
+                                            "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                            node.name,
+                                        )
+                                    })?;
+                                    next_carries.get(source_index).cloned().ok_or_else(|| {
+                                        format!(
+                                            "cpu.{loop_instruction} `{}` references unavailable carry source `{carry_kind}` during LLVM lowering",
+                                            node.name,
+                                        )
+                                    })
+                                }
+                                _ => Err(format!(
+                                    "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                    node.name,
+                                )),
+                            }
+                        };
+                        let factor = resolve_term(factor_term)?;
+                        let factor_offset = payloads.first().ok_or_else(|| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` is missing carry payload for `{carry_kind}` during LLVM lowering",
+                                node.name,
+                            )
+                        })?;
+                        let factor_reg = fresh_reg(&mut next_reg);
+                        body.push(format!("  {factor_reg} = add i64 {factor}, {factor_offset}"));
+                        let mut terms = terms_part.split("_plus_");
+                        let first = terms.next().ok_or_else(|| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                node.name,
+                            )
+                        })?;
+                        let mut source = resolve_term(first)?;
+                        for term in terms {
+                            let rhs = resolve_term(term)?;
+                            let reg = fresh_reg(&mut next_reg);
+                            body.push(format!("  {reg} = add i64 {source}, {rhs}"));
+                            source = reg;
+                        }
+                        if has_invariant {
+                            let offset = payloads.get(1).ok_or_else(|| {
+                                format!(
+                                    "cpu.{loop_instruction} `{}` is missing carry payload for `{carry_kind}` during LLVM lowering",
+                                    node.name,
+                                )
+                            })?;
+                            let reg = fresh_reg(&mut next_reg);
+                            body.push(format!("  {reg} = add i64 {source}, {offset}"));
+                            source = reg;
+                        }
+                        let reg = fresh_reg(&mut next_reg);
+                        body.push(format!("  {reg} = mul i64 {source}, {factor_reg}"));
+                        (reg, "mul")
+                    } else if let Some(prefix) = carry_kind.strip_prefix("mul_scaled_by_") {
+                        let (factor_term, terms_part) = prefix.split_once('_').ok_or_else(|| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                node.name,
+                            )
+                        })?;
+                        let (terms_part, has_invariant) = if let Some(terms_part) =
+                            terms_part.strip_suffix("_plus_invariant")
+                        {
+                            (terms_part, true)
+                        } else {
+                            (terms_part, false)
+                        };
+                        let resolve_term = |term: &str| -> Result<String, String> {
+                            match term {
+                                "current" => Ok(next_current.clone()),
+                                "prev_current" => Ok(current.clone()),
+                                other if other.starts_with("prev_carry") => {
+                                    let source_index = other[10..].parse::<usize>().map_err(|_| {
+                                        format!(
+                                            "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                            node.name,
+                                        )
+                                    })?;
+                                    current_carries.get(source_index).cloned().ok_or_else(|| {
+                                        format!(
+                                            "cpu.{loop_instruction} `{}` references unavailable carry source `{carry_kind}` during LLVM lowering",
+                                            node.name,
+                                        )
+                                    })
+                                }
+                                other if other.starts_with("carry") => {
+                                    let source_index = other[5..].parse::<usize>().map_err(|_| {
+                                        format!(
+                                            "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                            node.name,
+                                        )
+                                    })?;
+                                    next_carries.get(source_index).cloned().ok_or_else(|| {
+                                        format!(
+                                            "cpu.{loop_instruction} `{}` references unavailable carry source `{carry_kind}` during LLVM lowering",
+                                            node.name,
+                                        )
+                                    })
+                                }
+                                _ => Err(format!(
+                                    "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                    node.name,
+                                )),
+                            }
+                        };
+                        let factor = resolve_term(factor_term)?;
+                        let mut terms = terms_part.split("_plus_");
+                        let first = terms.next().ok_or_else(|| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                node.name,
+                            )
+                        })?;
+                        let mut source = resolve_term(first)?;
+                        for term in terms {
+                            let rhs = resolve_term(term)?;
+                            let reg = fresh_reg(&mut next_reg);
+                            body.push(format!("  {reg} = add i64 {source}, {rhs}"));
+                            source = reg;
+                        }
+                        if has_invariant {
+                            let offset = payloads.first().ok_or_else(|| {
+                                format!(
+                                    "cpu.{loop_instruction} `{}` is missing carry payload for `{carry_kind}` during LLVM lowering",
+                                    node.name,
+                                )
+                            })?;
+                            let reg = fresh_reg(&mut next_reg);
+                            body.push(format!("  {reg} = add i64 {source}, {offset}"));
+                            source = reg;
+                        }
+                        let reg = fresh_reg(&mut next_reg);
+                        body.push(format!("  {reg} = mul i64 {source}, {factor}"));
+                        (reg, "mul")
+                    } else if carry_kind.starts_with("mul_scaled_") {
+                        let (terms_part, has_invariant) =
+                            if let Some(terms_part) = carry_kind.strip_prefix("mul_scaled_") {
+                                if let Some(terms_part) = terms_part.strip_suffix("_plus_invariant")
+                                {
+                                    (terms_part, true)
+                                } else {
+                                    (terms_part, false)
+                                }
+                            } else {
+                                unreachable!()
+                            };
+                        let factor = payloads.first().ok_or_else(|| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` is missing carry payload for `{carry_kind}` during LLVM lowering",
+                                node.name,
+                            )
+                        })?;
+                        let resolve_term = |term: &str| -> Result<String, String> {
+                            match term {
+                                "current" => Ok(next_current.clone()),
+                                "prev_current" => Ok(current.clone()),
+                                other if other.starts_with("prev_carry") => {
+                                    let source_index = other[10..].parse::<usize>().map_err(|_| {
+                                        format!(
+                                            "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                            node.name,
+                                        )
+                                    })?;
+                                    current_carries.get(source_index).cloned().ok_or_else(|| {
+                                        format!(
+                                            "cpu.{loop_instruction} `{}` references unavailable carry source `{carry_kind}` during LLVM lowering",
+                                            node.name,
+                                        )
+                                    })
+                                }
+                                other if other.starts_with("carry") => {
+                                    let source_index = other[5..].parse::<usize>().map_err(|_| {
+                                        format!(
+                                            "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                            node.name,
+                                        )
+                                    })?;
+                                    next_carries.get(source_index).cloned().ok_or_else(|| {
+                                        format!(
+                                            "cpu.{loop_instruction} `{}` references unavailable carry source `{carry_kind}` during LLVM lowering",
+                                            node.name,
+                                        )
+                                    })
+                                }
+                                _ => Err(format!(
+                                    "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                    node.name,
+                                )),
+                            }
+                        };
+                        let mut terms = terms_part.split("_plus_");
+                        let first = terms.next().ok_or_else(|| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` has unsupported carry kind `{carry_kind}` during LLVM lowering",
+                                node.name,
+                            )
+                        })?;
+                        let mut source = resolve_term(first)?;
+                        for term in terms {
+                            let rhs = resolve_term(term)?;
+                            let reg = fresh_reg(&mut next_reg);
+                            body.push(format!("  {reg} = add i64 {source}, {rhs}"));
+                            source = reg;
+                        }
+                        if has_invariant {
+                            let offset = payloads.get(1).ok_or_else(|| {
+                                format!(
+                                    "cpu.{loop_instruction} `{}` is missing carry payload for `{carry_kind}` during LLVM lowering",
+                                    node.name,
+                                )
+                            })?;
+                            let reg = fresh_reg(&mut next_reg);
+                            body.push(format!("  {reg} = add i64 {source}, {offset}"));
+                            source = reg;
+                        }
+                        let reg = fresh_reg(&mut next_reg);
+                        body.push(format!("  {reg} = mul i64 {source}, {factor}"));
+                        (reg, "mul")
                     } else if carry_kind.starts_with("mul_") {
                         let (terms_part, has_invariant) =
                             if let Some(terms_part) = carry_kind.strip_prefix("mul_") {

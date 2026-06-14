@@ -104,14 +104,24 @@ pub fn render_ast(module: &AstModule) -> String {
         out.push_str(&render_ast_function_header(function));
         for stmt in &function.body {
             match stmt {
-                AstStmt::Let { name, ty, value } => {
+                AstStmt::Let {
+                    name,
+                    ty,
+                    value,
+                    mutable,
+                } => {
                     let type_suffix = render_ast_type_suffix(ty.as_ref());
+                    let prefix = if *mutable { "let mut" } else { "let" };
                     out.push_str(&format!(
-                        "    let {}{} = {}\n",
+                        "    {} {}{} = {}\n",
+                        prefix,
                         name,
                         type_suffix,
                         render_ast_expr(value)
                     ));
+                }
+                AstStmt::AssignLocal { name, value } => {
+                    out.push_str(&format!("    {} = {}\n", name, render_ast_expr(value)));
                 }
                 AstStmt::DestructureLet {
                     type_ref,
@@ -594,6 +604,13 @@ fn render_nir_expr(value: &NirExpr) -> String {
         NirExpr::Int(value) => value.to_string(),
         NirExpr::F32(value) | NirExpr::F64(value) => value.clone(),
         NirExpr::CastI64ToI32(value) => format!("i32_from_i64({})", render_nir_expr(value)),
+        NirExpr::CastI32ToI64(value) => format!("i64_from_i32({})", render_nir_expr(value)),
+        NirExpr::CastI64ToBool(value) => format!("bool_from_i64({})", render_nir_expr(value)),
+        NirExpr::CastBoolToI64(value) => format!("i64_from_bool({})", render_nir_expr(value)),
+        NirExpr::CastI64ToF32(value) => format!("f32_from_i64({})", render_nir_expr(value)),
+        NirExpr::CastF32ToI64(value) => format!("i64_from_f32({})", render_nir_expr(value)),
+        NirExpr::CastI64ToF64(value) => format!("f64_from_i64({})", render_nir_expr(value)),
+        NirExpr::CastF64ToI64(value) => format!("i64_from_f64({})", render_nir_expr(value)),
         NirExpr::Var(name) => name.clone(),
         NirExpr::Await(value) => format!("await {}", render_nir_expr(value)),
         NirExpr::Instantiate { domain, unit } => format!("instantiate {} {}", domain, unit),
@@ -1336,6 +1353,7 @@ fn render_ast_binary_op(op: AstBinaryOp) -> &'static str {
         AstBinaryOp::Sub => "-",
         AstBinaryOp::Mul => "*",
         AstBinaryOp::Div => "/",
+        AstBinaryOp::Rem => "%",
         AstBinaryOp::Eq => "==",
         AstBinaryOp::Ne => "!=",
         AstBinaryOp::Lt => "<",
@@ -1353,6 +1371,7 @@ fn render_nir_binary_op(op: NirBinaryOp) -> &'static str {
         NirBinaryOp::Sub => "-",
         NirBinaryOp::Mul => "*",
         NirBinaryOp::Div => "/",
+        NirBinaryOp::Rem => "%",
         NirBinaryOp::Eq => "==",
         NirBinaryOp::Ne => "!=",
         NirBinaryOp::Lt => "<",
@@ -1775,4 +1794,73 @@ fn escape_debug(value: &str) -> String {
         .replace('\n', "\\n")
         .replace('\r', "\\r")
         .replace('\t', "\\t")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn renders_mutable_and_reassigned_ast_locals() {
+        let module = AstModule {
+            uses: vec![],
+            domain: "cpu".to_owned(),
+            unit: "Main".to_owned(),
+            externs: vec![],
+            extern_interfaces: vec![],
+            consts: vec![],
+            type_aliases: vec![],
+            structs: vec![],
+            traits: vec![],
+            impls: vec![],
+            functions: vec![AstFunction {
+                visibility: AstVisibility::Private,
+                name: "main".to_owned(),
+                attributes: vec![],
+                test_name: None,
+                test_ignored: false,
+                test_should_fail: false,
+                test_reason: None,
+                test_timeout_ms: None,
+                test_clock_domain: None,
+                test_clock_policy: None,
+                is_async: false,
+                generic_params: vec![],
+                params: vec![],
+                return_type: Some(AstTypeRef {
+                    name: "i64".to_owned(),
+                    generic_args: vec![],
+                    is_optional: false,
+                    is_ref: false,
+                }),
+                body: vec![
+                    AstStmt::Let {
+                        mutable: true,
+                        name: "value".to_owned(),
+                        ty: Some(AstTypeRef {
+                            name: "i64".to_owned(),
+                            generic_args: vec![],
+                            is_optional: false,
+                            is_ref: false,
+                        }),
+                        value: AstExpr::Int(1),
+                    },
+                    AstStmt::AssignLocal {
+                        name: "value".to_owned(),
+                        value: AstExpr::Binary {
+                            op: AstBinaryOp::Add,
+                            lhs: Box::new(AstExpr::Var("value".to_owned())),
+                            rhs: Box::new(AstExpr::Int(2)),
+                        },
+                    },
+                    AstStmt::Return(Some(AstExpr::Var("value".to_owned()))),
+                ],
+            }],
+        };
+
+        let rendered = render_ast(&module);
+        assert!(rendered.contains("let mut value: i64 = 1"), "{rendered}");
+        assert!(rendered.contains("value = (value + 2)"), "{rendered}");
+        assert!(rendered.contains("return value"), "{rendered}");
+    }
 }

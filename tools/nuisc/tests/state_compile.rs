@@ -1543,6 +1543,122 @@ fn lowers_tail_recursive_factorial_affine_mul_state_project_with_affine_multipli
 }
 
 #[test]
+fn compiles_tail_recursive_factorial_scaled_mul_state_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_factorial_scaled_mul_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("tail recursive factorial scaled mul state project should compile");
+}
+
+#[test]
+fn lowers_tail_recursive_factorial_scaled_mul_state_project_with_scaled_multiplicative_chain_shape(
+) {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_factorial_scaled_mul_demo",
+    );
+
+    let loop_node = artifacts
+        .yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_chain")
+        .expect("expected loop_while_scalar_chain node");
+    assert_eq!(loop_node.op.args[3], "gt");
+    assert_eq!(loop_node.op.args[4], "sub");
+    assert_eq!(loop_node.op.args[6], "mul_scaled_current_plus_invariant");
+    assert!(loop_node.op.args[7].starts_with("int_"));
+    assert!(loop_node.op.args[8].starts_with("mul_"));
+}
+
+#[test]
+fn compiles_counted_while_multi_carry_scaled_mul_state_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/counted_while_multi_carry_scaled_mul_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("counted while multi-carry scaled mul state project should compile");
+}
+
+#[test]
+fn lowers_counted_while_multi_carry_scaled_mul_state_project_with_multi_carry_scaled_mul_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/counted_while_multi_carry_scaled_mul_demo",
+    );
+
+    let loop_node = artifacts
+        .yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_chain")
+        .expect("expected loop_while_scalar_chain node");
+    assert_eq!(loop_node.op.args[3], "gt");
+    assert_eq!(loop_node.op.args[4], "sub");
+    assert_eq!(loop_node.op.args[6], "add_current");
+    assert_eq!(loop_node.op.args[8], "mul_scaled_current_plus_carry0");
+    assert!(loop_node.op.args[9].starts_with("int_"));
+}
+
+#[test]
+fn compiles_counted_while_multi_carry_state_factor_mul_state_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/counted_while_multi_carry_state_factor_mul_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("counted while multi-carry state-factor mul state project should compile");
+}
+
+#[test]
+fn lowers_counted_while_multi_carry_state_factor_mul_state_project_with_state_factor_mul_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/counted_while_multi_carry_state_factor_mul_demo",
+    );
+
+    let loop_node = artifacts
+        .yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_chain")
+        .expect("expected loop_while_scalar_chain node");
+    assert_eq!(loop_node.op.args[3], "gt");
+    assert_eq!(loop_node.op.args[4], "sub");
+    assert_eq!(loop_node.op.args[6], "add_current");
+    assert_eq!(loop_node.op.args[8], "mul_scaled_by_current_current_plus_carry0");
+}
+
+#[test]
+fn compiles_counted_while_multi_carry_state_plus_invariant_factor_mul_state_project() {
+    let project = Path::new(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/counted_while_multi_carry_state_plus_invariant_factor_mul_demo",
+    );
+    nuisc::pipeline::compile_project(project)
+        .expect("counted while multi-carry state-plus-invariant-factor mul state project should compile");
+}
+
+#[test]
+fn lowers_counted_while_multi_carry_state_plus_invariant_factor_mul_state_project_with_state_plus_invariant_factor_mul_shape(
+) {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/state/counted_while_multi_carry_state_plus_invariant_factor_mul_demo",
+    );
+
+    let loop_node = artifacts
+        .yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "loop_while_scalar_chain")
+        .expect("expected loop_while_scalar_chain node");
+    assert_eq!(loop_node.op.args[3], "gt");
+    assert_eq!(loop_node.op.args[4], "sub");
+    assert_eq!(loop_node.op.args[6], "add_current");
+    assert_eq!(
+        loop_node.op.args[8],
+        "mul_scaled_by_current_plus_factor_invariant_current_plus_carry0"
+    );
+    assert!(loop_node.op.args[9].starts_with("int_"));
+}
+
+#[test]
 fn compiles_tail_recursive_cross_carry_state_project() {
     let project = Path::new(
         "/Users/Shared/chroot/dev/nuislang/examples/projects/state/tail_recursive_cross_carry_demo",

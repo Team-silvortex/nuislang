@@ -1,0 +1,3 @@
+name = "tail_recursive_factorial_scaled_mul_demo"
+version = "0.1.0"
+entry = "main.ns"

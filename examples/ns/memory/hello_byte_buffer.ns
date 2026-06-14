@@ -1,0 +1,17 @@
+mod cpu Main {
+  type Byte = i64;
+  type ByteBuffer = ref Buffer;
+  type ByteSlice = Slice<Byte>;
+
+  fn main() {
+    let buffer: ByteBuffer = alloc_buffer(8, 0);
+    let wrote_a: i64 = serialize_byte_into(72, buffer, 0);
+    let wrote_b: i64 = serialize_byte_into(105, buffer, 1);
+    let window: ByteSlice = bytes(buffer, 0, wrote_a + wrote_b);
+    let tail: ByteSlice = subbytes(window, 1, wrote_b);
+    let first: Byte = window[0];
+    let second: Byte = tail[0];
+    let marker: i64 = buffer_find_byte(buffer, 0, wrote_a + wrote_b, 105);
+    print(first + second + marker + tail.len);
+  }
+}

@@ -45,6 +45,7 @@ fn ast_expr_requires_match_hoist(expr: &AstExpr) -> bool {
 fn ast_stmt_requires_match_hoist(stmt: &AstStmt) -> bool {
     match stmt {
         AstStmt::Let { value, .. }
+        | AstStmt::AssignLocal { value, .. }
         | AstStmt::Const { value, .. }
         | AstStmt::Print(value)
         | AstStmt::Await(value)
@@ -111,6 +112,7 @@ fn rewrite_effectful_match_scrutinees_in_block(
                 let temp_name = format!("__match_scrutinee_{counter}");
                 *counter += 1;
                 rewritten.push(AstStmt::Let {
+                    mutable: false,
                     name: temp_name.clone(),
                     ty: None,
                     value: value.clone(),

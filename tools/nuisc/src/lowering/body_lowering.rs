@@ -24,6 +24,13 @@ fn expr_requires_statement_anchor(expr: &NirExpr) -> bool {
 
     match expr {
         NirExpr::CastI64ToI32(value)
+        | NirExpr::CastI32ToI64(value)
+        | NirExpr::CastI64ToBool(value)
+        | NirExpr::CastBoolToI64(value)
+        | NirExpr::CastI64ToF32(value)
+        | NirExpr::CastF32ToI64(value)
+        | NirExpr::CastI64ToF64(value)
+        | NirExpr::CastF64ToI64(value)
         | NirExpr::IsNull(value)
         | NirExpr::FieldAccess { base: value, .. } => expr_requires_statement_anchor(value),
         NirExpr::Binary { lhs, rhs, .. } => {
@@ -410,7 +417,14 @@ fn expr_contains_async_loop_primitive(expr: &NirExpr) -> bool {
         | NirExpr::CpuPresentFrame(inner)
         | NirExpr::Free(inner)
         | NirExpr::IsNull(inner)
-        | NirExpr::CastI64ToI32(inner) => expr_contains_async_loop_primitive(inner),
+        | NirExpr::CastI64ToI32(inner)
+        | NirExpr::CastI32ToI64(inner)
+        | NirExpr::CastI64ToBool(inner)
+        | NirExpr::CastBoolToI64(inner)
+        | NirExpr::CastI64ToF32(inner)
+        | NirExpr::CastF32ToI64(inner)
+        | NirExpr::CastI64ToF64(inner)
+        | NirExpr::CastF64ToI64(inner) => expr_contains_async_loop_primitive(inner),
         NirExpr::DataResult { value, .. }
         | NirExpr::ShaderResult { value, .. }
         | NirExpr::NetworkResult { value, .. }

@@ -66,7 +66,7 @@ fn collect_inferred_return_types_from_block(
 ) -> Result<bool, String> {
     for stmt in body {
         match stmt {
-            AstStmt::Let { name, ty, value } => {
+            AstStmt::Let { name, ty, value, .. } => {
                 let inferred = ty.clone().or_else(|| {
                     infer_ast_expr_type(
                         value,
@@ -76,6 +76,19 @@ fn collect_inferred_return_types_from_block(
                         function_return_types,
                     )
                 });
+                if let Some(inferred_ty) = inferred {
+                    env.insert(name.clone(), inferred_ty);
+                }
+            }
+            AstStmt::AssignLocal { name, value } => {
+                let inferred = infer_ast_expr_type(
+                    value,
+                    env,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                )
+                .or_else(|| env.get(name).cloned());
                 if let Some(inferred_ty) = inferred {
                     env.insert(name.clone(), inferred_ty);
                 }

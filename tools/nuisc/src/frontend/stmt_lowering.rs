@@ -25,7 +25,12 @@ pub(super) fn lower_stmt_with_async(
     struct_table: &BTreeMap<String, NirStructDef>,
 ) -> Result<NirStmt, String> {
     Ok(match stmt {
-        AstStmt::Let { name, ty, value } => {
+        AstStmt::Let {
+            name,
+            ty,
+            value,
+            ..
+        } => {
             if let super::AstExpr::If {
                 condition,
                 then_body,
@@ -58,6 +63,7 @@ pub(super) fn lower_stmt_with_async(
                     signatures,
                     struct_table,
                     &|value| AstStmt::Let {
+                        mutable: false,
                         name: name.clone(),
                         ty: Some(ty.clone().unwrap_or_else(|| AstTypeRef {
                             name: final_type.name.clone(),
@@ -95,6 +101,7 @@ pub(super) fn lower_stmt_with_async(
                     signatures,
                     struct_table,
                     &|value| AstStmt::Let {
+                        mutable: false,
                         name: name.clone(),
                         ty: Some(ty.clone().unwrap_or_else(|| AstTypeRef {
                             name: final_type.name.clone(),
@@ -126,6 +133,31 @@ pub(super) fn lower_stmt_with_async(
             )?;
             let inferred = infer_nir_expr_type(&lowered, bindings, signatures, struct_table);
             let final_type = resolve_declared_or_inferred(name, expected, inferred)?;
+            bindings.insert(name.clone(), final_type.clone());
+            NirStmt::Let {
+                name: name.clone(),
+                ty: Some(final_type),
+                value: lowered,
+            }
+        }
+        AstStmt::AssignLocal { name, value } => {
+            let current_ty = bindings
+                .get(name)
+                .cloned()
+                .ok_or_else(|| format!("cannot assign to unknown local `{name}`"))?;
+            let lowered = lower_expr_with_async(
+                value,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                module_consts,
+                signatures,
+                struct_table,
+                Some(&current_ty),
+                false,
+            )?;
+            let inferred = infer_nir_expr_type(&lowered, bindings, signatures, struct_table);
+            let final_type = resolve_declared_or_inferred(name, Some(current_ty.clone()), inferred)?;
             bindings.insert(name.clone(), final_type.clone());
             NirStmt::Let {
                 name: name.clone(),
@@ -745,11 +777,26 @@ fn expand_nested_control_expr_stmt(
     kind: ControlExprKind,
 ) -> Result<Option<Vec<AstStmt>>, String> {
     match stmt {
-        AstStmt::Let { name, ty, value } => expand_nested_control_expr_as_stmt(
+        AstStmt::Let {
+            name,
+            ty,
+            value,
+            mutable,
+        } => expand_nested_control_expr_as_stmt(
             value,
             &|value| AstStmt::Let {
+                mutable: *mutable,
                 name: name.clone(),
                 ty: ty.clone(),
+                value,
+            },
+            kind,
+            false,
+        ),
+        AstStmt::AssignLocal { name, value } => expand_nested_control_expr_as_stmt(
+            value,
+            &|value| AstStmt::AssignLocal {
+                name: name.clone(),
                 value,
             },
             kind,

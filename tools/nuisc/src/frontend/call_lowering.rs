@@ -91,6 +91,7 @@ pub(super) fn lower_call_expr_with_async(
     }
     if let Some(routed_or_core) = lower_routed_call_or_core_builtin(
         callee,
+        generic_args,
         args,
         current_domain,
         current_function_is_async,

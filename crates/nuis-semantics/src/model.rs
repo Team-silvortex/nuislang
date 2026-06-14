@@ -276,7 +276,8 @@ pub struct AstDestructureField { pub field: String, pub binding: AstDestructureB
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[rustfmt::skip]
 pub enum AstStmt {
-    Let { name: String, ty: Option<AstTypeRef>, value: AstExpr },
+    Let { mutable: bool, name: String, ty: Option<AstTypeRef>, value: AstExpr },
+    AssignLocal { name: String, value: AstExpr },
     DestructureLet { type_ref: Option<AstTypeRef>, fields: Vec<AstDestructureField>, value: AstExpr },
     Const { name: String, ty: Option<AstTypeRef>, value: AstExpr },
     Print(AstExpr), Await(AstExpr),
@@ -361,6 +362,7 @@ pub enum AstBinaryOp {
     Sub,
     Mul,
     Div,
+    Rem,
     Eq,
     Ne,
     Lt,
@@ -1529,6 +1531,13 @@ pub enum NirExpr {
     },
     HostBufferHandle(Box<NirExpr>),
     CastI64ToI32(Box<NirExpr>),
+    CastI32ToI64(Box<NirExpr>),
+    CastI64ToBool(Box<NirExpr>),
+    CastBoolToI64(Box<NirExpr>),
+    CastI64ToF32(Box<NirExpr>),
+    CastF32ToI64(Box<NirExpr>),
+    CastI64ToF64(Box<NirExpr>),
+    CastF64ToI64(Box<NirExpr>),
     Free(Box<NirExpr>),
     IsNull(Box<NirExpr>),
     Call {
@@ -1564,6 +1573,7 @@ pub enum NirBinaryOp {
     Sub,
     Mul,
     Div,
+    Rem,
     Eq,
     Ne,
     Lt,
@@ -1864,6 +1874,13 @@ pub fn nir_expr_effect_class(expr: &NirExpr) -> NirExprEffectClass {
         | NirExpr::F64(_)
         | NirExpr::Var(_)
         | NirExpr::CastI64ToI32(_)
+        | NirExpr::CastI32ToI64(_)
+        | NirExpr::CastI64ToBool(_)
+        | NirExpr::CastBoolToI64(_)
+        | NirExpr::CastI64ToF32(_)
+        | NirExpr::CastF32ToI64(_)
+        | NirExpr::CastI64ToF64(_)
+        | NirExpr::CastF64ToI64(_)
         | NirExpr::HostBufferHandle(_)
         | NirExpr::StructLiteral { .. }
         | NirExpr::FieldAccess { .. }

@@ -768,10 +768,69 @@ impl PreparedCarrySource {
                 format!("mul_prev_carry{index}")
             }
             (PreparedCarryLinearOp::Mul, Self::Carry(index)) => format!("mul_carry{index}"),
-            (PreparedCarryLinearOp::Mul, Self::ScaledStateList { .. })
-            | (PreparedCarryLinearOp::Mul, Self::ScaledStateListByState { .. })
-            | (PreparedCarryLinearOp::Mul, Self::ScaledStateListByStatePlusInvariant { .. })
-            | (PreparedCarryLinearOp::Mul, Self::ScaledStateListByFactorStateList { .. })
+            (
+                PreparedCarryLinearOp::Mul,
+                Self::ScaledStateList {
+                    terms,
+                    factor: _,
+                    offset,
+                },
+            ) => {
+                let rendered_terms = terms
+                    .iter()
+                    .map(|term| Self::state_ref_contract_fragment(*term))
+                    .collect::<Vec<_>>()
+                    .join("_plus_");
+                if offset.is_some() {
+                    format!("mul_scaled_{rendered_terms}_plus_invariant")
+                } else {
+                    format!("mul_scaled_{rendered_terms}")
+                }
+            }
+            (
+                PreparedCarryLinearOp::Mul,
+                Self::ScaledStateListByState {
+                    terms,
+                    factor,
+                    offset,
+                },
+            ) => {
+                let factor = Self::state_ref_contract_fragment(*factor);
+                let rendered_terms = terms
+                    .iter()
+                    .map(|term| Self::state_ref_contract_fragment(*term))
+                    .collect::<Vec<_>>()
+                    .join("_plus_");
+                if offset.is_some() {
+                    format!("mul_scaled_by_{factor}_{rendered_terms}_plus_invariant")
+                } else {
+                    format!("mul_scaled_by_{factor}_{rendered_terms}")
+                }
+            }
+            (
+                PreparedCarryLinearOp::Mul,
+                Self::ScaledStateListByStatePlusInvariant {
+                    terms,
+                    factor,
+                    factor_offset: _,
+                    offset,
+                },
+            ) => {
+                let factor = Self::state_ref_contract_fragment(*factor);
+                let rendered_terms = terms
+                    .iter()
+                    .map(|term| Self::state_ref_contract_fragment(*term))
+                    .collect::<Vec<_>>()
+                    .join("_plus_");
+                if offset.is_some() {
+                    format!(
+                        "mul_scaled_by_{factor}_plus_factor_invariant_{rendered_terms}_plus_invariant"
+                    )
+                } else {
+                    format!("mul_scaled_by_{factor}_plus_factor_invariant_{rendered_terms}")
+                }
+            }
+            (PreparedCarryLinearOp::Mul, Self::ScaledStateListByFactorStateList { .. })
             | (PreparedCarryLinearOp::Mul, Self::ScaledStateListByFactorStateListTimesInvariant { .. })
             | (PreparedCarryLinearOp::Mul, Self::ScaledStateListByFactorGroupProduct { .. })
             | (PreparedCarryLinearOp::Mul, Self::ScaledStateListByFactorGroupProductTimesInvariant { .. })

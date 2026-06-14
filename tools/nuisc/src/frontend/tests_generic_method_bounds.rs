@@ -949,6 +949,41 @@ fn reports_missing_dividable_bound_for_generic_binary_div() {
 }
 
 #[test]
+fn reports_missing_remainderable_bound_for_generic_binary_rem() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Remainderable {
+            fn rem(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Remainderable for i64 {
+            fn rem(lhs: i64, rhs: i64) -> i64 {
+              return lhs % rhs;
+            }
+          }
+
+          fn bump<T>(lhs: T, rhs: T) -> T {
+            return lhs % rhs;
+          }
+
+          fn main() -> i64 {
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains(
+            "calls operator `%` on generic parameter `T` without required bound `Remainderable`"
+        ),
+        "{error}"
+    );
+}
+
+#[test]
 fn reports_missing_equatable_bound_for_generic_binary_eq() {
     let error = parse_nuis_module(
         r#"

@@ -72,6 +72,7 @@ pub(super) fn hoist_direct_result_wrapper_args(
             let temp_name = format!("{temp_prefix}_{index}");
             env.insert(temp_name.clone(), inferred_ty.clone());
             hoisted.push(AstStmt::Let {
+                mutable: false,
                 name: temp_name.clone(),
                 ty: Some(inferred_ty),
                 value: rewritten_arg,

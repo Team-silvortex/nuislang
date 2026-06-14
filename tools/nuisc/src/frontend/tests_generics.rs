@@ -215,6 +215,54 @@ fn monomorphizes_generic_binary_add_with_addable_bound() {
 }
 
 #[test]
+fn monomorphizes_generic_binary_remainder_with_remainderable_bound() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Remainderable {
+            fn rem(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Remainderable for i64 {
+            fn rem(lhs: i64, rhs: i64) -> i64 {
+              return lhs % rhs;
+            }
+          }
+
+          fn reduce<T: Remainderable>(lhs: T, rhs: T) -> T {
+            return lhs % rhs;
+          }
+
+          fn main() -> i64 {
+            return reduce(9, 4);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Call { callee, .. }))) if callee == "reduce__i64"
+    ));
+
+    let specialized = module
+        .functions
+        .iter()
+        .find(|function| function.name == "reduce__i64")
+        .unwrap();
+    assert!(matches!(
+        specialized.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Binary { op, .. }))) if *op == nuis_semantics::model::NirBinaryOp::Rem
+    ));
+}
+
+#[test]
 fn monomorphizes_branch_local_payload_reconstruction_before_generic_call() {
     let module = parse_nuis_module(
         r#"

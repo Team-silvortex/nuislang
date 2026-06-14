@@ -11,13 +11,14 @@ use super::nova_builtins::lower_nova_builtin_call;
 use super::shader_builtins::lower_shader_builtin_call;
 use super::task_builtins::lower_task_builtin_call;
 use super::{
-    i64_type, infer_nir_expr_type, ref_type, AstExpr, FunctionSignature, NirExpr, NirStructDef,
-    NirTypeRef,
+    bool_type, compatible_types, i64_type, infer_nir_expr_type, ref_type, AstExpr,
+    FunctionSignature, NirExpr, NirStructDef, NirTypeRef,
 };
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn lower_routed_call_or_core_builtin(
     callee: &str,
+    generic_args: &[nuis_semantics::model::AstTypeRef],
     args: &[AstExpr],
     current_domain: &str,
     current_function_is_async: bool,
@@ -284,6 +285,300 @@ pub(super) fn lower_routed_call_or_core_builtin(
             )?;
             NirExpr::BufferLen(Box::new(lowered))
         }
+        "slice" => {
+            let [buffer, start, len] = args else {
+                return Err("slice(...) expects 3 args".to_owned());
+            };
+            let slice_payload_ty = lower_slice_payload_type(generic_args)?;
+            let lowered_buffer = lower_expr(
+                buffer,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&ref_type("Buffer")),
+            )?;
+            let lowered_start = lower_expr(
+                start,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let lowered_len = lower_expr(
+                len,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            NirExpr::StructLiteral {
+                type_name: "Slice".to_owned(),
+                type_args: vec![slice_payload_ty],
+                fields: vec![
+                    ("buffer".to_owned(), lowered_buffer),
+                    ("start".to_owned(), lowered_start),
+                    ("len".to_owned(), lowered_len),
+                ],
+            }
+        }
+        "bytes" => {
+            let [buffer, start, len] = args else {
+                return Err("bytes(...) expects 3 args".to_owned());
+            };
+            if !generic_args.is_empty() {
+                return Err("bytes(...) does not accept explicit generic args".to_owned());
+            }
+            let lowered_buffer = lower_expr(
+                buffer,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&ref_type("Buffer")),
+            )?;
+            let lowered_start = lower_expr(
+                start,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let lowered_len = lower_expr(
+                len,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            NirExpr::StructLiteral {
+                type_name: "Slice".to_owned(),
+                type_args: vec![i64_type()],
+                fields: vec![
+                    ("buffer".to_owned(), lowered_buffer),
+                    ("start".to_owned(), lowered_start),
+                    ("len".to_owned(), lowered_len),
+                ],
+            }
+        }
+        "subslice" => {
+            let [base, offset, len] = args else {
+                return Err("subslice(...) expects 3 args".to_owned());
+            };
+            let lowered_base = lower_expr(
+                base,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            let lowered_base_ty = infer_nir_expr_type(&lowered_base, bindings, signatures, struct_table)
+                .ok_or_else(|| "subslice(...) requires a typed `Slice<...>` input".to_owned())?;
+            let slice_payload_ty = slice_payload_type(&lowered_base_ty)
+                .ok_or_else(|| format!("subslice(...) expects `Slice<...>`, found `{}`", lowered_base_ty.render()))?;
+            if let Some(explicit_ty) = lower_optional_explicit_slice_payload_type(generic_args)? {
+                if !compatible_types(&explicit_ty, &slice_payload_ty) {
+                    return Err(format!(
+                        "subslice<...>(...) payload `{}` does not match input slice payload `{}`",
+                        explicit_ty.render(),
+                        slice_payload_ty.render()
+                    ));
+                }
+            }
+            let lowered_offset = lower_expr(
+                offset,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let lowered_len = lower_expr(
+                len,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            NirExpr::StructLiteral {
+                type_name: "Slice".to_owned(),
+                type_args: vec![slice_payload_ty],
+                fields: vec![
+                    (
+                        "buffer".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(lowered_base.clone()),
+                            field: "buffer".to_owned(),
+                        },
+                    ),
+                    (
+                        "start".to_owned(),
+                        NirExpr::Binary {
+                            op: nuis_semantics::model::NirBinaryOp::Add,
+                            lhs: Box::new(NirExpr::FieldAccess {
+                                base: Box::new(lowered_base),
+                                field: "start".to_owned(),
+                            }),
+                            rhs: Box::new(lowered_offset),
+                        },
+                    ),
+                    ("len".to_owned(), lowered_len),
+                ],
+            }
+        }
+        "subbytes" => {
+            let [base, offset, len] = args else {
+                return Err("subbytes(...) expects 3 args".to_owned());
+            };
+            if !generic_args.is_empty() {
+                return Err("subbytes(...) does not accept explicit generic args".to_owned());
+            }
+            let lowered_base = lower_expr(
+                base,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            let lowered_base_ty =
+                infer_nir_expr_type(&lowered_base, bindings, signatures, struct_table)
+                    .ok_or_else(|| "subbytes(...) requires a typed `Slice<i64>` input".to_owned())?;
+            let slice_payload_ty = slice_payload_type(&lowered_base_ty).ok_or_else(|| {
+                format!(
+                    "subbytes(...) expects `Slice<i64>`, found `{}`",
+                    lowered_base_ty.render()
+                )
+            })?;
+            if slice_payload_ty != i64_type() {
+                return Err(format!(
+                    "subbytes(...) expects `Slice<i64>`, found `Slice<{}>`",
+                    slice_payload_ty.render()
+                ));
+            }
+            let lowered_offset = lower_expr(
+                offset,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            let lowered_len = lower_expr(
+                len,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            NirExpr::StructLiteral {
+                type_name: "Slice".to_owned(),
+                type_args: vec![i64_type()],
+                fields: vec![
+                    (
+                        "buffer".to_owned(),
+                        NirExpr::FieldAccess {
+                            base: Box::new(lowered_base.clone()),
+                            field: "buffer".to_owned(),
+                        },
+                    ),
+                    (
+                        "start".to_owned(),
+                        NirExpr::Binary {
+                            op: nuis_semantics::model::NirBinaryOp::Add,
+                            lhs: Box::new(NirExpr::FieldAccess {
+                                base: Box::new(lowered_base),
+                                field: "start".to_owned(),
+                            }),
+                            rhs: Box::new(lowered_offset),
+                        },
+                    ),
+                    ("len".to_owned(), lowered_len),
+                ],
+            }
+        }
+        "slice_len" => {
+            let [base] = args else {
+                return Err("slice_len(...) expects 1 arg".to_owned());
+            };
+            let lowered = lower_expr(
+                base,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            let lowered_ty = infer_nir_expr_type(&lowered, bindings, signatures, struct_table)
+                .ok_or_else(|| "slice_len(...) requires a typed `Slice<...>` input".to_owned())?;
+            if slice_payload_type(&lowered_ty).is_none() {
+                return Err(format!(
+                    "slice_len(...) expects `Slice<...>`, found `{}`",
+                    lowered_ty.render()
+                ));
+            }
+            NirExpr::FieldAccess {
+                base: Box::new(lowered),
+                field: "len".to_owned(),
+            }
+        }
+        "slice_start" => {
+            let [base] = args else {
+                return Err("slice_start(...) expects 1 arg".to_owned());
+            };
+            let lowered = lower_expr(
+                base,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            let lowered_ty = infer_nir_expr_type(&lowered, bindings, signatures, struct_table)
+                .ok_or_else(|| "slice_start(...) requires a typed `Slice<...>` input".to_owned())?;
+            if slice_payload_type(&lowered_ty).is_none() {
+                return Err(format!(
+                    "slice_start(...) expects `Slice<...>`, found `{}`",
+                    lowered_ty.render()
+                ));
+            }
+            NirExpr::FieldAccess {
+                base: Box::new(lowered),
+                field: "start".to_owned(),
+            }
+        }
+        "slice_buffer" => {
+            let [base] = args else {
+                return Err("slice_buffer(...) expects 1 arg".to_owned());
+            };
+            let lowered = lower_expr(
+                base,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            let lowered_ty = infer_nir_expr_type(&lowered, bindings, signatures, struct_table)
+                .ok_or_else(|| "slice_buffer(...) requires a typed `Slice<...>` input".to_owned())?;
+            if slice_payload_type(&lowered_ty).is_none() {
+                return Err(format!(
+                    "slice_buffer(...) expects `Slice<...>`, found `{}`",
+                    lowered_ty.render()
+                ));
+            }
+            NirExpr::FieldAccess {
+                base: Box::new(lowered),
+                field: "buffer".to_owned(),
+            }
+        }
         "host_buffer_handle" => {
             let [buffer] = args else {
                 return Err("host_buffer_handle(...) expects 1 arg".to_owned());
@@ -299,26 +594,43 @@ pub(super) fn lower_routed_call_or_core_builtin(
             NirExpr::HostBufferHandle(Box::new(lowered))
         }
         "load_at" => {
-            let [buffer, index] = args else {
+            let [target, index] = args else {
                 return Err("load_at(...) expects 2 args".to_owned());
             };
-            NirExpr::LoadAt {
-                buffer: Box::new(lower_expr(
-                    buffer,
-                    current_domain,
-                    bindings,
-                    signatures,
-                    struct_table,
-                    Some(&ref_type("Buffer")),
-                )?),
-                index: Box::new(lower_expr(
-                    index,
-                    current_domain,
-                    bindings,
-                    signatures,
-                    struct_table,
-                    Some(&i64_type()),
-                )?),
+            let (buffer, base_index, payload_ty) = lower_slice_or_buffer_access_target(
+                target,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            let raw = NirExpr::LoadAt {
+                buffer: Box::new(buffer),
+                index: Box::new(NirExpr::Binary {
+                    op: nuis_semantics::model::NirBinaryOp::Add,
+                    lhs: Box::new(base_index),
+                    rhs: Box::new(lower_expr(
+                        index,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        Some(&i64_type()),
+                    )?),
+                }),
+            };
+            match payload_ty.name.as_str() {
+                "i64" => raw,
+                "i32" => NirExpr::CastI64ToI32(Box::new(raw)),
+                "bool" => NirExpr::CastI64ToBool(Box::new(raw)),
+                "f32" => NirExpr::CastI64ToF32(Box::new(raw)),
+                "f64" => NirExpr::CastI64ToF64(Box::new(raw)),
+                _ => {
+                    return Err(format!(
+                        "slice element loads currently support only `i64`, `i32`, `bool`, `f32`, and `f64`, found `Slice<{}>`",
+                        payload_ty.render()
+                    ))
+                }
             }
         }
         "store_value" => {
@@ -368,34 +680,52 @@ pub(super) fn lower_routed_call_or_core_builtin(
             }
         }
         "store_at" => {
-            let [buffer, index, value] = args else {
+            let [target, index, value] = args else {
                 return Err("store_at(...) expects 3 args".to_owned());
             };
+            let (buffer, base_index, payload_ty) = lower_slice_or_buffer_access_target(
+                target,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            let lowered_value = lower_expr(
+                value,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&payload_ty),
+            )?;
+            let stored_value = match payload_ty.name.as_str() {
+                "i64" => lowered_value,
+                "i32" => NirExpr::CastI32ToI64(Box::new(lowered_value)),
+                "bool" => NirExpr::CastBoolToI64(Box::new(lowered_value)),
+                "f32" => NirExpr::CastF32ToI64(Box::new(lowered_value)),
+                "f64" => NirExpr::CastF64ToI64(Box::new(lowered_value)),
+                _ => {
+                    return Err(format!(
+                        "slice element stores currently support only `i64`, `i32`, `bool`, `f32`, and `f64`, found `Slice<{}>`",
+                        payload_ty.render()
+                    ))
+                }
+            };
             NirExpr::StoreAt {
-                buffer: Box::new(lower_expr(
-                    buffer,
-                    current_domain,
-                    bindings,
-                    signatures,
-                    struct_table,
-                    Some(&ref_type("Buffer")),
-                )?),
-                index: Box::new(lower_expr(
-                    index,
-                    current_domain,
-                    bindings,
-                    signatures,
-                    struct_table,
-                    Some(&i64_type()),
-                )?),
-                value: Box::new(lower_expr(
-                    value,
-                    current_domain,
-                    bindings,
-                    signatures,
-                    struct_table,
-                    Some(&i64_type()),
-                )?),
+                buffer: Box::new(buffer),
+                index: Box::new(NirExpr::Binary {
+                    op: nuis_semantics::model::NirBinaryOp::Add,
+                    lhs: Box::new(base_index),
+                    rhs: Box::new(lower_expr(
+                        index,
+                        current_domain,
+                        bindings,
+                        signatures,
+                        struct_table,
+                        Some(&i64_type()),
+                    )?),
+                }),
+                value: Box::new(stored_value),
             }
         }
         "cpu_bind_core" => {
@@ -498,4 +828,77 @@ pub(super) fn lower_routed_call_or_core_builtin(
     };
 
     Ok(Some(expr))
+}
+
+fn slice_payload_type(ty: &NirTypeRef) -> Option<NirTypeRef> {
+    (ty.name == "Slice" && !ty.is_ref && !ty.is_optional && ty.generic_args.len() == 1)
+        .then(|| ty.generic_args[0].clone())
+}
+
+fn lower_optional_explicit_slice_payload_type(
+    generic_args: &[nuis_semantics::model::AstTypeRef],
+) -> Result<Option<NirTypeRef>, String> {
+    match generic_args {
+        [] => Ok(None),
+        [payload] => Ok(Some(super::lower_type_ref(payload))),
+        _ => Err("slice/subslice builtins accept at most 1 explicit generic arg".to_owned()),
+    }
+}
+
+fn lower_slice_payload_type(
+    generic_args: &[nuis_semantics::model::AstTypeRef],
+) -> Result<NirTypeRef, String> {
+    let explicit = lower_optional_explicit_slice_payload_type(generic_args)?;
+    let payload = explicit.unwrap_or_else(i64_type);
+    if payload != i64_type()
+        && payload != super::i32_type()
+        && payload != bool_type()
+        && payload != super::f32_type()
+        && payload != super::f64_type()
+    {
+        return Err(format!(
+            "slice<...>(...) currently supports only `Slice<i64>`, `Slice<i32>`, `Slice<bool>`, `Slice<f32>`, and `Slice<f64>`, found `Slice<{}>`",
+            payload.render()
+        ));
+    }
+    Ok(payload)
+}
+
+fn lower_slice_or_buffer_access_target(
+    target: &AstExpr,
+    current_domain: &str,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> Result<(NirExpr, NirExpr, NirTypeRef), String> {
+    let lowered = lower_expr(
+        target,
+        current_domain,
+        bindings,
+        signatures,
+        struct_table,
+        None,
+    )?;
+    let lowered_ty = infer_nir_expr_type(&lowered, bindings, signatures, struct_table)
+        .ok_or_else(|| "load/store target requires an explicit buffer-like type".to_owned())?;
+    if compatible_types(&ref_type("Buffer"), &lowered_ty) {
+        return Ok((lowered, NirExpr::Int(0), i64_type()));
+    }
+    if let Some(payload_ty) = slice_payload_type(&lowered_ty) {
+        return Ok((
+            NirExpr::FieldAccess {
+                base: Box::new(lowered.clone()),
+                field: "buffer".to_owned(),
+            },
+            NirExpr::FieldAccess {
+                base: Box::new(lowered),
+                field: "start".to_owned(),
+            },
+            payload_ty,
+        ));
+    }
+    Err(format!(
+        "load/store target expects `ref Buffer` or `Slice<...>`, found `{}`",
+        lowered_ty.render()
+    ))
 }

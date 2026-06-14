@@ -1067,6 +1067,13 @@ fn collect_used_vars_expr(expr: &NirExpr, out: &mut BTreeSet<String>) {
         | NirExpr::HostBufferHandle(inner)
         | NirExpr::Move(inner)
         | NirExpr::CastI64ToI32(inner)
+        | NirExpr::CastI32ToI64(inner)
+        | NirExpr::CastI64ToBool(inner)
+        | NirExpr::CastBoolToI64(inner)
+        | NirExpr::CastI64ToF32(inner)
+        | NirExpr::CastF32ToI64(inner)
+        | NirExpr::CastI64ToF64(inner)
+        | NirExpr::CastF64ToI64(inner)
         | NirExpr::LoadValue(inner)
         | NirExpr::LoadNext(inner)
         | NirExpr::BufferLen(inner)
@@ -1352,6 +1359,7 @@ fn fold_int_binary(op: NirBinaryOp, lhs: i64, rhs: i64) -> Option<i64> {
         NirBinaryOp::Sub => Some(lhs - rhs),
         NirBinaryOp::Mul => Some(lhs * rhs),
         NirBinaryOp::Div => (rhs != 0).then_some(lhs / rhs),
+        NirBinaryOp::Rem => (rhs != 0).then_some(lhs % rhs),
         NirBinaryOp::Eq => Some((lhs == rhs) as i64),
         NirBinaryOp::Ne => Some((lhs != rhs) as i64),
         NirBinaryOp::Lt => Some((lhs < rhs) as i64),
@@ -1710,6 +1718,29 @@ mod tests {
             else_body.first(),
             Some(NirStmt::Let { name, .. }) if name == "overall_bonus"
         ));
+    }
+
+    #[test]
+    fn prunes_dead_prior_rebinding_and_propagates_final_local_value() {
+        let mut module = sample_module(vec![
+            NirStmt::Let {
+                name: "value".to_owned(),
+                ty: None,
+                value: NirExpr::Int(1),
+            },
+            NirStmt::Let {
+                name: "value".to_owned(),
+                ty: None,
+                value: NirExpr::Int(2),
+            },
+            NirStmt::Return(Some(NirExpr::Var("value".to_owned()))),
+        ]);
+        let changed = simplify_nir_module(&mut module);
+        assert!(changed);
+        assert_eq!(
+            module.functions[0].body,
+            vec![NirStmt::Return(Some(NirExpr::Int(2)))]
+        );
     }
 
     #[test]

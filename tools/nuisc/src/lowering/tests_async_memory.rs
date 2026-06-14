@@ -100,6 +100,292 @@ fn sequences_memory_lifecycle_around_task_result_observation() {
 }
 
 #[test]
+fn lowers_slice_backed_buffer_access_sequence() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let buffer: ref Buffer = alloc_buffer(8, 0);
+            let view: Slice<i64> = slice(buffer, 2, 3);
+            view[1] = 9;
+            let value: i64 = view[1];
+            let size: i64 = view.len;
+            let total: i64 = value + size;
+            free(buffer);
+            return total;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "struct"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "field"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "store_at"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "load_at"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "free"));
+}
+
+#[test]
+fn lowers_subslice_backed_buffer_access_sequence() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let buffer: ref Buffer = alloc_buffer(8, 0);
+            let view: Slice<i64> = slice<i64>(buffer, 2, 5);
+            let inner: Slice<i64> = subslice<i64>(view, 1, 2);
+            let base: ref Buffer = slice_buffer(inner);
+            let offset: i64 = slice_start(inner);
+            let size: i64 = slice_len(inner);
+            inner[0] = 7;
+            let value: i64 = inner[0];
+            free(buffer);
+            return buffer_len(base) + offset + size + value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let struct_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "struct")
+        .count();
+    let field_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "field")
+        .count();
+    assert!(struct_count >= 2, "expected slice + subslice struct nodes");
+    assert!(field_count >= 3, "expected subslice field projections");
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "store_at"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "load_at"));
+}
+
+#[test]
+fn lowers_slice_i32_backed_buffer_access_sequence_with_cast_nodes() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i32 {
+            let buffer: ref Buffer = alloc_buffer(8, 0);
+            let view: Slice<i32> = slice<i32>(buffer, 1, 2);
+            let value: i32 = i32_from_i64(7);
+            view[0] = value;
+            let replay: i32 = view[0];
+            free(buffer);
+            return replay;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "cast_i32_to_i64"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "cast_i64_to_i32"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "store_at"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "load_at"));
+}
+
+#[test]
+fn lowers_slice_bool_backed_buffer_access_sequence_with_cast_nodes() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> bool {
+            let buffer: ref Buffer = alloc_buffer(8, 0);
+            let view: Slice<bool> = slice<bool>(buffer, 1, 2);
+            let value: bool = true;
+            view[0] = value;
+            let replay: bool = view[0];
+            free(buffer);
+            return replay;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "cast_bool_to_i64"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "cast_i64_to_bool"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "store_at"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "load_at"));
+}
+
+#[test]
+fn lowers_slice_f32_backed_buffer_access_sequence_with_cast_nodes() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> f32 {
+            let buffer: ref Buffer = alloc_buffer(8, 0);
+            let view: Slice<f32> = slice<f32>(buffer, 1, 2);
+            let value: f32 = 1.5;
+            view[0] = value;
+            let replay: f32 = view[0];
+            free(buffer);
+            return replay;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "cast_f32_to_i64"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "cast_i64_to_f32"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "store_at"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "load_at"));
+}
+
+#[test]
+fn lowers_slice_f64_backed_buffer_access_sequence_with_cast_nodes() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> f64 {
+            let buffer: ref Buffer = alloc_buffer(8, 0);
+            let view: Slice<f64> = slice<f64>(buffer, 1, 2);
+            let value: f64 = 1.5;
+            view[0] = value;
+            let replay: f64 = view[0];
+            free(buffer);
+            return replay;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "cast_f64_to_i64"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "cast_i64_to_f64"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "store_at"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "load_at"));
+}
+
+#[test]
+fn lowers_bytes_and_subbytes_backed_buffer_access_sequence() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type Byte = i64;
+          type ByteSlice = Slice<Byte>;
+
+          fn main() -> i64 {
+            let buffer: ref Buffer = alloc_buffer(8, 0);
+            let view: ByteSlice = bytes(buffer, 1, 4);
+            let inner: ByteSlice = subbytes(view, 1, 2);
+            inner[0] = 72;
+            let replay: Byte = inner[0];
+            free(buffer);
+            return replay + inner.len;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let struct_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "struct")
+        .count();
+    let field_count = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "field")
+        .count();
+
+    assert!(struct_count >= 2, "expected bytes + subbytes struct nodes");
+    assert!(field_count >= 3, "expected subbytes field projections");
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "store_at"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "load_at"));
+}
+
+#[test]
 fn sequences_network_session_packet_staging_memory_lifecycle() {
     let mut module = parse_nuis_module(
         r#"

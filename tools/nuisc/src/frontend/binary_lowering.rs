@@ -20,7 +20,11 @@ pub(super) fn lower_binary_expr_with_async(
     expected: Option<&NirTypeRef>,
 ) -> Result<NirExpr, String> {
     let operand_expected = match op {
-        AstBinaryOp::Add | AstBinaryOp::Sub | AstBinaryOp::Mul | AstBinaryOp::Div => expected,
+        AstBinaryOp::Add
+        | AstBinaryOp::Sub
+        | AstBinaryOp::Mul
+        | AstBinaryOp::Div
+        | AstBinaryOp::Rem => expected,
         _ => None,
     };
     let mut lowered_lhs = lower_nested_expr_with_async_and_consts(
@@ -94,6 +98,7 @@ pub(super) fn lower_binary_expr_with_async(
             | AstBinaryOp::Sub
             | AstBinaryOp::Mul
             | AstBinaryOp::Div
+            | AstBinaryOp::Rem
             | AstBinaryOp::And
             | AstBinaryOp::Or
     ) && (!compatible_types(&lhs_ty, &result_ty) || !compatible_types(&rhs_ty, &result_ty))
@@ -112,6 +117,7 @@ pub(super) fn lower_binary_expr_with_async(
             AstBinaryOp::Sub => NirBinaryOp::Sub,
             AstBinaryOp::Mul => NirBinaryOp::Mul,
             AstBinaryOp::Div => NirBinaryOp::Div,
+            AstBinaryOp::Rem => NirBinaryOp::Rem,
             AstBinaryOp::Eq => NirBinaryOp::Eq,
             AstBinaryOp::Ne => NirBinaryOp::Ne,
             AstBinaryOp::Lt => NirBinaryOp::Lt,
@@ -174,6 +180,7 @@ fn overloaded_binary_trait(op: AstBinaryOp) -> Option<(&'static str, &'static st
         AstBinaryOp::Sub => Some(("Subtractable", "sub")),
         AstBinaryOp::Mul => Some(("Multipliable", "mul")),
         AstBinaryOp::Div => Some(("Dividable", "div")),
+        AstBinaryOp::Rem => Some(("Remainderable", "rem")),
         AstBinaryOp::Eq | AstBinaryOp::Ne => Some(("Equatable", "eq")),
         AstBinaryOp::Lt => Some(("Orderable", "lt")),
         AstBinaryOp::Le => Some(("Orderable", "le")),
@@ -189,7 +196,11 @@ fn builtin_binary_supported(op: AstBinaryOp, lhs_ty: &NirTypeRef, rhs_ty: &NirTy
     }
     match op {
         AstBinaryOp::And | AstBinaryOp::Or => lhs_ty.is_bool_scalar() && rhs_ty.is_bool_scalar(),
-        AstBinaryOp::Add | AstBinaryOp::Sub | AstBinaryOp::Mul | AstBinaryOp::Div => {
+        AstBinaryOp::Add
+        | AstBinaryOp::Sub
+        | AstBinaryOp::Mul
+        | AstBinaryOp::Div
+        | AstBinaryOp::Rem => {
             lhs_ty.is_numeric_scalar() && rhs_ty.is_numeric_scalar()
         }
         AstBinaryOp::Eq | AstBinaryOp::Ne => {
@@ -228,7 +239,11 @@ fn binary_result_type(
             }
             Ok(bool_type())
         }
-        AstBinaryOp::Add | AstBinaryOp::Sub | AstBinaryOp::Mul | AstBinaryOp::Div => {
+        AstBinaryOp::Add
+        | AstBinaryOp::Sub
+        | AstBinaryOp::Mul
+        | AstBinaryOp::Div
+        | AstBinaryOp::Rem => {
             if !compatible_types(lhs, rhs) {
                 return Err(format!(
                     "binary `{}` expects matching operand types, found `{}` and `{}`",
@@ -299,6 +314,7 @@ fn render_binary_op(op: AstBinaryOp) -> &'static str {
         AstBinaryOp::Sub => "-",
         AstBinaryOp::Mul => "*",
         AstBinaryOp::Div => "/",
+        AstBinaryOp::Rem => "%",
         AstBinaryOp::Eq => "==",
         AstBinaryOp::Ne => "!=",
         AstBinaryOp::Lt => "<",

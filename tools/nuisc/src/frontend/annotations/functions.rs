@@ -108,6 +108,7 @@ fn validate_const_safe_block(body: &[AstStmt]) -> Result<(), &'static str> {
     for stmt in body {
         match stmt {
             AstStmt::Let { value, .. }
+            | AstStmt::AssignLocal { value, .. }
             | AstStmt::Const { value, .. }
             | AstStmt::Print(value)
             | AstStmt::Expr(value)

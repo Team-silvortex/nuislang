@@ -21,6 +21,9 @@ pub(super) fn validate_lambda_block_no_capture(
                 validate_lambda_expr_no_capture(value, visible_locals, outer_locals)?;
                 visible_locals.insert(name.clone());
             }
+            AstStmt::AssignLocal { value, .. } => {
+                validate_lambda_expr_no_capture(value, visible_locals, outer_locals)?;
+            }
             AstStmt::Print(value) | AstStmt::Await(value) | AstStmt::Expr(value) => {
                 validate_lambda_expr_no_capture(value, visible_locals, outer_locals)?;
             }
