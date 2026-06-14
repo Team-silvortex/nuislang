@@ -1118,7 +1118,10 @@ fn rejects_reassignment_of_unknown_local() {
     )
     .unwrap_err();
 
-    assert!(error.contains("cannot assign to unknown local `value`"), "{error}");
+    assert!(
+        error.contains("cannot assign to unknown local `value`"),
+        "{error}"
+    );
 }
 
 #[test]

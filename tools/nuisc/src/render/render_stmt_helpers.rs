@@ -12,7 +12,12 @@ pub(super) fn render_ast_stmt_inline(stmt: &AstStmt) -> String {
         } => {
             let suffix = render_ast_type_suffix(ty.as_ref());
             let prefix = if *mutable { "let mut" } else { "let" };
-            format!("{prefix} {}{} = {}", name, suffix, super::render_ast_expr(value))
+            format!(
+                "{prefix} {}{} = {}",
+                name,
+                suffix,
+                super::render_ast_expr(value)
+            )
         }
         AstStmt::AssignLocal { name, value } => {
             format!("{name} = {}", super::render_ast_expr(value))

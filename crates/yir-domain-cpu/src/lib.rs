@@ -54,12 +54,10 @@ struct ParsedCarryBranchSource {
 fn carry_state_fragment_is_valid(fragment: &str) -> bool {
     match fragment {
         "current" | "prev_current" => true,
-        other => {
-            other
-                .strip_prefix("prev_carry")
-                .or_else(|| other.strip_prefix("carry"))
-                .is_some_and(|index| index.parse::<usize>().is_ok())
-        }
+        other => other
+            .strip_prefix("prev_carry")
+            .or_else(|| other.strip_prefix("carry"))
+            .is_some_and(|index| index.parse::<usize>().is_ok()),
     }
 }
 
@@ -91,15 +89,24 @@ fn add_state_list_payload_len(kind: &str) -> Option<usize> {
             {
                 let rhs_offset = parse_group(rhs_group)?;
                 if let Some(rest) = rest.strip_suffix("_plus_invariant") {
-                    (rest, usize::from(lhs_offset) + usize::from(rhs_offset) + 2usize)
+                    (
+                        rest,
+                        usize::from(lhs_offset) + usize::from(rhs_offset) + 2usize,
+                    )
                 } else {
-                    (rest, usize::from(lhs_offset) + usize::from(rhs_offset) + 1usize)
+                    (
+                        rest,
+                        usize::from(lhs_offset) + usize::from(rhs_offset) + 1usize,
+                    )
                 }
             } else {
                 let (rhs_group, rest) = rest.split_once("_times_terms_")?;
                 let rhs_offset = parse_group(rhs_group)?;
                 if let Some(rest) = rest.strip_suffix("_plus_invariant") {
-                    (rest, usize::from(lhs_offset) + usize::from(rhs_offset) + 1usize)
+                    (
+                        rest,
+                        usize::from(lhs_offset) + usize::from(rhs_offset) + 1usize,
+                    )
                 } else {
                     (rest, usize::from(lhs_offset) + usize::from(rhs_offset))
                 }
@@ -121,7 +128,8 @@ fn add_state_list_payload_len(kind: &str) -> Option<usize> {
             } else {
                 (rest, 2usize)
             }
-        } else if let Some((factor_terms, rest)) = prefix.split_once("_times_factor_invariant_times_")
+        } else if let Some((factor_terms, rest)) =
+            prefix.split_once("_times_factor_invariant_times_")
         {
             let factor_terms = factor_terms.split("_plus_").collect::<Vec<_>>();
             if factor_terms.len() < 2
@@ -136,7 +144,9 @@ fn add_state_list_payload_len(kind: &str) -> Option<usize> {
             } else {
                 (rest, 1usize)
             }
-        } else if let Some((factor_terms, rest)) = prefix.split_once("_plus_factor_invariant_times_") {
+        } else if let Some((factor_terms, rest)) =
+            prefix.split_once("_plus_factor_invariant_times_")
+        {
             let factor_terms = factor_terms.split("_plus_").collect::<Vec<_>>();
             if factor_terms.is_empty()
                 || !factor_terms
@@ -306,12 +316,10 @@ fn validate_carry_condition_kind(
 fn carry_source_payload_len(kind: &str) -> Option<usize> {
     let carry_state_fragment_is_valid = |fragment: &str| match fragment {
         "current" | "prev_current" => true,
-        other => {
-            other
-                .strip_prefix("prev_carry")
-                .or_else(|| other.strip_prefix("carry"))
-                .is_some_and(|index| index.parse::<usize>().is_ok())
-        }
+        other => other
+            .strip_prefix("prev_carry")
+            .or_else(|| other.strip_prefix("carry"))
+            .is_some_and(|index| index.parse::<usize>().is_ok()),
     };
     let zero_payload_indexed_prefixes =
         ["add_prev_carry", "mul_prev_carry", "add_carry", "mul_carry"];
@@ -341,13 +349,16 @@ fn carry_source_payload_len(kind: &str) -> Option<usize> {
             .is_some_and(|index| index.parse::<usize>().is_ok())
     }) {
         Some(1)
-    } else if one_payload_zero_payload_indexed_prefixes.iter().any(|prefix| {
-        kind.strip_prefix(prefix).is_some_and(|suffix| {
-            suffix
-                .strip_suffix("_plus_invariant")
-                .is_some_and(|index| index.parse::<usize>().is_ok())
+    } else if one_payload_zero_payload_indexed_prefixes
+        .iter()
+        .any(|prefix| {
+            kind.strip_prefix(prefix).is_some_and(|suffix| {
+                suffix
+                    .strip_suffix("_plus_invariant")
+                    .is_some_and(|index| index.parse::<usize>().is_ok())
+            })
         })
-    }) {
+    {
         Some(1)
     } else if let Some(prefix) = kind.strip_prefix("mul_scaled_by_") {
         if let Some((factor, terms_part)) = prefix.split_once("_plus_factor_invariant_") {
@@ -379,9 +390,7 @@ fn carry_source_payload_len(kind: &str) -> Option<usize> {
             }
         }
     } else if let Some(prefix) = kind.strip_prefix("mul_scaled_") {
-        let terms_part = prefix
-            .strip_suffix("_plus_invariant")
-            .unwrap_or(prefix);
+        let terms_part = prefix.strip_suffix("_plus_invariant").unwrap_or(prefix);
         let terms = terms_part.split("_plus_").collect::<Vec<_>>();
         if !terms.is_empty() && terms.iter().all(|term| carry_state_fragment_is_valid(term)) {
             Some(1 + usize::from(prefix.ends_with("_plus_invariant")))
@@ -990,21 +999,32 @@ impl RegisteredMod for CpuMod {
                     node.op.args.iter().skip(1).cloned().collect(),
                 ))
             }
-            "spawn_task" => {
+            "spawn_task" | "spawn_thread" | "thread_spawn" => {
                 if node.op.args.len() != 2 {
                     return Err(format!(
-                        "node `{}` expects `cpu.spawn_task <name> <resource> <callee> <result>`",
-                        node.name
+                        "node `{}` expects `cpu.{} <name> <resource> <callee> <result>`",
+                        node.name,
+                        node.op.instruction
                     ));
                 }
                 Ok(InstructionSemantics::effect(vec![node.op.args[1].clone()]))
             }
-            "join" | "cancel" | "join_result" | "task_completed" | "task_timed_out"
-            | "task_cancelled" | "task_value" => {
+            "join" | "cancel" | "join_result" | "thread_join" | "thread_join_result"
+            | "task_completed" | "task_timed_out" | "task_cancelled" | "task_value"
+            | "mutex_lock" | "mutex_unlock" | "mutex_value" => {
                 if node.op.args.len() != 1 {
                     return Err(format!(
-                        "node `{}` expects `cpu.{} <name> <resource> <task>`",
+                        "node `{}` expects `cpu.{} <name> <resource> <input>`",
                         node.name, node.op.instruction
+                    ));
+                }
+                Ok(InstructionSemantics::effect(node.op.args.clone()))
+            }
+            "mutex_new" => {
+                if node.op.args.len() != 1 {
+                    return Err(format!(
+                        "node `{}` expects `cpu.mutex_new <name> <resource> <value>`",
+                        node.name
                     ));
                 }
                 Ok(InstructionSemantics::effect(node.op.args.clone()))
@@ -2335,6 +2355,22 @@ impl RegisteredMod for CpuMod {
                     state: TaskLifecycleState::Pending,
                 }))
             }
+            "spawn_thread" | "thread_spawn" => {
+                let callee = &node.op.args[0];
+                let result = state.expect_value(&node.op.args[1])?.clone();
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.{} @{} [{}] {} => {}",
+                        node.op.instruction, node.resource, resource.kind.raw, callee, node.name
+                    ),
+                );
+                Ok(Value::Thread(yir_core::ThreadHandle {
+                    label: format!("{callee}@{}", node.name),
+                    result: Box::new(result),
+                    state: TaskLifecycleState::Pending,
+                }))
+            }
             "join" => {
                 let task = state.expect_task(&node.op.args[0])?;
                 let label = task.label.clone();
@@ -2350,6 +2386,26 @@ impl RegisteredMod for CpuMod {
                     resource,
                     format!(
                         "effect cpu.join @{} [{}]: {}",
+                        node.resource, resource.kind.raw, label
+                    ),
+                );
+                Ok(result)
+            }
+            "thread_join" => {
+                let thread = state.expect_thread(&node.op.args[0])?;
+                let label = thread.label.clone();
+                let result = (*thread.result).clone();
+                let lifecycle = task_lifecycle_state_for_thread(thread);
+                if lifecycle == TaskLifecycleState::Cancelled {
+                    return Err(format!("thread `{label}` was cancelled before join"));
+                }
+                if lifecycle == TaskLifecycleState::TimedOut {
+                    return Err(format!("thread `{label}` timed out before join"));
+                }
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.thread_join @{} [{}]: {}",
                         node.resource, resource.kind.raw, label
                     ),
                 );
@@ -2387,6 +2443,28 @@ impl RegisteredMod for CpuMod {
                     resource,
                     format!(
                         "effect cpu.join_result @{} [{}]: {} => {}",
+                        node.resource, resource.kind.raw, label, lifecycle
+                    ),
+                );
+                Ok(Value::TaskResult(yir_core::TaskResultHandle {
+                    label,
+                    state: lifecycle,
+                    result,
+                }))
+            }
+            "thread_join_result" => {
+                let thread = state.expect_thread(&node.op.args[0])?;
+                let label = thread.label.clone();
+                let lifecycle = task_lifecycle_state_for_thread(thread);
+                let result = if lifecycle == TaskLifecycleState::Completed {
+                    Some(thread.result.clone())
+                } else {
+                    None
+                };
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.thread_join_result @{} [{}]: {} => {}",
                         node.resource, resource.kind.raw, label, lifecycle
                     ),
                 );
@@ -2436,6 +2514,65 @@ impl RegisteredMod for CpuMod {
                     limit: Some(limit),
                     state: lifecycle,
                 }))
+            }
+            "mutex_new" => {
+                let value = state.expect_value(&node.op.args[0])?.clone();
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.mutex_new @{} [{}]: {}",
+                        node.resource, resource.kind.raw, value
+                    ),
+                );
+                Ok(Value::Mutex(yir_core::MutexHandle {
+                    label: node.name.clone(),
+                    value: Box::new(value),
+                }))
+            }
+            "mutex_lock" => {
+                let mutex = state.expect_mutex(&node.op.args[0])?;
+                let label = mutex.label.clone();
+                let value = mutex.value.clone();
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.mutex_lock @{} [{}]: {}",
+                        node.resource, resource.kind.raw, label
+                    ),
+                );
+                Ok(Value::MutexGuard(yir_core::MutexGuardHandle {
+                    label,
+                    value,
+                }))
+            }
+            "mutex_unlock" => {
+                let guard = state.expect_mutex_guard(&node.op.args[0])?;
+                let label = guard.label.clone();
+                let value = guard.value.clone();
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.mutex_unlock @{} [{}]: {}",
+                        node.resource, resource.kind.raw, label
+                    ),
+                );
+                Ok(Value::Mutex(yir_core::MutexHandle {
+                    label,
+                    value,
+                }))
+            }
+            "mutex_value" => {
+                let guard = state.expect_mutex_guard(&node.op.args[0])?;
+                let label = guard.label.clone();
+                let value = (*guard.value).clone();
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.mutex_value @{} [{}]: {}",
+                        node.resource, resource.kind.raw, label
+                    ),
+                );
+                Ok(value)
             }
             "await" => {
                 let value = state.expect_value(&node.op.args[0])?.clone();
@@ -3719,6 +3856,14 @@ fn task_lifecycle_state(task: &yir_core::TaskHandle) -> TaskLifecycleState {
     }
 }
 
+fn task_lifecycle_state_for_thread(thread: &yir_core::ThreadHandle) -> TaskLifecycleState {
+    match thread.state {
+        TaskLifecycleState::Cancelled => TaskLifecycleState::Cancelled,
+        TaskLifecycleState::TimedOut => TaskLifecycleState::TimedOut,
+        TaskLifecycleState::Completed | TaskLifecycleState::Pending => TaskLifecycleState::Completed,
+    }
+}
+
 fn require_cpu_resource(node: &Node, resource: &Resource) -> Result<(), String> {
     if resource.kind.is_family("cpu") {
         Ok(())
@@ -3899,8 +4044,8 @@ mod tests {
     }
 
     #[test]
-    fn parse_carry_branch_source_accepts_add_current_plus_current_plus_current_plus_invariant_kind(
-    ) {
+    fn parse_carry_branch_source_accepts_add_current_plus_current_plus_current_plus_invariant_kind()
+    {
         let args = vec![
             "add_current_plus_current_plus_current_plus_invariant".to_owned(),
             "rhs0".to_owned(),
@@ -3924,8 +4069,14 @@ mod tests {
         ];
         let (source, next) =
             parse_carry_branch_source(&args, 0, "loop_node").expect("expected branch source");
-        assert_eq!(source.kind, "add_scaled_current_plus_current_plus_invariant");
-        assert_eq!(source.payload, vec!["factor0".to_owned(), "rhs0".to_owned()]);
+        assert_eq!(
+            source.kind,
+            "add_scaled_current_plus_current_plus_invariant"
+        );
+        assert_eq!(
+            source.payload,
+            vec!["factor0".to_owned(), "rhs0".to_owned()]
+        );
         assert_eq!(next, 3);
     }
 
@@ -3995,9 +4146,7 @@ mod tests {
 
     #[test]
     fn parse_carry_branch_source_accepts_add_scaled_by_multi_state_factor_kind() {
-        let args = vec![
-            "add_scaled_by_current_plus_current_times_current_plus_current".to_owned(),
-        ];
+        let args = vec!["add_scaled_by_current_plus_current_times_current_plus_current".to_owned()];
         let (source, next) =
             parse_carry_branch_source(&args, 0, "loop_node").expect("expected branch source");
         assert_eq!(

@@ -34,6 +34,12 @@ This file adds one more question:
 * if some rejected families later become task-crossing candidates, what shape
   should they probably take?
 
+The same staging question now also applies to explicit future concurrency
+families such as thread handles and lock handles:
+
+* they should probably enter through an explicit handle/resource contract
+* not through accidental plain-value promotion
+
 ## Current Split
 
 ### Plain Value Side
@@ -179,3 +185,4 @@ Read this together with:
 * [cpu-task-external-handle-glm-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-external-handle-glm-sketch.md)
 * [cpu-task-glm-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-glm-contract.md)
 * [cpu-task-scheduler-clock.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-scheduler-clock.md)
+* [cpu-thread-lock-staging-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-thread-lock-staging-sketch.md)

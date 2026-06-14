@@ -237,12 +237,18 @@ fn expr_collect_called_functions(
         | NirExpr::DataValue(value)
         | NirExpr::DataFreezeWindow(value)
         | NirExpr::CpuJoin(value)
+        | NirExpr::CpuThreadJoin(value)
         | NirExpr::CpuCancel(value)
         | NirExpr::CpuJoinResult(value)
+        | NirExpr::CpuThreadJoinResult(value)
         | NirExpr::CpuTaskCompleted(value)
         | NirExpr::CpuTaskTimedOut(value)
         | NirExpr::CpuTaskCancelled(value)
         | NirExpr::CpuTaskValue(value)
+        | NirExpr::CpuMutexNew(value)
+        | NirExpr::CpuMutexLock(value)
+        | NirExpr::CpuMutexUnlock(value)
+        | NirExpr::CpuMutexValue(value)
         | NirExpr::CpuPresentFrame(value)
         | NirExpr::Free(value)
         | NirExpr::IsNull(value)
@@ -349,7 +355,7 @@ fn expr_collect_called_functions(
         | NirExpr::DataProfileSendDownlink { input, .. } => {
             expr_collect_called_functions(input, eligible_names, called);
         }
-        NirExpr::CpuSpawn { args, .. } => {
+        NirExpr::CpuSpawn { args, .. } | NirExpr::CpuThreadSpawn { args, .. } => {
             for arg in args {
                 expr_collect_called_functions(arg, eligible_names, called);
             }

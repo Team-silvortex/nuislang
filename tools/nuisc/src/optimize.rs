@@ -473,6 +473,14 @@ fn simplify_expr(
             let (inner, changed) = simplify_expr(*inner, env, inline_templates, active_inline);
             (NirExpr::CpuJoinResult(Box::new(inner)), changed)
         }
+        NirExpr::CpuThreadJoin(inner) => {
+            let (inner, changed) = simplify_expr(*inner, env, inline_templates, active_inline);
+            (NirExpr::CpuThreadJoin(Box::new(inner)), changed)
+        }
+        NirExpr::CpuThreadJoinResult(inner) => {
+            let (inner, changed) = simplify_expr(*inner, env, inline_templates, active_inline);
+            (NirExpr::CpuThreadJoinResult(Box::new(inner)), changed)
+        }
         NirExpr::CpuTaskCompleted(inner) => {
             let (inner, changed) = simplify_expr(*inner, env, inline_templates, active_inline);
             (NirExpr::CpuTaskCompleted(Box::new(inner)), changed)
@@ -488,6 +496,22 @@ fn simplify_expr(
         NirExpr::CpuTaskValue(inner) => {
             let (inner, changed) = simplify_expr(*inner, env, inline_templates, active_inline);
             (NirExpr::CpuTaskValue(Box::new(inner)), changed)
+        }
+        NirExpr::CpuMutexNew(inner) => {
+            let (inner, changed) = simplify_expr(*inner, env, inline_templates, active_inline);
+            (NirExpr::CpuMutexNew(Box::new(inner)), changed)
+        }
+        NirExpr::CpuMutexLock(inner) => {
+            let (inner, changed) = simplify_expr(*inner, env, inline_templates, active_inline);
+            (NirExpr::CpuMutexLock(Box::new(inner)), changed)
+        }
+        NirExpr::CpuMutexUnlock(inner) => {
+            let (inner, changed) = simplify_expr(*inner, env, inline_templates, active_inline);
+            (NirExpr::CpuMutexUnlock(Box::new(inner)), changed)
+        }
+        NirExpr::CpuMutexValue(inner) => {
+            let (inner, changed) = simplify_expr(*inner, env, inline_templates, active_inline);
+            (NirExpr::CpuMutexValue(Box::new(inner)), changed)
         }
         NirExpr::CpuTimeout { task, limit } => {
             let (task, left) = simplify_expr(*task, env, inline_templates, active_inline);
@@ -1085,12 +1109,18 @@ fn collect_used_vars_expr(expr: &NirExpr, out: &mut BTreeSet<String>) {
         | NirExpr::DataValue(inner)
         | NirExpr::DataFreezeWindow(inner)
         | NirExpr::CpuJoin(inner)
+        | NirExpr::CpuThreadJoin(inner)
         | NirExpr::CpuCancel(inner)
         | NirExpr::CpuJoinResult(inner)
+        | NirExpr::CpuThreadJoinResult(inner)
         | NirExpr::CpuTaskCompleted(inner)
         | NirExpr::CpuTaskTimedOut(inner)
         | NirExpr::CpuTaskCancelled(inner)
         | NirExpr::CpuTaskValue(inner)
+        | NirExpr::CpuMutexNew(inner)
+        | NirExpr::CpuMutexLock(inner)
+        | NirExpr::CpuMutexUnlock(inner)
+        | NirExpr::CpuMutexValue(inner)
         | NirExpr::CpuPresentFrame(inner)
         | NirExpr::NetworkConfigReady(inner)
         | NirExpr::NetworkSendReady(inner)
@@ -1213,6 +1243,7 @@ fn collect_used_vars_expr(expr: &NirExpr, out: &mut BTreeSet<String>) {
             collect_used_vars_expr(len, out);
         }
         NirExpr::CpuSpawn { args, .. }
+        | NirExpr::CpuThreadSpawn { args, .. }
         | NirExpr::CpuExternCall { args, .. }
         | NirExpr::Call { args, .. } => {
             for arg in args {

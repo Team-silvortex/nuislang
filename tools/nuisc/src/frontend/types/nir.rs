@@ -198,12 +198,36 @@ pub(crate) fn infer_nir_expr_type(
             .get(callee)
             .and_then(|sig| sig.return_type.clone())
             .map(|ty| generic_named_type("Task", vec![ty])),
+        NirExpr::CpuThreadSpawn { callee, .. } => signatures
+            .get(callee)
+            .and_then(|sig| sig.return_type.clone())
+            .map(|ty| generic_named_type("Thread", vec![ty])),
         NirExpr::CpuJoin(task) => result_payload_type(task, bindings, signatures, struct_table),
         NirExpr::CpuCancel(task) => infer_nir_expr_type(task, bindings, signatures, struct_table),
         NirExpr::CpuJoinResult(task) => {
             result_payload_type(task, bindings, signatures, struct_table)
                 .map(|ty| make_result_type(NirResultFamily::Task, ty))
         }
+        NirExpr::CpuThreadJoin(thread) => infer_nir_expr_type(thread, bindings, signatures, struct_table)
+            .and_then(|ty| ty.thread_payload().cloned()),
+        NirExpr::CpuThreadJoinResult(thread) => infer_nir_expr_type(
+            thread,
+            bindings,
+            signatures,
+            struct_table,
+        )
+        .and_then(|ty| ty.thread_payload().cloned())
+        .map(|ty| make_result_type(NirResultFamily::Task, ty)),
+        NirExpr::CpuMutexNew(value) => infer_nir_expr_type(value, bindings, signatures, struct_table)
+            .map(|ty| generic_named_type("Mutex", vec![ty])),
+        NirExpr::CpuMutexLock(mutex) => infer_nir_expr_type(mutex, bindings, signatures, struct_table)
+            .and_then(|ty| ty.mutex_payload().cloned())
+            .map(|ty| generic_named_type("MutexGuard", vec![ty])),
+        NirExpr::CpuMutexUnlock(guard) => infer_nir_expr_type(guard, bindings, signatures, struct_table)
+            .and_then(|ty| ty.mutex_guard_payload().cloned())
+            .map(|ty| generic_named_type("Mutex", vec![ty])),
+        NirExpr::CpuMutexValue(guard) => infer_nir_expr_type(guard, bindings, signatures, struct_table)
+            .and_then(|ty| ty.mutex_guard_payload().cloned()),
         NirExpr::CpuTaskCompleted(_)
         | NirExpr::CpuTaskTimedOut(_)
         | NirExpr::CpuTaskCancelled(_) => Some(bool_type()),
@@ -414,8 +438,7 @@ pub(crate) fn infer_nir_expr_type(
             Some(i64_type())
         }
         NirExpr::CpuExternCall { callee, .. }
-            if callee == "host_deserialize_i64_from"
-                || callee == "host_deserialize_byte_from" =>
+            if callee == "host_deserialize_i64_from" || callee == "host_deserialize_byte_from" =>
         {
             Some(i64_type())
         }

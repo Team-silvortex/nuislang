@@ -723,9 +723,21 @@ fn render_nir_expr(value: &NirExpr) -> String {
                 .collect::<Vec<_>>()
                 .join(", ")
         ),
+        NirExpr::CpuThreadSpawn { callee, args } => format!(
+            "thread_spawn({}({}))",
+            callee,
+            args.iter()
+                .map(render_nir_expr)
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
         NirExpr::CpuJoin(task) => format!("join({})", render_nir_expr(task)),
+        NirExpr::CpuThreadJoin(thread) => format!("thread_join({})", render_nir_expr(thread)),
         NirExpr::CpuCancel(task) => format!("cancel({})", render_nir_expr(task)),
         NirExpr::CpuJoinResult(task) => format!("join_result({})", render_nir_expr(task)),
+        NirExpr::CpuThreadJoinResult(thread) => {
+            format!("thread_join_result({})", render_nir_expr(thread))
+        }
         NirExpr::CpuTaskCompleted(result) => {
             format!("task_completed({})", render_nir_expr(result))
         }
@@ -736,6 +748,10 @@ fn render_nir_expr(value: &NirExpr) -> String {
             format!("task_cancelled({})", render_nir_expr(result))
         }
         NirExpr::CpuTaskValue(result) => format!("task_value({})", render_nir_expr(result)),
+        NirExpr::CpuMutexNew(value) => format!("mutex_new({})", render_nir_expr(value)),
+        NirExpr::CpuMutexLock(mutex) => format!("mutex_lock({})", render_nir_expr(mutex)),
+        NirExpr::CpuMutexUnlock(guard) => format!("mutex_unlock({})", render_nir_expr(guard)),
+        NirExpr::CpuMutexValue(guard) => format!("mutex_value({})", render_nir_expr(guard)),
         NirExpr::CpuTimeout { task, limit } => format!(
             "timeout({}, {})",
             render_nir_expr(task),

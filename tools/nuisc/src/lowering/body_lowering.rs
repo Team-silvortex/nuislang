@@ -383,13 +383,20 @@ fn expr_contains_async_loop_primitive(expr: &NirExpr) -> bool {
     match expr {
         NirExpr::Await(_)
         | NirExpr::CpuSpawn { .. }
+        | NirExpr::CpuThreadSpawn { .. }
         | NirExpr::CpuJoin(_)
+        | NirExpr::CpuThreadJoin(_)
         | NirExpr::CpuCancel(_)
         | NirExpr::CpuJoinResult(_)
+        | NirExpr::CpuThreadJoinResult(_)
         | NirExpr::CpuTaskCompleted(_)
         | NirExpr::CpuTaskTimedOut(_)
         | NirExpr::CpuTaskCancelled(_)
         | NirExpr::CpuTaskValue(_)
+        | NirExpr::CpuMutexNew(_)
+        | NirExpr::CpuMutexLock(_)
+        | NirExpr::CpuMutexUnlock(_)
+        | NirExpr::CpuMutexValue(_)
         | NirExpr::CpuTimeout { .. } => true,
         NirExpr::Borrow(inner)
         | NirExpr::BorrowEnd(inner)

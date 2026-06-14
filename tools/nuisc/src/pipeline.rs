@@ -424,12 +424,18 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         | NirExpr::LoadNext(inner)
         | NirExpr::BufferLen(inner)
         | NirExpr::CpuJoin(inner)
+        | NirExpr::CpuThreadJoin(inner)
         | NirExpr::CpuCancel(inner)
         | NirExpr::CpuJoinResult(inner)
+        | NirExpr::CpuThreadJoinResult(inner)
         | NirExpr::CpuTaskCompleted(inner)
         | NirExpr::CpuTaskTimedOut(inner)
         | NirExpr::CpuTaskCancelled(inner)
         | NirExpr::CpuTaskValue(inner)
+        | NirExpr::CpuMutexNew(inner)
+        | NirExpr::CpuMutexLock(inner)
+        | NirExpr::CpuMutexUnlock(inner)
+        | NirExpr::CpuMutexValue(inner)
         | NirExpr::DataReady(inner)
         | NirExpr::DataMoved(inner)
         | NirExpr::DataWindowed(inner)
@@ -508,7 +514,7 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
             collect_instantiated_units_expr(input, units);
             collect_instantiated_units_expr(bias, units);
         }
-        NirExpr::CpuSpawn { args, .. } => {
+        NirExpr::CpuSpawn { args, .. } | NirExpr::CpuThreadSpawn { args, .. } => {
             for arg in args {
                 collect_instantiated_units_expr(arg, units);
             }

@@ -339,3 +339,61 @@ fn rejects_capturing_generic_lambda_unary_neg_without_required_bound() {
         "{error}"
     );
 }
+
+#[test]
+fn rejects_capturing_generic_lambda_alias_payload_equality_operator_with_mismatched_bound() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Showable {
+            fn show(value: Self) -> i64;
+          }
+
+          trait Equatable {
+            fn eq(lhs: Self, rhs: Self) -> bool;
+          }
+
+          impl Showable for i64 {
+            fn show(value: i64) -> i64 {
+              return value;
+            }
+          }
+
+          impl Equatable for i64 {
+            fn eq(lhs: i64, rhs: i64) -> bool {
+              return lhs == rhs;
+            }
+          }
+
+          type Alias<T> = T;
+          type Outer<T> = Alias<T>;
+
+          fn apply<T: Showable>(value: Outer<T>, f: Fn1<Outer<T>, bool>) -> bool {
+            return f(value);
+          }
+
+          fn same<T: Showable>(value: Outer<T>, other: Outer<T>) -> bool {
+            return apply(value, |x: Outer<T>| -> bool { return x == other; });
+          }
+
+          fn main() -> i64 {
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains(
+            "function `same` body lambda body via type alias `Alias` target via type alias `Outer` target"
+        ),
+        "{error}"
+    );
+    assert!(
+        error.contains(
+            "calls operator `==` on generic parameter `T` but bound `Showable` does not satisfy required trait `Equatable`"
+        ),
+        "{error}"
+    );
+}

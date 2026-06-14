@@ -66,7 +66,9 @@ fn collect_inferred_return_types_from_block(
 ) -> Result<bool, String> {
     for stmt in body {
         match stmt {
-            AstStmt::Let { name, ty, value, .. } => {
+            AstStmt::Let {
+                name, ty, value, ..
+            } => {
                 let inferred = ty.clone().or_else(|| {
                     infer_ast_expr_type(
                         value,

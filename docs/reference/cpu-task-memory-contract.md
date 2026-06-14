@@ -160,6 +160,11 @@ It does **not** yet fully answer questions like:
 
 So this is a **first barrier**, not the finished story.
 
+That also means future thread/lock work should not loosen this barrier casually.
+If concurrency grows beyond today’s task line, thread handles and lock handles
+should enter through an explicit staged contract instead of by silently letting
+shared-mutable shapes cross `spawn(...)`.
+
 ## Join and Observation Boundary
 
 The current task result line remains:
@@ -196,5 +201,6 @@ Read this together with:
 
 * [cpu-task-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-contract.md)
 * [cpu-task-external-handle-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-task-external-handle-contract.md)
+* [cpu-thread-lock-staging-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-thread-lock-staging-sketch.md)
 * [nir-memory-model.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nir-memory-model.md)
 * [nir-optimization-contract.md](/Users/Shared/chroot/dev/nuislang/docs/reference/nir-optimization-contract.md)

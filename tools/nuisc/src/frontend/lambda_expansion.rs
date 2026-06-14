@@ -1,9 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{
-    AstBinaryOp, AstDestructureBinding, AstDestructureField, AstExpr, AstFunction,
-    AstGenericParam, AstMatchArm, AstModule, AstParam, AstStmt, AstTypeRef, AstUnaryOp,
-    AstVisibility,
+    AstBinaryOp, AstDestructureBinding, AstDestructureField, AstExpr, AstFunction, AstGenericParam,
+    AstMatchArm, AstModule, AstParam, AstStmt, AstTypeRef, AstUnaryOp, AstVisibility,
 };
 
 use super::lambda_validation::collect_lambda_block_captures;
@@ -84,14 +83,20 @@ fn callable_type_arity(ty: &AstTypeRef) -> Option<usize> {
     }
 }
 
-fn callable_type_from_signature(params: &[AstParam], return_type: &AstTypeRef) -> Option<AstTypeRef> {
+fn callable_type_from_signature(
+    params: &[AstParam],
+    return_type: &AstTypeRef,
+) -> Option<AstTypeRef> {
     let name = match params.len() {
         1 => "Fn1",
         2 => "Fn2",
         3 => "Fn3",
         _ => return None,
     };
-    let mut generic_args = params.iter().map(|param| param.ty.clone()).collect::<Vec<_>>();
+    let mut generic_args = params
+        .iter()
+        .map(|param| param.ty.clone())
+        .collect::<Vec<_>>();
     generic_args.push(return_type.clone());
     Some(AstTypeRef {
         name: name.to_owned(),
@@ -176,10 +181,11 @@ fn infer_local_binding_type(
         AstExpr::Text(_) => Some(named_type("String")),
         AstExpr::Int(_) => Some(named_type("i64")),
         AstExpr::Float(_) => Some(named_type("f64")),
-        AstExpr::Var(name) => visible_local_types
-            .get(name)
-            .cloned()
-            .or_else(|| module_function_table.get(name).and_then(callable_type_from_function)),
+        AstExpr::Var(name) => visible_local_types.get(name).cloned().or_else(|| {
+            module_function_table
+                .get(name)
+                .and_then(callable_type_from_function)
+        }),
         AstExpr::StructLiteral {
             type_name,
             type_args,
@@ -210,11 +216,9 @@ fn infer_local_binding_type(
         }),
         AstExpr::Unary { op, operand } => match op {
             AstUnaryOp::Not => Some(named_type("bool")),
-            AstUnaryOp::Neg => infer_local_binding_type(
-                operand,
-                visible_local_types,
-                module_function_table,
-            ),
+            AstUnaryOp::Neg => {
+                infer_local_binding_type(operand, visible_local_types, module_function_table)
+            }
             AstUnaryOp::Deref => None,
         },
         AstExpr::Binary { op, lhs, rhs } => {
@@ -233,7 +237,11 @@ fn infer_local_binding_type(
                 | AstBinaryOp::Sub
                 | AstBinaryOp::Mul
                 | AstBinaryOp::Div
-                | AstBinaryOp::Rem if lhs_ty == rhs_ty => Some(lhs_ty),
+                | AstBinaryOp::Rem
+                    if lhs_ty == rhs_ty =>
+                {
+                    Some(lhs_ty)
+                }
                 _ => None,
             }
         }
@@ -252,13 +260,7 @@ fn named_type(name: &str) -> AstTypeRef {
 
 fn build_lambda_call(binding: &LambdaBinding, args: Vec<AstExpr>) -> AstExpr {
     let mut final_args = args;
-    final_args.extend(
-        binding
-            .captured_locals
-            .iter()
-            .cloned()
-            .map(AstExpr::Var),
-    );
+    final_args.extend(binding.captured_locals.iter().cloned().map(AstExpr::Var));
     AstExpr::Call {
         callee: binding.symbol.clone(),
         generic_args: Vec::new(),
@@ -519,11 +521,9 @@ fn expand_lambda_block(
                 locals.insert(name.clone());
                 if let Some(ty) = ty.clone() {
                     local_types.insert(name.clone(), ty);
-                } else if let Some(inferred_ty) = infer_local_binding_type(
-                    &rewritten_value,
-                    &local_types,
-                    module_function_table,
-                ) {
+                } else if let Some(inferred_ty) =
+                    infer_local_binding_type(&rewritten_value, &local_types, module_function_table)
+                {
                     local_types.insert(name.clone(), inferred_ty);
                 }
             }
@@ -544,11 +544,9 @@ fn expand_lambda_block(
                     name: name.clone(),
                     value: rewritten_value.clone(),
                 });
-                if let Some(inferred_ty) = infer_local_binding_type(
-                    &rewritten_value,
-                    &local_types,
-                    module_function_table,
-                ) {
+                if let Some(inferred_ty) =
+                    infer_local_binding_type(&rewritten_value, &local_types, module_function_table)
+                {
                     local_types.insert(name.clone(), inferred_ty);
                 }
             }
@@ -604,11 +602,9 @@ fn expand_lambda_block(
                 locals.insert(name.clone());
                 if let Some(ty) = ty.clone() {
                     local_types.insert(name.clone(), ty);
-                } else if let Some(inferred_ty) = infer_local_binding_type(
-                    &rewritten_value,
-                    &local_types,
-                    module_function_table,
-                ) {
+                } else if let Some(inferred_ty) =
+                    infer_local_binding_type(&rewritten_value, &local_types, module_function_table)
+                {
                     local_types.insert(name.clone(), inferred_ty);
                 }
             }

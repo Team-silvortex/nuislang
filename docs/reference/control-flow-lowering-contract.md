@@ -72,7 +72,32 @@ Working rule:
 * this is a supported combination of branch merging and helper-lowered async
   recursion
 
-### 3. Structured async `while` with branch-local carry updates
+### 3. Branch-local runtime observers inside `if` / lowered `match`
+
+Current truth:
+
+* branch-local runtime observation is now a supported sub-family of value
+  selection
+* this support is intentionally narrow and currently means observer-shaped task
+  or mutex reads that still collapse into branch-local values
+* today the stable checked-in observer family is:
+  * `task_completed(...)`
+  * `task_timed_out(...)`
+  * `task_cancelled(...)`
+  * `task_value(...)`
+  * `mutex_value(...)`
+
+Regression anchor:
+
+* [tests_branch_helpers.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_branch_helpers.rs)
+
+Working rule:
+
+* observer-shaped branch-local reads are allowed when each branch still reduces
+  to a select-compatible value path
+* this is not a general promise for arbitrary branch-local runtime work
+
+### 4. Structured async `while` with branch-local carry updates
 
 Current truth:
 
@@ -107,6 +132,43 @@ Working rule:
   loop-state/carry test family
 
 ## Not Yet Supported
+
+### Branch-local consuming task/thread/mutex runtime primitives
+
+Current rejection:
+
+* branch-local consuming runtime primitives are still intentionally rejected in
+  `if` / lowered `match`
+* the current disallowed family includes shapes such as:
+  * `join_result(...)`
+  * `thread_join_result(...)`
+  * `spawn(...)`
+  * `thread_spawn(...)`
+  * `join(...)`
+  * `thread_join(...)`
+  * `cancel(...)`
+  * `timeout(...)`
+  * `mutex_new(...)`
+  * `mutex_lock(...)`
+  * `mutex_unlock(...)`
+
+Regression anchor:
+
+* [tests_branch_helpers.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_branch_helpers.rs)
+
+Current diagnostic contract:
+
+* `conditional if/lowered-match lowering does not yet support branch-local consuming task/thread/mutex runtime primitives`
+* `hoist those effects before the branch or reduce each branch to pure/select-compatible values`
+
+What this means:
+
+* branch-local runtime observation and branch-local runtime consumption are not
+  the same support boundary
+* observer-safe task/mutex reads are now part of the current control-flow
+  mainline
+* consuming task/thread/mutex operations still need to be hoisted or reduced to
+  pre-branch values before lowering
 
 ### Mixed factor expressions after additive shared-suffix re-mix inside structured async `while`
 

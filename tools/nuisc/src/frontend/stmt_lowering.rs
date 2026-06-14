@@ -26,10 +26,7 @@ pub(super) fn lower_stmt_with_async(
 ) -> Result<NirStmt, String> {
     Ok(match stmt {
         AstStmt::Let {
-            name,
-            ty,
-            value,
-            ..
+            name, ty, value, ..
         } => {
             if let super::AstExpr::If {
                 condition,
@@ -157,7 +154,8 @@ pub(super) fn lower_stmt_with_async(
                 false,
             )?;
             let inferred = infer_nir_expr_type(&lowered, bindings, signatures, struct_table);
-            let final_type = resolve_declared_or_inferred(name, Some(current_ty.clone()), inferred)?;
+            let final_type =
+                resolve_declared_or_inferred(name, Some(current_ty.clone()), inferred)?;
             bindings.insert(name.clone(), final_type.clone());
             NirStmt::Let {
                 name: name.clone(),
@@ -542,17 +540,11 @@ fn lower_if_expr_branch_with_async(
     struct_table: &BTreeMap<String, NirStructDef>,
     wrap_terminal: &dyn Fn(super::AstExpr) -> AstStmt,
 ) -> Result<Vec<NirStmt>, String> {
-    let Some((last, prefix)) = body.split_last() else {
-        return Err("`if` expression branch cannot be empty".to_owned());
-    };
-    let AstStmt::Return(Some(value)) = last else {
-        return Err(
-            "`if` expression branch currently requires a tail expression result in each branch"
-                .to_owned(),
-        );
-    };
-    let mut rewritten_body = prefix.to_vec();
-    rewritten_body.push(wrap_terminal(value.clone()));
+    let rewritten_body = rewrite_control_expr_terminal_branch(
+        body,
+        wrap_terminal,
+        ControlExprKind::If,
+    )?;
     lower_stmt_block_with_async(
         &rewritten_body,
         current_domain,
@@ -1073,17 +1065,59 @@ fn rewrite_control_expr_terminal_branch(
             kind.branch_name()
         ));
     };
-    let AstStmt::Return(Some(value)) = last else {
-        return Err(format!(
+    let mut rewritten = prefix.to_vec();
+    match last {
+        AstStmt::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            rewritten.push(AstStmt::If {
+                condition: condition.clone(),
+                then_body: rewrite_control_expr_terminal_branch(then_body, wrap, ControlExprKind::If)?,
+                else_body: rewrite_control_expr_terminal_branch(else_body, wrap, ControlExprKind::If)?,
+            });
+            return Ok(rewritten);
+        }
+        AstStmt::Match { value, arms } => {
+            rewritten.push(AstStmt::Match {
+                value: value.clone(),
+                arms: arms
+                    .iter()
+                    .map(|arm| {
+                        Ok(AstMatchArm {
+                            pattern: arm.pattern.clone(),
+                            guard: arm.guard.clone(),
+                            body: rewrite_control_expr_terminal_branch(
+                                &arm.body,
+                                wrap,
+                                ControlExprKind::Match,
+                            )?,
+                        })
+                    })
+                    .collect::<Result<Vec<_>, String>>()?,
+            });
+            return Ok(rewritten);
+        }
+        AstStmt::Return(Some(value)) | AstStmt::Expr(value) => {
+            for root_kind in [ControlExprKind::If, ControlExprKind::Match] {
+                if let Some(expanded) =
+                    expand_nested_control_expr_as_stmt(value, wrap, root_kind, true)?
+                {
+                    rewritten.extend(expanded);
+                    return Ok(rewritten);
+                }
+            }
+            rewritten.push(wrap(value.clone()));
+            Ok(rewritten)
+        }
+        _ => Err(format!(
             "`{}` expression {} currently requires a tail expression result in each {}",
             kind.keyword(),
             kind.branch_name(),
             kind.branch_name()
-        ));
-    };
-    let mut rewritten = prefix.to_vec();
-    rewritten.push(wrap(value.clone()));
-    Ok(rewritten)
+        )),
+    }
 }
 
 fn emit_destructure_bindings(

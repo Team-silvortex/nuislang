@@ -10,6 +10,7 @@ Use it together with:
 
 * [nuis-0.19.0-mainline-goals.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-goals.md)
 * [nuis-0.19.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-compile-workflow.md)
+* [nuis-0.19.0-project-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-project-capability-matrix.md)
 * [nuis-0.19.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-release-checklist.md)
 
 ## Reading Rule
@@ -70,6 +71,30 @@ Recommended command:
 cargo test -q -p nuisc tests_control_flow
 ```
 
+### 1a. Lowering Branch-Local Runtime Boundary
+
+Primary family:
+
+* `core`:
+  [tests_branch_helpers.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/src/lowering/tests_branch_helpers.rs)
+
+Recommended command:
+
+```bash
+cargo test -q -p nuisc lowering::tests_branch_helpers
+```
+
+Current boundary defended here:
+
+* branch-local recursive `if` / lowered `match` value paths
+* shared-suffix return-chain and shared-binding lowering
+* branch-local runtime observer acceptance:
+  `task_completed`, `task_timed_out`, `task_cancelled`, `task_value`,
+  `mutex_value`
+* branch-local consuming runtime rejection:
+  `join_result`, `thread_join_result`, `mutex_lock`, `mutex_unlock`,
+  `spawn` / `join` / `timeout`-family shapes
+
 ### 2. Lowering Loop-Family Core
 
 Primary families:
@@ -118,12 +143,27 @@ Primary family:
 
 * `anchor`:
   [task_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/task_compile.rs)
+* current staged thread/lock project sample:
+  [task_thread_mutex_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_thread_mutex_demo)
 
 Recommended command:
 
 ```bash
 cargo test -q -p nuisc --test task_compile
 ```
+
+Useful frontdoor companion:
+
+```bash
+nuis project-doctor examples/projects/task/task_thread_mutex_demo
+nuis check examples/projects/task/task_thread_mutex_demo
+nuis test examples/projects/task/task_thread_mutex_demo
+```
+
+Current note:
+
+`task_thread_mutex_demo` now carries an explicit project smoke test and that
+smoke executes successfully through the staged AOT thread/lock path.
 
 ### 6. Memory/Address Pointer Closure
 

@@ -22,7 +22,11 @@ fn validate_function(function: &AstFunction) -> Result<(), String> {
     for param in &function.params {
         env.insert(param.name.clone(), false);
     }
-    validate_stmt_block(&function.body, &mut env, &format!("function `{}` body", function.name))
+    validate_stmt_block(
+        &function.body,
+        &mut env,
+        &format!("function `{}` body", function.name),
+    )
 }
 
 fn validate_impl_method(method: &AstImplMethod) -> Result<(), String> {
@@ -30,7 +34,11 @@ fn validate_impl_method(method: &AstImplMethod) -> Result<(), String> {
     for param in &method.params {
         env.insert(param.name.clone(), false);
     }
-    validate_stmt_block(&method.body, &mut env, &format!("impl method `{}` body", method.name))
+    validate_stmt_block(
+        &method.body,
+        &mut env,
+        &format!("impl method `{}` body", method.name),
+    )
 }
 
 fn validate_stmt_block(
@@ -122,7 +130,11 @@ fn validate_stmt(
     Ok(())
 }
 
-fn validate_expr(expr: &AstExpr, env: &BTreeMap<String, bool>, context: &str) -> Result<(), String> {
+fn validate_expr(
+    expr: &AstExpr,
+    env: &BTreeMap<String, bool>,
+    context: &str,
+) -> Result<(), String> {
     match expr {
         AstExpr::If {
             condition,

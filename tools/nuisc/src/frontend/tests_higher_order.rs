@@ -1,4 +1,4 @@
-use super::parse_nuis_module;
+use super::{lower_project_ast_to_nir, parse_nuis_ast, parse_nuis_module};
 use nuis_semantics::model::{NirExpr, NirStmt};
 
 fn stmt_tree_contains_call<F>(body: &[NirStmt], predicate: &F) -> bool
@@ -51,21 +51,30 @@ where
         | NirExpr::Borrow(base)
         | NirExpr::BorrowEnd(base)
         | NirExpr::CpuJoin(base)
+        | NirExpr::CpuThreadJoin(base)
         | NirExpr::DataReady(base)
         | NirExpr::DataMoved(base)
         | NirExpr::DataWindowed(base)
         | NirExpr::DataValue(base)
+        | NirExpr::CpuThreadJoinResult(base)
         | NirExpr::CpuTaskCompleted(base)
         | NirExpr::CpuTaskTimedOut(base)
         | NirExpr::CpuTaskCancelled(base)
-        | NirExpr::CpuTaskValue(base) => expr_contains_call(base, predicate),
+        | NirExpr::CpuTaskValue(base)
+        | NirExpr::CpuMutexNew(base)
+        | NirExpr::CpuMutexLock(base)
+        | NirExpr::CpuMutexUnlock(base)
+        | NirExpr::CpuMutexValue(base) => expr_contains_call(base, predicate),
         NirExpr::Binary { lhs, rhs, .. } => {
             expr_contains_call(lhs, predicate) || expr_contains_call(rhs, predicate)
         }
         NirExpr::CpuExternCall { args, .. } => {
             args.iter().any(|arg| expr_contains_call(arg, predicate))
         }
-        NirExpr::CpuSpawn { args, .. } => args.iter().any(|arg| expr_contains_call(arg, predicate)),
+        NirExpr::CpuSpawn { args, .. }
+        | NirExpr::CpuThreadSpawn { args, .. } => {
+            args.iter().any(|arg| expr_contains_call(arg, predicate))
+        }
         _ => false,
     }
 }
@@ -705,7 +714,9 @@ fn lowers_capturing_lambda_through_generic_fn1_template_parameter() {
     let helper = module
         .functions
         .iter()
-        .find(|function| function.name.starts_with("__hof_apply_") && function.name.ends_with("__i64"))
+        .find(|function| {
+            function.name.starts_with("__hof_apply_") && function.name.ends_with("__i64")
+        })
         .expect("expected monomorphized higher-order helper with capture threading");
     assert!(helper.generic_params.is_empty());
     assert_eq!(helper.params.len(), 2);
@@ -746,7 +757,9 @@ fn lowers_capturing_lambda_through_generic_fn1_alias_parameter() {
     let helper = module
         .functions
         .iter()
-        .find(|function| function.name.starts_with("__hof_apply_") && function.name.ends_with("__i64"))
+        .find(|function| {
+            function.name.starts_with("__hof_apply_") && function.name.ends_with("__i64")
+        })
         .expect("expected alias higher-order helper with capture threading");
     assert!(helper.generic_params.is_empty());
     assert_eq!(helper.params.len(), 2);
@@ -788,7 +801,9 @@ fn lowers_capturing_lambda_through_generic_fn2_and_fn3_parameters() {
     let apply2_helper = module
         .functions
         .iter()
-        .find(|function| function.name.starts_with("__hof_apply2_") && function.name.ends_with("__i64"))
+        .find(|function| {
+            function.name.starts_with("__hof_apply2_") && function.name.ends_with("__i64")
+        })
         .expect("expected monomorphized Fn2 helper");
     assert!(apply2_helper.generic_params.is_empty());
     assert_eq!(apply2_helper.params.len(), 3);
@@ -806,7 +821,9 @@ fn lowers_capturing_lambda_through_generic_fn2_and_fn3_parameters() {
     let apply3_helper = module
         .functions
         .iter()
-        .find(|function| function.name.starts_with("__hof_apply3_") && function.name.ends_with("__i64"))
+        .find(|function| {
+            function.name.starts_with("__hof_apply3_") && function.name.ends_with("__i64")
+        })
         .expect("expected monomorphized Fn3 alias helper");
     assert!(apply3_helper.generic_params.is_empty());
     assert_eq!(apply3_helper.params.len(), 4);
@@ -1497,21 +1514,27 @@ fn lowers_specialized_generic_recursive_async_body_with_capturing_lambda_and_bou
         .expect("expected recursive async generic specialization with capture");
     assert!(specialized.is_async);
     assert!(specialized.generic_params.is_empty());
-    assert!(stmt_tree_contains_call(&specialized.body, &|callee, args| {
-        callee == higher_order_concrete.name
-            && matches!(
-                args,
-                [NirExpr::StructLiteral { .. }, NirExpr::Var(extra)] if extra == "extra"
-            )
-    }));
-    assert!(stmt_tree_contains_call(&specialized.body, &|callee, args| {
-        callee == "climb__i64"
-            && matches!(
-                args,
-                [NirExpr::Var(value), NirExpr::Var(extra), NirExpr::Binary { .. }]
-                    if value == "value" && extra == "extra"
-            )
-    }));
+    assert!(stmt_tree_contains_call(
+        &specialized.body,
+        &|callee, args| {
+            callee == higher_order_concrete.name
+                && matches!(
+                    args,
+                    [NirExpr::StructLiteral { .. }, NirExpr::Var(extra)] if extra == "extra"
+                )
+        }
+    ));
+    assert!(stmt_tree_contains_call(
+        &specialized.body,
+        &|callee, args| {
+            callee == "climb__i64"
+                && matches!(
+                    args,
+                    [NirExpr::Var(value), NirExpr::Var(extra), NirExpr::Binary { .. }]
+                        if value == "value" && extra == "extra"
+                )
+        }
+    ));
 }
 
 // Trait-bound validation and bound-preserving generic lambda specialization.
@@ -1769,6 +1792,175 @@ fn lowers_capturing_generic_lambda_method_call_with_present_bound() {
         lambda.body.as_slice(),
         [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
             if callee == "impl.Addable.for.i64.add"
+                && matches!(
+                    args.as_slice(),
+                    [NirExpr::Var(lhs), NirExpr::Var(rhs)]
+                        if lhs == "x" && rhs == &capture_param_name
+                )
+    ));
+}
+
+#[test]
+fn lowers_higher_order_generic_lambda_with_qualified_helper_trait_bound() {
+    let main_ast = parse_nuis_ast(
+        r#"
+        use cpu Helper;
+
+        mod cpu Main {
+          impl Helper.Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          fn apply<T: Helper.Addable>(x: T, f: Fn1<T, T>) -> T {
+            return f(x);
+          }
+
+          fn bump<T: Helper.Addable>(value: T, extra: T) -> T {
+            return apply(value, |x: T| -> T { return x.add(extra); });
+          }
+
+          fn main() -> i64 {
+            return bump(2, 3);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let helper_ast = parse_nuis_ast(
+        r#"
+        mod cpu Helper {
+          pub trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let module = lower_project_ast_to_nir(&main_ast, &[helper_ast]).unwrap();
+
+    let higher_order_concrete = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__hof_apply_") && function.name.ends_with("__i64")
+        })
+        .expect("expected helper-trait monomorphized higher-order helper");
+    assert!(higher_order_concrete.generic_params.is_empty());
+    assert_eq!(higher_order_concrete.params.len(), 2);
+    assert!(matches!(
+        higher_order_concrete.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee.starts_with("__lambda_bump_")
+                && matches!(
+                    args.as_slice(),
+                    [NirExpr::Var(x), NirExpr::Var(extra)]
+                        if x == "x" && extra == "__capture_f_extra_0"
+                )
+    ));
+
+    let lambda = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__lambda_bump_") && function.name.ends_with("__i64")
+        })
+        .expect("expected helper-trait monomorphized captured generic lambda specialization");
+    assert!(lambda.generic_params.is_empty());
+    let capture_param_name = lambda.params[1].name.clone();
+    assert!(matches!(
+        lambda.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee == "impl.Helper.Addable.for.i64.add"
+                && matches!(
+                    args.as_slice(),
+                    [NirExpr::Var(lhs), NirExpr::Var(rhs)]
+                        if lhs == "x" && rhs == &capture_param_name
+                )
+    ));
+}
+
+#[test]
+fn lowers_higher_order_generic_lambda_with_qualified_helper_trait_bound_through_alias_chain() {
+    let main_ast = parse_nuis_ast(
+        r#"
+        use cpu Helper;
+
+        mod cpu Main {
+          type Alias<T> = T;
+          type Outer<T> = Alias<T>;
+
+          impl Helper.Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          fn apply<T: Helper.Addable>(x: Outer<T>, f: Fn1<Outer<T>, T>) -> T {
+            return f(x);
+          }
+
+          fn bump<T: Helper.Addable>(value: Outer<T>, extra: Outer<T>) -> T {
+            return apply(value, |x: Outer<T>| -> T { return x.add(extra); });
+          }
+
+          fn main() -> i64 {
+            return bump(2, 3);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let helper_ast = parse_nuis_ast(
+        r#"
+        mod cpu Helper {
+          pub trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let module = lower_project_ast_to_nir(&main_ast, &[helper_ast]).unwrap();
+
+    let higher_order_concrete = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__hof_apply_") && function.name.ends_with("__i64")
+        })
+        .expect("expected helper-trait alias-chain monomorphized higher-order helper");
+    assert!(higher_order_concrete.generic_params.is_empty());
+    assert_eq!(higher_order_concrete.params.len(), 2);
+    assert!(matches!(
+        higher_order_concrete.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee.starts_with("__lambda_bump_")
+                && matches!(
+                    args.as_slice(),
+                    [NirExpr::Var(x), NirExpr::Var(extra)]
+                        if x == "x" && extra == "__capture_f_extra_0"
+                )
+    ));
+
+    let lambda = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__lambda_bump_") && function.name.ends_with("__i64")
+        })
+        .expect(
+            "expected helper-trait alias-chain monomorphized captured generic lambda specialization",
+        );
+    assert!(lambda.generic_params.is_empty());
+    let capture_param_name = lambda.params[1].name.clone();
+    assert!(matches!(
+        lambda.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee == "impl.Helper.Addable.for.i64.add"
                 && matches!(
                     args.as_slice(),
                     [NirExpr::Var(lhs), NirExpr::Var(rhs)]
@@ -2515,8 +2707,7 @@ fn lowers_capturing_generic_lambda_ordering_ge_operator_with_present_bound() {
         .functions
         .iter()
         .find(|function| {
-            function.name.starts_with("__lambda_greater_eq_")
-                && function.name.ends_with("__Pair")
+            function.name.starts_with("__lambda_greater_eq_") && function.name.ends_with("__Pair")
         })
         .expect("expected monomorphized ordering >= captured generic lambda specialization");
     assert!(lambda.generic_params.is_empty());

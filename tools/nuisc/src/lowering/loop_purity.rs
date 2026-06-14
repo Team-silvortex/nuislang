@@ -31,6 +31,7 @@ pub(super) fn is_terminal_branch_pure_expr(
         | NirExpr::CpuTaskTimedOut(inner)
         | NirExpr::CpuTaskCancelled(inner)
         | NirExpr::CpuTaskValue(inner)
+        | NirExpr::CpuMutexValue(inner)
         | NirExpr::NetworkConfigReady(inner)
         | NirExpr::NetworkSendReady(inner)
         | NirExpr::NetworkRecvReady(inner)
@@ -464,9 +465,7 @@ fn is_pure_helper_expr(
         NirExpr::CastI64ToI32(inner)
         | NirExpr::CastI32ToI64(inner)
         | NirExpr::CastI64ToBool(inner)
-        | NirExpr::CastBoolToI64(inner) => {
-            is_pure_helper_expr(inner, function_map, memo, visiting)
-        }
+        | NirExpr::CastBoolToI64(inner) => is_pure_helper_expr(inner, function_map, memo, visiting),
         NirExpr::CastI64ToF32(inner) | NirExpr::CastF32ToI64(inner) => {
             is_pure_helper_expr(inner, function_map, memo, visiting)
         }
@@ -504,39 +503,37 @@ pub(super) fn substitute_branch_binding(
             binding_name,
             binding_value,
         ))),
-        NirExpr::CastI32ToI64(inner) => NirExpr::CastI32ToI64(Box::new(
+        NirExpr::CastI32ToI64(inner) => NirExpr::CastI32ToI64(Box::new(substitute_branch_binding(
+            inner,
+            binding_name,
+            binding_value,
+        ))),
+        NirExpr::CastI64ToBool(inner) => NirExpr::CastI64ToBool(Box::new(
             substitute_branch_binding(inner, binding_name, binding_value),
         )),
-        NirExpr::CastI64ToBool(inner) => {
-            NirExpr::CastI64ToBool(Box::new(substitute_branch_binding(
-                inner,
-                binding_name,
-                binding_value,
-            )))
-        }
         NirExpr::CastBoolToI64(inner) => NirExpr::CastBoolToI64(Box::new(
             substitute_branch_binding(inner, binding_name, binding_value),
         )),
-        NirExpr::CastI64ToF32(inner) => {
-            NirExpr::CastI64ToF32(Box::new(substitute_branch_binding(
-                inner,
-                binding_name,
-                binding_value,
-            )))
-        }
-        NirExpr::CastF32ToI64(inner) => NirExpr::CastF32ToI64(Box::new(
-            substitute_branch_binding(inner, binding_name, binding_value),
-        )),
-        NirExpr::CastI64ToF64(inner) => {
-            NirExpr::CastI64ToF64(Box::new(substitute_branch_binding(
-                inner,
-                binding_name,
-                binding_value,
-            )))
-        }
-        NirExpr::CastF64ToI64(inner) => NirExpr::CastF64ToI64(Box::new(
-            substitute_branch_binding(inner, binding_name, binding_value),
-        )),
+        NirExpr::CastI64ToF32(inner) => NirExpr::CastI64ToF32(Box::new(substitute_branch_binding(
+            inner,
+            binding_name,
+            binding_value,
+        ))),
+        NirExpr::CastF32ToI64(inner) => NirExpr::CastF32ToI64(Box::new(substitute_branch_binding(
+            inner,
+            binding_name,
+            binding_value,
+        ))),
+        NirExpr::CastI64ToF64(inner) => NirExpr::CastI64ToF64(Box::new(substitute_branch_binding(
+            inner,
+            binding_name,
+            binding_value,
+        ))),
+        NirExpr::CastF64ToI64(inner) => NirExpr::CastF64ToI64(Box::new(substitute_branch_binding(
+            inner,
+            binding_name,
+            binding_value,
+        ))),
         NirExpr::Call { callee, args } => NirExpr::Call {
             callee: callee.clone(),
             args: args
@@ -708,8 +705,11 @@ pub(super) fn prepare_terminal_branch(
     pure_helpers: &BTreeSet<String>,
 ) -> Option<PreparedTerminalBranch> {
     match stmts {
-        [NirStmt::Return(Some(value))] => Some(PreparedTerminalBranch::Return(value.clone())),
-        [NirStmt::Print(print), NirStmt::Return(Some(returned))] => {
+        [NirStmt::Return(Some(value))] | [NirStmt::Expr(value)] => {
+            Some(PreparedTerminalBranch::Return(value.clone()))
+        }
+        [NirStmt::Print(print), NirStmt::Return(Some(returned))]
+        | [NirStmt::Print(print), NirStmt::Expr(returned)] => {
             Some(PreparedTerminalBranch::PrintReturn {
                 print: print.clone(),
                 returned: returned.clone(),

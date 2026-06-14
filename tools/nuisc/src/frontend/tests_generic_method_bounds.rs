@@ -753,6 +753,54 @@ fn accepts_qualified_helper_trait_bound_for_operator_call() {
 }
 
 #[test]
+fn accepts_qualified_helper_trait_bound_for_operator_call_through_alias_chain_and_if() {
+    let main_ast = parse_nuis_ast(
+        r#"
+        use cpu Helper;
+
+        mod cpu Main {
+          type Alias<T> = T;
+          type Outer<T> = Alias<T>;
+
+          impl Helper.Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          fn bump<T: Helper.Addable>(lhs: Outer<T>, rhs: Outer<T>) -> T {
+            if true {
+              return lhs + rhs;
+            }
+            return lhs;
+          }
+
+          fn main() -> i64 {
+            return bump(7, 8);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let helper_ast = parse_nuis_ast(
+        r#"
+        mod cpu Helper {
+          pub trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let module = lower_project_ast_to_nir(&main_ast, &[helper_ast]).unwrap();
+    assert!(module
+        .functions
+        .iter()
+        .any(|function| function.name == "bump__i64"));
+}
+
+#[test]
 fn suggests_trait_method_name_for_explicit_trait_call_on_generic_param() {
     let error = parse_nuis_module(
         r#"

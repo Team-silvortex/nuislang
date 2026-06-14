@@ -561,12 +561,18 @@ pub(super) fn expr_walk_any(expr: &NirExpr, predicate: &dyn Fn(&NirExpr) -> bool
         | NirExpr::LoadNext(inner)
         | NirExpr::BufferLen(inner)
         | NirExpr::CpuJoin(inner)
+        | NirExpr::CpuThreadJoin(inner)
         | NirExpr::CpuCancel(inner)
         | NirExpr::CpuJoinResult(inner)
+        | NirExpr::CpuThreadJoinResult(inner)
         | NirExpr::CpuTaskCompleted(inner)
         | NirExpr::CpuTaskTimedOut(inner)
         | NirExpr::CpuTaskCancelled(inner)
         | NirExpr::CpuTaskValue(inner)
+        | NirExpr::CpuMutexNew(inner)
+        | NirExpr::CpuMutexLock(inner)
+        | NirExpr::CpuMutexUnlock(inner)
+        | NirExpr::CpuMutexValue(inner)
         | NirExpr::DataReady(inner)
         | NirExpr::DataMoved(inner)
         | NirExpr::DataWindowed(inner)
@@ -623,6 +629,7 @@ pub(super) fn expr_walk_any(expr: &NirExpr, predicate: &dyn Fn(&NirExpr) -> bool
             ..
         } => predicate(color) || predicate(speed) || predicate(radius),
         NirExpr::CpuSpawn { args, .. }
+        | NirExpr::CpuThreadSpawn { args, .. }
         | NirExpr::CpuExternCall { args, .. }
         | NirExpr::Call { args, .. } => args.iter().any(predicate),
         NirExpr::CpuTimeout { task, limit } => predicate(task) || predicate(limit),

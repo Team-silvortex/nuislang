@@ -446,7 +446,8 @@ fn verify_condition_expr(
                     &mut rhs_borrow_bindings,
                     true,
                 );
-                let rhs_facts = task_result_facts_for_short_circuit_rhs(lhs, true, task_result_facts);
+                let rhs_facts =
+                    task_result_facts_for_short_circuit_rhs(lhs, true, task_result_facts);
                 verify_condition_expr(
                     rhs,
                     &rhs_moved,
@@ -708,9 +709,13 @@ fn apply_guaranteed_expr_effects(
         NirExpr::Move(_)
         | NirExpr::Free(_)
         | NirExpr::CpuJoin(_)
+        | NirExpr::CpuThreadJoin(_)
         | NirExpr::CpuCancel(_)
         | NirExpr::CpuJoinResult(_)
+        | NirExpr::CpuThreadJoinResult(_)
         | NirExpr::CpuTimeout { .. }
+        | NirExpr::CpuMutexLock(_)
+        | NirExpr::CpuMutexUnlock(_)
         | NirExpr::BorrowEnd(_) => note_binding_effects(expr, "_", moved, borrows, borrow_bindings),
         NirExpr::Borrow(_) | NirExpr::LoadNext(_) if include_temporary_borrows => {
             note_binding_effects(expr, "_", moved, borrows, borrow_bindings)
@@ -905,8 +910,12 @@ fn verify_expr(
                 NirExpr::Move(inner)
                 | NirExpr::Free(inner)
                 | NirExpr::CpuJoin(inner)
+                | NirExpr::CpuThreadJoin(inner)
                 | NirExpr::CpuCancel(inner)
-                | NirExpr::CpuJoinResult(inner) => {
+                | NirExpr::CpuJoinResult(inner)
+                | NirExpr::CpuThreadJoinResult(inner)
+                | NirExpr::CpuMutexLock(inner)
+                | NirExpr::CpuMutexUnlock(inner) => {
                     if let Some(operation) = match expr {
                         NirExpr::Move(_) => Some("move(...)"),
                         NirExpr::Free(_) => Some("free(...)"),
@@ -1060,12 +1069,18 @@ fn verify_expr(
         | NirExpr::ShaderInlineWgsl { .. } => {}
         NirExpr::CpuPresentFrame(inner)
         | NirExpr::CpuJoin(inner)
+        | NirExpr::CpuThreadJoin(inner)
         | NirExpr::CpuCancel(inner)
         | NirExpr::CpuJoinResult(inner)
+        | NirExpr::CpuThreadJoinResult(inner)
         | NirExpr::CpuTaskCompleted(inner)
         | NirExpr::CpuTaskTimedOut(inner)
         | NirExpr::CpuTaskCancelled(inner)
         | NirExpr::CpuTaskValue(inner)
+        | NirExpr::CpuMutexNew(inner)
+        | NirExpr::CpuMutexLock(inner)
+        | NirExpr::CpuMutexUnlock(inner)
+        | NirExpr::CpuMutexValue(inner)
         | NirExpr::DataReady(inner)
         | NirExpr::DataMoved(inner)
         | NirExpr::DataWindowed(inner)
@@ -1171,14 +1186,18 @@ fn verify_expr(
             data_bindings,
             task_result_facts,
         )?,
-        NirExpr::CpuSpawn { args, .. } | NirExpr::CpuExternCall { args, .. } => verify_expr_sequence(
-            args.iter(),
-            moved,
-            borrows,
-            borrow_bindings,
-            data_bindings,
-            task_result_facts,
-        )?,
+        NirExpr::CpuSpawn { args, .. }
+        | NirExpr::CpuThreadSpawn { args, .. }
+        | NirExpr::CpuExternCall { args, .. } => {
+            verify_expr_sequence(
+                args.iter(),
+                moved,
+                borrows,
+                borrow_bindings,
+                data_bindings,
+                task_result_facts,
+            )?
+        }
         NirExpr::CpuTimeout { task, limit } => {
             verify_expr(
                 task,
@@ -1779,11 +1798,7 @@ fn verify_expr(
                 data_bindings,
                 task_result_facts,
             )?;
-            ensure_owned_address_target(
-                "store_value(..., target)",
-                target,
-                &next_borrow_bindings,
-            )?;
+            ensure_owned_address_target("store_value(..., target)", target, &next_borrow_bindings)?;
         }
         NirExpr::StoreNext { target, next } => {
             verify_expr(
@@ -1867,11 +1882,7 @@ fn verify_expr(
                 data_bindings,
                 task_result_facts,
             )?;
-            ensure_owned_address_target(
-                "store_at(..., buffer)",
-                buffer,
-                &current_borrow_bindings,
-            )?;
+            ensure_owned_address_target("store_at(..., buffer)", buffer, &current_borrow_bindings)?;
         }
         NirExpr::Call { args, .. } => verify_expr_sequence(
             args.iter(),
@@ -1954,9 +1965,7 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
         NirExpr::CastI64ToI32(inner)
         | NirExpr::CastI32ToI64(inner)
         | NirExpr::CastI64ToBool(inner)
-        | NirExpr::CastBoolToI64(inner) => {
-            verify_expr_uses(inner, moved)?
-        }
+        | NirExpr::CastBoolToI64(inner) => verify_expr_uses(inner, moved)?,
         NirExpr::CastI64ToF32(inner) | NirExpr::CastF32ToI64(inner) => {
             verify_expr_uses(inner, moved)?
         }
@@ -2014,12 +2023,18 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
         | NirExpr::ShaderInlineWgsl { .. } => {}
         NirExpr::CpuPresentFrame(inner)
         | NirExpr::CpuJoin(inner)
+        | NirExpr::CpuThreadJoin(inner)
         | NirExpr::CpuCancel(inner)
         | NirExpr::CpuJoinResult(inner)
+        | NirExpr::CpuThreadJoinResult(inner)
         | NirExpr::CpuTaskCompleted(inner)
         | NirExpr::CpuTaskTimedOut(inner)
         | NirExpr::CpuTaskCancelled(inner)
         | NirExpr::CpuTaskValue(inner)
+        | NirExpr::CpuMutexNew(inner)
+        | NirExpr::CpuMutexLock(inner)
+        | NirExpr::CpuMutexUnlock(inner)
+        | NirExpr::CpuMutexValue(inner)
         | NirExpr::DataReady(inner)
         | NirExpr::DataMoved(inner)
         | NirExpr::DataWindowed(inner)
@@ -2057,7 +2072,9 @@ fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Result<(), Stri
         NirExpr::KernelSortAxis { input, .. } => verify_expr_uses(input, moved)?,
         NirExpr::KernelTopkAxis { input, .. } => verify_expr_uses(input, moved)?,
         NirExpr::KernelTopk { input, .. } => verify_expr_uses(input, moved)?,
-        NirExpr::CpuSpawn { args, .. } | NirExpr::CpuExternCall { args, .. } => {
+        NirExpr::CpuSpawn { args, .. }
+        | NirExpr::CpuThreadSpawn { args, .. }
+        | NirExpr::CpuExternCall { args, .. } => {
             for arg in args {
                 verify_expr_uses(arg, moved)?;
             }

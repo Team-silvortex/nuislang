@@ -48,6 +48,63 @@ pub(super) fn ensure_task_like(
     }
 }
 
+pub(super) fn ensure_thread_like(
+    name: &str,
+    expr: &NirExpr,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> Result<(), String> {
+    match infer_nir_expr_type(expr, bindings, signatures, struct_table) {
+        Some(ty) if ty.is_thread_family() => Ok(()),
+        Some(ty) => Err(format!(
+            "{name}(...) expects `Thread<...>`, found `{}`",
+            render_type_name(&ty)
+        )),
+        None => Err(format!(
+            "{name}(...) requires a typed thread handle in the current frontend"
+        )),
+    }
+}
+
+pub(super) fn ensure_mutex_like(
+    name: &str,
+    expr: &NirExpr,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> Result<(), String> {
+    match infer_nir_expr_type(expr, bindings, signatures, struct_table) {
+        Some(ty) if ty.is_mutex_family() => Ok(()),
+        Some(ty) => Err(format!(
+            "{name}(...) expects `Mutex<...>`, found `{}`",
+            render_type_name(&ty)
+        )),
+        None => Err(format!(
+            "{name}(...) requires a typed mutex handle in the current frontend"
+        )),
+    }
+}
+
+pub(super) fn ensure_mutex_guard_like(
+    name: &str,
+    expr: &NirExpr,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> Result<(), String> {
+    match infer_nir_expr_type(expr, bindings, signatures, struct_table) {
+        Some(ty) if ty.is_mutex_guard_family() => Ok(()),
+        Some(ty) => Err(format!(
+            "{name}(...) expects `MutexGuard<...>`, found `{}`",
+            render_type_name(&ty)
+        )),
+        None => Err(format!(
+            "{name}(...) requires a typed mutex guard in the current frontend"
+        )),
+    }
+}
+
 pub(super) fn ensure_call_arg_matches_param(
     callee: &str,
     arg_index: usize,
@@ -171,6 +228,20 @@ mod tests {
         }
     }
 
+    fn thread_i64() -> NirTypeRef {
+        NirTypeRef {
+            name: "Thread".to_owned(),
+            generic_args: vec![NirTypeRef {
+                name: "i64".to_owned(),
+                generic_args: vec![],
+                is_optional: false,
+                is_ref: false,
+            }],
+            is_optional: false,
+            is_ref: false,
+        }
+    }
+
     #[test]
     fn spawn_input_error_mentions_owned_ref_boundary_for_owned_pointer_expr() {
         let expr = NirExpr::AllocNode {
@@ -248,6 +319,22 @@ mod tests {
         .unwrap_err();
         assert!(error.contains("expects `i64`, found `ref Node`"));
         assert!(error.contains("`ref Buffer -> i64`"));
+    }
+
+    #[test]
+    fn spawn_input_rejects_staged_thread_handles() {
+        let mut bindings = BTreeMap::new();
+        bindings.insert("worker".to_owned(), thread_i64());
+        let error = ensure_spawn_input_safe(
+            "spawn",
+            &NirExpr::Var("worker".to_owned()),
+            &bindings,
+            &BTreeMap::new(),
+            &BTreeMap::new(),
+        )
+        .unwrap_err();
+        assert!(error.contains("nested payloads cross the async boundary"));
+        assert!(error.contains("Thread<i64>"));
     }
 }
 

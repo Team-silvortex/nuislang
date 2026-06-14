@@ -194,17 +194,17 @@ fn lowers_hello_buffer_addressing_memory_source_with_ref_buffer_nir_shape() {
 
 #[test]
 fn compiles_hello_byte_buffer_memory_source() {
-    let source = Path::new(
-        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_byte_buffer.ns",
-    );
+    let source =
+        Path::new("/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_byte_buffer.ns");
     nuisc::pipeline::compile_source_path(source)
         .expect("hello_byte_buffer memory source should compile");
 }
 
 #[test]
 fn lowers_hello_byte_buffer_memory_source_with_byte_intrinsic_shape() {
-    let artifacts =
-        compiled_source("/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_byte_buffer.ns");
+    let artifacts = compiled_source(
+        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_byte_buffer.ns",
+    );
 
     assert!(
         artifacts
@@ -215,22 +215,29 @@ fn lowers_hello_byte_buffer_memory_source_with_byte_intrinsic_shape() {
         "expected byte serialization host intrinsic path"
     );
     assert!(
-        artifacts.yir.nodes.iter().filter(|node| {
-            node.op.module == "cpu" && node.op.instruction == "struct"
-        }).count()
+        artifacts
+            .yir
+            .nodes
+            .iter()
+            .filter(|node| { node.op.module == "cpu" && node.op.instruction == "struct" })
+            .count()
             >= 2,
         "expected bytes/subbytes lowering to materialize byte slice struct nodes"
     );
     assert!(
-        artifacts.yir.nodes.iter().any(|node| {
-            node.op.module == "cpu" && node.op.instruction == "field"
-        }),
+        artifacts
+            .yir
+            .nodes
+            .iter()
+            .any(|node| { node.op.module == "cpu" && node.op.instruction == "field" }),
         "expected byte subslice lowering to project slice fields"
     );
     assert!(
-        artifacts.yir.nodes.iter().any(|node| {
-            node.op.module == "cpu" && node.op.instruction == "load_at"
-        }),
+        artifacts
+            .yir
+            .nodes
+            .iter()
+            .any(|node| { node.op.module == "cpu" && node.op.instruction == "load_at" }),
         "expected byte slice read path to lower through load_at"
     );
     assert!(artifacts
@@ -240,8 +247,9 @@ fn lowers_hello_byte_buffer_memory_source_with_byte_intrinsic_shape() {
 
 #[test]
 fn lowers_hello_byte_buffer_memory_source_with_alias_resolved_ref_buffer_type() {
-    let artifacts =
-        compiled_source("/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_byte_buffer.ns");
+    let artifacts = compiled_source(
+        "/Users/Shared/chroot/dev/nuislang/examples/ns/memory/hello_byte_buffer.ns",
+    );
 
     let main = artifacts
         .nir
@@ -557,11 +565,13 @@ fn compiles_standardized_byte_slice_helper_api() {
     assert!(artifacts.llvm_ir.contains("call i64 @host_copy_bytes"));
     assert!(artifacts.llvm_ir.contains("call i64 @host_compare_bytes"));
     assert!(artifacts.llvm_ir.contains("icmp eq i64"));
-    assert!(artifacts
-        .llvm_ir
-        .matches("call i64 @host_compare_bytes")
-        .count()
-        >= 3);
+    assert!(
+        artifacts
+            .llvm_ir
+            .matches("call i64 @host_compare_bytes")
+            .count()
+            >= 3
+    );
 }
 
 #[test]
@@ -662,7 +672,10 @@ fn compiles_standardized_byte_slice_partition_api() {
         .iter()
         .filter(|node| node.op.module == "cpu" && node.op.instruction == "struct")
         .count();
-    assert!(struct_count >= 3, "expected bytes + before + after struct nodes");
+    assert!(
+        struct_count >= 3,
+        "expected bytes + before + after struct nodes"
+    );
     assert!(artifacts
         .yir
         .nodes
@@ -700,7 +713,10 @@ fn compiles_standardized_byte_split_once_api() {
         .iter()
         .filter(|node| node.op.module == "cpu" && node.op.instruction == "struct")
         .count();
-    assert!(struct_count >= 5, "expected bytes + byte split + text split + nested slice structs");
+    assert!(
+        struct_count >= 5,
+        "expected bytes + byte split + text split + nested slice structs"
+    );
     assert!(nir_contains_host_callee(
         &artifacts.nir,
         "host_buffer_find_byte"
@@ -1082,11 +1098,14 @@ fn expr_contains_host_callee(expr: &NirExpr, callee: &str) -> bool {
             args,
             ..
         } => {
-            found == callee || args.iter().any(|arg| expr_contains_host_callee(arg, callee))
+            found == callee
+                || args
+                    .iter()
+                    .any(|arg| expr_contains_host_callee(arg, callee))
         }
-        NirExpr::Call { args, .. } | NirExpr::MethodCall { args, .. } => {
-            args.iter().any(|arg| expr_contains_host_callee(arg, callee))
-        }
+        NirExpr::Call { args, .. } | NirExpr::MethodCall { args, .. } => args
+            .iter()
+            .any(|arg| expr_contains_host_callee(arg, callee)),
         NirExpr::StructLiteral { fields, .. } => fields
             .iter()
             .any(|(_, value)| expr_contains_host_callee(value, callee)),
@@ -1117,7 +1136,10 @@ fn expr_contains_host_callee(expr: &NirExpr, callee: &str) -> bool {
         NirExpr::StoreNext { target, next } => {
             expr_contains_host_callee(target, callee) || expr_contains_host_callee(next, callee)
         }
-        NirExpr::AllocBuffer { len: value, fill: next }
+        NirExpr::AllocBuffer {
+            len: value,
+            fill: next,
+        }
         | NirExpr::LoadAt {
             buffer: value,
             index: next,

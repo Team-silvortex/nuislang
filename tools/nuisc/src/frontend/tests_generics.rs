@@ -53,21 +53,30 @@ where
         | NirExpr::Borrow(base)
         | NirExpr::BorrowEnd(base)
         | NirExpr::CpuJoin(base)
+        | NirExpr::CpuThreadJoin(base)
         | NirExpr::DataReady(base)
         | NirExpr::DataMoved(base)
         | NirExpr::DataWindowed(base)
         | NirExpr::DataValue(base)
+        | NirExpr::CpuThreadJoinResult(base)
         | NirExpr::CpuTaskCompleted(base)
         | NirExpr::CpuTaskTimedOut(base)
         | NirExpr::CpuTaskCancelled(base)
-        | NirExpr::CpuTaskValue(base) => expr_contains_call(base, predicate),
+        | NirExpr::CpuTaskValue(base)
+        | NirExpr::CpuMutexNew(base)
+        | NirExpr::CpuMutexLock(base)
+        | NirExpr::CpuMutexUnlock(base)
+        | NirExpr::CpuMutexValue(base) => expr_contains_call(base, predicate),
         NirExpr::Binary { lhs, rhs, .. } => {
             expr_contains_call(lhs, predicate) || expr_contains_call(rhs, predicate)
         }
         NirExpr::CpuExternCall { args, .. } => {
             args.iter().any(|arg| expr_contains_call(arg, predicate))
         }
-        NirExpr::CpuSpawn { args, .. } => args.iter().any(|arg| expr_contains_call(arg, predicate)),
+        NirExpr::CpuSpawn { args, .. }
+        | NirExpr::CpuThreadSpawn { args, .. } => {
+            args.iter().any(|arg| expr_contains_call(arg, predicate))
+        }
         _ => false,
     }
 }

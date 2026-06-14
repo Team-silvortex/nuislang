@@ -1,0 +1,7 @@
+name = "task_thread_mutex_demo"
+entry = "main.ns"
+modules = ["main.ns"]
+tests = ["tests/smoke.ns"]
+abi = [
+  "cpu=cpu.arm64.apple_aapcs64"
+]

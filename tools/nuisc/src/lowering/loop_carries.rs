@@ -190,12 +190,18 @@ fn expr_contains_loop_variant_name(
         | NirExpr::LoadNext(inner)
         | NirExpr::BufferLen(inner)
         | NirExpr::CpuJoin(inner)
+        | NirExpr::CpuThreadJoin(inner)
         | NirExpr::CpuCancel(inner)
         | NirExpr::CpuJoinResult(inner)
+        | NirExpr::CpuThreadJoinResult(inner)
         | NirExpr::CpuTaskCompleted(inner)
         | NirExpr::CpuTaskTimedOut(inner)
         | NirExpr::CpuTaskCancelled(inner)
         | NirExpr::CpuTaskValue(inner)
+        | NirExpr::CpuMutexNew(inner)
+        | NirExpr::CpuMutexLock(inner)
+        | NirExpr::CpuMutexUnlock(inner)
+        | NirExpr::CpuMutexValue(inner)
         | NirExpr::DataReady(inner)
         | NirExpr::DataMoved(inner)
         | NirExpr::DataWindowed(inner)
@@ -263,7 +269,8 @@ fn expr_contains_loop_variant_name(
         }
         NirExpr::Call { args, .. }
         | NirExpr::CpuExternCall { args, .. }
-        | NirExpr::CpuSpawn { args, .. } => args
+        | NirExpr::CpuSpawn { args, .. }
+        | NirExpr::CpuThreadSpawn { args, .. } => args
             .iter()
             .any(|arg| expr_contains_loop_variant_name(arg, binding_name, carries)),
         NirExpr::MethodCall { receiver, args, .. } => {
@@ -384,69 +391,68 @@ fn parse_scaled_additive_carry_source(
         is_terminal_branch_pure_expr(expr, &BTreeSet::new())
             && expr_is_loop_invariant(expr, binding_name, carries)
     };
-    let into_scaled_state_list =
-        |source: PreparedCarrySource, factor: NirExpr| -> Option<PreparedCarrySource> {
-            match source {
-                PreparedCarrySource::AddStateList { terms, offset } => {
-                    let scaled_offset = offset.map(|offset| NirExpr::Binary {
-                        op: NirBinaryOp::Mul,
-                        lhs: Box::new(offset),
-                        rhs: Box::new(factor.clone()),
-                    });
-                    Some(PreparedCarrySource::ScaledStateList {
-                        terms,
-                        factor,
-                        offset: scaled_offset,
-                    })
-                }
-                PreparedCarrySource::AddInvariant { base, offset } => {
-                    let state_ref = match *base {
-                        PreparedCarrySource::Current => PreparedLoopStateRef::Current,
-                        PreparedCarrySource::PreviousCurrent => PreparedLoopStateRef::PreviousCurrent,
-                        PreparedCarrySource::PreviousCarry(index) => {
-                            PreparedLoopStateRef::PreviousCarry(index)
-                        }
-                        PreparedCarrySource::Carry(index) => PreparedLoopStateRef::Carry(index),
-                        _ => return None,
-                    };
-                    let scaled_offset = NirExpr::Binary {
-                        op: NirBinaryOp::Mul,
-                        lhs: Box::new(offset),
-                        rhs: Box::new(factor.clone()),
-                    };
-                    Some(PreparedCarrySource::ScaledStateList {
-                        terms: vec![state_ref],
-                        factor,
-                        offset: Some(scaled_offset),
-                    })
-                }
-                PreparedCarrySource::Current => Some(PreparedCarrySource::ScaledStateList {
-                    terms: vec![PreparedLoopStateRef::Current],
+    let into_scaled_state_list = |source: PreparedCarrySource,
+                                  factor: NirExpr|
+     -> Option<PreparedCarrySource> {
+        match source {
+            PreparedCarrySource::AddStateList { terms, offset } => {
+                let scaled_offset = offset.map(|offset| NirExpr::Binary {
+                    op: NirBinaryOp::Mul,
+                    lhs: Box::new(offset),
+                    rhs: Box::new(factor.clone()),
+                });
+                Some(PreparedCarrySource::ScaledStateList {
+                    terms,
                     factor,
-                    offset: None,
-                }),
-                PreparedCarrySource::PreviousCurrent => {
-                    Some(PreparedCarrySource::ScaledStateList {
-                        terms: vec![PreparedLoopStateRef::PreviousCurrent],
-                        factor,
-                        offset: None,
-                    })
-                }
-                PreparedCarrySource::PreviousCarry(index) => {
-                    Some(PreparedCarrySource::ScaledStateList {
-                        terms: vec![PreparedLoopStateRef::PreviousCarry(index)],
-                        factor,
-                        offset: None,
-                    })
-                }
-                PreparedCarrySource::Carry(index) => Some(PreparedCarrySource::ScaledStateList {
-                    terms: vec![PreparedLoopStateRef::Carry(index)],
-                    factor,
-                    offset: None,
-                }),
-                _ => None,
+                    offset: scaled_offset,
+                })
             }
-        };
+            PreparedCarrySource::AddInvariant { base, offset } => {
+                let state_ref = match *base {
+                    PreparedCarrySource::Current => PreparedLoopStateRef::Current,
+                    PreparedCarrySource::PreviousCurrent => PreparedLoopStateRef::PreviousCurrent,
+                    PreparedCarrySource::PreviousCarry(index) => {
+                        PreparedLoopStateRef::PreviousCarry(index)
+                    }
+                    PreparedCarrySource::Carry(index) => PreparedLoopStateRef::Carry(index),
+                    _ => return None,
+                };
+                let scaled_offset = NirExpr::Binary {
+                    op: NirBinaryOp::Mul,
+                    lhs: Box::new(offset),
+                    rhs: Box::new(factor.clone()),
+                };
+                Some(PreparedCarrySource::ScaledStateList {
+                    terms: vec![state_ref],
+                    factor,
+                    offset: Some(scaled_offset),
+                })
+            }
+            PreparedCarrySource::Current => Some(PreparedCarrySource::ScaledStateList {
+                terms: vec![PreparedLoopStateRef::Current],
+                factor,
+                offset: None,
+            }),
+            PreparedCarrySource::PreviousCurrent => Some(PreparedCarrySource::ScaledStateList {
+                terms: vec![PreparedLoopStateRef::PreviousCurrent],
+                factor,
+                offset: None,
+            }),
+            PreparedCarrySource::PreviousCarry(index) => {
+                Some(PreparedCarrySource::ScaledStateList {
+                    terms: vec![PreparedLoopStateRef::PreviousCarry(index)],
+                    factor,
+                    offset: None,
+                })
+            }
+            PreparedCarrySource::Carry(index) => Some(PreparedCarrySource::ScaledStateList {
+                terms: vec![PreparedLoopStateRef::Carry(index)],
+                factor,
+                offset: None,
+            }),
+            _ => None,
+        }
+    };
     if let Some(source) = parse_additive_carry_source(lhs, binding_name, carries) {
         if invariant(rhs) {
             return into_scaled_state_list(source, (**rhs).clone());
@@ -473,61 +479,62 @@ fn parse_state_scaled_additive_carry_source(
     else {
         return None;
     };
-    let into_scaled_by_state =
-        |source: PreparedCarrySource, factor: PreparedLoopStateRef| -> Option<PreparedCarrySource> {
-            match source {
-                PreparedCarrySource::AddStateList { terms, offset } => {
-                    Some(PreparedCarrySource::ScaledStateListByState {
-                        terms,
-                        factor,
-                        offset,
-                    })
-                }
-                PreparedCarrySource::AddInvariant { base, offset } => {
-                    let state_ref = match *base {
-                        PreparedCarrySource::Current => PreparedLoopStateRef::Current,
-                        PreparedCarrySource::PreviousCurrent => PreparedLoopStateRef::PreviousCurrent,
-                        PreparedCarrySource::PreviousCarry(index) => {
-                            PreparedLoopStateRef::PreviousCarry(index)
-                        }
-                        PreparedCarrySource::Carry(index) => PreparedLoopStateRef::Carry(index),
-                        _ => return None,
-                    };
-                    Some(PreparedCarrySource::ScaledStateListByState {
-                        terms: vec![state_ref],
-                        factor,
-                        offset: Some(offset),
-                    })
-                }
-                PreparedCarrySource::Current => Some(PreparedCarrySource::ScaledStateListByState {
-                    terms: vec![PreparedLoopStateRef::Current],
+    let into_scaled_by_state = |source: PreparedCarrySource,
+                                factor: PreparedLoopStateRef|
+     -> Option<PreparedCarrySource> {
+        match source {
+            PreparedCarrySource::AddStateList { terms, offset } => {
+                Some(PreparedCarrySource::ScaledStateListByState {
+                    terms,
+                    factor,
+                    offset,
+                })
+            }
+            PreparedCarrySource::AddInvariant { base, offset } => {
+                let state_ref = match *base {
+                    PreparedCarrySource::Current => PreparedLoopStateRef::Current,
+                    PreparedCarrySource::PreviousCurrent => PreparedLoopStateRef::PreviousCurrent,
+                    PreparedCarrySource::PreviousCarry(index) => {
+                        PreparedLoopStateRef::PreviousCarry(index)
+                    }
+                    PreparedCarrySource::Carry(index) => PreparedLoopStateRef::Carry(index),
+                    _ => return None,
+                };
+                Some(PreparedCarrySource::ScaledStateListByState {
+                    terms: vec![state_ref],
+                    factor,
+                    offset: Some(offset),
+                })
+            }
+            PreparedCarrySource::Current => Some(PreparedCarrySource::ScaledStateListByState {
+                terms: vec![PreparedLoopStateRef::Current],
+                factor,
+                offset: None,
+            }),
+            PreparedCarrySource::PreviousCurrent => {
+                Some(PreparedCarrySource::ScaledStateListByState {
+                    terms: vec![PreparedLoopStateRef::PreviousCurrent],
                     factor,
                     offset: None,
-                }),
-                PreparedCarrySource::PreviousCurrent => {
-                    Some(PreparedCarrySource::ScaledStateListByState {
-                        terms: vec![PreparedLoopStateRef::PreviousCurrent],
-                        factor,
-                        offset: None,
-                    })
-                }
-                PreparedCarrySource::PreviousCarry(index) => {
-                    Some(PreparedCarrySource::ScaledStateListByState {
-                        terms: vec![PreparedLoopStateRef::PreviousCarry(index)],
-                        factor,
-                        offset: None,
-                    })
-                }
-                PreparedCarrySource::Carry(index) => {
-                    Some(PreparedCarrySource::ScaledStateListByState {
-                        terms: vec![PreparedLoopStateRef::Carry(index)],
-                        factor,
-                        offset: None,
-                    })
-                }
-                _ => None,
+                })
             }
-        };
+            PreparedCarrySource::PreviousCarry(index) => {
+                Some(PreparedCarrySource::ScaledStateListByState {
+                    terms: vec![PreparedLoopStateRef::PreviousCarry(index)],
+                    factor,
+                    offset: None,
+                })
+            }
+            PreparedCarrySource::Carry(index) => {
+                Some(PreparedCarrySource::ScaledStateListByState {
+                    terms: vec![PreparedLoopStateRef::Carry(index)],
+                    factor,
+                    offset: None,
+                })
+            }
+            _ => None,
+        }
+    };
     if let Some(factor) = parse_prepared_loop_state_ref_expr(rhs, binding_name, carries) {
         if let Some(source) = parse_additive_carry_source(lhs, binding_name, carries) {
             return into_scaled_by_state(source, factor);
@@ -572,72 +579,71 @@ fn parse_state_plus_invariant_scaled_additive_carry_source(
             _ => None,
         }
     };
-    let into_scaled_by_state_plus_invariant =
-        |source: PreparedCarrySource,
-         factor: PreparedLoopStateRef,
-         factor_offset: NirExpr|
-         -> Option<PreparedCarrySource> {
-            match source {
-                PreparedCarrySource::AddStateList { terms, offset } => {
-                    Some(PreparedCarrySource::ScaledStateListByStatePlusInvariant {
-                        terms,
-                        factor,
-                        factor_offset,
-                        offset,
-                    })
-                }
-                PreparedCarrySource::AddInvariant { base, offset } => {
-                    let state_ref = match *base {
-                        PreparedCarrySource::Current => PreparedLoopStateRef::Current,
-                        PreparedCarrySource::PreviousCurrent => PreparedLoopStateRef::PreviousCurrent,
-                        PreparedCarrySource::PreviousCarry(index) => {
-                            PreparedLoopStateRef::PreviousCarry(index)
-                        }
-                        PreparedCarrySource::Carry(index) => PreparedLoopStateRef::Carry(index),
-                        _ => return None,
-                    };
-                    Some(PreparedCarrySource::ScaledStateListByStatePlusInvariant {
-                        terms: vec![state_ref],
-                        factor,
-                        factor_offset,
-                        offset: Some(offset),
-                    })
-                }
-                PreparedCarrySource::Current => {
-                    Some(PreparedCarrySource::ScaledStateListByStatePlusInvariant {
-                        terms: vec![PreparedLoopStateRef::Current],
-                        factor,
-                        factor_offset,
-                        offset: None,
-                    })
-                }
-                PreparedCarrySource::PreviousCurrent => Some(
-                    PreparedCarrySource::ScaledStateListByStatePlusInvariant {
-                        terms: vec![PreparedLoopStateRef::PreviousCurrent],
-                        factor,
-                        factor_offset,
-                        offset: None,
-                    },
-                ),
-                PreparedCarrySource::PreviousCarry(index) => Some(
-                    PreparedCarrySource::ScaledStateListByStatePlusInvariant {
-                        terms: vec![PreparedLoopStateRef::PreviousCarry(index)],
-                        factor,
-                        factor_offset,
-                        offset: None,
-                    },
-                ),
-                PreparedCarrySource::Carry(index) => {
-                    Some(PreparedCarrySource::ScaledStateListByStatePlusInvariant {
-                        terms: vec![PreparedLoopStateRef::Carry(index)],
-                        factor,
-                        factor_offset,
-                        offset: None,
-                    })
-                }
-                _ => None,
+    let into_scaled_by_state_plus_invariant = |source: PreparedCarrySource,
+                                               factor: PreparedLoopStateRef,
+                                               factor_offset: NirExpr|
+     -> Option<PreparedCarrySource> {
+        match source {
+            PreparedCarrySource::AddStateList { terms, offset } => {
+                Some(PreparedCarrySource::ScaledStateListByStatePlusInvariant {
+                    terms,
+                    factor,
+                    factor_offset,
+                    offset,
+                })
             }
-        };
+            PreparedCarrySource::AddInvariant { base, offset } => {
+                let state_ref = match *base {
+                    PreparedCarrySource::Current => PreparedLoopStateRef::Current,
+                    PreparedCarrySource::PreviousCurrent => PreparedLoopStateRef::PreviousCurrent,
+                    PreparedCarrySource::PreviousCarry(index) => {
+                        PreparedLoopStateRef::PreviousCarry(index)
+                    }
+                    PreparedCarrySource::Carry(index) => PreparedLoopStateRef::Carry(index),
+                    _ => return None,
+                };
+                Some(PreparedCarrySource::ScaledStateListByStatePlusInvariant {
+                    terms: vec![state_ref],
+                    factor,
+                    factor_offset,
+                    offset: Some(offset),
+                })
+            }
+            PreparedCarrySource::Current => {
+                Some(PreparedCarrySource::ScaledStateListByStatePlusInvariant {
+                    terms: vec![PreparedLoopStateRef::Current],
+                    factor,
+                    factor_offset,
+                    offset: None,
+                })
+            }
+            PreparedCarrySource::PreviousCurrent => {
+                Some(PreparedCarrySource::ScaledStateListByStatePlusInvariant {
+                    terms: vec![PreparedLoopStateRef::PreviousCurrent],
+                    factor,
+                    factor_offset,
+                    offset: None,
+                })
+            }
+            PreparedCarrySource::PreviousCarry(index) => {
+                Some(PreparedCarrySource::ScaledStateListByStatePlusInvariant {
+                    terms: vec![PreparedLoopStateRef::PreviousCarry(index)],
+                    factor,
+                    factor_offset,
+                    offset: None,
+                })
+            }
+            PreparedCarrySource::Carry(index) => {
+                Some(PreparedCarrySource::ScaledStateListByStatePlusInvariant {
+                    terms: vec![PreparedLoopStateRef::Carry(index)],
+                    factor,
+                    factor_offset,
+                    offset: None,
+                })
+            }
+            _ => None,
+        }
+    };
     if let Some((factor, factor_offset)) = parse_factor(rhs) {
         if let Some(source) = parse_additive_carry_source(lhs, binding_name, carries) {
             return into_scaled_by_state_plus_invariant(source, factor, factor_offset);
@@ -1088,36 +1094,30 @@ pub(super) fn parse_loop_carry_linear(
     match rhs {
         NirExpr::Var(rhs_name) => parse_linear_var_source(op, rhs_name, binding_name, carries),
         _ => match op {
-            PreparedCarryLinearOp::Mul => parse_state_plus_invariant_scaled_additive_carry_source(
-                rhs,
-                binding_name,
-                carries,
-            )
-            .or_else(|| parse_state_scaled_additive_carry_source(
-                rhs,
-                binding_name,
-                carries,
-            ))
-            .or_else(|| parse_scaled_additive_carry_source(
-                rhs,
-                binding_name,
-                carries,
-            ))
-            .or_else(|| parse_additive_carry_source(rhs, binding_name, carries))
-            .or_else(|| {
-                    parse_prepared_fixed_read_carry_source(rhs, binding_name, carries)
-                        .map(PreparedCarrySource::FixedRead)
-                })
-                .or_else(|| parse_prepared_dynamic_read_carry_source(rhs, binding_name, carries))
-                .map(|source| (op, source)),
-            PreparedCarryLinearOp::Add => parse_prepared_fixed_read_carry_source(
-                rhs,
-                binding_name,
-                carries,
-            )
-            .map(PreparedCarrySource::FixedRead)
-            .or_else(|| parse_prepared_dynamic_read_carry_source(rhs, binding_name, carries))
-            .map(|source| (op, source)),
+            PreparedCarryLinearOp::Mul => {
+                parse_state_plus_invariant_scaled_additive_carry_source(rhs, binding_name, carries)
+                    .or_else(|| {
+                        parse_state_scaled_additive_carry_source(rhs, binding_name, carries)
+                    })
+                    .or_else(|| parse_scaled_additive_carry_source(rhs, binding_name, carries))
+                    .or_else(|| parse_additive_carry_source(rhs, binding_name, carries))
+                    .or_else(|| {
+                        parse_prepared_fixed_read_carry_source(rhs, binding_name, carries)
+                            .map(PreparedCarrySource::FixedRead)
+                    })
+                    .or_else(|| {
+                        parse_prepared_dynamic_read_carry_source(rhs, binding_name, carries)
+                    })
+                    .map(|source| (op, source))
+            }
+            PreparedCarryLinearOp::Add => {
+                parse_prepared_fixed_read_carry_source(rhs, binding_name, carries)
+                    .map(PreparedCarrySource::FixedRead)
+                    .or_else(|| {
+                        parse_prepared_dynamic_read_carry_source(rhs, binding_name, carries)
+                    })
+                    .map(|source| (op, source))
+            }
         },
     }
 }
@@ -1294,14 +1294,8 @@ mod tests {
                 rhs: Box::new(NirExpr::Int(1)),
             }),
         };
-        let (op, source) = parse_loop_carry_linear(
-            "acc",
-            &expr,
-            "current",
-            &[],
-            &BTreeMap::new(),
-        )
-        .expect("expected multiplicative additive carry source");
+        let (op, source) = parse_loop_carry_linear("acc", &expr, "current", &[], &BTreeMap::new())
+            .expect("expected multiplicative additive carry source");
         assert!(matches!(op, PreparedCarryLinearOp::Mul));
         assert_eq!(
             source.contract_kind(PreparedCarryLinearOp::Mul),
@@ -1327,14 +1321,9 @@ mod tests {
                 rhs: Box::new(NirExpr::Var("slot".to_owned())),
             }),
         };
-        let (op, source) = parse_loop_carry_linear(
-            "acc",
-            &expr,
-            "current",
-            &carries,
-            &BTreeMap::new(),
-        )
-        .expect("expected multiplicative additive carry source");
+        let (op, source) =
+            parse_loop_carry_linear("acc", &expr, "current", &carries, &BTreeMap::new())
+                .expect("expected multiplicative additive carry source");
         assert!(matches!(op, PreparedCarryLinearOp::Mul));
         assert_eq!(
             source.contract_kind(PreparedCarryLinearOp::Mul),
@@ -1357,14 +1346,8 @@ mod tests {
                 rhs: Box::new(NirExpr::Int(2)),
             }),
         };
-        let (op, source) = parse_loop_carry_linear(
-            "acc",
-            &expr,
-            "current",
-            &[],
-            &BTreeMap::new(),
-        )
-        .expect("expected scaled multiplicative additive carry source");
+        let (op, source) = parse_loop_carry_linear("acc", &expr, "current", &[], &BTreeMap::new())
+            .expect("expected scaled multiplicative additive carry source");
         assert!(matches!(op, PreparedCarryLinearOp::Mul));
         assert_eq!(
             source.contract_kind(PreparedCarryLinearOp::Mul),
@@ -1394,14 +1377,9 @@ mod tests {
                 rhs: Box::new(NirExpr::Var("current".to_owned())),
             }),
         };
-        let (op, source) = parse_loop_carry_linear(
-            "acc",
-            &expr,
-            "current",
-            &carries,
-            &BTreeMap::new(),
-        )
-        .expect("expected state-scaled multiplicative additive carry source");
+        let (op, source) =
+            parse_loop_carry_linear("acc", &expr, "current", &carries, &BTreeMap::new())
+                .expect("expected state-scaled multiplicative additive carry source");
         assert!(matches!(op, PreparedCarryLinearOp::Mul));
         assert_eq!(
             source.contract_kind(PreparedCarryLinearOp::Mul),
@@ -1410,8 +1388,8 @@ mod tests {
     }
 
     #[test]
-    fn parse_loop_carry_linear_accepts_state_plus_invariant_scaled_multiplicative_additive_source(
-    ) {
+    fn parse_loop_carry_linear_accepts_state_plus_invariant_scaled_multiplicative_additive_source()
+    {
         let carries = vec![PreparedCarryUpdate {
             binding_name: "sum".to_owned(),
             kind: PreparedCarryUpdateKind::Linear {
@@ -1436,14 +1414,10 @@ mod tests {
                 }),
             }),
         };
-        let (op, source) = parse_loop_carry_linear(
-            "acc",
-            &expr,
-            "current",
-            &carries,
-            &BTreeMap::new(),
-        )
-        .expect("expected state-plus-invariant scaled multiplicative additive carry source");
+        let (op, source) =
+            parse_loop_carry_linear("acc", &expr, "current", &carries, &BTreeMap::new()).expect(
+                "expected state-plus-invariant scaled multiplicative additive carry source",
+            );
         assert!(matches!(op, PreparedCarryLinearOp::Mul));
         assert_eq!(
             source.contract_kind(PreparedCarryLinearOp::Mul),

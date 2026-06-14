@@ -62,6 +62,10 @@ That means the pure `std` task layer is not “the final runtime”.
 It is the current checked-in front door for readable task structure and
 observation.
 
+If future thread/lock work begins, it should be staged beside this lane rather
+than silently folded into it. See
+[cpu-thread-lock-staging-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-thread-lock-staging-sketch.md).
+
 ## Pure Task Layers
 
 These are the current narrow checked-in task routes.

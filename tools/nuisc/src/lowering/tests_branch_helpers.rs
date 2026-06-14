@@ -70,6 +70,63 @@ fn lowers_join_result_and_task_state_primitives_into_cpu_nodes() {
 }
 
 #[test]
+fn lowers_thread_and_mutex_primitives_into_cpu_nodes() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn ping() -> i64 {
+            return 7;
+          }
+
+          fn main() -> i64 {
+            let worker: Thread<i64> = thread_spawn(ping());
+            let joined: TaskResult<i64> = thread_join_result(worker);
+            let lock: Mutex<i64> = mutex_new(11);
+            let guard: MutexGuard<i64> = mutex_lock(lock);
+            let value: i64 = mutex_value(guard);
+            let unlocked: Mutex<i64> = mutex_unlock(guard);
+            if task_completed(joined) {
+              return value + thread_join(worker) + mutex_value(mutex_lock(unlocked));
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "spawn_thread"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "thread_join_result"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "thread_join"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "mutex_new"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "mutex_lock"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "mutex_unlock"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "mutex_value"));
+}
+
+#[test]
 fn lowers_pure_branch_local_binding_into_guard_print_return() {
     let module = parse_nuis_module(
         r#"
@@ -386,6 +443,100 @@ fn lowers_if_expression_with_shared_borrow_lifecycle_into_select_then_owner_writ
 }
 
 #[test]
+fn lowers_match_expression_with_thread_result_observation_into_select() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> i64 {
+            let worker: Thread<i64> = thread_spawn(ping(5));
+            let joined: TaskResult<i64> = thread_join_result(worker);
+            let done: bool = task_completed(joined);
+            let current: i64 = match done {
+              true => {
+                1
+              }
+              _ => {
+                0
+              }
+            };
+            return current + 1;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "thread_join_result"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "task_completed"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "select"));
+}
+
+#[test]
+fn lowers_match_expression_with_mutex_branch_lifecycle_into_select() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let lock: Mutex<i64> = mutex_new(11);
+            let guard: MutexGuard<i64> = mutex_lock(lock);
+            let first: i64 = mutex_value(guard);
+            let reopened: Mutex<i64> = mutex_unlock(guard);
+            let reopened_guard: MutexGuard<i64> = mutex_lock(reopened);
+            let current: i64 = match 1 {
+              1 => {
+                mutex_value(reopened_guard)
+              }
+              _ => {
+                first + mutex_value(reopened_guard)
+              }
+            };
+            return current + 1;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "mutex_new"));
+    assert!(yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "mutex_lock")
+        .count()
+        >= 2);
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "mutex_unlock"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "mutex_value"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "select"));
+}
+
+#[test]
 fn lowers_match_expression_with_shared_borrow_lifecycle_and_shared_suffix() {
     let module = parse_nuis_module(
         r#"
@@ -601,4 +752,469 @@ fn lowers_nested_pure_helper_param_passthrough_into_branch_print_return() {
         .nodes
         .iter()
         .any(|node| { node.op.module == "cpu" && node.op.instruction == "branch_print_return" }));
+}
+
+#[test]
+fn lowers_nested_if_expression_chain_with_tail_expr_branches_into_selects() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let current: i64 = if true {
+              if false {
+                4
+              } else {
+                7
+              }
+            } else {
+              1
+            };
+            return current + 1;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let selects = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .collect::<Vec<_>>();
+    assert!(
+        selects.len() >= 2,
+        "expected nested tail-expression `if` chain to lower through select nodes"
+    );
+}
+
+#[test]
+fn lowers_match_expression_arm_with_nested_if_tail_expr_into_selects() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let current: i64 = match 1 {
+              1 => {
+                if false {
+                  9
+                } else {
+                  4
+                }
+              }
+              _ => {
+                0
+              }
+            };
+            return current + 1;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let selects = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .collect::<Vec<_>>();
+    assert!(
+        !selects.is_empty(),
+        "expected match arm tail-expression lowering to produce select nodes"
+    );
+}
+
+#[test]
+fn lowers_nested_if_return_chain_with_pure_local_bindings_into_selects() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            if true {
+              let seed: i64 = 4;
+              if false {
+                let widened: i64 = seed + 3;
+                return widened;
+              } else {
+                let widened: i64 = seed + 6;
+                return widened;
+              }
+            } else {
+              let fallback: i64 = 1;
+              return fallback;
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let selects = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .collect::<Vec<_>>();
+    assert!(
+        selects.len() >= 2,
+        "expected pure local bindings in nested return chain to still lower through selects"
+    );
+}
+
+#[test]
+fn lowers_multi_arm_match_return_chain_with_pure_local_bindings_into_selects() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            match 2 {
+              1 => {
+                let seed: i64 = 4;
+                let widened: i64 = seed + 3;
+                return widened;
+              }
+              2 => {
+                let seed: i64 = 5;
+                let widened: i64 = seed + 6;
+                return widened;
+              }
+              _ => {
+                let fallback: i64 = 1;
+                return fallback;
+              }
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let selects = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .collect::<Vec<_>>();
+    assert!(
+        selects.len() >= 2,
+        "expected lowered multi-arm match return chain with pure local bindings to use nested selects"
+    );
+}
+
+#[test]
+fn lowers_if_return_chain_with_shared_suffix_after_branch_local_binding() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            if true {
+              let value: i64 = 4;
+              let widened: i64 = value + 3;
+              return widened;
+            } else {
+              let value: i64 = 8;
+              let widened: i64 = value + 3;
+              return widened;
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let selects = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .collect::<Vec<_>>();
+    let adds = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "add")
+        .collect::<Vec<_>>();
+    assert!(
+        !selects.is_empty(),
+        "expected shared-suffix return chain to select the branch-local binding"
+    );
+    assert!(
+        adds.len() >= 1,
+        "expected shared suffix arithmetic to remain lowered after branch selection"
+    );
+}
+
+#[test]
+fn lowers_match_return_chain_with_shared_suffix_after_branch_local_binding() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            match 2 {
+              1 => {
+                let value: i64 = 4;
+                let widened: i64 = value + 3;
+                return widened;
+              }
+              _ => {
+                let value: i64 = 8;
+                let widened: i64 = value + 3;
+                return widened;
+              }
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    let selects = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .collect::<Vec<_>>();
+    let adds = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "add")
+        .collect::<Vec<_>>();
+    assert!(
+        !selects.is_empty(),
+        "expected lowered match shared-suffix return chain to select the branch-local binding"
+    );
+    assert!(
+        adds.len() >= 1,
+        "expected shared suffix arithmetic to survive match lowering"
+    );
+}
+
+#[test]
+fn lowers_if_expression_with_branch_local_task_observer_binding() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> i64 {
+            let worker: Thread<i64> = thread_spawn(ping(5));
+            let joined: TaskResult<i64> = thread_join_result(worker);
+            let current: i64 = if true {
+              let done: bool = task_completed(joined);
+              if done {
+                let observed: i64 = task_value(joined);
+                observed
+              } else {
+                0
+              }
+            } else {
+              0
+            };
+            return current + 1;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "thread_join_result"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "task_completed"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "task_value"));
+    assert!(yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count()
+        >= 2);
+}
+
+#[test]
+fn lowers_match_expression_with_branch_local_mutex_observer_binding() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let lock: Mutex<i64> = mutex_new(11);
+            let guard: MutexGuard<i64> = mutex_lock(lock);
+            let current: i64 = match 1 {
+              1 => {
+                let observed: i64 = mutex_value(guard);
+                observed
+              }
+              _ => {
+                0
+              }
+            };
+            return current + 1;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "mutex_value"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "select"));
+}
+
+#[test]
+fn lowers_match_expression_with_branch_local_task_observer_binding() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> i64 {
+            let worker: Thread<i64> = thread_spawn(ping(5));
+            let joined: TaskResult<i64> = thread_join_result(worker);
+            let current: i64 = match 1 {
+              1 => {
+                let done: bool = task_completed(joined);
+                if done {
+                  task_value(joined)
+                } else {
+                  0
+                }
+              }
+              _ => {
+                0
+              }
+            };
+            return current + 1;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "thread_join_result"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "task_completed"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "task_value"));
+    assert!(yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count()
+        >= 2);
+}
+
+#[test]
+fn reports_effectful_thread_branch_lowering_gap_explicitly() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn ping(seed: i64) -> i64 {
+            return seed + 9;
+          }
+
+          fn main() -> i64 {
+            let worker: Thread<i64> = thread_spawn(ping(5));
+            let current: i64 = if true {
+              let joined: TaskResult<i64> = thread_join_result(worker);
+              let resolved: i64 = if task_completed(joined) {
+                task_value(joined)
+              } else {
+                0
+              };
+              resolved
+            } else {
+              0
+            };
+            return current + 1;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let error = lower_nir_to_yir_builtin_cpu(&module).unwrap_err();
+    assert!(error.contains("conditional `if`/lowered-`match` lowering"));
+    assert!(error.contains("consuming task/thread/mutex runtime primitives"));
+    assert!(error.contains("join-result"));
+    assert!(error.contains("pure/select-compatible values"));
+}
+
+#[test]
+fn reports_effectful_mutex_branch_lowering_gap_explicitly() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let lock: Mutex<i64> = mutex_new(11);
+            let current: i64 = if true {
+              let guard: MutexGuard<i64> = mutex_lock(lock);
+              let value: i64 = mutex_value(guard);
+              value
+            } else {
+              0
+            };
+            return current + 1;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let error = lower_nir_to_yir_builtin_cpu(&module).unwrap_err();
+    assert!(error.contains("conditional `if`/lowered-`match` lowering"));
+    assert!(error.contains("consuming task/thread/mutex runtime primitives"));
+    assert!(error.contains("lock"));
+}
+
+#[test]
+fn reports_effectful_mutex_unlock_branch_lowering_gap_explicitly() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let lock: Mutex<i64> = mutex_new(11);
+            let guard: MutexGuard<i64> = mutex_lock(lock);
+            let current: i64 = if true {
+              let reopened: Mutex<i64> = mutex_unlock(guard);
+              let reopened_guard: MutexGuard<i64> = mutex_lock(reopened);
+              mutex_value(reopened_guard)
+            } else {
+              0
+            };
+            return current + 1;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let error = lower_nir_to_yir_builtin_cpu(&module).unwrap_err();
+    assert!(error.contains("conditional `if`/lowered-`match` lowering"));
+    assert!(error.contains("consuming task/thread/mutex runtime primitives"));
+    assert!(error.contains("unlock"));
 }

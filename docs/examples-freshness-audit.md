@@ -10,6 +10,10 @@ to list everything that exists, but to decide:
 * what already feels overshadowed and should be reconsidered before the next
   cleanup pass
 
+Companion current-state matrix:
+
+* [versioning/nuis-0.19.0-project-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-project-capability-matrix.md)
+
 Current policy:
 
 * do not delete an example only because it is old

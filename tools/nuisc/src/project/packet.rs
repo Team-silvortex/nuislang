@@ -30,6 +30,12 @@ fn classify_packet_field_kind(ty: &AstTypeRef) -> &'static str {
     ) {
         return "container";
     }
+    if ty.name == "Thread" {
+        return "thread";
+    }
+    if matches!(ty.name.as_str(), "Mutex" | "MutexGuard") {
+        return "sync-resource";
+    }
     if matches!(
         ty.name.as_str(),
         "TaskResult" | "DataResult" | "ShaderResult" | "KernelResult" | "NetworkResult"
@@ -50,7 +56,8 @@ fn classify_packet_field_role(kind: &str) -> &'static str {
     match kind {
         "scalar" | "nominal" | "container" => "payload",
         "marker" | "handle-table" => "control-plane",
-        "result" => "async-carrier",
+        "result" | "thread" => "async-carrier",
+        "sync-resource" => "sync-resource",
         "ref" | "optional" => "unsupported-shape",
         _ => "payload",
     }
@@ -286,15 +293,21 @@ pub(super) fn validate_project_packet_contracts(module: &ProjectModule) -> Resul
                 ));
             }
             match field.ty.name.as_str() {
-                "Task" => {
+                "Task" | "Thread" => {
                     return Err(format!(
-                        "project mod `mod {} {}` packet struct `{}.{}` is not packet-safe yet: `Task<...>` fields are currently rejected (kind={}, role={})",
-                        module.ast.domain, module.ast.unit, definition.name, field.name, field_kind, field_role
+                        "project mod `mod {} {}` packet struct `{}.{}` is not packet-safe yet: async/concurrency carrier fields like `{}` are currently rejected (kind={}, role={})",
+                        module.ast.domain, module.ast.unit, definition.name, field.name, field.ty.name, field_kind, field_role
                     ));
                 }
                 "TaskResult" | "DataResult" | "ShaderResult" | "KernelResult" | "NetworkResult" => {
                     return Err(format!(
                         "project mod `mod {} {}` packet struct `{}.{}` is not packet-safe yet: result-carrier fields like `{}` are currently rejected (kind={}, role={})",
+                        module.ast.domain, module.ast.unit, definition.name, field.name, field.ty.name, field_kind, field_role
+                    ));
+                }
+                "Mutex" | "MutexGuard" => {
+                    return Err(format!(
+                        "project mod `mod {} {}` packet struct `{}.{}` is not packet-safe yet: synchronization-resource fields like `{}` are currently rejected (kind={}, role={})",
                         module.ast.domain, module.ast.unit, definition.name, field.name, field.ty.name, field_kind, field_role
                     ));
                 }

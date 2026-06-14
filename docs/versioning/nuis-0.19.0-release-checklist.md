@@ -15,8 +15,14 @@ mainline, not only one inherited `0.18` gate plus newer prose.
   still describes the actual current push
 * [ ] confirm [nuis-0.19.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-compile-workflow.md)
   still matches the real CLI/compiler frontdoor story
+* [ ] confirm [nuis-0.19.0-workflow-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-workflow-capability-matrix.md)
+  still matches the current workflow/frontdoor/mainline route combinations
 * [ ] confirm [nuis-0.19.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-regression-matrix.md)
   still matches the practical current gate
+* [ ] confirm [nuis-0.19.0-frontend-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-frontend-capability-matrix.md)
+  still matches the current frontend combination truth
+* [ ] confirm [nuis-0.19.0-project-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-project-capability-matrix.md)
+  still matches the current project/example anchor story
 * [ ] confirm [nuis-0.19.0-address-pointer-mainline.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-address-pointer-mainline.md)
   still matches the honest current address/source-style story
 * [ ] confirm [README.md](/Users/Shared/chroot/dev/nuislang/README.md),
@@ -39,6 +45,10 @@ mainline, not only one inherited `0.18` gate plus newer prose.
   `cargo test -q -p nuisc --test memory_compile`
   `cargo test -q -p nuisc shader_nova_contracts`
   `cargo test -q -p nuisc --test network_compile`
+* [ ] staged thread/lock frontdoor sample still passes:
+  `nuis project-doctor examples/projects/task/task_thread_mutex_demo`
+  `nuis check examples/projects/task/task_thread_mutex_demo`
+  `nuis test examples/projects/task/task_thread_mutex_demo`
 * [ ] wider integration complements still pass:
   `cargo test -q -p nuisc multidomain_async`
   `cargo test -q -p nuisc tests_async_runtime`

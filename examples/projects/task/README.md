@@ -12,6 +12,8 @@ If you only want the current task mainline, start with:
 
 * [task_runtime_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_runtime_demo)
   smallest task/runtime anchor
+* [task_thread_mutex_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_thread_mutex_demo)
+  current staged `Thread<T>` / `Mutex<T>` project anchor
 * [task_recursive_async_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_recursive_async_demo)
   current recursive async anchor
 * [task_recursive_async_shared_suffix_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_recursive_async_shared_suffix_demo)
@@ -75,6 +77,11 @@ If you only want the current task mainline, start with:
   [task_scheduler_observe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_scheduler_observe_demo)
 * task/tooling bridge:
   [task_cli_tooling_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_cli_tooling_demo)
+* staged thread/lock route:
+  [task_thread_mutex_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_thread_mutex_demo)
+  current note:
+  explicit project smoke test is checked in and now runs through the staged
+  AOT thread/lock lowering path
 * future/probe route:
   [task_join_nonconsuming_probe_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_join_nonconsuming_probe_demo)
 

@@ -377,10 +377,16 @@ pub(super) fn lower_routed_call_or_core_builtin(
                 struct_table,
                 None,
             )?;
-            let lowered_base_ty = infer_nir_expr_type(&lowered_base, bindings, signatures, struct_table)
-                .ok_or_else(|| "subslice(...) requires a typed `Slice<...>` input".to_owned())?;
-            let slice_payload_ty = slice_payload_type(&lowered_base_ty)
-                .ok_or_else(|| format!("subslice(...) expects `Slice<...>`, found `{}`", lowered_base_ty.render()))?;
+            let lowered_base_ty =
+                infer_nir_expr_type(&lowered_base, bindings, signatures, struct_table).ok_or_else(
+                    || "subslice(...) requires a typed `Slice<...>` input".to_owned(),
+                )?;
+            let slice_payload_ty = slice_payload_type(&lowered_base_ty).ok_or_else(|| {
+                format!(
+                    "subslice(...) expects `Slice<...>`, found `{}`",
+                    lowered_base_ty.render()
+                )
+            })?;
             if let Some(explicit_ty) = lower_optional_explicit_slice_payload_type(generic_args)? {
                 if !compatible_types(&explicit_ty, &slice_payload_ty) {
                     return Err(format!(
@@ -448,8 +454,9 @@ pub(super) fn lower_routed_call_or_core_builtin(
                 None,
             )?;
             let lowered_base_ty =
-                infer_nir_expr_type(&lowered_base, bindings, signatures, struct_table)
-                    .ok_or_else(|| "subbytes(...) requires a typed `Slice<i64>` input".to_owned())?;
+                infer_nir_expr_type(&lowered_base, bindings, signatures, struct_table).ok_or_else(
+                    || "subbytes(...) requires a typed `Slice<i64>` input".to_owned(),
+                )?;
             let slice_payload_ty = slice_payload_type(&lowered_base_ty).ok_or_else(|| {
                 format!(
                     "subbytes(...) expects `Slice<i64>`, found `{}`",
@@ -513,17 +520,11 @@ pub(super) fn lower_routed_call_or_core_builtin(
             }
             if current_domain != "cpu" {
                 return Err(
-                    "fillbytes(...) is currently only allowed inside `mod cpu <unit>`"
-                        .to_owned(),
+                    "fillbytes(...) is currently only allowed inside `mod cpu <unit>`".to_owned(),
                 );
             }
-            let (buffer, start, len) = lower_byte_slice_parts(
-                target,
-                current_domain,
-                bindings,
-                signatures,
-                struct_table,
-            )?;
+            let (buffer, start, len) =
+                lower_byte_slice_parts(target, current_domain, bindings, signatures, struct_table)?;
             let lowered_value = lower_expr(
                 value,
                 current_domain,
@@ -553,17 +554,11 @@ pub(super) fn lower_routed_call_or_core_builtin(
             }
             if current_domain != "cpu" {
                 return Err(
-                    "bytes_fill(...) is currently only allowed inside `mod cpu <unit>`"
-                        .to_owned(),
+                    "bytes_fill(...) is currently only allowed inside `mod cpu <unit>`".to_owned(),
                 );
             }
-            let (buffer, start, len) = lower_byte_slice_parts(
-                target,
-                current_domain,
-                bindings,
-                signatures,
-                struct_table,
-            )?;
+            let (buffer, start, len) =
+                lower_byte_slice_parts(target, current_domain, bindings, signatures, struct_table)?;
             let lowered_value = lower_expr(
                 value,
                 current_domain,
@@ -593,24 +588,13 @@ pub(super) fn lower_routed_call_or_core_builtin(
             }
             if current_domain != "cpu" {
                 return Err(
-                    "copybytes(...) is currently only allowed inside `mod cpu <unit>`"
-                        .to_owned(),
+                    "copybytes(...) is currently only allowed inside `mod cpu <unit>`".to_owned(),
                 );
             }
-            let (dst_buffer, dst_start, dst_len) = lower_byte_slice_parts(
-                dst,
-                current_domain,
-                bindings,
-                signatures,
-                struct_table,
-            )?;
-            let (src_buffer, src_start, src_len) = lower_byte_slice_parts(
-                src,
-                current_domain,
-                bindings,
-                signatures,
-                struct_table,
-            )?;
+            let (dst_buffer, dst_start, dst_len) =
+                lower_byte_slice_parts(dst, current_domain, bindings, signatures, struct_table)?;
+            let (src_buffer, src_start, src_len) =
+                lower_byte_slice_parts(src, current_domain, bindings, signatures, struct_table)?;
             NirExpr::CpuExternCall {
                 abi: "c".to_owned(),
                 interface: None,
@@ -638,20 +622,10 @@ pub(super) fn lower_routed_call_or_core_builtin(
                         .to_owned(),
                 );
             }
-            let (dst_buffer, dst_start, dst_len) = lower_byte_slice_parts(
-                dst,
-                current_domain,
-                bindings,
-                signatures,
-                struct_table,
-            )?;
-            let (src_buffer, src_start, src_len) = lower_byte_slice_parts(
-                src,
-                current_domain,
-                bindings,
-                signatures,
-                struct_table,
-            )?;
+            let (dst_buffer, dst_start, dst_len) =
+                lower_byte_slice_parts(dst, current_domain, bindings, signatures, struct_table)?;
+            let (src_buffer, src_start, src_len) =
+                lower_byte_slice_parts(src, current_domain, bindings, signatures, struct_table)?;
             lower_host_compare_or_copy_call(
                 "host_copy_bytes",
                 dst_buffer,
@@ -675,20 +649,10 @@ pub(super) fn lower_routed_call_or_core_builtin(
                         .to_owned(),
                 );
             }
-            let (lhs_buffer, lhs_start, lhs_len) = lower_byte_slice_parts(
-                lhs,
-                current_domain,
-                bindings,
-                signatures,
-                struct_table,
-            )?;
-            let (rhs_buffer, rhs_start, rhs_len) = lower_byte_slice_parts(
-                rhs,
-                current_domain,
-                bindings,
-                signatures,
-                struct_table,
-            )?;
+            let (lhs_buffer, lhs_start, lhs_len) =
+                lower_byte_slice_parts(lhs, current_domain, bindings, signatures, struct_table)?;
+            let (rhs_buffer, rhs_start, rhs_len) =
+                lower_byte_slice_parts(rhs, current_domain, bindings, signatures, struct_table)?;
             NirExpr::CpuExternCall {
                 abi: "c".to_owned(),
                 interface: None,
@@ -716,20 +680,10 @@ pub(super) fn lower_routed_call_or_core_builtin(
                         .to_owned(),
                 );
             }
-            let (lhs_buffer, lhs_start, lhs_len) = lower_byte_slice_parts(
-                lhs,
-                current_domain,
-                bindings,
-                signatures,
-                struct_table,
-            )?;
-            let (rhs_buffer, rhs_start, rhs_len) = lower_byte_slice_parts(
-                rhs,
-                current_domain,
-                bindings,
-                signatures,
-                struct_table,
-            )?;
+            let (lhs_buffer, lhs_start, lhs_len) =
+                lower_byte_slice_parts(lhs, current_domain, bindings, signatures, struct_table)?;
+            let (rhs_buffer, rhs_start, rhs_len) =
+                lower_byte_slice_parts(rhs, current_domain, bindings, signatures, struct_table)?;
             lower_host_compare_or_copy_call(
                 "host_compare_bytes",
                 lhs_buffer,
@@ -749,24 +703,13 @@ pub(super) fn lower_routed_call_or_core_builtin(
             }
             if current_domain != "cpu" {
                 return Err(
-                    "bytes_eq(...) is currently only allowed inside `mod cpu <unit>`"
-                        .to_owned(),
+                    "bytes_eq(...) is currently only allowed inside `mod cpu <unit>`".to_owned(),
                 );
             }
-            let (lhs_buffer, lhs_start, lhs_len) = lower_byte_slice_parts(
-                lhs,
-                current_domain,
-                bindings,
-                signatures,
-                struct_table,
-            )?;
-            let (rhs_buffer, rhs_start, rhs_len) = lower_byte_slice_parts(
-                rhs,
-                current_domain,
-                bindings,
-                signatures,
-                struct_table,
-            )?;
+            let (lhs_buffer, lhs_start, lhs_len) =
+                lower_byte_slice_parts(lhs, current_domain, bindings, signatures, struct_table)?;
+            let (rhs_buffer, rhs_start, rhs_len) =
+                lower_byte_slice_parts(rhs, current_domain, bindings, signatures, struct_table)?;
             NirExpr::Binary {
                 op: nuis_semantics::model::NirBinaryOp::Eq,
                 lhs: Box::new(lower_host_compare_or_copy_call(
@@ -786,7 +729,9 @@ pub(super) fn lower_routed_call_or_core_builtin(
                 return Err("bytes_starts_with(...) expects 2 args".to_owned());
             };
             if !generic_args.is_empty() {
-                return Err("bytes_starts_with(...) does not accept explicit generic args".to_owned());
+                return Err(
+                    "bytes_starts_with(...) does not accept explicit generic args".to_owned(),
+                );
             }
             if current_domain != "cpu" {
                 return Err(
@@ -794,20 +739,10 @@ pub(super) fn lower_routed_call_or_core_builtin(
                         .to_owned(),
                 );
             }
-            let (base_buffer, base_start, base_len) = lower_byte_slice_parts(
-                base,
-                current_domain,
-                bindings,
-                signatures,
-                struct_table,
-            )?;
-            let (prefix_buffer, prefix_start, prefix_len) = lower_byte_slice_parts(
-                prefix,
-                current_domain,
-                bindings,
-                signatures,
-                struct_table,
-            )?;
+            let (base_buffer, base_start, base_len) =
+                lower_byte_slice_parts(base, current_domain, bindings, signatures, struct_table)?;
+            let (prefix_buffer, prefix_start, prefix_len) =
+                lower_byte_slice_parts(prefix, current_domain, bindings, signatures, struct_table)?;
             NirExpr::Binary {
                 op: nuis_semantics::model::NirBinaryOp::And,
                 lhs: Box::new(NirExpr::Binary {
@@ -843,20 +778,10 @@ pub(super) fn lower_routed_call_or_core_builtin(
                         .to_owned(),
                 );
             }
-            let (base_buffer, base_start, base_len) = lower_byte_slice_parts(
-                base,
-                current_domain,
-                bindings,
-                signatures,
-                struct_table,
-            )?;
-            let (suffix_buffer, suffix_start, suffix_len) = lower_byte_slice_parts(
-                suffix,
-                current_domain,
-                bindings,
-                signatures,
-                struct_table,
-            )?;
+            let (base_buffer, base_start, base_len) =
+                lower_byte_slice_parts(base, current_domain, bindings, signatures, struct_table)?;
+            let (suffix_buffer, suffix_start, suffix_len) =
+                lower_byte_slice_parts(suffix, current_domain, bindings, signatures, struct_table)?;
             let suffix_base_start = NirExpr::Binary {
                 op: nuis_semantics::model::NirBinaryOp::Add,
                 lhs: Box::new(base_start),
@@ -901,13 +826,8 @@ pub(super) fn lower_routed_call_or_core_builtin(
                         .to_owned(),
                 );
             }
-            let (buffer, start, len) = lower_byte_slice_parts(
-                base,
-                current_domain,
-                bindings,
-                signatures,
-                struct_table,
-            )?;
+            let (buffer, start, len) =
+                lower_byte_slice_parts(base, current_domain, bindings, signatures, struct_table)?;
             let lowered_needle = lower_expr(
                 needle,
                 current_domain,
@@ -941,13 +861,8 @@ pub(super) fn lower_routed_call_or_core_builtin(
                         .to_owned(),
                 );
             }
-            let (buffer, start, len) = lower_byte_slice_parts(
-                base,
-                current_domain,
-                bindings,
-                signatures,
-                struct_table,
-            )?;
+            let (buffer, start, len) =
+                lower_byte_slice_parts(base, current_domain, bindings, signatures, struct_table)?;
             let lowered_needle = lower_expr(
                 needle,
                 current_domain,
@@ -973,7 +888,9 @@ pub(super) fn lower_routed_call_or_core_builtin(
                 return Err("bytes_contains_byte(...) expects 2 args".to_owned());
             };
             if !generic_args.is_empty() {
-                return Err("bytes_contains_byte(...) does not accept explicit generic args".to_owned());
+                return Err(
+                    "bytes_contains_byte(...) does not accept explicit generic args".to_owned(),
+                );
             }
             if current_domain != "cpu" {
                 return Err(
@@ -981,13 +898,8 @@ pub(super) fn lower_routed_call_or_core_builtin(
                         .to_owned(),
                 );
             }
-            let (buffer, start, len) = lower_byte_slice_parts(
-                base,
-                current_domain,
-                bindings,
-                signatures,
-                struct_table,
-            )?;
+            let (buffer, start, len) =
+                lower_byte_slice_parts(base, current_domain, bindings, signatures, struct_table)?;
             let lowered_needle = lower_expr(
                 needle,
                 current_domain,
@@ -1017,7 +929,9 @@ pub(super) fn lower_routed_call_or_core_builtin(
                 return Err("bytes_contains_text(...) expects 2 args".to_owned());
             };
             if !generic_args.is_empty() {
-                return Err("bytes_contains_text(...) does not accept explicit generic args".to_owned());
+                return Err(
+                    "bytes_contains_text(...) does not accept explicit generic args".to_owned(),
+                );
             }
             if current_domain != "cpu" {
                 return Err(
@@ -1025,13 +939,8 @@ pub(super) fn lower_routed_call_or_core_builtin(
                         .to_owned(),
                 );
             }
-            let (buffer, start, len) = lower_byte_slice_parts(
-                base,
-                current_domain,
-                bindings,
-                signatures,
-                struct_table,
-            )?;
+            let (buffer, start, len) =
+                lower_byte_slice_parts(base, current_domain, bindings, signatures, struct_table)?;
             let lowered_needle = lower_expr(
                 needle,
                 current_domain,
@@ -1061,7 +970,9 @@ pub(super) fn lower_routed_call_or_core_builtin(
                 return Err("bytes_find_line_end(...) expects 1 arg".to_owned());
             };
             if !generic_args.is_empty() {
-                return Err("bytes_find_line_end(...) does not accept explicit generic args".to_owned());
+                return Err(
+                    "bytes_find_line_end(...) does not accept explicit generic args".to_owned(),
+                );
             }
             if current_domain != "cpu" {
                 return Err(
@@ -1069,13 +980,8 @@ pub(super) fn lower_routed_call_or_core_builtin(
                         .to_owned(),
                 );
             }
-            let (buffer, start, len) = lower_byte_slice_parts(
-                base,
-                current_domain,
-                bindings,
-                signatures,
-                struct_table,
-            )?;
+            let (buffer, start, len) =
+                lower_byte_slice_parts(base, current_domain, bindings, signatures, struct_table)?;
             NirExpr::CpuExternCall {
                 abi: "c".to_owned(),
                 interface: None,
@@ -1088,7 +994,9 @@ pub(super) fn lower_routed_call_or_core_builtin(
                 return Err("bytes_trim_line_end(...) expects 1 arg".to_owned());
             };
             if !generic_args.is_empty() {
-                return Err("bytes_trim_line_end(...) does not accept explicit generic args".to_owned());
+                return Err(
+                    "bytes_trim_line_end(...) does not accept explicit generic args".to_owned(),
+                );
             }
             if current_domain != "cpu" {
                 return Err(
@@ -1096,13 +1004,8 @@ pub(super) fn lower_routed_call_or_core_builtin(
                         .to_owned(),
                 );
             }
-            let (buffer, start, len) = lower_byte_slice_parts(
-                base,
-                current_domain,
-                bindings,
-                signatures,
-                struct_table,
-            )?;
+            let (buffer, start, len) =
+                lower_byte_slice_parts(base, current_domain, bindings, signatures, struct_table)?;
             NirExpr::CpuExternCall {
                 abi: "c".to_owned(),
                 interface: None,
@@ -1115,7 +1018,9 @@ pub(super) fn lower_routed_call_or_core_builtin(
                 return Err("bytes_slice_before(...) expects 2 args".to_owned());
             };
             if !generic_args.is_empty() {
-                return Err("bytes_slice_before(...) does not accept explicit generic args".to_owned());
+                return Err(
+                    "bytes_slice_before(...) does not accept explicit generic args".to_owned(),
+                );
             }
             let lowered_base = lower_expr(
                 base,
@@ -1125,7 +1030,13 @@ pub(super) fn lower_routed_call_or_core_builtin(
                 struct_table,
                 None,
             )?;
-            ensure_byte_slice_input("bytes_slice_before", &lowered_base, bindings, signatures, struct_table)?;
+            ensure_byte_slice_input(
+                "bytes_slice_before",
+                &lowered_base,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
             let lowered_index = lower_expr(
                 index,
                 current_domain,
@@ -1171,7 +1082,9 @@ pub(super) fn lower_routed_call_or_core_builtin(
                 return Err("bytes_slice_after(...) expects 2 args".to_owned());
             };
             if !generic_args.is_empty() {
-                return Err("bytes_slice_after(...) does not accept explicit generic args".to_owned());
+                return Err(
+                    "bytes_slice_after(...) does not accept explicit generic args".to_owned(),
+                );
             }
             let lowered_base = lower_expr(
                 base,
@@ -1181,7 +1094,13 @@ pub(super) fn lower_routed_call_or_core_builtin(
                 struct_table,
                 None,
             )?;
-            ensure_byte_slice_input("bytes_slice_after", &lowered_base, bindings, signatures, struct_table)?;
+            ensure_byte_slice_input(
+                "bytes_slice_after",
+                &lowered_base,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
             let lowered_index = lower_expr(
                 index,
                 current_domain,
@@ -1235,7 +1154,7 @@ pub(super) fn lower_routed_call_or_core_builtin(
             };
             if !generic_args.is_empty() {
                 return Err(
-                    "bytes_split_once_byte(...) does not accept explicit generic args".to_owned()
+                    "bytes_split_once_byte(...) does not accept explicit generic args".to_owned(),
                 );
             }
             if current_domain != "cpu" {
@@ -1244,13 +1163,8 @@ pub(super) fn lower_routed_call_or_core_builtin(
                         .to_owned(),
                 );
             }
-            let (buffer, start, len) = lower_byte_slice_parts(
-                base,
-                current_domain,
-                bindings,
-                signatures,
-                struct_table,
-            )?;
+            let (buffer, start, len) =
+                lower_byte_slice_parts(base, current_domain, bindings, signatures, struct_table)?;
             let lowered_needle = lower_expr(
                 needle,
                 current_domain,
@@ -1283,7 +1197,7 @@ pub(super) fn lower_routed_call_or_core_builtin(
             };
             if !generic_args.is_empty() {
                 return Err(
-                    "bytes_split_once_text(...) does not accept explicit generic args".to_owned()
+                    "bytes_split_once_text(...) does not accept explicit generic args".to_owned(),
                 );
             }
             if current_domain != "cpu" {
@@ -1292,13 +1206,8 @@ pub(super) fn lower_routed_call_or_core_builtin(
                         .to_owned(),
                 );
             }
-            let (buffer, start, len) = lower_byte_slice_parts(
-                base,
-                current_domain,
-                bindings,
-                signatures,
-                struct_table,
-            )?;
+            let (buffer, start, len) =
+                lower_byte_slice_parts(base, current_domain, bindings, signatures, struct_table)?;
             let lowered_needle = lower_expr(
                 needle,
                 current_domain,
@@ -1393,7 +1302,9 @@ pub(super) fn lower_routed_call_or_core_builtin(
                 None,
             )?;
             let lowered_ty = infer_nir_expr_type(&lowered, bindings, signatures, struct_table)
-                .ok_or_else(|| "slice_buffer(...) requires a typed `Slice<...>` input".to_owned())?;
+                .ok_or_else(|| {
+                    "slice_buffer(...) requires a typed `Slice<...>` input".to_owned()
+                })?;
             if slice_payload_type(&lowered_ty).is_none() {
                 return Err(format!(
                     "slice_buffer(...) expects `Slice<...>`, found `{}`",

@@ -2017,15 +2017,25 @@ impl Parser {
     }
 
     fn peek_assignment_op(&self) -> Option<AssignmentOp> {
-        if self.peek_symbol('+') && matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol('='))) {
+        if self.peek_symbol('+')
+            && matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol('=')))
+        {
             Some(AssignmentOp::AddAssign)
-        } else if self.peek_symbol('-') && matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol('='))) {
+        } else if self.peek_symbol('-')
+            && matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol('=')))
+        {
             Some(AssignmentOp::SubAssign)
-        } else if self.peek_symbol('*') && matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol('='))) {
+        } else if self.peek_symbol('*')
+            && matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol('=')))
+        {
             Some(AssignmentOp::MulAssign)
-        } else if self.peek_symbol('/') && matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol('='))) {
+        } else if self.peek_symbol('/')
+            && matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol('=')))
+        {
             Some(AssignmentOp::DivAssign)
-        } else if self.peek_symbol('%') && matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol('='))) {
+        } else if self.peek_symbol('%')
+            && matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol('=')))
+        {
             Some(AssignmentOp::RemAssign)
         } else if self.peek_symbol('=')
             && !matches!(self.tokens.get(self.cursor + 1), Some(Token::Symbol('=')))

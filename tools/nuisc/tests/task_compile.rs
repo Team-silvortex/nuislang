@@ -2539,6 +2539,13 @@ fn compiles_task_cli_tooling_project() {
 }
 
 #[test]
+fn compiles_task_thread_mutex_project() {
+    let project =
+        Path::new("/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_thread_mutex_demo");
+    nuisc::pipeline::compile_project(project).expect("task thread/mutex project should compile");
+}
+
+#[test]
 fn lowers_task_cli_tooling_project_with_timeout_and_host_io_shape() {
     let artifacts = compiled_project(
         "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_cli_tooling_demo",
@@ -2629,6 +2636,80 @@ fn lowers_task_cli_tooling_project_with_timeout_and_host_io_shape() {
             } if name == "stderr_code"
                 && ty.render() == "i64"
                 && callee == "host_stderr_write"
+            )
+    }));
+}
+
+#[test]
+fn lowers_task_thread_mutex_project_with_thread_and_lock_shape() {
+    let artifacts = compiled_project(
+        "/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_thread_mutex_demo",
+    );
+
+    let capture = artifacts
+        .nir
+        .functions
+        .iter()
+        .find(|function| function.name == "capture_thread_mutex")
+        .expect("expected capture_thread_mutex function");
+
+    assert!(capture.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::CpuMutexNew(_),
+            } if name == "lock" && ty.render() == "Mutex<i64>"
+        )
+    }));
+    assert!(capture.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::CpuMutexLock(_),
+            } if name == "guard" && ty.render() == "MutexGuard<i64>"
+        )
+    }));
+    assert!(capture.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::CpuMutexUnlock(_),
+            } if name == "reopened" && ty.render() == "Mutex<i64>"
+        )
+    }));
+    assert!(capture.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::CpuThreadSpawn { callee, .. },
+            } if name == "worker" && ty.render() == "Thread<i64>" && callee == "ping"
+        )
+    }));
+    assert!(capture.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::Let {
+                name,
+                ty: Some(ty),
+                value: NirExpr::CpuThreadJoinResult(_),
+            } if name == "joined" && ty.render() == "TaskResult<i64>"
+        )
+    }));
+    assert!(capture.body.iter().any(|stmt| {
+        matches!(
+            stmt,
+            NirStmt::If {
+                condition: NirExpr::CpuTaskCompleted(_),
+                ..
+            }
         )
     }));
 }

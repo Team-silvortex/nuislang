@@ -3,7 +3,8 @@ use std::collections::BTreeMap;
 use nuis_semantics::model::{AstExpr, NirExpr, NirResultFamily, NirStructDef, NirTypeRef};
 
 use super::{
-    ensure_spawn_input_safe, ensure_task_like, i64_type, infer_nir_expr_type,
+    ensure_mutex_guard_like, ensure_mutex_like, ensure_spawn_input_safe, ensure_task_like,
+    ensure_thread_like, i64_type, infer_nir_expr_type,
     lower_nested_expr_with_async_and_consts, lower_result_observer_call_with_consts,
     FunctionSignature, ModuleConstValue,
 };
@@ -87,6 +88,77 @@ pub(super) fn lower_task_builtin_call(
                     .collect::<Result<Vec<_>, _>>()?,
             }
         }
+        "thread_spawn" => {
+            if current_domain != "cpu" {
+                return Err(
+                    "thread_spawn(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let [call] = args else {
+                return Err(
+                    "thread_spawn(...) expects exactly one async function call".to_owned(),
+                );
+            };
+            let AstExpr::Call {
+                callee: spawned_callee,
+                generic_args: spawned_generic_args,
+                args: spawned_args,
+            } = call
+            else {
+                return Err(
+                    "thread_spawn(...) expects an async function call like `thread_spawn(task())`"
+                        .to_owned(),
+                );
+            };
+            if !spawned_generic_args.is_empty() {
+                return Err(
+                    "thread_spawn(...) does not yet support explicit generic arguments on the spawned call"
+                        .to_owned(),
+                );
+            }
+            let signature = signatures.get(spawned_callee).ok_or_else(|| {
+                format!("thread_spawn(...) references unknown function `{spawned_callee}`")
+            })?;
+            if !signature.is_async {
+                return Err(format!(
+                    "thread_spawn(...) expects async function call, found sync function `{spawned_callee}`"
+                ));
+            }
+            if signature.params.len() != spawned_args.len() {
+                return Err(format!(
+                    "function `{spawned_callee}` expects {} args, found {}",
+                    signature.params.len(),
+                    spawned_args.len()
+                ));
+            }
+            NirExpr::CpuThreadSpawn {
+                callee: spawned_callee.clone(),
+                args: spawned_args
+                    .iter()
+                    .map(|arg| {
+                        let lowered = lower_nested_expr_with_async_and_consts(
+                            arg,
+                            current_domain,
+                            current_function_is_async,
+                            bindings,
+                            module_consts,
+                            signatures,
+                            struct_table,
+                            None,
+                        )?;
+                        ensure_spawn_input_safe(
+                            "thread_spawn",
+                            &lowered,
+                            bindings,
+                            signatures,
+                            struct_table,
+                        )?;
+                        Ok::<NirExpr, String>(lowered)
+                    })
+                    .collect::<Result<Vec<_>, _>>()?,
+            }
+        }
         "join" => {
             if current_domain != "cpu" {
                 return Err(
@@ -152,6 +224,157 @@ pub(super) fn lower_task_builtin_call(
             )?;
             ensure_task_like("join_result", &lowered, bindings, signatures, struct_table)?;
             NirExpr::CpuJoinResult(Box::new(lowered))
+        }
+        "thread_join" => {
+            if current_domain != "cpu" {
+                return Err(
+                    "thread_join(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let [thread] = args else {
+                return Err("thread_join(...) expects exactly one thread handle".to_owned());
+            };
+            let lowered = lower_nested_expr_with_async_and_consts(
+                thread,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                module_consts,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            ensure_thread_like("thread_join", &lowered, bindings, signatures, struct_table)?;
+            NirExpr::CpuThreadJoin(Box::new(lowered))
+        }
+        "thread_join_result" => {
+            if current_domain != "cpu" {
+                return Err(
+                    "thread_join_result(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let [thread] = args else {
+                return Err(
+                    "thread_join_result(...) expects exactly one thread handle".to_owned(),
+                );
+            };
+            let lowered = lower_nested_expr_with_async_and_consts(
+                thread,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                module_consts,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            ensure_thread_like(
+                "thread_join_result",
+                &lowered,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            NirExpr::CpuThreadJoinResult(Box::new(lowered))
+        }
+        "mutex_new" => {
+            if current_domain != "cpu" {
+                return Err(
+                    "mutex_new(...) is currently only allowed inside `mod cpu <unit>`".to_owned(),
+                );
+            }
+            let [value] = args else {
+                return Err("mutex_new(...) expects exactly one value".to_owned());
+            };
+            let lowered = lower_nested_expr_with_async_and_consts(
+                value,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                module_consts,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            let ty = infer_nir_expr_type(&lowered, bindings, signatures, struct_table)
+                .ok_or_else(|| "mutex_new(...) requires an explicit typed value".to_owned())?;
+            if ty.is_ref || ty.is_optional || ty.is_result_family() || ty.is_concurrency_bridge_family()
+            {
+                return Err(format!(
+                    "mutex_new(...) expects a staged mutex payload value, found `{}`",
+                    ty.render()
+                ));
+            }
+            NirExpr::CpuMutexNew(Box::new(lowered))
+        }
+        "mutex_lock" => {
+            if current_domain != "cpu" {
+                return Err(
+                    "mutex_lock(...) is currently only allowed inside `mod cpu <unit>`".to_owned(),
+                );
+            }
+            let [mutex] = args else {
+                return Err("mutex_lock(...) expects exactly one mutex handle".to_owned());
+            };
+            let lowered = lower_nested_expr_with_async_and_consts(
+                mutex,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                module_consts,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            ensure_mutex_like("mutex_lock", &lowered, bindings, signatures, struct_table)?;
+            NirExpr::CpuMutexLock(Box::new(lowered))
+        }
+        "mutex_unlock" => {
+            if current_domain != "cpu" {
+                return Err(
+                    "mutex_unlock(...) is currently only allowed inside `mod cpu <unit>`"
+                        .to_owned(),
+                );
+            }
+            let [guard] = args else {
+                return Err("mutex_unlock(...) expects exactly one mutex guard".to_owned());
+            };
+            let lowered = lower_nested_expr_with_async_and_consts(
+                guard,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                module_consts,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            ensure_mutex_guard_like("mutex_unlock", &lowered, bindings, signatures, struct_table)?;
+            NirExpr::CpuMutexUnlock(Box::new(lowered))
+        }
+        "mutex_value" => {
+            if current_domain != "cpu" {
+                return Err(
+                    "mutex_value(...) is currently only allowed inside `mod cpu <unit>`".to_owned(),
+                );
+            }
+            let [guard] = args else {
+                return Err("mutex_value(...) expects exactly one mutex guard".to_owned());
+            };
+            let lowered = lower_nested_expr_with_async_and_consts(
+                guard,
+                current_domain,
+                current_function_is_async,
+                bindings,
+                module_consts,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            ensure_mutex_guard_like("mutex_value", &lowered, bindings, signatures, struct_table)?;
+            NirExpr::CpuMutexValue(Box::new(lowered))
         }
         "task_completed" => lower_result_observer_call_with_consts(
             "task_completed",

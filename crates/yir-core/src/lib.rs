@@ -320,10 +320,13 @@ impl Operation {
             (OperationDomainFamily::Cpu, "store_next") => SemanticOp::CpuStoreNext,
             (OperationDomainFamily::Cpu, "store_at") => SemanticOp::CpuStoreAt,
             (OperationDomainFamily::Cpu, "free") => SemanticOp::CpuFree,
-            (OperationDomainFamily::Cpu, "join") => SemanticOp::CpuJoin,
+            (OperationDomainFamily::Cpu, "join") | (OperationDomainFamily::Cpu, "thread_join") => {
+                SemanticOp::CpuJoin
+            }
             (OperationDomainFamily::Cpu, "cancel") => SemanticOp::CpuCancel,
             (OperationDomainFamily::Cpu, "timeout") => SemanticOp::CpuTimeout,
-            (OperationDomainFamily::Cpu, "join_result") => SemanticOp::CpuJoinResult,
+            (OperationDomainFamily::Cpu, "join_result")
+            | (OperationDomainFamily::Cpu, "thread_join_result") => SemanticOp::CpuJoinResult,
             (OperationDomainFamily::Cpu, "task_completed") => SemanticOp::CpuTaskCompleted,
             (OperationDomainFamily::Cpu, "task_timed_out") => SemanticOp::CpuTaskTimedOut,
             (OperationDomainFamily::Cpu, "task_cancelled") => SemanticOp::CpuTaskCancelled,
@@ -444,7 +447,7 @@ impl Operation {
                 match self.instruction.as_str() {
                     "await" => Some(AsyncCoreOp::Await),
                     "async_call" => Some(AsyncCoreOp::ScheduleCall),
-                    "spawn_task" => Some(AsyncCoreOp::SpawnTask),
+                    "spawn_task" | "spawn_thread" | "thread_spawn" => Some(AsyncCoreOp::SpawnTask),
                     _ => None,
                 }
             }
@@ -973,7 +976,10 @@ pub enum Value {
     RenderPass(RenderPass),
     Frame(FrameSurface),
     Task(TaskHandle),
+    Thread(ThreadHandle),
     TaskResult(TaskResultHandle),
+    Mutex(MutexHandle),
+    MutexGuard(MutexGuardHandle),
     Unit,
 }
 
@@ -1967,10 +1973,29 @@ pub struct TaskHandle {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ThreadHandle {
+    pub label: String,
+    pub result: Box<Value>,
+    pub state: TaskLifecycleState,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TaskResultHandle {
     pub label: String,
     pub state: TaskLifecycleState,
     pub result: Option<Box<Value>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MutexHandle {
+    pub label: String,
+    pub value: Box<Value>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MutexGuardHandle {
+    pub label: String,
+    pub value: Box<Value>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2044,7 +2069,10 @@ impl fmt::Display for Value {
                 }
                 None => write!(f, "task<{}>", task.label),
             },
+            Self::Thread(thread) => write!(f, "thread<{}:{}>", thread.label, thread.state),
             Self::TaskResult(result) => write!(f, "task_result<{}:{}>", result.label, result.state),
+            Self::Mutex(mutex) => write!(f, "mutex<{}>", mutex.label),
+            Self::MutexGuard(guard) => write!(f, "mutex_guard<{}>", guard.label),
             Self::Unit => write!(f, "()"),
         }
     }
@@ -2506,7 +2534,10 @@ impl ExecutionState {
             Some(Value::RenderPass(_)) => Err(format!("`{name}` is render-pass, expected int")),
             Some(Value::Frame(_)) => Err(format!("`{name}` is frame, expected int")),
             Some(Value::Task(_)) => Err(format!("`{name}` is task, expected int")),
+            Some(Value::Thread(_)) => Err(format!("`{name}` is thread, expected int")),
             Some(Value::TaskResult(_)) => Err(format!("`{name}` is task-result, expected int")),
+            Some(Value::Mutex(_)) => Err(format!("`{name}` is mutex, expected int")),
+            Some(Value::MutexGuard(_)) => Err(format!("`{name}` is mutex-guard, expected int")),
             Some(Value::Unit) => Err(format!("`{name}` is unit, expected int")),
             None => Err(format!("missing value for `{name}`")),
         }
@@ -2590,6 +2621,30 @@ impl ExecutionState {
         match self.values.get(name) {
             Some(Value::TaskResult(result)) => Ok(result),
             Some(other) => Err(format!("`{name}` is {other}, expected task-result")),
+            None => Err(format!("missing value for `{name}`")),
+        }
+    }
+
+    pub fn expect_thread(&self, name: &str) -> Result<&ThreadHandle, String> {
+        match self.values.get(name) {
+            Some(Value::Thread(thread)) => Ok(thread),
+            Some(other) => Err(format!("`{name}` is {other}, expected thread")),
+            None => Err(format!("missing value for `{name}`")),
+        }
+    }
+
+    pub fn expect_mutex(&self, name: &str) -> Result<&MutexHandle, String> {
+        match self.values.get(name) {
+            Some(Value::Mutex(mutex)) => Ok(mutex),
+            Some(other) => Err(format!("`{name}` is {other}, expected mutex")),
+            None => Err(format!("missing value for `{name}`")),
+        }
+    }
+
+    pub fn expect_mutex_guard(&self, name: &str) -> Result<&MutexGuardHandle, String> {
+        match self.values.get(name) {
+            Some(Value::MutexGuard(guard)) => Ok(guard),
+            Some(other) => Err(format!("`{name}` is {other}, expected mutex-guard")),
             None => Err(format!("missing value for `{name}`")),
         }
     }

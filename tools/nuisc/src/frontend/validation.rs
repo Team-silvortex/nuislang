@@ -59,7 +59,7 @@ pub(super) fn validate_declared_nir_types(module: &NirModule) -> Result<(), Stri
             if function.is_async {
                 if let Some(detail) = async_parameter_violation_detail(&param.ty, &struct_table) {
                     return Err(format!(
-                        "async function `{}` parameter `{}` cannot cross async boundary with type `{}`; {}; async parameters currently forbid `ref`, resource-bearing `Window<...>` / `WindowMut<...>` / `Pipe<...>`, control-plane `Marker<...>` / `HandleTable<...>`, `?`, `Instance<...>`, `Task<...>`, and `TaskResult<...>` / `DataResult<...>` families",
+                        "async function `{}` parameter `{}` cannot cross async boundary with type `{}`; {}; async parameters currently forbid `ref`, resource-bearing `Window<...>` / `WindowMut<...>` / `Pipe<...>`, control-plane `Marker<...>` / `HandleTable<...>`, `?`, `Instance<...>`, `Task<...>`, `Thread<...>`, `Mutex<...>` / `MutexGuard<...>`, and `TaskResult<...>` / `DataResult<...>` families",
                         function.name, param.name, param.ty.render(), detail,
                     ));
                 }
@@ -70,7 +70,7 @@ pub(super) fn validate_declared_nir_types(module: &NirModule) -> Result<(), Stri
             if function.is_async {
                 if let Some(detail) = async_boundary_violation_detail(return_type, &struct_table) {
                     return Err(format!(
-                        "async function `{}` cannot return `{}` across async boundary; {}; async returns currently forbid `ref`, resource-bearing `Window<...>` / `WindowMut<...>` / `Pipe<...>`, control-plane `Marker<...>` / `HandleTable<...>`, `?`, `Instance<...>`, `Task<...>`, and `*Result<...>` families",
+                        "async function `{}` cannot return `{}` across async boundary; {}; async returns currently forbid `ref`, resource-bearing `Window<...>` / `WindowMut<...>` / `Pipe<...>`, control-plane `Marker<...>` / `HandleTable<...>`, `?`, `Instance<...>`, `Task<...>`, `Thread<...>`, `Mutex<...>` / `MutexGuard<...>`, and `*Result<...>` families",
                         function.name, return_type.render(), detail
                     ));
                 }

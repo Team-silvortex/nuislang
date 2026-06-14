@@ -200,9 +200,7 @@ fn builtin_binary_supported(op: AstBinaryOp, lhs_ty: &NirTypeRef, rhs_ty: &NirTy
         | AstBinaryOp::Sub
         | AstBinaryOp::Mul
         | AstBinaryOp::Div
-        | AstBinaryOp::Rem => {
-            lhs_ty.is_numeric_scalar() && rhs_ty.is_numeric_scalar()
-        }
+        | AstBinaryOp::Rem => lhs_ty.is_numeric_scalar() && rhs_ty.is_numeric_scalar(),
         AstBinaryOp::Eq | AstBinaryOp::Ne => {
             (lhs_ty.is_integer_scalar() && rhs_ty.is_integer_scalar())
                 || (lhs_ty.is_float_scalar() && rhs_ty.is_float_scalar())

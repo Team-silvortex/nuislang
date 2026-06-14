@@ -307,7 +307,11 @@ impl PreparedCarrySource {
 
     pub(super) fn scaled_state_list_by_state(
         &self,
-    ) -> Option<(&[PreparedLoopStateRef], PreparedLoopStateRef, Option<&NirExpr>)> {
+    ) -> Option<(
+        &[PreparedLoopStateRef],
+        PreparedLoopStateRef,
+        Option<&NirExpr>,
+    )> {
         match self {
             Self::ScaledStateListByState {
                 terms,
@@ -476,10 +480,7 @@ impl PreparedCarrySource {
                 format!("add_prev_carry{index}")
             }
             (PreparedCarryLinearOp::Add, Self::Carry(index)) => format!("add_carry{index}"),
-            (
-                PreparedCarryLinearOp::Add,
-                Self::AddStateList { terms, offset },
-            ) => {
+            (PreparedCarryLinearOp::Add, Self::AddStateList { terms, offset }) => {
                 let rendered_terms = terms
                     .iter()
                     .map(|term| Self::state_ref_contract_fragment(*term))
@@ -706,32 +707,26 @@ impl PreparedCarrySource {
                 }
             }
             (PreparedCarryLinearOp::Add, Self::InvariantExpr(_)) => "add_invariant".to_owned(),
-            (
-                PreparedCarryLinearOp::Add,
-                Self::AddInvariant {
-                    base,
-                    offset: _,
-                },
-            ) => match base.as_ref() {
-                Self::Current => "add_current_plus_invariant".to_owned(),
-                Self::PreviousCurrent => "add_prev_current_plus_invariant".to_owned(),
-                Self::PreviousCarry(index) => format!("add_prev_carry{index}_plus_invariant"),
-                Self::Carry(index) => format!("add_carry{index}_plus_invariant"),
-                Self::InvariantExpr(_)
-                | Self::AddInvariant { .. }
-                | Self::AddStateList { .. }
-                | Self::ScaledStateList { .. }
-                | Self::ScaledStateListByState { .. }
-                | Self::ScaledStateListByStatePlusInvariant { .. }
-                | Self::ScaledStateListByFactorStateList { .. }
-                | Self::ScaledStateListByFactorStateListTimesInvariant { .. }
-                | Self::ScaledStateListByFactorGroupProduct { .. }
-                | Self::ScaledStateListByFactorGroupProductTimesInvariant { .. }
-                | Self::FixedRead(_)
-                | Self::DynamicReadAt { .. } => {
-                    "add_source_plus_invariant".to_owned()
+            (PreparedCarryLinearOp::Add, Self::AddInvariant { base, offset: _ }) => {
+                match base.as_ref() {
+                    Self::Current => "add_current_plus_invariant".to_owned(),
+                    Self::PreviousCurrent => "add_prev_current_plus_invariant".to_owned(),
+                    Self::PreviousCarry(index) => format!("add_prev_carry{index}_plus_invariant"),
+                    Self::Carry(index) => format!("add_carry{index}_plus_invariant"),
+                    Self::InvariantExpr(_)
+                    | Self::AddInvariant { .. }
+                    | Self::AddStateList { .. }
+                    | Self::ScaledStateList { .. }
+                    | Self::ScaledStateListByState { .. }
+                    | Self::ScaledStateListByStatePlusInvariant { .. }
+                    | Self::ScaledStateListByFactorStateList { .. }
+                    | Self::ScaledStateListByFactorStateListTimesInvariant { .. }
+                    | Self::ScaledStateListByFactorGroupProduct { .. }
+                    | Self::ScaledStateListByFactorGroupProductTimesInvariant { .. }
+                    | Self::FixedRead(_)
+                    | Self::DynamicReadAt { .. } => "add_source_plus_invariant".to_owned(),
                 }
-            },
+            }
             (
                 PreparedCarryLinearOp::Add,
                 Self::FixedRead(PreparedFixedReadCarrySource::Value(_)),
@@ -831,16 +826,18 @@ impl PreparedCarrySource {
                 }
             }
             (PreparedCarryLinearOp::Mul, Self::ScaledStateListByFactorStateList { .. })
-            | (PreparedCarryLinearOp::Mul, Self::ScaledStateListByFactorStateListTimesInvariant { .. })
+            | (
+                PreparedCarryLinearOp::Mul,
+                Self::ScaledStateListByFactorStateListTimesInvariant { .. },
+            )
             | (PreparedCarryLinearOp::Mul, Self::ScaledStateListByFactorGroupProduct { .. })
-            | (PreparedCarryLinearOp::Mul, Self::ScaledStateListByFactorGroupProductTimesInvariant { .. })
-             => {
+            | (
+                PreparedCarryLinearOp::Mul,
+                Self::ScaledStateListByFactorGroupProductTimesInvariant { .. },
+            ) => {
                 unreachable!("invariant/affine carry sources are currently add-only")
             }
-            (
-                PreparedCarryLinearOp::Mul,
-                Self::AddStateList { terms, offset },
-            ) => {
+            (PreparedCarryLinearOp::Mul, Self::AddStateList { terms, offset }) => {
                 let rendered_terms = terms
                     .iter()
                     .map(|term| Self::state_ref_contract_fragment(*term))
@@ -853,32 +850,26 @@ impl PreparedCarrySource {
                 }
             }
             (PreparedCarryLinearOp::Mul, Self::InvariantExpr(_)) => "mul_invariant".to_owned(),
-            (
-                PreparedCarryLinearOp::Mul,
-                Self::AddInvariant {
-                    base,
-                    offset: _,
-                },
-            ) => match base.as_ref() {
-                Self::Current => "mul_current_plus_invariant".to_owned(),
-                Self::PreviousCurrent => "mul_prev_current_plus_invariant".to_owned(),
-                Self::PreviousCarry(index) => format!("mul_prev_carry{index}_plus_invariant"),
-                Self::Carry(index) => format!("mul_carry{index}_plus_invariant"),
-                Self::InvariantExpr(_)
-                | Self::AddInvariant { .. }
-                | Self::AddStateList { .. }
-                | Self::ScaledStateList { .. }
-                | Self::ScaledStateListByState { .. }
-                | Self::ScaledStateListByStatePlusInvariant { .. }
-                | Self::ScaledStateListByFactorStateList { .. }
-                | Self::ScaledStateListByFactorStateListTimesInvariant { .. }
-                | Self::ScaledStateListByFactorGroupProduct { .. }
-                | Self::ScaledStateListByFactorGroupProductTimesInvariant { .. }
-                | Self::FixedRead(_)
-                | Self::DynamicReadAt { .. } => {
-                    "mul_source_plus_invariant".to_owned()
+            (PreparedCarryLinearOp::Mul, Self::AddInvariant { base, offset: _ }) => {
+                match base.as_ref() {
+                    Self::Current => "mul_current_plus_invariant".to_owned(),
+                    Self::PreviousCurrent => "mul_prev_current_plus_invariant".to_owned(),
+                    Self::PreviousCarry(index) => format!("mul_prev_carry{index}_plus_invariant"),
+                    Self::Carry(index) => format!("mul_carry{index}_plus_invariant"),
+                    Self::InvariantExpr(_)
+                    | Self::AddInvariant { .. }
+                    | Self::AddStateList { .. }
+                    | Self::ScaledStateList { .. }
+                    | Self::ScaledStateListByState { .. }
+                    | Self::ScaledStateListByStatePlusInvariant { .. }
+                    | Self::ScaledStateListByFactorStateList { .. }
+                    | Self::ScaledStateListByFactorStateListTimesInvariant { .. }
+                    | Self::ScaledStateListByFactorGroupProduct { .. }
+                    | Self::ScaledStateListByFactorGroupProductTimesInvariant { .. }
+                    | Self::FixedRead(_)
+                    | Self::DynamicReadAt { .. } => "mul_source_plus_invariant".to_owned(),
                 }
-            },
+            }
             (
                 PreparedCarryLinearOp::Mul,
                 Self::FixedRead(PreparedFixedReadCarrySource::Value(_)),

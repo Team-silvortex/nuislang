@@ -98,6 +98,7 @@ pub(super) fn note_binding_effects(
         NirExpr::Move(inner)
         | NirExpr::Free(inner)
         | NirExpr::CpuJoin(inner)
+        | NirExpr::CpuThreadJoin(inner)
         | NirExpr::CpuCancel(inner)
         | NirExpr::CpuJoinResult(inner) => {
             if let Some(source) = expr_resource_key(inner) {
@@ -107,6 +108,14 @@ pub(super) fn note_binding_effects(
         }
         NirExpr::CpuTimeout { task, .. } => {
             if let Some(source) = expr_resource_key(task) {
+                moved.insert(source.clone());
+                borrows.remove(&source);
+            }
+        }
+        NirExpr::CpuThreadJoinResult(inner)
+        | NirExpr::CpuMutexLock(inner)
+        | NirExpr::CpuMutexUnlock(inner) => {
+            if let Some(source) = expr_resource_key(inner) {
                 moved.insert(source.clone());
                 borrows.remove(&source);
             }
@@ -186,7 +195,9 @@ fn note_nested_expr_effects(
         | NirExpr::LoadNext(inner)
         | NirExpr::BufferLen(inner)
         | NirExpr::Free(inner)
-        | NirExpr::IsNull(inner) => note_binding_effects(inner, "_", moved, borrows, borrow_bindings),
+        | NirExpr::IsNull(inner) => {
+            note_binding_effects(inner, "_", moved, borrows, borrow_bindings)
+        }
         NirExpr::AllocNode { value, next } => {
             note_binding_effects(value, "_", moved, borrows, borrow_bindings);
             note_binding_effects(next, "_", moved, borrows, borrow_bindings);

@@ -187,13 +187,20 @@ fn lower_expr(
         | NirExpr::CpuInputI64 { .. }
         | NirExpr::CpuTickI64 { .. }
         | NirExpr::CpuSpawn { .. }
+        | NirExpr::CpuThreadSpawn { .. }
         | NirExpr::CpuJoin(_)
+        | NirExpr::CpuThreadJoin(_)
         | NirExpr::CpuCancel(_)
         | NirExpr::CpuJoinResult(_)
+        | NirExpr::CpuThreadJoinResult(_)
         | NirExpr::CpuTaskCompleted(_)
         | NirExpr::CpuTaskTimedOut(_)
         | NirExpr::CpuTaskCancelled(_)
         | NirExpr::CpuTaskValue(_)
+        | NirExpr::CpuMutexNew(_)
+        | NirExpr::CpuMutexLock(_)
+        | NirExpr::CpuMutexUnlock(_)
+        | NirExpr::CpuMutexValue(_)
         | NirExpr::CpuTimeout { .. }
         | NirExpr::CpuPresentFrame(_)
         | NirExpr::CpuExternCall { .. } => lower_cpu_expr(expr, state, bindings)

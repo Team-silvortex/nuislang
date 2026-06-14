@@ -161,6 +161,54 @@ fn rejects_project_packet_control_field_on_payload_role_field() {
 }
 
 #[test]
+fn rejects_project_thread_packet_field() {
+    let project = project_with_modules(vec![(
+        "main.ns",
+        r#"
+        mod cpu Main {
+          @packet
+          struct Packet {
+            @packet_field
+            payload: Thread<i64>,
+          }
+
+          fn main() -> i64 { return 1; }
+        }
+        "#,
+    )]);
+    let error = validate_project_modules(&project.modules).unwrap_err();
+    assert!(error.contains(
+        "annotation `@packet_field` currently only supports payload-role fields (kind=thread, role=async-carrier)"
+    ));
+}
+
+#[test]
+fn rejects_project_mutex_packet_control_field() {
+    let project = project_with_modules(vec![(
+        "main.ns",
+        r#"
+        mod cpu Main {
+          @packet
+          struct Packet {
+            @packet_field
+            seed: i64,
+            @packet_control_field
+            payload: Mutex<i64>,
+          }
+
+          fn main() -> i64 { return 1; }
+        }
+        "#,
+    )]);
+    let error = validate_project_modules(&project.modules).unwrap_err();
+    assert!(
+        error.contains("kind=sync-resource")
+            || error.contains("synchronization-resource fields like `Mutex`"),
+        "{error}"
+    );
+}
+
+#[test]
 fn rejects_project_packet_struct_without_packet_fields() {
     let project = project_with_modules(vec![(
         "main.ns",

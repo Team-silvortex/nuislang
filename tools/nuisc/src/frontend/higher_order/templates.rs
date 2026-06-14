@@ -4,9 +4,9 @@ use nuis_semantics::model::{
     AstExpr, AstFunction, AstMatchArm, AstParam, AstStmt, AstTypeAlias, AstVisibility,
 };
 
+use super::super::resolve_ast_type_ref_aliases;
 use super::callables::is_callable_type_with_aliases;
 use super::expansion::{specialize_higher_order_call, BoundCallable};
-use super::super::resolve_ast_type_ref_aliases;
 
 pub(crate) fn specialize_higher_order_template(
     template: &AstFunction,
@@ -37,10 +37,13 @@ pub(crate) fn specialize_higher_order_template(
             let Some(bound) = callable_bindings.get(&param.name) else {
                 return Vec::<AstParam>::new();
             };
-            let Ok(resolved_callable_ty) = resolve_ast_type_ref_aliases(&param.ty, visible_type_aliases) else {
+            let Ok(resolved_callable_ty) =
+                resolve_ast_type_ref_aliases(&param.ty, visible_type_aliases)
+            else {
                 return Vec::<AstParam>::new();
             };
-            let Some(callable_arity) = super::callables::callable_type_arity(&resolved_callable_ty) else {
+            let Some(callable_arity) = super::callables::callable_type_arity(&resolved_callable_ty)
+            else {
                 return Vec::<AstParam>::new();
             };
             let Some(callable_function) = function_table.get(&bound.symbol) else {

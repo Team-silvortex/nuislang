@@ -6385,22 +6385,60 @@ mod tests {
             domain: "cpu".to_owned(),
             unit: "Main".to_owned(),
             externs: vec![
-                host_extern("host_serialize_text_into", &["text_handle", "buffer_handle", "offset"]),
-                host_extern("host_serialize_i64_into", &["value", "buffer_handle", "offset"]),
-                host_extern("host_serialize_bool_into", &["value", "buffer_handle", "offset"]),
-                host_extern("host_serialize_byte_into", &["value", "buffer_handle", "offset"]),
-                host_extern("host_deserialize_i64_from", &["buffer_handle", "offset", "len"]),
+                host_extern(
+                    "host_serialize_text_into",
+                    &["text_handle", "buffer_handle", "offset"],
+                ),
+                host_extern(
+                    "host_serialize_i64_into",
+                    &["value", "buffer_handle", "offset"],
+                ),
+                host_extern(
+                    "host_serialize_bool_into",
+                    &["value", "buffer_handle", "offset"],
+                ),
+                host_extern(
+                    "host_serialize_byte_into",
+                    &["value", "buffer_handle", "offset"],
+                ),
+                host_extern(
+                    "host_deserialize_i64_from",
+                    &["buffer_handle", "offset", "len"],
+                ),
                 host_extern("host_deserialize_byte_from", &["buffer_handle", "offset"]),
-                host_extern("host_deserialize_bool_from", &["buffer_handle", "offset", "len"]),
-                host_extern("host_deserialize_text_from", &["buffer_handle", "offset", "len"]),
-                host_extern("host_fill_bytes", &["buffer_handle", "offset", "len", "value"]),
+                host_extern(
+                    "host_deserialize_bool_from",
+                    &["buffer_handle", "offset", "len"],
+                ),
+                host_extern(
+                    "host_deserialize_text_from",
+                    &["buffer_handle", "offset", "len"],
+                ),
+                host_extern(
+                    "host_fill_bytes",
+                    &["buffer_handle", "offset", "len", "value"],
+                ),
                 host_extern(
                     "host_copy_bytes",
-                    &["dst_handle", "dst_offset", "dst_len", "src_handle", "src_offset", "src_len"],
+                    &[
+                        "dst_handle",
+                        "dst_offset",
+                        "dst_len",
+                        "src_handle",
+                        "src_offset",
+                        "src_len",
+                    ],
                 ),
                 host_extern(
                     "host_compare_bytes",
-                    &["lhs_handle", "lhs_offset", "lhs_len", "rhs_handle", "rhs_offset", "rhs_len"],
+                    &[
+                        "lhs_handle",
+                        "lhs_offset",
+                        "lhs_len",
+                        "rhs_handle",
+                        "rhs_offset",
+                        "rhs_len",
+                    ],
                 ),
             ],
             extern_interfaces: Vec::new(),
@@ -6437,14 +6475,15 @@ mod tests {
         assert!(shim.contains("static int64_t nuis_host_buffer_find_text("));
         assert!(shim.contains("static int64_t nuis_host_buffer_find_line_end("));
         assert!(shim.contains("static int64_t nuis_host_buffer_trim_line_end("));
-        assert!(
-            shim.contains("return nuis_host_serialize_text_into(text_handle, buffer_handle, offset);")
-        );
+        assert!(shim
+            .contains("return nuis_host_serialize_text_into(text_handle, buffer_handle, offset);"));
         assert!(shim.contains("return nuis_host_serialize_i64_into(value, buffer_handle, offset);"));
         assert!(
             shim.contains("return nuis_host_serialize_bool_into(value, buffer_handle, offset);")
         );
-        assert!(shim.contains("return nuis_host_serialize_byte_into(value, buffer_handle, offset);"));
+        assert!(
+            shim.contains("return nuis_host_serialize_byte_into(value, buffer_handle, offset);")
+        );
         assert!(shim.contains("return nuis_host_deserialize_i64_from(buffer_handle, offset, len);"));
         assert!(shim.contains("return nuis_host_deserialize_byte_from(buffer_handle, offset);"));
         assert!(shim.contains("return nuis_host_deserialize_bool_from("));

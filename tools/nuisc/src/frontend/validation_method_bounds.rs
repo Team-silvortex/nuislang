@@ -501,7 +501,10 @@ fn validate_stmt_generic_method_bounds(
     context: &str,
 ) -> Result<(), String> {
     match stmt {
-        AstStmt::Let { name, ty, value, .. } | AstStmt::Const { name, ty, value } => {
+        AstStmt::Let {
+            name, ty, value, ..
+        }
+        | AstStmt::Const { name, ty, value } => {
             validate_expr_generic_method_bounds(
                 value,
                 visible_type_aliases,

@@ -37,12 +37,12 @@ fn parse_bound_callable_expr(
             callee,
             generic_args,
             args,
-        } if generic_args.is_empty() && callee.starts_with(LAMBDA_BIND_PREFIX) => Some(
-            BoundCallable {
+        } if generic_args.is_empty() && callee.starts_with(LAMBDA_BIND_PREFIX) => {
+            Some(BoundCallable {
                 symbol: callee[LAMBDA_BIND_PREFIX.len()..].to_owned(),
                 capture_args: args.to_vec(),
-            },
-        ),
+            })
+        }
         _ => None,
     }
 }
@@ -702,8 +702,14 @@ pub(crate) fn specialize_higher_order_call(
             let resolved_callable_ty =
                 resolve_ast_type_ref_aliases(&param.ty, visible_type_aliases)?;
             let callable_arity = super::callables::callable_type_arity(&resolved_callable_ty)
-                .ok_or_else(|| format!("higher-order parameter `{}` is not callable", param.name))?;
-            let capture_param_defs = callable.params.iter().skip(callable_arity).collect::<Vec<_>>();
+                .ok_or_else(|| {
+                    format!("higher-order parameter `{}` is not callable", param.name)
+                })?;
+            let capture_param_defs = callable
+                .params
+                .iter()
+                .skip(callable_arity)
+                .collect::<Vec<_>>();
             if capture_param_defs.len() != bound_callable.capture_args.len() {
                 return Err(format!(
                     "callable `{}` capture shape does not match higher-order binding `{}`",
@@ -713,12 +719,14 @@ pub(crate) fn specialize_higher_order_call(
             let helper_capture_args = capture_param_defs
                 .iter()
                 .enumerate()
-                .map(|(index, capture_param)| AstExpr::Var(format!(
-                    "__capture_{}_{}_{}",
-                    sanitize_symbol_fragment(&param.name),
-                    sanitize_symbol_fragment(&capture_param.name),
-                    index
-                )))
+                .map(|(index, capture_param)| {
+                    AstExpr::Var(format!(
+                        "__capture_{}_{}_{}",
+                        sanitize_symbol_fragment(&param.name),
+                        sanitize_symbol_fragment(&capture_param.name),
+                        index
+                    ))
+                })
                 .collect::<Vec<_>>();
             for capture_arg in &bound_callable.capture_args {
                 ordinary_args.push(annotate_expr_head_with_expected_type(

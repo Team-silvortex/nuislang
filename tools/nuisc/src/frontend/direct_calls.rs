@@ -350,7 +350,10 @@ pub(super) fn lower_direct_call_builtin_or_named_call(
                 abi: "c".to_owned(),
                 interface: None,
                 callee: "host_deserialize_byte_from".to_owned(),
-                args: vec![NirExpr::HostBufferHandle(Box::new(lowered_buffer)), lowered_offset],
+                args: vec![
+                    NirExpr::HostBufferHandle(Box::new(lowered_buffer)),
+                    lowered_offset,
+                ],
             }))
         }
         "deserialize_text_from" => {

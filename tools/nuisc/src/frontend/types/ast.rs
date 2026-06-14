@@ -337,7 +337,9 @@ pub(crate) fn infer_ast_expr_type_inner(
                         payload.clone()
                     }
                     [payload] if *payload == ast_named_type("bool") => payload.clone(),
-                    [payload] => return Some(ast_generic_named_type("Slice", vec![payload.clone()])),
+                    [payload] => {
+                        return Some(ast_generic_named_type("Slice", vec![payload.clone()]))
+                    }
                     _ => return None,
                 };
                 let buffer_ty = infer_ast_expr_type_inner(
@@ -458,7 +460,11 @@ pub(crate) fn infer_ast_expr_type_inner(
                     function_return_types,
                     active_exprs,
                 )?;
-                if base_ty.name == "Slice" && !base_ty.is_ref && !base_ty.is_optional && base_ty.generic_args.len() == 1 {
+                if base_ty.name == "Slice"
+                    && !base_ty.is_ref
+                    && !base_ty.is_optional
+                    && base_ty.generic_args.len() == 1
+                {
                     match generic_args.as_slice() {
                         [] => Some(base_ty),
                         [payload] if *payload == base_ty.generic_args[0] => Some(base_ty),

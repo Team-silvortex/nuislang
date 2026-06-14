@@ -706,6 +706,46 @@ impl NirTypeRef {
         self.name == "HandleTable" && !self.is_ref
     }
 
+    pub fn is_thread_family(&self) -> bool {
+        self.name == "Thread" && !self.is_ref
+    }
+
+    pub fn is_mutex_family(&self) -> bool {
+        self.name == "Mutex" && !self.is_ref
+    }
+
+    pub fn is_mutex_guard_family(&self) -> bool {
+        self.name == "MutexGuard" && !self.is_ref
+    }
+
+    pub fn is_concurrency_bridge_family(&self) -> bool {
+        self.is_thread_family() || self.is_mutex_family() || self.is_mutex_guard_family()
+    }
+
+    pub fn thread_payload(&self) -> Option<&NirTypeRef> {
+        if self.is_thread_family() {
+            self.generic_args.first()
+        } else {
+            None
+        }
+    }
+
+    pub fn mutex_payload(&self) -> Option<&NirTypeRef> {
+        if self.is_mutex_family() {
+            self.generic_args.first()
+        } else {
+            None
+        }
+    }
+
+    pub fn mutex_guard_payload(&self) -> Option<&NirTypeRef> {
+        if self.is_mutex_guard_family() {
+            self.generic_args.first()
+        } else {
+            None
+        }
+    }
+
     pub fn marker_tag(&self) -> Option<&NirTypeRef> {
         if self.is_marker_family() {
             self.generic_args.first()
@@ -730,6 +770,9 @@ impl NirTypeRef {
             self.container_kind(),
             Some(NirContainerKind::Instance | NirContainerKind::Task)
         ) {
+            return false;
+        }
+        if self.is_concurrency_bridge_family() {
             return false;
         }
         if self.is_result_family() {
@@ -880,6 +923,57 @@ impl NirTypeRef {
                                 schema.render()
                             ));
                         }
+                    }
+                }
+                if self.is_thread_family() {
+                    if self.generic_args.len() != 1 {
+                        return Err(
+                            "`Thread<...>` must carry exactly one payload type argument".to_owned()
+                        );
+                    }
+                    let payload = self.thread_payload().expect("thread payload");
+                    if !payload.is_async_boundary_safe() || payload.is_concurrency_bridge_family() {
+                        return Err(format!(
+                            "`Thread<...>` expects a staged join payload that is async-boundary-safe and not itself a thread/lock family, found `{}`",
+                            payload.render()
+                        ));
+                    }
+                }
+                if self.is_mutex_family() {
+                    if self.generic_args.len() != 1 {
+                        return Err(
+                            "`Mutex<...>` must carry exactly one payload type argument".to_owned()
+                        );
+                    }
+                    let payload = self.mutex_payload().expect("mutex payload");
+                    if payload.is_ref
+                        || payload.is_optional
+                        || payload.is_result_family()
+                        || payload.is_concurrency_bridge_family()
+                    {
+                        return Err(format!(
+                            "`Mutex<...>` expects a staged value payload, found `{}`",
+                            payload.render()
+                        ));
+                    }
+                }
+                if self.is_mutex_guard_family() {
+                    if self.generic_args.len() != 1 {
+                        return Err(
+                            "`MutexGuard<...>` must carry exactly one payload type argument"
+                                .to_owned(),
+                        );
+                    }
+                    let payload = self.mutex_guard_payload().expect("mutex guard payload");
+                    if payload.is_ref
+                        || payload.is_optional
+                        || payload.is_result_family()
+                        || payload.is_concurrency_bridge_family()
+                    {
+                        return Err(format!(
+                            "`MutexGuard<...>` expects a staged value payload, found `{}`",
+                            payload.render()
+                        ));
                     }
                 }
             }
@@ -1229,6 +1323,16 @@ pub enum NirExpr {
     CpuTaskTimedOut(Box<NirExpr>),
     CpuTaskCancelled(Box<NirExpr>),
     CpuTaskValue(Box<NirExpr>),
+    CpuThreadSpawn {
+        callee: String,
+        args: Vec<NirExpr>,
+    },
+    CpuThreadJoin(Box<NirExpr>),
+    CpuThreadJoinResult(Box<NirExpr>),
+    CpuMutexNew(Box<NirExpr>),
+    CpuMutexLock(Box<NirExpr>),
+    CpuMutexUnlock(Box<NirExpr>),
+    CpuMutexValue(Box<NirExpr>),
     CpuTimeout {
         task: Box<NirExpr>,
         limit: Box<NirExpr>,
@@ -1997,13 +2101,20 @@ pub fn nir_expr_effect_class(expr: &NirExpr) -> NirExprEffectClass {
         | NirExpr::ShaderResult { .. } => NirExprEffectClass::DomainReadOnly,
         NirExpr::CpuWindow { .. }
         | NirExpr::CpuSpawn { .. }
+        | NirExpr::CpuThreadSpawn { .. }
         | NirExpr::CpuJoin(_)
+        | NirExpr::CpuThreadJoin(_)
         | NirExpr::CpuCancel(_)
         | NirExpr::CpuJoinResult(_)
+        | NirExpr::CpuThreadJoinResult(_)
         | NirExpr::CpuTaskCompleted(_)
         | NirExpr::CpuTaskTimedOut(_)
         | NirExpr::CpuTaskCancelled(_)
         | NirExpr::CpuTaskValue(_)
+        | NirExpr::CpuMutexNew(_)
+        | NirExpr::CpuMutexLock(_)
+        | NirExpr::CpuMutexUnlock(_)
+        | NirExpr::CpuMutexValue(_)
         | NirExpr::CpuTimeout { .. }
         | NirExpr::CpuPresentFrame(_)
         | NirExpr::ShaderPassReady(_)
@@ -2149,6 +2260,44 @@ mod tests {
         assert_eq!(mutable.container_kind(), Some(NirContainerKind::Window));
         immutable.validate_container_contract().unwrap();
         mutable.validate_container_contract().unwrap();
+    }
+
+    #[test]
+    fn recognizes_staged_thread_and_mutex_families() {
+        let thread = generic("Thread", named("i64"));
+        let mutex = generic("Mutex", named("i64"));
+        let guard = generic("MutexGuard", named("i64"));
+
+        assert!(thread.is_thread_family());
+        assert!(mutex.is_mutex_family());
+        assert!(guard.is_mutex_guard_family());
+        assert!(thread.is_concurrency_bridge_family());
+        assert!(mutex.is_concurrency_bridge_family());
+        assert!(guard.is_concurrency_bridge_family());
+        assert!(!thread.is_async_boundary_safe());
+        assert!(!mutex.is_async_boundary_safe());
+        assert!(!guard.is_async_boundary_safe());
+        thread.validate_container_contract().unwrap();
+        mutex.validate_container_contract().unwrap();
+        guard.validate_container_contract().unwrap();
+    }
+
+    #[test]
+    fn rejects_thread_payloads_that_are_not_staged_join_safe() {
+        let error = generic("Thread", generic("TaskResult", named("i64")))
+            .validate_container_contract()
+            .unwrap_err();
+        assert!(error.contains("Thread<...>"));
+        assert!(error.contains("TaskResult<i64>"));
+    }
+
+    #[test]
+    fn rejects_mutex_payloads_that_are_nested_thread_lock_families() {
+        let error = generic("Mutex", generic("Thread", named("i64")))
+            .validate_container_contract()
+            .unwrap_err();
+        assert!(error.contains("Mutex<...>"));
+        assert!(error.contains("Thread<i64>"));
     }
 
     #[test]

@@ -239,6 +239,11 @@ space.
 
 The current task/GLM alignment is still incomplete.
 
+That incompleteness matters even more for future thread/lock work: the current
+repository should not pretend that a future `Thread<T>` or `Mutex<T>` family
+can reuse the present task approximation unchanged. See the staged split in
+[cpu-thread-lock-staging-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-thread-lock-staging-sketch.md).
+
 In particular, the repository does **not** yet fully specify:
 
 * whether task payloads are copied, transferred, or wrapped

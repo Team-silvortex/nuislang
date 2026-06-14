@@ -161,6 +161,32 @@ fn glm_profile_classifies_task_value_as_res_read() {
 }
 
 #[test]
+fn glm_profile_classifies_thread_join_result_as_res_own() {
+    let profile = nir_glm_profile(&NirExpr::CpuThreadJoinResult(Box::new(NirExpr::Var(
+        "thread".to_owned(),
+    ))))
+    .expect("thread_join_result should have a GLM profile");
+    assert_eq!(profile.result_class, NirGlmValueClass::Val);
+    assert_eq!(profile.accesses.len(), 1);
+    assert_eq!(profile.accesses[0].class, NirGlmValueClass::Res);
+    assert_eq!(profile.accesses[0].mode, NirGlmUseMode::Own);
+    assert_eq!(profile.effect, NirGlmEffect::None);
+}
+
+#[test]
+fn glm_profile_classifies_mutex_lock_as_res_own_with_domain_move() {
+    let profile = nir_glm_profile(&NirExpr::CpuMutexLock(Box::new(NirExpr::Var(
+        "lock".to_owned(),
+    ))))
+    .expect("mutex_lock should have a GLM profile");
+    assert_eq!(profile.result_class, NirGlmValueClass::Res);
+    assert_eq!(profile.accesses.len(), 1);
+    assert_eq!(profile.accesses[0].class, NirGlmValueClass::Res);
+    assert_eq!(profile.accesses[0].mode, NirGlmUseMode::Own);
+    assert_eq!(profile.effect, NirGlmEffect::DomainMove);
+}
+
+#[test]
 fn glm_verifier_accepts_borrow_end_then_write_then_free_sequence() {
     let module = module_with_body(vec![
         NirStmt::Let {
@@ -422,6 +448,199 @@ fn glm_verifier_accepts_task_value_inside_completed_branch() {
             else_body: vec![],
         },
     ]);
+
+    verify_nir_module(&module).unwrap();
+}
+
+#[test]
+fn glm_verifier_rejects_thread_join_after_join_result_of_same_thread() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "thread".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::Expr(NirExpr::CpuThreadJoinResult(Box::new(NirExpr::Var(
+            "thread".to_owned(),
+        )))),
+        NirStmt::Expr(NirExpr::CpuThreadJoin(Box::new(NirExpr::Var(
+            "thread".to_owned(),
+        )))),
+    ]);
+
+    let error = verify_nir_module(&module).unwrap_err();
+    assert!(error.contains("use of moved value `thread`"));
+}
+
+#[test]
+fn glm_verifier_rejects_second_mutex_lock_of_same_mutex() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "lock".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::Expr(NirExpr::CpuMutexLock(Box::new(NirExpr::Var(
+            "lock".to_owned(),
+        )))),
+        NirStmt::Expr(NirExpr::CpuMutexLock(Box::new(NirExpr::Var(
+            "lock".to_owned(),
+        )))),
+    ]);
+
+    let error = verify_nir_module(&module).unwrap_err();
+    assert!(error.contains("use of moved value `lock`"));
+}
+
+#[test]
+fn glm_verifier_rejects_mutex_value_after_unlock_of_same_guard() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "guard".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::Expr(NirExpr::CpuMutexUnlock(Box::new(NirExpr::Var(
+            "guard".to_owned(),
+        )))),
+        NirStmt::Expr(NirExpr::CpuMutexValue(Box::new(NirExpr::Var(
+            "guard".to_owned(),
+        )))),
+    ]);
+
+    let error = verify_nir_module(&module).unwrap_err();
+    assert!(error.contains("use of moved value `guard`"));
+}
+
+#[test]
+fn glm_verifier_rejects_thread_use_after_if_branch_consumes_it() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "thread".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::If {
+            condition: NirExpr::Bool(true),
+            then_body: vec![NirStmt::Expr(NirExpr::CpuThreadJoin(Box::new(
+                NirExpr::Var("thread".to_owned()),
+            )))],
+            else_body: vec![],
+        },
+        NirStmt::Expr(NirExpr::CpuThreadJoin(Box::new(NirExpr::Var(
+            "thread".to_owned(),
+        )))),
+    ]);
+
+    let error = verify_nir_module(&module).unwrap_err();
+    assert!(error.contains("use of moved value `thread`"));
+}
+
+#[test]
+fn glm_verifier_rejects_mutex_use_after_if_branch_locks_it() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "lock".to_owned(),
+            ty: None,
+            value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                value: Box::new(NirExpr::Int(10)),
+                next: Box::new(NirExpr::Null),
+            })),
+        },
+        NirStmt::If {
+            condition: NirExpr::Bool(true),
+            then_body: vec![NirStmt::Expr(NirExpr::CpuMutexLock(Box::new(
+                NirExpr::Var("lock".to_owned()),
+            )))],
+            else_body: vec![],
+        },
+        NirStmt::Expr(NirExpr::CpuMutexLock(Box::new(NirExpr::Var(
+            "lock".to_owned(),
+        )))),
+    ]);
+
+    let error = verify_nir_module(&module).unwrap_err();
+    assert!(error.contains("use of moved value `lock`"));
+}
+
+#[test]
+fn glm_verifier_accepts_branch_local_thread_consumption_without_post_merge_reuse() {
+    let module = module_with_body(vec![NirStmt::If {
+        condition: NirExpr::Bool(true),
+        then_body: vec![
+            NirStmt::Let {
+                name: "thread".to_owned(),
+                ty: None,
+                value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                    value: Box::new(NirExpr::Int(10)),
+                    next: Box::new(NirExpr::Null),
+                })),
+            },
+            NirStmt::Expr(NirExpr::CpuThreadJoin(Box::new(NirExpr::Var(
+                "thread".to_owned(),
+            )))),
+        ],
+        else_body: vec![
+            NirStmt::Let {
+                name: "thread".to_owned(),
+                ty: None,
+                value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                    value: Box::new(NirExpr::Int(11)),
+                    next: Box::new(NirExpr::Null),
+                })),
+            },
+            NirStmt::Expr(NirExpr::CpuThreadJoinResult(Box::new(NirExpr::Var(
+                "thread".to_owned(),
+            )))),
+        ],
+    }]);
+
+    verify_nir_module(&module).unwrap();
+}
+
+#[test]
+fn glm_verifier_accepts_branch_local_mutex_consumption_without_post_merge_reuse() {
+    let module = module_with_body(vec![NirStmt::If {
+        condition: NirExpr::Bool(true),
+        then_body: vec![
+            NirStmt::Let {
+                name: "lock".to_owned(),
+                ty: None,
+                value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                    value: Box::new(NirExpr::Int(10)),
+                    next: Box::new(NirExpr::Null),
+                })),
+            },
+            NirStmt::Expr(NirExpr::CpuMutexLock(Box::new(NirExpr::Var(
+                "lock".to_owned(),
+            )))),
+        ],
+        else_body: vec![
+            NirStmt::Let {
+                name: "guard".to_owned(),
+                ty: None,
+                value: NirExpr::Move(Box::new(NirExpr::AllocNode {
+                    value: Box::new(NirExpr::Int(11)),
+                    next: Box::new(NirExpr::Null),
+                })),
+            },
+            NirStmt::Expr(NirExpr::CpuMutexUnlock(Box::new(NirExpr::Var(
+                "guard".to_owned(),
+            )))),
+        ],
+    }]);
 
     verify_nir_module(&module).unwrap();
 }
@@ -951,13 +1170,9 @@ fn glm_verifier_rejects_store_at_value_consume_after_buffer_temporary_borrow() {
             })),
         },
         NirStmt::Expr(NirExpr::StoreAt {
-            buffer: Box::new(NirExpr::Borrow(Box::new(NirExpr::Var(
-                "head".to_owned(),
-            )))),
+            buffer: Box::new(NirExpr::Borrow(Box::new(NirExpr::Var("head".to_owned())))),
             index: Box::new(NirExpr::Int(0)),
-            value: Box::new(NirExpr::Move(Box::new(NirExpr::Var(
-                "head".to_owned(),
-            )))),
+            value: Box::new(NirExpr::Move(Box::new(NirExpr::Var("head".to_owned())))),
         }),
         NirStmt::Expr(NirExpr::Free(Box::new(NirExpr::Var("scratch".to_owned())))),
     ]);

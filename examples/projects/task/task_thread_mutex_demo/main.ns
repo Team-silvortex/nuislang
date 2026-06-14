@@ -1,0 +1,47 @@
+mod cpu Main {
+  type IntThread = Thread<i64>;
+  type IntTaskResult = TaskResult<i64>;
+  type IntMutex = Mutex<i64>;
+  type IntMutexGuard = MutexGuard<i64>;
+
+  struct ThreadMutexSummary {
+    first_read: i64,
+    second_read: i64,
+    thread_value: i64
+  }
+
+  async fn ping(seed: i64) -> i64 {
+    return seed + 9;
+  }
+
+  fn capture_thread_mutex(seed: i64) -> ThreadMutexSummary {
+    let lock: IntMutex = mutex_new(seed + 3);
+    let guard: IntMutexGuard = mutex_lock(lock);
+    let first_read: i64 = mutex_value(guard);
+    let reopened: IntMutex = mutex_unlock(guard);
+    let reopened_guard: IntMutexGuard = mutex_lock(reopened);
+    let second_read: i64 = mutex_value(reopened_guard);
+
+    let worker: IntThread = thread_spawn(ping(second_read));
+    let joined: IntTaskResult = thread_join_result(worker);
+
+    if task_completed(joined) {
+      return ThreadMutexSummary {
+        first_read: first_read,
+        second_read: second_read,
+        thread_value: task_value(joined)
+      };
+    }
+
+    return ThreadMutexSummary {
+      first_read: first_read,
+      second_read: second_read,
+      thread_value: 0
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: ThreadMutexSummary = capture_thread_mutex(5);
+    return summary.first_read + summary.second_read + summary.thread_value;
+  }
+}

@@ -6,6 +6,10 @@ It exists to answer one practical question quickly:
 
 `when a frontend feature moves, which test file should take the next proof?`
 
+Companion current-state matrix:
+
+* [nuis-0.19.0-frontend-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-frontend-capability-matrix.md)
+
 ## Short Rule
 
 Prefer adding the new test to the narrowest existing file that already owns the
@@ -134,5 +138,6 @@ These areas are now present enough that future work should stay intentional:
 * generic specialization plus higher-order helper plus capture threading
 * bound validation plus lambda bodies
 * recursive async generic bodies that still cross helper specialization
+* qualified helper traits plus alias chains plus higher-order specialization
 
 If one of these moves, update the owning test file first before broad cleanup.

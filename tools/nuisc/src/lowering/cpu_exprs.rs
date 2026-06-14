@@ -27,6 +27,17 @@ pub(super) fn lower_cpu_expr(
         NirExpr::CpuJoin(task) => Some(lower_cpu_join(task, state, bindings)),
         NirExpr::CpuCancel(task) => Some(lower_cpu_cancel(task, state, bindings)),
         NirExpr::CpuJoinResult(task) => Some(lower_task_result_entry_node(state, bindings, task)),
+        NirExpr::CpuThreadSpawn { callee, args } => {
+            Some(lower_cpu_thread_spawn(callee, args, state, bindings))
+        }
+        NirExpr::CpuThreadJoin(thread) => Some(lower_cpu_thread_join(thread, state, bindings)),
+        NirExpr::CpuThreadJoinResult(thread) => {
+            Some(lower_cpu_thread_join_result(thread, state, bindings))
+        }
+        NirExpr::CpuMutexNew(value) => Some(lower_cpu_mutex_new(value, state, bindings)),
+        NirExpr::CpuMutexLock(mutex) => Some(lower_cpu_mutex_lock(mutex, state, bindings)),
+        NirExpr::CpuMutexUnlock(guard) => Some(lower_cpu_mutex_unlock(guard, state, bindings)),
+        NirExpr::CpuMutexValue(guard) => Some(lower_cpu_mutex_value(guard, state, bindings)),
         NirExpr::CpuTaskCompleted(result) => Some(lower_task_result_observer_node(
             state,
             bindings,
@@ -208,6 +219,60 @@ fn lower_cpu_join(
     Ok(name)
 }
 
+fn lower_cpu_thread_spawn(
+    callee: &str,
+    args: &[NirExpr],
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<String, String> {
+    let returned = lower_async_call_boundary(callee, args, state, bindings)?;
+    let name = next_name(state, "cpu_spawn_thread");
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "spawn_thread".to_owned(),
+            args: vec![callee.to_owned(), returned.clone()],
+        },
+    });
+    push_dep_edges(state, &returned, &name);
+    state.yir.edges.push(Edge {
+        kind: EdgeKind::Effect,
+        from: returned,
+        to: name.clone(),
+    });
+    Ok(name)
+}
+
+fn lower_cpu_thread_join(
+    thread: &NirExpr,
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<String, String> {
+    super::result_nodes::lower_cpu_unary_value_effect(
+        state,
+        bindings,
+        thread,
+        "cpu_thread_join",
+        "thread_join",
+    )
+}
+
+fn lower_cpu_thread_join_result(
+    thread: &NirExpr,
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<String, String> {
+    super::result_nodes::lower_cpu_unary_value_effect(
+        state,
+        bindings,
+        thread,
+        "cpu_thread_join_result",
+        "thread_join_result",
+    )
+}
+
 fn lower_cpu_cancel(
     task: &NirExpr,
     state: &mut LoweringState<'_>,
@@ -231,6 +296,62 @@ fn lower_cpu_cancel(
         to: name.clone(),
     });
     Ok(name)
+}
+
+fn lower_cpu_mutex_new(
+    value: &NirExpr,
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<String, String> {
+    super::result_nodes::lower_cpu_unary_value_effect(
+        state,
+        bindings,
+        value,
+        "cpu_mutex_new",
+        "mutex_new",
+    )
+}
+
+fn lower_cpu_mutex_lock(
+    mutex: &NirExpr,
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<String, String> {
+    super::result_nodes::lower_cpu_unary_value_effect(
+        state,
+        bindings,
+        mutex,
+        "cpu_mutex_lock",
+        "mutex_lock",
+    )
+}
+
+fn lower_cpu_mutex_unlock(
+    guard: &NirExpr,
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<String, String> {
+    super::result_nodes::lower_cpu_unary_value_effect(
+        state,
+        bindings,
+        guard,
+        "cpu_mutex_unlock",
+        "mutex_unlock",
+    )
+}
+
+fn lower_cpu_mutex_value(
+    guard: &NirExpr,
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<String, String> {
+    super::result_nodes::lower_cpu_unary_value_effect(
+        state,
+        bindings,
+        guard,
+        "cpu_mutex_value",
+        "mutex_value",
+    )
 }
 
 fn lower_cpu_timeout(

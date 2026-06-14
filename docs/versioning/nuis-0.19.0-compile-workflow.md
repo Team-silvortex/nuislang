@@ -21,6 +21,7 @@ Use it together with:
 
 * [nuis-0.19.0-mainline-goals.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-goals.md)
 * [nuis-0.19.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-regression-matrix.md)
+* [nuis-0.19.0-workflow-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-workflow-capability-matrix.md)
 * [nuis-0.19.0-address-pointer-mainline.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-address-pointer-mainline.md)
 * [nuis-0.18.0-loop-memory-read-contract-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-loop-memory-read-contract-sketch.md)
 
@@ -160,6 +161,15 @@ The current believable mainline should still be taught through:
   [state_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/state_compile.rs)
 * async/task proof:
   [task_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/task_compile.rs)
+  current staged thread/lock project anchor:
+  [task_thread_mutex_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_thread_mutex_demo)
+  current frontdoor sample:
+  `nuis project-doctor examples/projects/task/task_thread_mutex_demo`
+  `nuis check examples/projects/task/task_thread_mutex_demo`
+  `nuis test examples/projects/task/task_thread_mutex_demo`
+  current honesty rule:
+  project test is explicit, frontdoor-visible, and now executes successfully
+  through the staged AOT thread/lock path
 * memory/address proof:
   [memory_compile.rs](/Users/Shared/chroot/dev/nuislang/tools/nuisc/tests/memory_compile.rs)
 * shader/helper-mediated proof:

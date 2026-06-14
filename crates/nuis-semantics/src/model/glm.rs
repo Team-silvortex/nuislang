@@ -25,7 +25,17 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::FieldAccess { .. }
         | NirExpr::Binary { .. }
         | NirExpr::IsNull(_) => None,
-        NirExpr::CpuJoin(_) | NirExpr::CpuJoinResult(_) => Some(NirGlmProfile {
+        NirExpr::CpuJoin(_) | NirExpr::CpuJoinResult(_) | NirExpr::CpuThreadJoin(_) => {
+            Some(NirGlmProfile {
+                result_class: NirGlmValueClass::Val,
+                accesses: vec![NirGlmAccess {
+                    class: NirGlmValueClass::Res,
+                    mode: NirGlmUseMode::Own,
+                }],
+                effect: NirGlmEffect::None,
+            })
+        }
+        NirExpr::CpuThreadJoinResult(_) => Some(NirGlmProfile {
             result_class: NirGlmValueClass::Val,
             accesses: vec![NirGlmAccess {
                 class: NirGlmValueClass::Res,
@@ -33,24 +43,45 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
             }],
             effect: NirGlmEffect::None,
         }),
-        NirExpr::CpuCancel(_) | NirExpr::CpuTimeout { .. } => Some(NirGlmProfile {
-            result_class: NirGlmValueClass::Res,
-            accesses: vec![NirGlmAccess {
-                class: NirGlmValueClass::Res,
-                mode: NirGlmUseMode::Own,
-            }],
-            effect: NirGlmEffect::DomainMove,
-        }),
         NirExpr::CpuTaskCompleted(_)
         | NirExpr::CpuTaskTimedOut(_)
         | NirExpr::CpuTaskCancelled(_)
-        | NirExpr::CpuTaskValue(_) => Some(NirGlmProfile {
+        | NirExpr::CpuTaskValue(_)
+        | NirExpr::CpuMutexValue(_) => Some(NirGlmProfile {
             result_class: NirGlmValueClass::Val,
             accesses: vec![NirGlmAccess {
                 class: NirGlmValueClass::Res,
                 mode: NirGlmUseMode::Read,
             }],
             effect: NirGlmEffect::None,
+        }),
+        NirExpr::CpuCancel(_) | NirExpr::CpuTimeout { .. } | NirExpr::CpuMutexUnlock(_) => {
+            Some(NirGlmProfile {
+                result_class: NirGlmValueClass::Res,
+                accesses: vec![NirGlmAccess {
+                    class: NirGlmValueClass::Res,
+                    mode: NirGlmUseMode::Own,
+                }],
+                effect: NirGlmEffect::DomainMove,
+            })
+        }
+        NirExpr::CpuThreadSpawn { .. } | NirExpr::CpuMutexNew(_) => {
+            Some(NirGlmProfile {
+                result_class: NirGlmValueClass::Res,
+                accesses: vec![NirGlmAccess {
+                    class: NirGlmValueClass::Val,
+                    mode: NirGlmUseMode::Read,
+                }],
+                effect: NirGlmEffect::None,
+            })
+        }
+        NirExpr::CpuMutexLock(_) => Some(NirGlmProfile {
+            result_class: NirGlmValueClass::Res,
+            accesses: vec![NirGlmAccess {
+                class: NirGlmValueClass::Res,
+                mode: NirGlmUseMode::Own,
+            }],
+            effect: NirGlmEffect::DomainMove,
         }),
         NirExpr::Borrow(_) => Some(NirGlmProfile {
             result_class: NirGlmValueClass::Res,

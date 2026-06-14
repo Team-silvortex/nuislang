@@ -177,3 +177,57 @@ fn reports_match_bind_pattern_value_used_inside_if_for_ambiguous_wrong_bound_met
         "{error}"
     );
 }
+
+#[test]
+fn reports_match_bind_pattern_value_used_inside_if_for_missing_generic_operator_bound() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          type Alias<T> = T;
+          type Outer<T> = Alias<T>;
+
+          fn bump<T>(value: Outer<T>) -> T {
+            match value {
+              local => {
+                if true {
+                  return local + value;
+                }
+                return value;
+              }
+              _ => {
+                return value;
+              }
+            }
+          }
+
+          fn main() -> i64 {
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains(
+            "function `bump` body via type alias `Alias` target via type alias `Outer` target"
+        ),
+        "{error}"
+    );
+    assert!(
+        error.contains(
+            "calls operator `+` on generic parameter `T` without required bound `Addable`"
+        ),
+        "{error}"
+    );
+}

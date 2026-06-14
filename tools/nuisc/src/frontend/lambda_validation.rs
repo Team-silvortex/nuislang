@@ -36,18 +36,8 @@ pub(super) fn collect_lambda_block_captures(
                 collect_lambda_expr_captures(condition, visible_locals, outer_locals, captures)?;
                 let mut then_locals = visible_locals.clone();
                 let mut else_locals = visible_locals.clone();
-                collect_lambda_block_captures(
-                    then_body,
-                    &mut then_locals,
-                    outer_locals,
-                    captures,
-                )?;
-                collect_lambda_block_captures(
-                    else_body,
-                    &mut else_locals,
-                    outer_locals,
-                    captures,
-                )?;
+                collect_lambda_block_captures(then_body, &mut then_locals, outer_locals, captures)?;
+                collect_lambda_block_captures(else_body, &mut else_locals, outer_locals, captures)?;
             }
             AstStmt::Match { value, arms } => {
                 collect_lambda_expr_captures(value, visible_locals, outer_locals, captures)?;

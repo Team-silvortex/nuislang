@@ -1433,11 +1433,7 @@ fn lowers_mutable_async_while_with_memory_carry_and_continue_into_flow_cond_chai
         .iter()
         .any(|edge| edge.to.starts_with("loop_carry_")));
     assert!(incoming_free.iter().any(|edge| edge.from == buffer_name));
-    assert!(path_exists(
-        &yir,
-        &buffer_name,
-        &free.name
-    ));
+    assert!(path_exists(&yir, &buffer_name, &free.name));
 }
 
 #[test]

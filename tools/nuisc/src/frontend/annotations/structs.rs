@@ -145,15 +145,21 @@ fn validate_packet_struct_contract(definition: &AstStructDef) -> Result<(), Stri
             ));
         }
         match field.ty.name.as_str() {
-            "Task" => {
+            "Task" | "Thread" => {
                 return Err(format!(
-                    "struct `{}` field `{}` is not packet-safe yet: `@packet` currently rejects `Task<...>` fields (role={})",
-                    definition.name, field.name, field_role
+                    "struct `{}` field `{}` is not packet-safe yet: `@packet` currently rejects async/concurrency carrier fields like `{}` (role={})",
+                    definition.name, field.name, field.ty.name, field_role
                 ));
             }
             "TaskResult" | "DataResult" | "ShaderResult" | "KernelResult" | "NetworkResult" => {
                 return Err(format!(
                     "struct `{}` field `{}` is not packet-safe yet: `@packet` currently rejects result-carrier fields like `{}` (role={})",
+                    definition.name, field.name, field.ty.name, field_role
+                ));
+            }
+            "Mutex" | "MutexGuard" => {
+                return Err(format!(
+                    "struct `{}` field `{}` is not packet-safe yet: `@packet` currently rejects synchronization-resource fields like `{}` (role={})",
                     definition.name, field.name, field.ty.name, field_role
                 ));
             }
@@ -186,7 +192,8 @@ fn packet_field_contract_role(ty: &AstTypeRef) -> &'static str {
     match ty.name.as_str() {
         "Marker" | "HandleTable" => "control-plane",
         "TaskResult" | "DataResult" | "ShaderResult" | "KernelResult" | "NetworkResult"
-        | "Task" => "async-carrier",
+        | "Task" | "Thread" => "async-carrier",
+        "Mutex" | "MutexGuard" => "sync-resource",
         _ if ty.is_ref || ty.is_optional => "unsupported-shape",
         _ => "payload",
     }

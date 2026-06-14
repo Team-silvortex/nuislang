@@ -661,6 +661,7 @@ fn build_test_main_function(test_function: &AstFunction) -> AstFunction {
             };
             vec![
                 AstStmt::Let {
+                    mutable: false,
                     name: "passed".to_owned(),
                     ty: Some(bool_type_ref()),
                     value: value_expr,
@@ -680,6 +681,7 @@ fn build_test_main_function(test_function: &AstFunction) -> AstFunction {
             };
             vec![
                 AstStmt::Let {
+                    mutable: false,
                     name: "status".to_owned(),
                     ty: Some(i64_type_ref()),
                     value: value_expr,

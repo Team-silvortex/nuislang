@@ -915,12 +915,18 @@ fn expr_references_any_name(expr: &NirExpr, names: &BTreeSet<String>) -> bool {
         | NirExpr::LoadNext(inner)
         | NirExpr::BufferLen(inner)
         | NirExpr::CpuJoin(inner)
+        | NirExpr::CpuThreadJoin(inner)
         | NirExpr::CpuCancel(inner)
         | NirExpr::CpuJoinResult(inner)
+        | NirExpr::CpuThreadJoinResult(inner)
         | NirExpr::CpuTaskCompleted(inner)
         | NirExpr::CpuTaskTimedOut(inner)
         | NirExpr::CpuTaskCancelled(inner)
         | NirExpr::CpuTaskValue(inner)
+        | NirExpr::CpuMutexNew(inner)
+        | NirExpr::CpuMutexLock(inner)
+        | NirExpr::CpuMutexUnlock(inner)
+        | NirExpr::CpuMutexValue(inner)
         | NirExpr::DataReady(inner)
         | NirExpr::DataMoved(inner)
         | NirExpr::DataWindowed(inner)
@@ -977,7 +983,8 @@ fn expr_references_any_name(expr: &NirExpr, names: &BTreeSet<String>) -> bool {
         }
         NirExpr::Call { args, .. }
         | NirExpr::CpuExternCall { args, .. }
-        | NirExpr::CpuSpawn { args, .. } => {
+        | NirExpr::CpuSpawn { args, .. }
+        | NirExpr::CpuThreadSpawn { args, .. } => {
             args.iter().any(|arg| expr_references_any_name(arg, names))
         }
         NirExpr::MethodCall { receiver, args, .. } => {
@@ -1415,81 +1422,81 @@ fn parse_derived_conditional_temp_binding(
 ) -> Option<PreparedConditionalTempBinding> {
     let (derived_binding_name, expr) = extract_pure_branch_binding(stmt, pure_helpers)?;
     let normalized = inline_pure_helper_calls(&expr, inlineable_pure_helpers);
-    let (source_temp_name, make_branch_expr): (
-        &str,
-        Box<dyn Fn(&NirExpr) -> NirExpr>,
-    ) = match &normalized {
-        NirExpr::Binary {
-            op: NirBinaryOp::Add,
-            lhs,
-            rhs,
-        } if is_terminal_branch_pure_expr(rhs, pure_helpers) => match lhs.as_ref() {
-            NirExpr::Var(name) => {
-                let rhs = (**rhs).clone();
-                (
-                    name.as_str(),
-                    Box::new(move |base| NirExpr::Binary {
-                        op: NirBinaryOp::Add,
-                        lhs: Box::new(base.clone()),
-                        rhs: Box::new(rhs.clone()),
-                    }),
-                )
-            }
+    let (source_temp_name, make_branch_expr): (&str, Box<dyn Fn(&NirExpr) -> NirExpr>) =
+        match &normalized {
+            NirExpr::Binary {
+                op: NirBinaryOp::Add,
+                lhs,
+                rhs,
+            } if is_terminal_branch_pure_expr(rhs, pure_helpers) => match lhs.as_ref() {
+                NirExpr::Var(name) => {
+                    let rhs = (**rhs).clone();
+                    (
+                        name.as_str(),
+                        Box::new(move |base| NirExpr::Binary {
+                            op: NirBinaryOp::Add,
+                            lhs: Box::new(base.clone()),
+                            rhs: Box::new(rhs.clone()),
+                        }),
+                    )
+                }
+                _ => return None,
+            },
+            NirExpr::Binary {
+                op: NirBinaryOp::Add,
+                lhs,
+                rhs,
+            } => match (lhs.as_ref(), rhs.as_ref()) {
+                (NirExpr::Var(name), other)
+                    if parse_prepared_loop_state_ref_expr(other, binding_name, carries)
+                        .is_some() =>
+                {
+                    let rhs = other.clone();
+                    (
+                        name.as_str(),
+                        Box::new(move |base| NirExpr::Binary {
+                            op: NirBinaryOp::Add,
+                            lhs: Box::new(base.clone()),
+                            rhs: Box::new(rhs.clone()),
+                        }),
+                    )
+                }
+                (other, NirExpr::Var(name))
+                    if parse_prepared_loop_state_ref_expr(other, binding_name, carries)
+                        .is_some() =>
+                {
+                    let lhs = other.clone();
+                    (
+                        name.as_str(),
+                        Box::new(move |base| NirExpr::Binary {
+                            op: NirBinaryOp::Add,
+                            lhs: Box::new(lhs.clone()),
+                            rhs: Box::new(base.clone()),
+                        }),
+                    )
+                }
+                _ => return None,
+            },
+            NirExpr::Binary {
+                op: NirBinaryOp::Mul,
+                lhs,
+                rhs,
+            } if is_terminal_branch_pure_expr(rhs, pure_helpers) => match lhs.as_ref() {
+                NirExpr::Var(name) => {
+                    let rhs = (**rhs).clone();
+                    (
+                        name.as_str(),
+                        Box::new(move |base| NirExpr::Binary {
+                            op: NirBinaryOp::Mul,
+                            lhs: Box::new(base.clone()),
+                            rhs: Box::new(rhs.clone()),
+                        }),
+                    )
+                }
+                _ => return None,
+            },
             _ => return None,
-        },
-        NirExpr::Binary {
-            op: NirBinaryOp::Add,
-            lhs,
-            rhs,
-        } => match (lhs.as_ref(), rhs.as_ref()) {
-            (NirExpr::Var(name), other)
-                if parse_prepared_loop_state_ref_expr(other, binding_name, carries).is_some() =>
-            {
-                let rhs = other.clone();
-                (
-                    name.as_str(),
-                    Box::new(move |base| NirExpr::Binary {
-                        op: NirBinaryOp::Add,
-                        lhs: Box::new(base.clone()),
-                        rhs: Box::new(rhs.clone()),
-                    }),
-                )
-            }
-            (other, NirExpr::Var(name))
-                if parse_prepared_loop_state_ref_expr(other, binding_name, carries).is_some() =>
-            {
-                let lhs = other.clone();
-                (
-                    name.as_str(),
-                    Box::new(move |base| NirExpr::Binary {
-                        op: NirBinaryOp::Add,
-                        lhs: Box::new(lhs.clone()),
-                        rhs: Box::new(base.clone()),
-                    }),
-                )
-            }
-            _ => return None,
-        },
-        NirExpr::Binary {
-            op: NirBinaryOp::Mul,
-            lhs,
-            rhs,
-        } if is_terminal_branch_pure_expr(rhs, pure_helpers) => match lhs.as_ref() {
-            NirExpr::Var(name) => {
-                let rhs = (**rhs).clone();
-                (
-                    name.as_str(),
-                    Box::new(move |base| NirExpr::Binary {
-                        op: NirBinaryOp::Mul,
-                        lhs: Box::new(base.clone()),
-                        rhs: Box::new(rhs.clone()),
-                    }),
-                )
-            }
-            _ => return None,
-        },
-        _ => return None,
-    };
+        };
     let source = conditional_temps.get(source_temp_name)?;
     Some(PreparedConditionalTempBinding {
         binding_name: derived_binding_name,
@@ -1595,13 +1602,15 @@ fn parse_loop_carry_delta_branch_source(
                 } else if let Some((factor_terms, factor_scale, factor_offset)) =
                     factor_scaled_affine
                 {
-                    Some(PreparedCarrySource::ScaledStateListByFactorStateListTimesInvariant {
-                        terms,
-                        factor_terms,
-                        factor_scale,
-                        factor_offset,
-                        offset,
-                    })
+                    Some(
+                        PreparedCarrySource::ScaledStateListByFactorStateListTimesInvariant {
+                            terms,
+                            factor_terms,
+                            factor_scale,
+                            factor_offset,
+                            offset,
+                        },
+                    )
                 } else if let Some((
                     lhs_factor_terms,
                     lhs_factor_offset,
@@ -1699,8 +1708,10 @@ fn parse_loop_carry_delta_branch_source(
                     lhs,
                     rhs,
                 } => {
-                    let lhs = parse_inner(lhs, binding_name, carries, expr_contains_loop_variant_ref)?;
-                    let rhs = parse_inner(rhs, binding_name, carries, expr_contains_loop_variant_ref)?;
+                    let lhs =
+                        parse_inner(lhs, binding_name, carries, expr_contains_loop_variant_ref)?;
+                    let rhs =
+                        parse_inner(rhs, binding_name, carries, expr_contains_loop_variant_ref)?;
                     let mut terms = lhs.terms;
                     terms.extend(rhs.terms);
                     let offset = combine_invariant_terms(
@@ -1857,8 +1868,10 @@ fn parse_loop_carry_delta_branch_source(
                     lhs,
                     rhs,
                 } => {
-                    let lhs = parse_inner(lhs, binding_name, carries, expr_contains_loop_variant_ref)?;
-                    let rhs = parse_inner(rhs, binding_name, carries, expr_contains_loop_variant_ref)?;
+                    let lhs =
+                        parse_inner(lhs, binding_name, carries, expr_contains_loop_variant_ref)?;
+                    let rhs =
+                        parse_inner(rhs, binding_name, carries, expr_contains_loop_variant_ref)?;
                     let mut terms = lhs.terms;
                     terms.extend(rhs.terms);
                     let offset = combine_invariant_terms(
@@ -1883,19 +1896,16 @@ fn parse_loop_carry_delta_branch_source(
                         .iter()
                         .flat_map(|term| std::iter::repeat_n(*term, factor as usize))
                         .collect::<Vec<_>>();
-                    let offset = parsed.offset.map(|offset| scale_invariant_expr(offset, factor));
+                    let offset = parsed
+                        .offset
+                        .map(|offset| scale_invariant_expr(offset, factor));
                     Some(ParsedAdditiveSource { terms, offset })
                 }
                 _ => None,
             }
         }
 
-        let parsed = parse_inner(
-            expr,
-            binding_name,
-            carries,
-            &expr_contains_loop_variant_ref,
-        )?;
+        let parsed = parse_inner(expr, binding_name, carries, &expr_contains_loop_variant_ref)?;
         if parsed.terms.len() + usize::from(parsed.offset.is_some()) <= 1 {
             return None;
         }
@@ -1938,8 +1948,7 @@ fn parse_loop_carry_delta_branch_source(
                     || parse_additive_source_for_factor(expr, binding_name, carries).is_some()
                     || parse_scaled_additive_source_for_factor(expr, binding_name, carries)
                         .is_some()
-                    || parse_factor_group_product_for_factor(expr, binding_name, carries)
-                        .is_some()
+                    || parse_factor_group_product_for_factor(expr, binding_name, carries).is_some()
                     || parse_scaled_factor_group_product_for_factor(expr, binding_name, carries)
                         .is_some()
             };

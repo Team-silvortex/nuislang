@@ -5,6 +5,22 @@ This file is the canonical short reading map for the current repository spine.
 If several READMEs seem to overlap, prefer this file first, then drill into the
 local README for the area you are actively touching.
 
+## Fast Reading Order
+
+If you only need the shortest current `0.19.*` reading route, use this order:
+
+1. [versioning/nuis-0.19.0-snapshot.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-snapshot.md)
+2. [versioning/nuis-0.19.0-mainline-goals.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-goals.md)
+3. [versioning/nuis-0.19.0-workflow-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-workflow-capability-matrix.md)
+4. [versioning/nuis-0.19.0-frontend-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-frontend-capability-matrix.md)
+5. [versioning/nuis-0.19.0-project-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-project-capability-matrix.md)
+6. [versioning/nuis-0.19.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-regression-matrix.md)
+7. [versioning/nuis-0.19.0-release-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-release-checklist.md)
+
+Short rule:
+
+`snapshot says what the line means; goals say what is being pushed; matrices say what is already real together; regression/checklist say how that truth is defended`
+
 ## Start Here
 
 * repo status and current toolchain spine:
@@ -27,6 +43,8 @@ local README for the area you are actively touching.
   [versioning/nuis-0.18.0-loop-memory-read-contract-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.18.0-loop-memory-read-contract-sketch.md)
 * current compile workflow anchor:
   [versioning/nuis-0.19.0-compile-workflow.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-compile-workflow.md)
+* current workflow capability matrix:
+  [versioning/nuis-0.19.0-workflow-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-workflow-capability-matrix.md)
   current CLI frontdoor rule:
   `nuis status/help -> nuis workflow -> nuis project-doctor/project-status/scheduler-view -> check/test/build/release-check`
 * current example-routing anchor:
@@ -39,8 +57,12 @@ local README for the area you are actively touching.
   [versioning/nuis-0.17.0-network-http-readiness-checklist.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-network-http-readiness-checklist.md)
 * current mainline regression matrix:
   [versioning/nuis-0.19.0-mainline-regression-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-mainline-regression-matrix.md)
+* current project capability matrix:
+  [versioning/nuis-0.19.0-project-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-project-capability-matrix.md)
 * current frontend regression placement map:
   [versioning/nuis-0.19.0-frontend-test-map.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-frontend-test-map.md)
+* current frontend capability matrix:
+  [versioning/nuis-0.19.0-frontend-capability-matrix.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-frontend-capability-matrix.md)
 * current self-hosted gate plan:
   [versioning/nuis-0.17.0-self-hosted-mainline-gate-plan.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.17.0-self-hosted-mainline-gate-plan.md)
 * current generic completion plan:
@@ -111,6 +133,12 @@ local README for the area you are actively touching.
   `command/subprocess -> workflow -> cli toolchain samples is now a checked-in std ladder`
   current `nuis` frontdoor consumption rule:
   `status/help/workflow/project-status/project-doctor/scheduler-view now expose one grouped frontdoor summary family`
+* current async thread/lock staging anchor:
+  [reference/cpu-thread-lock-staging-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/cpu-thread-lock-staging-sketch.md)
+  shortest rule:
+  `Task<T> remains the current async contract; staged Thread<T>/Mutex<T>/MutexGuard<T> now exist as explicit handle/resource families rather than disguised plain values`
+  current project anchor:
+  [task_thread_mutex_demo](/Users/Shared/chroot/dev/nuislang/examples/projects/task/task_thread_mutex_demo)
 * annotation / intrinsic future edge:
   [reference/annotation-intrinsic-stdlib-sketch.md](/Users/Shared/chroot/dev/nuislang/docs/reference/annotation-intrinsic-stdlib-sketch.md)
   shortest rule:

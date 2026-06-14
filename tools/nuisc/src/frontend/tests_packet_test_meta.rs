@@ -247,6 +247,56 @@ fn rejects_task_fields_inside_packet_struct() {
 }
 
 #[test]
+fn rejects_thread_fields_inside_packet_struct() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          @packet
+          struct Packet {
+            @packet_field
+            payload: Thread<i64>,
+          }
+
+          fn main() -> i64 {
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(error.contains("annotation `@packet_field` currently only supports payload-role fields (role=async-carrier)"));
+}
+
+#[test]
+fn rejects_mutex_fields_inside_packet_struct() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          @packet
+          struct Packet {
+            @packet_field
+            seed: i64,
+            @packet_control_field
+            payload: Mutex<i64>,
+          }
+
+          fn main() -> i64 {
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains("role=sync-resource")
+            || error.contains("synchronization-resource fields like `Mutex`"),
+        "{error}"
+    );
+}
+
+#[test]
 fn rejects_handle_table_fields_inside_packet_struct() {
     let error = parse_nuis_module(
         r#"

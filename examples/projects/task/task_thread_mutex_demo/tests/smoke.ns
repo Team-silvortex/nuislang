@@ -1,0 +1,57 @@
+mod cpu Main {
+  type IntThread = Thread<i64>;
+  type IntTaskResult = TaskResult<i64>;
+  type IntMutex = Mutex<i64>;
+  type IntMutexGuard = MutexGuard<i64>;
+
+  async fn ping(seed: i64) -> i64 {
+    return seed + 9;
+  }
+
+  fn compute_total(seed: i64) -> i64 {
+    let lock: IntMutex = mutex_new(seed + 3);
+    let guard: IntMutexGuard = mutex_lock(lock);
+    let first_read: i64 = mutex_value(guard);
+    let reopened: IntMutex = mutex_unlock(guard);
+    let reopened_guard: IntMutexGuard = mutex_lock(reopened);
+    let second_read: i64 = mutex_value(reopened_guard);
+
+    let worker: IntThread = thread_spawn(ping(second_read));
+    let joined: IntTaskResult = thread_join_result(worker);
+
+    if task_completed(joined) {
+      return first_read + second_read + task_value(joined);
+    }
+
+    return 0;
+  }
+
+  fn compute_direct_join_total(seed: i64) -> i64 {
+    let lock: IntMutex = mutex_new(seed + 3);
+    let guard: IntMutexGuard = mutex_lock(lock);
+    let first_read: i64 = mutex_value(guard);
+    let reopened: IntMutex = mutex_unlock(guard);
+    let reopened_guard: IntMutexGuard = mutex_lock(reopened);
+    let second_read: i64 = mutex_value(reopened_guard);
+
+    let worker: IntThread = thread_spawn(ping(second_read));
+    let thread_value: i64 = thread_join(worker);
+    return first_read + second_read + thread_value;
+  }
+
+  test("thread_mutex_join_result") fn thread_mutex_join_result() -> i64 {
+    if compute_total(5) == 33 {
+      return 1;
+    }
+
+    return 0;
+  }
+
+  test("thread_mutex_join_direct") fn thread_mutex_join_direct() -> i64 {
+    if compute_direct_join_total(5) == 33 {
+      return 1;
+    }
+
+    return 0;
+  }
+}

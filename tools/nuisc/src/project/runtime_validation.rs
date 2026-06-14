@@ -1229,7 +1229,9 @@ fn validate_network_owned_handle_provenance_in_expr(
                 function_return_kinds,
             )?;
         }
-        NirExpr::CpuSpawn { callee, args } | NirExpr::Call { callee, args } => {
+        NirExpr::CpuSpawn { callee, args }
+        | NirExpr::CpuThreadSpawn { callee, args }
+        | NirExpr::Call { callee, args } => {
             validate_network_function_call_requirements(
                 callee,
                 args,
@@ -2001,7 +2003,9 @@ fn infer_network_param_requirements_in_expr(
                 )?;
             }
         }
-        NirExpr::CpuSpawn { callee, args } | NirExpr::Call { callee, args } => {
+        NirExpr::CpuSpawn { callee, args }
+        | NirExpr::CpuThreadSpawn { callee, args }
+        | NirExpr::Call { callee, args } => {
             if let Some(callee_requirements) = function_requirements.get(callee) {
                 for (index, arg) in args.iter().enumerate() {
                     let Some(Some(requirement)) = callee_requirements.get(index) else {
@@ -2034,12 +2038,18 @@ fn infer_network_param_requirements_in_expr(
         | NirExpr::LoadNext(inner)
         | NirExpr::BufferLen(inner)
         | NirExpr::CpuJoin(inner)
+        | NirExpr::CpuThreadJoin(inner)
         | NirExpr::CpuCancel(inner)
         | NirExpr::CpuJoinResult(inner)
+        | NirExpr::CpuThreadJoinResult(inner)
         | NirExpr::CpuTaskCompleted(inner)
         | NirExpr::CpuTaskTimedOut(inner)
         | NirExpr::CpuTaskCancelled(inner)
         | NirExpr::CpuTaskValue(inner)
+        | NirExpr::CpuMutexNew(inner)
+        | NirExpr::CpuMutexLock(inner)
+        | NirExpr::CpuMutexUnlock(inner)
+        | NirExpr::CpuMutexValue(inner)
         | NirExpr::DataReady(inner)
         | NirExpr::DataMoved(inner)
         | NirExpr::DataWindowed(inner)
