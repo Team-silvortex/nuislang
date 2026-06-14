@@ -863,6 +863,14 @@ fn validate_generic_receiver_operator_bound(
         {
             return Ok(());
         }
+        let variants = collect_trait_name_variants(required_bound, trait_methods);
+        if variants.iter().any(|candidate| candidate == bound)
+            && trait_methods
+                .get(bound)
+                .is_some_and(|methods| methods.contains(method))
+        {
+            return Ok(());
+        }
         return Err(format!(
             "{context} calls operator `{operator}` on generic parameter `{generic_name}` but bound `{bound}` does not satisfy required trait `{required_bound}`"
         ));

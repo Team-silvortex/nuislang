@@ -1,6 +1,76 @@
 use super::parse_nuis_module;
 use nuis_semantics::model::{NirExpr, NirStmt};
 
+fn stmt_tree_contains_call<F>(body: &[NirStmt], predicate: &F) -> bool
+where
+    F: Fn(&str, &[NirExpr]) -> bool,
+{
+    body.iter().any(|stmt| stmt_contains_call(stmt, predicate))
+}
+
+fn stmt_contains_call<F>(stmt: &NirStmt, predicate: &F) -> bool
+where
+    F: Fn(&str, &[NirExpr]) -> bool,
+{
+    match stmt {
+        NirStmt::Let { value, .. }
+        | NirStmt::Const { value, .. }
+        | NirStmt::Expr(value)
+        | NirStmt::Await(value)
+        | NirStmt::Print(value) => expr_contains_call(value, predicate),
+        NirStmt::Return(Some(value)) => expr_contains_call(value, predicate),
+        NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            expr_contains_call(condition, predicate)
+                || stmt_tree_contains_call(then_body, predicate)
+                || stmt_tree_contains_call(else_body, predicate)
+        }
+        NirStmt::While { condition, body } => {
+            expr_contains_call(condition, predicate) || stmt_tree_contains_call(body, predicate)
+        }
+        _ => false,
+    }
+}
+
+fn expr_contains_call<F>(expr: &NirExpr, predicate: &F) -> bool
+where
+    F: Fn(&str, &[NirExpr]) -> bool,
+{
+    match expr {
+        NirExpr::Call { callee, args } => {
+            predicate(callee, args) || args.iter().any(|arg| expr_contains_call(arg, predicate))
+        }
+        NirExpr::StructLiteral { fields, .. } => fields
+            .iter()
+            .any(|(_, value)| expr_contains_call(value, predicate)),
+        NirExpr::FieldAccess { base, .. }
+        | NirExpr::Await(base)
+        | NirExpr::Borrow(base)
+        | NirExpr::BorrowEnd(base)
+        | NirExpr::CpuJoin(base)
+        | NirExpr::DataReady(base)
+        | NirExpr::DataMoved(base)
+        | NirExpr::DataWindowed(base)
+        | NirExpr::DataValue(base)
+        | NirExpr::CpuTaskCompleted(base)
+        | NirExpr::CpuTaskTimedOut(base)
+        | NirExpr::CpuTaskCancelled(base)
+        | NirExpr::CpuTaskValue(base) => expr_contains_call(base, predicate),
+        NirExpr::Binary { lhs, rhs, .. } => {
+            expr_contains_call(lhs, predicate) || expr_contains_call(rhs, predicate)
+        }
+        NirExpr::CpuExternCall { args, .. } => {
+            args.iter().any(|arg| expr_contains_call(arg, predicate))
+        }
+        NirExpr::CpuSpawn { args, .. } => args.iter().any(|arg| expr_contains_call(arg, predicate)),
+        _ => false,
+    }
+}
+
+// Baseline callable specialization and named-function routing.
 #[test]
 fn combines_higher_order_specialization_with_trait_generic_monomorphization() {
     let module = parse_nuis_module(
@@ -116,6 +186,382 @@ fn lowers_generic_fn1_higher_order_lambda_family() {
 }
 
 #[test]
+fn lowers_generic_named_function_through_concrete_fn1_parameter() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn id<T>(value: T) -> T {
+            return value;
+          }
+
+          fn apply_i64(value: i64, mapper: Fn1<i64, i64>) -> i64 {
+            return mapper(value);
+          }
+
+          fn main() -> i64 {
+            return apply_i64(6, id);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let helper = module
+        .functions
+        .iter()
+        .find(|function| function.name == "__hof_apply_i64_id")
+        .expect("expected higher-order helper specialized for generic named function");
+    assert!(helper.generic_params.is_empty());
+    assert!(matches!(
+        helper.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee == "id__i64"
+                && matches!(args.as_slice(), [NirExpr::Var(name)] if name == "value")
+    ));
+
+    let id_specialized = module
+        .functions
+        .iter()
+        .find(|function| function.name == "id__i64")
+        .expect("expected generic callable specialization");
+    assert!(id_specialized.generic_params.is_empty());
+}
+
+// Generic callable value coverage across Fn1/Fn2/Fn3 and callable aliases.
+#[test]
+fn lowers_generic_named_function_through_generic_fn1_template_parameter() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn id<T>(value: T) -> T {
+            return value;
+          }
+
+          fn apply<T>(value: T, mapper: Fn1<T, T>) -> T {
+            return mapper(value);
+          }
+
+          fn main() -> i64 {
+            return apply(9, id);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let helper = module
+        .functions
+        .iter()
+        .find(|function| function.name == "__hof_apply_id__i64")
+        .expect("expected monomorphized higher-order helper");
+    assert!(helper.generic_params.is_empty());
+    assert!(matches!(
+        helper.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee == "id__i64"
+                && matches!(args.as_slice(), [NirExpr::Var(name)] if name == "value")
+    ));
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
+            if callee == &helper.name
+    ));
+}
+
+#[test]
+fn lowers_generic_named_function_through_generic_fn1_alias_parameter() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type Mapper<T> = Fn1<T, T>;
+
+          fn id<T>(value: T) -> T {
+            return value;
+          }
+
+          fn apply<T>(value: T, mapper: Mapper<T>) -> T {
+            return mapper(value);
+          }
+
+          fn main() -> i64 {
+            return apply(9, id);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let helper = module
+        .functions
+        .iter()
+        .find(|function| function.name == "__hof_apply_id__i64")
+        .expect("expected monomorphized alias Fn1 higher-order helper");
+    assert!(helper.generic_params.is_empty());
+    assert!(matches!(
+        helper.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee == "id__i64"
+                && matches!(args.as_slice(), [NirExpr::Var(name)] if name == "value")
+    ));
+}
+
+#[test]
+fn lowers_generic_named_function_through_concrete_fn2_parameter() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn choose_left<T>(lhs: T, rhs: T) -> T {
+            return lhs;
+          }
+
+          fn apply_i64(lhs: i64, rhs: i64, mapper: Fn2<i64, i64, i64>) -> i64 {
+            return mapper(lhs, rhs);
+          }
+
+          fn main() -> i64 {
+            return apply_i64(6, 2, choose_left);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let helper = module
+        .functions
+        .iter()
+        .find(|function| function.name == "__hof_apply_i64_choose_left")
+        .expect("expected Fn2 higher-order helper specialized for generic named function");
+    assert!(helper.generic_params.is_empty());
+    assert!(matches!(
+        helper.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee == "choose_left__i64"
+                && matches!(
+                    args.as_slice(),
+                    [NirExpr::Var(lhs), NirExpr::Var(rhs)] if lhs == "lhs" && rhs == "rhs"
+                )
+    ));
+
+    let specialized = module
+        .functions
+        .iter()
+        .find(|function| function.name == "choose_left__i64")
+        .expect("expected generic Fn2 callable specialization");
+    assert!(specialized.generic_params.is_empty());
+}
+
+#[test]
+fn lowers_generic_named_function_through_generic_fn2_template_parameter() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn choose_left<T>(lhs: T, rhs: T) -> T {
+            return lhs;
+          }
+
+          fn apply<T>(lhs: T, rhs: T, mapper: Fn2<T, T, T>) -> T {
+            return mapper(lhs, rhs);
+          }
+
+          fn main() -> i64 {
+            return apply(9, 4, choose_left);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let helper = module
+        .functions
+        .iter()
+        .find(|function| function.name == "__hof_apply_choose_left__i64")
+        .expect("expected monomorphized Fn2 higher-order helper");
+    assert!(helper.generic_params.is_empty());
+    assert!(matches!(
+        helper.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee == "choose_left__i64"
+                && matches!(
+                    args.as_slice(),
+                    [NirExpr::Var(lhs), NirExpr::Var(rhs)] if lhs == "lhs" && rhs == "rhs"
+                )
+    ));
+}
+
+#[test]
+fn lowers_generic_named_function_through_generic_fn2_alias_parameter() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type Mapper2<T> = Fn2<T, T, T>;
+
+          fn choose_left<T>(lhs: T, rhs: T) -> T {
+            return lhs;
+          }
+
+          fn apply<T>(lhs: T, rhs: T, mapper: Mapper2<T>) -> T {
+            return mapper(lhs, rhs);
+          }
+
+          fn main() -> i64 {
+            return apply(9, 4, choose_left);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let helper = module
+        .functions
+        .iter()
+        .find(|function| function.name == "__hof_apply_choose_left__i64")
+        .expect("expected monomorphized alias Fn2 higher-order helper");
+    assert!(helper.generic_params.is_empty());
+    assert!(matches!(
+        helper.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee == "choose_left__i64"
+                && matches!(
+                    args.as_slice(),
+                    [NirExpr::Var(lhs), NirExpr::Var(rhs)] if lhs == "lhs" && rhs == "rhs"
+                )
+    ));
+}
+
+#[test]
+fn lowers_generic_named_function_through_concrete_fn3_parameter() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn choose_first<T>(lhs: T, mid: T, rhs: T) -> T {
+            return lhs;
+          }
+
+          fn apply_i64(lhs: i64, mid: i64, rhs: i64, mapper: Fn3<i64, i64, i64, i64>) -> i64 {
+            return mapper(lhs, mid, rhs);
+          }
+
+          fn main() -> i64 {
+            return apply_i64(6, 2, 1, choose_first);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let helper = module
+        .functions
+        .iter()
+        .find(|function| function.name == "__hof_apply_i64_choose_first")
+        .expect("expected Fn3 higher-order helper specialized for generic named function");
+    assert!(helper.generic_params.is_empty());
+    assert!(matches!(
+        helper.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee == "choose_first__i64"
+                && matches!(
+                    args.as_slice(),
+                    [NirExpr::Var(lhs), NirExpr::Var(mid), NirExpr::Var(rhs)]
+                        if lhs == "lhs" && mid == "mid" && rhs == "rhs"
+                )
+    ));
+
+    let specialized = module
+        .functions
+        .iter()
+        .find(|function| function.name == "choose_first__i64")
+        .expect("expected generic Fn3 callable specialization");
+    assert!(specialized.generic_params.is_empty());
+}
+
+#[test]
+fn lowers_generic_named_function_through_generic_fn3_template_parameter() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn choose_first<T>(lhs: T, mid: T, rhs: T) -> T {
+            return lhs;
+          }
+
+          fn apply<T>(lhs: T, mid: T, rhs: T, mapper: Fn3<T, T, T, T>) -> T {
+            return mapper(lhs, mid, rhs);
+          }
+
+          fn main() -> i64 {
+            return apply(9, 4, 1, choose_first);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let helper = module
+        .functions
+        .iter()
+        .find(|function| function.name == "__hof_apply_choose_first__i64")
+        .expect("expected monomorphized Fn3 higher-order helper");
+    assert!(helper.generic_params.is_empty());
+    assert!(matches!(
+        helper.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee == "choose_first__i64"
+                && matches!(
+                    args.as_slice(),
+                    [NirExpr::Var(lhs), NirExpr::Var(mid), NirExpr::Var(rhs)]
+                        if lhs == "lhs" && mid == "mid" && rhs == "rhs"
+                )
+    ));
+}
+
+#[test]
+fn lowers_generic_named_function_through_generic_fn3_alias_parameter() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type Reducer<T> = Fn3<T, T, T, T>;
+
+          fn choose_first<T>(lhs: T, mid: T, rhs: T) -> T {
+            return lhs;
+          }
+
+          fn apply<T>(lhs: T, mid: T, rhs: T, mapper: Reducer<T>) -> T {
+            return mapper(lhs, mid, rhs);
+          }
+
+          fn main() -> i64 {
+            return apply(9, 4, 1, choose_first);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let helper = module
+        .functions
+        .iter()
+        .find(|function| function.name == "__hof_apply_choose_first__i64")
+        .expect("expected monomorphized alias Fn3 higher-order helper");
+    assert!(helper.generic_params.is_empty());
+    assert!(matches!(
+        helper.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee == "choose_first__i64"
+                && matches!(
+                    args.as_slice(),
+                    [NirExpr::Var(lhs), NirExpr::Var(mid), NirExpr::Var(rhs)]
+                        if lhs == "lhs" && mid == "mid" && rhs == "rhs"
+                )
+    ));
+}
+
+// Capturing lambda threading through generic callable parameters.
+#[test]
 fn lowers_explicit_generic_fn1_higher_order_call_with_zero_arg_generic_argument() {
     let module = parse_nuis_module(
         r#"
@@ -179,6 +625,7 @@ fn lowers_explicit_generic_fn1_higher_order_call_with_zero_arg_generic_argument(
     ));
 }
 
+// Payload alias, async, and recursive higher-order specialization.
 #[test]
 fn lowers_generic_fn1_alias_higher_order_lambda_family() {
     let module = parse_nuis_module(
@@ -226,6 +673,159 @@ fn lowers_generic_fn1_alias_higher_order_lambda_family() {
         main.body.last(),
         Some(NirStmt::Return(Some(NirExpr::Call { callee, .. })))
             if callee == &higher_order_concrete.name
+    ));
+}
+
+#[test]
+fn lowers_capturing_lambda_through_generic_fn1_template_parameter() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn apply<T>(value: T, mapper: Fn1<T, T>) -> T {
+            return mapper(value);
+          }
+
+          fn main() -> i64 {
+            let seed: i64 = 6;
+            return apply(1, |x: i64| -> i64 { return x + seed; });
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let lambda = module
+        .functions
+        .iter()
+        .find(|function| function.name.starts_with("__lambda_main_"))
+        .expect("expected synthesized captured generic lambda");
+    assert!(lambda.generic_params.is_empty());
+    assert_eq!(lambda.params.len(), 2);
+
+    let helper = module
+        .functions
+        .iter()
+        .find(|function| function.name.starts_with("__hof_apply_") && function.name.ends_with("__i64"))
+        .expect("expected monomorphized higher-order helper with capture threading");
+    assert!(helper.generic_params.is_empty());
+    assert_eq!(helper.params.len(), 2);
+    assert!(matches!(
+        helper.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee == &lambda.name
+                && matches!(args.as_slice(), [NirExpr::Var(x), NirExpr::Var(seed)] if x == "value" && seed == "__capture_mapper_seed_0")
+    ));
+}
+
+#[test]
+fn lowers_capturing_lambda_through_generic_fn1_alias_parameter() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type Mapper<T> = Fn1<T, T>;
+
+          fn apply<T>(value: T, mapper: Mapper<T>) -> T {
+            return mapper(value);
+          }
+
+          fn main() -> i64 {
+            let seed: i64 = 6;
+            return apply(1, |x: i64| -> i64 { return x + seed; });
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let lambda = module
+        .functions
+        .iter()
+        .find(|function| function.name.starts_with("__lambda_main_"))
+        .expect("expected synthesized captured alias generic lambda");
+    assert!(lambda.generic_params.is_empty());
+    let helper = module
+        .functions
+        .iter()
+        .find(|function| function.name.starts_with("__hof_apply_") && function.name.ends_with("__i64"))
+        .expect("expected alias higher-order helper with capture threading");
+    assert!(helper.generic_params.is_empty());
+    assert_eq!(helper.params.len(), 2);
+    assert!(matches!(
+        helper.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee == &lambda.name
+                && matches!(args.as_slice(), [NirExpr::Var(x), NirExpr::Var(seed)] if x == "value" && seed == "__capture_mapper_seed_0")
+    ));
+}
+
+#[test]
+fn lowers_capturing_lambda_through_generic_fn2_and_fn3_parameters() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type Reducer<T> = Fn3<T, T, T, T>;
+
+          fn apply2<T>(lhs: T, rhs: T, mapper: Fn2<T, T, T>) -> T {
+            return mapper(lhs, rhs);
+          }
+
+          fn apply3<T>(lhs: T, mid: T, rhs: T, mapper: Reducer<T>) -> T {
+            return mapper(lhs, mid, rhs);
+          }
+
+          fn main() -> i64 {
+            let seed: i64 = 6;
+            let pair: i64 = apply2(1, 2, |x: i64, y: i64| -> i64 { return x + y + seed; });
+            return apply3(pair, 3, 4, |lhs: i64, mid: i64, rhs: i64| -> i64 {
+              return lhs + mid + rhs + seed;
+            });
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let apply2_helper = module
+        .functions
+        .iter()
+        .find(|function| function.name.starts_with("__hof_apply2_") && function.name.ends_with("__i64"))
+        .expect("expected monomorphized Fn2 helper");
+    assert!(apply2_helper.generic_params.is_empty());
+    assert_eq!(apply2_helper.params.len(), 3);
+    assert!(matches!(
+        apply2_helper.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee.starts_with("__lambda_main_")
+                && matches!(
+                    args.as_slice(),
+                    [NirExpr::Var(lhs), NirExpr::Var(rhs), NirExpr::Var(seed)]
+                        if lhs == "lhs" && rhs == "rhs" && seed == "__capture_mapper_seed_0"
+                )
+    ));
+
+    let apply3_helper = module
+        .functions
+        .iter()
+        .find(|function| function.name.starts_with("__hof_apply3_") && function.name.ends_with("__i64"))
+        .expect("expected monomorphized Fn3 alias helper");
+    assert!(apply3_helper.generic_params.is_empty());
+    assert_eq!(apply3_helper.params.len(), 4);
+    assert!(matches!(
+        apply3_helper.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee.starts_with("__lambda_main_")
+                && matches!(
+                    args.as_slice(),
+                    [
+                        NirExpr::Var(lhs),
+                        NirExpr::Var(mid),
+                        NirExpr::Var(rhs),
+                        NirExpr::Var(seed)
+                    ] if lhs == "lhs"
+                        && mid == "mid"
+                        && rhs == "rhs"
+                        && seed == "__capture_mapper_seed_0"
+                )
     ));
 }
 
@@ -781,6 +1381,141 @@ fn lowers_specialized_generic_recursive_async_body_into_payload_alias_higher_ord
 }
 
 #[test]
+fn lowers_specialized_generic_recursive_async_body_with_capturing_lambda_and_bound() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          type JustAlias<T> = Just<T>;
+          type Mapper<T> = Fn1<T, T>;
+
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          struct Just<T> {
+            value: T,
+          }
+
+          fn apply_payload<T: Addable>(value: JustAlias<T>, f: Mapper<T>) -> T {
+            match value {
+              JustAlias<T>(payload) => {
+                return f(payload);
+              }
+              _ => {
+                return value.value;
+              }
+            }
+          }
+
+          async fn climb<T: Addable>(value: T, extra: T, remaining: i64) -> T {
+            if remaining == 0 {
+              return apply_payload(
+                JustAlias<T>(value),
+                |x: T| -> T { return x.add(extra); }
+              );
+            }
+            return await climb(value, extra, remaining - 1);
+          }
+
+          async fn main() -> i64 {
+            return await climb(7, 3, 4);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let higher_order_concrete = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__hof_apply_payload_") && function.name.ends_with("__i64")
+        })
+        .expect("expected recursive async payload higher-order helper with capture threading");
+    assert!(higher_order_concrete.generic_params.is_empty());
+    assert_eq!(higher_order_concrete.params.len(), 2);
+    assert!(matches!(
+        higher_order_concrete.body.as_slice(),
+        [NirStmt::If { condition: NirExpr::Bool(true), then_body, else_body }]
+            if matches!(
+                then_body.as_slice(),
+                [
+                    NirStmt::Let {
+                        name: payload_name,
+                        value: NirExpr::FieldAccess { base, field },
+                        ..
+                    },
+                    NirStmt::Return(Some(NirExpr::Call { callee, args }))
+                ]
+                    if payload_name == "payload"
+                        && matches!(base.as_ref(), NirExpr::Var(name) if name == "value")
+                        && field == "value"
+                        && callee.starts_with("__lambda_climb_")
+                        && matches!(
+                            args.as_slice(),
+                            [NirExpr::Var(payload), NirExpr::Var(extra)]
+                                if payload == "payload" && extra == "__capture_f_extra_0"
+                        )
+            ) && matches!(
+                else_body.as_slice(),
+                [NirStmt::Return(Some(NirExpr::FieldAccess { base, field }))]
+                    if field == "value"
+                        && matches!(base.as_ref(), NirExpr::Var(name) if name == "value")
+            )
+    ));
+
+    let lambda = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__lambda_climb_") && function.name.ends_with("__i64")
+        })
+        .expect("expected captured recursive lambda specialization");
+    assert!(lambda.generic_params.is_empty());
+    let capture_param_name = lambda.params[1].name.clone();
+    assert!(matches!(
+        lambda.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee == "impl.Addable.for.i64.add"
+                && matches!(
+                    args.as_slice(),
+                    [NirExpr::Var(lhs), NirExpr::Var(rhs)]
+                        if lhs == "x" && rhs == &capture_param_name
+                )
+    ));
+
+    let specialized = module
+        .functions
+        .iter()
+        .find(|function| function.name == "climb__i64")
+        .expect("expected recursive async generic specialization with capture");
+    assert!(specialized.is_async);
+    assert!(specialized.generic_params.is_empty());
+    assert!(stmt_tree_contains_call(&specialized.body, &|callee, args| {
+        callee == higher_order_concrete.name
+            && matches!(
+                args,
+                [NirExpr::StructLiteral { .. }, NirExpr::Var(extra)] if extra == "extra"
+            )
+    }));
+    assert!(stmt_tree_contains_call(&specialized.body, &|callee, args| {
+        callee == "climb__i64"
+            && matches!(
+                args,
+                [NirExpr::Var(value), NirExpr::Var(extra), NirExpr::Binary { .. }]
+                    if value == "value" && extra == "extra"
+            )
+    }));
+}
+
+// Trait-bound validation and bound-preserving generic lambda specialization.
+#[test]
 fn rejects_generic_lambda_method_call_without_required_bound() {
     let error = parse_nuis_module(
         r#"
@@ -967,6 +1702,1012 @@ fn lowers_generic_lambda_method_call_with_present_bound() {
         [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
             if callee == "impl.Addable.for.i64.add"
                 && matches!(args.as_slice(), [NirExpr::Var(lhs), NirExpr::Var(rhs)] if lhs == "x" && rhs == "x")
+    ));
+}
+
+#[test]
+fn lowers_capturing_generic_lambda_method_call_with_present_bound() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          fn apply<T: Addable>(x: T, f: Fn1<T, T>) -> T {
+            return f(x);
+          }
+
+          fn bump<T: Addable>(value: T, extra: T) -> T {
+            return apply(value, |x: T| -> T { return x.add(extra); });
+          }
+
+          fn main() -> i64 {
+            return bump(2, 3);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let higher_order_concrete = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__hof_apply_") && function.name.ends_with("__i64")
+        })
+        .expect("expected monomorphized higher-order helper");
+    assert!(higher_order_concrete.generic_params.is_empty());
+    assert_eq!(higher_order_concrete.params.len(), 2);
+    assert!(matches!(
+        higher_order_concrete.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee.starts_with("__lambda_bump_")
+                && matches!(
+                    args.as_slice(),
+                    [NirExpr::Var(x), NirExpr::Var(extra)] if x == "x" && extra == "__capture_f_extra_0"
+                )
+    ));
+
+    let lambda = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__lambda_bump_") && function.name.ends_with("__i64")
+        })
+        .expect("expected monomorphized captured generic lambda specialization");
+    assert!(lambda.generic_params.is_empty());
+    assert_eq!(lambda.params.len(), 2);
+    let capture_param_name = lambda.params[1].name.clone();
+    assert!(matches!(
+        lambda.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee == "impl.Addable.for.i64.add"
+                && matches!(
+                    args.as_slice(),
+                    [NirExpr::Var(lhs), NirExpr::Var(rhs)]
+                        if lhs == "x" && rhs == &capture_param_name
+                )
+    ));
+}
+
+#[test]
+fn lowers_capturing_generic_lambda_explicit_trait_call_with_present_bound() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          fn apply<T: Addable>(x: T, f: Fn1<T, T>) -> T {
+            return f(x);
+          }
+
+          fn bump<T: Addable>(value: T, extra: T) -> T {
+            return apply(value, |x: T| -> T { return Addable.add(x, extra); });
+          }
+
+          fn main() -> i64 {
+            return bump(2, 3);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let higher_order_concrete = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__hof_apply_") && function.name.ends_with("__i64")
+        })
+        .expect("expected monomorphized higher-order helper");
+    assert!(higher_order_concrete.generic_params.is_empty());
+    assert_eq!(higher_order_concrete.params.len(), 2);
+    assert!(matches!(
+        higher_order_concrete.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee.starts_with("__lambda_bump_")
+                && matches!(
+                    args.as_slice(),
+                    [NirExpr::Var(x), NirExpr::Var(extra)] if x == "x" && extra == "__capture_f_extra_0"
+                )
+    ));
+
+    let lambda = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__lambda_bump_") && function.name.ends_with("__i64")
+        })
+        .expect("expected monomorphized explicit-trait captured generic lambda specialization");
+    assert!(lambda.generic_params.is_empty());
+    let capture_param_name = lambda.params[1].name.clone();
+    assert!(matches!(
+        lambda.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee == "impl.Addable.for.i64.add"
+                && matches!(
+                    args.as_slice(),
+                    [NirExpr::Var(lhs), NirExpr::Var(rhs)]
+                        if lhs == "x" && rhs == &capture_param_name
+                )
+    ));
+}
+
+#[test]
+fn lowers_capturing_generic_lambda_operator_call_with_present_bound() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          fn apply<T: Addable>(x: T, f: Fn1<T, T>) -> T {
+            return f(x);
+          }
+
+          fn bump<T: Addable>(value: T, extra: T) -> T {
+            return apply(value, |x: T| -> T { return x + extra; });
+          }
+
+          fn main() -> i64 {
+            return bump(2, 3);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let higher_order_concrete = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__hof_apply_") && function.name.ends_with("__i64")
+        })
+        .expect("expected monomorphized higher-order helper");
+    assert!(higher_order_concrete.generic_params.is_empty());
+    assert_eq!(higher_order_concrete.params.len(), 2);
+    assert!(matches!(
+        higher_order_concrete.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee.starts_with("__lambda_bump_")
+                && matches!(
+                    args.as_slice(),
+                    [NirExpr::Var(x), NirExpr::Var(extra)] if x == "x" && extra == "__capture_f_extra_0"
+                )
+    ));
+
+    let lambda = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__lambda_bump_") && function.name.ends_with("__i64")
+        })
+        .expect("expected monomorphized operator captured generic lambda specialization");
+    assert!(lambda.generic_params.is_empty());
+    let capture_param_name = lambda.params[1].name.clone();
+    assert!(matches!(
+        lambda.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Binary { lhs, rhs, .. }))]
+            if matches!(lhs.as_ref(), NirExpr::Var(name) if name == "x")
+                && matches!(rhs.as_ref(), NirExpr::Var(name) if name == &capture_param_name)
+    ));
+}
+
+#[test]
+fn lowers_capturing_generic_lambda_equality_operator_with_present_bound() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          struct Pair {
+            value: i64,
+          }
+
+          trait Equatable {
+            fn eq(lhs: Self, rhs: Self) -> bool;
+          }
+
+          impl Equatable for Pair {
+            fn eq(lhs: Pair, rhs: Pair) -> bool {
+              return lhs.value == rhs.value;
+            }
+          }
+
+          fn apply<T: Equatable>(x: T, f: Fn1<T, bool>) -> bool {
+            return f(x);
+          }
+
+          fn same<T: Equatable>(value: T, other: T) -> bool {
+            return apply(value, |x: T| -> bool { return x == other; });
+          }
+
+          fn main() -> i64 {
+            let lhs: Pair = Pair { value: 2 };
+            let rhs: Pair = Pair { value: 2 };
+            if same(lhs, rhs) {
+              return 1;
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let higher_order_concrete = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__hof_apply_") && function.name.ends_with("__Pair")
+        })
+        .expect("expected monomorphized bool-returning higher-order helper");
+    assert!(higher_order_concrete.generic_params.is_empty());
+    assert_eq!(higher_order_concrete.params.len(), 2);
+    assert!(matches!(
+        higher_order_concrete.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee.starts_with("__lambda_same_")
+                && matches!(
+                    args.as_slice(),
+                    [NirExpr::Var(x), NirExpr::Var(other)]
+                        if x == "x" && other == "__capture_f_other_0"
+                )
+    ));
+
+    let lambda = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__lambda_same_") && function.name.ends_with("__Pair")
+        })
+        .expect("expected monomorphized equality captured generic lambda specialization");
+    assert!(lambda.generic_params.is_empty());
+    assert_eq!(lambda.params.len(), 2);
+    let capture_param_name = lambda.params[1].name.clone();
+    assert!(matches!(
+        lambda.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee == "impl.Equatable.for.Pair.eq"
+                && matches!(
+                    args.as_slice(),
+                    [NirExpr::Var(lhs), NirExpr::Var(rhs)]
+                        if lhs == "x" && rhs == &capture_param_name
+                )
+    ));
+}
+
+#[test]
+fn lowers_generic_lambda_unary_neg_with_present_bound() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          struct Pair {
+            value: i64,
+          }
+
+          trait Negatable {
+            fn neg(value: Self) -> Self;
+          }
+
+          impl Negatable for Pair {
+            fn neg(value: Pair) -> Pair {
+              return Pair { value: 0 - value.value };
+            }
+          }
+
+          fn apply<T: Negatable>(x: T, f: Fn1<T, T>) -> T {
+            return f(x);
+          }
+
+          fn flip<T: Negatable>(value: T) -> T {
+            return apply(value, |x: T| -> T { return -x; });
+          }
+
+          fn main() -> i64 {
+            return flip(Pair { value: 7 }).value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let higher_order_concrete = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__hof_apply_") && function.name.ends_with("__Pair")
+        })
+        .expect("expected monomorphized unary-neg higher-order helper");
+    assert!(higher_order_concrete.generic_params.is_empty());
+    assert!(matches!(
+        higher_order_concrete.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee.starts_with("__lambda_flip_")
+                && matches!(args.as_slice(), [NirExpr::Var(x)] if x == "x")
+    ));
+
+    let lambda = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__lambda_flip_") && function.name.ends_with("__Pair")
+        })
+        .expect("expected monomorphized unary-neg generic lambda specialization");
+    assert!(lambda.generic_params.is_empty());
+    assert!(matches!(
+        lambda.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee == "impl.Negatable.for.Pair.neg"
+                && matches!(args.as_slice(), [NirExpr::Var(value)] if value == "x")
+    ));
+}
+
+#[test]
+fn lowers_capturing_generic_lambda_inequality_operator_with_present_bound() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          struct Pair {
+            value: i64,
+          }
+
+          trait Equatable {
+            fn eq(lhs: Self, rhs: Self) -> bool;
+          }
+
+          impl Equatable for Pair {
+            fn eq(lhs: Pair, rhs: Pair) -> bool {
+              return lhs.value == rhs.value;
+            }
+          }
+
+          fn apply<T: Equatable>(x: T, f: Fn1<T, bool>) -> bool {
+            return f(x);
+          }
+
+          fn different<T: Equatable>(value: T, other: T) -> bool {
+            return apply(value, |x: T| -> bool { return x != other; });
+          }
+
+          fn main() -> i64 {
+            let lhs: Pair = Pair { value: 2 };
+            let rhs: Pair = Pair { value: 3 };
+            if different(lhs, rhs) {
+              return 1;
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let higher_order_concrete = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__hof_apply_") && function.name.ends_with("__Pair")
+        })
+        .expect("expected monomorphized bool-returning inequality helper");
+    assert!(higher_order_concrete.generic_params.is_empty());
+    assert_eq!(higher_order_concrete.params.len(), 2);
+    assert!(matches!(
+        higher_order_concrete.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee.starts_with("__lambda_different_")
+                && matches!(
+                    args.as_slice(),
+                    [NirExpr::Var(x), NirExpr::Var(other)]
+                        if x == "x" && other == "__capture_f_other_0"
+                )
+    ));
+
+    let lambda = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__lambda_different_") && function.name.ends_with("__Pair")
+        })
+        .expect("expected monomorphized inequality captured generic lambda specialization");
+    assert!(lambda.generic_params.is_empty());
+    let capture_param_name = lambda.params[1].name.clone();
+    assert!(matches!(
+        lambda.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Binary { lhs, rhs, .. }))]
+            if matches!(
+                lhs.as_ref(),
+                NirExpr::Call { callee, args }
+                    if callee == "impl.Equatable.for.Pair.eq"
+                        && matches!(
+                            args.as_slice(),
+                            [NirExpr::Var(lhs), NirExpr::Var(rhs)]
+                                if lhs == "x" && rhs == &capture_param_name
+                        )
+            ) && matches!(rhs.as_ref(), NirExpr::Bool(false))
+    ));
+}
+
+#[test]
+fn lowers_capturing_generic_lambda_ordering_operator_with_present_bound() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          struct Pair {
+            value: i64,
+          }
+
+          trait Orderable {
+            fn lt(lhs: Self, rhs: Self) -> bool;
+            fn le(lhs: Self, rhs: Self) -> bool;
+            fn gt(lhs: Self, rhs: Self) -> bool;
+            fn ge(lhs: Self, rhs: Self) -> bool;
+          }
+
+          impl Orderable for Pair {
+            fn lt(lhs: Pair, rhs: Pair) -> bool {
+              return lhs.value < rhs.value;
+            }
+
+            fn le(lhs: Pair, rhs: Pair) -> bool {
+              return lhs.value <= rhs.value;
+            }
+
+            fn gt(lhs: Pair, rhs: Pair) -> bool {
+              return lhs.value > rhs.value;
+            }
+
+            fn ge(lhs: Pair, rhs: Pair) -> bool {
+              return lhs.value >= rhs.value;
+            }
+          }
+
+          fn apply<T: Orderable>(x: T, f: Fn1<T, bool>) -> bool {
+            return f(x);
+          }
+
+          fn less<T: Orderable>(value: T, other: T) -> bool {
+            return apply(value, |x: T| -> bool { return x < other; });
+          }
+
+          fn main() -> i64 {
+            let lhs: Pair = Pair { value: 2 };
+            let rhs: Pair = Pair { value: 3 };
+            if less(lhs, rhs) {
+              return 1;
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let higher_order_concrete = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__hof_apply_") && function.name.ends_with("__Pair")
+        })
+        .expect("expected monomorphized bool-returning ordering helper");
+    assert!(higher_order_concrete.generic_params.is_empty());
+    assert_eq!(higher_order_concrete.params.len(), 2);
+    assert!(matches!(
+        higher_order_concrete.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee.starts_with("__lambda_less_")
+                && matches!(
+                    args.as_slice(),
+                    [NirExpr::Var(x), NirExpr::Var(other)]
+                        if x == "x" && other == "__capture_f_other_0"
+                )
+    ));
+
+    let lambda = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__lambda_less_") && function.name.ends_with("__Pair")
+        })
+        .expect("expected monomorphized ordering captured generic lambda specialization");
+    assert!(lambda.generic_params.is_empty());
+    let capture_param_name = lambda.params[1].name.clone();
+    assert!(matches!(
+        lambda.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee == "impl.Orderable.for.Pair.lt"
+                && matches!(
+                    args.as_slice(),
+                    [NirExpr::Var(lhs), NirExpr::Var(rhs)]
+                        if lhs == "x" && rhs == &capture_param_name
+                )
+    ));
+}
+
+#[test]
+fn lowers_capturing_generic_lambda_ordering_le_operator_with_present_bound() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          struct Pair {
+            value: i64,
+          }
+
+          trait Orderable {
+            fn lt(lhs: Self, rhs: Self) -> bool;
+            fn le(lhs: Self, rhs: Self) -> bool;
+            fn gt(lhs: Self, rhs: Self) -> bool;
+            fn ge(lhs: Self, rhs: Self) -> bool;
+          }
+
+          impl Orderable for Pair {
+            fn lt(lhs: Pair, rhs: Pair) -> bool {
+              return lhs.value < rhs.value;
+            }
+
+            fn le(lhs: Pair, rhs: Pair) -> bool {
+              return lhs.value <= rhs.value;
+            }
+
+            fn gt(lhs: Pair, rhs: Pair) -> bool {
+              return lhs.value > rhs.value;
+            }
+
+            fn ge(lhs: Pair, rhs: Pair) -> bool {
+              return lhs.value >= rhs.value;
+            }
+          }
+
+          fn apply<T: Orderable>(x: T, f: Fn1<T, bool>) -> bool {
+            return f(x);
+          }
+
+          fn less_eq<T: Orderable>(value: T, other: T) -> bool {
+            return apply(value, |x: T| -> bool { return x <= other; });
+          }
+
+          fn main() -> i64 {
+            let lhs: Pair = Pair { value: 2 };
+            let rhs: Pair = Pair { value: 3 };
+            if less_eq(lhs, rhs) {
+              return 1;
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let higher_order_concrete = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__hof_apply_") && function.name.ends_with("__Pair")
+        })
+        .expect("expected monomorphized bool-returning ordering <= helper");
+    assert!(higher_order_concrete.generic_params.is_empty());
+    assert_eq!(higher_order_concrete.params.len(), 2);
+    assert!(matches!(
+        higher_order_concrete.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee.starts_with("__lambda_less_eq_")
+                && matches!(
+                    args.as_slice(),
+                    [NirExpr::Var(x), NirExpr::Var(other)]
+                        if x == "x" && other == "__capture_f_other_0"
+                )
+    ));
+
+    let lambda = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__lambda_less_eq_") && function.name.ends_with("__Pair")
+        })
+        .expect("expected monomorphized ordering <= captured generic lambda specialization");
+    assert!(lambda.generic_params.is_empty());
+    let capture_param_name = lambda.params[1].name.clone();
+    assert!(matches!(
+        lambda.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee == "impl.Orderable.for.Pair.le"
+                && matches!(
+                    args.as_slice(),
+                    [NirExpr::Var(lhs), NirExpr::Var(rhs)]
+                        if lhs == "x" && rhs == &capture_param_name
+                )
+    ));
+}
+
+#[test]
+fn lowers_capturing_generic_lambda_ordering_gt_operator_with_present_bound() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          struct Pair {
+            value: i64,
+          }
+
+          trait Orderable {
+            fn lt(lhs: Self, rhs: Self) -> bool;
+            fn le(lhs: Self, rhs: Self) -> bool;
+            fn gt(lhs: Self, rhs: Self) -> bool;
+            fn ge(lhs: Self, rhs: Self) -> bool;
+          }
+
+          impl Orderable for Pair {
+            fn lt(lhs: Pair, rhs: Pair) -> bool {
+              return lhs.value < rhs.value;
+            }
+
+            fn le(lhs: Pair, rhs: Pair) -> bool {
+              return lhs.value <= rhs.value;
+            }
+
+            fn gt(lhs: Pair, rhs: Pair) -> bool {
+              return lhs.value > rhs.value;
+            }
+
+            fn ge(lhs: Pair, rhs: Pair) -> bool {
+              return lhs.value >= rhs.value;
+            }
+          }
+
+          fn apply<T: Orderable>(x: T, f: Fn1<T, bool>) -> bool {
+            return f(x);
+          }
+
+          fn greater<T: Orderable>(value: T, other: T) -> bool {
+            return apply(value, |x: T| -> bool { return x > other; });
+          }
+
+          fn main() -> i64 {
+            let lhs: Pair = Pair { value: 3 };
+            let rhs: Pair = Pair { value: 2 };
+            if greater(lhs, rhs) {
+              return 1;
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let higher_order_concrete = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__hof_apply_") && function.name.ends_with("__Pair")
+        })
+        .expect("expected monomorphized bool-returning ordering > helper");
+    assert!(higher_order_concrete.generic_params.is_empty());
+    assert_eq!(higher_order_concrete.params.len(), 2);
+    assert!(matches!(
+        higher_order_concrete.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee.starts_with("__lambda_greater_")
+                && matches!(
+                    args.as_slice(),
+                    [NirExpr::Var(x), NirExpr::Var(other)]
+                        if x == "x" && other == "__capture_f_other_0"
+                )
+    ));
+
+    let lambda = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__lambda_greater_") && function.name.ends_with("__Pair")
+        })
+        .expect("expected monomorphized ordering > captured generic lambda specialization");
+    assert!(lambda.generic_params.is_empty());
+    let capture_param_name = lambda.params[1].name.clone();
+    assert!(matches!(
+        lambda.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee == "impl.Orderable.for.Pair.gt"
+                && matches!(
+                    args.as_slice(),
+                    [NirExpr::Var(lhs), NirExpr::Var(rhs)]
+                        if lhs == "x" && rhs == &capture_param_name
+                )
+    ));
+}
+
+#[test]
+fn lowers_capturing_generic_lambda_ordering_ge_operator_with_present_bound() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          struct Pair {
+            value: i64,
+          }
+
+          trait Orderable {
+            fn lt(lhs: Self, rhs: Self) -> bool;
+            fn le(lhs: Self, rhs: Self) -> bool;
+            fn gt(lhs: Self, rhs: Self) -> bool;
+            fn ge(lhs: Self, rhs: Self) -> bool;
+          }
+
+          impl Orderable for Pair {
+            fn lt(lhs: Pair, rhs: Pair) -> bool {
+              return lhs.value < rhs.value;
+            }
+
+            fn le(lhs: Pair, rhs: Pair) -> bool {
+              return lhs.value <= rhs.value;
+            }
+
+            fn gt(lhs: Pair, rhs: Pair) -> bool {
+              return lhs.value > rhs.value;
+            }
+
+            fn ge(lhs: Pair, rhs: Pair) -> bool {
+              return lhs.value >= rhs.value;
+            }
+          }
+
+          fn apply<T: Orderable>(x: T, f: Fn1<T, bool>) -> bool {
+            return f(x);
+          }
+
+          fn greater_eq<T: Orderable>(value: T, other: T) -> bool {
+            return apply(value, |x: T| -> bool { return x >= other; });
+          }
+
+          fn main() -> i64 {
+            let lhs: Pair = Pair { value: 3 };
+            let rhs: Pair = Pair { value: 2 };
+            if greater_eq(lhs, rhs) {
+              return 1;
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let higher_order_concrete = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__hof_apply_") && function.name.ends_with("__Pair")
+        })
+        .expect("expected monomorphized bool-returning ordering >= helper");
+    assert!(higher_order_concrete.generic_params.is_empty());
+    assert_eq!(higher_order_concrete.params.len(), 2);
+    assert!(matches!(
+        higher_order_concrete.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee.starts_with("__lambda_greater_eq_")
+                && matches!(
+                    args.as_slice(),
+                    [NirExpr::Var(x), NirExpr::Var(other)]
+                        if x == "x" && other == "__capture_f_other_0"
+                )
+    ));
+
+    let lambda = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__lambda_greater_eq_")
+                && function.name.ends_with("__Pair")
+        })
+        .expect("expected monomorphized ordering >= captured generic lambda specialization");
+    assert!(lambda.generic_params.is_empty());
+    let capture_param_name = lambda.params[1].name.clone();
+    assert!(matches!(
+        lambda.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee == "impl.Orderable.for.Pair.ge"
+                && matches!(
+                    args.as_slice(),
+                    [NirExpr::Var(lhs), NirExpr::Var(rhs)]
+                        if lhs == "x" && rhs == &capture_param_name
+                )
+    ));
+}
+
+#[test]
+fn lowers_generic_lambda_unary_not_with_present_bound() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          struct Pair {
+            value: i64,
+          }
+
+          trait Notable {
+            fn not(value: Self) -> bool;
+          }
+
+          impl Notable for Pair {
+            fn not(value: Pair) -> bool {
+              return value.value == 0;
+            }
+          }
+
+          fn apply<T: Notable>(x: T, f: Fn1<T, bool>) -> bool {
+            return f(x);
+          }
+
+          fn empty<T: Notable>(value: T) -> bool {
+            return apply(value, |x: T| -> bool { return !x; });
+          }
+
+          fn main() -> i64 {
+            let value: Pair = Pair { value: 0 };
+            if empty(value) {
+              return 1;
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let higher_order_concrete = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__hof_apply_") && function.name.ends_with("__Pair")
+        })
+        .expect("expected monomorphized unary-not higher-order helper");
+    assert!(higher_order_concrete.generic_params.is_empty());
+    assert!(matches!(
+        higher_order_concrete.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee.starts_with("__lambda_empty_")
+                && matches!(args.as_slice(), [NirExpr::Var(x)] if x == "x")
+    ));
+
+    let lambda = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__lambda_empty_") && function.name.ends_with("__Pair")
+        })
+        .expect("expected monomorphized unary-not generic lambda specialization");
+    assert!(lambda.generic_params.is_empty());
+    assert!(matches!(
+        lambda.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee == "impl.Notable.for.Pair.not"
+                && matches!(args.as_slice(), [NirExpr::Var(value)] if value == "x")
+    ));
+}
+
+#[test]
+fn lowers_capturing_generic_lambda_with_bound_inside_nested_while_match() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          trait Addable {
+            fn add(lhs: Self, rhs: Self) -> Self;
+          }
+
+          impl Addable for i64 {
+            fn add(lhs: i64, rhs: i64) -> i64 {
+              return lhs + rhs;
+            }
+          }
+
+          fn apply<T: Addable>(x: T, f: Fn1<T, T>) -> T {
+            return f(x);
+          }
+
+          fn choose<T: Addable>(value: T, extra: T, mode: i64) -> T {
+            while mode > 0 {
+              match mode {
+                1 => {
+                  return apply(value, |x: T| -> T { return x.add(extra); });
+                }
+                _ => {
+                  return value;
+                }
+              }
+            }
+            return value;
+          }
+
+          fn main() -> i64 {
+            return choose(2, 3, 1);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let helper = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__hof_apply_") && function.name.ends_with("__i64")
+        })
+        .expect("expected monomorphized higher-order helper inside nested control flow");
+    assert!(helper.generic_params.is_empty());
+    assert_eq!(helper.params.len(), 2);
+    assert!(matches!(
+        helper.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee.starts_with("__lambda_choose_")
+                && matches!(
+                    args.as_slice(),
+                    [NirExpr::Var(x), NirExpr::Var(extra)] if x == "x" && extra == "__capture_f_extra_0"
+                )
+    ));
+
+    let lambda = module
+        .functions
+        .iter()
+        .find(|function| {
+            function.name.starts_with("__lambda_choose_") && function.name.ends_with("__i64")
+        })
+        .expect("expected monomorphized captured lambda inside nested control flow");
+    assert!(lambda.generic_params.is_empty());
+    let capture_param_name = lambda.params[1].name.clone();
+    assert!(matches!(
+        lambda.body.as_slice(),
+        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+            if callee == "impl.Addable.for.i64.add"
+                && matches!(
+                    args.as_slice(),
+                    [NirExpr::Var(lhs), NirExpr::Var(rhs)]
+                        if lhs == "x" && rhs == &capture_param_name
+                )
+    ));
+
+    let choose = module
+        .functions
+        .iter()
+        .find(|function| function.name == "choose__i64")
+        .expect("expected monomorphized control-flow generic function");
+    assert!(matches!(
+        choose.body.first(),
+        Some(NirStmt::While { body, .. })
+            if matches!(
+                body.as_slice(),
+                [NirStmt::If { then_body, else_body, .. }]
+                    if matches!(
+                        then_body.as_slice(),
+                        [NirStmt::Return(Some(NirExpr::Call { callee, args }))]
+                            if callee == &helper.name
+                                && matches!(
+                                    args.as_slice(),
+                                    [NirExpr::Var(value), NirExpr::Var(extra)]
+                                        if value == "value" && extra == "extra"
+                                )
+                    ) && matches!(
+                        else_body.as_slice(),
+                        [NirStmt::Return(Some(NirExpr::Var(name)))] if name == "value"
+                    )
+            )
     ));
 }
 

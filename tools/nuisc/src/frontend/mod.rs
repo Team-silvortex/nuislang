@@ -39,8 +39,20 @@ mod tests_control_flow;
 mod tests_destructure_let;
 #[cfg(test)]
 mod tests_frontend_core;
+
+// Generic specialization and higher-order behavior.
+#[cfg(test)]
+mod tests_generics;
+#[cfg(test)]
+mod tests_generic_structs;
 #[cfg(test)]
 mod tests_generic_constraints;
+#[cfg(test)]
+mod tests_higher_order;
+#[cfg(test)]
+mod tests_lambda_higher_order;
+
+// Generic method-bound validation across surface shapes.
 #[cfg(test)]
 mod tests_generic_destructure_let;
 #[cfg(test)]
@@ -53,14 +65,8 @@ mod tests_generic_method_bounds_if_bindings;
 mod tests_generic_method_bounds_lambda_bindings;
 #[cfg(test)]
 mod tests_generic_method_bounds_nested_match;
-#[cfg(test)]
-mod tests_generic_structs;
-#[cfg(test)]
-mod tests_generics;
-#[cfg(test)]
-mod tests_higher_order;
-#[cfg(test)]
-mod tests_lambda_higher_order;
+
+// Pattern/control-flow surface coverage.
 #[cfg(test)]
 mod tests_match_patterns;
 #[cfg(test)]

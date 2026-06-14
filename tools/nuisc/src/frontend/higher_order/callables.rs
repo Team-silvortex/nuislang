@@ -75,15 +75,82 @@ pub(crate) fn function_type_matches_callable(
                 .map(|ty| ast_type_from_nir(&ty)),
         ))
         .collect::<Result<Vec<_>, _>>()?;
-    let mut substitutions = BTreeMap::<String, AstTypeRef>::new();
+    let callable_generic_names = callable
+        .generic_params
+        .iter()
+        .map(|param| param.name.clone())
+        .collect::<BTreeSet<_>>();
+    let mut expected_substitutions = BTreeMap::<String, AstTypeRef>::new();
+    let mut callable_substitutions = BTreeMap::<String, AstTypeRef>::new();
     for (expected_part, callable_part) in expected_parts.iter().zip(callable_parts.iter()) {
-        unify_generic_type_pattern(
+        unify_callable_type_parts(
             expected_part,
             callable_part,
             generic_names,
-            &mut substitutions,
+            &callable_generic_names,
+            &mut expected_substitutions,
+            &mut callable_substitutions,
             &callable.name,
         )?;
     }
     Ok(true)
+}
+
+fn unify_callable_type_parts(
+    expected: &AstTypeRef,
+    callable: &AstTypeRef,
+    expected_generic_names: &BTreeSet<String>,
+    callable_generic_names: &BTreeSet<String>,
+    expected_substitutions: &mut BTreeMap<String, AstTypeRef>,
+    callable_substitutions: &mut BTreeMap<String, AstTypeRef>,
+    context: &str,
+) -> Result<(), String> {
+    if expected.name != callable.name {
+        if expected_generic_names.contains(&expected.name) {
+            return unify_generic_type_pattern(
+                expected,
+                callable,
+                expected_generic_names,
+                expected_substitutions,
+                context,
+            );
+        }
+        if callable_generic_names.contains(&callable.name) {
+            return unify_generic_type_pattern(
+                callable,
+                expected,
+                callable_generic_names,
+                callable_substitutions,
+                context,
+            );
+        }
+        return Err(format!(
+            "callable type mismatch: expected `{}` but found `{}`",
+            expected.name, callable.name
+        ));
+    }
+    if expected.is_optional != callable.is_optional || expected.is_ref != callable.is_ref {
+        return Err(format!(
+            "callable type qualifier mismatch: expected `{}` but found `{}`",
+            expected.name, callable.name
+        ));
+    }
+    if expected.generic_args.len() != callable.generic_args.len() {
+        return Err(format!(
+            "callable type arity mismatch: expected `{}` but found `{}`",
+            expected.name, callable.name
+        ));
+    }
+    for (expected_arg, callable_arg) in expected.generic_args.iter().zip(&callable.generic_args) {
+        unify_callable_type_parts(
+            expected_arg,
+            callable_arg,
+            expected_generic_names,
+            callable_generic_names,
+            expected_substitutions,
+            callable_substitutions,
+            context,
+        )?;
+    }
+    Ok(())
 }

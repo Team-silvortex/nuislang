@@ -64,6 +64,9 @@ The goal is to make the current gate story easier to trust and rename cleanly:
 * current `0.19` docs should say what those gates actually defend
 * current project-backed anchors should stay the primary evidence:
   `state`, `task`, `memory`, `shader`, `network`
+* frontend regression ownership should be easier to place without reading the
+  whole test tree by hand:
+  [versioning/nuis-0.19.0-frontend-test-map.md](/Users/Shared/chroot/dev/nuislang/docs/versioning/nuis-0.19.0-frontend-test-map.md)
 
 Short rule:
 
